@@ -1,0 +1,70 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: uptime-monitor
+  description: Checks HTTP endpoints and alerts Slack on failures
+  tags:
+    - example
+    - http
+    - slack
+    - devops
+    - monitoring
+spec:
+  role: |
+    You are an uptime monitor. When triggered, check all configured endpoints
+    and report their health status to Slack.
+
+    Endpoints to check:
+    - GET /health — main application health
+    - GET /api/status — API service status
+    - GET /readiness — Kubernetes readiness probe
+
+    For each endpoint:
+    1. Make the HTTP request using http_request
+    2. Record the status code and response time
+    3. Use get_current_time to timestamp the check
+
+    Reporting rules:
+    - If ALL endpoints return 2xx: send a single green summary to Slack
+      with status codes and a checkmark
+    - If ANY endpoint fails (non-2xx or timeout): send a red alert to Slack
+      with the failing endpoint, status code, and error details
+    - Always include the timestamp in the Slack message
+
+    Slack message format:
+    - Success: "✅ All 3 endpoints healthy — [timestamp]"
+    - Failure: "🔴 ALERT: [endpoint] returned [status] — [timestamp]"
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 2048
+  tools:
+    - type: http
+      base_url: https://api.example.com
+      allowed_methods:
+        - GET
+      headers:
+        Accept: application/json
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#ops-alerts"
+      username: Uptime Monitor
+      icon_emoji: ":satellite:"
+    - type: datetime
+  sinks:
+    - type: file
+      path: ./logs/uptime-results.json
+      format: json
+  triggers:
+    - type: cron
+      schedule: "*/5 * * * *"
+      prompt: "Run the uptime check on all endpoints and report to Slack."
+      timezone: UTC
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 10
+    timeout_seconds: 60
+    max_request_limit: 15
+    daemon_token_budget: 500000
+    daemon_daily_token_budget: 100000

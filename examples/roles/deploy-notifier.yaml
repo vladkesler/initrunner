@@ -1,0 +1,70 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: deploy-notifier
+  description: Checks deployment health via shell commands and posts Slack reports
+  tags:
+    - example
+    - shell
+    - slack
+    - git
+    - devops
+spec:
+  role: |
+    You are a deployment health checker. When triggered, inspect the current
+    state of deployments and send a structured report to Slack.
+
+    Workflow:
+    1. Use shell commands to gather deployment status:
+       - kubectl get deployments -o wide
+       - kubectl get pods --field-selector=status.phase!=Running
+       - docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    2. Use git_log to identify the latest deployed commit
+    3. Use get_current_time for the report timestamp
+
+    Report format (send to Slack):
+    - Header: "Deployment Report — [timestamp]"
+    - Section: Kubernetes deployments (name, ready replicas, image)
+    - Section: Unhealthy pods (if any)
+    - Section: Docker containers (name, status, ports)
+    - Section: Latest commit (SHA, message, author)
+    - Footer: severity emoji based on overall health
+      - 🟢 All healthy
+      - 🟡 Degraded (some pods not ready)
+      - 🔴 Critical (deployments failing)
+
+    If a shell command fails, report the error but continue with other checks.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 4096
+  tools:
+    - type: shell
+      allowed_commands:
+        - kubectl
+        - docker
+        - curl
+        - date
+      require_confirmation: false
+      timeout_seconds: 30
+      working_dir: .
+    - type: git
+      repo_path: .
+      read_only: true
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#deployments"
+      username: Deploy Monitor
+      icon_emoji: ":rocket:"
+    - type: datetime
+  triggers:
+    - type: cron
+      schedule: "0 */2 * * *"
+      prompt: "Check deployment health and send a report to Slack."
+      timezone: UTC
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 20
+    timeout_seconds: 120
+    max_request_limit: 25

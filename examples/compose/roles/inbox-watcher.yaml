@@ -1,0 +1,24 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: inbox-watcher
+  description: Monitors inbox and forwards new messages
+  tags:
+    - compose
+    - email
+spec:
+  role: >
+    You are an inbox monitor. When triggered, summarize the incoming
+    email content and forward it for triage. Output a concise summary
+    including sender, subject, and key points.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+  triggers:
+    - type: cron
+      schedule: "*/5 * * * *"
+      prompt: "Check for new emails and summarize any unread messages."
+  guardrails:
+    max_tokens_per_run: 2000
+    timeout_seconds: 30

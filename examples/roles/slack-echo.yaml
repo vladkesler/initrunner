@@ -1,0 +1,20 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: slack-echo
+  description: Echo messages to Slack
+  tags: [example, slack]
+spec:
+  role: |
+    You are a Slack notifier. When the user gives you a message, send it
+    to Slack using send_slack_message. Confirm what you sent.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+  tools:
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+  guardrails:
+    max_tokens_per_run: 5000
+    max_tool_calls: 3
+    timeout_seconds: 30

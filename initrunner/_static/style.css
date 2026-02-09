@@ -1,0 +1,73 @@
+/* InitRunner dashboard overrides */
+
+/* Smooth transition for HTMX swaps */
+.htmx-settling {
+    opacity: 1;
+}
+.htmx-swapping {
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
+/* Chat scroll container */
+.chat-messages {
+    scroll-behavior: smooth;
+    overflow-y: auto;
+}
+
+/* Monospace for code-like content */
+.mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 0.875rem;
+}
+
+/* Pulse indicator for streaming */
+.streaming-indicator::after {
+    content: "\25CF";
+    animation: pulse 1s ease-in-out infinite;
+    margin-left: 0.25rem;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Drawer backdrop */
+.drawer-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Truncate long text in table cells */
+.truncate-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* YAML content display */
+.yaml-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    tab-size: 2;
+}
+
+/* Facehash avatar 3D tilt */
+.facehash-wrap {
+    perspective: 600px;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+.facehash-wrap > svg {
+    transform: rotateX(var(--rot-x, 0deg)) rotateY(var(--rot-y, 0deg));
+    transition: transform 0.3s ease;
+}
+.facehash-wrap:hover > svg {
+    transform: rotateX(0deg) rotateY(0deg);
+}
+
+/* Event log auto-scroll */
+.event-log {
+    max-height: 500px;
+    overflow-y: auto;
+}

@@ -1,0 +1,55 @@
+apiVersion: initrunner/v1
+kind: Compose
+metadata:
+  name: content-pipeline
+  description: >
+    Multi-agent content creation pipeline. A file watcher monitors ./drafts/
+    for new markdown or text files, extracts the topic, and delegates to a
+    researcher. The researcher fans out to a writer (polished output) and a
+    reviewer (QA checks). Memory is enabled for researcher and writer so they
+    build up knowledge across runs.
+spec:
+  shared_memory:
+    enabled: true
+    store_path: ./.initrunner/content-shared.db
+    max_memories: 2000
+  services:
+    content-watcher:
+      role: roles/content-watcher.yaml
+      sink:
+        type: delegate
+        target: researcher
+      health_check:
+        interval_seconds: 60
+        timeout_seconds: 15
+        retries: 5
+      environment:
+        CONTENT_DIR: ./drafts
+
+    researcher:
+      role: roles/researcher.yaml
+      depends_on:
+        - content-watcher
+      sink:
+        type: delegate
+        target:
+          - writer
+          - reviewer
+
+    writer:
+      role: roles/writer.yaml
+      depends_on:
+        - researcher
+      restart:
+        condition: on-failure
+        max_retries: 3
+        delay_seconds: 5
+
+    reviewer:
+      role: roles/reviewer.yaml
+      depends_on:
+        - researcher
+      restart:
+        condition: on-failure
+        max_retries: 2
+        delay_seconds: 5

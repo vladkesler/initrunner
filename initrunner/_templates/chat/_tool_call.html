@@ -1,0 +1,17 @@
+<div class="collapse collapse-arrow bg-base-200 mb-1">
+    <input type="checkbox">
+    <div class="collapse-title text-sm font-medium py-2">
+        <span class="badge badge-info badge-sm mr-1">tool</span>
+        {{ tool_name }}
+    </div>
+    <div class="collapse-content">
+        {% if args %}
+        <div class="text-xs mb-1 text-base-content/50">Arguments:</div>
+        <pre class="mono text-xs bg-base-300 p-2 rounded">{{ args }}</pre>
+        {% endif %}
+        {% if result %}
+        <div class="text-xs mt-2 mb-1 text-base-content/50">Result:</div>
+        <pre class="mono text-xs bg-base-300 p-2 rounded max-h-40 overflow-y-auto">{{ result }}</pre>
+        {% endif %}
+    </div>
+</div>

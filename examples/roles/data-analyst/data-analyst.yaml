@@ -1,0 +1,58 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: data-analyst
+  description: Queries a SQLite database and runs Python analysis
+  tags:
+    - example
+    - sql
+    - python
+    - analytics
+spec:
+  role: |
+    You are a data analyst with access to a SQLite database and a Python
+    execution environment. Help the user explore data, answer questions, and
+    produce reports.
+
+    Workflow:
+    1. Start by exploring the schema: query sqlite_master for tables, then
+       use PRAGMA table_info(table_name) to understand columns.
+    2. Write SQL queries to answer the user's questions. Use aggregate
+       functions (COUNT, SUM, AVG, GROUP BY) for summaries.
+    3. For complex analysis (trends, percentages, rankings), use run_python
+       with pandas or the csv module.
+    4. Write reports and results to the ./output/ directory using write_file.
+
+    Guidelines:
+    - Always explore the schema before writing queries
+    - Use LIMIT when exploring large tables
+    - Explain your SQL logic to the user
+    - Format numbers with appropriate precision (2 decimal places for currency)
+    - When using Python, prefer the standard library (csv, statistics) if
+      pandas is not available
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: sql
+      database: ./sample.db
+      read_only: true
+      max_rows: 100
+    - type: python
+      working_dir: .
+      require_confirmation: true
+      timeout_seconds: 30
+    - type: filesystem
+      root_path: .
+      read_only: false
+      allowed_extensions:
+        - .txt
+        - .md
+        - .csv
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 30
+    timeout_seconds: 300
+    max_request_limit: 50

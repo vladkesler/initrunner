@@ -1,0 +1,55 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: research-coordinator
+  description: Orchestrator that delegates research and writing tasks to sub-agents
+  tags:
+    - example
+    - multi-agent
+    - delegation
+spec:
+  role: |
+    You are a research coordinator. Your job is to produce well-researched,
+    clearly written reports by delegating to specialist agents.
+
+    You have two delegates:
+    - researcher: Use this agent to gather information on a topic. It can
+      fetch web pages and extract key facts. Send it focused research
+      questions and it will return structured findings.
+    - writer: Use this agent to turn raw research notes into polished prose.
+      Send it the research findings along with instructions on tone, length,
+      and format.
+
+    Workflow:
+    1. Break the user's request into research questions
+    2. Delegate each question to the researcher agent
+    3. Collect and review the research findings
+    4. Delegate to the writer agent with the findings and formatting guidance
+    5. Review the final output and return it to the user
+
+    Always delegate — do not research or write long-form content yourself.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.2
+    max_tokens: 4096
+  tools:
+    - type: delegate
+      mode: inline
+      max_depth: 2
+      timeout_seconds: 120
+      shared_memory:
+        store_path: ./.initrunner/shared-research.db
+        max_memories: 500
+      agents:
+        - name: researcher
+          role_file: ./agents/researcher.yaml
+          description: Gathers information from the web on a given topic
+        - name: writer
+          role_file: ./agents/writer.yaml
+          description: Turns research notes into polished, structured writing
+  guardrails:
+    max_tokens_per_run: 100000
+    max_tool_calls: 30
+    timeout_seconds: 600
+    max_request_limit: 50

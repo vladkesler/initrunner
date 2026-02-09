@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}New Role — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li>New Role</li>
+        </ul>
+    </div>
+    <h1 class="text-2xl font-bold mt-2">Create New Role</h1>
+</div>
+
+{# Tabs #}
+<div role="tablist" class="tabs tabs-bordered mb-4">
+    <input type="radio" name="create-tabs" role="tab" class="tab" aria-label="Form Builder" checked id="tab-form">
+    <div role="tabpanel" class="tab-content pt-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {# Left: Form #}
+            <div>
+                <form id="role-form" class="space-y-4" onsubmit="return false;">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Agent Name</span></label>
+                        <input type="text" name="name" class="input input-bordered" placeholder="my-agent" pattern="^[a-z0-9][a-z0-9-]*[a-z0-9]$" required id="role-name">
+                        <label class="label"><span class="label-text-alt">Lowercase letters, numbers, hyphens</span></label>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Description</span></label>
+                        <input type="text" name="description" class="input input-bordered" placeholder="A helpful agent" id="role-description">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Provider</span></label>
+                            <select name="provider" class="select select-bordered" id="role-provider">
+                                <option value="openai" selected>openai</option>
+                                <option value="anthropic">anthropic</option>
+                                <option value="google">google</option>
+                                <option value="groq">groq</option>
+                                <option value="mistral">mistral</option>
+                                <option value="cohere">cohere</option>
+                                <option value="ollama">ollama</option>
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Model</span></label>
+                            <input type="text" name="model" class="input input-bordered" value="gpt-4o-mini" id="role-model">
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">System Prompt</span></label>
+                        <textarea name="system_prompt" class="textarea textarea-bordered h-24" placeholder="You are a helpful assistant." id="role-system-prompt">You are a helpful assistant.</textarea>
+                    </div>
+
+                    {# Tools #}
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Tools</span></label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for type_name, desc in tool_types.items() %}
+                            <label class="label cursor-pointer gap-2 border border-base-300 rounded-lg px-3 py-2">
+                                <input type="checkbox" name="tools" value="{{ type_name }}" class="checkbox checkbox-sm tool-checkbox">
+                                <span class="label-text">{{ type_name }}</span>
+                                <span class="label-text-alt text-xs">{{ desc }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {# Feature toggles #}
+                    <div class="flex gap-6">
+                        <div class="form-control">
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" name="memory" class="toggle toggle-sm" id="role-memory">
+                                <span class="label-text">Memory</span>
+                            </label>
+                        </div>
+                        <div class="form-control">
+                            <label class="label cursor-pointer gap-2">
+                                <input type="checkbox" name="ingest" class="toggle toggle-sm" id="role-ingest">
+                                <span class="label-text">Ingestion (RAG)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="createRoleFromForm()">Create</button>
+                </form>
+            </div>
+
+            {# Right: Live YAML preview #}
+            <div>
+                <div class="card bg-base-100 shadow-sm sticky top-4">
+                    <div class="card-body">
+                        <h3 class="card-title text-sm">YAML Preview</h3>
+                        <pre class="mono text-sm whitespace-pre-wrap max-h-[70vh] overflow-auto" id="yaml-preview">Fill in the form to see preview...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="radio" name="create-tabs" role="tab" class="tab" aria-label="AI Generate" id="tab-ai">
+    <div role="tabpanel" class="tab-content pt-4">
+        <div class="max-w-3xl">
+            <div class="form-control">
+                <label class="label"><span class="label-text">Describe your agent</span></label>
+                <textarea id="ai-description" class="textarea textarea-bordered h-32" placeholder="A code reviewer that watches my Python repo, reads files, uses git blame, and posts summaries to Slack every Monday"></textarea>
+            </div>
+
+            <button type="button" class="btn btn-primary mt-4" onclick="generateRole()" id="ai-generate-btn">Generate</button>
+
+            <div id="ai-result" class="mt-4 hidden">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Generated YAML (editable)</span></label>
+                    <textarea id="ai-yaml" class="textarea textarea-bordered mono text-sm h-96"></textarea>
+                </div>
+                <button type="button" class="btn btn-primary mt-2" onclick="saveGeneratedRole()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Status messages #}
+<div id="create-status" class="toast toast-end hidden">
+    <div class="alert" id="create-alert">
+        <span id="create-message"></span>
+    </div>
+</div>
+
+<script>
+var _MODEL_MAP = {
+    openai: "gpt-4o-mini",
+    anthropic: "claude-sonnet-4-5-20250929",
+    google: "claude-sonnet-4-5-20250929",
+    groq: "claude-sonnet-4-5-20250929",
+    mistral: "claude-sonnet-4-5-20250929",
+    cohere: "claude-sonnet-4-5-20250929",
+    ollama: "llama3.2"
+};
+
+// Provider -> model default
+var providerEl = document.getElementById("role-provider");
+if (providerEl) {
+    providerEl.addEventListener("change", function() {
+        var m = _MODEL_MAP[this.value] || "gpt-4o-mini";
+        document.getElementById("role-model").value = m;
+        updateYamlPreview();
+    });
+}
+
+// Live preview update
+var formInputs = document.querySelectorAll("#role-form input, #role-form textarea, #role-form select");
+formInputs.forEach(function(el) {
+    el.addEventListener("input", updateYamlPreview);
+    el.addEventListener("change", updateYamlPreview);
+});
+
+function updateYamlPreview() {
+    var name = document.getElementById("role-name").value || "my-agent";
+    var desc = document.getElementById("role-description").value || "";
+    var provider = document.getElementById("role-provider").value;
+    var model = document.getElementById("role-model").value;
+    var prompt = document.getElementById("role-system-prompt").value || "You are a helpful assistant.";
+    var memory = document.getElementById("role-memory").checked;
+    var ingest = document.getElementById("role-ingest").checked;
+
+    var tools = [];
+    document.querySelectorAll(".tool-checkbox:checked").forEach(function(cb) {
+        tools.push("    - type: " + cb.value);
+    });
+
+    var lines = [
+        "apiVersion: initrunner/v1",
+        "kind: Agent",
+        "metadata:",
+        "  name: " + name,
+        "  description: " + desc,
+        "  tags: []",
+        "spec:",
+        "  role: |",
+        "    " + prompt.replace(/\n/g, "\n    "),
+        "  model:",
+        "    provider: " + provider,
+        "    name: " + model,
+        "    temperature: 0.1",
+        "    max_tokens: 4096",
+    ];
+
+    if (tools.length > 0) {
+        lines.push("  tools:");
+        tools.forEach(function(t) { lines.push(t); });
+    }
+
+    if (memory) {
+        lines.push("  memory:");
+        lines.push("    max_sessions: 10");
+        lines.push("    max_memories: 1000");
+        lines.push("    max_resume_messages: 20");
+    }
+
+    if (ingest) {
+        lines.push("  ingest:");
+        lines.push("    sources:");
+        lines.push('      - "./docs/**/*.md"');
+        lines.push("    chunking:");
+        lines.push("      strategy: fixed");
+        lines.push("      chunk_size: 512");
+        lines.push("      chunk_overlap: 50");
+    }
+
+    lines.push("  guardrails:");
+    lines.push("    max_tokens_per_run: 50000");
+    lines.push("    max_tool_calls: 20");
+    lines.push("    timeout_seconds: 300");
+    lines.push("    max_request_limit: 50");
+
+    document.getElementById("yaml-preview").textContent = lines.join("\n");
+}
+
+function showStatus(msg, isError) {
+    var el = document.getElementById("create-status");
+    var alert = document.getElementById("create-alert");
+    var msgEl = document.getElementById("create-message");
+    el.classList.remove("hidden");
+    alert.className = "alert " + (isError ? "alert-error" : "alert-success");
+    msgEl.textContent = msg;
+    setTimeout(function() { el.classList.add("hidden"); }, 5000);
+}
+
+function createRoleFromForm() {
+    var yaml = document.getElementById("yaml-preview").textContent;
+    fetch("/api/roles", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({yaml_content: yaml})
+    })
+    .then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(d) { throw new Error(d.detail || "Failed"); });
+        return resp.json();
+    })
+    .then(function(data) {
+        showStatus("Created " + data.name + "!", false);
+        setTimeout(function() { window.location.href = "/roles/" + data.id; }, 1000);
+    })
+    .catch(function(err) { showStatus(err.message, true); });
+}
+
+function generateRole() {
+    var desc = document.getElementById("ai-description").value.trim();
+    if (!desc) return;
+
+    var btn = document.getElementById("ai-generate-btn");
+    btn.disabled = true;
+    btn.textContent = "Generating...";
+
+    fetch("/api/roles/generate", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({description: desc})
+    })
+    .then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(d) { throw new Error(d.detail || "Failed"); });
+        return resp.json();
+    })
+    .then(function(data) {
+        document.getElementById("ai-yaml").value = data.yaml_content;
+        document.getElementById("ai-result").classList.remove("hidden");
+    })
+    .catch(function(err) { showStatus(err.message, true); })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = "Generate";
+    });
+}
+
+function saveGeneratedRole() {
+    var yaml = document.getElementById("ai-yaml").value;
+    fetch("/api/roles", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({yaml_content: yaml})
+    })
+    .then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(d) { throw new Error(d.detail || "Failed"); });
+        return resp.json();
+    })
+    .then(function(data) {
+        showStatus("Created " + data.name + "!", false);
+        setTimeout(function() { window.location.href = "/roles/" + data.id; }, 1000);
+    })
+    .catch(function(err) { showStatus(err.message, true); });
+}
+
+// Initial preview
+updateYamlPreview();
+</script>
+{% endblock %}

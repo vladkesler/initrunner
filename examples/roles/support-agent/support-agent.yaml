@@ -1,0 +1,49 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: support-agent
+  description: Answers questions from the support knowledge base
+  tags:
+  - support
+  - rag
+spec:
+  role: 'You are a support agent. Use search_documents to find relevant
+
+    articles before answering. Always cite your sources.
+
+    '
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  ingest:
+    sources:
+    - ./knowledge-base/**/*.html
+    - ./knowledge-base/**/*.md
+    chunking:
+      strategy: fixed
+      chunk_size: 512
+      chunk_overlap: 50
+  tools:
+  - type: filesystem
+    root_path: ./src
+    read_only: true
+    allowed_extensions: []
+  triggers:
+  - type: file_watch
+    paths:
+    - ./knowledge-base
+    extensions:
+    - .html
+    - .md
+    prompt_template: 'Knowledge base updated: {path}. Re-index.'
+    debounce_seconds: 1.0
+  - type: cron
+    schedule: 0 9 * * 1
+    prompt: Generate weekly support coverage report.
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50

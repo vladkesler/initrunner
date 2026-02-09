@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}InitRunner{% endblock %}</title>
+    <link rel="stylesheet" href="/static/daisyui.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/tailwindcss.js"></script>
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/ext/sse.js"></script>
+    <script src="/static/ext/ws.js"></script>
+    <script src="/static/app.js?v={{ app_version }}"></script>
+</head>
+<body class="min-h-screen bg-base-200" hx-boost="true">
+    {% include "_nav.html" %}
+    <main class="container mx-auto px-4 py-6 max-w-7xl">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_macros.html" import success_badge %}
+
+{% block title %}Audit Log — InitRunner{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Audit Log</h1>
+    <div class="flex gap-2">
+        <input type="text" name="agent_name" placeholder="Filter by agent..."
+               value="{{ agent_name }}"
+               class="input input-bordered input-sm w-48"
+               hx-get="/audit/table"
+               hx-trigger="keyup changed delay:300ms"
+               hx-target="#audit-table-body"
+               hx-include="[name=limit]">
+        <select name="limit" class="select select-bordered select-sm"
+                hx-get="/audit/table"
+                hx-trigger="change"
+                hx-target="#audit-table-body"
+                hx-include="[name=agent_name]">
+            <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+            <option value="500" {% if limit == 500 %}selected{% endif %}>500</option>
+        </select>
+    </div>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm w-full">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Agent</th>
+                <th>Prompt</th>
+                <th>Status</th>
+                <th>Tokens</th>
+                <th>Duration</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="audit-table-body">
+            {% include "audit/_table.html" %}
+        </tbody>
+    </table>
+</div>
+
+{# Detail drawer #}
+<div id="audit-detail" class="fixed top-0 right-0 h-full w-full max-w-lg bg-base-100 shadow-xl z-50 transform translate-x-full transition-transform duration-200 overflow-y-auto"
+     style="display:none">
+</div>
+<div id="audit-backdrop" class="fixed inset-0 drawer-backdrop z-40" style="display:none"
+     onclick="document.getElementById('audit-detail').style.display='none'; document.getElementById('audit-detail').classList.add('translate-x-full'); this.style.display='none'">
+</div>
+
+<script>
+document.body.addEventListener("htmx:afterSwap", function(event) {
+    if (event.detail.target.id === "audit-detail") {
+        var panel = document.getElementById("audit-detail");
+        var backdrop = document.getElementById("audit-backdrop");
+        panel.style.display = "block";
+        backdrop.style.display = "block";
+        requestAnimationFrame(function() {
+            panel.classList.remove("translate-x-full");
+        });
+    }
+});
+</script>
+
+{% if not records %}
+<div class="flex flex-col items-center justify-center py-12 text-base-content/50">
+    <p class="text-lg">No audit records found</p>
+    <p class="text-sm mt-1">Run an agent to generate audit entries</p>
+</div>
+{% endif %}
+{% endblock %}

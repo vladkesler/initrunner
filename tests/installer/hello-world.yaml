@@ -1,0 +1,26 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: hello-world
+  description: A friendly greeter agent
+  tags:
+  - example
+  - greeting
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: 'You are a friendly greeter. Keep your responses short, warm, and cheerful.
+
+    Always greet the user enthusiastically and ask how you can help them today.
+
+    '
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.8
+    max_tokens: 256
+  guardrails:
+    max_tokens_per_run: 5000
+    max_tool_calls: 0
+    timeout_seconds: 30
+    max_request_limit: 5

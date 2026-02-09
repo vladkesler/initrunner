@@ -1,0 +1,45 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: content-watcher
+  description: Watches ./drafts/ for new content and extracts topics for research
+  tags:
+    - compose
+    - content
+spec:
+  role: |
+    You are a content intake agent. When a file change is detected in the
+    drafts folder, read the file and produce a structured brief for the
+    research team.
+
+    Your output must include:
+    1. Topic — the main subject of the draft
+    2. Key themes — bullet list of the core ideas and subtopics covered
+    3. Research questions — specific questions that need external research
+       to strengthen the draft
+    4. Target audience — who this content is written for
+    5. Draft excerpt — a short representative quote from the original text
+
+    Be concise and actionable. The research team will use your output to
+    find supporting data, examples, and citations.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+  tools:
+    - type: filesystem
+      root_path: ./drafts/
+      read_only: true
+  triggers:
+    - type: file_watch
+      paths:
+        - ./drafts/
+      extensions:
+        - .md
+        - .txt
+      process_existing: true
+      prompt_template: "New or updated draft detected: {path}. Read the file and produce a research brief."
+      debounce_seconds: 2.0
+  guardrails:
+    max_tokens_per_run: 3000
+    timeout_seconds: 30

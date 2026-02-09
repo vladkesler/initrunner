@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — InitRunner</title>
+    <link rel="stylesheet" href="/static/daisyui.css">
+    <script src="/static/tailwindcss.js"></script>
+</head>
+<body class="min-h-screen bg-base-200 flex items-center justify-center">
+    <div class="card bg-base-100 shadow-xl w-full max-w-md">
+        <div class="card-body">
+            <h1 class="card-title text-2xl font-bold justify-center mb-2">InitRunner</h1>
+            <p class="text-center text-base-content/60 mb-4">Enter your API key to access the dashboard</p>
+
+            {% if error %}
+            <div class="alert alert-error mb-4">
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form method="POST" action="/login">
+                <div class="form-control mb-4">
+                    <label class="label" for="api_key">
+                        <span class="label-text">API Key</span>
+                    </label>
+                    <input type="password" id="api_key" name="api_key"
+                           class="input input-bordered w-full"
+                           placeholder="Enter your API key"
+                           required autofocus>
+                </div>
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+                <button type="submit" class="btn btn-primary w-full">Login</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,90 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: ci-notifier
+  description: Sends Slack notifications and updates GitHub commit status
+  tags:
+    - compose
+    - ci
+    - slack
+    - api
+spec:
+  role: |
+    You are a CI notification agent. You receive analyzed build events and:
+
+    1. Send a formatted Slack notification:
+       - Success: "✅ Build passed — [repo] @ [branch] ([sha])"
+       - Failure: "❌ Build failed — [repo] @ [branch] ([sha])\n
+         Diagnosis: [diagnosis]\nCategory: [category]"
+       - Include the build URL as a link
+       - Add a timestamp via get_current_time
+
+    2. Update the GitHub commit status using the create_commit_status API
+       endpoint:
+       - state: "success" or "failure"
+       - description: brief status message
+       - context: "ci-pipeline/initrunner"
+
+    Always send both the Slack message and the GitHub status update.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 2048
+  tools:
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#ci-alerts"
+      username: CI Pipeline
+      icon_emoji: ":construction_worker:"
+    - type: api
+      name: github-status
+      description: GitHub commit status API
+      base_url: https://api.github.com
+      headers:
+        Accept: application/vnd.github.v3+json
+        User-Agent: initrunner-ci-pipeline
+      auth:
+        Authorization: "Bearer ${GITHUB_TOKEN}"
+      endpoints:
+        - name: create_commit_status
+          method: POST
+          path: "/repos/{owner}/{repo}/statuses/{sha}"
+          description: Create a commit status check
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: sha
+              type: string
+              required: true
+              description: Full commit SHA
+            - name: state
+              type: string
+              required: true
+              description: "Status state: pending, success, failure, or error"
+            - name: description
+              type: string
+              required: false
+              description: Short status description
+            - name: context
+              type: string
+              required: false
+              default: "ci-pipeline/initrunner"
+              description: Status context identifier
+          body_template:
+            state: "{state}"
+            description: "{description}"
+            context: "{context}"
+          timeout: 15
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 15000
+    max_tool_calls: 10
+    timeout_seconds: 60
+    max_request_limit: 15

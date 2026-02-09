@@ -1,0 +1,84 @@
+<div class="p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Audit Detail</h2>
+        <button class="btn btn-ghost btn-sm"
+                onclick="document.getElementById('audit-detail').style.display='none'; document.getElementById('audit-detail').classList.add('translate-x-full'); document.getElementById('audit-backdrop').style.display='none'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="space-y-3">
+        <div>
+            <div class="text-xs text-base-content/50 uppercase">Agent</div>
+            <div class="font-medium">{{ record.agent_name }}</div>
+        </div>
+
+        <div>
+            <div class="text-xs text-base-content/50 uppercase">Run ID</div>
+            <div class="mono text-sm">{{ record.run_id }}</div>
+        </div>
+
+        <div>
+            <div class="text-xs text-base-content/50 uppercase">Timestamp</div>
+            <div>{{ record.timestamp }}</div>
+        </div>
+
+        <div>
+            <div class="text-xs text-base-content/50 uppercase">Status</div>
+            {% if record.success %}
+            <span class="badge badge-success">Success</span>
+            {% else %}
+            <span class="badge badge-error">Error</span>
+            {% endif %}
+        </div>
+
+        {% if record.trigger_type %}
+        <div>
+            <div class="text-xs text-base-content/50 uppercase">Trigger</div>
+            <span class="badge badge-warning">{{ record.trigger_type }}</span>
+        </div>
+        {% endif %}
+
+        <div class="stats stats-vertical shadow w-full">
+            <div class="stat">
+                <div class="stat-title">Tokens In</div>
+                <div class="stat-value text-lg">{{ record.tokens_in }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Tokens Out</div>
+                <div class="stat-value text-lg">{{ record.tokens_out }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Total Tokens</div>
+                <div class="stat-value text-lg">{{ record.total_tokens }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Tool Calls</div>
+                <div class="stat-value text-lg">{{ record.tool_calls }}</div>
+            </div>
+            <div class="stat">
+                <div class="stat-title">Duration</div>
+                <div class="stat-value text-lg">{{ record.duration_ms }}ms</div>
+            </div>
+        </div>
+
+        <div>
+            <div class="text-xs text-base-content/50 uppercase mb-1">Prompt</div>
+            <div class="bg-base-200 p-3 rounded-lg text-sm whitespace-pre-wrap">{{ record.user_prompt }}</div>
+        </div>
+
+        <div>
+            <div class="text-xs text-base-content/50 uppercase mb-1">Output</div>
+            <div class="bg-base-200 p-3 rounded-lg text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">{{ record.output }}</div>
+        </div>
+
+        {% if record.error %}
+        <div>
+            <div class="text-xs text-base-content/50 uppercase mb-1">Error</div>
+            <div class="bg-error/10 text-error p-3 rounded-lg text-sm">{{ record.error }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>

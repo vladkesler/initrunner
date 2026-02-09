@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Memory — {{ role_name }} — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li><a href="/roles/{{ role_id }}">{{ role_name }}</a></li>
+            <li>Memory</li>
+        </ul>
+    </div>
+    <div class="flex items-center justify-between mt-2">
+        <h1 class="text-2xl font-bold">Memory</h1>
+        <div class="flex gap-2">
+            <a href="/api/memories/{{ role_id }}/export"
+               class="btn btn-ghost btn-sm" hx-boost="false" download>Export JSON</a>
+            <button class="btn btn-error btn-sm"
+                    onclick="document.getElementById('clear-modal').showModal()">
+                Clear All
+            </button>
+        </div>
+    </div>
+</div>
+
+{# Clear confirmation modal #}
+<dialog id="clear-modal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Clear All Memories?</h3>
+        <p class="py-4">This will permanently delete all stored memories for <strong>{{ role_name }}</strong>. This action cannot be undone.</p>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost">Cancel</button>
+            </form>
+            <button class="btn btn-error"
+                    hx-delete="/roles/{{ role_id }}/memory/clear"
+                    hx-target="#memory-table-body"
+                    hx-on::after-request="document.getElementById('clear-modal').close()">
+                Clear
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<div class="flex gap-2 mb-4">
+    <input type="search" name="category" placeholder="Filter by category..."
+           class="input input-bordered input-sm w-48"
+           hx-get="/roles/{{ role_id }}/memory/table"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#memory-table-body"
+           hx-include="this">
+</div>
+
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm w-full">
+        <thead>
+            <tr>
+                <th>Created</th>
+                <th>Category</th>
+                <th>Content</th>
+            </tr>
+        </thead>
+        <tbody id="memory-table-body">
+            {% for m in memories %}
+            <tr>
+                <td class="text-xs mono whitespace-nowrap">{{ m.created_at[:19] }}</td>
+                <td><span class="badge badge-ghost badge-sm">{{ m.category or "—" }}</span></td>
+                <td class="text-sm">{{ m.content[:200] }}{% if m.content|length > 200 %}...{% endif %}</td>
+            </tr>
+            {% endfor %}
+            {% if not memories %}
+            <tr>
+                <td colspan="3" class="text-center text-base-content/50 py-8">No memories stored</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

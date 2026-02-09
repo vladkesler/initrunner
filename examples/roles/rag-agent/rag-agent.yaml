@@ -1,0 +1,52 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: rag-agent
+  description: Knowledge base Q&A agent with document ingestion
+  tags:
+    - example
+    - rag
+    - knowledge-base
+spec:
+  role: |
+    You are a helpful documentation assistant for AcmeDB. You answer user
+    questions using the ingested knowledge base.
+
+    Rules:
+    - ALWAYS call search_documents before answering a question
+    - Base your answers only on information found in the documents
+    - Cite the source document for each claim (e.g., "Per the Getting Started
+      guide, ...")
+    - If search_documents returns no relevant results, say so honestly rather
+      than guessing
+    - When a user asks about a topic covered across multiple documents,
+      synthesize the information and cite all relevant sources
+    - Use read_file to view a full document when the search snippet is not
+      enough context
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  ingest:
+    sources:
+      - ./docs/**/*.md
+    chunking:
+      strategy: paragraph
+      chunk_size: 512
+      chunk_overlap: 50
+    embeddings:
+      provider: openai
+      model: text-embedding-3-small
+      api_key_env: OPENAI_API_KEY
+  tools:
+    - type: filesystem
+      root_path: ./docs
+      read_only: true
+      allowed_extensions:
+        - .md
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15
+    timeout_seconds: 120
+    max_request_limit: 30

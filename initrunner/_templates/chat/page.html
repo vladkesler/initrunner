@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Chat — {{ role_name }} — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li><a href="/roles/{{ role_id }}">{{ role_name }}</a></li>
+            <li>Chat</li>
+        </ul>
+    </div>
+</div>
+
+<div class="drawer drawer-end">
+    <input id="history-drawer-toggle" type="checkbox" class="drawer-toggle" />
+    <div class="drawer-content">
+        {# Toolbar — must be inside drawer-content for DaisyUI grid layout #}
+        <div class="flex items-center gap-2 mb-3">
+            <button id="btn-new-chat" class="btn btn-sm btn-outline" title="Start new conversation">New Chat</button>
+            <button id="btn-export" class="btn btn-sm btn-ghost" title="Export conversation as markdown">Export</button>
+            {% if has_memory %}
+            <button id="btn-history" class="btn btn-sm btn-ghost" title="Browse past conversations">History</button>
+            {% endif %}
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4">
+                {# Status bar #}
+                <div id="chat-status-bar" class="flex items-center gap-3 text-xs text-base-content/60 mb-3 px-1">
+                    <span class="font-mono">{{ model_name }}</span>
+                    <span class="opacity-50">|</span>
+                    <span><span id="status-tokens-in" class="font-bold text-primary">0</span> in</span>
+                    <span><span id="status-tokens-out" class="font-bold text-primary">0</span> out</span>
+                    {% if session_token_budget %}
+                    <span class="opacity-50">|</span>
+                    <span id="status-budget">
+                        <span id="status-budget-used">0</span>/<span>{{ session_token_budget | int }}</span>
+                        (<span id="status-budget-pct">0</span>%)
+                    </span>
+                    {% endif %}
+                </div>
+
+                {# Messages area #}
+                <template id="assistant-avatar">{{ facehash(role_name, 32) }}</template>
+                <div id="chat-messages" class="chat-messages min-h-[400px] max-h-[60vh] space-y-2 mb-4">
+                    {% for msg in history %}
+                    {% if msg.role == "user" %}
+                    <div class="chat chat-end">
+                        <div class="chat-bubble chat-bubble-primary">{{ msg.content }}</div>
+                    </div>
+                    {% elif msg.role == "assistant" %}
+                    <div class="chat chat-start">
+                        <div class="chat-image">{{ facehash(role_name, 32) }}</div>
+                        <div class="chat-bubble chat-bubble-neutral whitespace-pre-wrap">{{ msg.content }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                {# Input form #}
+                <form id="chat-form" class="flex gap-2" hx-boost="false">
+                    <textarea name="prompt" rows="1"
+                              class="textarea textarea-bordered flex-1 resize-none"
+                              placeholder="Type a message..."
+                              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea>
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# History drawer sidebar #}
+    <div class="drawer-side z-50">
+        <label for="history-drawer-toggle" class="drawer-overlay"></label>
+        <div class="bg-base-200 w-80 min-h-full p-4">
+            <h3 class="font-bold text-lg mb-4">Conversation History</h3>
+            <div id="history-list" class="space-y-2">
+                <div class="text-sm text-base-content/50">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var roleId = {{ role_id | tojson }};
+    var chatApi = initChatStream("chat-form", "chat-messages", "/roles/" + roleId + "/chat/stream", {
+        roleId: roleId,
+        modelName: {{ model_name | tojson }},
+        sessionTokenBudget: {{ session_token_budget or 'null' }}
+    });
+
+    if (chatApi) {
+        chatApi.restoreSession();
+
+        // New Chat button
+        document.getElementById("btn-new-chat").addEventListener("click", function() {
+            chatApi.resetSession();
+        });
+
+        // Export button
+        document.getElementById("btn-export").addEventListener("click", function() {
+            chatApi.exportConversation({{ role_name | tojson }});
+        });
+
+        // History button
+        var historyBtn = document.getElementById("btn-history");
+        if (historyBtn) {
+            historyBtn.addEventListener("click", function() {
+                var toggle = document.getElementById("history-drawer-toggle");
+                toggle.checked = !toggle.checked;
+                if (toggle.checked) {
+                    loadHistorySessions(roleId, chatApi);
+                }
+            });
+        }
+    }
+})();
+
+function loadHistorySessions(roleId, chatApi) {
+    var list = document.getElementById("history-list");
+    list.innerHTML = '<div class="text-sm text-base-content/50">Loading...</div>';
+
+    fetch("/roles/" + roleId + "/chat/sessions")
+        .then(function(r) { return r.json(); })
+        .then(function(sessions) {
+            list.innerHTML = "";
+            if (!sessions.length) {
+                list.innerHTML = '<div class="text-sm text-base-content/50">No past sessions</div>';
+                return;
+            }
+            sessions.forEach(function(s) {
+                var item = document.createElement("div");
+                item.className = "card bg-base-100 shadow-sm cursor-pointer hover:bg-base-300 transition-colors";
+                var body = document.createElement("div");
+                body.className = "card-body p-3";
+
+                var preview = document.createElement("div");
+                preview.className = "text-sm font-medium truncate";
+                preview.textContent = s.preview || "Untitled";
+                body.appendChild(preview);
+
+                var meta = document.createElement("div");
+                meta.className = "flex items-center justify-between text-xs text-base-content/50 mt-1";
+                var ts = s.timestamp ? s.timestamp.substring(0, 16).replace("T", " ") : "";
+                meta.innerHTML = '<span>' + escapeHtml(ts) + '</span><span>' + s.message_count + ' msgs</span>';
+                body.appendChild(meta);
+
+                var deleteBtn = document.createElement("button");
+                deleteBtn.className = "btn btn-xs btn-ghost btn-error mt-1";
+                deleteBtn.textContent = "Delete";
+                deleteBtn.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    if (!confirm("Delete this session?")) return;
+                    fetch("/roles/" + roleId + "/chat/sessions/" + s.session_id, { method: "DELETE" })
+                        .then(function() { item.remove(); });
+                });
+                body.appendChild(deleteBtn);
+
+                item.appendChild(body);
+                item.addEventListener("click", function() {
+                    loadSession(roleId, s.session_id, chatApi);
+                    document.getElementById("history-drawer-toggle").checked = false;
+                });
+                list.appendChild(item);
+            });
+        });
+}
+
+function loadSession(roleId, sessionId, chatApi) {
+    fetch("/roles/" + roleId + "/chat/sessions/" + sessionId + "/messages")
+        .then(function(r) { return r.json(); })
+        .then(function(messages) {
+            chatApi.loadSession(sessionId, messages);
+        });
+}
+</script>
+{% endblock %}

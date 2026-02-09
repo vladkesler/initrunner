@@ -1,0 +1,24 @@
+{% from "_macros.html" import success_badge %}
+{% for r in records %}
+<tr class="hover cursor-pointer"
+    hx-get="/audit/{{ r.run_id }}"
+    hx-target="#audit-detail"
+    hx-swap="innerHTML">
+    <td class="text-xs mono">{{ r.timestamp[:19] }}</td>
+    <td>
+        <div class="flex items-center gap-2">
+            {{ facehash(r.agent_name, 24) }}
+            {{ r.agent_name }}
+        </div>
+    </td>
+    <td class="truncate-cell">{{ r.user_prompt[:80] }}</td>
+    <td>{{ success_badge(r.success) }}</td>
+    <td class="text-xs">{{ r.total_tokens }}</td>
+    <td class="text-xs">{{ r.duration_ms }}ms</td>
+    <td>
+        {% if r.trigger_type %}
+        <span class="badge badge-warning badge-xs">{{ r.trigger_type }}</span>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}

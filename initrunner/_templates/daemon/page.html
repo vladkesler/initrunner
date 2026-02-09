@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Daemon — {{ role_name }} — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li><a href="/roles/{{ role_id }}">{{ role_name }}</a></li>
+            <li>Daemon</li>
+        </ul>
+    </div>
+    <div class="flex items-center justify-between mt-2">
+        <h1 class="text-2xl font-bold">Daemon</h1>
+        <div class="flex gap-2">
+            <button id="start-btn" class="btn btn-primary btn-sm" onclick="toggleDaemon()">
+                Start Triggers
+            </button>
+        </div>
+    </div>
+</div>
+
+{# Trigger cards #}
+{% if triggers %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+    {% for t in triggers %}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body py-3">
+            <div class="flex items-center gap-2">
+                <span class="badge badge-warning badge-sm">{{ t.type }}</span>
+                <span class="text-sm">{{ t.summary }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# Status indicator #}
+<div id="daemon-status" class="mb-4" style="display:none">
+    <div class="alert">
+        <span id="daemon-status-text">Connecting...</span>
+    </div>
+</div>
+
+{# Event log #}
+<div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+        <h3 class="card-title text-sm">Event Log</h3>
+        <div id="event-log" class="event-log mono text-sm bg-base-200 rounded-lg p-3 min-h-[200px]">
+            <div class="text-base-content/30">Waiting for events...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+var ws = null;
+var running = false;
+
+function toggleDaemon() {
+    if (running) {
+        stopDaemon();
+    } else {
+        startDaemon();
+    }
+}
+
+function startDaemon() {
+    var btn = document.getElementById("start-btn");
+    var statusDiv = document.getElementById("daemon-status");
+    var statusText = document.getElementById("daemon-status-text");
+    var log = document.getElementById("event-log");
+
+    btn.disabled = true;
+    statusDiv.style.display = "block";
+    statusText.textContent = "Starting...";
+
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    var wsUrl = proto + "//" + location.host + "/api/daemon/{{ role_id }}";
+    // Add auth if cookie exists
+    var apiKey = document.cookie.split(";").map(function(c) { return c.trim(); }).find(function(c) { return c.startsWith("initrunner_token="); });
+    if (apiKey) {
+        wsUrl += "?api_key=" + apiKey.split("=")[1];
+    }
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = function() {
+        statusText.textContent = "Connected, waiting for triggers to start...";
+    };
+
+    ws.onmessage = function(event) {
+        var msg = JSON.parse(event.data);
+        if (msg.type === "started") {
+            running = true;
+            btn.disabled = false;
+            btn.textContent = "Stop Triggers";
+            btn.classList.remove("btn-primary");
+            btn.classList.add("btn-error");
+            statusDiv.querySelector(".alert").className = "alert alert-success";
+            statusText.textContent = "Triggers running";
+            log.innerHTML = "";
+        } else if (msg.type === "stopped") {
+            resetUI();
+        } else if (msg.type === "event") {
+            var entry = document.createElement("div");
+            entry.className = "py-1 border-b border-base-300";
+            entry.innerHTML = '<span class="text-base-content/50">' + escapeHtml(msg.data.timestamp) + '</span> ' +
+                '<span class="badge badge-warning badge-xs">' + escapeHtml(msg.data.trigger) + '</span> ' +
+                escapeHtml(msg.data.prompt);
+            log.appendChild(entry);
+            scrollToBottom(log);
+        } else if (msg.type === "error") {
+            statusDiv.querySelector(".alert").className = "alert alert-error";
+            statusText.textContent = "Error: " + msg.data.message;
+            resetUI();
+        }
+    };
+
+    ws.onclose = function() {
+        if (running) {
+            statusDiv.querySelector(".alert").className = "alert alert-warning";
+            statusText.textContent = "Connection lost";
+        }
+        resetUI();
+    };
+
+    ws.onerror = function() {
+        statusDiv.querySelector(".alert").className = "alert alert-error";
+        statusText.textContent = "Connection error";
+        resetUI();
+    };
+}
+
+function stopDaemon() {
+    if (ws) {
+        ws.close();
+    }
+    // Also call the stop API
+    fetch("/api/daemon/{{ role_id }}/stop", { method: "POST" });
+    resetUI();
+}
+
+function resetUI() {
+    running = false;
+    var btn = document.getElementById("start-btn");
+    btn.disabled = false;
+    btn.textContent = "Start Triggers";
+    btn.classList.remove("btn-error");
+    btn.classList.add("btn-primary");
+}
+</script>
+{% endblock %}

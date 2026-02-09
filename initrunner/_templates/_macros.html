@@ -1,0 +1,45 @@
+{# Reusable DaisyUI component macros #}
+
+{% macro badge(text, variant="neutral") %}
+<span class="badge badge-{{ variant }} badge-sm">{{ text }}</span>
+{% endmacro %}
+
+{% macro stat_card(title, value, desc="") %}
+<div class="stat">
+    <div class="stat-title">{{ title }}</div>
+    <div class="stat-value text-lg">{{ value }}</div>
+    {% if desc %}<div class="stat-desc">{{ desc }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro empty_state(message, icon="") %}
+<div class="flex flex-col items-center justify-center py-12 text-base-content/50">
+    {% if icon %}
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="{{ icon }}" />
+    </svg>
+    {% endif %}
+    <p class="text-lg">{{ message }}</p>
+</div>
+{% endmacro %}
+
+{% macro feature_badges(features) %}
+{% for f in features %}
+{% if f == "tools" %}{{ badge(f, "info") }}
+{% elif f == "triggers" %}{{ badge(f, "warning") }}
+{% elif f == "ingest" %}{{ badge(f, "success") }}
+{% elif f == "memory" %}{{ badge(f, "secondary") }}
+{% elif f == "sinks" %}{{ badge(f, "accent") }}
+{% elif f == "skills" %}{{ badge(f, "primary") }}
+{% else %}{{ badge(f) }}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% macro success_badge(is_success) %}
+{% if is_success %}
+<span class="badge badge-success badge-sm">success</span>
+{% else %}
+<span class="badge badge-error badge-sm">error</span>
+{% endif %}
+{% endmacro %}

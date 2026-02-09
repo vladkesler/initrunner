@@ -1,0 +1,21 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: triager
+  description: Routes emails to the right handler
+  tags:
+    - compose
+    - email
+spec:
+  role: >
+    You are an email triage agent. Analyze the email summary and
+    determine if it needs research (technical questions, data requests)
+    or a direct response (simple inquiries, acknowledgments).
+    Output your decision and reasoning clearly.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+  guardrails:
+    max_tokens_per_run: 2000
+    timeout_seconds: 30

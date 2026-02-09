@@ -1,0 +1,202 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: github-tracker
+  description: Manages GitHub issues and repos via declarative API endpoints
+  tags:
+    - example
+    - api
+    - github
+    - developer-tools
+spec:
+  role: |
+    You are a GitHub project assistant. You help users track issues, manage
+    repositories, and stay on top of their projects using the GitHub REST API.
+
+    Capabilities:
+    - List and search issues (filter by state, labels, assignee)
+    - View issue details including comments and labels
+    - Create new issues with title, body, and labels
+    - Add comments to existing issues
+    - List repositories for any user or organization
+
+    Guidelines:
+    - When listing issues, default to state=open unless the user specifies otherwise
+    - When creating issues, ask for confirmation before submitting
+    - Format issue lists as numbered summaries with title, state, and labels
+    - Include issue URLs in your responses so users can click through
+    - Use get_current_time for timestamps in comments
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: api
+      name: github
+      description: GitHub REST API v3
+      base_url: https://api.github.com
+      headers:
+        Accept: application/vnd.github.v3+json
+        User-Agent: initrunner-github-tracker
+      auth:
+        Authorization: "Bearer ${GITHUB_TOKEN}"
+      endpoints:
+        - name: list_issues
+          method: GET
+          path: "/repos/{owner}/{repo}/issues"
+          description: List issues in a repository
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner (user or org)
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: state
+              type: string
+              required: false
+              default: open
+              description: "Filter by state: open, closed, or all"
+            - name: labels
+              type: string
+              required: false
+              description: Comma-separated list of label names
+          query_params:
+            state: "{state}"
+            labels: "{labels}"
+            per_page: "10"
+          response_extract: "$[*].{number,title,state,labels[*].name}"
+          timeout: 15
+
+        - name: get_issue
+          method: GET
+          path: "/repos/{owner}/{repo}/issues/{issue_number}"
+          description: Get details of a specific issue
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: issue_number
+              type: integer
+              required: true
+              description: Issue number
+          timeout: 15
+
+        - name: create_issue
+          method: POST
+          path: "/repos/{owner}/{repo}/issues"
+          description: Create a new issue
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: title
+              type: string
+              required: true
+              description: Issue title
+            - name: body
+              type: string
+              required: false
+              description: Issue body (markdown)
+            - name: labels
+              type: string
+              required: false
+              description: Comma-separated label names
+          body_template:
+            title: "{title}"
+            body: "{body}"
+            labels: "{labels}"
+          timeout: 15
+
+        - name: add_comment
+          method: POST
+          path: "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+          description: Add a comment to an issue
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: issue_number
+              type: integer
+              required: true
+              description: Issue number
+            - name: body
+              type: string
+              required: true
+              description: Comment body (markdown)
+          body_template:
+            body: "{body}"
+          timeout: 15
+
+        - name: list_repos
+          method: GET
+          path: "/users/{username}/repos"
+          description: List public repositories for a user
+          parameters:
+            - name: username
+              type: string
+              required: true
+              description: GitHub username
+            - name: sort
+              type: string
+              required: false
+              default: updated
+              description: "Sort by: created, updated, pushed, full_name"
+          query_params:
+            sort: "{sort}"
+            per_page: "10"
+          response_extract: "$[*].{name,description,language,stargazers_count}"
+          timeout: 15
+
+    - type: datetime
+
+    - type: mcp
+      transport: stdio
+      command: npx
+      args:
+        - -y
+        - "@modelcontextprotocol/server-filesystem"
+        - ./repos
+      tool_filter:
+        - read_file
+        - list_directory
+
+    # --- MCP alternative (uncomment to use instead of the api tool above) ---
+    # To use the official GitHub MCP server instead of declarative endpoints:
+    #
+    # - type: mcp
+    #   transport: stdio
+    #   command: npx
+    #   args:
+    #     - -y
+    #     - "@modelcontextprotocol/server-github"
+    #   tool_filter:
+    #     - list_issues
+    #     - get_issue
+    #     - create_issue
+    #     - add_issue_comment
+    #     - search_repositories
+
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 120
+    max_request_limit: 30

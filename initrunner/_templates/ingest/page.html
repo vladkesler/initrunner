@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Ingest — {{ role_name }} — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li><a href="/roles/{{ role_id }}">{{ role_name }}</a></li>
+            <li>Ingest</li>
+        </ul>
+    </div>
+    <div class="flex items-center justify-between mt-2">
+        <h1 class="text-2xl font-bold">Ingestion</h1>
+        <div class="flex gap-2">
+            <button id="ingest-btn" class="btn btn-primary btn-sm"
+                    onclick="startIngest('{{ role_id }}', false)">
+                Run Ingestion
+            </button>
+            <button class="btn btn-ghost btn-sm"
+                    onclick="startIngest('{{ role_id }}', true)">
+                Force Re-ingest
+            </button>
+        </div>
+    </div>
+</div>
+
+{# Sources list #}
+{% if sources %}
+<div class="card bg-base-100 shadow-sm mb-4">
+    <div class="card-body">
+        <h3 class="card-title text-sm">Sources ({{ sources|length }})</h3>
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr><th>Name</th><th>Path</th><th>Size</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in sources %}
+                    <tr>
+                        <td class="font-medium">{{ s.name }}</td>
+                        <td class="mono text-xs truncate-cell">{{ s.path }}</td>
+                        <td class="text-xs">{% if s.size_bytes %}{{ (s.size_bytes / 1024)|round(1) }} KB{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Progress area #}
+<div id="ingest-progress" style="display:none" class="mb-4">
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-sm">Progress</h3>
+            <progress id="ingest-bar" class="progress progress-primary w-full" value="0" max="100"></progress>
+            <div id="ingest-status" class="text-sm text-base-content/70 mt-1"></div>
+        </div>
+    </div>
+</div>
+
+{# Results area #}
+<div id="ingest-result" style="display:none" class="mb-4">
+</div>
+
+<script>
+function startIngest(roleId, force) {
+    var btn = document.getElementById("ingest-btn");
+    var progress = document.getElementById("ingest-progress");
+    var bar = document.getElementById("ingest-bar");
+    var status = document.getElementById("ingest-status");
+    var result = document.getElementById("ingest-result");
+
+    btn.disabled = true;
+    btn.classList.add("loading");
+    progress.style.display = "block";
+    result.style.display = "none";
+    bar.value = 0;
+    status.textContent = "Starting...";
+
+    var url = "/api/ingest/" + roleId + (force ? "?force=true" : "");
+    var evtSource = new EventSource(url);
+
+    // SSE requires POST but EventSource only does GET.
+    // Use fetch + ReadableStream instead.
+    evtSource.close();
+
+    fetch(url, { method: "POST" }).then(function(response) {
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+
+        function read() {
+            reader.read().then(function(result) {
+                if (result.done) {
+                    btn.disabled = false;
+                    btn.classList.remove("loading");
+                    return;
+                }
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split("\n");
+                buffer = lines.pop();
+
+                var eventType = "";
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line.startsWith("event: ")) {
+                        eventType = line.substring(7).trim();
+                    } else if (line.startsWith("data: ")) {
+                        var data = line.substring(6);
+                        try {
+                            var parsed = JSON.parse(data);
+                            handleEvent(eventType, parsed);
+                        } catch (e) {}
+                        eventType = "";
+                    }
+                }
+                read();
+            });
+        }
+        read();
+    }).catch(function(err) {
+        status.textContent = "Error: " + err.message;
+        btn.disabled = false;
+        btn.classList.remove("loading");
+    });
+
+    function handleEvent(type, data) {
+        if (type === "progress") {
+            var pct = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+            bar.value = pct;
+            status.textContent = data.file + " — " + data.status + " (" + data.current + "/" + data.total + ")";
+        } else if (type === "done") {
+            bar.value = 100;
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            var resultDiv = document.getElementById("ingest-result");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = '<div class="alert alert-success">' +
+                '<span>Ingestion complete: ' +
+                (data.new || 0) + ' new, ' +
+                (data.updated || 0) + ' updated, ' +
+                (data.skipped || 0) + ' skipped, ' +
+                (data.errored || 0) + ' errors. ' +
+                (data.total_chunks || 0) + ' total chunks.</span></div>';
+            status.textContent = "Done";
+        } else if (type === "error") {
+            btn.disabled = false;
+            btn.classList.remove("loading");
+            var resultDiv = document.getElementById("ingest-result");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = '<div class="alert alert-error"><span>' +
+                escapeHtml(data.message) + '</span></div>';
+            status.textContent = "Error";
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: researcher
+  description: Researches topics from triaged emails
+  tags:
+    - compose
+    - email
+spec:
+  role: >
+    You are a research agent. Given a triaged email that requires
+    research, investigate the topic and produce a concise research
+    summary with key findings and recommendations.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.3
+  guardrails:
+    max_tokens_per_run: 4000
+    timeout_seconds: 60

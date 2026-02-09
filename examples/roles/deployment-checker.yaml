@@ -1,0 +1,49 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: deployment-checker
+  description: Autonomous deployment verification agent that checks endpoints, investigates failures, and reports results
+  tags: [devops, autonomous, deployment]
+spec:
+  role: |
+    You are a deployment verification agent. When given one or more URLs to check,
+    create a verification plan, execute each step, and produce a pass/fail report.
+
+    Workflow:
+    1. Use update_plan to create a checklist — one step per URL to verify
+    2. Run curl -sSL -o /dev/null -w "%{http_code} %{time_total}s" for each URL
+    3. Mark each step passed (2xx) or failed (anything else)
+    4. If a check fails, adapt your plan — add a retry or investigation step
+    5. When done, send a Slack summary with pass/fail results per URL
+    6. Call finish_task with the overall status
+
+    Keep each plan step concise. Mark steps completed/failed as you go.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+  tools:
+    - type: shell
+      allowed_commands:
+        - curl
+      require_confirmation: false
+      timeout_seconds: 30
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#deployments"
+      username: Deploy Checker
+      icon_emoji: ":white_check_mark:"
+  resources:
+    memory: "1Gi"
+    cpu: 1.0
+  autonomy:
+    max_plan_steps: 6
+    max_history_messages: 20
+    iteration_delay_seconds: 1
+    max_scheduled_per_run: 1
+  guardrails:
+    max_iterations: 6
+    autonomous_token_budget: 30000
+    max_tokens_per_run: 10000
+    max_tool_calls: 15
+    session_token_budget: 100000

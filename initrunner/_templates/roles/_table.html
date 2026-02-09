@@ -1,0 +1,41 @@
+{% from "_macros.html" import feature_badges %}
+{% for role in roles %}
+<tr class="hover">
+    <td>
+        <div class="flex items-center gap-3">
+            {{ facehash(role.name, 32) }}
+            <div>
+                <a href="/roles/{{ role.id }}" class="font-medium link link-hover">{{ role.name }}</a>
+                {% if role.description %}
+                <br><span class="text-xs text-base-content/50">{{ role.description[:80] }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td class="mono text-sm">{{ role.model }}</td>
+    <td>{{ feature_badges(role.features) }}</td>
+    <td>
+        {% if role.valid %}
+        <span class="badge badge-success badge-sm">valid</span>
+        {% else %}
+        <span class="badge badge-error badge-sm" title="{{ role.error or '' }}">invalid</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if role.valid %}
+        <div class="flex gap-1">
+            <a href="/roles/{{ role.id }}/chat" class="btn btn-ghost btn-xs">Chat</a>
+            {% if "memory" in role.features %}
+            <a href="/roles/{{ role.id }}/memory" class="btn btn-ghost btn-xs">Memory</a>
+            {% endif %}
+            {% if "ingest" in role.features %}
+            <a href="/roles/{{ role.id }}/ingest" class="btn btn-ghost btn-xs">Ingest</a>
+            {% endif %}
+            {% if "triggers" in role.features %}
+            <a href="/roles/{{ role.id }}/daemon" class="btn btn-ghost btn-xs">Daemon</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}

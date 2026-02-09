@@ -1,0 +1,364 @@
+/* InitRunner TUI — Reactor Core Theme */
+
+/* ---- Global Foundations ---- */
+
+Screen {
+    background: $background;
+    layout: vertical;
+}
+
+* {
+    scrollbar-color: $primary 30%;
+    scrollbar-color-hover: $primary 50%;
+    scrollbar-color-active: $primary 70%;
+    scrollbar-background: $surface;
+    scrollbar-background-hover: $surface;
+    scrollbar-background-active: $surface;
+}
+
+/* ---- DataTable (all screens) ---- */
+
+DataTable {
+    background: $surface;
+    scrollbar-color: $primary 30%;
+    scrollbar-color-hover: $primary 50%;
+}
+
+DataTable > .datatable--header {
+    background: $primary 8%;
+    color: $secondary;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary 18%;
+    color: $text;
+}
+
+DataTable > .datatable--even-row {
+    background: $surface;
+}
+
+DataTable > .datatable--odd-row {
+    background: $background;
+}
+
+/* ---- Shared: Filter Bar ---- */
+
+#filter-bar {
+    dock: bottom;
+    height: 3;
+    padding: 0 1;
+    display: none;
+    border-top: solid $primary 30%;
+}
+
+#filter-bar.visible {
+    display: block;
+}
+
+#filter-bar:focus {
+    border-top: solid $primary;
+}
+
+/* ---- Shared: Full-size Modal ---- */
+
+.full-modal, #detail-modal, #yaml-modal {
+    width: 80%;
+    height: 80%;
+    border: round $primary;
+    background: $surface;
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+/* ---- Shared: Confirm Modal ---- */
+
+#confirm-modal {
+    width: 50;
+    height: auto;
+    max-height: 15;
+    border: round $error;
+    background: $surface;
+    padding: 1 2;
+}
+
+/* ---- Roles Screen ---- */
+
+RolesScreen #roles-table {
+    height: 1fr;
+}
+
+RolesScreen #empty-state {
+    height: 1fr;
+    content-align: center middle;
+    text-align: center;
+    color: $text-muted;
+}
+
+/* ---- Run Screen ---- */
+
+RunScreen #status-bar {
+    height: 1;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+RunScreen #chat-container {
+    height: 1fr;
+    overflow-y: auto;
+    padding: 0 1;
+}
+
+RunScreen #input-area {
+    height: auto;
+    max-height: 8;
+    min-height: 3;
+    border: round $primary 30%;
+    background: $surface;
+    padding: 0 1;
+}
+
+RunScreen #input-area:focus {
+    border: round $primary;
+    background: $surface-lighten-1;
+}
+
+RunScreen #input-area .text-area--placeholder {
+    color: $text-muted;
+}
+
+/* ---- Chat Messages ---- */
+
+.user-message {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    background: $primary 5%;
+    border-left: thick $primary;
+}
+
+.user-message .msg-role {
+    color: $primary;
+    text-style: bold;
+}
+
+.agent-message {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    border-left: thick $success;
+}
+
+.agent-message .msg-role {
+    color: $success;
+    text-style: bold;
+}
+
+.error-message {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    background: $error 8%;
+    border-left: thick $error;
+}
+
+.thinking-indicator {
+    margin: 1 0 0 0;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* ---- Audit Screen ---- */
+
+AuditScreen #audit-table {
+    height: 1fr;
+}
+
+/* ---- Ingest Screen ---- */
+
+IngestScreen #sources-table {
+    height: 1fr;
+}
+
+IngestScreen #ingest-status {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    background: $primary-background;
+}
+
+IngestScreen ProgressBar Bar {
+    color: $primary;
+    background: $surface;
+}
+
+IngestScreen #progress-bar {
+    dock: bottom;
+    height: 3;
+    padding: 0 1;
+    display: none;
+}
+
+IngestScreen #progress-bar.visible {
+    display: block;
+}
+
+/* ---- Daemon Screen ---- */
+
+DaemonScreen #daemon-status {
+    height: 1;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+DaemonScreen #trigger-table {
+    height: 1fr;
+    max-height: 50%;
+}
+
+DaemonScreen #event-separator {
+    color: $primary 40%;
+}
+
+DaemonScreen #event-log {
+    height: 1fr;
+    background: $background;
+    padding: 0 1;
+}
+
+/* ---- Role Detail Screen ---- */
+
+RoleDetailScreen #detail-status-bar {
+    height: 1;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+RoleDetailScreen #detail-scroll {
+    height: 1fr;
+    padding: 1 2;
+}
+
+/* Section cards */
+RoleDetailScreen .detail-section {
+    background: $surface;
+    border-left: thick $secondary;
+    padding: 0 1 0 1;
+    margin: 0 0 1 0;
+}
+
+/* Collapsible matches card style */
+RoleDetailScreen Collapsible {
+    background: $surface;
+    border-left: thick $secondary;
+    padding: 0 1;
+    margin: 0 0 1 0;
+}
+
+RoleDetailScreen CollapsibleTitle {
+    color: $secondary;
+}
+
+/* Unconfigured summary */
+RoleDetailScreen #unconfigured-summary {
+    color: $text-muted;
+    padding: 1 1 0 1;
+}
+
+/* ── Edit modals ── */
+.edit-modal {
+    width: 62;
+    height: auto;
+    max-height: 32;
+    border: round $secondary;
+    background: $surface;
+    padding: 1 2;
+}
+
+.edit-modal .edit-modal-rule {
+    margin: 0 0 1 0;
+    color: $secondary 40%;
+}
+
+.edit-modal .edit-modal-fields {
+    max-height: 20;
+}
+
+/* Field rows: side-by-side label + input */
+.field-row {
+    height: 3;
+    margin: 0 0 1 0;
+}
+
+.field-row-bool {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.field-label {
+    width: 22;
+    height: 3;
+    content-align-vertical: middle;
+    color: $secondary;
+    padding: 1 1 0 0;
+}
+
+.field-row-bool .field-label {
+    height: 1;
+    padding: 0 1 0 0;
+}
+
+.field-row Input {
+    width: 1fr;
+    margin: 0;
+}
+
+.field-row Switch {
+    margin: 0;
+}
+
+/* Button row */
+.edit-modal-buttons {
+    height: 3;
+    margin: 1 0 0 0;
+    align: right middle;
+}
+
+.edit-modal-buttons Button {
+    margin: 0 0 0 1;
+    min-width: 10;
+}
+
+/* Text edit modal overrides */
+.text-edit-modal {
+    width: 70;
+    max-height: 35;
+}
+
+.text-edit-modal TextArea {
+    height: 10;
+    min-height: 6;
+}
+
+/* Section picker */
+.section-picker {
+    width: 40;
+    height: auto;
+    max-height: 20;
+    border: round $secondary;
+    background: $surface;
+    padding: 1 2;
+}
+
+/* ---- Help Screen ---- */
+
+HelpScreen #help-table {
+    height: 1fr;
+}
+
+/* ---- Modals ---- */
+
+ModalScreen {
+    align: center middle;
+}

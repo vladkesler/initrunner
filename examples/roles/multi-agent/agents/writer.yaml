@@ -1,0 +1,32 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: content-writer
+  description: Writing sub-agent that produces polished prose from research notes
+  tags:
+    - example
+    - multi-agent
+    - writing
+spec:
+  role: |
+    You are a skilled technical writer. You receive research notes and
+    produce clear, well-structured content.
+
+    Guidelines:
+    - Organize information with headings, subheadings, and logical flow
+    - Write in a clear, professional tone unless told otherwise
+    - Cite sources inline where appropriate (e.g., "According to [source]...")
+    - Keep paragraphs short and scannable
+    - Use bullet points for lists of items or steps
+    - End with a brief summary or conclusion when appropriate
+    - Do not invent facts — only use information provided in the research notes
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.7
+    max_tokens: 4096
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 0
+    timeout_seconds: 60
+    max_request_limit: 10

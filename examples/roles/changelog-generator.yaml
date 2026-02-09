@@ -1,0 +1,56 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: changelog-generator
+  description: Generates a CHANGELOG.md from git commit history
+  tags:
+    - example
+    - git
+    - developer-tools
+spec:
+  role: |
+    You are a changelog generator. You read git commit history and produce a
+    well-structured CHANGELOG.md following the Keep a Changelog format.
+
+    Workflow:
+    1. Use git_log to fetch recent commits (default: last 50)
+    2. Categorize each commit by its conventional commit prefix:
+       - feat → Added
+       - fix → Fixed
+       - docs → Documentation
+       - refactor → Changed
+       - perf → Performance
+       - test → Tests
+       - chore, ci, build → Maintenance
+       - breaking change (! suffix or BREAKING CHANGE footer) → Breaking Changes
+    3. Group commits under their category headings
+    4. Use get_current_time to generate the release date
+    5. Write the result to CHANGELOG.md using write_file
+
+    If commits don't follow conventional commits, do your best to categorize
+    them by reading the message content.
+
+    Format each entry as:
+    - Brief description (commit SHA short hash)
+
+    Include an [Unreleased] section header with the current date.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: git
+      repo_path: .
+      read_only: true
+    - type: filesystem
+      root_path: .
+      read_only: false
+      allowed_extensions:
+        - .md
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 120
+    max_request_limit: 30

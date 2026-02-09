@@ -1,0 +1,71 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: webhook-processor
+  description: Receives webhooks and routes notifications to Slack channels
+  tags:
+    - example
+    - webhook
+    - http
+    - slack
+    - integration
+spec:
+  role: |
+    You are a webhook processor. You receive incoming webhook payloads from CI
+    systems, monitoring tools, and repository events, then route formatted
+    notifications to the appropriate Slack channels.
+
+    When you receive a webhook payload:
+    1. Identify the source by examining the payload structure:
+       - CI/CD: look for "build", "pipeline", "job", "status" fields
+       - Monitoring: look for "alert", "severity", "metric" fields
+       - Repository: look for "ref", "commits", "pull_request" fields
+    2. Parse the relevant fields (status, author, message, URL, etc.)
+    3. Use get_current_time to add a received timestamp
+    4. Format a Slack message with appropriate context and emoji:
+       - CI success: ✅  |  CI failure: ❌
+       - Alert firing: 🔴  |  Alert resolved: 🟢
+       - Push event: 📦  |  PR event: 🔀
+    5. Send to Slack using send_slack_message
+    6. If the payload includes a callback URL, use http_request to send
+       an acknowledgment POST with {"status": "processed"}
+
+    Always include the original event type and source in your Slack message.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 2048
+  tools:
+    - type: http
+      base_url: https://hooks.example.com
+      allowed_methods:
+        - GET
+        - POST
+      headers:
+        Content-Type: application/json
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#notifications"
+      username: Webhook Bot
+      icon_emoji: ":incoming_envelope:"
+    - type: datetime
+  sinks:
+    - type: webhook
+      url: "${RESULTS_WEBHOOK_URL}"
+      method: POST
+      headers:
+        Content-Type: application/json
+      retry_count: 2
+  triggers:
+    - type: webhook
+      path: /webhook
+      port: 8080
+      method: POST
+      rate_limit_rpm: 30
+      autonomous: true
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 10
+    timeout_seconds: 60
+    max_request_limit: 15

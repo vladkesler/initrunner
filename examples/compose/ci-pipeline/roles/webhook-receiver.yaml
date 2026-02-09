@@ -1,0 +1,43 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: ci-webhook-receiver
+  description: Receives CI webhooks and extracts structured event data
+  tags:
+    - compose
+    - ci
+    - webhook
+spec:
+  role: |
+    You are a CI webhook receiver. You receive raw webhook payloads from CI
+    systems (GitHub Actions, GitLab CI, Jenkins, CircleCI) and extract
+    structured event data.
+
+    For each incoming payload, extract and output:
+    - source: the CI system name
+    - repo: repository full name (owner/repo)
+    - branch: the branch that was built
+    - sha: the commit SHA (first 8 characters)
+    - status: success, failure, or pending
+    - author: the commit or build author
+    - message: the commit message or build name
+    - url: link to the build or run
+
+    Output these fields as a clear structured summary. If any field is missing
+    from the payload, mark it as "unknown".
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 1024
+  triggers:
+    - type: webhook
+      path: /ci-webhook
+      port: 9090
+      method: POST
+      rate_limit_rpm: 60
+  guardrails:
+    max_tokens_per_run: 5000
+    max_tool_calls: 5
+    timeout_seconds: 30
+    max_request_limit: 10

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% from "_macros.html" import feature_badges, badge %}
+
+{% block title %}{{ role.name }} — InitRunner{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li><a href="/roles">Roles</a></li>
+            <li>{{ role.name }}</li>
+        </ul>
+    </div>
+    <div class="flex items-center justify-between mt-2">
+        <div class="flex items-center gap-3">
+            {{ facehash(role.name, 48) }}
+            <h1 class="text-2xl font-bold">{{ role.name }}</h1>
+        </div>
+        <div class="flex gap-2">
+            <a href="/roles/{{ role.id }}/chat" class="btn btn-primary btn-sm">Chat</a>
+            {% if role.memory %}
+            <a href="/roles/{{ role.id }}/memory" class="btn btn-ghost btn-sm">Memory</a>
+            {% endif %}
+            {% if role.ingest %}
+            <a href="/roles/{{ role.id }}/ingest" class="btn btn-ghost btn-sm">Ingest</a>
+            {% endif %}
+            {% if "triggers" in role.features %}
+            <a href="/roles/{{ role.id }}/daemon" class="btn btn-ghost btn-sm">Daemon</a>
+            {% endif %}
+        </div>
+    </div>
+    {% if role.description %}
+    <p class="text-base-content/70 mt-1">{{ role.description }}</p>
+    {% endif %}
+    <div class="mt-2">{{ feature_badges(role.features) }}</div>
+</div>
+
+{# Tabs #}
+<div role="tablist" class="tabs tabs-bordered mb-4">
+    <input type="radio" name="detail-tabs" role="tab" class="tab" aria-label="Overview" checked>
+    <div role="tabpanel" class="tab-content pt-4">
+        {# Model + Guardrails #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title text-sm">Model</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <tr><td class="text-base-content/50">Provider</td><td>{{ role.model_config_detail.provider }}</td></tr>
+                            <tr><td class="text-base-content/50">Name</td><td class="mono">{{ role.model_config_detail.name }}</td></tr>
+                            {% if role.model_config_detail.base_url %}
+                            <tr><td class="text-base-content/50">Base URL</td><td class="mono text-xs">{{ role.model_config_detail.base_url }}</td></tr>
+                            {% endif %}
+                            <tr><td class="text-base-content/50">Temperature</td><td>{{ role.model_config_detail.temperature }}</td></tr>
+                            <tr><td class="text-base-content/50">Max Tokens</td><td>{{ role.model_config_detail.max_tokens }}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title text-sm">Guardrails</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <tr><td class="text-base-content/50">Max Tokens/Run</td><td>{{ role.guardrails.max_tokens_per_run }}</td></tr>
+                            <tr><td class="text-base-content/50">Timeout</td><td>{{ role.guardrails.timeout_seconds }}s</td></tr>
+                            <tr><td class="text-base-content/50">Max Tool Calls</td><td>{{ role.guardrails.max_tool_calls }}</td></tr>
+                            <tr><td class="text-base-content/50">Max Requests</td><td>{{ role.guardrails.max_request_limit }}</td></tr>
+                            {% if role.guardrails.session_token_budget %}
+                            <tr><td class="text-base-content/50">Session Budget</td><td>{{ role.guardrails.session_token_budget }}</td></tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Tools #}
+        {% if role.tools %}
+        <div class="card bg-base-100 shadow-sm mt-4">
+            <div class="card-body">
+                <h3 class="card-title text-sm">Tools ({{ role.tools|length }})</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for tool in role.tools %}
+                    <div class="badge badge-outline gap-1" title="{{ tool.summary }}">{{ tool.type }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Triggers #}
+        {% if role.triggers %}
+        <div class="card bg-base-100 shadow-sm mt-4">
+            <div class="card-body">
+                <h3 class="card-title text-sm">Triggers ({{ role.triggers|length }})</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for trigger in role.triggers %}
+                    <div class="badge badge-warning badge-outline gap-1" title="{{ trigger.summary }}">{{ trigger.type }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Ingest #}
+        {% if role.ingest %}
+        <div class="card bg-base-100 shadow-sm mt-4">
+            <div class="card-body">
+                <h3 class="card-title text-sm">Ingestion</h3>
+                <table class="table table-sm">
+                    <tr><td class="text-base-content/50">Strategy</td><td>{{ role.ingest.chunking_strategy }}</td></tr>
+                    <tr><td class="text-base-content/50">Chunk Size</td><td>{{ role.ingest.chunk_size }}</td></tr>
+                    <tr><td class="text-base-content/50">Overlap</td><td>{{ role.ingest.chunk_overlap }}</td></tr>
+                    <tr><td class="text-base-content/50">Backend</td><td>{{ role.ingest.store_backend }}</td></tr>
+                    <tr><td class="text-base-content/50">Sources</td><td>{{ role.ingest.sources|length }} source(s)</td></tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Memory #}
+        {% if role.memory %}
+        <div class="card bg-base-100 shadow-sm mt-4">
+            <div class="card-body">
+                <h3 class="card-title text-sm">Memory</h3>
+                <table class="table table-sm">
+                    <tr><td class="text-base-content/50">Backend</td><td>{{ role.memory.store_backend }}</td></tr>
+                    <tr><td class="text-base-content/50">Max Sessions</td><td>{{ role.memory.max_sessions }}</td></tr>
+                    <tr><td class="text-base-content/50">Max Memories</td><td>{{ role.memory.max_memories }}</td></tr>
+                    <tr><td class="text-base-content/50">Max Resume Msgs</td><td>{{ role.memory.max_resume_messages }}</td></tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <input type="radio" name="detail-tabs" role="tab" class="tab" aria-label="System Prompt">
+    <div role="tabpanel" class="tab-content pt-4">
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <pre class="whitespace-pre-wrap text-sm">{{ role.system_prompt }}</pre>
+            </div>
+        </div>
+    </div>
+
+    <input type="radio" name="detail-tabs" role="tab" class="tab" aria-label="YAML">
+    <div role="tabpanel" class="tab-content pt-4">
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <textarea id="yaml-editor" class="textarea textarea-bordered mono text-sm w-full h-96" spellcheck="false">{{ role.yaml_content }}</textarea>
+                <div class="flex gap-2 mt-3">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveYaml('{{ role.id }}')">Save</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="resetYaml()">Reset</button>
+                </div>
+                <div id="yaml-status" class="mt-2 hidden">
+                    <div class="alert alert-sm" id="yaml-alert">
+                        <span id="yaml-message"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var _originalYaml = document.getElementById("yaml-editor").value;
+
+function resetYaml() {
+    document.getElementById("yaml-editor").value = _originalYaml;
+    document.getElementById("yaml-status").classList.add("hidden");
+}
+
+function saveYaml(roleId) {
+    var yaml = document.getElementById("yaml-editor").value;
+    var statusEl = document.getElementById("yaml-status");
+    var alertEl = document.getElementById("yaml-alert");
+    var msgEl = document.getElementById("yaml-message");
+
+    fetch("/api/roles/" + roleId, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({yaml_content: yaml})
+    })
+    .then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(d) { throw new Error(d.detail || "Save failed"); });
+        return resp.json();
+    })
+    .then(function(data) {
+        statusEl.classList.remove("hidden");
+        alertEl.className = "alert alert-success alert-sm";
+        msgEl.textContent = "Saved successfully.";
+        _originalYaml = yaml;
+    })
+    .catch(function(err) {
+        statusEl.classList.remove("hidden");
+        alertEl.className = "alert alert-error alert-sm";
+        msgEl.textContent = err.message;
+    });
+}
+</script>
+{% endblock %}

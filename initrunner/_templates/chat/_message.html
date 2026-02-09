@@ -1,0 +1,10 @@
+{% if role == "user" %}
+<div class="chat chat-end">
+    <div class="chat-bubble chat-bubble-primary">{{ content }}</div>
+</div>
+{% else %}
+<div class="chat chat-start">
+    <div class="chat-image">{{ facehash(role_name, 32) }}</div>
+    <div class="chat-bubble chat-bubble-neutral whitespace-pre-wrap">{{ content }}</div>
+</div>
+{% endif %}

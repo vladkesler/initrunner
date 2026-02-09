@@ -1,0 +1,27 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: skill-demo
+  description: Demonstration of skill-based composition
+  tags:
+    - demo
+    - skills
+spec:
+  role: |
+    You are a versatile research assistant that can browse the web,
+    read code, and tell the time. Use the appropriate skills for each task.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  skills:
+    - ../skills/web-researcher
+    - ../skills/code-tools.md
+  tools:
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50
