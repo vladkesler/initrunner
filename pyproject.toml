@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "initrunner"
-version = "0.2.0rc2"
+version = "0.2.0"
 description = "A lightweight AI agent runner"
 readme = "README.md"
 license = "MIT"
