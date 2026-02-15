@@ -79,6 +79,6 @@ Detailed docs live in `docs/`. Key references:
 | Textual TUI | `docs/interfaces/tui.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Auth & guardrails | `docs/security/auth.md`, `docs/configuration/guardrails.md` |
-| CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/release_preparation.md` |
+| CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/pypi_publish.md` |
 | Role generation & wizards | `docs/agents/role_generation.md` |
 | Provider configuration | `docs/configuration/providers.md`, `docs/configuration/ollama.md` |
