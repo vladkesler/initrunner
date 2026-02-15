@@ -107,12 +107,17 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
 
-      - name: Install from TestPyPI
+      - name: Download from TestPyPI
         run: |
-          pip install \
+          pip download --no-deps \
             --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
+            -d /tmp/testpypi-pkg \
             "initrunner==${{ steps.version.outputs.version }}"
+
+      - name: Install from local wheel with all extras
+        run: |
+          WHEEL=$(ls /tmp/testpypi-pkg/initrunner-*.whl)
+          pip install "${WHEEL}[tui,ingest,dashboard]"
 
       - name: Smoke test - CLI
         run: |
@@ -130,25 +135,10 @@ jobs:
           "
 
       - name: Smoke test - tui extra
-        run: |
-          pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            "initrunner[tui]==${{ steps.version.outputs.version }}"
-          python -c "import initrunner.tui; print('TUI import OK')"
+        run: python -c "import initrunner.tui; print('TUI import OK')"
 
       - name: Smoke test - ingest extra
-        run: |
-          pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            "initrunner[ingest]==${{ steps.version.outputs.version }}"
-          python -c "import initrunner.ingestion; print('Ingest import OK')"
+        run: python -c "import initrunner.ingestion; print('Ingest import OK')"
 
       - name: Smoke test - dashboard extra
-        run: |
-          pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            "initrunner[dashboard]==${{ steps.version.outputs.version }}"
-          python -c "import initrunner.api; print('Dashboard import OK')"
+        run: python -c "import initrunner.api; print('Dashboard import OK')"
