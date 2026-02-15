@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.2.0b1] - 2026-02-12
+## [0.2.0rc1] - 2026-02-15
 
-First public beta release.
+First public release candidate.
 
 ### Added
 

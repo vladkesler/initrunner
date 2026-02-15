@@ -1,0 +1,154 @@
+name: Publish to TestPyPI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run ty check initrunner/
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --dev
+      - run: uv run pytest tests/ -v
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: uv sync --dev
+
+      - name: Verify package version is a pre-release
+        run: |
+          PKG_VERSION=$(uv run python -c "import importlib.metadata; print(importlib.metadata.version('initrunner'))")
+          echo "Package version: $PKG_VERSION"
+          if [[ ! "$PKG_VERSION" =~ (rc|a|b|dev) ]]; then
+            echo "ERROR: Package version '$PKG_VERSION' is not a pre-release version."
+            echo "TestPyPI workflow should only publish pre-release versions."
+            exit 1
+          fi
+
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  verify-install:
+    needs: publish
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Wait for TestPyPI to index the package
+        run: sleep 30
+
+      - name: Get package version from build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Extract version from wheel filename
+        id: version
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          # Wheel filename format: name-version-py3-none-any.whl
+          VERSION=$(echo "$WHEEL" | sed 's/.*initrunner-\(.*\)-py3.*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Install from TestPyPI
+        run: |
+          pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "initrunner==${{ steps.version.outputs.version }}"
+
+      - name: Smoke test - CLI
+        run: |
+          initrunner --version
+          initrunner --help
+
+      - name: Smoke test - core imports
+        run: |
+          python -c "
+          import initrunner
+          import initrunner.agent
+          import initrunner.cli
+          import initrunner.runner
+          print('Core imports OK')
+          "
+
+      - name: Smoke test - tui extra
+        run: |
+          pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "initrunner[tui]==${{ steps.version.outputs.version }}"
+          python -c "import initrunner.tui; print('TUI import OK')"
+
+      - name: Smoke test - ingest extra
+        run: |
+          pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "initrunner[ingest]==${{ steps.version.outputs.version }}"
+          python -c "import initrunner.ingestion; print('Ingest import OK')"
+
+      - name: Smoke test - dashboard extra
+        run: |
+          pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "initrunner[dashboard]==${{ steps.version.outputs.version }}"
+          python -c "import initrunner.api; print('Dashboard import OK')"
