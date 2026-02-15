@@ -115,6 +115,9 @@ jobs:
             "initrunner==${{ steps.version.outputs.version }}"
 
       - name: Install from local wheel with all extras
+        env:
+          PIP_INDEX_URL: ""
+          PIP_EXTRA_INDEX_URL: ""
         run: |
           WHEEL=$(ls /tmp/testpypi-pkg/initrunner-*.whl)
           pip install "${WHEEL}[tui,ingest,dashboard]"
