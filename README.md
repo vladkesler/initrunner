@@ -21,7 +21,7 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, and triggers — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **Note:** InitRunner is currently in beta (v0.2.0b1). APIs may change between releases.
+> **Note:** InitRunner is in early release (v0.2.0). APIs may change between minor versions.
 
 ## Table of Contents
 
@@ -30,6 +30,7 @@ Your agent is a YAML file. Its tools, knowledge base, memory, and triggers — a
 - [From Simple to Powerful](#from-simple-to-powerful)
 - [Community Roles](#community-roles)
 - [Install & Quickstart](#install--quickstart)
+- [Docker](#docker)
 - [Core Concepts](#core-concepts)
 - [CLI Quick Reference](#cli-quick-reference)
 - [Documentation](#documentation)
@@ -193,7 +194,17 @@ Every install shows a security summary (tools, model, author) and asks for confi
 curl -fsSL https://initrunner.ai/install.sh | sh
 ```
 
-Or install directly with `pip install initrunner`, `uv tool install initrunner`, or `pipx install initrunner`. Common extras:
+Or with a package manager:
+
+```bash
+pip install initrunner
+# or
+uv tool install initrunner
+# or
+pipx install initrunner
+```
+
+Common extras:
 
 | Extra | What it adds |
 |-------|--------------|
@@ -233,6 +244,44 @@ initrunner run code-reviewer.yaml -p "Review the last 3 commits"
 ```
 
 Start an interactive chat with `-i`, or use `initrunner setup` for a guided wizard. See [docs/getting-started/setup.md](docs/getting-started/setup.md) for provider setup.
+
+## Docker
+
+Run InitRunner without installing Python — just Docker:
+
+```bash
+# One-shot prompt
+docker run --rm -e OPENAI_API_KEY \
+    -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
+    run /roles/my-agent.yaml -p "Hello"
+
+# Interactive chat
+docker run --rm -it -e OPENAI_API_KEY \
+    -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
+    run /roles/my-agent.yaml -i
+
+# Web dashboard
+docker run -d -e OPENAI_API_KEY \
+    -v ./roles:/roles -v initrunner-data:/data \
+    -p 8420:8420 ghcr.io/vladkesler/initrunner:latest \
+    ui --role-dir /roles
+```
+
+Or use the included `docker-compose.yml` to start the dashboard with persistent storage:
+
+```bash
+# Set API keys in .env or export them, then:
+docker compose up
+```
+
+Build the image locally:
+
+```bash
+docker build -t initrunner .
+docker run --rm initrunner --version
+```
+
+The default image includes dashboard, ingestion, all model providers, and safety extras. Override with `--build-arg EXTRAS="dashboard,anthropic"` to customize. Using Ollama on the host? Use `http://host.docker.internal:11434/v1` as the model endpoint.
 
 ## Core Concepts
 

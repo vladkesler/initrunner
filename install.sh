@@ -472,6 +472,7 @@ verify_install() {
 print_summary() {
     printf "\n"
     printf "  %bGet started:%b\n" "$BOLD" "$RESET"
+    printf "    initrunner setup\n"
     printf "    initrunner init --name my-agent\n"
     printf "    initrunner run role.yaml -p \"Hello!\"\n"
     printf "    initrunner --help\n"
