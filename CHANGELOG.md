@@ -36,3 +36,4 @@ First public release candidate.
 - **Multi-provider support**: OpenAI, Anthropic, Google, Groq, Mistral (via pydantic-ai-slim extras)
 - **Context window safety**: REPL history sliding window, max_resume_messages, daemon session pruning
 - **Security hardening**: env var scrubbing for Python/git subprocesses, SQL query_only pragma, bounded tool results
+- **Docker support**: multi-stage Dockerfile (uv-based), docker-compose.yml, .dockerignore, and CI workflow for publishing images to GHCR and Docker Hub on version tags

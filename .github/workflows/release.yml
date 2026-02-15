@@ -69,3 +69,30 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          # Extract the section for this version (between its ## header and the next ## header or EOF)
+          NOTES=$(awk "/^## \\[${TAG}\\]/{found=1; next} /^## \\[/{found=0} found" CHANGELOG.md)
+          # Write to file to avoid quoting issues
+          echo "$NOTES" > release_notes.md
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: dist/*
