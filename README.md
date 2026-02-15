@@ -267,6 +267,8 @@ docker run -d -e OPENAI_API_KEY \
     ui --role-dir /roles
 ```
 
+The image is also available on Docker Hub: `vladkesler/initrunner`
+
 Or use the included `docker-compose.yml` to start the dashboard with persistent storage:
 
 ```bash
