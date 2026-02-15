@@ -38,10 +38,10 @@ jobs:
         with:
           images: |
             ghcr.io/vladkesler/initrunner
-            docker.io/initrunner/initrunner
+            docker.io/vladkesler/initrunner
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
