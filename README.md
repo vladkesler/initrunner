@@ -299,7 +299,11 @@ spec:
   role: "System prompt goes here."
   model: { provider: openai, name: gpt-4o-mini }
   tools: [...]
-  guardrails: { max_tool_calls: 20, timeout_seconds: 300 }
+  guardrails:
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_tokens_per_run: 50000
+    autonomous_token_budget: 200000
 ```
 
 Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-4o-mini`.
@@ -331,8 +335,24 @@ Add a built-in tool by creating a single file in `initrunner/agent/tools/` with 
 |------|---------|----------|
 | Single-shot | `initrunner run role.yaml -p "prompt"` | One question, one answer |
 | Interactive | `initrunner run role.yaml -i` | Multi-turn chat (REPL) |
+| Autonomous | `initrunner run role.yaml -p "prompt" -a` | Multi-step agentic loop with self-reflection |
 | Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook) |
 | API server | `initrunner serve role.yaml` | OpenAI-compatible HTTP API |
+
+### Guardrails
+
+Control costs and runaway agents with `spec.guardrails`:
+
+| Setting | Default | Scope |
+|---------|---------|-------|
+| `max_tokens_per_run` | 50 000 | Output tokens per single LLM call |
+| `max_tool_calls` | 20 | Tool invocations per run |
+| `timeout_seconds` | 300 | Wall-clock timeout per run |
+| `autonomous_token_budget` | — | Total tokens across all autonomous iterations |
+| `session_token_budget` | — | Cumulative limit for an interactive session |
+| `daemon_daily_token_budget` | — | Daily token cap for daemon mode |
+
+See [Guardrails](docs/configuration/guardrails.md) and [Token Control](docs/configuration/token_control.md) for the full reference.
 
 For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#from-simple-to-powerful) above. Full references: [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Triggers](docs/core/triggers.md) · [Compose](docs/orchestration/agent_composer.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md)
 
@@ -342,6 +362,8 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 |---------|-------------|
 | `run <role.yaml> -p "..."` | Single-shot prompt |
 | `run <role.yaml> -i` | Interactive REPL |
+| `run <role.yaml> -p "..." -a` | Autonomous agentic loop |
+| `run <role.yaml> -p "..." -a --max-iterations N` | Autonomous with iteration limit |
 | `validate <role.yaml>` | Validate a role definition |
 | `init --name <name> [--model <model>]` | Scaffold a new role |
 | `setup` | Guided provider setup wizard |
@@ -367,7 +389,7 @@ See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full comm
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) |
-| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Triggers](docs/core/triggers.md) |
+| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
 | Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [CI/CD](docs/operations/cicd.md) |
 

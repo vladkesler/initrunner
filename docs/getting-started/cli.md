@@ -46,10 +46,14 @@
 |------|-------------|
 | `-p, --prompt TEXT` | Single prompt to send |
 | `-i, --interactive` | Interactive REPL mode |
+| `-a, --autonomous` | Autonomous agentic loop mode (requires `-p`) |
+| `--max-iterations N` | Override max iterations for autonomous mode |
 | `--resume` | Resume the previous REPL session (requires `memory:` config) |
 | `--dry-run` | Simulate with TestModel (no API calls) |
 | `--audit-db PATH` | Custom audit database path |
 | `--no-audit` | Disable audit logging |
+
+Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `spec.guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 
 Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then continues interactively.
 
