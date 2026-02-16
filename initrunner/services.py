@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
 
     from initrunner.agent.executor import AutonomousResult, RunResult
+    from initrunner.agent.prompt import UserPrompt
     from initrunner.agent.schema import RoleDefinition
     from initrunner.audit.logger import AuditLogger, AuditRecord
     from initrunner.ingestion.pipeline import FileStatus, IngestStats
@@ -146,7 +147,7 @@ def build_agent_sync(path: Path) -> tuple[RoleDefinition, Agent]:
 def execute_run_sync(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: str | UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
@@ -166,7 +167,7 @@ def execute_run_sync(
 def execute_autonomous_sync(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: str | UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     memory_store: MemoryStoreBase | None = None,
@@ -188,7 +189,7 @@ def execute_autonomous_sync(
 def execute_run_stream_sync(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: str | UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
@@ -333,7 +334,14 @@ def delete_session_sync(role: RoleDefinition, session_id: str) -> bool:
 
 def export_session_markdown_sync(role: RoleDefinition, messages: list[ModelMessage]) -> str:
     """Convert a ModelMessage list to a markdown string for export."""
-    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+    from pydantic_ai.messages import (
+        ModelRequest,
+        ModelResponse,
+        TextPart,
+        UserPromptPart,
+    )
+
+    from initrunner.agent.prompt import render_content_as_text
 
     lines: list[str] = []
     lines.append(f"# Chat Export — {role.metadata.name}")
@@ -343,8 +351,13 @@ def export_session_markdown_sync(role: RoleDefinition, messages: list[ModelMessa
         if isinstance(msg, ModelRequest):
             for part in msg.parts:
                 if isinstance(part, UserPromptPart):
-                    content = part.content if isinstance(part.content, str) else str(part.content)
-                    lines.append(f"**You:** {content}")
+                    if isinstance(part.content, str):
+                        lines.append(f"**You:** {part.content}")
+                    elif isinstance(part.content, list):
+                        text_parts = [render_content_as_text(item) for item in part.content]
+                        lines.append(f"**You:** {' '.join(text_parts)}")
+                    else:
+                        lines.append(f"**You:** {part.content}")
                     lines.append("")
         elif isinstance(msg, ModelResponse):
             for part in msg.parts:

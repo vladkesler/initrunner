@@ -83,3 +83,4 @@ Detailed docs live in `docs/`. Key references:
 | CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/pypi_publish.md` |
 | Role generation & wizards | `docs/agents/role_generation.md` |
 | Provider configuration | `docs/configuration/providers.md`, `docs/configuration/ollama.md` |
+| Multimodal input | `docs/core/multimodal.md` |

@@ -5,9 +5,18 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+class ContentPart(BaseModel):
+    """Multimodal content part (OpenAI format)."""
+
+    type: str  # "text", "image_url", "input_audio", etc.
+    text: str | None = None
+    image_url: dict | None = None  # {"url": "..."}
+    input_audio: dict | None = None  # {"data": "base64...", "format": "mp3"}
+
+
 class ChatMessage(BaseModel):
     role: str
-    content: str | None = None
+    content: str | list[ContentPart] | None = None
 
 
 class ChatCompletionRequest(BaseModel):

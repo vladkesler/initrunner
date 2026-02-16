@@ -70,6 +70,12 @@ function initChatStream(formId, messagesId, streamUrl, options) {
     options = options || {};
     var roleId = options.roleId || "";
     var sessionTokenBudget = options.sessionTokenBudget || null;
+    var uploadUrl = options.uploadUrl || "";
+
+    // Attachment state
+    var pendingAttachmentIds = [];  // IDs from uploaded files
+    var pendingAttachmentUrls = []; // URL strings
+    var pendingAttachmentNames = []; // display names for chips
 
     // Session ID management — persist per role in sessionStorage
     var storageKey = "initrunner_session_" + roleId;
@@ -108,6 +114,53 @@ function initChatStream(formId, messagesId, streamUrl, options) {
         }
     }
 
+    function renderAttachmentChips() {
+        var container = document.getElementById("attachment-chips");
+        if (!container) return;
+        container.innerHTML = "";
+        var hasItems = pendingAttachmentNames.length > 0;
+        container.style.display = hasItems ? "flex" : "none";
+        pendingAttachmentNames.forEach(function(name, idx) {
+            var chip = document.createElement("div");
+            chip.className = "badge badge-outline gap-1";
+            chip.innerHTML = escapeHtml(name) + ' <button class="btn btn-xs btn-ghost btn-circle">&times;</button>';
+            chip.querySelector("button").addEventListener("click", function() {
+                pendingAttachmentIds.splice(idx, 1);
+                pendingAttachmentUrls.splice(idx, 1);
+                pendingAttachmentNames.splice(idx, 1);
+                renderAttachmentChips();
+            });
+            container.appendChild(chip);
+        });
+    }
+
+    // File upload handler
+    var fileInput = document.getElementById("file-upload");
+    var attachBtn = document.getElementById("btn-attach-file");
+    if (attachBtn && fileInput && uploadUrl) {
+        attachBtn.addEventListener("click", function() { fileInput.click(); });
+        fileInput.addEventListener("change", function() {
+            if (!fileInput.files || !fileInput.files.length) return;
+            var formData = new FormData();
+            for (var i = 0; i < fileInput.files.length; i++) {
+                formData.append("file_" + i, fileInput.files[i]);
+            }
+            fetch(uploadUrl, { method: "POST", body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) { alert(data.error); return; }
+                    var ids = data.attachment_ids || [];
+                    for (var j = 0; j < ids.length; j++) {
+                        pendingAttachmentIds.push(ids[j]);
+                        pendingAttachmentUrls.push(""); // not a URL
+                        pendingAttachmentNames.push(fileInput.files[j] ? fileInput.files[j].name : "file");
+                    }
+                    renderAttachmentChips();
+                });
+            fileInput.value = "";
+        });
+    }
+
     form.addEventListener("submit", function(e) {
         e.preventDefault();
         var input = form.querySelector("textarea, input[name=prompt]");
@@ -143,6 +196,25 @@ function initChatStream(formId, messagesId, streamUrl, options) {
         if (submitBtn) submitBtn.disabled = true;
 
         var url = streamUrl + "?prompt=" + encodeURIComponent(prompt) + "&session_id=" + encodeURIComponent(sessionId);
+        // Append attachment params if present
+        var aidList = pendingAttachmentIds.filter(function(id) { return id; });
+        var aurlList = pendingAttachmentUrls.filter(function(u) { return u; });
+        if (aidList.length) url += "&attachment_ids=" + encodeURIComponent(aidList.join(","));
+        if (aurlList.length) url += "&attachment_urls=" + encodeURIComponent(aurlList.join(","));
+        // Show attachment indicator in user message if present
+        if (pendingAttachmentNames.length) {
+            var indicator = document.createElement("div");
+            indicator.className = "text-xs text-base-content/50 mt-1";
+            indicator.textContent = "[" + pendingAttachmentNames.length + " attachment(s)]";
+            var lastChat = messages.lastElementChild;
+            if (lastChat) lastChat.appendChild(indicator);
+        }
+        // Clear pending attachments
+        pendingAttachmentIds = [];
+        pendingAttachmentUrls = [];
+        pendingAttachmentNames = [];
+        renderAttachmentChips();
+
         var evtSource = new EventSource(url);
 
         var thinkingTimer = setTimeout(function() {

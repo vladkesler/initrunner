@@ -232,14 +232,26 @@ class ChatView(ScrollableContainer):
 
     def replay_messages(self, messages: list, role_name: str | None = None) -> None:
         """Replay a list of ModelMessage objects as chat bubbles."""
-        from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+        from pydantic_ai.messages import (
+            ModelRequest,
+            ModelResponse,
+            TextPart,
+            UserPromptPart,
+        )
+
+        from initrunner.agent.prompt import render_content_as_text
 
         for msg in messages:
             if isinstance(msg, ModelRequest):
                 for part in msg.parts:
                     if isinstance(part, UserPromptPart):
-                        text = part.content if isinstance(part.content, str) else str(part.content)
-                        self.add_user_message(text)
+                        if isinstance(part.content, str):
+                            self.add_user_message(part.content)
+                        elif isinstance(part.content, list):
+                            text_parts = [render_content_as_text(item) for item in part.content]
+                            self.add_user_message(" ".join(text_parts))
+                        else:
+                            self.add_user_message(str(part.content))
             elif isinstance(msg, ModelResponse):
                 for part in msg.parts:
                     if isinstance(part, TextPart):

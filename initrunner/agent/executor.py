@@ -17,6 +17,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
 
 from initrunner._ids import generate_id
+from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
 from initrunner.agent.schema import RoleDefinition
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
@@ -141,7 +142,7 @@ def check_token_budget(consumed: int, budget: int | None) -> TokenBudgetStatus:
 
 
 def _validate_input_or_fail(
-    prompt: str,
+    prompt: UserPrompt,
     role: RoleDefinition,
     run_id: str,
     *,
@@ -153,12 +154,13 @@ def _validate_input_or_fail(
     """Run pre-flight content validation. Returns a failed RunResult if blocked, else None."""
     from initrunner.agent.policies import redact_text, validate_input
 
+    prompt_text = extract_text_from_prompt(prompt)
     content_policy = role.spec.security.content
-    validation = validate_input(prompt, content_policy, model_override=model_override)
+    validation = validate_input(prompt_text, content_policy, model_override=model_override)
     if not validation.valid:
         result = RunResult(run_id=run_id, success=False, error=validation.reason, duration_ms=0)
         if audit_logger is not None:
-            audit_prompt = redact_text(prompt, content_policy)
+            audit_prompt = redact_text(prompt_text, content_policy)
             audit_logger.log(
                 AuditRecord.from_run(
                     result,
@@ -202,7 +204,7 @@ def _apply_output_validation(result: RunResult, role: RoleDefinition) -> None:
 def _audit_result(
     result: RunResult,
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None,
     trigger_type: str | None = None,
@@ -213,8 +215,12 @@ def _audit_result(
         return
     from initrunner.agent.policies import redact_text
 
+    prompt_text = extract_text_from_prompt(prompt)
+    summary = attachment_summary(prompt)
     content_policy = role.spec.security.content
-    audit_prompt = redact_text(prompt, content_policy)
+    audit_prompt = redact_text(prompt_text, content_policy)
+    if summary:
+        audit_prompt = f"{audit_prompt} {summary}"
     audit_output = redact_text(result.output, content_policy)
     audit_logger.log(
         AuditRecord.from_run(
@@ -235,7 +241,7 @@ def _audit_result(
 
 def _prepare_run(
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list | None = None,
@@ -292,7 +298,7 @@ def _prepare_run(
 def execute_run(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list | None = None,
@@ -366,7 +372,7 @@ def execute_run(
 def execute_run_stream(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list | None = None,

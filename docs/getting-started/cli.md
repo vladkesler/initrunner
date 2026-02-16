@@ -52,6 +52,8 @@
 | `--dry-run` | Simulate with TestModel (no API calls) |
 | `--audit-db PATH` | Custom audit database path |
 | `--no-audit` | Disable audit logging |
+| `--skill-dir PATH` | Extra skill search directory |
+| `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
 
 Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `spec.guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 

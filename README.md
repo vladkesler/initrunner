@@ -369,6 +369,7 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 | `setup` | Guided provider setup wizard |
 | `ingest <role.yaml>` | Ingest documents into vector store |
 | `daemon <role.yaml>` | Run in trigger-driven daemon mode |
+| `run <role.yaml> -p "..." -A file.png` | Attach files or URLs to prompt |
 | `serve <role.yaml>` | Serve as OpenAI-compatible API |
 | `tui` | Launch terminal dashboard |
 | `ui` | Launch web dashboard |
@@ -388,7 +389,7 @@ See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full comm
 |------|----------|
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
-| Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) |
+| Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
 | Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [CI/CD](docs/operations/cicd.md) |

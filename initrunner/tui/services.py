@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pydantic_ai import Agent
 
     from initrunner.agent.executor import RunResult
+    from initrunner.agent.prompt import UserPrompt
     from initrunner.agent.schema import RoleDefinition
     from initrunner.audit.logger import AuditRecord
     from initrunner.stores.base import Memory, SessionSummary
@@ -45,7 +46,7 @@ class ServiceBridge:
     async def run_agent(
         agent: Agent,
         role: RoleDefinition,
-        prompt: str,
+        prompt: str | UserPrompt,
         *,
         audit_logger: Any = None,
         message_history: list | None = None,
@@ -63,7 +64,7 @@ class ServiceBridge:
     def run_agent_streamed(
         agent: Agent,
         role: RoleDefinition,
-        prompt: str,
+        prompt: str | UserPrompt,
         *,
         audit_logger: Any = None,
         message_history: list | None = None,

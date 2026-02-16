@@ -58,8 +58,16 @@
                     {% endfor %}
                 </div>
 
+                {# Attachment chips #}
+                <div id="attachment-chips" class="flex flex-wrap gap-1 mb-2" style="display:none;"></div>
+
                 {# Input form #}
                 <form id="chat-form" class="flex gap-2" hx-boost="false">
+                    <input type="file" id="file-upload" class="hidden" multiple
+                           accept="image/*,audio/*,video/*,.pdf,.docx,.xlsx,.txt,.md,.csv,.html" />
+                    <button type="button" id="btn-attach-file" class="btn btn-sm btn-ghost" title="Attach file">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                    </button>
                     <textarea name="prompt" rows="1"
                               class="textarea textarea-bordered flex-1 resize-none"
                               placeholder="Type a message..."
@@ -88,7 +96,8 @@
     var chatApi = initChatStream("chat-form", "chat-messages", "/roles/" + roleId + "/chat/stream", {
         roleId: roleId,
         modelName: {{ model_name | tojson }},
-        sessionTokenBudget: {{ session_token_budget or 'null' }}
+        sessionTokenBudget: {{ session_token_budget or 'null' }},
+        uploadUrl: "/roles/" + roleId + "/chat/upload"
     });
 
     if (chatApi) {

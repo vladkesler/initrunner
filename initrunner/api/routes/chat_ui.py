@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import tempfile
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from starlette.datastructures import UploadFile
 
 from initrunner._ids import generate_id
 from initrunner.api._helpers import resolve_role_path, run_in_thread
@@ -20,6 +23,12 @@ _logger = logging.getLogger(__name__)
 _TOKEN_QUEUE_MAX = 10_000
 _MAX_API_HISTORY = 40
 _HEARTBEAT_INTERVAL = 100  # iterations (~10s at 0.1s poll)
+_UPLOAD_MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+_UPLOAD_TTL_SECONDS = 300  # 5 minutes
+
+# In-memory staging store for uploaded attachments: id → (path, expires_at)
+_upload_staging: dict[str, tuple[str, float]] = {}
+_upload_lock = asyncio.Lock()
 
 
 @router.get("/roles/{role_id}/chat", response_class=HTMLResponse)
@@ -50,17 +59,60 @@ async def chat_page(request: Request, role_id: str):
     )
 
 
+@router.post("/roles/{role_id}/chat/upload")
+async def chat_upload(request: Request, role_id: str):
+    """Upload files for attachment staging. Returns JSON list of attachment IDs."""
+    form = await request.form()
+    attachment_ids: list[str] = []
+
+    async with _upload_lock:
+        # Prune expired entries
+        now = time.time()
+        expired = [k for k, (_, exp) in _upload_staging.items() if exp < now]
+        for k in expired:
+            path = _upload_staging.pop(k)[0]
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        for key in form:
+            upload = form[key]
+            if not isinstance(upload, UploadFile) or upload.filename is None:
+                continue
+            data = await upload.read()
+            if len(data) > _UPLOAD_MAX_FILE_SIZE:
+                return JSONResponse(
+                    {"error": f"File too large: {upload.filename} (max 20 MB)"},
+                    status_code=400,
+                )
+            # Write to temp file preserving extension
+            suffix = Path(upload.filename).suffix
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, prefix="ir_upload_")
+            tmp.write(data)
+            tmp.close()
+
+            aid = generate_id()
+            _upload_staging[aid] = (tmp.name, time.time() + _UPLOAD_TTL_SECONDS)
+            attachment_ids.append(aid)
+
+    return JSONResponse({"attachment_ids": attachment_ids})
+
+
 @router.get("/roles/{role_id}/chat/stream")
 async def chat_stream(
     request: Request,
     role_id: str,
     prompt: str = Query(..., min_length=1, max_length=100_000),
     session_id: str | None = Query(None),
+    attachment_ids: str | None = Query(None),
+    attachment_urls: str | None = Query(None),
 ):
     """SSE streaming chat endpoint.
 
     Streams token chunks as SSE ``message`` events, then sends ``event: close``
-    with stats JSON when complete.
+    with stats JSON when complete.  Supports multimodal attachments via
+    ``attachment_ids`` (from upload endpoint) and ``attachment_urls`` params.
     """
     role_path = await resolve_role_path(request, role_id)
 
@@ -92,6 +144,48 @@ async def chat_stream(
 
             session = sessions.create(sid, role_id, agent, role, role_path)
 
+    # Resolve attachments into a multimodal prompt if present
+    attachments: list[str] = []
+    resolved_paths: list[str] = []
+    if attachment_ids:
+        async with _upload_lock:
+            for aid in attachment_ids.split(","):
+                aid = aid.strip()
+                if aid in _upload_staging:
+                    path, _ = _upload_staging.pop(aid)
+                    attachments.append(path)
+                    resolved_paths.append(path)
+    if attachment_urls:
+        for url in attachment_urls.split(","):
+            url = url.strip()
+            if url:
+                attachments.append(url)
+
+    if attachments:
+        from initrunner.agent.prompt import build_multimodal_prompt
+
+        try:
+            user_prompt = build_multimodal_prompt(prompt, attachments)
+        except (FileNotFoundError, ValueError) as exc:
+            error_msg = str(exc)
+
+            async def _error_stream():
+                yield f"event: close\ndata: {json.dumps({'error': error_msg})}\n\n"
+
+            return StreamingResponse(
+                _error_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+            )
+        finally:
+            for p in resolved_paths:
+                try:
+                    Path(p).unlink(missing_ok=True)
+                except OSError:
+                    pass
+    else:
+        user_prompt = prompt
+
     async def event_stream():
         from initrunner.services import execute_run_stream_sync
 
@@ -110,7 +204,7 @@ async def chat_stream(
             return execute_run_stream_sync(
                 session.agent,
                 session.role,
-                prompt,
+                user_prompt,
                 message_history=session.message_history or None,
                 on_token=on_token,
                 audit_logger=audit_logger,
@@ -242,15 +336,22 @@ async def get_session_messages(request: Request, role_id: str, session_id: str):
     """Load messages for a specific session."""
     from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
+    from initrunner.agent.prompt import render_content_as_text
+
     def _to_json(messages):
         result = []
         for msg in messages:
             if isinstance(msg, ModelRequest):
                 for part in msg.parts:
                     if isinstance(part, UserPromptPart):
-                        content = (
-                            part.content if isinstance(part.content, str) else str(part.content)
-                        )
+                        if isinstance(part.content, str):
+                            content = part.content
+                        elif isinstance(part.content, list):
+                            content = " ".join(
+                                render_content_as_text(item) for item in part.content
+                            )
+                        else:
+                            content = str(part.content)
                         result.append({"role": "user", "content": content})
             elif isinstance(msg, ModelResponse):
                 for part in msg.parts:

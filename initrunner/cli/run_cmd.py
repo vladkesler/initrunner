@@ -39,6 +39,14 @@ def run(
     skill_dir: Annotated[
         Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
     ] = None,
+    attach: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--attach",
+            "-A",
+            help="Attach file or URL (repeatable, supports images/audio/video/docs)",
+        ),
+    ] = None,
 ) -> None:
     """Run an agent with a role definition."""
     if autonomous and not prompt:
@@ -46,6 +54,12 @@ def run(
         raise typer.Exit(1)
     if autonomous and interactive:
         console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
+        raise typer.Exit(1)
+
+    import sys
+
+    if attach and not prompt and not interactive and sys.stdin.isatty():
+        console.print("[red]Error:[/red] use --prompt with --attach or pipe stdin.")
         raise typer.Exit(1)
 
     from initrunner.runner import run_autonomous, run_interactive, run_single
@@ -58,6 +72,17 @@ def run(
             custom_output_text="[dry-run] Simulated response.", call_tools=[]
         )
 
+    # Build multimodal prompt if attachments provided
+    user_prompt = prompt
+    if attach and prompt:
+        from initrunner.agent.prompt import build_multimodal_prompt
+
+        try:
+            user_prompt = build_multimodal_prompt(prompt, attach)
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[red]Attachment error:[/red] {e}")
+            raise typer.Exit(1) from None
+
     with command_context(
         role_file,
         audit_db=audit_db,
@@ -69,31 +94,31 @@ def run(
         message_history = None
 
         if autonomous:
-            assert prompt is not None  # guarded above
+            assert user_prompt is not None  # guarded above
             run_autonomous(
                 agent,
                 role,
-                prompt,
+                user_prompt,
                 audit_logger=audit_logger,
                 sink_dispatcher=sink_dispatcher,
                 memory_store=memory_store,
                 model_override=model_override,
                 max_iterations_override=max_iterations,
             )
-        elif prompt and not interactive:
+        elif user_prompt and not interactive:
             run_single(
                 agent,
                 role,
-                prompt,
+                user_prompt,
                 audit_logger=audit_logger,
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
             )
-        elif prompt and interactive:
+        elif user_prompt and interactive:
             _, message_history = run_single(
                 agent,
                 role,
-                prompt,
+                user_prompt,
                 audit_logger=audit_logger,
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,

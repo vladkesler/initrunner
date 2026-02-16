@@ -6,6 +6,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from initrunner.agent.executor import RunResult, execute_run
+from initrunner.agent.prompt import UserPrompt, extract_text_from_prompt
 from initrunner.agent.schema import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import _display_result, console
@@ -15,7 +16,7 @@ from initrunner.sinks.dispatcher import SinkDispatcher
 def run_single(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list | None = None,
@@ -34,5 +35,5 @@ def run_single(
         )
     _display_result(result)
     if sink_dispatcher is not None:
-        sink_dispatcher.dispatch(result, prompt)
+        sink_dispatcher.dispatch(result, extract_text_from_prompt(prompt))
     return result, messages

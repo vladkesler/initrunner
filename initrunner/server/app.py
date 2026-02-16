@@ -21,6 +21,7 @@ from starlette.routing import Route
 
 from initrunner.agent.executor import execute_run, execute_run_stream
 from initrunner.agent.policies import validate_input
+from initrunner.agent.prompt import extract_text_from_prompt
 from initrunner.agent.schema import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.server.conversations import ConversationStore
@@ -150,16 +151,21 @@ def create_app(
         try:
             if server_history is not None:
                 # Use server-side history; prompt is just the last user message
-                last_user = ""
+                last_user_msg = None
                 for msg in reversed(req.messages):
                     if msg.role == "user":
-                        last_user = msg.content or ""
+                        last_user_msg = msg
                         break
-                if not last_user:
+                if last_user_msg is None or not last_user_msg.content:
                     return _error_response(
                         400, "invalid_request_error", "no user message found in messages"
                     )
-                prompt = last_user
+                if isinstance(last_user_msg.content, list):
+                    from initrunner.server.convert import convert_content_parts
+
+                    prompt = convert_content_parts(last_user_msg.content)
+                else:
+                    prompt = last_user_msg.content
                 message_history = server_history
             else:
                 prompt, message_history = openai_messages_to_pydantic(req.messages)
@@ -194,7 +200,7 @@ def create_app(
     async def _handle_non_stream(
         agent: Agent,
         role: RoleDefinition,
-        prompt: str,
+        prompt,
         message_history: list | None,
         model_name: str,
         conv_id: str,
@@ -202,7 +208,7 @@ def create_app(
         audit_logger: AuditLogger | None,
     ) -> JSONResponse:
         content_policy = role.spec.security.content
-        validation = validate_input(prompt, content_policy)
+        validation = validate_input(extract_text_from_prompt(prompt), content_policy)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
 
@@ -249,7 +255,7 @@ def create_app(
     async def _handle_stream(
         agent: Agent,
         role: RoleDefinition,
-        prompt: str,
+        prompt,
         message_history: list | None,
         model_name: str,
         conv_id: str,
@@ -259,7 +265,7 @@ def create_app(
         # Pre-flight input validation — reject before streaming starts so the
         # client gets a proper HTTP 400, not a 200 SSE stream with an error.
         content_policy = role.spec.security.content
-        validation = validate_input(prompt, content_policy)
+        validation = validate_input(extract_text_from_prompt(prompt), content_policy)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
 

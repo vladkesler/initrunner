@@ -15,6 +15,7 @@ from initrunner.agent.executor import (
     execute_run,
 )
 from initrunner.agent.memory_ops import save_session
+from initrunner.agent.prompt import UserPrompt, extract_text_from_prompt
 from initrunner.agent.schema import AutonomyConfig, RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import (
@@ -89,7 +90,7 @@ def _persist_autonomous_memory(
 def run_autonomous(
     agent: Agent,
     role: RoleDefinition,
-    prompt: str,
+    prompt: UserPrompt,
     *,
     audit_logger: AuditLogger | None = None,
     sink_dispatcher: SinkDispatcher | None = None,
@@ -235,7 +236,7 @@ def run_autonomous(
 
     # Dispatch to sinks (final output only)
     if sink_dispatcher is not None and iterations:
-        sink_dispatcher.dispatch(iterations[-1], prompt)
+        sink_dispatcher.dispatch(iterations[-1], extract_text_from_prompt(prompt))
 
     _display_autonomous_summary(
         auto_result, reflection_state.summary, max_iterations, cumulative_tokens

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-02-16
+
+### Added
+
+- **Multimodal input** across CLI, server, and dashboard: attach images, audio, video, and documents via `--attach`/`-A` (CLI), OpenAI-format `content` arrays (server), and file upload (dashboard)
+
+### Documentation
+
+- New multimodal reference (`docs/core/multimodal.md`): supported file types, CLI examples, REPL commands, server API format, dashboard upload flow, model compatibility, and error handling
+- Add `--attach`/`-A` flag to CLI reference
+- Add multimodal content parts and examples to server docs
+- Add file attachments section to dashboard docs
+- Add multimodal links to README and CLAUDE.md
+
 ## [0.3.0] - 2026-02-16
 
 ### Added

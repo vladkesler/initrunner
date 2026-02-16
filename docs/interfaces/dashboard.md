@@ -182,6 +182,17 @@ All routes delegate to sync functions in `services.py`. The TUI's
 | `/audit/table` | `audit/_table.html` | HTMX fragment: filtered audit rows |
 | `/audit/{run_id}` | `audit/_detail.html` | HTMX fragment: audit detail panel |
 
+## File Attachments
+
+The chat interface supports uploading files to send as multimodal input alongside text prompts.
+
+- **Upload endpoint:** `POST /roles/{role_id}/chat/upload` — accepts form-data file uploads, returns a JSON list of attachment IDs
+- **Staging:** uploaded files are held in memory for **5 minutes** (TTL), then pruned
+- **Size limit:** 20 MB per file
+- **Flow:** attachment IDs from the upload response are passed to the SSE stream endpoint with the next prompt
+
+Supported file types: images, audio, video, and documents. See [Multimodal Input](../core/multimodal.md) for the full list.
+
 ## HTMX Patterns
 
 ### Fragment-based updates

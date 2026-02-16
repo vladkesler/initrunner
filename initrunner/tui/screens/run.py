@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from textual.binding import Binding
 from textual.screen import ModalScreen
@@ -114,6 +114,7 @@ class RunScreen(RoleScreen):
         Binding("ctrl+e", "export_conversation", "Export", show=True),
         Binding("ctrl+d", "exit_chat", "Exit", show=True),
         Binding("ctrl+r", "resume_session", "Resume", show=True),
+        Binding("ctrl+a", "attach_file", "Attach", show=True),
         Binding("escape", "exit_chat", "Back", show=True),
     ]
 
@@ -121,6 +122,7 @@ class RunScreen(RoleScreen):
         super().__init__(role_path=role_path, role=role)
         self._agent: Agent | None = None
         self._message_history: list | None = None
+        self._pending_attachments: list[str] = []
         from initrunner._ids import generate_id
 
         self._session_id = generate_id()
@@ -189,12 +191,26 @@ class RunScreen(RoleScreen):
         from initrunner.tui.widgets.chat_view import ChatView
 
         chat = self.query_one("#chat-container", ChatView)
-        chat.add_user_message(text)
 
-        # Try streaming first, fall back to non-streaming
-        self.run_worker(self._run_streamed(text), exclusive=True, group="agent-run")
+        # Build multimodal prompt if attachments are pending
+        if self._pending_attachments:
+            from initrunner.agent.prompt import build_multimodal_prompt
 
-    async def _run_streamed(self, prompt: str) -> None:
+            try:
+                user_prompt = build_multimodal_prompt(text, self._pending_attachments)
+            except (FileNotFoundError, ValueError) as e:
+                self.notify(f"Attachment error: {e}", severity="error")
+                self._busy = False
+                return
+            display_text = f"{text} [{len(self._pending_attachments)} attachment(s)]"
+            self._pending_attachments.clear()
+            chat.add_user_message(display_text)
+            self.run_worker(self._run_streamed(user_prompt), exclusive=True, group="agent-run")
+        else:
+            chat.add_user_message(text)
+            self.run_worker(self._run_streamed(text), exclusive=True, group="agent-run")
+
+    async def _run_streamed(self, prompt: Any) -> None:
         from initrunner.tui.services import ServiceBridge
         from initrunner.tui.widgets.chat_view import ChatView
 
@@ -241,7 +257,7 @@ class RunScreen(RoleScreen):
         finally:
             self._busy = False
 
-    async def _run_non_streamed(self, prompt: str) -> None:
+    async def _run_non_streamed(self, prompt: Any) -> None:
         from initrunner.tui.services import ServiceBridge
         from initrunner.tui.widgets.chat_view import ChatView
 
@@ -439,6 +455,35 @@ class RunScreen(RoleScreen):
         path = Path.cwd() / filename
         path.write_text(md, encoding="utf-8")
         self.notify(f"Exported to {filename}")
+
+    def action_attach_file(self) -> None:
+        """Prompt user for a file path or URL to attach."""
+        from initrunner.tui.widgets.chat_input import ChatInput
+
+        area = self.query_one("#input-area", ChatInput)
+        text = area.text.strip()
+        # If the input starts with /attach, treat it as an attach command
+        if text.startswith("/attach "):
+            path = text[len("/attach ") :].strip()
+            if path:
+                self._pending_attachments.append(path)
+                self.notify(f"Queued: {path} ({len(self._pending_attachments)} total)")
+            area.clear()
+        elif text == "/attachments":
+            if self._pending_attachments:
+                self.notify(", ".join(self._pending_attachments))
+            else:
+                self.notify("No attachments queued")
+            area.clear()
+        elif text == "/clear-attachments":
+            self._pending_attachments.clear()
+            self.notify("Attachments cleared")
+            area.clear()
+        else:
+            self.notify(
+                "Type /attach <path_or_url> then press Ctrl+A, "
+                "or /attachments to list, /clear-attachments to clear"
+            )
 
     def action_exit_chat(self) -> None:
         self.app.pop_screen()

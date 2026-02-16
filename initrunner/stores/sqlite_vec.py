@@ -835,7 +835,7 @@ class SqliteVecMemoryStore(MemoryStoreBase):
                 c.commit()
                 return row_id
 
-            return _retry_on_locked(self._conn, _do)  # type: ignore[return-value]
+            return _retry_on_locked(self._conn, _do)
 
     def search_memories(self, embedding: list[float], top_k: int = 5) -> list[tuple[Memory, float]]:
         with self._lock:

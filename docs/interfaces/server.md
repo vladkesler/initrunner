@@ -77,7 +77,61 @@ Each `ChatMessage` has:
 | Field | Type | Description |
 |-------|------|-------------|
 | `role` | `str` | `"system"`, `"user"`, or `"assistant"` |
-| `content` | `str \| null` | Message content |
+| `content` | `str \| list[ContentPart] \| null` | Message content (string for text-only, list for multimodal) |
+
+### Multimodal Input
+
+The `content` field can be a list of `ContentPart` objects for multimodal messages. Each part has a `type` and a type-specific field:
+
+| Type | Field | Description |
+|------|-------|-------------|
+| `text` | `text` | Plain text content |
+| `image_url` | `image_url` | `{"url": "https://..."}` or `{"url": "data:image/png;base64,..."}` |
+| `input_audio` | `input_audio` | `{"data": "<base64>", "format": "mp3"}` |
+
+**Example — image via URL:**
+
+```json
+{
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Describe this image."},
+      {"type": "image_url", "image_url": {"url": "https://example.com/photo.jpg"}}
+    ]
+  }]
+}
+```
+
+**Example — image via base64 data URI:**
+
+```json
+{
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "What is this?"},
+      {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo..."}}
+    ]
+  }]
+}
+```
+
+**Example — audio input:**
+
+```json
+{
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Transcribe this."},
+      {"type": "input_audio", "input_audio": {"data": "<base64>", "format": "mp3"}}
+    ]
+  }]
+}
+```
+
+See [Multimodal Input](../core/multimodal.md) for supported file types, size limits, and model compatibility.
 
 ## Non-Streaming Response
 
