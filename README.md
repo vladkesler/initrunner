@@ -78,7 +78,7 @@ That's it. No Python, no boilerplate. The same file also runs as an interactive 
 
 ## Why InitRunner
 
-**Config, not code** — Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 13+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, MCP) work out of the box. Need a custom tool? One file, one decorator.
+**Config, not code** — Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 16 built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, and more) work out of the box. Need a custom tool? One file, one decorator.
 
 **Version-control your agents** — Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
 
@@ -358,24 +358,38 @@ Validate with `initrunner validate role.yaml` or scaffold one with `initrunner i
 
 ### Tools
 
-Tools are configured in `spec.tools`. The most common ones:
+Tools give your agent capabilities beyond text generation. Configure them in `spec.tools`.
+
+#### Built-in tools
 
 | Type | What it does |
 |------|-------------|
 | `filesystem` | Read/write files within a root directory |
 | `git` | Git log, diff, blame, show (read-only by default) |
-| `http` | HTTP requests to a base URL |
-| `python` | Run Python in an isolated subprocess |
 | `shell` | Run shell commands with allowlist/blocklist |
-| `mcp` | Connect to MCP servers (stdio, SSE, streamable-http) |
+| `python` | Run Python in an isolated subprocess |
 | `sql` | Query SQLite databases (read-only by default) |
+| `http` | HTTP requests to a base URL |
+| `web_reader` | Fetch web pages and convert to markdown |
+| `web_scraper` | Scrape, chunk, embed, and store web pages |
+| `search` | Web and news search (DuckDuckGo, SerpAPI, Brave, Tavily) |
+| `email` | Search, read, and send email via IMAP/SMTP |
+| `slack` | Send messages to Slack channels |
+| `api` | Declarative REST API endpoints from YAML |
+| `datetime` | Get current time and parse dates |
+| `mcp` | Connect to MCP servers (stdio, SSE, streamable-http) |
 | `delegate` | Hand off to other agents |
+| `custom` | Load tool functions from external Python modules |
 
 See [docs/agents/tools.md](docs/agents/tools.md) for the full reference.
 
-### Creating tools
+#### Custom tools
 
-Add a built-in tool by creating a single file in `initrunner/agent/tools/` with a config class and a `@register_tool` decorated builder function. The tool is auto-discovered and immediately available in role YAML — no other files need editing. Tools use [PydanticAI's FunctionToolset](https://ai.pydantic.dev/tools/) under the hood. See [docs/agents/tool_creation.md](docs/agents/tool_creation.md) for the full guide, including custom tools loaded from external modules, declarative API tools, and the plugin registry.
+Add a built-in tool by creating a single file in `initrunner/agent/tools/` with a config class and a `@register_tool` decorated builder function — it's auto-discovered and immediately available in role YAML. Alternatively, load your own Python functions with `type: custom` and a `module` path pointing to any importable module. See [docs/agents/tool_creation.md](docs/agents/tool_creation.md) for the full guide.
+
+#### Plugin registry
+
+Third-party packages can register new tool types via the `initrunner.tools` entry point. Once installed (`pip install initrunner-<name>`), the tool type is available in YAML like any built-in. Run `initrunner plugins` to list discovered plugins. See the [plugin section of the tool creation guide](docs/agents/tool_creation.md) for details.
 
 ### Run modes
 
