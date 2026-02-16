@@ -167,6 +167,19 @@ response = client.chat.completions.create(
 )
 ```
 
+Or connect [Open WebUI](https://github.com/open-webui/open-webui) for a full chat interface:
+
+```bash
+docker run -d --name open-webui --network host \
+  -e OPENAI_API_BASE_URL=http://127.0.0.1:3000/v1 \
+  -e OPENAI_API_KEY=unused \
+  -v open-webui:/app/backend/data \
+  ghcr.io/open-webui/open-webui:main
+# Open http://localhost:8080 and select the support-agent model
+```
+
+See [Server docs](docs/interfaces/server.md#open-webui-integration) for the full walkthrough.
+
 ## Community Roles
 
 Browse, install, and run roles shared by the community — no copy-paste needed:

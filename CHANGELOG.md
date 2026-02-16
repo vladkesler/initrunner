@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- **Open WebUI integration guide** in `server.md`: step-by-step setup for using InitRunner agents with Open WebUI
 - **RAG guide** (`docs/core/rag-guide.md`): new practical guide with RAG vs Memory comparison, end-to-end walkthrough, and common patterns
 - Fix `search_documents` signature to include `source` parameter in `ingestion.md` and `tools.md`
 - Add Ollama (`ollama:nomic-embed-text`) to provider defaults tables in `ingestion.md` and `memory.md`

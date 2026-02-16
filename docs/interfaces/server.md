@@ -297,3 +297,53 @@ When no server-side conversation exists, the server converts OpenAI-format messa
 - `tool` role messages are skipped.
 
 When a server-side conversation exists (via `X-Conversation-Id`), only the last user message from the request is extracted as the new prompt, and the stored history is used directly.
+
+## Open WebUI Integration
+
+[Open WebUI](https://github.com/open-webui/open-webui) gives you a ChatGPT-like web interface for any InitRunner agent. Because `initrunner serve` speaks the OpenAI wire format, Open WebUI works out of the box — no plugins or adapters needed.
+
+### Setup
+
+This walkthrough uses the `support-agent` example, which includes a RAG knowledge base.
+
+**1. Ingest the knowledge base**
+
+```bash
+initrunner ingest examples/roles/support-agent/support-agent.yaml
+```
+
+**2. Start the InitRunner server**
+
+```bash
+initrunner serve examples/roles/support-agent/support-agent.yaml --host 0.0.0.0 --port 3000
+```
+
+> `--host 0.0.0.0` is required so the Docker container can reach the server.
+
+**3. Launch Open WebUI**
+
+```bash
+docker run -d \
+  --name open-webui \
+  --network host \
+  -e OPENAI_API_BASE_URL=http://127.0.0.1:3000/v1 \
+  -e OPENAI_API_KEY=unused \
+  -v open-webui:/app/backend/data \
+  ghcr.io/open-webui/open-webui:main
+```
+
+**4. Open your browser**
+
+Navigate to `http://localhost:8080`, create a local account, and select the `support-agent` model from the model dropdown. Start chatting — responses are served by your InitRunner agent.
+
+### Cleanup
+
+```bash
+docker rm -f open-webui
+docker volume rm open-webui
+```
+
+### Notes
+
+- If you start the server with `--api-key`, set `OPENAI_API_KEY` to the same value in the `docker run` command.
+- For production deployments, consider running both services behind a reverse proxy with TLS.
