@@ -16,7 +16,7 @@ from initrunner._compat import _PROVIDER_EXTRAS, require_provider
 from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
 from initrunner.cli._helpers import check_ollama_running, console, install_extra
 from initrunner.config import get_global_env_path, get_home_dir
-from initrunner.templates import TEMPLATES, _default_model_name
+from initrunner.templates import TEMPLATES
 
 _PROVIDERS = ["openai", "anthropic", "google", "groq", "mistral", "cohere", "ollama"]
 
@@ -113,6 +113,7 @@ def run_setup(
     output: Path,
     accept_risks: bool = False,
     interfaces: str | None = None,
+    model: str | None = None,
 ) -> None:
     """Execute the guided setup wizard."""
     # ---------------------------------------------------------------
@@ -282,6 +283,23 @@ def run_setup(
                     )
 
     # ---------------------------------------------------------------
+    # Step 4b: Model selection
+    # ---------------------------------------------------------------
+    if model is not None:
+        model_name = model
+        console.print(f"Model: [cyan]{model_name}[/cyan]")
+    else:
+        from initrunner.cli._helpers import prompt_model_selection
+
+        ollama_models_list = None
+        if provider == "ollama":
+            try:
+                ollama_models_list = _check_ollama_models() or None
+            except Exception:
+                pass
+        model_name = prompt_model_selection(provider, ollama_models=ollama_models_list)
+
+    # ---------------------------------------------------------------
     # Step 5: Role creation via template picker
     # ---------------------------------------------------------------
     if output.exists():
@@ -319,7 +337,7 @@ def run_setup(
             template_key = _SETUP_TEMPLATES[template]
 
         builder = TEMPLATES[template_key]
-        content = builder(name, provider)
+        content = builder(name, provider, model_name)
         output.write_text(content)
         console.print(f"[green]Created[/green] {output}")
 
@@ -378,7 +396,6 @@ def run_setup(
     # ---------------------------------------------------------------
     # Step 7: Success summary
     # ---------------------------------------------------------------
-    model_name = _default_model_name(provider)
     summary_lines = [
         f"[bold]Provider:[/bold]  {provider}",
         f"[bold]Model:[/bold]     {model_name}",

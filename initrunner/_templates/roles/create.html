@@ -47,7 +47,12 @@
                         </div>
                         <div class="form-control">
                             <label class="label"><span class="label-text">Model</span></label>
-                            <input type="text" name="model" class="input input-bordered" value="gpt-4o-mini" id="role-model">
+                            <select name="model_select" class="select select-bordered" id="role-model-select">
+                                <!-- populated by JS from PROVIDER_MODELS -->
+                            </select>
+                            <input type="text" name="model_custom" class="input input-bordered mt-2 hidden"
+                                   id="role-model-custom" placeholder="Enter custom model name">
+                            <input type="hidden" name="model" id="role-model" value="gpt-4o-mini">
                         </div>
                     </div>
 
@@ -131,25 +136,66 @@
 </div>
 
 <script>
-var _MODEL_MAP = {
-    openai: "gpt-4o-mini",
-    anthropic: "claude-sonnet-4-5-20250929",
-    google: "claude-sonnet-4-5-20250929",
-    groq: "claude-sonnet-4-5-20250929",
-    mistral: "claude-sonnet-4-5-20250929",
-    cohere: "claude-sonnet-4-5-20250929",
-    ollama: "llama3.2"
-};
+var _PROVIDER_MODELS = {{ provider_models | tojson }};
 
-// Provider -> model default
-var providerEl = document.getElementById("role-provider");
-if (providerEl) {
-    providerEl.addEventListener("change", function() {
-        var m = _MODEL_MAP[this.value] || "gpt-4o-mini";
-        document.getElementById("role-model").value = m;
+function populateModelSelect(provider) {
+    var select = document.getElementById("role-model-select");
+    var hidden = document.getElementById("role-model");
+    var customInput = document.getElementById("role-model-custom");
+    select.innerHTML = "";
+    customInput.classList.add("hidden");
+    customInput.value = "";
+
+    var models = _PROVIDER_MODELS[provider] || [];
+    for (var i = 0; i < models.length; i++) {
+        var opt = document.createElement("option");
+        opt.value = models[i][0];
+        opt.textContent = models[i][0] + " — " + models[i][1];
+        select.appendChild(opt);
+    }
+    var customOpt = document.createElement("option");
+    customOpt.value = "__custom__";
+    customOpt.textContent = "Custom...";
+    select.appendChild(customOpt);
+
+    if (models.length > 0) {
+        hidden.value = models[0][0];
+    }
+    updateYamlPreview();
+}
+
+var modelSelect = document.getElementById("role-model-select");
+if (modelSelect) {
+    modelSelect.addEventListener("change", function() {
+        var customInput = document.getElementById("role-model-custom");
+        var hidden = document.getElementById("role-model");
+        if (this.value === "__custom__") {
+            customInput.classList.remove("hidden");
+            hidden.value = customInput.value;
+        } else {
+            customInput.classList.add("hidden");
+            hidden.value = this.value;
+        }
         updateYamlPreview();
     });
 }
+
+var modelCustom = document.getElementById("role-model-custom");
+if (modelCustom) {
+    modelCustom.addEventListener("input", function() {
+        document.getElementById("role-model").value = this.value;
+        updateYamlPreview();
+    });
+}
+
+var providerEl = document.getElementById("role-provider");
+if (providerEl) {
+    providerEl.addEventListener("change", function() {
+        populateModelSelect(this.value);
+    });
+}
+
+populateModelSelect("openai");
 
 // Live preview update
 var formInputs = document.querySelectorAll("#role-form input, #role-form textarea, #role-form select");

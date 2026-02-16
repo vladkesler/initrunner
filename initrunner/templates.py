@@ -5,17 +5,73 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+# Curated popular models per provider. First entry is the default.
+# Keep this list up-to-date when providers release new models.
+# Users can always type a custom model name not in this list.
+PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
+    "openai": [
+        ("gpt-4o-mini", "Fast, affordable"),
+        ("gpt-4o", "High capability GPT-4"),
+        ("gpt-4.1", "Latest GPT-4.1"),
+        ("gpt-4.1-mini", "Small GPT-4.1"),
+        ("gpt-4.1-nano", "Fastest GPT-4.1"),
+        ("o3-mini", "Reasoning model"),
+    ],
+    "anthropic": [
+        ("claude-sonnet-4-5-20250929", "Balanced, fast"),
+        ("claude-haiku-35-20241022", "Compact, very fast"),
+        ("claude-opus-4-20250514", "Most capable"),
+    ],
+    "google": [
+        ("gemini-2.0-flash", "Fast multimodal"),
+        ("gemini-2.5-pro-preview-05-06", "Most capable"),
+        ("gemini-2.0-flash-lite", "Lightweight"),
+    ],
+    "groq": [
+        ("llama-3.3-70b-versatile", "Fast Llama 70B"),
+        ("llama-3.1-8b-instant", "Ultra-fast 8B"),
+        ("mixtral-8x7b-32768", "Mixtral MoE"),
+    ],
+    "mistral": [
+        ("mistral-large-latest", "Most capable"),
+        ("mistral-small-latest", "Fast, efficient"),
+        ("codestral-latest", "Code-optimized"),
+    ],
+    "cohere": [
+        ("command-r-plus", "Advanced RAG"),
+        ("command-r", "Balanced"),
+        ("command-light", "Fast"),
+    ],
+    "bedrock": [
+        ("us.anthropic.claude-sonnet-4-20250514-v1:0", "Claude Sonnet via Bedrock"),
+        ("us.anthropic.claude-haiku-4-20250514-v1:0", "Claude Haiku via Bedrock"),
+        ("us.meta.llama3-2-90b-instruct-v1:0", "Llama 3.2 90B via Bedrock"),
+    ],
+    "xai": [
+        ("grok-3", "Most capable Grok"),
+        ("grok-3-mini", "Fast Grok"),
+    ],
+    "ollama": [
+        ("llama3.2", "Llama 3.2"),
+        ("llama3.1", "Llama 3.1"),
+        ("mistral", "Mistral 7B"),
+        ("codellama", "Code Llama"),
+        ("phi3", "Microsoft Phi-3"),
+    ],
+}
+
 
 def _default_model_name(provider: str) -> str:
-    if provider == "openai":
-        return "gpt-4o-mini"
-    if provider == "ollama":
-        return "llama3.2"
-    return "claude-sonnet-4-5-20250929"
+    models = PROVIDER_MODELS.get(provider, [])
+    if models:
+        return models[0][0]
+    raise ValueError(
+        f"No models defined for provider '{provider}'. Add it to PROVIDER_MODELS in templates.py."
+    )
 
 
-def template_basic(name: str, provider: str) -> str:
-    model_name = _default_model_name(provider)
+def template_basic(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent
@@ -43,8 +99,8 @@ spec:
 """
 
 
-def template_rag(name: str, provider: str) -> str:
-    model_name = _default_model_name(provider)
+def template_rag(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent
@@ -81,8 +137,8 @@ spec:
 """
 
 
-def template_daemon(name: str, provider: str) -> str:
-    model_name = _default_model_name(provider)
+def template_daemon(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent
@@ -126,8 +182,8 @@ spec:
 """
 
 
-def template_memory(name: str, provider: str) -> str:
-    model_name = _default_model_name(provider)
+def template_memory(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent
@@ -162,9 +218,9 @@ spec:
 """
 
 
-def template_ollama(name: str, provider: str) -> str:
+def template_ollama(name: str, provider: str, model_name: str | None = None) -> str:
     # Always use ollama provider for this template, regardless of --provider flag
-    model_name = _default_model_name("ollama")
+    model_name = model_name or _default_model_name("ollama")
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent
@@ -234,8 +290,8 @@ def add_numbers(a: int, b: int) -> str:
 '''
 
 
-def template_api(name: str, provider: str) -> str:
-    model_name = _default_model_name(provider)
+def template_api(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
     return f"""\
 apiVersion: initrunner/v1
 kind: Agent

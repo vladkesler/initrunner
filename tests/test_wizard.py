@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import pytest
 import yaml
 
 from initrunner.agent.schema import RoleDefinition
 from initrunner.templates import (
+    PROVIDER_MODELS,
     TOOL_DESCRIPTIONS,
     TOOL_PROMPT_FIELDS,
     WIZARD_TEMPLATES,
+    _default_model_name,
     build_role_yaml,
+    template_basic,
+    template_rag,
 )
 
 
@@ -161,3 +166,63 @@ class TestTemplateConstants:
                 field_name, prompt_text, _default = entry
                 assert isinstance(field_name, str)
                 assert isinstance(prompt_text, str)
+
+
+class TestProviderModels:
+    """Tests for PROVIDER_MODELS and _default_model_name."""
+
+    _EXPECTED_PROVIDERS = (
+        "openai",
+        "anthropic",
+        "google",
+        "groq",
+        "mistral",
+        "cohere",
+        "bedrock",
+        "xai",
+        "ollama",
+    )
+
+    def test_all_providers_present(self):
+        for prov in self._EXPECTED_PROVIDERS:
+            assert prov in PROVIDER_MODELS, f"Missing provider: {prov}"
+
+    def test_each_provider_has_models(self):
+        for prov in self._EXPECTED_PROVIDERS:
+            models = PROVIDER_MODELS[prov]
+            assert len(models) >= 2, f"Provider {prov} should have at least 2 models"
+
+    def test_model_entries_are_tuples(self):
+        for prov, models in PROVIDER_MODELS.items():
+            for entry in models:
+                assert len(entry) == 2, f"Expected (id, desc) tuple for {prov}: {entry}"
+                assert isinstance(entry[0], str)
+                assert isinstance(entry[1], str)
+
+    def test_default_model_returns_first_entry(self):
+        for prov, models in PROVIDER_MODELS.items():
+            assert _default_model_name(prov) == models[0][0]
+
+    def test_default_model_unknown_provider_raises(self):
+        with pytest.raises(ValueError, match="No models defined"):
+            _default_model_name("unknown-provider")
+
+
+class TestTemplateModelName:
+    """Tests for template functions accepting optional model_name."""
+
+    def test_basic_with_model_name(self):
+        result = template_basic("test", "openai", model_name="gpt-4o")
+        assert "gpt-4o" in result
+
+    def test_basic_without_model_name(self):
+        result = template_basic("test", "openai")
+        assert "gpt-4o-mini" in result
+
+    def test_rag_with_model_name(self):
+        result = template_rag("test", "anthropic", model_name="claude-opus-4-20250514")
+        assert "claude-opus-4-20250514" in result
+
+    def test_rag_without_model_name(self):
+        result = template_rag("test", "anthropic")
+        assert "claude-sonnet-4-5-20250929" in result

@@ -126,6 +126,10 @@ def init(
         str, typer.Option(help="Template: basic, rag, daemon, memory, ollama, tool, api, skill")
     ] = "basic",
     provider: Annotated[str, typer.Option(help="Model provider")] = "openai",
+    model: Annotated[
+        str | None,
+        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+    ] = None,
     interactive: Annotated[
         bool, typer.Option("--interactive", "-i", help="Launch interactive wizard")
     ] = False,
@@ -193,7 +197,10 @@ def init(
         )
         raise typer.Exit(1)
 
-    content = builder(name, provider)
+    if template in ("tool", "skill"):
+        content = builder(name, provider)
+    else:
+        content = builder(name, provider, model)
     output.write_text(content)
     console.print(f"[green]Created[/green] {output} (template={template})")
 
@@ -209,6 +216,10 @@ def create(
     provider: Annotated[str | None, typer.Option(help="Model provider for generation")] = None,
     output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
     name: Annotated[str | None, typer.Option(help="Agent name (auto-derived if omitted)")] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+    ] = None,
     no_confirm: Annotated[bool, typer.Option("--no-confirm", help="Skip preview")] = False,
 ) -> None:
     """Generate a role.yaml from a natural language description using AI."""
@@ -222,6 +233,7 @@ def create(
             yaml_text = generate_role_sync(
                 description,
                 provider=provider,
+                model_name=model,
                 name_hint=name,
             )
     except Exception as e:
@@ -264,6 +276,10 @@ def setup(
     template: Annotated[
         str | None, typer.Option(help="Template: chatbot, rag, memory, daemon")
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+    ] = None,
     skip_test: Annotated[bool, typer.Option("--skip-test", help="Skip connectivity test")] = False,
     output: Annotated[Path, typer.Option(help="Role output path")] = Path("role.yaml"),
     accept_risks: Annotated[
@@ -286,4 +302,5 @@ def setup(
         output=output,
         accept_risks=accept_risks,
         interfaces=interfaces,
+        model=model,
     )

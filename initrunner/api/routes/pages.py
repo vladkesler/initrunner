@@ -72,7 +72,7 @@ async def roles_table_fragment(
 @router.get("/roles/new", response_class=HTMLResponse)
 async def role_create_page(request: Request):
     """Role creation page with form builder and AI generation tabs."""
-    from initrunner.templates import TOOL_DESCRIPTIONS
+    from initrunner.templates import PROVIDER_MODELS, TOOL_DESCRIPTIONS
 
     return _templates(request).TemplateResponse(
         request,
@@ -80,6 +80,7 @@ async def role_create_page(request: Request):
         {
             "active_page": "roles",
             "tool_types": TOOL_DESCRIPTIONS,
+            "provider_models": PROVIDER_MODELS,
         },
     )
 

@@ -225,7 +225,9 @@ class TestTrimHistoryPreserveFirst:
         trimmed = trim_message_history(msgs, 4, preserve_first=True)
         assert len(trimmed) <= 4
         # First message should be preserved
-        assert trimmed[0].parts[0].content == "original task"
+        first_part = trimmed[0].parts[0]
+        assert isinstance(first_part, UserPromptPart)
+        assert first_part.content == "original task"
 
     def test_no_trim_when_under_limit(self):
         from pydantic_ai.messages import ModelRequest, UserPromptPart

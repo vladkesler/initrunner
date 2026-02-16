@@ -46,6 +46,40 @@ def install_extra(extra: str) -> bool:
         return False
 
 
+def prompt_model_selection(
+    provider: str,
+    ollama_models: list[str] | None = None,
+) -> str:
+    """Show model choices for a provider and return selected model name."""
+    from rich.prompt import Prompt
+
+    from initrunner.templates import PROVIDER_MODELS, _default_model_name
+
+    if provider == "ollama" and ollama_models:
+        choices = [(m, "(local)") for m in ollama_models]
+    else:
+        choices = PROVIDER_MODELS.get(provider, [])
+
+    default = choices[0][0] if choices else _default_model_name(provider)
+
+    console.print()
+    console.print("[bold]Select a model:[/bold]")
+    for i, (model_id, desc) in enumerate(choices, 1):
+        default_tag = " (default)" if model_id == default else ""
+        desc_part = f" — {desc}" if desc else ""
+        console.print(f"  {i}. {model_id}{desc_part}{default_tag}")
+    console.print("  Or type a custom model name (press Enter for default)")
+
+    raw = Prompt.ask("Model", default=default)
+
+    if raw.strip().isdigit():
+        idx = int(raw.strip()) - 1
+        if 0 <= idx < len(choices):
+            return choices[idx][0]
+
+    return raw.strip() or default
+
+
 def check_ollama_running() -> None:
     """Ping local Ollama and warn if it's not reachable."""
     import urllib.request

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-02-16
+
+### Added
+
+- **Model selection** in role creation: interactive wizard, setup command, and web dashboard now prompt users to choose an LLM model (not just provider). Supports all 9 providers with curated model lists and custom model name input.
+- `--model` CLI flag for `initrunner init`, `initrunner create`, and `initrunner setup` commands
+- `PROVIDER_MODELS` registry covering OpenAI, Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI, and Ollama
+
+### Fixed
+
+- Web dashboard model defaults for Google, Groq, Mistral, and Cohere (previously all incorrectly defaulted to `claude-sonnet-4-5-20250929`)
+
 ## [0.2.0] - 2026-02-15
 
 First public release candidate.

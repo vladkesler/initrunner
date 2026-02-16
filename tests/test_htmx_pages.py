@@ -221,7 +221,7 @@ class TestAuditDashboardIntegration:
                 spec=AgentSpec(
                     role="test",
                     model=ModelConfig(provider="openai", name="gpt-4"),
-                    system_prompt="test",
+
                     guardrails=Guardrails(),
                 ),
             )

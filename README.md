@@ -1,6 +1,6 @@
 # InitRunner — The AI Agent Runner
 
-<p align="center"><img src="assets/mascot.png" alt="InitRunner mascot" width="300"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vladkesler/initrunner/main/assets/mascot.png" alt="InitRunner mascot" width="300"></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white" alt="Python 3.11+">
@@ -9,7 +9,6 @@
   <a href="tests/"><img src="https://img.shields.io/badge/tests-710+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
-  <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta">
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
 </p>
 
@@ -21,7 +20,7 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, and triggers — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **Note:** InitRunner is in early release (v0.2.0). APIs may change between minor versions.
+> **Note:** InitRunner is in early release (v0.3.0). APIs may change between minor versions.
 
 ## Table of Contents
 
@@ -304,7 +303,7 @@ spec:
   guardrails: { max_tool_calls: 20, timeout_seconds: 300 }
 ```
 
-Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent`.
+Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-4o-mini`.
 
 ### Tools
 
@@ -372,7 +371,7 @@ The default provider is OpenAI (`gpt-4o-mini`). Switch providers by changing `sp
 | `run <role.yaml> -p "..."` | Single-shot prompt |
 | `run <role.yaml> -i` | Interactive REPL |
 | `validate <role.yaml>` | Validate a role definition |
-| `init --name <name>` | Scaffold a new role |
+| `init --name <name> [--model <model>]` | Scaffold a new role |
 | `setup` | Guided provider setup wizard |
 | `ingest <role.yaml>` | Ingest documents into vector store |
 | `daemon <role.yaml>` | Run in trigger-driven daemon mode |

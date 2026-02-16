@@ -19,7 +19,6 @@ def run_wizard() -> None:
         TOOL_DESCRIPTIONS,
         TOOL_PROMPT_FIELDS,
         WIZARD_TEMPLATES,
-        _default_model_name,
         build_role_yaml,
     )
 
@@ -52,7 +51,19 @@ def run_wizard() -> None:
     if provider == "ollama":
         check_ollama_running()
 
-    model_name = _default_model_name(provider)
+    # --- Model selection ---
+    from initrunner.cli._helpers import prompt_model_selection
+
+    ollama_models = None
+    if provider == "ollama":
+        try:
+            from initrunner.cli.setup_cmd import _check_ollama_models
+
+            ollama_models = _check_ollama_models() or None
+        except Exception:
+            pass  # fall back to static PROVIDER_MODELS["ollama"]
+
+    model_name = prompt_model_selection(provider, ollama_models=ollama_models)
 
     # --- Base template ---
     console.print()

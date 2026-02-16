@@ -66,7 +66,31 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 | `--name TEXT` | Agent name (default: `my-agent`) |
 | `--template TEXT` | Template: `basic`, `rag`, `daemon`, `memory`, `ollama`, `tool`, `api`, `skill` (default: `basic`) |
 | `--provider TEXT` | Model provider (default: `openai`) |
+| `--model TEXT` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-5-20250929`). Uses provider default if omitted. |
 | `--output PATH` | Output file path (default: `role.yaml`) |
+
+## Setup options
+
+| Flag | Description |
+|------|-------------|
+| `--provider TEXT` | Provider (skip interactive selection) |
+| `--name TEXT` | Agent name (default: `my-agent`) |
+| `--template TEXT` | Template: `chatbot`, `rag`, `memory`, `daemon` |
+| `--model TEXT` | Model name. Uses provider default if omitted. |
+| `--skip-test` | Skip connectivity test |
+| `--output PATH` | Role output path (default: `role.yaml`) |
+| `-y, --accept-risks` | Accept security disclaimer without prompting |
+| `--interfaces TEXT` | Install interfaces: `tui`, `dashboard`, `both`, `skip` |
+
+## Create options
+
+| Flag | Description |
+|------|-------------|
+| `--provider TEXT` | Model provider for generation (auto-detected if omitted) |
+| `--output PATH` | Output file path (default: `role.yaml`) |
+| `--name TEXT` | Agent name (auto-derived if omitted) |
+| `--model TEXT` | Model name for the generated role |
+| `--no-confirm` | Skip the YAML preview |
 
 ## Serve options
 

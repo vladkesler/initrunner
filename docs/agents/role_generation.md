@@ -17,11 +17,12 @@ The wizard walks through each section of a role definition, building a complete 
 1. **Agent name** — lowercase with hyphens (e.g. `my-agent`)
 2. **Description** — optional free-text
 3. **Provider** — choose from `openai`, `anthropic`, `google`, `groq`, `mistral`, `cohere`, `ollama`
-4. **Base template** — pre-populates system prompt, tools, and features (see table below)
-5. **Tool selection** — pick tools by number or name, then configure each one
-6. **Memory** — enable/disable long-term memory
-7. **Ingestion** — enable/disable RAG with source glob and chunking config
-8. **Output file** — path to write (default: `role.yaml`)
+4. **Model** — choose from a curated list of models for the selected provider, or type a custom model name
+5. **Base template** — pre-populates system prompt, tools, and features (see table below)
+6. **Tool selection** — pick tools by number or name, then configure each one
+7. **Memory** — enable/disable long-term memory
+8. **Ingestion** — enable/disable RAG with source glob and chunking config
+9. **Output file** — path to write (default: `role.yaml`)
 
 ### Templates
 
@@ -68,6 +69,7 @@ initrunner create "A code review assistant that reads git diffs and suggests imp
 | `--provider TEXT` | Model provider for generation (auto-detected if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
 | `--name TEXT` | Agent name (auto-derived from description if omitted) |
+| `--model TEXT` | Model name for the generated role (e.g. `gpt-4o`, `claude-sonnet-4-5-20250929`) |
 | `--no-confirm` | Skip the YAML preview and write immediately |
 
 ### How It Works
@@ -90,7 +92,7 @@ The web dashboard at `/roles/new` offers two tabs for role creation.
 A structured form with fields for:
 
 - Name, description
-- Provider, model
+- Provider, model (dropdown with curated per-provider options and custom input)
 - System prompt
 - Tool checkboxes
 - Memory and ingestion toggles
@@ -147,6 +149,7 @@ from pathlib import Path
 yaml_text = build_role_yaml_sync(
     name="my-agent",
     provider="openai",
+    model_name="gpt-4o",
     tools=[{"type": "filesystem", "root_path": ".", "read_only": True}],
     memory=True,
 )

@@ -17,7 +17,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,12 @@ _tool_registry: dict[str, ToolRegistration] = {}
 _registry_lock = threading.Lock()
 
 
+_F = TypeVar("_F", bound=Callable[..., "AbstractToolset"])
+
+
 def register_tool(
     type_name: str, config_class: type[Any]
-) -> Callable[[Callable[..., AbstractToolset]], Callable[..., AbstractToolset]]:
+) -> Callable[[_F], _F]:
     """Decorator that registers a tool builder.
 
     Usage::
@@ -67,7 +70,7 @@ def register_tool(
             ...
     """
 
-    def decorator(func: Callable[..., AbstractToolset]) -> Callable[..., AbstractToolset]:
+    def decorator(func: _F) -> _F:
         # Validate type field default matches type_name (skip if no default)
         from pydantic_core import PydanticUndefined
 

@@ -21,7 +21,7 @@ ollama pull llama3.2
 3. Scaffold a role:
 
 ```bash
-initrunner init --template ollama --name my-local-agent
+initrunner init --template ollama --name my-local-agent --model llama3.2
 ```
 
 4. Run the agent:
@@ -240,18 +240,18 @@ spec:
 ### Scaffold an Ollama Role
 
 ```bash
-initrunner init --template ollama --name my-agent
+initrunner init --template ollama --name my-agent --model mistral
 ```
 
-This generates a `role.yaml` pre-configured for `provider: ollama` with `llama3.2`. After scaffolding, InitRunner pings `http://localhost:11434/api/tags` and prints a warning if Ollama is not reachable.
+This generates a `role.yaml` pre-configured for `provider: ollama` with the specified model (or `llama3.2` by default). After scaffolding, InitRunner pings `http://localhost:11434/api/tags` and prints a warning if Ollama is not reachable.
 
 ### Available Templates
 
 Any template works with `--provider ollama`:
 
 ```bash
-initrunner init --template basic --provider ollama
-initrunner init --template rag --provider ollama
+initrunner init --template basic --provider ollama --model codellama
+initrunner init --template rag --provider ollama --model llama3.2
 initrunner init --template memory --provider ollama
 initrunner init --template daemon --provider ollama
 initrunner init --template ollama  # dedicated template with Ollama-specific comments

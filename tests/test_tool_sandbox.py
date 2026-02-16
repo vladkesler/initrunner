@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 
 from initrunner.agent._paths import validate_path_within
-from initrunner.agent.schema import McpToolConfig, ToolSandboxConfig
+from initrunner.agent.schema import McpToolConfig, RoleDefinition, ToolSandboxConfig
 from initrunner.agent.tools import (
     _validate_custom_tool_imports,
     _validate_store_path,
@@ -88,10 +88,8 @@ class TestASTImportValidation:
 # ---------------------------------------------------------------------------
 
 
-def _make_role_with_sandbox(sandbox: ToolSandboxConfig) -> object:
+def _make_role_with_sandbox(sandbox: ToolSandboxConfig) -> RoleDefinition:
     """Build a minimal RoleDefinition with a given ToolSandboxConfig."""
-    from initrunner.agent.schema import RoleDefinition
-
     return RoleDefinition.model_validate(
         {
             "apiVersion": "initrunner/v1",

@@ -9,7 +9,7 @@ The `initrunner setup` command is a guided wizard that configures your model pro
 initrunner setup
 
 # Non-interactive with all options specified
-initrunner setup --provider openai --template chatbot --name my-agent
+initrunner setup --provider openai --model gpt-4o --template chatbot --name my-agent
 
 # Local Ollama setup (no API key needed)
 initrunner setup --provider ollama
@@ -25,8 +25,11 @@ initrunner setup --skip-test
 | `--provider` | `str` | *(interactive)* | Provider name. Skips the interactive selection prompt. |
 | `--name` | `str` | `my-agent` | Agent name used in the generated role YAML. |
 | `--template` | `str` | *(interactive)* | Starter template: `chatbot`, `rag`, `memory`, or `daemon`. |
+| `--model` | `str` | *(interactive)* | Model name. Skips the interactive model selection prompt. |
 | `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
 | `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
+| `-y, --accept-risks` | `bool` | `false` | Accept security disclaimer without prompting. |
+| `--interfaces` | `str` | *(interactive)* | Install interfaces: `tui`, `dashboard`, `both`, or `skip`. |
 
 ## Supported Providers
 
@@ -34,10 +37,12 @@ initrunner setup --skip-test
 |----------|---------|---------------|---------------|
 | `openai` | `OPENAI_API_KEY` | *(included in core)* | `gpt-4o-mini` |
 | `anthropic` | `ANTHROPIC_API_KEY` | `initrunner[anthropic]` | `claude-sonnet-4-5-20250929` |
-| `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `claude-sonnet-4-5-20250929` |
-| `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `claude-sonnet-4-5-20250929` |
-| `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `claude-sonnet-4-5-20250929` |
-| `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `claude-sonnet-4-5-20250929` |
+| `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-2.0-flash` |
+| `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
+| `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
+| `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-r-plus` |
+| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
+| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-3` |
 | `ollama` | *(none)* | *(included in core)* | `llama3.2` |
 
 ## How It Works
@@ -74,6 +79,27 @@ Skipped for Ollama (no API key required). For other providers:
 3. For OpenAI and Anthropic, validates the key with a lightweight API call.
 4. If validation fails, offers to re-enter the key.
 5. Saves the key to `~/.initrunner/.env` with `0600` permissions.
+
+### 4b. Model Selection
+
+After the API key is configured, the wizard prompts for a model. When `--model` is passed, this step is skipped.
+
+For most providers, a numbered menu of curated models is displayed (sourced from `PROVIDER_MODELS` in `templates.py`):
+
+```
+Select a model:
+  1. gpt-4o-mini — Fast, affordable (default)
+  2. gpt-4o — High capability GPT-4
+  3. gpt-4.1 — Latest GPT-4.1
+  4. gpt-4.1-mini — Small GPT-4.1
+  5. gpt-4.1-nano — Fastest GPT-4.1
+  6. o3-mini — Reasoning model
+  Or type a custom model name (press Enter for default)
+```
+
+You can pick a number, type a custom model name not in the list, or press Enter for the provider's default. Custom model names are always accepted — the curated list is a convenience, not a restriction.
+
+For **Ollama**, the wizard queries `http://localhost:11434/api/tags` for locally available models and shows those instead. If no local models are found, it falls back to the static curated list (`llama3.2`, `llama3.1`, `mistral`, `codellama`, `phi3`).
 
 ### 5. Role Creation
 
@@ -128,13 +154,13 @@ For CI, automation, or scripting, pass all options as flags to skip all prompts:
 ```bash
 # Fully non-interactive OpenAI setup
 export OPENAI_API_KEY="sk-..."
-initrunner setup --provider openai --template chatbot --name my-agent --skip-test
+initrunner setup --provider openai --model gpt-4o --template chatbot --name my-agent --skip-test
 
 # Ollama (no API key needed)
-initrunner setup --provider ollama --template chatbot --skip-test
+initrunner setup --provider ollama --model llama3.2 --template chatbot --skip-test
 
 # Custom output path
-initrunner setup --provider anthropic --template rag --output agents/researcher.yaml --skip-test
+initrunner setup --provider anthropic --model claude-sonnet-4-5-20250929 --template rag --output agents/researcher.yaml --skip-test
 ```
 
 The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.

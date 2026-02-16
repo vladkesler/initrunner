@@ -74,6 +74,7 @@ class TestDaemonTokenTracker:
         tracker.record_usage(100)
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "Lifetime budget" in reason
 
     def test_daily_budget_enforced(self):
@@ -81,6 +82,7 @@ class TestDaemonTokenTracker:
         tracker.record_usage(50)
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "Daily budget" in reason
 
     def test_daily_reset(self):
@@ -108,6 +110,7 @@ class TestDaemonTokenTracker:
         tracker.last_reset_date = date(2020, 1, 1)
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "Lifetime budget" in reason
 
 
@@ -130,6 +133,7 @@ class TestRunSingle:
         role = _make_role()
         result, _messages = run_single(agent, role, "Hi")
         assert result.success is False
+        assert result.error is not None
         assert "boom" in result.error
 
     def test_sink_dispatch(self):
