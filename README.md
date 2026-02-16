@@ -18,9 +18,9 @@
 
 **Define AI agents like CI pipelines. YAML in, autonomous agents out.**
 
-Your agent is a YAML file. Its tools, knowledge base, memory, and triggers — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
+Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **Note:** InitRunner is in early release (v0.3.0). APIs may change between minor versions.
+> **Note:** InitRunner is in early release (v0.4.0). APIs may change between minor versions.
 
 ## Table of Contents
 
@@ -179,6 +179,34 @@ docker run -d --name open-webui --network host \
 ```
 
 See [Server docs](docs/interfaces/server.md#open-webui-integration) for the full walkthrough.
+
+### 6. Attach files and media
+
+Send images, audio, video, and documents alongside your prompts — from the CLI, REPL, API, or dashboard:
+
+```bash
+# Attach an image to a prompt
+initrunner run role.yaml -p "Describe this image" -A photo.png
+
+# Multiple attachments
+initrunner run role.yaml -p "Compare these" -A before.png -A after.png
+
+# URL attachment
+initrunner run role.yaml -p "What's in this image?" -A https://example.com/photo.jpg
+```
+
+In the interactive REPL, use `/attach` to queue files:
+
+```
+> /attach diagram.png
+Queued attachment: diagram.png
+> /attach notes.pdf
+Queued attachment: notes.pdf
+> What do these show?
+[assistant response with both attachments]
+```
+
+The API server accepts multimodal content in the standard OpenAI format. See [Multimodal Input](docs/core/multimodal.md) for the full reference.
 
 ## Community Roles
 
