@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Web dashboard model defaults for Google, Groq, Mistral, and Cohere (previously all incorrectly defaulted to `claude-sonnet-4-5-20250929`)
 
+### Documentation
+
+- **RAG guide** (`docs/core/rag-guide.md`): new practical guide with RAG vs Memory comparison, end-to-end walkthrough, and common patterns
+- Fix `search_documents` signature to include `source` parameter in `ingestion.md` and `tools.md`
+- Add Ollama (`ollama:nomic-embed-text`) to provider defaults tables in `ingestion.md` and `memory.md`
+- Add chunking strategy guidance and parameter tuning rules of thumb to `ingestion.md`
+- Add troubleshooting section to `ingestion.md`
+- Add `pdf-agent` example (mixed PDF/Markdown ingestion)
+- Add `local-rag` example (fully local Ollama RAG, no API keys)
+
 ## [0.2.0] - 2026-02-15
 
 First public release candidate.
