@@ -5,6 +5,9 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white" alt="Python 3.11+">
   <a href="https://pypi.org/project/initrunner/"><img src="https://img.shields.io/pypi/v/initrunner?color=%2334D058&v=1" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/initrunner/"><img src="https://img.shields.io/pypi/dm/initrunner?color=%2334D058" alt="PyPI downloads"></a>
+  <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
+  <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-710+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
@@ -19,6 +22,16 @@
 **Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon.**
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
+
+<p align="center">
+  <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
+  <em>Interactive REPL — chat with any agent from the terminal</em>
+</p>
+
+<p align="center">
+  <img src="assets/screenshot-dashboard.png" alt="InitRunner web dashboard — Create New Role" width="700"><br>
+  <em>Web dashboard — create and manage roles with a live YAML preview</em>
+</p>
 
 > **Note:** InitRunner is in early release (v0.4.0). APIs may change between minor versions.
 
@@ -452,6 +465,8 @@ See `examples/roles/skill-demo.yaml` for a role composing multiple skills.
 
 - [GitHub Issues](https://github.com/vladkesler/initrunner/issues) — Bug reports and feature requests
 - [Changelog](CHANGELOG.md) — Release notes and version history
+
+If you find InitRunner useful, consider giving it a star — it helps others discover the project.
 
 ## Contributing
 
