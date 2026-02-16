@@ -256,7 +256,7 @@ See [docs/getting-started/installation.md](docs/getting-started/installation.md)
 
 **2. Create your first agent**
 
-Use the `code-reviewer.yaml` from [above](#see-it-in-action), or scaffold one:
+Use the `code-reviewer.yaml` from [above](#see-it-in-action), scaffold one, or follow the hands-on [Tutorial](docs/getting-started/tutorial.md):
 
 ```bash
 initrunner init --name my-agent --model gpt-4o-mini
@@ -415,7 +415,7 @@ See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full comm
 
 | Area | Key docs |
 |------|----------|
-| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [CLI Reference](docs/getting-started/cli.md) |
+| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
