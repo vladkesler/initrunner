@@ -23,16 +23,6 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-<p align="center">
-  <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
-  <em>Interactive REPL — chat with any agent from the terminal</em>
-</p>
-
-<p align="center">
-  <img src="assets/screenshot-dashboard.png" alt="InitRunner web dashboard — Create New Role" width="700"><br>
-  <em>Web dashboard — create and manage roles with a live YAML preview</em>
-</p>
-
 > **Note:** InitRunner is in early release (v0.4.0). APIs may change between minor versions.
 
 ## Table of Contents
@@ -79,6 +69,11 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
 That's it. No Python, no boilerplate. The same file also runs as an interactive chat (`-i`), a trigger-driven daemon, or an OpenAI-compatible API server.
+
+<p align="center">
+  <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
+  <em>Interactive REPL — chat with any agent from the terminal</em>
+</p>
 
 ## Why InitRunner
 
@@ -330,6 +325,11 @@ docker run --rm initrunner --version
 The default image includes dashboard, ingestion, all model providers, and safety extras. Override with `--build-arg EXTRAS="dashboard,anthropic"` to customize. Using Ollama on the host? Use `http://host.docker.internal:11434/v1` as the model endpoint.
 
 ## Core Concepts
+
+<p align="center">
+  <img src="assets/screenshot-dashboard.png" alt="InitRunner web dashboard — Create New Role" width="700"><br>
+  <em>Web dashboard — create and manage roles with a live YAML preview</em>
+</p>
 
 ### Role files
 
