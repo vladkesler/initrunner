@@ -36,7 +36,7 @@ def _search_duckduckgo(
 ) -> list[dict[str, str]]:
     """Search using DuckDuckGo (free, no API key required)."""
     try:
-        from duckduckgo_search import DDGS
+        from duckduckgo_search import DDGS  # type: ignore[import-not-found]
     except ImportError:
         raise ImportError("duckduckgo-search is required: pip install initrunner[search]") from None
 
