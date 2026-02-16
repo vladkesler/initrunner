@@ -2,75 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
-
-## [0.4.0] - 2026-02-16
+## [Unreleased] - 2026-02-16
 
 ### Added
-
-- **Multimodal input** across CLI, server, and dashboard: attach images, audio, video, and documents via `--attach`/`-A` (CLI), OpenAI-format `content` arrays (server), and file upload (dashboard)
-
-### Documentation
-
-- New multimodal reference (`docs/core/multimodal.md`): supported file types, CLI examples, REPL commands, server API format, dashboard upload flow, model compatibility, and error handling
-- Add `--attach`/`-A` flag to CLI reference
-- Add multimodal content parts and examples to server docs
-- Add file attachments section to dashboard docs
-- Add multimodal links to README and CLAUDE.md
-
-## [0.3.0] - 2026-02-16
-
-### Added
-
-- **Model selection** in role creation: interactive wizard, setup command, and web dashboard now prompt users to choose an LLM model (not just provider). Supports all 9 providers with curated model lists and custom model name input.
-- `--model` CLI flag for `initrunner init`, `initrunner create`, and `initrunner setup` commands
-- `PROVIDER_MODELS` registry covering OpenAI, Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI, and Ollama
+- add multimodal input section and bump version to v0.4.0 in README (e1aa97f)
+- add model selection to role creation and setup (v0.3.0) (d69be97)
+- add GitHub Release creation to release workflow and update changelog (1422f79)
+- add Docker support and CI workflow for image publishing (e808b5d)
 
 ### Fixed
-
-- Web dashboard model defaults for Google, Groq, Mistral, and Cohere (previously all incorrectly defaulted to `claude-sonnet-4-5-20250929`)
+- add retry-on-locked wrapper to sqlite-vec write paths (0573a74)
+- update version assertion in test_cli.py and fix ruff formatting (3859649)
+- bust GitHub Camo cache for PyPI version badge (04a25a6)
+- use correct Docker Hub namespace and fix latest tag in publish workflow (3cbf5d4)
+- clear pip index env vars during wheel install to avoid TestPyPI dependency pollution (d7fc20b)
+- download wheel from TestPyPI with --no-deps to avoid name-squatted packages (8f460da)
 
 ### Documentation
+- surface autonomous mode and budget controls in README and CLI docs (2af688a)
+- add Open WebUI integration guide to server docs and README (6cf6109)
+- add documentation changes to CHANGELOG.md for v0.3.0 (b890321)
+- improve RAG documentation, fix search_documents signature, add examples (1223c0b)
+- reduce repetition in README.md (03ade5e)
+- mention Docker Hub as alternative registry (615e48f)
+- remove release_preparation.md, superseded by pypi_publish.md (53edbc5)
 
-- **Open WebUI integration guide** in `server.md`: step-by-step setup for using InitRunner agents with Open WebUI
-- **RAG guide** (`docs/core/rag-guide.md`): new practical guide with RAG vs Memory comparison, end-to-end walkthrough, and common patterns
-- Fix `search_documents` signature to include `source` parameter in `ingestion.md` and `tools.md`
-- Add Ollama (`ollama:nomic-embed-text`) to provider defaults tables in `ingestion.md` and `memory.md`
-- Add chunking strategy guidance and parameter tuning rules of thumb to `ingestion.md`
-- Add troubleshooting section to `ingestion.md`
-- Add `pdf-agent` example (mixed PDF/Markdown ingestion)
-- Add `local-rag` example (fully local Ollama RAG, no API keys)
+### Changed
+- fix ruff formatting in _registry.py and test_htmx_pages.py (6d9c980)
 
-## [0.2.0] - 2026-02-15
-
-First public release candidate.
-
-### Added
-
-- **Agent runner** with single-shot, interactive REPL (`--resume` support), and daemon modes
-- **Role YAML schema** with Pydantic validation and discriminated unions for type-safe configs
-- **Built-in tools**: filesystem, HTTP, web_reader, datetime, Python (subprocess isolation), SQL (read-only SQLite), git
-- **MCP tool support** via FastMCP integration
-- **Document ingestion pipeline**: extract (PDF/DOCX/XLSX), chunk, embed, store with batched embedding
-- **sqlite-vec vector store** with dimension auto-detection, glob SQL pre-filtering, and auto-retrieval tool
-- **Memory system**: remember/recall/list_memories tools with SQLite persistence and session resume
-- **Trigger system**: cron (croniter), file watcher (watchfiles), and webhook (starlette/uvicorn) triggers
-- **Compose orchestration**: multi-agent services via `compose.yaml` with delegate sinks, health monitoring, restart policies, and cycle detection
-- **Audit trail**: append-only SQLite log with auto-pruning (configurable retention and max records)
-- **TUI dashboard** (optional `[tui]` extra): Textual-based k9s-style interface with roles, chat, audit, ingest, memory, and daemon screens
-- **Web dashboard** (optional `[dashboard]` extra): FastAPI + Next.js browser UI with WebSocket chat, SSE ingestion, and daemon event streaming
-- **OpenAI-compatible API server** (`initrunner serve`): serve any role as a chat completions endpoint with optional API key auth
-- **Agent pipelines** (`initrunner pipeline`): chain multiple agents in sequence
-- **Role registry** (`initrunner install/search/update`): install roles from GitHub or the community index
-- **Tool plugins** (`initrunner plugins`): discover and list third-party tool plugins
-- **Test suites** (`initrunner test`): run test suites against agent roles
-- **Agent delegation** for multi-agent workflows
-- **Skills system** for reusable agent capabilities
-- **Content safety policies** with configurable enforcement
-- **Tool sandboxing** via PEP 578 audit hooks
-- **CLI** via Typer: `run`, `validate`, `init`, `ingest`, `daemon`, `ui`, `compose up/validate`, `memory clear/export`
-- **Multi-provider support**: OpenAI, Anthropic, Google, Groq, Mistral (via pydantic-ai-slim extras)
-- **Context window safety**: REPL history sliding window, max_resume_messages, daemon session pruning
-- **Security hardening**: env var scrubbing for Python/git subprocesses, SQL query_only pragma, bounded tool results
-- **Docker support**: multi-stage Dockerfile (uv-based), docker-compose.yml, .dockerignore, and CI workflow for publishing images to GHCR and Docker Hub on version tags
+### Maintenance
+- release 0.2.0 (2bb690f)
+- bump version to 0.2.0rc2 for TestPyPI re-publish (c4c6118)
+- bump version to 0.2.0rc1 and add TestPyPI workflow (24167ac)
+- initial release (499b56e)

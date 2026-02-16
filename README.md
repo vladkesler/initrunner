@@ -1,4 +1,4 @@
-# InitRunner — The AI Agent Runner
+# InitRunner — AI Agent Roles as YAML
 
 <p align="center"><img src="https://raw.githubusercontent.com/vladkesler/initrunner/main/assets/mascot.png" alt="InitRunner mascot" width="300"></p>
 
@@ -16,7 +16,7 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**Define AI agents like CI pipelines. YAML in, autonomous agents out.**
+**Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon.**
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
