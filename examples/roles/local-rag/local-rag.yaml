@@ -1,0 +1,49 @@
+# Local RAG Agent (Ollama)
+#
+# Fully offline RAG agent using Ollama for both LLM and embeddings.
+# No external API keys needed — everything runs locally.
+#
+# Prerequisites:
+#   1. Install Ollama: https://ollama.com
+#   2. Pull required models:
+#        ollama pull llama3.2
+#        ollama pull nomic-embed-text
+#   3. Ensure Ollama is running: ollama serve
+#
+# Usage:
+#   initrunner ingest local-rag.yaml
+#   initrunner run local-rag.yaml -i
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: local-rag
+  description: Fully local RAG agent using Ollama (no API keys needed)
+  tags:
+    - example
+    - rag
+    - ollama
+    - local
+spec:
+  role: |
+    You are a helpful assistant with access to a local knowledge base.
+    Use search_documents to find relevant information before answering.
+    Always cite your sources.
+  model:
+    provider: ollama
+    name: llama3.2
+    temperature: 0.1
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+      - "./docs/**/*.txt"
+    chunking:
+      strategy: paragraph
+      chunk_size: 512
+      chunk_overlap: 50
+    embeddings:
+      provider: ollama
+      model: nomic-embed-text
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15

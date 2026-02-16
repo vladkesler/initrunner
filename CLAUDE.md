@@ -72,6 +72,7 @@ Detailed docs live in `docs/`. Key references:
 | Security model | `docs/security/security.md` |
 | Ingestion pipeline | `docs/core/ingestion.md` |
 | Memory system | `docs/core/memory.md` |
+| RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook) | `docs/core/triggers.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |

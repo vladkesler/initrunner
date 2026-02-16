@@ -151,6 +151,16 @@ Splits on double newlines (`\n\n`) first, then merges small paragraphs until `ch
 
 Best for: prose documents, markdown, articles, documentation.
 
+### Choosing a Strategy and Parameters
+
+**Fixed vs Paragraph**: Use `fixed` when documents lack clear paragraph boundaries (code, logs, CSV data). Use `paragraph` when documents have natural structure (markdown, articles, prose) — it produces more coherent chunks because it avoids splitting mid-sentence.
+
+**`chunk_size`**: Smaller chunks (256–512) give more precise retrieval — each result closely matches the query. Larger chunks (512–1024) include more surrounding context per result, which helps when answers span multiple sentences. Rules of thumb:
+- **Q&A over documentation**: 256–512 characters
+- **Summarization or dense technical content**: 512–1024 characters
+
+**`chunk_overlap`**: Overlap prevents key information from being split across chunk boundaries. Set it to roughly 10% of `chunk_size` (e.g. 50 for chunk_size 512, 100 for chunk_size 1024). Too little overlap risks losing context at boundaries; too much wastes storage on duplicate content.
+
 ## Supported File Formats
 
 ### Core Formats (always available)
@@ -191,6 +201,7 @@ The embedding provider is determined by this priority:
 | `openai` | `openai:text-embedding-3-small` |
 | `anthropic` | `openai:text-embedding-3-small` (Anthropic has no embeddings API) |
 | `google` | `google:text-embedding-004` |
+| `ollama` | `ollama:nomic-embed-text` |
 
 If no match is found, falls back to `openai:text-embedding-3-small`.
 
@@ -271,12 +282,14 @@ This means re-running ingestion is safe and idempotent — it always reflects th
 When `spec.ingest` is configured, a `search_documents` tool is auto-registered on the agent:
 
 ```
-search_documents(query: str, top_k: int = 5) -> str
+search_documents(query: str, top_k: int = 5, source: str | None = None) -> str
 ```
 
-- Creates an embedding from the query using the same embedding model as ingestion.
-- Searches the vector store for the `top_k` most similar chunks.
-- Returns results formatted as:
+- **`query`** — The search query. An embedding is created using the same model as ingestion.
+- **`top_k`** — Number of results to return (default: 5).
+- **`source`** — Optional source filter. Pass an exact path (e.g. `"./docs/guide.md"`) or a glob pattern (e.g. `"*.md"`) to restrict results to matching sources.
+
+Results are formatted as:
 
 ```
 [Source: ./docs/guide.md | Score: 0.872]
@@ -289,6 +302,16 @@ Another matching chunk...
 ```
 
 The score is `1 - distance` (higher is more similar).
+
+Example with source filtering:
+
+```python
+# Search only markdown files
+search_documents("installation steps", source="*.md")
+
+# Search a specific file
+search_documents("error handling", source="./docs/api-reference.md")
+```
 
 If no documents have been ingested, the tool returns a message directing the user to run `initrunner ingest`.
 
@@ -307,6 +330,54 @@ initrunner ingest role.yaml --force
 | `--force` | Force re-ingestion of all files. Also wipes the store when the embedding model has changed. |
 
 The command displays the agent name, a spinner during processing, and the total number of chunks stored on completion.
+
+## Troubleshooting
+
+### No results from `search_documents`
+
+- **Documents not ingested** — Run `initrunner ingest role.yaml` before querying. The tool returns "No documents have been ingested yet" if the store database doesn't exist.
+- **Query mismatch** — Semantic search works best when the query uses similar vocabulary to the documents. Try rephrasing with terms that appear in your source files.
+
+### `EmbeddingModelChangedError`
+
+Raised when the embedding model in your role.yaml differs from the one used to create the store. The existing embeddings are incompatible with the new model.
+
+**Fix:** Re-run with `--force` to wipe the store and re-ingest:
+```bash
+initrunner ingest role.yaml --force
+```
+
+### `DimensionMismatchError`
+
+The embedding model produces vectors with a different dimension than what the store expects. This typically happens when switching between embedding models.
+
+**Fix:** Same as above — use `--force` to wipe and re-ingest.
+
+### Optional format errors (PDF, DOCX, XLSX)
+
+If you see an error like `"Install initrunner[ingest] for PDF support"`, install the extra:
+```bash
+pip install initrunner[ingest]
+# or with uv:
+uv pip install initrunner[ingest]
+```
+
+### API key not set
+
+Embedding providers require credentials. If you see authentication errors:
+- **OpenAI**: Set `OPENAI_API_KEY` in your environment.
+- **Google**: Set `GOOGLE_API_KEY` or configure Application Default Credentials.
+- **Custom endpoint**: Set the env var specified in `embeddings.api_key_env`.
+- **Ollama**: No API key needed — runs locally.
+
+### `sqlite-vec` not available
+
+The default vector store backend requires the `sqlite-vec` extension. Install it:
+```bash
+pip install sqlite-vec
+# or with uv:
+uv pip install sqlite-vec
+```
 
 ## Scaffold a RAG Role
 

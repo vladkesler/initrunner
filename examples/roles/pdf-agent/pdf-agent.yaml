@@ -1,0 +1,50 @@
+# PDF Knowledge Base Agent
+#
+# Demonstrates mixed PDF + Markdown ingestion with larger chunk sizes
+# suitable for dense technical documents.
+#
+# Prerequisites:
+#   pip install initrunner[ingest]   # required for PDF support (pymupdf4llm)
+#
+# Usage:
+#   initrunner ingest pdf-agent.yaml
+#   initrunner run pdf-agent.yaml -i
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: pdf-agent
+  description: Knowledge base agent with PDF and Markdown support
+  tags:
+    - example
+    - rag
+    - pdf
+spec:
+  role: |
+    You are a technical documentation assistant. You answer questions
+    using the ingested knowledge base which contains PDFs and Markdown files.
+
+    Rules:
+    - ALWAYS call search_documents before answering a question
+    - Base your answers only on information found in the documents
+    - Cite the source file for each claim
+    - If no relevant results are found, say so honestly
+    - For PDF sources, mention the document name (not the full path)
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+      - "./docs/**/*.pdf"
+    chunking:
+      strategy: fixed
+      chunk_size: 1024
+      chunk_overlap: 100
+    embeddings:
+      provider: openai
+      model: text-embedding-3-small
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15

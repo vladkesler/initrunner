@@ -871,7 +871,7 @@ See [Tool Creation Guide](tool_creation.md#plugin-registry) for how to use and c
 
 When `spec.ingest` is configured, InitRunner automatically registers a document search tool:
 
-- **`search_documents(query: str, top_k: int = 5) -> str`** — Search ingested documents for relevant content. Returns matching chunks with source attribution and similarity scores.
+- **`search_documents(query: str, top_k: int = 5, source: str | None = None) -> str`** — Search ingested documents for relevant content. Returns matching chunks with source attribution and similarity scores. Pass `source` to filter results by exact path or glob pattern (e.g. `"*.md"`).
 
 This tool requires running `initrunner ingest` first. If no documents have been ingested, it returns a message directing the user to run ingestion.
 

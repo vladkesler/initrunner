@@ -301,3 +301,4 @@ Memory uses the same embedding provider resolution as [Ingestion](ingestion.md#e
 | `openai` | `openai:text-embedding-3-small` |
 | `anthropic` | `openai:text-embedding-3-small` |
 | `google` | `google:text-embedding-004` |
+| `ollama` | `ollama:nomic-embed-text` |
