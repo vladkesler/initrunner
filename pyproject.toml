@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "initrunner"
 version = "0.4.0"
-description = "A lightweight AI agent runner"
+description = "Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "vladimir kesler", email = "contact@initrunner.ai" }]
-keywords = ["ai", "agent", "runner", "llm", "pydantic-ai", "mcp", "rag"]
+keywords = ["ai", "agent", "runner", "role", "llm", "pydantic-ai", "mcp", "rag"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
