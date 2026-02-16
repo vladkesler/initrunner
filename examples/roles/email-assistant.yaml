@@ -1,0 +1,27 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: email-assistant
+  description: Search, read, and summarize emails
+  tags: [example, email]
+spec:
+  role: |
+    You are an email assistant. You can search the user's inbox, read
+    individual emails, and list mail folders. When the user asks about
+    their email, use the available tools to find and summarize messages.
+    Always present results concisely.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+  tools:
+    - type: email
+      imap_host: imap.gmail.com
+      smtp_host: smtp.gmail.com
+      username: ${EMAIL_USER}
+      password: ${EMAIL_PASS}
+      read_only: true
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 10
+    timeout_seconds: 60

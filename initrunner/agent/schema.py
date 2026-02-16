@@ -336,6 +336,31 @@ class SlackToolConfig(ToolConfigBase):
         return "slack: webhook"
 
 
+class EmailToolConfig(ToolConfigBase):
+    type: Literal["email"] = "email"
+    imap_host: str
+    smtp_host: str = ""
+    imap_port: int = 993
+    smtp_port: int = 587
+    username: str
+    password: str
+    use_ssl: bool = True
+    default_folder: str = "INBOX"
+    read_only: bool = True
+    max_results: int = 20
+    max_body_chars: int = 50_000
+    timeout_seconds: int = 30
+
+    @model_validator(mode="after")
+    def _validate_smtp_for_write(self) -> EmailToolConfig:
+        if not self.read_only and not self.smtp_host:
+            raise ValueError("smtp_host is required when read_only is false")
+        return self
+
+    def summary(self) -> str:
+        return f"email: {self.imap_host} (ro={self.read_only})"
+
+
 class WebScraperToolConfig(ToolConfigBase):
     type: Literal["web_scraper"] = "web_scraper"
     allowed_domains: list[str] = []
@@ -348,6 +373,24 @@ class WebScraperToolConfig(ToolConfigBase):
         if self.allowed_domains:
             return f"web_scraper: {', '.join(self.allowed_domains[:3])}"
         return "web_scraper"
+
+
+class SearchToolConfig(ToolConfigBase):
+    type: Literal["search"] = "search"
+    provider: Literal["duckduckgo", "serpapi", "brave", "tavily"] = "duckduckgo"
+    api_key: str = ""
+    max_results: int = 10
+    safe_search: bool = True
+    timeout_seconds: int = 15
+
+    @model_validator(mode="after")
+    def _validate_api_key_for_paid(self) -> SearchToolConfig:
+        if self.provider != "duckduckgo" and not self.api_key:
+            raise ValueError(f"provider '{self.provider}' requires 'api_key'")
+        return self
+
+    def summary(self) -> str:
+        return f"search: {self.provider}"
 
 
 class PluginToolConfig(ToolConfigBase):

@@ -37,6 +37,7 @@ dependencies = [
 [project.optional-dependencies]
 ingest = ["pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
 local-embeddings = ["fastembed>=0.7.4"]
+search = ["duckduckgo-search>=7.0.0"]
 safety = ["better-profanity>=0.7.0"]
 anthropic = ["pydantic-ai-slim[anthropic]>=1.56.0"]
 google = ["pydantic-ai-slim[google]>=1.56.0"]

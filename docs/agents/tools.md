@@ -22,6 +22,7 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `shell` | Execute commands in a subprocess with allow/block lists |
 | `slack` | Send messages to Slack via incoming webhooks |
 | `web_scraper` | Fetch, chunk, embed, and store web pages in the document store |
+| `search` | Search the web and news via DuckDuckGo, SerpAPI, Brave, or Tavily |
 | *(plugin)* | Any other type is resolved via the [plugin registry](tool_creation.md#plugin-registry) |
 
 ## Quick Example
@@ -848,6 +849,72 @@ triggers:
   - type: cron
     schedule: "0 */6 * * *"
     prompt: "Scrape the changelog and report changes."
+```
+
+## Search Tool
+
+Searches the web and news using one of four providers. DuckDuckGo is the default (free, no API key). Paid providers (SerpAPI, Brave, Tavily) require an API key and use `httpx` (bundled).
+
+```yaml
+tools:
+  - type: search
+    provider: duckduckgo     # default
+    max_results: 10          # default: 10
+    safe_search: true        # default: true
+    timeout_seconds: 15      # default: 15
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | `"duckduckgo" \| "serpapi" \| "brave" \| "tavily"` | `"duckduckgo"` | Search provider to use. |
+| `api_key` | `str` | `""` | API key for paid providers. Supports `${ENV_VAR}` syntax. Not needed for DuckDuckGo. |
+| `max_results` | `int` | `10` | Maximum number of results per search. |
+| `safe_search` | `bool` | `true` | Enable safe search filtering. |
+| `timeout_seconds` | `int` | `15` | HTTP request timeout in seconds. |
+
+### Registered Functions
+
+- **`web_search(query: str, num_results: int = 5) -> str`** — Search the web for information. Returns a numbered list of results with title, URL, and snippet. `num_results` is clamped to `max_results`.
+- **`news_search(query: str, num_results: int = 5, days_back: int = 7) -> str`** — Search for recent news articles. `days_back` controls the time window (mapped to provider-specific time filters).
+
+### Providers
+
+| Provider | Free? | API Key | Notes |
+|----------|-------|---------|-------|
+| `duckduckgo` | Yes | Not required | Uses `duckduckgo-search` library. Install with `pip install initrunner[search]`. |
+| `serpapi` | No | Required (`SERPAPI_API_KEY`) | Google results via SerpAPI. Uses `httpx` (bundled). |
+| `brave` | No | Required (`BRAVE_API_KEY`) | Brave Search API. Uses `httpx` (bundled). |
+| `tavily` | No | Required (`TAVILY_API_KEY`) | Tavily search API. Uses `httpx` (bundled). |
+
+### Install
+
+DuckDuckGo requires the optional `search` extra:
+
+```bash
+pip install initrunner[search]
+```
+
+Paid providers use `httpx`, which is already bundled with InitRunner — no extra install needed.
+
+### Example
+
+```yaml
+# Research assistant with web and news search
+tools:
+  - type: search
+    provider: duckduckgo
+  - type: datetime
+```
+
+```yaml
+# Using a paid provider
+tools:
+  - type: search
+    provider: brave
+    api_key: ${BRAVE_API_KEY}
+    max_results: 5
 ```
 
 ## Plugin Tools

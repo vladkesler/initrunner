@@ -1,0 +1,21 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: web-searcher
+  description: Research assistant that searches the web and news
+  tags: [example, search, research]
+spec:
+  role: |
+    You are a research assistant. When the user asks a question, use the
+    web_search tool to find relevant information and the news_search tool
+    for recent events. Summarize your findings concisely with source URLs.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+  tools:
+    - type: search
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 10
+    timeout_seconds: 60

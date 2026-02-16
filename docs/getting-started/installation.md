@@ -40,6 +40,7 @@ pipx install initrunner
 | `ingest` | `pip install initrunner[ingest]` | Additional formats: PDF, DOCX, XLSX (base text ingestion is built-in) |
 | `local-embeddings` | `pip install initrunner[local-embeddings]` | Local embeddings via fastembed (no API key needed) |
 | `safety` | `pip install initrunner[safety]` | Profanity filter for content policy |
+| `search` | `pip install initrunner[search]` | Web search via DuckDuckGo (free, no API key) |
 | `dashboard` | `pip install initrunner[dashboard]` | Web dashboard (FastAPI + Next.js) |
 | `tui` | `pip install initrunner[tui]` | Terminal TUI dashboard (Textual) |
 

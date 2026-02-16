@@ -311,6 +311,23 @@ triggers:
 
 ---
 
+## Search Tool — Web Research
+
+Search the web and news from inside an agent. DuckDuckGo is the default provider (free, no API key).
+
+```yaml
+tools:
+  - type: search
+  - type: datetime
+```
+
+> The `search` tool registers two functions: `web_search` for general queries and `news_search` for recent events. Pair it with `datetime` so the agent can reason about time when filtering news. DuckDuckGo requires the `search` extra (`pip install initrunner[search]`); paid providers (SerpAPI, Brave, Tavily) need an `api_key` but use `httpx` which is already bundled.
+
+- Full example: [`examples/roles/web-searcher.yaml`](../examples/roles/web-searcher.yaml)
+- Reference: [tools.md — Search Tool](tools.md#search-tool)
+
+---
+
 ## Common Tool Combinations
 
 Proven patterns from the example roles:
@@ -325,6 +342,7 @@ Proven patterns from the example roles:
 | **Webhook routing** | http + slack + datetime | webhook | [`webhook-processor.yaml`](../examples/roles/webhook-processor.yaml) |
 | **Web monitoring** | web_scraper + datetime | cron | [`web-monitor.yaml`](../examples/roles/web-monitor.yaml) |
 | **Changelog** | git + filesystem + datetime | — (interactive) | [`changelog-generator.yaml`](../examples/roles/changelog-generator.yaml) |
+| **Web research** | search + datetime | — (interactive) | [`web-searcher.yaml`](../examples/roles/web-searcher.yaml) |
 | **Custom utilities** | custom + datetime | — (interactive) | [`custom-tools-demo/`](../examples/roles/custom-tools-demo/) |
 
 ---

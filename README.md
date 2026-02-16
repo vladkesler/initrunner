@@ -35,6 +35,7 @@ Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and mult
 - [Docker](#docker)
 - [Core Concepts](#core-concepts)
 - [CLI Quick Reference](#cli-quick-reference)
+- [User Interfaces](#user-interfaces)
 - [Documentation](#documentation)
 - [Examples](#examples)
 - [Community & Support](#community--support)
@@ -259,6 +260,7 @@ Common extras:
 | `initrunner[anthropic]` | Anthropic provider (Claude) |
 | `initrunner[ingest]` | PDF, DOCX, XLSX ingestion |
 | `initrunner[dashboard]` | Web dashboard (FastAPI + Next.js) |
+| `initrunner[search]` | Web search (DuckDuckGo) |
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 
@@ -400,6 +402,11 @@ Control costs and runaway agents with `spec.guardrails`:
 
 See [Guardrails](docs/configuration/guardrails.md) and [Token Control](docs/configuration/token_control.md) for the full reference.
 
+<p align="center">
+  <img src="assets/screenshot-audit.png" alt="InitRunner audit log — agent runs with tokens, duration, and trigger modes" width="700"><br>
+  <em>Audit log — track every agent run with tokens, duration, and trigger mode</em>
+</p>
+
 For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#from-simple-to-powerful) above. Full references: [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Triggers](docs/core/triggers.md) · [Compose](docs/orchestration/agent_composer.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md)
 
 ## CLI Quick Reference
@@ -430,6 +437,22 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 | `update [name] / --all` | Update installed roles |
 
 See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full command list and all options.
+
+## User Interfaces
+
+Beyond the CLI, InitRunner includes a terminal UI and a web dashboard for visual agent management.
+
+| | Terminal UI (`tui`) | Web Dashboard (`ui`) |
+|---|---|---|
+| **Launch** | `initrunner tui` | `initrunner ui` |
+| **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
+| **Chat** | Streaming chat with token counts | SSE streaming chat with file attachments |
+| **Audit** | Browse & filter audit records | Audit log with detail panel |
+| **Memory** | View, export, delete memories | View, filter, export, clear memories |
+| **Daemon** | Real-time trigger event log | WebSocket trigger monitor |
+| **Style** | k9s-style keyboard-driven (Textual) | Server-rendered HTML (HTMX + DaisyUI) |
+
+See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashboard.md) · [API Server docs](docs/interfaces/server.md)
 
 ## Documentation
 
