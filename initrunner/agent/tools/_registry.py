@@ -58,9 +58,7 @@ _registry_lock = threading.Lock()
 _F = TypeVar("_F", bound=Callable[..., "AbstractToolset"])
 
 
-def register_tool(
-    type_name: str, config_class: type[Any]
-) -> Callable[[_F], _F]:
+def register_tool(type_name: str, config_class: type[Any]) -> Callable[[_F], _F]:
     """Decorator that registers a tool builder.
 
     Usage::
