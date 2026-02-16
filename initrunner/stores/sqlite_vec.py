@@ -6,6 +6,7 @@ import fnmatch
 import json
 import sqlite3
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,31 @@ CREATE TABLE IF NOT EXISTS store_meta (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _retry_on_locked(conn, fn, max_retries=7, base_delay=0.1):
+    """Execute *fn(conn)* with retries on 'database is locked' errors."""
+    for attempt in range(max_retries):
+        try:
+            return fn(conn)
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower():
+                raise
+            if attempt == max_retries - 1:
+                logger.error("Failed to acquire DB lock after %d attempts", max_retries)
+                raise
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            delay = base_delay * (2**attempt)
+            logger.debug(
+                "Database locked, retrying in %.2fs (attempt %d/%d)",
+                delay,
+                attempt + 1,
+                max_retries,
+            )
+            time.sleep(delay)
 
 
 def _read_meta(conn: sqlite3.Connection, key: str) -> str | None:
@@ -355,8 +381,12 @@ def _init_store_common(
     """Shared init: open connection, create store_meta, migrate, resolve dimensions."""
     conn = _open_sqlite_vec(db_path)
     try:
-        conn.execute(_CREATE_STORE_META)
-        conn.commit()
+
+        def _init(c):
+            c.execute(_CREATE_STORE_META)
+            c.commit()
+
+        _retry_on_locked(conn, _init)
         _migrate_legacy_dimensions(conn, vec_table_name)
         resolved = _resolve_dimensions(conn, db_path, dimensions, allow_none=allow_none)
     except Exception:
@@ -621,52 +651,62 @@ class SqliteVecMemoryStore(MemoryStoreBase):
             raise
 
     def _init_tables(self) -> None:
-        self._conn.execute(
-            """\
-            CREATE TABLE IF NOT EXISTS sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                agent_name TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                messages_json TEXT NOT NULL
-            );"""
-        )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_agent "
-            "ON sessions (agent_name, timestamp DESC);"
-        )
-        self._conn.execute(
-            """\
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                content TEXT NOT NULL,
-                category TEXT NOT NULL DEFAULT 'general',
-                created_at TEXT NOT NULL
-            );"""
-        )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_memories_category ON memories (category);"
-        )
-        # Only create vec table if we know the dimensions
-        if self._dimensions is not None:
-            self._conn.execute(
-                f"CREATE VIRTUAL TABLE IF NOT EXISTS memories_vec "
-                f"USING vec0(embedding float[{self._dimensions}]);"
+        dims = self._dimensions
+
+        def _do(c):
+            c.execute(
+                """\
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    agent_name TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    messages_json TEXT NOT NULL
+                );"""
             )
-        self._conn.commit()
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sessions_agent "
+                "ON sessions (agent_name, timestamp DESC);"
+            )
+            c.execute(
+                """\
+                CREATE TABLE IF NOT EXISTS memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT 'general',
+                    created_at TEXT NOT NULL
+                );"""
+            )
+            c.execute("CREATE INDEX IF NOT EXISTS idx_memories_category ON memories (category);")
+            # Only create vec table if we know the dimensions
+            if dims is not None:
+                c.execute(
+                    f"CREATE VIRTUAL TABLE IF NOT EXISTS memories_vec "
+                    f"USING vec0(embedding float[{dims}]);"
+                )
+            c.commit()
+
+        _retry_on_locked(self._conn, _do)
 
     def _ensure_vec_table(self, dimensions: int) -> None:
         """Lazily create the memories_vec table when dimensions become known."""
         with self._lock:
             if self._dimensions is not None:
                 return
-            self._conn.execute(_CREATE_STORE_META)
-            _write_meta(self._conn, "dimensions", str(dimensions))
-            self._conn.execute(
-                f"CREATE VIRTUAL TABLE IF NOT EXISTS memories_vec "
-                f"USING vec0(embedding float[{dimensions}]);"
-            )
-            self._conn.commit()
+
+            def _do(c):
+                c.execute(_CREATE_STORE_META)
+                c.execute(
+                    "INSERT OR REPLACE INTO store_meta (key, value) VALUES (?, ?)",
+                    ("dimensions", str(dimensions)),
+                )
+                c.execute(
+                    f"CREATE VIRTUAL TABLE IF NOT EXISTS memories_vec "
+                    f"USING vec0(embedding float[{dimensions}]);"
+                )
+                c.commit()
+
+            _retry_on_locked(self._conn, _do)
             self._dimensions = dimensions
 
     @property
@@ -780,18 +820,22 @@ class SqliteVecMemoryStore(MemoryStoreBase):
     def add_memory(self, content: str, category: str, embedding: list[float]) -> int:
         self._ensure_vec_table(len(embedding))
         with self._lock:
-            now = datetime.now(UTC).isoformat()
-            cursor = self._conn.execute(
-                "INSERT INTO memories (content, category, created_at) VALUES (?, ?, ?)",
-                (content, category, now),
-            )
-            row_id = cursor.lastrowid
-            self._conn.execute(
-                "INSERT INTO memories_vec (rowid, embedding) VALUES (?, ?)",
-                (row_id, sqlite_vec.serialize_float32(embedding)),
-            )
-            self._conn.commit()
-            return row_id  # type: ignore[return-value]
+
+            def _do(c):
+                now = datetime.now(UTC).isoformat()
+                cursor = c.execute(
+                    "INSERT INTO memories (content, category, created_at) VALUES (?, ?, ?)",
+                    (content, category, now),
+                )
+                row_id = cursor.lastrowid
+                c.execute(
+                    "INSERT INTO memories_vec (rowid, embedding) VALUES (?, ?)",
+                    (row_id, sqlite_vec.serialize_float32(embedding)),
+                )
+                c.commit()
+                return row_id
+
+            return _retry_on_locked(self._conn, _do)  # type: ignore[return-value]
 
     def search_memories(self, embedding: list[float], top_k: int = 5) -> list[tuple[Memory, float]]:
         with self._lock:
