@@ -213,26 +213,12 @@ Common extras:
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 
-**2. Create your first agent** (`code-reviewer.yaml`)
+**2. Create your first agent**
 
-```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: An experienced code review agent
-spec:
-  role: |
-    You are a senior engineer. Review code changes for correctness,
-    readability, and potential bugs. Be constructive.
-  model: { provider: openai, name: gpt-4o-mini }
-  tools:
-    - type: git
-      repo_path: .
-      read_only: true
-    - type: filesystem
-      root_path: .
-      read_only: true
+Use the `code-reviewer.yaml` from [above](#see-it-in-action), or scaffold one:
+
+```bash
+initrunner init --name my-agent --model gpt-4o-mini
 ```
 
 **3. Set your API key and run**
@@ -326,19 +312,6 @@ See [docs/agents/tools.md](docs/agents/tools.md) for the full reference.
 
 Add a built-in tool by creating a single file in `initrunner/agent/tools/` with a config class and a `@register_tool` decorated builder function. The tool is auto-discovered and immediately available in role YAML — no other files need editing. Tools use [PydanticAI's FunctionToolset](https://ai.pydantic.dev/tools/) under the hood. See [docs/agents/tool_creation.md](docs/agents/tool_creation.md) for the full guide, including custom tools loaded from external modules, declarative API tools, and the plugin registry.
 
-### Skills
-
-Skills are reusable bundles of tools and prompts packaged as `SKILL.md` files. They let you compose capabilities across agents without duplicating configuration. Reference them from a role with `spec.skills`:
-
-```yaml
-spec:
-  skills:
-    - ../skills/web-researcher
-    - ../skills/code-tools.md
-```
-
-See [docs/agents/skills_feature.md](docs/agents/skills_feature.md) for skill file format, resolution rules, and examples.
-
 ### Run modes
 
 | Mode | Command | Use case |
@@ -348,21 +321,7 @@ See [docs/agents/skills_feature.md](docs/agents/skills_feature.md) for skill fil
 | Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook) |
 | API server | `initrunner serve role.yaml` | OpenAI-compatible HTTP API |
 
-### RAG & Memory
-
-**Document ingestion** — add `spec.ingest` to your role pointing at your documents, then run `initrunner ingest role.yaml` to extract, chunk, embed, and store locally in SQLite (powered by `sqlite-vec`). A `search_documents` tool is automatically registered so the model can query the knowledge base at runtime. See [docs/core/ingestion.md](docs/core/ingestion.md) for custom embedding models, URL sources, and chunking strategies.
-
-**Long-term memory** — add `spec.memory` to your role and the agent gets `remember()`, `recall()`, and `list_memories()` tools. Use `--resume` to continue previous REPL sessions. See [docs/core/memory.md](docs/core/memory.md).
-
-### Triggers & Compose
-
-**Triggers** let daemons react to events — cron schedules, file changes, or webhooks. See [docs/core/triggers.md](docs/core/triggers.md).
-
-**Compose** orchestrates multiple agents as a pipeline with delegate sinks, health checks, and restart policies. Deploy with `compose up` (foreground) or `compose install` (systemd). See [docs/orchestration/agent_composer.md](docs/orchestration/agent_composer.md).
-
-### Providers
-
-The default provider is OpenAI (`gpt-4o-mini`). Switch providers by changing `spec.model` in your role file and installing the relevant extra (e.g. `pip install initrunner[anthropic]`). See [docs/configuration/providers.md](docs/configuration/providers.md) for Ollama, OpenRouter, Azure, custom endpoints, and the full provider table.
+For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#from-simple-to-powerful) above. Full references: [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Triggers](docs/core/triggers.md) · [Compose](docs/orchestration/agent_composer.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md)
 
 ## CLI Quick Reference
 
@@ -390,42 +349,16 @@ See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full comm
 
 ## Documentation
 
-**Getting Started**
+| Area | Key docs |
+|------|----------|
+| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [CLI Reference](docs/getting-started/cli.md) |
+| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) |
+| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Triggers](docs/core/triggers.md) |
+| Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
+| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [CI/CD](docs/operations/cicd.md) |
 
-- [Installation](docs/getting-started/installation.md) — Install methods, extras, dev setup, environment
-- [Setup](docs/getting-started/setup.md) — First-time setup wizard and provider configuration
-- [CLI Reference](docs/getting-started/cli.md) — All commands and options
-
-**Agent Development**
-
-- [Tools](docs/agents/tools.md) — Full tool reference with configuration examples
-- [Tool Creation](docs/agents/tool_creation.md) — Building custom tools and plugins
-- [Skills](docs/agents/skills_feature.md) — Reusable skill definitions
-- [Providers](docs/configuration/providers.md) — Provider configs, custom endpoints, model reference
-- [Ollama](docs/configuration/ollama.md) — Local model setup with Ollama
-
-**Advanced Features**
-
-- [Ingestion](docs/core/ingestion.md) — Document extraction, chunking, and embedding
-- [Memory](docs/core/memory.md) — Session persistence and semantic memory
-- [Triggers](docs/core/triggers.md) — Cron, file watcher, and webhook triggers
-- [Compose](docs/orchestration/agent_composer.md) — Multi-agent orchestration and delegate sinks
-- [Delegation](docs/orchestration/delegation.md) — Agent-to-agent delegation patterns
-- [Pipelines](docs/orchestration/pipelines.md) — Sequential and parallel agent pipelines
-- [Sinks](docs/orchestration/sinks.md) — Output sinks (webhook, file, custom)
-- [Server](docs/interfaces/server.md) — OpenAI-compatible API server
-
-**Operations**
-
-- [Dashboard](docs/interfaces/dashboard.md) — Web dashboard setup and API reference
-- [TUI](docs/interfaces/tui.md) — Terminal dashboard key bindings and screens
-- [Audit](docs/core/audit.md) — Audit trail queries, export, and pruning
-- [Security](docs/security/security.md) — Security model, sandboxing, and content policies
-- [Guardrails](docs/configuration/guardrails.md) — Guardrails config and token budgets
-- [Token Control](docs/configuration/token_control.md) — Token budgets and usage limits
-- [Testing](docs/operations/testing.md) — Test suites and assertions
-- [CI/CD](docs/operations/cicd.md) — Continuous integration and deployment
-- [Registry](docs/agents/registry.md) — Installing and sharing community roles
+See [`docs/`](docs/) for the full index.
 
 ## Examples
 
@@ -447,27 +380,11 @@ See `examples/roles/skill-demo.yaml` for a role composing multiple skills.
 ## Community & Support
 
 - [GitHub Issues](https://github.com/vladkesler/initrunner/issues) — Bug reports and feature requests
-- [GitHub Discussions](https://github.com/vladkesler/initrunner/discussions) — Questions and community help
 - [Changelog](CHANGELOG.md) — Release notes and version history
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-Run local quality checks before pushing:
-
-```bash
-uv sync --dev
-uv run pre-commit install
-uv run pre-commit run --all-files
-```
-
-Manual Ruff commands (equivalent to CI formatting/lint checks):
-
-```bash
-uv run ruff format .
-uv run ruff check .
-```
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR guidelines, and quality checks.
 
 ### Share a role
 
