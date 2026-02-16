@@ -254,22 +254,27 @@ Common extras:
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 
-**2. Create your first agent**
+**2. Create your first agent and run it**
 
-Use the `code-reviewer.yaml` from [above](#see-it-in-action), scaffold one, or follow the hands-on [Tutorial](docs/getting-started/tutorial.md):
-
-```bash
-initrunner init --name my-agent --model gpt-4o-mini
-```
-
-**3. Set your API key and run**
+The fastest way to get started — `setup` walks you through provider, API key, model, and agent creation in one step:
 
 ```bash
-export OPENAI_API_KEY=sk-...
-initrunner run code-reviewer.yaml -p "Review the last 3 commits"
+initrunner setup                # guided wizard — picks provider, stores API key, creates a role
+initrunner run my-agent.yaml -p "Hello!"   # single-shot prompt
+initrunner run my-agent.yaml -i            # interactive chat
 ```
 
-Start an interactive chat with `-i`, or use `initrunner setup` for a guided wizard. See [docs/getting-started/setup.md](docs/getting-started/setup.md) for provider setup.
+There are several ways to create a role — pick whichever fits:
+
+| Method | Command | Best for |
+|--------|---------|----------|
+| Guided wizard | `initrunner setup` | First-time setup ([docs](docs/getting-started/setup.md)) |
+| Interactive scaffold | `initrunner init -i` | Prompted step-by-step creation ([docs](docs/getting-started/cli.md)) |
+| AI generation | `initrunner create "code reviewer for Python"` | Describe what you want in natural language ([docs](docs/agents/role_generation.md)) |
+| CLI flags | `initrunner init --name my-agent --model gpt-4o-mini` | Quick one-liner ([docs](docs/getting-started/cli.md)) |
+| Manual YAML | Copy the [example above](#see-it-in-action) | Full control |
+
+See the hands-on [Tutorial](docs/getting-started/tutorial.md) for a complete walkthrough.
 
 ## Docker
 
@@ -393,8 +398,10 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 | `run <role.yaml> -p "..." -a` | Autonomous agentic loop |
 | `run <role.yaml> -p "..." -a --max-iterations N` | Autonomous with iteration limit |
 | `validate <role.yaml>` | Validate a role definition |
-| `init --name <name> [--model <model>]` | Scaffold a new role |
-| `setup` | Guided provider setup wizard |
+| `init --name <name> [--model <model>]` | Scaffold a new role from CLI flags |
+| `init -i` | Interactive role-creation wizard |
+| `create "<description>"` | AI-generate a role from a description |
+| `setup` | Guided provider + API key + role setup |
 | `ingest <role.yaml>` | Ingest documents into vector store |
 | `daemon <role.yaml>` | Run in trigger-driven daemon mode |
 | `run <role.yaml> -p "..." -A file.png` | Attach files or URLs to prompt |
