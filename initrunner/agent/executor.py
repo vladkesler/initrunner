@@ -323,34 +323,50 @@ def execute_run(
     if blocked is not None:
         return blocked, []
 
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("initrunner")
+
     result = RunResult(run_id=run_id)
     new_messages: list = []
     start = time.monotonic()
 
-    try:
-        agent_result = _run_with_timeout(
-            lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
-            timeout=role.spec.guardrails.timeout_seconds,
-        )
+    with tracer.start_as_current_span(
+        "initrunner.agent.run",
+        attributes={
+            "initrunner.run_id": run_id,
+            "initrunner.agent_name": role.metadata.name,
+            "initrunner.trigger_type": trigger_type or "",
+        },
+    ) as span:
+        try:
+            agent_result = _run_with_timeout(
+                lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
+                timeout=role.spec.guardrails.timeout_seconds,
+            )
 
-        raw_output = agent_result.output
-        if isinstance(raw_output, (dict, list)):
-            result.output = json.dumps(raw_output)
-        else:
-            result.output = str(raw_output)
+            raw_output = agent_result.output
+            if isinstance(raw_output, (dict, list)):
+                result.output = json.dumps(raw_output)
+            else:
+                result.output = str(raw_output)
 
-        _apply_output_validation(result, role)
+            _apply_output_validation(result, role)
 
-        usage = agent_result.usage()
-        result.tokens_in = usage.input_tokens or 0
-        result.tokens_out = usage.output_tokens or 0
-        result.total_tokens = usage.total_tokens or 0
-        result.tool_calls = usage.tool_calls or 0
-        new_messages = agent_result.all_messages()
-    except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
-        _handle_run_error(result, e)
+            usage = agent_result.usage()
+            result.tokens_in = usage.input_tokens or 0
+            result.tokens_out = usage.output_tokens or 0
+            result.total_tokens = usage.total_tokens or 0
+            result.tool_calls = usage.tool_calls or 0
+            new_messages = agent_result.all_messages()
+        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
+            _handle_run_error(result, e)
 
-    result.duration_ms = int((time.monotonic() - start) * 1000)
+        result.duration_ms = int((time.monotonic() - start) * 1000)
+
+        span.set_attribute("initrunner.tokens_total", result.total_tokens)
+        span.set_attribute("initrunner.duration_ms", result.duration_ms)
+        span.set_attribute("initrunner.success", result.success)
 
     _audit_result(
         result,
@@ -402,6 +418,10 @@ def execute_run_stream(
     if blocked is not None:
         return blocked, []
 
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("initrunner")
+
     result = RunResult(run_id=run_id)
     new_messages: list = []
     output_parts: list[str] = []
@@ -409,40 +429,52 @@ def execute_run_stream(
 
     stream_state: dict = {"messages": [], "usage": None}
 
-    try:
+    with tracer.start_as_current_span(
+        "initrunner.agent.run",
+        attributes={
+            "initrunner.run_id": run_id,
+            "initrunner.agent_name": role.metadata.name,
+            "initrunner.trigger_type": trigger_type or "",
+        },
+    ) as span:
+        try:
 
-        def _do_stream():
-            stream = agent.run_stream_sync(
-                prompt,
-                **stream_kwargs,
+            def _do_stream():
+                stream = agent.run_stream_sync(
+                    prompt,
+                    **stream_kwargs,
+                )
+                for chunk in stream.stream_text(delta=True):
+                    output_parts.append(chunk)
+                    if on_token is not None:
+                        on_token(chunk)
+
+                stream_state["messages"] = stream.all_messages()
+                stream_state["usage"] = stream.usage()
+
+            _run_with_timeout(
+                lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
+                timeout=role.spec.guardrails.timeout_seconds,
             )
-            for chunk in stream.stream_text(delta=True):
-                output_parts.append(chunk)
-                if on_token is not None:
-                    on_token(chunk)
+            new_messages = stream_state["messages"]
+            usage = stream_state["usage"]
 
-            stream_state["messages"] = stream.all_messages()
-            stream_state["usage"] = stream.usage()
+            result.output = "".join(output_parts)
 
-        _run_with_timeout(
-            lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
-            timeout=role.spec.guardrails.timeout_seconds,
-        )
-        new_messages = stream_state["messages"]
-        usage = stream_state["usage"]
+            _apply_output_validation(result, role)
 
-        result.output = "".join(output_parts)
+            if usage is not None:
+                result.tokens_in = usage.input_tokens or 0
+                result.tokens_out = usage.output_tokens or 0
+                result.total_tokens = usage.total_tokens or 0
+        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
+            _handle_run_error(result, e, partial_output="".join(output_parts))
 
-        _apply_output_validation(result, role)
+        result.duration_ms = int((time.monotonic() - start) * 1000)
 
-        if usage is not None:
-            result.tokens_in = usage.input_tokens or 0
-            result.tokens_out = usage.output_tokens or 0
-            result.total_tokens = usage.total_tokens or 0
-    except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
-        _handle_run_error(result, e, partial_output="".join(output_parts))
-
-    result.duration_ms = int((time.monotonic() - start) * 1000)
+        span.set_attribute("initrunner.tokens_total", result.total_tokens)
+        span.set_attribute("initrunner.duration_ms", result.duration_ms)
+        span.set_attribute("initrunner.success", result.success)
 
     _audit_result(
         result,

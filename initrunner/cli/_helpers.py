@@ -157,6 +157,14 @@ def command_context(
     Yields (role, agent, audit_logger, memory_store, sink_dispatcher).
     """
     role, agent = load_and_build_or_exit(role_file, extra_skill_dirs=extra_skill_dirs)
+
+    # Setup observability after load so TracerProvider is active before
+    # the first agent.run_sync() call (PydanticAI resolves it lazily).
+    _otel_provider = None
+    if role.spec.observability is not None:
+        from initrunner.observability import setup_tracing
+
+        _otel_provider = setup_tracing(role.spec.observability, role.metadata.name)
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     memory_store = None
@@ -179,3 +187,7 @@ def command_context(
             memory_store.close()
         if audit_logger is not None:
             audit_logger.close()
+        if _otel_provider is not None:
+            from initrunner.observability import shutdown_tracing
+
+            shutdown_tracing()

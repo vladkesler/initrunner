@@ -109,14 +109,30 @@ class ComposeService:
         with self._execution_lock:
             with self._counter_lock:
                 self._run_count += 1
-            result, _ = execute_run(
-                self.agent,
-                self.role,
-                prompt,
-                audit_logger=self.audit_logger,
-                trigger_type=trigger_type,
-                trigger_metadata=trigger_metadata or {},
-            )
+
+            from initrunner.observability import extract_trace_context
+
+            parent_ctx = extract_trace_context(trigger_metadata or {})
+            ctx_token = None
+            if parent_ctx is not None:
+                from opentelemetry import context
+
+                ctx_token = context.attach(parent_ctx)
+
+            try:
+                result, _ = execute_run(
+                    self.agent,
+                    self.role,
+                    prompt,
+                    audit_logger=self.audit_logger,
+                    trigger_type=trigger_type,
+                    trigger_metadata=trigger_metadata or {},
+                )
+            finally:
+                if ctx_token is not None:
+                    from opentelemetry import context
+
+                    context.detach(ctx_token)
 
             if not result.success:
                 with self._counter_lock:

@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-02-16
 
 ### Added
+- OpenTelemetry observability with OTLP, console, and Logfire backends
+- `traced-agent` example role with console observability
+- observability documentation (`docs/core/observability.md`)
 - add multimodal input section and bump version to v0.4.0 in README (e1aa97f)
 - add model selection to role creation and setup (v0.3.0) (d69be97)
 - add GitHub Release creation to release workflow and update changelog (1422f79)

@@ -634,6 +634,18 @@ class AuditConfig(BaseModel):
     retention_days: int = 90
 
 
+class ObservabilityConfig(BaseModel):
+    """OpenTelemetry observability configuration."""
+
+    backend: Literal["otlp", "logfire", "console"] = "otlp"
+    endpoint: str = "http://localhost:4317"
+    service_name: str = ""  # empty = use agent metadata.name
+    trace_tool_calls: bool = True
+    trace_token_usage: bool = True
+    sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
+    include_content: bool = False
+
+
 class SecurityPolicy(BaseModel):
     content: ContentPolicy = ContentPolicy()
     server: ServerConfig = ServerConfig()
@@ -707,6 +719,7 @@ class AgentSpec(BaseModel):
     guardrails: Guardrails = Guardrails()
     resources: ResourceConfig = ResourceConfig()
     security: SecurityPolicy = SecurityPolicy()
+    observability: ObservabilityConfig | None = None
 
     @field_validator("tools", mode="before")
     @classmethod

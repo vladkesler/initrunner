@@ -312,18 +312,24 @@ class DelegateSink(SinkBase):
 
             trace_str = ",".join(trace)
 
+            metadata = {
+                "_compose_trace": trace_str,
+                "_compose_original_prompt": payload.trigger_metadata.get(
+                    "_compose_original_prompt", payload.prompt
+                ),
+                "_compose_source_output": payload.output,
+            }
+
+            from initrunner.observability import inject_trace_context
+
+            inject_trace_context(metadata)
+
             event = DelegateEvent(
                 source_service=self._source_service,
                 target_service=self._target_service,
                 prompt=payload.output,
                 source_run_id=payload.run_id,
-                metadata={
-                    "_compose_trace": trace_str,
-                    "_compose_original_prompt": payload.trigger_metadata.get(
-                        "_compose_original_prompt", payload.prompt
-                    ),
-                    "_compose_source_output": payload.output,
-                },
+                metadata=metadata,
                 trace=trace,
             )
 

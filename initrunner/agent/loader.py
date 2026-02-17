@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
@@ -129,18 +130,21 @@ def _create_agent(
     system_prompt: str,
     toolsets: list,
     output_type: type,
+    instrument: Any = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
-    return Agent(
-        _build_model(role.spec.model),
-        output_type=output_type,
-        system_prompt=system_prompt,
-        model_settings=ModelSettings(
+    kwargs: dict[str, Any] = {
+        "output_type": output_type,
+        "system_prompt": system_prompt,
+        "model_settings": ModelSettings(
             temperature=role.spec.model.temperature,
             max_tokens=role.spec.model.max_tokens,
         ),
-        toolsets=toolsets if toolsets else None,
-    )
+        "toolsets": toolsets if toolsets else None,
+    }
+    if instrument is not None:
+        kwargs["instrument"] = instrument
+    return Agent(_build_model(role.spec.model), **kwargs)
 
 
 def build_agent(
@@ -156,7 +160,14 @@ def build_agent(
     from initrunner.agent.tools import build_toolsets
 
     toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
-    return _create_agent(role, system_prompt, toolsets, output_type)
+
+    instrument = None
+    if role.spec.observability is not None:
+        from initrunner.observability import get_instrumentation_settings
+
+        instrument = get_instrumentation_settings(role.spec.observability)
+
+    return _create_agent(role, system_prompt, toolsets, output_type, instrument=instrument)
 
 
 def _load_dotenv(role_dir: Path) -> None:

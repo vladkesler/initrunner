@@ -55,6 +55,23 @@ class TestRoleDefinition:
         assert role.metadata.name == "test-agent"
         assert role.spec.role == "You are a test agent."
 
+    def test_observability_none_by_default(self):
+        role = RoleDefinition.model_validate(_minimal_role_data())
+        assert role.spec.observability is None
+
+    def test_observability_parses(self):
+        data = _minimal_role_data()
+        data["spec"]["observability"] = {
+            "backend": "console",
+            "service_name": "my-svc",
+            "sample_rate": 0.5,
+        }
+        role = RoleDefinition.model_validate(data)
+        assert role.spec.observability is not None
+        assert role.spec.observability.backend == "console"
+        assert role.spec.observability.service_name == "my-svc"
+        assert role.spec.observability.sample_rate == 0.5
+
     def test_invalid_api_version(self):
         data = _minimal_role_data()
         data["apiVersion"] = "wrong/v99"

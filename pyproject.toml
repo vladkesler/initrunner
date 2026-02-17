@@ -44,6 +44,11 @@ google = ["pydantic-ai-slim[google]>=1.56.0"]
 groq = ["pydantic-ai-slim[groq]>=1.56.0"]
 mistral = ["pydantic-ai-slim[mistral]>=1.56.0"]
 all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=1.56.0"]
+observability = [
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "opentelemetry-instrumentation-logging>=0.41b0",
+]
 tui = ["textual>=7.5.0"]
 dashboard = ["fastapi>=0.115.0", "uvicorn[standard]>=0.34.0", "jinja2>=3.1"]
 

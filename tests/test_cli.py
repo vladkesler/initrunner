@@ -206,6 +206,7 @@ class TestRun:
         role = MagicMock()
         role.spec.memory = None
         role.spec.sinks = []
+        role.spec.observability = None
         agent = MagicMock()
         mock_load.return_value = (role, agent)
         mock_run_single.return_value = (

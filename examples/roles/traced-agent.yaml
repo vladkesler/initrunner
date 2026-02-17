@@ -1,0 +1,55 @@
+# Traced Agent — observability with OpenTelemetry console backend
+#
+# Demonstrates InitRunner's built-in observability. Uses backend: console
+# so traces print to stderr with zero external dependencies (no Jaeger,
+# no Docker). For production, switch to backend: otlp and point at your
+# collector.
+#
+# Run:
+#   pip install initrunner[observability]
+#   initrunner run examples/roles/traced-agent.yaml -p "What time is it?" --no-audit
+#
+# You'll see JSON spans on stderr showing the full trace hierarchy:
+#   initrunner.agent.run → agent run → chat gpt-4o-mini → running tool (get_current_time)
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: traced-agent
+  description: A simple agent with OpenTelemetry console tracing enabled
+  tags:
+    - example
+    - observability
+    - opentelemetry
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are a helpful assistant with access to the current date and time.
+    When asked what time it is, use the get_current_time tool and report
+    the result. Keep responses short.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 256
+  tools:
+    # Include a tool so the trace shows tool-call spans
+    - type: datetime
+
+  # --- Observability configuration ---
+  observability:
+    backend: console            # Print spans to stderr (no external deps)
+    # backend: otlp             # Send to an OTLP collector (Jaeger, Tempo, etc.)
+    # endpoint: http://localhost:4317
+    service_name: traced-agent  # Service name shown in traces
+    trace_tool_calls: true      # Emit spans for each tool invocation
+    trace_token_usage: true     # Record token usage as span attributes
+    sample_rate: 1.0            # Sample every trace (1.0 = 100%)
+    include_content: false      # Set true to include prompts/completions in spans
+
+  guardrails:
+    max_tokens_per_run: 5000
+    max_tool_calls: 5
+    timeout_seconds: 30
+    max_request_limit: 5

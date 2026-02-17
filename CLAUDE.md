@@ -74,6 +74,7 @@ Detailed docs live in `docs/`. Key references:
 | Memory system | `docs/core/memory.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook) | `docs/core/triggers.md` |
+| Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Web dashboard | `docs/interfaces/dashboard.md` |

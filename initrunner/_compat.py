@@ -44,6 +44,16 @@ def require_provider(provider: str) -> None:
         ) from None
 
 
+def require_observability() -> None:
+    """Check that opentelemetry-sdk is importable, or raise with install hint."""
+    try:
+        importlib.import_module("opentelemetry.sdk")
+    except ImportError:
+        raise RuntimeError(
+            "OpenTelemetry observability requires: pip install initrunner[observability]"
+        ) from None
+
+
 def require_ingest(package: str) -> None:
     """Check that a heavy ingest dependency is importable, or raise with install hint."""
     try:

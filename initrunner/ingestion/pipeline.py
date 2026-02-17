@@ -589,12 +589,21 @@ def run_ingest(
     max_total_ingest_mb: float = 0,
 ) -> IngestStats:
     """Run the full ingestion pipeline synchronously. Returns IngestStats."""
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("initrunner")
+
     stats = IngestStats()
     files, urls = resolve_sources(config.sources, base_dir=base_dir)
     if not files and not urls:
         return stats
 
     db_path = _get_store_path(agent_name, config.store_path)
+
+    ingest_span = tracer.start_span(
+        "initrunner.ingest",
+        attributes={"initrunner.agent_name": agent_name},
+    )
 
     lock = _get_ingest_lock(db_path)
     if not lock.acquire(blocking=False):
@@ -733,6 +742,10 @@ def run_ingest(
                     write_conn.close()
     finally:
         lock.release()
+
+    ingest_span.set_attribute("initrunner.ingest.files_processed", stats.new + stats.updated)
+    ingest_span.set_attribute("initrunner.ingest.chunks_created", stats.total_chunks)
+    ingest_span.end()
 
     return stats
 
