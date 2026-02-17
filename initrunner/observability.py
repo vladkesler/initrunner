@@ -37,10 +37,10 @@ def setup_tracing(config: ObservabilityConfig, agent_name: str) -> Any:
 
     require_observability()
 
-    from opentelemetry import trace
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+    from opentelemetry import trace  # type: ignore[import-not-found]
+    from opentelemetry.sdk.resources import Resource  # type: ignore[import-not-found]
+    from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
+    from opentelemetry.sdk.trace.sampling import TraceIdRatioBased  # type: ignore[import-not-found]
 
     from initrunner import __version__
 
@@ -56,7 +56,7 @@ def setup_tracing(config: ObservabilityConfig, agent_name: str) -> Any:
     provider = TracerProvider(resource=resource, sampler=sampler)
 
     if config.backend == "console":
-        from opentelemetry.sdk.trace.export import (
+        from opentelemetry.sdk.trace.export import (  # type: ignore[import-not-found]
             ConsoleSpanExporter,
             SimpleSpanProcessor,
         )
@@ -64,10 +64,10 @@ def setup_tracing(config: ObservabilityConfig, agent_name: str) -> Any:
         provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
     else:
         # otlp
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore[import-not-found]
             OTLPSpanExporter,
         )
-        from opentelemetry.sdk.trace.export import (
+        from opentelemetry.sdk.trace.export import (  # type: ignore[import-not-found]
             BatchSpanProcessor,
         )
 
@@ -155,7 +155,7 @@ def setup_log_correlation() -> None:
     if _provider is None:
         return
     try:
-        from opentelemetry.instrumentation.logging import (
+        from opentelemetry.instrumentation.logging import (  # type: ignore[import-not-found]
             LoggingInstrumentor,
         )
 

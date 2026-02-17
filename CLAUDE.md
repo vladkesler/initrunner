@@ -59,6 +59,7 @@ These rules apply to every task in this codebase:
 - Tests go in `tests/` mirroring the source layout. Use `pytest` fixtures and `unittest.mock`.
 - Keep tool result sizes bounded (truncate with `[truncated]` marker). See existing tools for limits.
 - Sensitive env vars must be scrubbed from subprocess environments (see `_SENSITIVE_ENV_KEYS` pattern).
+- Optional-dependency imports must have `# type: ignore[import-not-found]` to suppress `ty` errors in environments where the extras aren't installed (e.g. `from opentelemetry import trace  # type: ignore[import-not-found]`).
 
 ## Documentation Index
 
