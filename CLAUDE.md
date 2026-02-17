@@ -14,6 +14,7 @@ uv run pytest tests/ -v      # run tests (710 tests)
 uv run ruff check .          # lint
 uv run ruff format .         # format
 uv run ty check              # type check
+scripts/release.sh <version> # bump version, commit, tag
 ```
 
 ## Project Layout
@@ -60,6 +61,12 @@ These rules apply to every task in this codebase:
 - Keep tool result sizes bounded (truncate with `[truncated]` marker). See existing tools for limits.
 - Sensitive env vars must be scrubbed from subprocess environments (see `_SENSITIVE_ENV_KEYS` pattern).
 - Optional-dependency imports must have `# type: ignore[import-not-found]` to suppress `ty` errors in environments where the extras aren't installed (e.g. `from opentelemetry import trace  # type: ignore[import-not-found]`).
+
+## Versioning
+
+The package version is defined in one place: `initrunner/__init__.py` (`__version__ = "x.y.z"`). Hatchling reads it at build time via `[tool.hatch.version]` in `pyproject.toml` — do **not** add a static `version` field to `[project]`.
+
+To release a new version, run `scripts/release.sh <version>` (e.g. `scripts/release.sh 0.6.0`). The script updates `__init__.py`, adds a CHANGELOG header, commits, and tags. Then push with `git push origin main && git push origin v<version>`.
 
 ## Documentation Index
 

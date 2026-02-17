@@ -11,6 +11,16 @@ InitRunner publishes to PyPI via two GitHub Actions workflows using OIDC trusted
 
 Both workflows share the same lint and test gates before building or publishing.
 
+## Bumping the Version
+
+Run the release script to prepare a version bump:
+
+    scripts/release.sh 0.6.0
+
+This updates `initrunner/__init__.py`, adds a CHANGELOG section header, commits, and creates the `v0.6.0` tag. Then push to trigger the release pipeline:
+
+    git push origin main && git push origin v0.6.0
+
 ## Production Publish (`release.yml`)
 
 Triggered when a `v*` tag is pushed to the repository. The pipeline runs five jobs in sequence:
@@ -67,7 +77,7 @@ The package description shown on PyPI comes from `README.md`, embedded at build 
 
 ### Tag/version mismatch
 
-The build job fails with `Tag vX.Y.Z does not match package version ...`. This means the version in `pyproject.toml` (and `initrunner/__init__.py`) was not bumped before tagging. Fix: delete the tag, bump the version, commit, then re-tag.
+The build job fails with `Tag vX.Y.Z does not match package version ...`. This means the version in `initrunner/__init__.py` was not bumped before tagging. Use `scripts/release.sh <version>` to avoid this — it updates the version, commits, and tags in one step. To fix manually: delete the tag, bump the version in `initrunner/__init__.py`, commit, then re-tag.
 
 ### Broken images on PyPI
 
@@ -91,4 +101,4 @@ TestPyPI rejects uploads of versions that already exist. Unlike production PyPI,
 
 ### Pre-release version rejected
 
-The TestPyPI workflow enforces that the version contains `rc`, `a`, `b`, or `dev`. If the build fails with `Package version is not a pre-release version`, add a pre-release suffix to the version in `pyproject.toml` and `initrunner/__init__.py` before dispatching the workflow.
+The TestPyPI workflow enforces that the version contains `rc`, `a`, `b`, or `dev`. If the build fails with `Package version is not a pre-release version`, add a pre-release suffix to the version in `initrunner/__init__.py` before dispatching the workflow.

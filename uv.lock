@@ -1289,7 +1289,6 @@ wheels = [
 
 [[package]]
 name = "initrunner"
-version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1379,11 +1378,11 @@ requires-dist = [
     { name = "opentelemetry-sdk", marker = "extra == 'observability'", specifier = ">=1.20.0" },
     { name = "pydantic", specifier = ">=2.11" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=1.56.0" },
-    { name = "pydantic-ai-slim", extras = ["anthropic", "google", "groq", "mistral", "cohere", "bedrock", "xai"], marker = "extra == 'all-models'", specifier = ">=1.56.0" },
+    { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all-models'", specifier = ">=1.56.0" },
+    { name = "pydantic-ai-slim", extras = ["fastmcp", "openai"], specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["groq"], marker = "extra == 'groq'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=1.56.0" },
-    { name = "pydantic-ai-slim", extras = ["openai", "fastmcp"], specifier = ">=1.56.0" },
     { name = "pymupdf4llm", marker = "extra == 'ingest'", specifier = ">=0.2.9" },
     { name = "python-docx", marker = "extra == 'ingest'", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
@@ -1395,7 +1394,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'dashboard'", specifier = ">=0.34.0" },
     { name = "watchfiles", specifier = ">=1.1.1" },
 ]
-provides-extras = ["ingest", "local-embeddings", "search", "safety", "anthropic", "google", "groq", "mistral", "all-models", "observability", "tui", "dashboard"]
+provides-extras = ["all-models", "anthropic", "dashboard", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "tui"]
 
 [package.metadata.requires-dev]
 dev = [

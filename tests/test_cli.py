@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
+from initrunner import __version__
 from initrunner.cli.main import app
 
 runner = CliRunner()
@@ -14,7 +15,7 @@ class TestVersion:
     def test_version(self):
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
-        assert "0.5.0" in result.output
+        assert __version__ in result.output
 
 
 class TestValidate:
