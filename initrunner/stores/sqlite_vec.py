@@ -27,6 +27,7 @@ from initrunner.stores.base import (
     DocumentStore,
     Memory,
     MemoryStoreBase,
+    MemoryType,
     SearchResult,
     SessionSummary,
 )
@@ -210,12 +211,17 @@ _ALLOWED_COLUMNS = frozenset(
         "content",
         "category",
         "created_at",
+        "memory_type",
+        "metadata_json",
+        "consolidated_at",
     }
 )
 _ALLOWED_DATA_EXPRS = frozenset(
     {
         "chunks.text, chunks.source",
         "memories.content, memories.category, memories.created_at",
+        "memories.content, memories.category, memories.created_at, "
+        "memories.memory_type, memories.metadata_json, memories.consolidated_at",
     }
 )
 
@@ -674,7 +680,11 @@ class SqliteVecMemoryStore(MemoryStoreBase):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     content TEXT NOT NULL,
                     category TEXT NOT NULL DEFAULT 'general',
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    memory_type TEXT NOT NULL DEFAULT 'semantic'
+                        CHECK(memory_type IN ('episodic', 'semantic', 'procedural')),
+                    metadata_json TEXT,
+                    consolidated_at TEXT
                 );"""
             )
             c.execute("CREATE INDEX IF NOT EXISTS idx_memories_category ON memories (category);")
@@ -687,6 +697,27 @@ class SqliteVecMemoryStore(MemoryStoreBase):
             c.commit()
 
         _retry_on_locked(self._conn, _do)
+        self._migrate_memory_columns()
+
+    def _migrate_memory_columns(self) -> None:
+        """Add memory_type, metadata_json, consolidated_at columns to existing DBs."""
+        columns = {row[1] for row in self._conn.execute("PRAGMA table_info(memories)").fetchall()}
+        if "memory_type" not in columns:
+            self._conn.execute(
+                "ALTER TABLE memories ADD COLUMN memory_type TEXT NOT NULL DEFAULT 'semantic'"
+            )
+        if "metadata_json" not in columns:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN metadata_json TEXT")
+        if "consolidated_at" not in columns:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN consolidated_at TEXT")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_type ON memories (memory_type);"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_type_category "
+            "ON memories (memory_type, category);"
+        )
+        self._conn.commit()
 
     def _ensure_vec_table(self, dimensions: int) -> None:
         """Lazily create the memories_vec table when dimensions become known."""
@@ -817,15 +848,28 @@ class SqliteVecMemoryStore(MemoryStoreBase):
 
     # --- Long-term: semantic memories ---
 
-    def add_memory(self, content: str, category: str, embedding: list[float]) -> int:
+    def add_memory(
+        self,
+        content: str,
+        category: str,
+        embedding: list[float],
+        *,
+        memory_type: MemoryType = MemoryType.SEMANTIC,
+        metadata: dict | None = None,
+    ) -> int:
+        # Validate memory_type
+        MemoryType(memory_type)
         self._ensure_vec_table(len(embedding))
+        metadata_json = json.dumps(metadata) if metadata else None
         with self._lock:
 
             def _do(c):
                 now = datetime.now(UTC).isoformat()
                 cursor = c.execute(
-                    "INSERT INTO memories (content, category, created_at) VALUES (?, ?, ?)",
-                    (content, category, now),
+                    "INSERT INTO memories "
+                    "(content, category, created_at, memory_type, metadata_json) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (content, category, now, str(memory_type), metadata_json),
                 )
                 row_id = cursor.lastrowid
                 c.execute(
@@ -837,59 +881,184 @@ class SqliteVecMemoryStore(MemoryStoreBase):
 
             return _retry_on_locked(self._conn, _do)
 
-    def search_memories(self, embedding: list[float], top_k: int = 5) -> list[tuple[Memory, float]]:
+    def search_memories(
+        self,
+        embedding: list[float],
+        top_k: int = 5,
+        *,
+        memory_types: list[MemoryType] | None = None,
+    ) -> list[tuple[Memory, float]]:
         with self._lock:
             if self._dimensions is None:
                 return []
-            rows = _vec_search(
-                self._conn,
-                "memories_vec",
-                "memories",
-                "id",
-                "memories.content, memories.category, memories.created_at",
-                embedding,
-                top_k,
+
+            data_cols = (
+                "memories.content, memories.category, memories.created_at, "
+                "memories.memory_type, memories.metadata_json, memories.consolidated_at"
             )
-            return [
+
+            if memory_types is None:
+                rows = _vec_search(
+                    self._conn,
+                    "memories_vec",
+                    "memories",
+                    "id",
+                    data_cols,
+                    embedding,
+                    top_k,
+                )
+                return self._rows_to_memories(rows)
+
+            # Iterative overfetch for type-filtered search
+            type_set = {str(t) for t in memory_types}
+            total_count = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+            if total_count == 0:
+                return []
+
+            fetch_k = min(top_k * 2, total_count)
+            collected: list[tuple] = []
+
+            while True:
+                rows = _vec_search(
+                    self._conn,
+                    "memories_vec",
+                    "memories",
+                    "id",
+                    data_cols,
+                    embedding,
+                    fetch_k,
+                )
+                collected = [r for r in rows if r[5] in type_set]
+                if len(collected) >= top_k or fetch_k >= total_count:
+                    break
+                fetch_k = min(fetch_k * 2, total_count)
+
+            return self._rows_to_memories(collected[:top_k])
+
+    @staticmethod
+    def _rows_to_memories(rows: list[tuple]) -> list[tuple[Memory, float]]:
+        """Convert raw rows to (Memory, distance) tuples."""
+        results: list[tuple[Memory, float]] = []
+        for row in rows:
+            meta = json.loads(row[6]) if row[6] else None
+            mem_type = MemoryType(row[5]) if row[5] else MemoryType.SEMANTIC
+            results.append(
                 (
-                    Memory(id=row[0], content=row[2], category=row[3], created_at=row[4]),
+                    Memory(
+                        id=row[0],
+                        content=row[2],
+                        category=row[3],
+                        created_at=row[4],
+                        memory_type=mem_type,
+                        metadata=meta,
+                        consolidated_at=row[7] if len(row) > 7 else None,
+                    ),
                     row[1],
                 )
-                for row in rows
+            )
+        return results
+
+    def list_memories(
+        self,
+        category: str | None = None,
+        limit: int = 20,
+        *,
+        memory_type: MemoryType | None = None,
+    ) -> list[Memory]:
+        with self._lock:
+            conditions: list[str] = []
+            params: list[object] = []
+            if category:
+                conditions.append("category = ?")
+                params.append(category)
+            if memory_type is not None:
+                conditions.append("memory_type = ?")
+                params.append(str(memory_type))
+            where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+            params.append(limit)
+            rows = self._conn.execute(
+                f"SELECT id, content, category, created_at, memory_type, metadata_json, "
+                f"consolidated_at FROM memories{where} ORDER BY created_at DESC LIMIT ?",
+                params,
+            ).fetchall()
+            return [
+                Memory(
+                    id=r[0],
+                    content=r[1],
+                    category=r[2],
+                    created_at=r[3],
+                    memory_type=MemoryType(r[4]) if r[4] else MemoryType.SEMANTIC,
+                    metadata=json.loads(r[5]) if r[5] else None,
+                    consolidated_at=r[6],
+                )
+                for r in rows
             ]
 
-    def list_memories(self, category: str | None = None, limit: int = 20) -> list[Memory]:
+    def count_memories(self, *, memory_type: MemoryType | None = None) -> int:
         with self._lock:
-            if category:
+            if memory_type is not None:
+                row = self._conn.execute(
+                    "SELECT COUNT(*) FROM memories WHERE memory_type = ?",
+                    (str(memory_type),),
+                ).fetchone()
+            else:
+                row = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()
+            return row[0] if row else 0
+
+    def prune_memories(
+        self, keep_count: int = 1000, *, memory_type: MemoryType | None = None
+    ) -> int:
+        with self._lock:
+            if memory_type is not None:
                 rows = self._conn.execute(
-                    "SELECT id, content, category, created_at FROM memories "
-                    "WHERE category = ? ORDER BY created_at DESC LIMIT ?",
-                    (category, limit),
+                    "SELECT id FROM memories WHERE memory_type = ? ORDER BY created_at DESC",
+                    (str(memory_type),),
                 ).fetchall()
             else:
                 rows = self._conn.execute(
-                    "SELECT id, content, category, created_at FROM memories "
-                    "ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
+                    "SELECT id FROM memories ORDER BY created_at DESC",
                 ).fetchall()
-            return [Memory(id=r[0], content=r[1], category=r[2], created_at=r[3]) for r in rows]
-
-    def count_memories(self) -> int:
-        with self._lock:
-            row = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()
-            return row[0] if row else 0
-
-    def prune_memories(self, keep_count: int = 1000) -> int:
-        with self._lock:
-            rows = self._conn.execute(
-                "SELECT id FROM memories ORDER BY created_at DESC",
-            ).fetchall()
             to_delete = [r[0] for r in rows[keep_count:]]
             _delete_by_ids(self._conn, "memories_vec", "rowid", to_delete)
             _delete_by_ids(self._conn, "memories", "id", to_delete)
             if to_delete:
                 self._conn.commit()
             return len(to_delete)
+
+    def mark_consolidated(self, memory_ids: list[int], consolidated_at: str) -> None:
+        if not memory_ids:
+            return
+        with self._lock:
+            for i in range(0, len(memory_ids), _DELETE_BATCH_SIZE):
+                batch = memory_ids[i : i + _DELETE_BATCH_SIZE]
+                placeholders = ",".join("?" * len(batch))
+                self._conn.execute(
+                    f"UPDATE memories SET consolidated_at = ? WHERE id IN ({placeholders})",
+                    [consolidated_at, *batch],
+                )
+            self._conn.commit()
+
+    def get_unconsolidated_episodes(self, limit: int = 20) -> list[Memory]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, content, category, created_at, memory_type, metadata_json, "
+                "consolidated_at FROM memories "
+                "WHERE memory_type = 'episodic' AND consolidated_at IS NULL "
+                "ORDER BY created_at ASC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [
+                Memory(
+                    id=r[0],
+                    content=r[1],
+                    category=r[2],
+                    created_at=r[3],
+                    memory_type=MemoryType(r[4]) if r[4] else MemoryType.EPISODIC,
+                    metadata=json.loads(r[5]) if r[5] else None,
+                    consolidated_at=r[6],
+                )
+                for r in rows
+            ]
 
     # --- Lifecycle ---
 

@@ -6,7 +6,13 @@ from unittest.mock import MagicMock, patch
 
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 
-from initrunner.agent.memory_ops import TurnResult, finalize_turn, save_session
+from initrunner.agent.memory_ops import (
+    TurnResult,
+    build_memory_system_prompt,
+    export_memories,
+    finalize_turn,
+    save_session,
+)
 from initrunner.agent.schema import (
     AgentSpec,
     ApiVersion,
@@ -14,8 +20,10 @@ from initrunner.agent.schema import (
     MemoryConfig,
     Metadata,
     ModelConfig,
+    ProceduralMemoryConfig,
     RoleDefinition,
 )
+from initrunner.stores.base import Memory, MemoryType
 
 
 def _make_role(*, memory: MemoryConfig | None = None) -> RoleDefinition:
@@ -99,3 +107,100 @@ class TestFinalizeTurn:
         result = finalize_turn(role, "session-1", msgs, memory_store=None)
         assert isinstance(result, TurnResult)
         assert result.save_ok is True
+
+
+class TestBuildMemorySystemPrompt:
+    def test_loads_procedural_memories(self):
+        proc_memories = [
+            Memory(
+                id=1,
+                content="Always greet the user",
+                category="policy",
+                created_at="2026-01-01T00:00:00",
+                memory_type=MemoryType.PROCEDURAL,
+            ),
+            Memory(
+                id=2,
+                content="Use JSON for API responses",
+                category="format",
+                created_at="2026-01-01T00:00:00",
+                memory_type=MemoryType.PROCEDURAL,
+            ),
+        ]
+        mock_store = MagicMock()
+        mock_store.list_memories.return_value = proc_memories
+
+        role = _make_role(memory=MemoryConfig())
+
+        with patch("initrunner.stores.factory.open_memory_store") as mock_open:
+            mock_open.return_value.__enter__ = MagicMock(return_value=mock_store)
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            result = build_memory_system_prompt(role)
+
+        assert "Learned Procedures and Policies" in result
+        assert "Always greet the user" in result
+        assert "Use JSON for API responses" in result
+
+    def test_returns_empty_when_no_memory(self):
+        role = _make_role()
+        result = build_memory_system_prompt(role)
+        assert result == ""
+
+    def test_returns_empty_when_procedural_disabled(self):
+        role = _make_role(memory=MemoryConfig(procedural=ProceduralMemoryConfig(enabled=False)))
+        result = build_memory_system_prompt(role)
+        assert result == ""
+
+    def test_returns_empty_on_failure(self):
+        role = _make_role(memory=MemoryConfig())
+        with patch("initrunner.stores.factory.open_memory_store") as mock_open:
+            mock_open.side_effect = RuntimeError("db error")
+            result = build_memory_system_prompt(role)
+        assert result == ""
+
+    def test_returns_empty_when_no_procedures(self):
+        mock_store = MagicMock()
+        mock_store.list_memories.return_value = []
+
+        role = _make_role(memory=MemoryConfig())
+
+        with patch("initrunner.stores.factory.open_memory_store") as mock_open:
+            mock_open.return_value.__enter__ = MagicMock(return_value=mock_store)
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            result = build_memory_system_prompt(role)
+
+        assert result == ""
+
+
+class TestExportMemoriesWithTypes:
+    def test_export_includes_memory_type(self):
+        mock_store = MagicMock()
+        mock_store.list_memories.return_value = [
+            Memory(
+                id=1,
+                content="fact",
+                category="general",
+                created_at="2026-01-01",
+                memory_type=MemoryType.SEMANTIC,
+            ),
+            Memory(
+                id=2,
+                content="episode",
+                category="run",
+                created_at="2026-01-01",
+                memory_type=MemoryType.EPISODIC,
+                metadata={"tool_calls": 3},
+            ),
+        ]
+
+        role = _make_role(memory=MemoryConfig())
+
+        with patch("initrunner.stores.factory.open_memory_store") as mock_open:
+            mock_open.return_value.__enter__ = MagicMock(return_value=mock_store)
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            result = export_memories(role)
+
+        assert len(result) == 2
+        assert result[0]["memory_type"] == "semantic"
+        assert result[1]["memory_type"] == "episodic"
+        assert result[1]["metadata"] == {"tool_calls": 3}

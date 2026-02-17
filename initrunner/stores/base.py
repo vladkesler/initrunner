@@ -16,6 +16,12 @@ class StoreBackend(StrEnum):
     SQLITE_VEC = "sqlite-vec"
 
 
+class MemoryType(StrEnum):
+    EPISODIC = "episodic"
+    SEMANTIC = "semantic"
+    PROCEDURAL = "procedural"
+
+
 @dataclass(frozen=True)
 class StoreConfig:
     """Narrow config for tools that read/write the document store."""
@@ -49,6 +55,9 @@ class Memory:
     content: str
     category: str
     created_at: str
+    memory_type: MemoryType = MemoryType.SEMANTIC
+    metadata: dict | None = None
+    consolidated_at: str | None = None
 
 
 class _LazyDir:
@@ -224,21 +233,47 @@ class MemoryStore(abc.ABC):
     """Abstract interface for long-term memories."""
 
     @abc.abstractmethod
-    def add_memory(self, content: str, category: str, embedding: list[float]) -> int: ...
+    def add_memory(
+        self,
+        content: str,
+        category: str,
+        embedding: list[float],
+        *,
+        memory_type: MemoryType = MemoryType.SEMANTIC,
+        metadata: dict | None = None,
+    ) -> int: ...
 
     @abc.abstractmethod
     def search_memories(
-        self, embedding: list[float], top_k: int = 5
+        self,
+        embedding: list[float],
+        top_k: int = 5,
+        *,
+        memory_types: list[MemoryType] | None = None,
     ) -> list[tuple[Memory, float]]: ...
 
     @abc.abstractmethod
-    def list_memories(self, category: str | None = None, limit: int = 20) -> list[Memory]: ...
+    def list_memories(
+        self,
+        category: str | None = None,
+        limit: int = 20,
+        *,
+        memory_type: MemoryType | None = None,
+    ) -> list[Memory]: ...
 
     @abc.abstractmethod
-    def count_memories(self) -> int: ...
+    def count_memories(self, *, memory_type: MemoryType | None = None) -> int: ...
 
     @abc.abstractmethod
-    def prune_memories(self, keep_count: int = 1000) -> int: ...
+    def prune_memories(
+        self, keep_count: int = 1000, *, memory_type: MemoryType | None = None
+    ) -> int: ...
+
+    @abc.abstractmethod
+    def mark_consolidated(self, memory_ids: list[int], consolidated_at: str) -> None: ...
+
+    @abc.abstractmethod
+    def get_unconsolidated_episodes(self, limit: int = 20) -> list[Memory]: ...
 
 
 class MemoryStoreBase(SessionStore, MemoryStore):

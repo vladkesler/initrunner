@@ -946,13 +946,15 @@ See [Ingestion](../core/ingestion.md) for details on configuring document ingest
 
 ### Memory Tools (from `memory`)
 
-When `spec.memory` is configured, three tools are auto-registered:
+When `spec.memory` is configured, up to five tools are auto-registered depending on which memory types are enabled:
 
-- **`remember(content: str, category: str = "general") -> str`** — Store information in long-term memory with a semantic embedding. Categories are sanitized to lowercase alphanumeric with underscores.
-- **`recall(query: str, top_k: int = 5) -> str`** — Search long-term memory by semantic similarity. Returns memories with category, similarity score, and timestamp.
-- **`list_memories(category: str | None = None, limit: int = 20) -> str`** — List recent memories, optionally filtered by category.
+- **`remember(content: str, category: str = "general") -> str`** — Store a semantic memory (fact/knowledge) with an embedding. Only registered when `semantic.enabled` is `true`.
+- **`recall(query: str, top_k: int = 5, memory_types: list[str] | None = None) -> str`** — Search all memory types by semantic similarity. Pass `memory_types` to filter (e.g. `["semantic", "procedural"]`). Always registered.
+- **`list_memories(category: str | None = None, limit: int = 20, memory_type: str | None = None) -> str`** — List recent memories, optionally filtered by category or type. Always registered.
+- **`learn_procedure(content: str, category: str = "general") -> str`** — Store a procedural memory (policy/pattern). Auto-injected into the system prompt on future runs. Only registered when `procedural.enabled` is `true`.
+- **`record_episode(content: str, category: str = "general") -> str`** — Record an episodic memory (what happened). Only registered when `episodic.enabled` is `true`.
 
-See [Memory](../core/memory.md) for details on configuring the memory system.
+See [Memory](../core/memory.md) for details on memory types, consolidation, and configuration.
 
 ## Tool Build Order
 

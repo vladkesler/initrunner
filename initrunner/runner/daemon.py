@@ -171,12 +171,28 @@ class DaemonRunner:
                 self._tracker.record_usage(result.total_tokens)
                 _display_result(result)
                 self._dispatch_sink(result, event)
+                self._capture_episode(result, event)
 
             self._maybe_prune_sessions()
         finally:
             with self._in_flight_cond:
                 self._in_flight_count -= 1
                 self._in_flight_cond.notify_all()
+
+    def _capture_episode(self, result: RunResult, event: TriggerEvent) -> None:
+        """Capture a daemon run result as an episodic memory."""
+        if self._memory_store is None or self._role.spec.memory is None:
+            return
+        from initrunner.agent.memory_capture import capture_episode
+
+        summary = f"Daemon trigger ({event.trigger_type}): {result.output[:500]}"
+        capture_episode(
+            self._memory_store,
+            self._role,
+            summary,
+            category="daemon_run",
+            trigger_type=event.trigger_type,
+        )
 
     def _dispatch_sink(self, result: RunResult, event: TriggerEvent) -> None:
         """Dispatch a run result to configured sinks."""

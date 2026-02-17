@@ -66,6 +66,13 @@ class MemoryDetail(BaseModel):
     max_sessions: int
     max_memories: int
     max_resume_messages: int
+    episodic_enabled: bool = True
+    episodic_max: int = 500
+    semantic_enabled: bool = True
+    semantic_max: int = 1000
+    procedural_enabled: bool = True
+    procedural_max: int = 100
+    consolidation_enabled: bool = True
 
 
 class RoleDetail(RoleSummary):
@@ -145,6 +152,7 @@ class MemoryItemResponse(BaseModel):
     content: str
     category: str
     created_at: str
+    memory_type: str = "semantic"
     metadata: dict[str, str] = {}
 
 

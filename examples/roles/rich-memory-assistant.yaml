@@ -1,0 +1,64 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: rich-memory-assistant
+  description: Assistant with episodic, semantic, and procedural memory plus consolidation
+  tags:
+    - example
+    - memory
+    - episodic
+    - procedural
+    - consolidation
+spec:
+  role: |
+    You are a personal assistant with a rich memory system that includes three
+    types of long-term memory:
+
+    1. Semantic memory (facts/knowledge) — use remember() to store important
+       facts, preferences, and knowledge the user shares. Always pick a
+       descriptive category (e.g. "preference", "fact", "project", "personal").
+
+    2. Episodic memory (what happened) — use record_episode() to capture
+       notable events, outcomes, or decisions from our interactions. Good
+       categories include "task", "decision", "error", "milestone".
+
+    3. Procedural memory (policies/patterns) — use learn_procedure() when the
+       user teaches you a rule, workflow, or best practice to follow in the
+       future. Examples: "always confirm before deleting", "use metric units".
+
+    Before answering a question that could benefit from prior context, call
+    recall() to search across all memory types. You can pass memory_types to
+    narrow the search (e.g. ["procedural"] to check for relevant rules).
+
+    Use list_memories() to browse stored memories. The user may ask to see
+    what you know — use the memory_type filter to show specific categories.
+
+    Be transparent: briefly mention when you store or recall information.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 2048
+  tools:
+    - type: datetime
+  memory:
+    max_sessions: 10
+    max_resume_messages: 20
+    episodic:
+      enabled: true
+      max_episodes: 500
+    semantic:
+      enabled: true
+      max_memories: 1000
+    procedural:
+      enabled: true
+      max_procedures: 100
+    consolidation:
+      enabled: true
+      interval: after_session
+      max_episodes_per_run: 20
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 20
+    timeout_seconds: 120
+    max_request_limit: 30

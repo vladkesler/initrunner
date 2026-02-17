@@ -145,3 +145,10 @@ def run_interactive(
     from initrunner.runner import maybe_prune_sessions
 
     maybe_prune_sessions(role, memory_store)
+
+    # Consolidation at session exit
+    if memory_store is not None and role.spec.memory is not None:
+        if role.spec.memory.consolidation.interval == "after_session":
+            from initrunner.agent.memory_consolidation import maybe_consolidate
+
+            maybe_consolidate(memory_store, role)

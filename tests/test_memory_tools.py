@@ -2,8 +2,11 @@
 
 from initrunner.agent.schema import (
     EmbeddingConfig,
+    EpisodicMemoryConfig,
     MemoryConfig,
+    ProceduralMemoryConfig,
     RoleDefinition,
+    SemanticMemoryConfig,
 )
 from initrunner.agent.tools import _build_memory_toolset, build_toolsets
 
@@ -56,7 +59,9 @@ class TestBuildMemoryToolset:
         assert "remember" in names
         assert "recall" in names
         assert "list_memories" in names
-        assert len(names) == 3
+        assert "learn_procedure" in names
+        assert "record_episode" in names
+        assert len(names) == 5
 
     def test_build_toolsets_with_memory(self):
         data = _minimal_role_data()
@@ -94,3 +99,76 @@ class TestRememberSanitizesCategory:
         category = "notes"
         sanitized = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_") or "general"
         assert sanitized == "notes"
+
+
+class TestConditionalToolRegistration:
+    def test_disabled_semantic_no_remember(self, tmp_path):
+        config = MemoryConfig(
+            store_path=str(tmp_path / "mem.db"),
+            semantic=SemanticMemoryConfig(enabled=False),
+        )
+        toolset = _build_memory_toolset(config, "test-agent", "openai")
+        names = list(toolset.tools.keys())
+        assert "remember" not in names
+        assert "recall" in names
+        assert "list_memories" in names
+
+    def test_disabled_procedural_no_learn_procedure(self, tmp_path):
+        config = MemoryConfig(
+            store_path=str(tmp_path / "mem.db"),
+            procedural=ProceduralMemoryConfig(enabled=False),
+        )
+        toolset = _build_memory_toolset(config, "test-agent", "openai")
+        names = list(toolset.tools.keys())
+        assert "learn_procedure" not in names
+        assert "remember" in names
+
+    def test_disabled_episodic_no_record_episode(self, tmp_path):
+        config = MemoryConfig(
+            store_path=str(tmp_path / "mem.db"),
+            episodic=EpisodicMemoryConfig(enabled=False),
+        )
+        toolset = _build_memory_toolset(config, "test-agent", "openai")
+        names = list(toolset.tools.keys())
+        assert "record_episode" not in names
+        assert "remember" in names
+
+
+class TestMemoryConfigBackwardCompat:
+    def test_max_memories_syncs_to_semantic(self):
+        mc = MemoryConfig(max_memories=500)
+        assert mc.semantic.max_memories == 500
+
+    def test_explicit_semantic_not_overridden(self):
+        mc = MemoryConfig(max_memories=500, semantic=SemanticMemoryConfig(max_memories=200))
+        # Explicit semantic wins — max_memories != 1000, but semantic was also set
+        assert mc.semantic.max_memories == 200
+
+    def test_default_max_memories_no_sync(self):
+        mc = MemoryConfig(semantic=SemanticMemoryConfig(max_memories=200))
+        assert mc.semantic.max_memories == 200
+        assert mc.max_memories == 1000
+
+    def test_nested_configs_in_role_yaml(self):
+        data = {
+            "apiVersion": "initrunner/v1",
+            "kind": "Agent",
+            "metadata": {"name": "test-agent", "description": "A test agent"},
+            "spec": {
+                "role": "You are a test agent.",
+                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "memory": {
+                    "episodic": {"enabled": True, "max_episodes": 100},
+                    "semantic": {"enabled": True, "max_memories": 500},
+                    "procedural": {"enabled": False},
+                    "consolidation": {"enabled": True, "interval": "after_autonomous"},
+                },
+            },
+        }
+        role = RoleDefinition.model_validate(data)
+        mem = role.spec.memory
+        assert mem is not None
+        assert mem.episodic.max_episodes == 100
+        assert mem.semantic.max_memories == 500
+        assert mem.procedural.enabled is False
+        assert mem.consolidation.interval == "after_autonomous"

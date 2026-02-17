@@ -59,32 +59,15 @@ def _build_autonomous_result(
     )
 
 
-def _persist_autonomous_memory(
+def _capture_autonomous_episode(
     memory_store: MemoryStoreBase,
     role: RoleDefinition,
     summary: str,
 ) -> None:
-    """Persist the autonomous run summary as a long-term memory."""
-    try:
-        from initrunner.ingestion.embeddings import embed_single as _embed_single
+    """Persist the autonomous run summary as an episodic memory."""
+    from initrunner.agent.memory_capture import capture_episode
 
-        embed_provider = (
-            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"  # type: ignore[union-attr]
-        )
-        embed_model = role.spec.memory.embeddings.model  # type: ignore[union-attr]
-        embed_base_url = role.spec.memory.embeddings.base_url  # type: ignore[union-attr]
-        embed_api_key_env = role.spec.memory.embeddings.api_key_env  # type: ignore[union-attr]
-        embedding = _embed_single(
-            embed_provider,
-            embed_model,
-            summary,
-            base_url=embed_base_url,
-            api_key_env=embed_api_key_env,
-            input_type="document",
-        )
-        memory_store.add_memory(summary, "autonomous_run", embedding)
-    except Exception:
-        _logger.warning("Failed to persist autonomous run summary to memory", exc_info=True)
+    capture_episode(memory_store, role, summary, category="autonomous_run")
 
 
 def run_autonomous(
@@ -230,9 +213,16 @@ def run_autonomous(
         if not save_session(role, session_id, message_history):
             _display_save_warning()
 
-    # Persist final summary as a memory
+    # Persist final summary as an episodic memory
     if memory_store is not None and role.spec.memory is not None and reflection_state.summary:
-        _persist_autonomous_memory(memory_store, role, reflection_state.summary)
+        _capture_autonomous_episode(memory_store, role, reflection_state.summary)
+
+    # Consolidation at session exit
+    if memory_store is not None and role.spec.memory is not None:
+        from initrunner.agent.memory_consolidation import maybe_consolidate
+
+        if role.spec.memory.consolidation.interval in ("after_session", "after_autonomous"):
+            maybe_consolidate(memory_store, role)
 
     # Dispatch to sinks (final output only)
     if sink_dispatcher is not None and iterations:

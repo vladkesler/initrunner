@@ -173,7 +173,17 @@ def build_agent(
 
         instrument = get_instrumentation_settings(role.spec.observability)
 
-    return _create_agent(role, system_prompt, toolsets, output_type, instrument=instrument)
+    agent = _create_agent(role, system_prompt, toolsets, output_type, instrument=instrument)
+
+    # Register dynamic system prompt for procedural memory injection
+    if role.spec.memory is not None and role.spec.memory.procedural.enabled:
+        from initrunner.agent.memory_ops import build_memory_system_prompt
+
+        @agent.system_prompt
+        def _procedural_context() -> str:
+            return build_memory_system_prompt(role)
+
+    return agent
 
 
 def _load_dotenv(role_dir: Path) -> None:

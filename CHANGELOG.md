@@ -2,9 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2026-02-16
+## [0.5.0] - 2026-02-17
 
 ### Added
+- rich memory architecture: episodic, semantic, and procedural memory types
+- memory consolidation: automatic extraction of semantic facts from episodic records via LLM
+- episodic auto-capture in autonomous and daemon modes with structured metadata
+- procedural memory injection into agent system prompts
+- `learn_procedure()` and `record_episode()` memory tools (conditional on type config)
+- `memory_types` filter parameter on `recall()` tool
+- `memory_type` filter parameter on `list_memories()` tool
+- `memory list` CLI command with `--type`, `--category`, `--limit` filters
+- `memory consolidate` CLI command for manual consolidation
+- `--type` option on `memory clear` CLI command for type-scoped clearing
+- `rich-memory-assistant` example role demonstrating all memory types
+- auto-migration for existing memory databases (adds `memory_type`, `metadata_json`, `consolidated_at` columns)
 - structured output (`spec.output`) with JSON Schema validation for role definitions
 - `invoice-classifier` example role demonstrating structured output
 - structured output documentation (`docs/core/structured-output.md`)
@@ -25,6 +37,10 @@ All notable changes to this project will be documented in this file.
 - download wheel from TestPyPI with --no-deps to avoid name-squatted packages (8f460da)
 
 ### Documentation
+- complete rewrite of `docs/core/memory.md` for rich memory architecture
+- update memory tools section in `docs/agents/tools.md` (3 → 5 tools)
+- update autonomy docs with episodic auto-capture and consolidation
+- add `memory list` and `memory consolidate` to CLI reference
 - surface autonomous mode and budget controls in README and CLI docs (2af688a)
 - add Open WebUI integration guide to server docs and README (6cf6109)
 - add documentation changes to CHANGELOG.md for v0.3.0 (b890321)

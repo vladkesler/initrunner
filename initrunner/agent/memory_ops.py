@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
 
     from initrunner.agent.schema import RoleDefinition
-    from initrunner.stores.base import MemoryStoreBase, SessionSummary
+    from initrunner.stores.base import MemoryStoreBase, MemoryType, SessionSummary
 
 _logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ def clear_memories(
     *,
     sessions_only: bool = False,
     memories_only: bool = False,
+    memory_type: MemoryType | None = None,
 ) -> bool:
     """Clear memory store. Returns True if a store was found and cleared."""
     from initrunner.stores.factory import open_memory_store
@@ -38,7 +39,7 @@ def clear_memories(
         if not memories_only:
             store.prune_sessions(role.metadata.name, keep_count=0)
         if not sessions_only:
-            store.prune_memories(keep_count=0)
+            store.prune_memories(keep_count=0, memory_type=memory_type)
         return True
 
 
@@ -51,7 +52,14 @@ def export_memories(role: RoleDefinition) -> list[dict]:
             return []
         memories = store.list_memories(limit=999999)
     return [
-        {"id": m.id, "content": m.content, "category": m.category, "created_at": m.created_at}
+        {
+            "id": m.id,
+            "content": m.content,
+            "category": m.category,
+            "created_at": m.created_at,
+            "memory_type": str(m.memory_type),
+            "metadata": m.metadata,
+        }
         for m in memories
     ]
 
@@ -134,6 +142,35 @@ def delete_session(role: RoleDefinition, session_id: str) -> bool:
         if store is None:
             return False
         return store.delete_session(session_id, role.metadata.name)
+
+
+def build_memory_system_prompt(role: RoleDefinition) -> str:
+    """Build a system prompt section from procedural memories. Never raises."""
+    try:
+        from initrunner.stores.base import MemoryType
+        from initrunner.stores.factory import open_memory_store
+
+        if role.spec.memory is None:
+            return ""
+        if not role.spec.memory.procedural.enabled:
+            return ""
+
+        with open_memory_store(role.spec.memory, role.metadata.name) as store:
+            if store is None:
+                return ""
+            procedures = store.list_memories(limit=20, memory_type=MemoryType.PROCEDURAL)
+
+        if not procedures:
+            return ""
+
+        lines = ["## Learned Procedures and Policies", ""]
+        for mem in procedures:
+            lines.append(f"- [{mem.category}] {mem.content}")
+
+        return "\n".join(lines)
+    except Exception:
+        _logger.warning("Failed to load procedural memories for system prompt", exc_info=True)
+        return ""
 
 
 def finalize_turn(

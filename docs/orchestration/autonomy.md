@@ -204,9 +204,14 @@ Important caveats:
 When `spec.memory` is configured:
 
 - The autonomous run's session (all iterations) is saved for `--resume` in interactive mode
-- If `finish_task` is called with a summary, that summary is persisted as a memory with category `autonomous_run`
-- Memories from previous runs can be recalled by the agent via the `recall` tool (if memory tools are configured)
-- In daemon mode, sessions are pruned after each trigger execution
+- **Episodic auto-capture**: when `finish_task` is called with a summary, the summary is persisted as an episodic memory with category `autonomous_run` and structured metadata
+- **Consolidation**: on autonomous loop exit, consolidation runs automatically (if `consolidation.interval` is `after_autonomous` or `after_session`) to extract semantic facts from episodic records
+- Memories from previous runs can be recalled by the agent via the `recall` tool, which searches across all memory types (episodic, semantic, procedural)
+- The agent also has access to `record_episode()` (to manually capture episodes) and `learn_procedure()` (to store reusable policies) when those memory types are enabled
+- **Procedural injection**: any learned procedures are auto-injected into the system prompt at the start of each iteration
+- In daemon mode, sessions are pruned after each trigger execution and episodic memories are auto-captured with trigger metadata
+
+See [Memory System](../core/memory.md) for full details on memory types, consolidation, and configuration.
 
 ## Budget and Safety
 

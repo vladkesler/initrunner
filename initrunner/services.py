@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from initrunner.agent.schema import RoleDefinition
     from initrunner.audit.logger import AuditLogger, AuditRecord
     from initrunner.ingestion.pipeline import FileStatus, IngestStats
-    from initrunner.stores.base import Memory, MemoryStoreBase, SessionSummary
+    from initrunner.stores.base import Memory, MemoryStoreBase, MemoryType, SessionSummary
     from initrunner.triggers.base import TriggerEvent
     from initrunner.triggers.dispatcher import TriggerDispatcher
 
@@ -259,6 +259,7 @@ def list_memories_sync(
     *,
     category: str | None = None,
     limit: int = 100,
+    memory_type: MemoryType | None = None,
 ) -> list[Memory]:
     """List memories for a role (sync)."""
     from initrunner.stores.factory import open_memory_store
@@ -266,7 +267,7 @@ def list_memories_sync(
     with open_memory_store(role.spec.memory, role.metadata.name) as store:
         if store is None:
             return []
-        return store.list_memories(category=category, limit=limit)
+        return store.list_memories(category=category, limit=limit, memory_type=memory_type)
 
 
 def clear_memories_sync(
@@ -554,6 +555,13 @@ def role_to_detail(path: Path, role: RoleDefinition):
             max_sessions=role.spec.memory.max_sessions,
             max_memories=role.spec.memory.max_memories,
             max_resume_messages=role.spec.memory.max_resume_messages,
+            episodic_enabled=role.spec.memory.episodic.enabled,
+            episodic_max=role.spec.memory.episodic.max_episodes,
+            semantic_enabled=role.spec.memory.semantic.enabled,
+            semantic_max=role.spec.memory.semantic.max_memories,
+            procedural_enabled=role.spec.memory.procedural.enabled,
+            procedural_max=role.spec.memory.procedural.max_procedures,
+            consolidation_enabled=role.spec.memory.consolidation.enabled,
         )
 
     return RoleDetail(

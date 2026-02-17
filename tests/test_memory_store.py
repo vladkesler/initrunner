@@ -9,6 +9,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from initrunner.stores.base import MemoryType
 from initrunner.stores.sqlite_vec import SqliteVecMemoryStore as MemoryStore
 from initrunner.stores.sqlite_vec import _filter_system_prompts
 
@@ -239,3 +240,234 @@ class TestConcurrentAccess:
             assert store.count_memories() == 20
             results = store.search_memories(emb_a, top_k=5)
             assert len(results) == 5
+
+
+class TestMemoryTypes:
+    def test_add_and_count_by_type(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            store.add_memory(
+                "fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
+            )
+            store.add_memory(
+                "episode", "run", [0.0, 1.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+            store.add_memory(
+                "procedure", "policy", [0.0, 0.0, 1.0, 0.0], memory_type=MemoryType.PROCEDURAL
+            )
+            assert store.count_memories() == 3
+            assert store.count_memories(memory_type=MemoryType.SEMANTIC) == 1
+            assert store.count_memories(memory_type=MemoryType.EPISODIC) == 1
+            assert store.count_memories(memory_type=MemoryType.PROCEDURAL) == 1
+
+    def test_list_by_type(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            store.add_memory(
+                "fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
+            )
+            store.add_memory(
+                "episode", "run", [0.0, 1.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+            store.add_memory(
+                "procedure", "policy", [0.0, 0.0, 1.0, 0.0], memory_type=MemoryType.PROCEDURAL
+            )
+            semantic = store.list_memories(memory_type=MemoryType.SEMANTIC)
+            assert len(semantic) == 1
+            assert semantic[0].memory_type == MemoryType.SEMANTIC
+            episodic = store.list_memories(memory_type=MemoryType.EPISODIC)
+            assert len(episodic) == 1
+            assert episodic[0].memory_type == MemoryType.EPISODIC
+
+    def test_prune_by_type(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            for i in range(5):
+                store.add_memory(
+                    f"episode {i}",
+                    "run",
+                    [float(i == j) for j in range(4)],
+                    memory_type=MemoryType.EPISODIC,
+                )
+            store.add_memory(
+                "fact", "general", [0.5, 0.5, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
+            )
+
+            deleted = store.prune_memories(keep_count=2, memory_type=MemoryType.EPISODIC)
+            assert deleted == 3
+            # Semantic memory should be untouched
+            assert store.count_memories(memory_type=MemoryType.SEMANTIC) == 1
+            assert store.count_memories(memory_type=MemoryType.EPISODIC) == 2
+
+    def test_search_with_type_filter(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            store.add_memory(
+                "semantic fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
+            )
+            store.add_memory(
+                "episode event", "run", [0.9, 0.1, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+            store.add_memory(
+                "procedure rule", "policy", [0.8, 0.2, 0.0, 0.0], memory_type=MemoryType.PROCEDURAL
+            )
+
+            # Search for only episodic memories
+            results = store.search_memories(
+                [1.0, 0.0, 0.0, 0.0], top_k=5, memory_types=[MemoryType.EPISODIC]
+            )
+            assert len(results) == 1
+            assert results[0][0].memory_type == MemoryType.EPISODIC
+
+            # Search for semantic + procedural
+            results = store.search_memories(
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=5,
+                memory_types=[MemoryType.SEMANTIC, MemoryType.PROCEDURAL],
+            )
+            assert len(results) == 2
+            types = {r[0].memory_type for r in results}
+            assert types == {MemoryType.SEMANTIC, MemoryType.PROCEDURAL}
+
+    def test_default_memory_type_is_semantic(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            store.add_memory("plain memory", "general", [1.0, 0.0, 0.0, 0.0])
+            mems = store.list_memories()
+            assert mems[0].memory_type == MemoryType.SEMANTIC
+
+    def test_metadata_storage(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            meta = {"tool_calls": 3, "duration_ms": 1200}
+            store.add_memory(
+                "episode",
+                "run",
+                [1.0, 0.0, 0.0, 0.0],
+                memory_type=MemoryType.EPISODIC,
+                metadata=meta,
+            )
+            mems = store.list_memories()
+            assert mems[0].metadata == meta
+
+    def test_metadata_none(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            store.add_memory("fact", "general", [1.0, 0.0, 0.0, 0.0])
+            mems = store.list_memories()
+            assert mems[0].metadata is None
+
+
+class TestConsolidation:
+    def test_mark_consolidated(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            id1 = store.add_memory(
+                "ep1", "run", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+            id2 = store.add_memory(
+                "ep2", "run", [0.0, 1.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+
+            store.mark_consolidated([id1, id2], "2026-01-01T00:00:00+00:00")
+
+            mems = store.list_memories(memory_type=MemoryType.EPISODIC)
+            for m in mems:
+                assert m.consolidated_at == "2026-01-01T00:00:00+00:00"
+
+    def test_get_unconsolidated_episodes(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            id1 = store.add_memory(
+                "ep1", "run", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
+            )
+            store.add_memory("ep2", "run", [0.0, 1.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC)
+            store.add_memory(
+                "fact", "general", [0.0, 0.0, 1.0, 0.0], memory_type=MemoryType.SEMANTIC
+            )
+
+            # Mark one as consolidated
+            store.mark_consolidated([id1], "2026-01-01T00:00:00+00:00")
+
+            unconsolidated = store.get_unconsolidated_episodes()
+            assert len(unconsolidated) == 1
+            assert unconsolidated[0].content == "ep2"
+
+    def test_get_unconsolidated_episodes_respects_limit(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            for i in range(10):
+                store.add_memory(
+                    f"ep{i}",
+                    "run",
+                    [float(i == j) for j in range(4)],
+                    memory_type=MemoryType.EPISODIC,
+                )
+
+            unconsolidated = store.get_unconsolidated_episodes(limit=3)
+            assert len(unconsolidated) == 3
+
+    def test_mark_consolidated_empty_list(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with MemoryStore(db_path, dimensions=4) as store:
+            # Should not error
+            store.mark_consolidated([], "2026-01-01T00:00:00+00:00")
+
+
+class TestMemoryMigration:
+    def test_existing_db_gets_new_columns(self, tmp_path):
+        """Simulates an existing DB without the new columns, verifies migration."""
+        import sqlite_vec
+
+        from initrunner.stores.sqlite_vec import _open_sqlite_vec
+
+        db_path = tmp_path / "old.db"
+        # Create old-style DB manually using sqlite-vec enabled connection
+        conn = _open_sqlite_vec(db_path)
+        conn.execute("CREATE TABLE store_meta (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO store_meta VALUES ('dimensions', '4')")
+        conn.execute(
+            "CREATE TABLE memories ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "content TEXT NOT NULL, "
+            "category TEXT NOT NULL DEFAULT 'general', "
+            "created_at TEXT NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO memories (content, category, created_at) "
+            "VALUES ('old fact', 'general', '2025-01-01')"
+        )
+        conn.execute(
+            "CREATE TABLE sessions ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "session_id TEXT NOT NULL, "
+            "agent_name TEXT NOT NULL, "
+            "timestamp TEXT NOT NULL, "
+            "messages_json TEXT NOT NULL)"
+        )
+        conn.execute("CREATE VIRTUAL TABLE memories_vec USING vec0(embedding float[4])")
+        conn.execute(
+            "INSERT INTO memories_vec (rowid, embedding) VALUES (1, ?)",
+            (sqlite_vec.serialize_float32([1.0, 0.0, 0.0, 0.0]),),
+        )
+        conn.commit()
+        conn.close()
+
+        # Open with new store — should migrate
+        with MemoryStore(db_path) as store:
+            mems = store.list_memories()
+            assert len(mems) == 1
+            assert mems[0].memory_type == MemoryType.SEMANTIC
+            assert mems[0].metadata is None
+            assert mems[0].consolidated_at is None
+
+            # Should be able to add new-style memories
+            store.add_memory(
+                "new fact",
+                "general",
+                [0.0, 1.0, 0.0, 0.0],
+                memory_type=MemoryType.PROCEDURAL,
+                metadata={"source": "test"},
+            )
+            assert store.count_memories() == 2
+            assert store.count_memories(memory_type=MemoryType.PROCEDURAL) == 1
