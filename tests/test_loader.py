@@ -198,6 +198,79 @@ class TestBuildAgent:
         call_kwargs = mock_agent_cls.call_args
         assert call_kwargs.kwargs["output_type"] is dict
 
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_output_type_from_role_config(self, mock_require, mock_agent_cls, tmp_path: Path):
+        """A role with json_schema output produces a BaseModel output_type."""
+        from pydantic import BaseModel as PydanticBaseModel
+
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+              description: A test
+            spec:
+              role: You are helpful.
+              model:
+                provider: anthropic
+                name: claude-sonnet-4-5-20250929
+              output:
+                type: json_schema
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [approved, rejected]
+                    amount:
+                      type: number
+                  required: [status, amount]
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role, role_dir=tmp_path)
+        call_kwargs = mock_agent_cls.call_args
+        output_type = call_kwargs.kwargs["output_type"]
+        assert output_type is not str
+        assert issubclass(output_type, PydanticBaseModel)
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_explicit_output_type_overrides_role_config(
+        self, mock_require, mock_agent_cls, tmp_path: Path
+    ):
+        """Explicit output_type param wins over role config."""
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+              description: A test
+            spec:
+              role: You are helpful.
+              model:
+                provider: anthropic
+                name: claude-sonnet-4-5-20250929
+              output:
+                type: json_schema
+                schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                  required: [status]
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role, role_dir=tmp_path, output_type=dict)
+        call_kwargs = mock_agent_cls.call_args
+        assert call_kwargs.kwargs["output_type"] is dict
+
     @patch(
         "initrunner.agent.loader.require_provider",
         side_effect=RuntimeError("Provider 'anthropic' requires extra"),

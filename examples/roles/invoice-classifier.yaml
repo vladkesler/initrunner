@@ -1,0 +1,50 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: invoice-classifier
+  description: Classifies invoices and extracts structured data
+  tags:
+  - example
+  - structured-output
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are an invoice classifier. Given a description of an invoice or expense,
+    extract the relevant fields and return structured JSON. Always determine a
+    status (approved, rejected, or needs_review) based on the amount and context.
+    Amounts under 500 are auto-approved, over 10000 need review, otherwise approved
+    unless something looks suspicious.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.0
+    max_tokens: 512
+  output:
+    type: json_schema
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, needs_review]
+          description: Classification decision
+        amount:
+          type: number
+          description: Invoice amount in USD
+        vendor:
+          type: string
+          description: Vendor or supplier name
+        category:
+          type: string
+          enum: [software, hardware, services, travel, office, other]
+          description: Expense category
+        reason:
+          type: string
+          description: Brief justification for the classification
+      required: [status, amount, vendor, category, reason]
+  guardrails:
+    max_tokens_per_run: 5000
+    max_tool_calls: 0
+    timeout_seconds: 30
+    max_request_limit: 5

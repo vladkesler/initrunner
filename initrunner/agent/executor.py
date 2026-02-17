@@ -12,6 +12,7 @@ from concurrent.futures import TimeoutError as _FuturesTimeout
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
+from pydantic import BaseModel
 from pydantic_ai import Agent, UsageLimits
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
@@ -346,7 +347,9 @@ def execute_run(
             )
 
             raw_output = agent_result.output
-            if isinstance(raw_output, (dict, list)):
+            if isinstance(raw_output, BaseModel):
+                result.output = raw_output.model_dump_json()
+            elif isinstance(raw_output, (dict, list)):
                 result.output = json.dumps(raw_output)
             else:
                 result.output = str(raw_output)
@@ -417,6 +420,13 @@ def execute_run_stream(
     )
     if blocked is not None:
         return blocked, []
+
+    if role.spec.output.type != "text":
+        raise ValueError(
+            "Streaming is not supported with structured output "
+            f"(output.type={role.spec.output.type!r}). "
+            "Use non-streaming execution instead."
+        )
 
     from opentelemetry import trace
 

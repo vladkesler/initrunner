@@ -150,12 +150,18 @@ def _create_agent(
 def build_agent(
     role: RoleDefinition,
     role_dir: Path | None = None,
-    output_type: type = str,
+    output_type: type | None = None,
     extra_skill_dirs: list[Path] | None = None,
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
     _validate_provider(role)
     system_prompt, all_tools = _resolve_skills_and_merge(role, role_dir, extra_skill_dirs)
+
+    # Resolve output type: explicit param wins, then role config, then str default
+    if output_type is None:
+        from initrunner.agent.output import resolve_output_type
+
+        output_type = resolve_output_type(role.spec.output, role_dir)
 
     from initrunner.agent.tools import build_toolsets
 

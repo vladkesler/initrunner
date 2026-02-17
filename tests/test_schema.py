@@ -25,6 +25,7 @@ from initrunner.agent.schema import (
     McpToolConfig,
     Metadata,
     ModelConfig,
+    OutputConfig,
     PythonToolConfig,
     RoleDefinition,
     SqlToolConfig,
@@ -686,3 +687,102 @@ class TestParseToolList:
         dt = DateTimeToolConfig()
         result = parse_tool_list([dt])
         assert result == [dt]
+
+
+class TestOutputConfig:
+    def test_default_is_text(self):
+        config = OutputConfig()
+        assert config.type == "text"
+        assert config.schema_ is None
+        assert config.schema_file is None
+
+    def test_explicit_text(self):
+        config = OutputConfig(type="text")
+        assert config.type == "text"
+
+    def test_json_schema_with_inline_schema(self):
+        config = OutputConfig.model_validate(
+            {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "required": ["name"],
+                },
+            }
+        )
+        assert config.type == "json_schema"
+        assert config.schema_ is not None
+
+    def test_json_schema_with_schema_file(self):
+        config = OutputConfig(type="json_schema", schema_file="./output.json")
+        assert config.type == "json_schema"
+        assert config.schema_file == "./output.json"
+
+    def test_json_schema_without_schema_or_file_raises(self):
+        with pytest.raises(ValidationError, match="json_schema output requires"):
+            OutputConfig(type="json_schema")
+
+    def test_json_schema_both_schema_and_file_raises(self):
+        with pytest.raises(ValidationError, match="mutually exclusive"):
+            OutputConfig.model_validate(
+                {
+                    "type": "json_schema",
+                    "schema": {"type": "object", "properties": {}},
+                    "schema_file": "./output.json",
+                }
+            )
+
+    def test_text_ignores_schema(self):
+        """text type with schema set is allowed (schema is just ignored)."""
+        config = OutputConfig.model_validate(
+            {
+                "type": "text",
+                "schema": {"type": "object"},
+            }
+        )
+        assert config.type == "text"
+        assert config.schema_ is not None
+
+    def test_role_definition_default_output(self):
+        data = _minimal_role_data()
+        role = RoleDefinition.model_validate(data)
+        assert role.spec.output.type == "text"
+
+    def test_role_definition_with_output(self):
+        data = _minimal_role_data()
+        data["spec"]["output"] = {
+            "type": "json_schema",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["approved", "rejected"]},
+                    "amount": {"type": "number"},
+                },
+                "required": ["status", "amount"],
+            },
+        }
+        role = RoleDefinition.model_validate(data)
+        assert role.spec.output.type == "json_schema"
+        assert role.spec.output.schema_ is not None
+        assert "status" in role.spec.output.schema_["properties"]
+
+    def test_role_definition_output_schema_file(self):
+        data = _minimal_role_data()
+        data["spec"]["output"] = {
+            "type": "json_schema",
+            "schema_file": "./invoice_result.json",
+        }
+        role = RoleDefinition.model_validate(data)
+        assert role.spec.output.type == "json_schema"
+        assert role.spec.output.schema_file == "./invoice_result.json"
+
+    def test_alias_schema_works(self):
+        """The 'schema' alias maps to schema_ field."""
+        config = OutputConfig.model_validate(
+            {
+                "type": "json_schema",
+                "schema": {"type": "object", "properties": {}},
+            }
+        )
+        assert config.schema_ is not None

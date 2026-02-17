@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-02-16
 
 ### Added
+- structured output (`spec.output`) with JSON Schema validation for role definitions
+- `invoice-classifier` example role demonstrating structured output
+- structured output documentation (`docs/core/structured-output.md`)
 - OpenTelemetry observability with OTLP, console, and Logfire backends
 - `traced-agent` example role with console observability
 - observability documentation (`docs/core/observability.md`)

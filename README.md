@@ -216,6 +216,34 @@ Queued attachment: notes.pdf
 
 The API server accepts multimodal content in the standard OpenAI format. See [Multimodal Input](docs/core/multimodal.md) for the full reference.
 
+### 7. Get structured output
+
+Force the agent to return validated JSON matching a schema — ideal for pipelines and automation:
+
+```yaml
+spec:
+  output:
+    type: json_schema
+    schema:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, needs_review]
+        amount:
+          type: number
+        vendor:
+          type: string
+      required: [status, amount, vendor]
+```
+
+```bash
+initrunner run classifier.yaml -p "Acme Corp invoice for $250"
+# → {"status": "approved", "amount": 250.0, "vendor": "Acme Corp"}
+```
+
+See [Structured Output](docs/core/structured-output.md) for inline schemas, external schema files, and pipeline integration.
+
 ## Community Roles
 
 Browse, install, and run roles shared by the community — no copy-paste needed:
@@ -472,7 +500,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Area | Key docs |
 |------|----------|
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
-| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
