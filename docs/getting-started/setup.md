@@ -127,12 +127,16 @@ If the test fails, a warning is printed but setup is still considered complete.
 A summary panel is displayed showing the configured provider, default model, config file path, and role file path. Next-step commands are printed:
 
 ```
+initrunner ingest role.yaml          # index your documents first (RAG template only)
 initrunner run role.yaml -p "Ask me anything"
 initrunner run role.yaml -i          # interactive REPL
 initrunner validate role.yaml
 initrunner init --template rag       # more templates
 initrunner tui                       # terminal dashboard
+initrunner ui                        # web dashboard
 ```
+
+The `initrunner ingest` line only appears when the RAG template is selected — it reminds you to index your documents before querying the agent.
 
 ## Templates
 

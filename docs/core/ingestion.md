@@ -161,6 +161,21 @@ Best for: prose documents, markdown, articles, documentation.
 
 **`chunk_overlap`**: Overlap prevents key information from being split across chunk boundaries. Set it to roughly 10% of `chunk_size` (e.g. 50 for chunk_size 512, 100 for chunk_size 1024). Too little overlap risks losing context at boundaries; too much wastes storage on duplicate content.
 
+### Recommended Settings by Document Type
+
+| Document Type | Strategy | chunk_size | chunk_overlap | Why |
+|--------------|----------|-----------|--------------|-----|
+| Markdown docs | `paragraph` | 512 | 50 | Natural paragraph boundaries; precise retrieval |
+| API reference | `paragraph` | 256 | 25 | Short entries; one chunk per endpoint/method |
+| Long-form articles | `paragraph` | 1024 | 100 | Preserves context around multi-sentence answers |
+| Source code | `fixed` | 512 | 50 | No paragraph structure; fixed windows work well |
+| Log files | `fixed` | 256 | 0 | Each line is independent; no overlap needed |
+| CSV / tabular data | `fixed` | 1024 | 0 | Keep rows together; overlap would split rows |
+| PDFs (mixed layout) | `fixed` | 512 | 50 | Paragraph detection unreliable after PDF extraction |
+| Mixed knowledge base | `paragraph` | 512 | 50 | Good default for heterogeneous content |
+
+These are starting points — adjust based on your retrieval quality. Smaller chunks improve precision (each result closely matches the query); larger chunks provide more context per result.
+
 ## Supported File Formats
 
 ### Core Formats (always available)

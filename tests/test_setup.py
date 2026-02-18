@@ -631,6 +631,94 @@ class TestSecurityDisclaimer:
         assert "Beta Software Notice" not in result.output
 
 
+class TestNextStepsIngestHint:
+    """Tests for the template-aware 'initrunner ingest' hint in next steps."""
+
+    def test_rag_template_shows_ingest_hint(self, clean_env, monkeypatch):
+        """RAG template should include 'initrunner ingest' in next steps."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-4o-mini",
+                "--template",
+                "rag",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--output",
+                str(output),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "initrunner ingest" in result.output
+
+    def test_chatbot_template_no_ingest_hint(self, clean_env, monkeypatch):
+        """Chatbot template should NOT include 'initrunner ingest' in next steps."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-4o-mini",
+                "--template",
+                "chatbot",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--output",
+                str(output),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "initrunner ingest" not in result.output
+
+    def test_ollama_rag_template_no_ingest_hint(self, clean_env):
+        """Ollama + RAG: no ingest hint (Ollama forces its own template)."""
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        with (
+            patch("initrunner.cli.setup_cmd.check_ollama_running"),
+            patch("initrunner.cli.setup_cmd._check_ollama_models", return_value=["llama3.2"]),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "llama3.2",
+                    "--template",
+                    "rag",
+                    "--skip-test",
+                    "--interfaces",
+                    "skip",
+                    "--output",
+                    str(output),
+                ],
+            )
+        assert result.exit_code == 0
+        assert "initrunner ingest" not in result.output
+
+
 class TestInterfaceInstall:
     """Tests for the interface picker step in the setup wizard."""
 

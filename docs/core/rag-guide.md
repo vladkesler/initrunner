@@ -2,6 +2,20 @@
 
 This guide covers practical patterns for using InitRunner's retrieval-augmented generation (RAG) capabilities. For full configuration reference, see [Ingestion](ingestion.md) and [Memory](memory.md).
 
+> **New to RAG?** Start with the [RAG Quickstart](../getting-started/rag-quickstart.md) — three commands to a working document Q&A agent.
+
+## Before You Begin
+
+- [ ] InitRunner installed (`pip install initrunner`)
+- [ ] Embedding provider configured — one of:
+  - `OPENAI_API_KEY` set (used by OpenAI and Anthropic providers)
+  - `GOOGLE_API_KEY` set (for Google provider)
+  - Ollama running with an embedding model (`ollama pull nomic-embed-text`)
+- [ ] Documents ready (Markdown, text, HTML, PDF, DOCX, XLSX)
+- [ ] Optional extras installed if needed: `initrunner[ingest]` for PDF/DOCX/XLSX support
+
+> **Note:** The `local-embeddings` extra (`fastembed`) is declared in `pyproject.toml` but not yet implemented. For local embeddings without an API key, use [Ollama](../configuration/ollama.md).
+
 ## RAG vs Memory — When to Use Which
 
 InitRunner has two systems for giving agents access to information beyond their training data:
@@ -197,6 +211,37 @@ spec:
 ```
 
 See the [Ollama configuration guide](../../docs/configuration/ollama.md) for setup instructions.
+
+## Embedding Model Options
+
+The default embedding model depends on your agent's provider. You can override it in `ingest.embeddings`. See [Ingestion: Embedding Options](ingestion.md#embedding-options) for configuration details.
+
+| Provider | Model | Dimensions | Quality Tier | Cost Tier | Notes |
+|----------|-------|-----------|-------------|----------|-------|
+| OpenAI | `text-embedding-3-small` | 1536 | Good | Low | Default for OpenAI/Anthropic |
+| OpenAI | `text-embedding-3-large` | 3072 | Best (cloud) | Medium | 2x storage vs small |
+| Google | `text-embedding-004` | 768 | Good | Free tier available | Default for Google |
+| Ollama | `nomic-embed-text` | 768 | Good | Free (local) | Default for Ollama |
+| Ollama | `mxbai-embed-large` | 1024 | Better (local) | Free (local) | Higher quality local option |
+
+**When to use which:**
+
+- **Starting out / cost-sensitive** — `text-embedding-3-small` (OpenAI default). Good quality at low cost.
+- **Maximum retrieval quality** — `text-embedding-3-large`. Better for large knowledge bases where precision matters. Uses 2x storage.
+- **Fully local / no API key** — `nomic-embed-text` via Ollama. Free, private, good quality. Use `mxbai-embed-large` for better accuracy at the cost of slightly more storage.
+- **Google ecosystem** — `text-embedding-004`. Good quality with a free tier.
+
+To override the default:
+
+```yaml
+spec:
+  ingest:
+    embeddings:
+      provider: openai
+      model: text-embedding-3-large
+```
+
+See [Providers: Embedding Configuration](../configuration/providers.md#embedding-configuration) for the full resolution logic.
 
 ## Next Steps
 

@@ -80,6 +80,7 @@ Detailed docs live in `docs/`. Key references:
 | Security model | `docs/security/security.md` |
 | Ingestion pipeline | `docs/core/ingestion.md` |
 | Memory system | `docs/core/memory.md` |
+| RAG quickstart | `docs/getting-started/rag-quickstart.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook) | `docs/core/triggers.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |

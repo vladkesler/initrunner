@@ -302,6 +302,7 @@ def run_setup(
     # ---------------------------------------------------------------
     # Step 5: Role creation via template picker
     # ---------------------------------------------------------------
+    template_key = None
     if output.exists():
         console.print(f"[dim]{output} already exists, skipping role creation.[/dim]")
     else:
@@ -414,6 +415,8 @@ def run_setup(
     )
 
     console.print("[bold]Next steps:[/bold]")
+    if template_key == "rag":
+        console.print(f"  initrunner ingest {output}          # index your documents first")
     console.print(f'  initrunner run {output} -p "Ask me anything"')
     console.print(f"  initrunner run {output} -i          # interactive REPL")
     console.print(f"  initrunner validate {output}")
