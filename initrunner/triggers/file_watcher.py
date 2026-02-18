@@ -7,7 +7,7 @@ from pathlib import Path
 
 from watchfiles import watch
 
-from initrunner.agent.schema import FileWatchTriggerConfig
+from initrunner.agent.schema.triggers import FileWatchTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
 
 

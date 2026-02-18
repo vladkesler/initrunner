@@ -13,16 +13,9 @@ from initrunner.agent.memory_ops import (
     finalize_turn,
     save_session,
 )
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    Kind,
-    MemoryConfig,
-    Metadata,
-    ModelConfig,
-    ProceduralMemoryConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.memory import MemoryConfig, ProceduralMemoryConfig
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.stores.base import Memory, MemoryType
 
 

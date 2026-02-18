@@ -11,7 +11,7 @@ from initrunner.runner.interactive import run_interactive
 from initrunner.runner.single import run_single
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.stores.base import MemoryStoreBase
 
 __all__ = [

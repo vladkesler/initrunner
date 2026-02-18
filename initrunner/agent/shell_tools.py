@@ -13,7 +13,7 @@ from initrunner.agent._subprocess import (
     format_subprocess_output,
     run_subprocess_text,
 )
-from initrunner.agent.schema import ShellToolConfig
+from initrunner.agent.schema.tools import ShellToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _FORK_BOMB_PATTERN = re.compile(r":\(\)\s*\{")

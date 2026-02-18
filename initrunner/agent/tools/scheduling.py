@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent.schema import AutonomyConfig
+from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.triggers.schedule_queue import ScheduleQueue
 
 _logger = logging.getLogger(__name__)

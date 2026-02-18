@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from pydantic_ai import Agent
 
 from initrunner.agent.executor import RunResult, execute_run
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.eval.assertions import AssertionResult, evaluate_assertions
 from initrunner.eval.schema import TestCase, TestSuiteDefinition
 

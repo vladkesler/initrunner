@@ -9,14 +9,15 @@ import httpx
 import pytest
 
 from initrunner.agent._env import resolve_env_vars
-from initrunner.agent.schema import AgentSpec, SlackToolConfig
+from initrunner.agent.schema.role import AgentSpec
+from initrunner.agent.schema.tools import SlackToolConfig
 from initrunner.agent.slack_tools import build_slack_toolset
 from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

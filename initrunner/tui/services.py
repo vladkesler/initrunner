@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from initrunner.agent.executor import RunResult
     from initrunner.agent.prompt import UserPrompt
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditRecord
     from initrunner.stores.base import Memory, SessionSummary
 

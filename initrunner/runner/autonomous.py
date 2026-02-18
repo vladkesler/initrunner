@@ -16,7 +16,8 @@ from initrunner.agent.executor import (
 )
 from initrunner.agent.memory_ops import save_session
 from initrunner.agent.prompt import UserPrompt, extract_text_from_prompt
-from initrunner.agent.schema import AutonomyConfig, RoleDefinition
+from initrunner.agent.schema.autonomy import AutonomyConfig
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import (
     _display_autonomous_header,

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.compose.schema import ComposeDefinition
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"

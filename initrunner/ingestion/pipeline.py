@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 from pydantic_ai.embeddings import Embedder
 
-from initrunner.agent.schema import IngestConfig
+from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.ingestion.chunker import Chunk, chunk_text
 from initrunner.ingestion.embeddings import compute_model_identity, create_embedder, embed_texts
 from initrunner.ingestion.extractors import extract_text

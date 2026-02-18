@@ -16,13 +16,13 @@ from initrunner.agent.api_tools import (
     _resolve_headers,
     build_api_toolset,
 )
-from initrunner.agent.schema import ApiEndpoint, ApiParameter, ApiToolConfig
+from initrunner.agent.schema.tools import ApiEndpoint, ApiParameter, ApiToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {
@@ -311,7 +311,7 @@ class TestExtractResponse:
 class TestApiToolConfigInRoleYaml:
     def test_parses_from_dict(self):
         """API tool config parses correctly via the field_validator."""
-        from initrunner.agent.schema import AgentSpec
+        from initrunner.agent.schema.role import AgentSpec
 
         spec_data = {
             "role": "test",

@@ -17,7 +17,7 @@ from initrunner.audit._redact import scrub_secrets
 
 if TYPE_CHECKING:
     from initrunner.agent.executor import RunResult
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 logger = get_logger("audit")
 

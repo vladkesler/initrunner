@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._urls import SSRFBlocked
-from initrunner.agent.schema import WebReaderToolConfig
+from initrunner.agent.schema.tools import WebReaderToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 

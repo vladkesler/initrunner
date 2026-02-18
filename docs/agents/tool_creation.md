@@ -15,7 +15,7 @@ A built-in tool is one Python file containing a config class, a builder function
 
 from typing import Literal
 from pydantic_ai.toolsets.function import FunctionToolset
-from initrunner.agent.schema import ToolConfigBase
+from initrunner.agent.schema.tools import ToolConfigBase
 from initrunner.agent.tools._registry import register_tool, ToolBuildContext
 
 

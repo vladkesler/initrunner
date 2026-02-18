@@ -2,7 +2,7 @@
 
 import time
 
-from initrunner.agent.schema import CronTriggerConfig, FileWatchTriggerConfig
+from initrunner.agent.schema.triggers import CronTriggerConfig, FileWatchTriggerConfig
 from initrunner.triggers.base import TriggerEvent
 from initrunner.triggers.cron import CronTrigger
 from initrunner.triggers.dispatcher import TriggerDispatcher

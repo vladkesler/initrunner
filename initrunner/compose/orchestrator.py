@@ -12,7 +12,8 @@ from rich.table import Table
 
 from initrunner.agent.executor import execute_run
 from initrunner.agent.loader import _load_dotenv, build_agent, load_and_build, load_role
-from initrunner.agent.schema import MemoryConfig, RoleDefinition
+from initrunner.agent.schema.memory import MemoryConfig
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.compose.delegate_sink import DelegateEvent, DelegateSink
 from initrunner.compose.schema import ComposeDefinition, ComposeServiceConfig

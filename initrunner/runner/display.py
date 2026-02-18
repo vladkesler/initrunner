@@ -7,7 +7,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from initrunner.agent.executor import AutonomousResult, RunResult, TokenBudgetStatus
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 
 console = Console()
 

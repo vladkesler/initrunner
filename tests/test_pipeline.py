@@ -121,7 +121,11 @@ class TestProgressCallback:
         """Verify progress_callback is invoked per file with mocked embedder."""
         from unittest.mock import MagicMock, patch
 
-        from initrunner.agent.schema import ChunkingConfig, EmbeddingConfig, IngestConfig
+        from initrunner.agent.schema.ingestion import (
+            ChunkingConfig,
+            EmbeddingConfig,
+            IngestConfig,
+        )
 
         # Create test files
         (tmp_path / "a.txt").write_text("hello world content here")

@@ -14,7 +14,7 @@ from rich.markup import escape
 if TYPE_CHECKING:
     from pydantic_ai import Agent
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger
 
 console = Console()

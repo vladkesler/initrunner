@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 from initrunner._paths import ensure_private_dir
 from initrunner.config import get_roles_dir
@@ -243,7 +243,7 @@ def _validate_yaml_content(content: str) -> RoleDefinition:
     import yaml
     from pydantic import ValidationError
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     try:
         data = yaml.safe_load(content)

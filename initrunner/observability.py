@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import ObservabilityConfig
+    from initrunner.agent.schema.observability import ObservabilityConfig
 
 _logger = logging.getLogger(__name__)
 

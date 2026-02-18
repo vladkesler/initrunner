@@ -357,14 +357,8 @@ class TestServerConvert:
 class TestExecutorMultimodal:
     def test_execute_run_with_multimodal_prompt(self):
         from initrunner.agent.executor import execute_run
-        from initrunner.agent.schema import (
-            AgentSpec,
-            ApiVersion,
-            Kind,
-            Metadata,
-            ModelConfig,
-            RoleDefinition,
-        )
+        from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 
         role = RoleDefinition(
             apiVersion=ApiVersion.V1,

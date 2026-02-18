@@ -13,7 +13,7 @@ from textual.widgets import Footer
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class BaseScreen(Screen):

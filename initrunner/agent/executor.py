@@ -19,7 +19,7 @@ from pydantic_ai.models import Model
 
 from initrunner._ids import generate_id
 from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
 _logger = logging.getLogger(__name__)

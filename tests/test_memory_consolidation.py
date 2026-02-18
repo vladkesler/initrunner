@@ -5,16 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.memory_consolidation import maybe_consolidate
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    ConsolidationConfig,
-    Kind,
-    MemoryConfig,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.memory import ConsolidationConfig, MemoryConfig
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.stores.base import Memory, MemoryType
 
 

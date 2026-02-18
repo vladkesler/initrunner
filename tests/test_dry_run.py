@@ -113,7 +113,7 @@ class TestRunDryRun:
 
 
 def _make_mock_role():
-    from initrunner.agent.schema import SecurityPolicy
+    from initrunner.agent.schema.security import SecurityPolicy
 
     role = MagicMock()
     role.metadata.name = "test-agent"

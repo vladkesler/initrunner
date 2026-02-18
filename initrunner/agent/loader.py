@@ -12,7 +12,8 @@ from pydantic_ai.settings import ModelSettings
 
 from initrunner._compat import require_provider
 from initrunner._yaml import load_yaml_model
-from initrunner.agent.schema import ModelConfig, RoleDefinition
+from initrunner.agent.schema.base import ModelConfig
+from initrunner.agent.schema.role import RoleDefinition
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._paths import validate_path_within
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent.schema import FileSystemToolConfig
+from initrunner.agent.schema.tools import FileSystemToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _MAX_READ_FILE_BYTES = 1_048_576  # 1 MB

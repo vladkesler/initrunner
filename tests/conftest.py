@@ -7,16 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    AutonomyConfig,
-    Guardrails,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.autonomy import AutonomyConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.tools._registry import ToolBuildContext
 
 

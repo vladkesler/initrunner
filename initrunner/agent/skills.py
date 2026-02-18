@@ -12,7 +12,8 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from initrunner.agent.schema import SkillDefinition, SkillFrontmatter, ToolConfig
+from initrunner.agent.schema.role import SkillDefinition, SkillFrontmatter
+from initrunner.agent.schema.tools import ToolConfig
 
 logger = logging.getLogger(__name__)
 

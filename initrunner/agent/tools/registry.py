@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from initrunner.agent.schema import ToolConfig
+from initrunner.agent.schema.tools import ToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, get_builder
 from initrunner.stores.base import StoreConfig
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 def _make_store_config(role: RoleDefinition) -> StoreConfig:

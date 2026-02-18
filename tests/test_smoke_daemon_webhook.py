@@ -13,16 +13,10 @@ from unittest.mock import MagicMock, Mock, patch
 import httpx
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    Kind,
-    MemoryConfig,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-    WebhookTriggerConfig,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.memory import MemoryConfig
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+from initrunner.agent.schema.triggers import WebhookTriggerConfig
 from initrunner.server.rate_limiter import TokenBucketRateLimiter
 from initrunner.triggers.base import TriggerEvent
 from initrunner.triggers.dispatcher import TriggerDispatcher

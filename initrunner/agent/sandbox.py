@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import ToolSandboxConfig
+    from initrunner.agent.schema.security import ToolSandboxConfig
     from initrunner.audit.logger import AuditLogger
 
 logger = logging.getLogger(__name__)

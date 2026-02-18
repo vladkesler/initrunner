@@ -15,7 +15,7 @@ from initrunner.stores.base import (
 )
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import MemoryConfig
+    from initrunner.agent.schema.memory import MemoryConfig
 
 
 def create_document_store(

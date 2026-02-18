@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from initrunner.agent.schema import ObservabilityConfig, RoleDefinition
+from initrunner.agent.schema.observability import ObservabilityConfig
+from initrunner.agent.schema.role import RoleDefinition
 
 # ---------------------------------------------------------------------------
 # ObservabilityConfig validation

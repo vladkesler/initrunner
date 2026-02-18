@@ -9,7 +9,7 @@ from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._subprocess import scrub_env
-from initrunner.agent.schema import McpToolConfig
+from initrunner.agent.schema.tools import McpToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 

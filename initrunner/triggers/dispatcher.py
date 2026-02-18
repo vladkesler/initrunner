@@ -37,7 +37,7 @@ def _register_builtins() -> None:
     individual trigger modules are still only imported when a trigger
     is actually built.
     """
-    from initrunner.agent.schema import (
+    from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
         FileWatchTriggerConfig,
         WebhookTriggerConfig,

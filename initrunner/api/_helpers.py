@@ -11,7 +11,7 @@ from fastapi import HTTPException, Request
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 BUILD_TIMEOUT = 60.0
 

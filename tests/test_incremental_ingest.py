@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from initrunner.agent.schema import ChunkingConfig, EmbeddingConfig, IngestConfig
+from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, IngestConfig
 from initrunner.ingestion.pipeline import FileStatus, run_ingest
 from initrunner.stores.sqlite_vec import SqliteVecDocumentStore as SqliteVecStore
 

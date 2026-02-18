@@ -16,7 +16,7 @@ from initrunner.agent._subprocess import (
     format_subprocess_output,
     scrub_env,
 )
-from initrunner.agent.schema import PythonToolConfig
+from initrunner.agent.schema.tools import PythonToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 # Best-effort network restriction: a sys.audit hook that blocks outbound socket

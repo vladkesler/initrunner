@@ -7,10 +7,10 @@ from pathlib import Path
 
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema import (
+from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.schema.sinks import (
     CustomSinkConfig,
     FileSinkConfig,
-    RoleDefinition,
     SinkConfig,
     WebhookSinkConfig,
 )

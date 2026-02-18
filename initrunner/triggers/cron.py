@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from croniter import croniter
 
-from initrunner.agent.schema import CronTriggerConfig
+from initrunner.agent.schema.triggers import CronTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
 
 

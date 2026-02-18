@@ -174,14 +174,8 @@ class TestRunAgentStreamed:
         """Test that execute_run_stream_sync returns a RunResult even on failure."""
         from unittest.mock import MagicMock
 
-        from initrunner.agent.schema import (
-            AgentSpec,
-            ApiVersion,
-            Kind,
-            Metadata,
-            ModelConfig,
-            RoleDefinition,
-        )
+        from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
         from initrunner.services import execute_run_stream_sync
 
         mock_agent = MagicMock()

@@ -180,7 +180,7 @@ class RoleDetailScreen(RoleScreen):
         return "\n".join(lines)
 
     def _build_security_section(self) -> str:
-        from initrunner.agent.schema import SecurityPolicy
+        from initrunner.agent.schema.security import SecurityPolicy
 
         sec = self._role.spec.security
         defaults = SecurityPolicy()

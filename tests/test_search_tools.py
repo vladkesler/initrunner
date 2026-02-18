@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from initrunner.agent._env import resolve_env_vars
-from initrunner.agent.schema import AgentSpec, SearchToolConfig
+from initrunner.agent.schema.role import AgentSpec
+from initrunner.agent.schema.tools import SearchToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.agent.tools.search import (
     _format_results,
@@ -19,7 +20,7 @@ from initrunner.agent.tools.search import (
 
 def _make_ctx():
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

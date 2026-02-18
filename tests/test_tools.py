@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from initrunner.agent.schema import (
+from initrunner.agent.schema.tools import (
     CustomToolConfig,
     DateTimeToolConfig,
     FileSystemToolConfig,
@@ -33,7 +33,7 @@ from initrunner.mcp.server import build_mcp_toolset
 
 def _make_ctx() -> ToolBuildContext:
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {
@@ -466,7 +466,7 @@ class TestCustomToolsetEnhanced:
             sys.path.remove(str(tmp_path))
         sys.modules.pop(mod_name, None)
 
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(
             {

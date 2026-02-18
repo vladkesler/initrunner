@@ -5,16 +5,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.memory_capture import capture_episode
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    EpisodicMemoryConfig,
-    Kind,
-    MemoryConfig,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.memory import EpisodicMemoryConfig, MemoryConfig
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.stores.base import MemoryType
 
 

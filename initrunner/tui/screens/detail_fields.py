@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class FieldKind(StrEnum):
@@ -91,7 +91,7 @@ def guardrails_fields(role: RoleDefinition) -> list[FieldSpec]:
 
 
 def tool_fields(tool: Any) -> list[FieldSpec]:
-    from initrunner.agent.schema import (
+    from initrunner.agent.schema.tools import (
         ApiToolConfig,
         CustomToolConfig,
         DateTimeToolConfig,
@@ -228,7 +228,7 @@ def tool_fields(tool: Any) -> list[FieldSpec]:
 
 
 def trigger_fields(trigger: Any) -> list[FieldSpec]:
-    from initrunner.agent.schema import (
+    from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
         FileWatchTriggerConfig,
         WebhookTriggerConfig,
@@ -267,11 +267,7 @@ def trigger_fields(trigger: Any) -> list[FieldSpec]:
 
 
 def sink_fields(sink: Any) -> list[FieldSpec]:
-    from initrunner.agent.schema import (
-        CustomSinkConfig,
-        FileSinkConfig,
-        WebhookSinkConfig,
-    )
+    from initrunner.agent.schema.sinks import CustomSinkConfig, FileSinkConfig, WebhookSinkConfig
 
     fields: list[FieldSpec] = []
     if isinstance(sink, WebhookSinkConfig):

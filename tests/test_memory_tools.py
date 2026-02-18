@@ -1,13 +1,13 @@
 """Tests for the memory toolset integration."""
 
-from initrunner.agent.schema import (
-    EmbeddingConfig,
+from initrunner.agent.schema.ingestion import EmbeddingConfig
+from initrunner.agent.schema.memory import (
     EpisodicMemoryConfig,
     MemoryConfig,
     ProceduralMemoryConfig,
-    RoleDefinition,
     SemanticMemoryConfig,
 )
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.agent.tools import _build_memory_toolset, build_toolsets
 
 
