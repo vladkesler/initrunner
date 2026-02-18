@@ -73,6 +73,27 @@
     "tools": []
   },
   {
+    "name": "audio-assistant",
+    "category": "role",
+    "description": "Fetch YouTube transcripts and transcribe local audio files",
+    "tags": [
+      "example",
+      "audio",
+      "youtube"
+    ],
+    "files": [
+      "audio-assistant.yaml"
+    ],
+    "primary_file": "audio-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: audio-assistant\n  description: Fetch YouTube transcripts and transcribe local audio files\n  tags: [example, audio, youtube]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are an audio assistant. You have two capabilities:\n\n    1. **YouTube transcripts** — When given a YouTube URL, use get_youtube_transcript\n       to fetch the video's captions, then summarize or answer questions about the content.\n    2. **Audio transcription** — When given a local audio file path, use transcribe_audio\n       to convert speech to text, then summarize or answer questions about it.\n\n    Always present transcripts clearly. When summarizing, highlight the key points.\n    If a transcript is very long, provide a structured summary with sections.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: audio\n      youtube_languages: [\"en\"]\n      include_timestamps: false\n      # For local file transcription, override with an audio-capable model:\n      transcription_model: openai:gpt-4o-audio-preview\n      max_audio_mb: 25.0\n      max_transcript_chars: 80000\n  guardrails:\n    max_tokens_per_run: 20000\n    max_tool_calls: 5\n    timeout_seconds: 120\n    max_request_limit: 10\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": [
+      "audio"
+    ]
+  },
+  {
     "name": "changelog-generator",
     "category": "role",
     "description": "Generates a CHANGELOG.md from git commit history",

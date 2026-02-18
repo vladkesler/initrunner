@@ -1,0 +1,35 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: audio-assistant
+  description: Fetch YouTube transcripts and transcribe local audio files
+  tags: [example, audio, youtube]
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are an audio assistant. You have two capabilities:
+
+    1. **YouTube transcripts** — When given a YouTube URL, use get_youtube_transcript
+       to fetch the video's captions, then summarize or answer questions about the content.
+    2. **Audio transcription** — When given a local audio file path, use transcribe_audio
+       to convert speech to text, then summarize or answer questions about it.
+
+    Always present transcripts clearly. When summarizing, highlight the key points.
+    If a transcript is very long, provide a structured summary with sections.
+  model:
+    provider: openai
+    name: gpt-5-mini
+  tools:
+    - type: audio
+      youtube_languages: ["en"]
+      include_timestamps: false
+      # For local file transcription, override with an audio-capable model:
+      transcription_model: openai:gpt-4o-audio-preview
+      max_audio_mb: 25.0
+      max_transcript_chars: 80000
+  guardrails:
+    max_tokens_per_run: 20000
+    max_tool_calls: 5
+    timeout_seconds: 120
+    max_request_limit: 10
