@@ -1,0 +1,64 @@
+# Agent Run Report
+
+| Field | Value |
+|-------|-------|
+| **Agent** | {{ agent_name }} |
+| **Model** | {{ model }} |
+| **Run ID** | `{{ run_id }}` |
+| **Timestamp** | {{ timestamp }} |
+| **Status** | {{ "Success" if success else "Failed" }} |
+{% if dry_run %}| **Mode** | dry-run |
+{% endif %}{% if autonomous %}| **Mode** | autonomous ({{ iteration_count }} iterations) |
+{% endif %}
+
+## Prompt
+
+{{ prompt }}
+
+## Output
+
+{% if success %}
+{{ output }}
+{% else %}
+**Error:** {{ error }}
+
+{% if output %}
+### Partial Output
+
+{{ output }}
+{% endif %}
+{% endif %}
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+| Tokens In | {{ tokens_in }} |
+| Tokens Out | {{ tokens_out }} |
+| Total Tokens | {{ total_tokens }} |
+| Tool Calls | {{ tool_calls }} |
+| Duration | {{ duration_ms }}ms |
+{% if autonomous %}
+## Iterations
+
+{% for iter in iterations %}
+### Iteration {{ loop.index }}
+
+| Metric | Value |
+|--------|-------|
+| Tokens | {{ iter.total_tokens }} |
+| Tool Calls | {{ iter.tool_calls }} |
+| Duration | {{ iter.duration_ms }}ms |
+| Status | {{ "OK" if iter.success else "Error" }} |
+
+{% if iter.output %}
+{{ iter.output[:500] }}{% if iter.output|length > 500 %}...{% endif %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if finish_summary %}
+## Summary
+
+{{ finish_summary }}
+{% endif %}

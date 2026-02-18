@@ -63,6 +63,7 @@ def main(
 # Command registrations — plain functions from *_cmd modules
 # ---------------------------------------------------------------------------
 
+from initrunner.cli.doctor_cmd import doctor  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
     info,
@@ -95,6 +96,7 @@ app.command()(search)
 app.command()(info)
 app.command("list")(list_roles)
 app.command()(update)
+app.command()(doctor)
 
 
 def app_entry() -> None:

@@ -21,6 +21,7 @@
 | `initrunner info <source>` | Inspect a role's metadata without installing |
 | `initrunner list` | List installed roles |
 | `initrunner update [name]` | Update installed role(s) to latest version |
+| `initrunner doctor` | Check provider configuration, API keys, and connectivity |
 | `initrunner plugins` | List discovered tool plugins |
 | `initrunner audit prune` | Prune old audit records |
 | `initrunner audit export` | Export audit records as JSON or CSV |
@@ -56,6 +57,9 @@
 | `--no-audit` | Disable audit logging |
 | `--skill-dir PATH` | Extra skill search directory |
 | `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
+| `--export-report` | Export a markdown report after the run. See [Report Export](../core/reports.md). |
+| `--report-path PATH` | Report output path (default: `initrunner-report.md`). |
+| `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. |
 
 Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `spec.guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 
@@ -126,3 +130,12 @@ See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-
 | `--until TEXT` | End timestamp (ISO 8601) |
 | `--limit INT` | Max events to show (default: `100`) |
 | `--audit-db PATH` | Path to audit database |
+
+## Doctor options
+
+| Flag | Description |
+|------|-------------|
+| `--quickstart` | Run a smoke prompt to verify end-to-end connectivity |
+| `--role PATH` | Role file to test (loads its `.env` and uses it for `--quickstart`) |
+
+See [Doctor](../operations/doctor.md) for details.

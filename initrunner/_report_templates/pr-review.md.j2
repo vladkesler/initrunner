@@ -1,0 +1,25 @@
+# PR Review Report
+
+| Field | Value |
+|-------|-------|
+| **Agent** | {{ agent_name }} |
+| **Model** | {{ model }} |
+| **Run ID** | `{{ run_id }}` |
+| **Timestamp** | {{ timestamp }} |
+| **Status** | {{ "Success" if success else "Failed" }} |
+{% if dry_run %}| **Mode** | dry-run |
+{% endif %}
+
+## Review
+
+{% if success %}
+{{ output }}
+{% else %}
+**Error:** {{ error }}
+{% endif %}
+
+## Metrics
+
+| Tokens In | Tokens Out | Total | Duration |
+|-----------|------------|-------|----------|
+| {{ tokens_in }} | {{ tokens_out }} | {{ total_tokens }} | {{ duration_ms }}ms |
