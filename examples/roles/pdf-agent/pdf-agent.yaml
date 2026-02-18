@@ -32,7 +32,7 @@ spec:
     - For PDF sources, mention the document name (not the full path)
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
   ingest:
     sources:

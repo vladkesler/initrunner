@@ -25,7 +25,7 @@ def role_dir(tmp_path):
           role: You are a test agent.
           model:
             provider: openai
-            name: gpt-4o-mini
+            name: gpt-5-mini
     """)
     )
     return tmp_path
@@ -48,7 +48,7 @@ _VALID_YAML = textwrap.dedent("""\
       role: You are a new agent.
       model:
         provider: openai
-        name: gpt-4o-mini
+        name: gpt-5-mini
 """)
 
 
@@ -85,7 +85,7 @@ class TestCreateRole:
               role: Test
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         resp = client.post("/api/roles", json={"yaml_content": bad_yaml})
         assert resp.status_code == 400
@@ -117,7 +117,7 @@ class TestUpdateRole:
               role: You are an updated agent.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         resp = client.put(f"/api/roles/{role_id}", json={"yaml_content": updated_yaml})
         assert resp.status_code == 200

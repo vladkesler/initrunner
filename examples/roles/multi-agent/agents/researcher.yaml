@@ -22,7 +22,7 @@ spec:
     - Do not editorialize or write prose — just report the facts
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 2048
   tools:

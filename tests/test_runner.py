@@ -23,7 +23,7 @@ def _make_role(
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             guardrails=Guardrails(
                 max_iterations=max_iterations,
                 autonomous_token_budget=autonomous_token_budget,

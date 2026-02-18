@@ -992,7 +992,7 @@ spec:
   role: You summarize YouTube videos from their transcripts.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: audio
       youtube_languages: ["en", "es"]

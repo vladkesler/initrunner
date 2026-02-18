@@ -12,9 +12,9 @@ class TestPromptModelSelection:
 
     def test_default_on_enter(self):
         """Pressing Enter returns the default (first) model."""
-        with patch("rich.prompt.Prompt.ask", return_value="gpt-4o-mini"):
+        with patch("rich.prompt.Prompt.ask", return_value="gpt-5-mini"):
             result = prompt_model_selection("openai")
-        assert result == "gpt-4o-mini"
+        assert result == "gpt-5-mini"
 
     def test_number_input_selects_model(self):
         """Typing '2' selects the second model in the list."""
@@ -70,4 +70,4 @@ class TestPromptModelSelection:
         """Empty string returns the default model."""
         with patch("rich.prompt.Prompt.ask", return_value=""):
             result = prompt_model_selection("openai")
-        assert result == "gpt-4o-mini"
+        assert result == "gpt-5-mini"

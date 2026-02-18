@@ -42,7 +42,7 @@ def _make_ctx() -> ToolBuildContext:
             "metadata": {"name": "test-agent", "description": "test"},
             "spec": {
                 "role": "test",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
             },
         }
     )
@@ -475,7 +475,7 @@ class TestCustomToolsetEnhanced:
                 "metadata": {"name": "test-agent", "description": "test"},
                 "spec": {
                     "role": "test",
-                    "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                    "model": {"provider": "openai", "name": "gpt-5-mini"},
                 },
             }
         )

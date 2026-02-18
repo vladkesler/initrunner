@@ -168,7 +168,7 @@ class TestTriggerFields:
 
         role = MagicMock()
         role.metadata.name = "agent1"
-        role.spec.model.name = "gpt-4o-mini"
+        role.spec.model.name = "gpt-5-mini"
         role.spec.model.provider = "openai"
 
         record = AuditRecord.from_run(
@@ -199,7 +199,7 @@ class TestTriggerFields:
 
         role = MagicMock()
         role.metadata.name = "agent1"
-        role.spec.model.name = "gpt-4o-mini"
+        role.spec.model.name = "gpt-5-mini"
         role.spec.model.provider = "openai"
 
         record = AuditRecord.from_run(result, role, "test prompt")

@@ -33,7 +33,7 @@ spec:
     Always include the original event type and source in your Slack message.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 2048
   tools:

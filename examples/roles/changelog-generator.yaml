@@ -36,7 +36,7 @@ spec:
     Include an [Unreleased] section header with the current date.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:

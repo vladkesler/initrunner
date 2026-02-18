@@ -120,7 +120,7 @@ All field editors validate types before saving (e.g. integers, floats, booleans)
 Interactive chat with an agent. The layout has three sections:
 
 ```
-┌─ Agent: support-agent | openai:gpt-4o-mini | tokens: 1.2k in / 890 out ─┐
+┌─ Agent: support-agent | openai:gpt-5-mini | tokens: 1.2k in / 890 out ─┐
 │                                                                           │
 │  you                                                                      │
 │  What files are in the knowledge base?                                    │

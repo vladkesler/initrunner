@@ -40,7 +40,7 @@ VALID_ROLE_YAML = textwrap.dedent("""\
       role: You are helpful.
       model:
         provider: openai
-        name: gpt-4o-mini
+        name: gpt-5-mini
 """)
 
 VALID_ROLE_WITH_TOOLS_YAML = textwrap.dedent("""\
@@ -54,7 +54,7 @@ VALID_ROLE_WITH_TOOLS_YAML = textwrap.dedent("""\
       role: You review code.
       model:
         provider: openai
-        name: gpt-4o-mini
+        name: gpt-5-mini
       tools:
         - type: filesystem
           root_path: /src
@@ -73,7 +73,7 @@ VALID_ROLE_WITH_DEPS_YAML = textwrap.dedent("""\
       role: You are helpful.
       model:
         provider: openai
-        name: gpt-4o-mini
+        name: gpt-5-mini
 """)
 
 
@@ -255,7 +255,7 @@ class TestRoleInfo:
         assert info.description == "A test agent"
         assert info.author == "testuser"
         assert info.provider == "openai"
-        assert info.model == "gpt-4o-mini"
+        assert info.model == "gpt-5-mini"
         assert info.tools == []
         assert info.has_triggers is False
         assert info.has_ingestion is False
@@ -850,7 +850,7 @@ class TestSchemaExtension:
               role: You are helpful.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         role = _validate_yaml_content(yaml_content)
         assert role.metadata.author == ""

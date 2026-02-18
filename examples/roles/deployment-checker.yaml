@@ -20,7 +20,7 @@ spec:
     Keep each plan step concise. Mark steps completed/failed as you go.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
   tools:
     - type: shell

@@ -14,7 +14,7 @@ spec:
     Output your decision and reasoning clearly.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
   guardrails:
     max_tokens_per_run: 2000

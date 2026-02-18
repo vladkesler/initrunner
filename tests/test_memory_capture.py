@@ -18,7 +18,7 @@ def _make_role(*, episodic_enabled: bool = True) -> RoleDefinition:
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             memory=MemoryConfig(
                 episodic=EpisodicMemoryConfig(enabled=episodic_enabled),
             ),
@@ -68,7 +68,7 @@ class TestCaptureEpisode:
             metadata=Metadata(name="test-agent"),
             spec=AgentSpec(
                 role="You are a test.",
-                model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+                model=ModelConfig(provider="openai", name="gpt-5-mini"),
             ),
         )
         mock_store = MagicMock()

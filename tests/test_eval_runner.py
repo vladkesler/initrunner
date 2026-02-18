@@ -26,7 +26,7 @@ def _make_role() -> RoleDefinition:
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
         ),
     )
 

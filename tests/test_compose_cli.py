@@ -49,7 +49,7 @@ def _write_roles(tmp_path: Path) -> None:
               role: You are agent {name}.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         (roles_dir / f"{name}.yaml").write_text(role)
 

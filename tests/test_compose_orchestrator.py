@@ -26,7 +26,7 @@ def _make_role_data() -> dict:
         "metadata": {"name": "test-agent", "description": "test"},
         "spec": {
             "role": "You are a test agent.",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
         },
     }
 

@@ -10,7 +10,7 @@ spec:
     concise summary of the page content. Highlight key information.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: web_reader
   guardrails:

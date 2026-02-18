@@ -13,7 +13,7 @@ spec:
     tone friendly and concise.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.5
   guardrails:
     max_tokens_per_run: 3000

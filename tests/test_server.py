@@ -29,7 +29,7 @@ def _make_role(name: str = "test-agent") -> RoleDefinition:
         metadata=Metadata(name=name),
         spec=AgentSpec(
             role="You are a test.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             guardrails=Guardrails(),
         ),
     )
@@ -389,7 +389,7 @@ def _make_security_role(**security_kwargs) -> RoleDefinition:
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             guardrails=Guardrails(),
             security=SecurityPolicy(**security_kwargs),
         ),

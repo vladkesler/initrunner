@@ -85,7 +85,7 @@ class TestInlineInvoker:
                   role: You are helpful.
                   model:
                     provider: openai
-                    name: gpt-4o-mini
+                    name: gpt-5-mini
             """)
         )
 
@@ -125,7 +125,7 @@ class TestInlineInvoker:
                   role: Test
                   model:
                     provider: openai
-                    name: gpt-4o-mini
+                    name: gpt-5-mini
             """)
         )
 
@@ -291,7 +291,7 @@ class TestInlineInvokerSharedMemory:
                   role: You are helpful.
                   model:
                     provider: openai
-                    name: gpt-4o-mini
+                    name: gpt-5-mini
             """)
         )
 
@@ -339,7 +339,7 @@ class TestInlineInvokerSharedMemory:
                   role: You are helpful.
                   model:
                     provider: openai
-                    name: gpt-4o-mini
+                    name: gpt-5-mini
             """)
         )
 

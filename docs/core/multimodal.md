@@ -161,7 +161,7 @@ Not all models support all modalities. If a model doesn't support a given conten
 
 | Modality | Example models |
 |----------|---------------|
-| Images | `gpt-4o`, `gpt-4o-mini`, `claude-sonnet-4-5-20250929`, `gemini-2.0-flash` |
+| Images | `gpt-4o`, `gpt-5-mini`, `claude-sonnet-4-5-20250929`, `gemini-2.0-flash` |
 | Audio | `gpt-4o-audio-preview` |
 | Video | `gemini-2.0-flash` |
 | Documents (PDF) | `gpt-4o`, `claude-sonnet-4-5-20250929`, `gemini-2.0-flash` |

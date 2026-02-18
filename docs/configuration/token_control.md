@@ -206,7 +206,7 @@ tokens: 1200in/450out | 320ms | budget: 1,650/500,000
 The TUI run screen shows a persistent status bar with cumulative token counts and, when a session budget is configured, a color-coded percentage:
 
 ```
-my-agent | openai:gpt-4o-mini | 1200 in 450 out | 1,650/500,000 (0%)
+my-agent | openai:gpt-5-mini | 1200 in 450 out | 1,650/500,000 (0%)
 ```
 
 The guardrails detail screen in the TUI lists all nine guardrail fields with their current values (showing "unlimited" for unset optional limits).

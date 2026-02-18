@@ -35,7 +35,7 @@ def _make_role(
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test agent.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             autonomy=autonomy,
             guardrails=Guardrails(
                 max_iterations=max_iterations,
@@ -297,7 +297,7 @@ class TestAutonomousRoleValidation:
               role: You are a research agent.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
               autonomy:
                 max_plan_steps: 10
                 max_history_messages: 30

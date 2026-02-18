@@ -611,7 +611,7 @@ spec:
     including sender, subject, and key points.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
   triggers:
     - type: cron

@@ -10,7 +10,7 @@ Each step builds on the previous one and shows the **complete YAML** so you can 
 - **InitRunner** installed — see [Installation](installation.md)
 - **An API key** configured — see [Setup](setup.md)
 
-The examples below use `openai/gpt-4o-mini`. To use a different provider, swap the `model:` block — see [Provider Configuration](../configuration/providers.md) for options including Anthropic, Google, Ollama, and others.
+The examples below use `openai/gpt-5-mini`. To use a different provider, swap the `model:` block — see [Provider Configuration](../configuration/providers.md) for options including Anthropic, Google, Ollama, and others.
 
 > **Hitting API issues?** Add `--dry-run` to any `initrunner run` command to simulate with a test model. This lets you verify your YAML and follow along without making API calls.
 
@@ -37,7 +37,7 @@ spec:
     what changed. Be concise and focus on meaningful changes.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 2048
   guardrails:
@@ -112,7 +112,7 @@ spec:
     Always use timestamped filenames so reports can be searched by date.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:
@@ -188,7 +188,7 @@ spec:
     Always use timestamped filenames so reports can be searched by date.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:
@@ -255,7 +255,7 @@ spec:
     - Use list_memories() when asked for a summary of past observations
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:
@@ -391,7 +391,7 @@ spec:
       isn't enough context
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:
@@ -486,7 +486,7 @@ spec:
       isn't enough context
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:
@@ -608,7 +608,7 @@ spec:
       isn't enough context
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   tools:                            # Step 3: agent capabilities

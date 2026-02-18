@@ -117,7 +117,7 @@ class TestBuildRoleYaml:
             name="full-agent",
             description="Full test",
             provider="openai",
-            model_name="gpt-4o-mini",
+            model_name="gpt-5-mini",
             system_prompt="Test prompt.",
             tools=[{"type": "filesystem", "root_path": "."}],
             memory=True,
@@ -217,7 +217,7 @@ class TestTemplateModelName:
 
     def test_basic_without_model_name(self):
         result = template_basic("test", "openai")
-        assert "gpt-4o-mini" in result
+        assert "gpt-5-mini" in result
 
     def test_rag_with_model_name(self):
         result = template_rag("test", "anthropic", model_name="claude-opus-4-20250514")

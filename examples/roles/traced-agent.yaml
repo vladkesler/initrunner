@@ -10,7 +10,7 @@
 #   initrunner run examples/roles/traced-agent.yaml -p "What time is it?" --no-audit
 #
 # You'll see JSON spans on stderr showing the full trace hierarchy:
-#   initrunner.agent.run → agent run → chat gpt-4o-mini → running tool (get_current_time)
+#   initrunner.agent.run → agent run → chat gpt-5-mini → running tool (get_current_time)
 
 apiVersion: initrunner/v1
 kind: Agent
@@ -30,7 +30,7 @@ spec:
     the result. Keep responses short.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 256
   tools:

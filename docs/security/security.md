@@ -15,7 +15,7 @@ spec:
   role: You are a helpful assistant.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   security:
     content:
       blocked_input_patterns:
@@ -90,7 +90,7 @@ security:
       BLOCKED: Competitor comparisons, off-topic, requests to ignore instructions
 ```
 
-The classifier uses the default `openai:gpt-4o-mini` model. Both sync and async variants are provided -- the executor uses the sync path (safe inside `asyncio.to_thread`).
+The classifier uses the default `openai:gpt-5-mini` model. Both sync and async variants are provided -- the executor uses the sync path (safe inside `asyncio.to_thread`).
 
 ### `server` -- Server Configuration
 
@@ -373,7 +373,7 @@ spec:
   role: You are a helpful assistant.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
 ```
 
 ## Middleware Execution Order

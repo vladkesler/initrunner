@@ -24,7 +24,7 @@ spec:
     Use the learn_procedure() tool to record useful patterns.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   memory:
     max_sessions: 10
     max_resume_messages: 20

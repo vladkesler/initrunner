@@ -18,7 +18,7 @@ spec:
     extract the relevant fields and return structured JSON.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
   output:
     type: json_schema

@@ -37,7 +37,7 @@ def test_role_aggregates_all_domains() -> None:
         metadata=Metadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test agent.",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
         ),
     )
     assert role.metadata.name == "test-agent"

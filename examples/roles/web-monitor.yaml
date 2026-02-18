@@ -11,7 +11,7 @@ spec:
     Use search_documents to compare new content with previously stored versions.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: web_scraper
       allowed_domains:

@@ -34,7 +34,7 @@ def _make_ctx(role_dir=None):
             "metadata": {"name": "test-agent", "description": "test"},
             "spec": {
                 "role": "test",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
             },
         }
     )
@@ -159,7 +159,7 @@ class TestEmailSchema:
     def test_in_agent_spec(self):
         spec_data = {
             "role": "Test agent",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
             "tools": [
                 {
                     "type": "email",

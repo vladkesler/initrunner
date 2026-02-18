@@ -22,7 +22,7 @@ def _make_payload(**overrides) -> SinkPayload:
         "tokens_in": 10,
         "tokens_out": 20,
         "duration_ms": 100,
-        "model": "gpt-4o-mini",
+        "model": "gpt-5-mini",
         "provider": "openai",
         "trigger_type": None,
         "trigger_metadata": {},

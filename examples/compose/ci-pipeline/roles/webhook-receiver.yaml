@@ -27,7 +27,7 @@ spec:
     from the payload, mark it as "unknown".
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 1024
   triggers:

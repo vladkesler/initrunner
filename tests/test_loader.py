@@ -92,9 +92,9 @@ class TestLoadRole:
 class TestBuildModel:
     def test_standard_provider_returns_string(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
         result = _build_model(mc)
-        assert result == "openai:gpt-4o-mini"
+        assert result == "openai:gpt-5-mini"
 
     def test_ollama_returns_openai_chat_model(self):
         from pydantic_ai.models.openai import OpenAIChatModel
@@ -284,7 +284,7 @@ class TestBuildAgent:
 class TestApiKeyValidation:
     def test_missing_openai_key_raises(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
         with pytest.raises(RoleLoadError, match="OPENAI_API_KEY"):
             _build_model(mc)
 
@@ -296,23 +296,23 @@ class TestApiKeyValidation:
 
     def test_set_key_passes(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
         result = _build_model(mc)
-        assert result == "openai:gpt-4o-mini"
+        assert result == "openai:gpt-5-mini"
 
     def test_api_key_env_override_on_standard_provider(self, monkeypatch):
         """When api_key_env is set on a standard provider (no base_url), it checks that var."""
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("MY_CUSTOM_KEY", raising=False)
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini", api_key_env="MY_CUSTOM_KEY")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini", api_key_env="MY_CUSTOM_KEY")
         with pytest.raises(RoleLoadError, match="MY_CUSTOM_KEY"):
             _build_model(mc)
 
     def test_api_key_env_override_set_passes(self, monkeypatch):
         monkeypatch.setenv("MY_CUSTOM_KEY", "sk-custom")
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini", api_key_env="MY_CUSTOM_KEY")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini", api_key_env="MY_CUSTOM_KEY")
         result = _build_model(mc)
-        assert result == "openai:gpt-4o-mini"
+        assert result == "openai:gpt-5-mini"
 
     def test_ollama_skips_key_check(self):
         """Ollama uses custom provider path — no API key needed."""
@@ -329,7 +329,7 @@ class TestApiKeyValidation:
 
     def test_error_message_is_actionable(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        mc = ModelConfig(provider="openai", name="gpt-4o-mini")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
         with pytest.raises(RoleLoadError, match="export OPENAI_API_KEY="):
             _build_model(mc)
         with pytest.raises(RoleLoadError, match=r"\.env file"):

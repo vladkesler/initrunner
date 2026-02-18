@@ -36,7 +36,7 @@ spec:
     Be transparent: briefly mention when you store or recall information.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 2048
   tools:

@@ -31,7 +31,7 @@ def _make_ctx(role_dir=None):
             "metadata": {"name": "test-agent", "description": "test"},
             "spec": {
                 "role": "test",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
             },
         }
     )
@@ -315,7 +315,7 @@ class TestApiToolConfigInRoleYaml:
 
         spec_data = {
             "role": "test",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
             "tools": [
                 {
                     "type": "api",

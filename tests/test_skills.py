@@ -192,14 +192,14 @@ class TestAgentSpecSkills:
     def test_skills_field_default_empty(self):
         spec = AgentSpec(
             role="test",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
         )
         assert spec.skills == []
 
     def test_skills_field_accepts_strings(self):
         spec = AgentSpec(
             role="test",
-            model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
             skills=["web-researcher", "./skills/code-tools.md"],
         )
         assert len(spec.skills) == 2

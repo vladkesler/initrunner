@@ -12,7 +12,7 @@ spec:
     Always present results concisely.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: email
       imap_host: imap.gmail.com

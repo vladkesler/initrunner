@@ -40,7 +40,7 @@ With `backend: console`, each completed span is printed to stderr as a JSON obje
 
 ```json
 {
-    "name": "chat gpt-4o-mini",
+    "name": "chat gpt-5-mini",
     "context": {
         "trace_id": "0x3a1f...",
         "span_id": "0x4d1e..."
@@ -49,8 +49,8 @@ With `backend: console`, each completed span is printed to stderr as a JSON obje
     "parent_id": "0x9f3a...",
     "attributes": {
         "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "gpt-4o-mini",
-        "gen_ai.response.model": "gpt-4o-mini-2024-07-18",
+        "gen_ai.request.model": "gpt-5-mini",
+        "gen_ai.response.model": "gpt-5-mini-2024-07-18",
         "gen_ai.usage.input_tokens": 85,
         "gen_ai.usage.output_tokens": 24
     }

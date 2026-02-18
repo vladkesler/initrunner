@@ -32,7 +32,7 @@ class TestValidate:
               role: You are helpful.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         )
         result = runner.invoke(app, ["validate", str(role_file)])
@@ -52,7 +52,7 @@ class TestValidate:
               role: You are helpful.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
               tools:
                 - type: filesystem
                   root_path: /src
@@ -240,7 +240,7 @@ class TestIngest:
               role: Test
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         )
         result = runner.invoke(app, ["ingest", str(role_file)])
@@ -262,7 +262,7 @@ class TestIngest:
               role: Test
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
               ingest:
                 sources:
                   - "*.txt"
@@ -296,7 +296,7 @@ class TestIngest:
               role: Test
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
               ingest:
                 sources:
                   - "*.txt"
@@ -329,7 +329,7 @@ class TestAuditExport:
                     agent_name="agent-a",
                     timestamp="2025-01-01T00:00:00Z",
                     user_prompt="hello",
-                    model="gpt-4o-mini",
+                    model="gpt-5-mini",
                     provider="openai",
                     output="hi",
                     tokens_in=10,
@@ -349,7 +349,7 @@ class TestAuditExport:
                     agent_name="agent-b",
                     timestamp="2025-01-02T00:00:00Z",
                     user_prompt="world",
-                    model="gpt-4o-mini",
+                    model="gpt-5-mini",
                     provider="openai",
                     output="ok",
                     tokens_in=20,

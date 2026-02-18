@@ -30,7 +30,7 @@ def role_dir(tmp_path):
           role: You are a test agent.
           model:
             provider: openai
-            name: gpt-4o-mini
+            name: gpt-5-mini
     """)
     )
     return tmp_path

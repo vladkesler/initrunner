@@ -105,7 +105,7 @@ Before installing, the command displays a security summary:
   Description: Reviews code for best practices and bugs
   Author:      jcdenton
   Tools:       filesystem
-  Model:       openai/gpt-4o-mini
+  Model:       openai/gpt-5-mini
 
 Install this role? [y/N]:
 ```
@@ -173,7 +173,7 @@ Downloads and parses the role, then displays a summary table:
 │ Name        │ code-reviewer                      │
 │ Description │ Reviews code for best practices    │
 │ Author      │ jcdenton                           │
-│ Model       │ openai/gpt-4o-mini                 │
+│ Model       │ openai/gpt-5-mini                 │
 │ Tools       │ filesystem                         │
 │ Triggers    │ no                                 │
 │ Ingestion   │ no                                 │

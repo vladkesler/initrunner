@@ -11,7 +11,7 @@ spec:
     for recent events. Summarize your findings concisely with source URLs.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: search
     - type: datetime

@@ -10,7 +10,7 @@ spec:
     to Slack using send_slack_message. Confirm what you sent.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: slack
       webhook_url: "${SLACK_WEBHOOK_URL}"

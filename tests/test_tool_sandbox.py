@@ -99,7 +99,7 @@ def _make_role_with_sandbox(sandbox: ToolSandboxConfig) -> RoleDefinition:
             "metadata": {"name": "test-agent", "description": "test"},
             "spec": {
                 "role": "test",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
                 "security": {"tools": sandbox.model_dump()},
             },
         }

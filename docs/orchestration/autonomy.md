@@ -30,7 +30,7 @@ spec:
     track progress with update_plan, and call finish_task when done.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   guardrails:
     max_iterations: 10
 ```
@@ -259,7 +259,7 @@ spec:
     Keep each plan step concise. Mark steps completed/failed as you go.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.0
   tools:
     - type: shell

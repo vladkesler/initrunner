@@ -32,7 +32,7 @@ spec:
     Be objective and constructive. Your review helps maintain content quality.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.2
   tools:
     - type: web_reader

@@ -22,7 +22,7 @@ spec:
     then use delegate_to_summarizer to create a summary.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   tools:
     - type: delegate
       agents:

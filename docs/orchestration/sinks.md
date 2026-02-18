@@ -27,7 +27,7 @@ spec:
     You are a monitoring assistant.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   triggers:
     - type: cron
       schedule: "0 9 * * 1"
@@ -99,7 +99,7 @@ sinks:
 **`json`** (default) — One JSON object per line (JSONL). Each line contains the full payload:
 
 ```json
-{"agent_name": "my-agent", "run_id": "abc123", "prompt": "Hello", "output": "Hi there!", "success": true, "error": null, "tokens_in": 15, "tokens_out": 8, "duration_ms": 420, "model": "gpt-4o-mini", "provider": "openai", "trigger_type": "cron", "trigger_metadata": {"schedule": "daily"}, "timestamp": "2025-06-01T09:00:00+00:00"}
+{"agent_name": "my-agent", "run_id": "abc123", "prompt": "Hello", "output": "Hi there!", "success": true, "error": null, "tokens_in": 15, "tokens_out": 8, "duration_ms": 420, "model": "gpt-5-mini", "provider": "openai", "trigger_type": "cron", "trigger_metadata": {"schedule": "daily"}, "timestamp": "2025-06-01T09:00:00+00:00"}
 ```
 
 **`text`** — Human-readable, one line per result:

@@ -20,7 +20,7 @@ def _make_ctx(role_dir=None, ingest_store_path=None):
     """Build a ToolBuildContext for web scraper tests."""
     spec: dict = {
         "role": "test",
-        "model": {"provider": "openai", "name": "gpt-4o-mini"},
+        "model": {"provider": "openai", "name": "gpt-5-mini"},
         "security": {"tools": {"restrict_db_paths": False}},
     }
     if ingest_store_path is not None:

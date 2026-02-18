@@ -1,6 +1,6 @@
 # Providers & Model Configuration
 
-The default model is `openai`/`gpt-4o-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `spec.model` block in your role YAML.
+The default model is `openai`/`gpt-5-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `spec.model` block in your role YAML.
 
 ## Standard providers
 
@@ -15,7 +15,7 @@ spec:
 
 | Provider | Env Var | Extra to install | Example model |
 |----------|---------|-----------------|---------------|
-| `openai` | `OPENAI_API_KEY` | *(included)* | `gpt-4o-mini` |
+| `openai` | `OPENAI_API_KEY` | *(included)* | `gpt-5-mini` |
 | `anthropic` | `ANTHROPIC_API_KEY` | `initrunner[anthropic]` | `claude-sonnet-4-20250514` |
 | `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-2.0-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
@@ -33,7 +33,7 @@ Install all provider extras at once with `pip install initrunner[all-models]`.
 spec:
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
 ```
 
 **Anthropic** (`pip install initrunner[anthropic]`):
@@ -98,7 +98,7 @@ spec:
 
 | Provider | Model | Description |
 |----------|-------|-------------|
-| `openai` | **`gpt-4o-mini`** | Fast, affordable (default) |
+| `openai` | **`gpt-5-mini`** | Fast, affordable (default) |
 | `openai` | `gpt-4o` | High capability GPT-4 |
 | `openai` | `gpt-4.1` | Latest GPT-4.1 |
 | `openai` | `gpt-4.1-mini` | Small GPT-4.1 |
@@ -179,7 +179,7 @@ This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that expos
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `provider` | string | `openai` | Provider name (`openai`, `anthropic`, `google`, `groq`, `mistral`, `cohere`, `bedrock`, `xai`, `ollama`) |
-| `name` | string | `gpt-4o-mini` | Model identifier |
+| `name` | string | `gpt-5-mini` | Model identifier |
 | `base_url` | string | *null* | Custom endpoint URL (triggers OpenAI-compatible mode) |
 | `api_key_env` | string | *null* | Environment variable containing the API key |
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |
@@ -263,7 +263,7 @@ spec:
     articles before answering. Always cite your sources.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
   ingest:

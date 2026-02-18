@@ -19,7 +19,7 @@ def make_role(
     name: str = "test-agent",
     system_prompt: str = "You are a test.",
     provider: str = "openai",
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "gpt-5-mini",
     max_iterations: int = 10,
     autonomous_token_budget: int | None = None,
     autonomy: AutonomyConfig | None = None,

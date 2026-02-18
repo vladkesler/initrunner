@@ -21,7 +21,7 @@ def valid_role_yaml(tmp_path: Path) -> Path:
           role: You are a test assistant.
           model:
             provider: openai
-            name: gpt-4o-mini
+            name: gpt-5-mini
     """)
     p = tmp_path / "test-role.yaml"
     p.write_text(content)
@@ -110,7 +110,7 @@ class TestDiscoverRolesSync:
               role: You are nested.
               model:
                 provider: openai
-                name: gpt-4o-mini
+                name: gpt-5-mini
         """)
         (subdir / "nested.yaml").write_text(content)
 
@@ -133,7 +133,7 @@ class TestDiscoverRolesSync:
                   role: You are {name}.
                   model:
                     provider: openai
-                    name: gpt-4o-mini
+                    name: gpt-5-mini
             """)
             (tmp_path / f"{name}.yaml").write_text(content)
 
@@ -185,7 +185,7 @@ class TestRunAgentStreamed:
             metadata=Metadata(name="test-agent"),
             spec=AgentSpec(
                 role="You are a test.",
-                model=ModelConfig(provider="openai", name="gpt-4o-mini"),
+                model=ModelConfig(provider="openai", name="gpt-5-mini"),
             ),
         )
 

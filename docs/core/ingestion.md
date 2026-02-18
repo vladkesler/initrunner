@@ -16,7 +16,7 @@ spec:
     content before answering. Always cite your sources.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   ingest:
     sources:
       - "./docs/**/*.md"

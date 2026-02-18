@@ -20,7 +20,7 @@ _ROLE_YAML = textwrap.dedent("""\
       role: You are helpful.
       model:
         provider: openai
-        name: gpt-4o-mini
+        name: gpt-5-mini
 """)
 
 _SUITE_YAML = textwrap.dedent("""\

@@ -112,7 +112,7 @@ JSON output deserializes `trigger_metadata` back to a dict:
     "agent_name": "my-agent",
     "timestamp": "2025-06-15T09:00:00+00:00",
     "user_prompt": "Generate weekly status report.",
-    "model": "gpt-4o-mini",
+    "model": "gpt-5-mini",
     "provider": "openai",
     "output": "Here is your weekly report...",
     "tokens_in": 150,
@@ -196,7 +196,7 @@ The audit database uses WAL journal mode for concurrent read/write safety.
 | `agent_name` | `TEXT` | Agent name from `metadata.name` |
 | `timestamp` | `TEXT` | ISO 8601 timestamp of the run |
 | `user_prompt` | `TEXT` | The prompt sent to the agent |
-| `model` | `TEXT` | Model name (e.g. `gpt-4o-mini`) |
+| `model` | `TEXT` | Model name (e.g. `gpt-5-mini`) |
 | `provider` | `TEXT` | Model provider (e.g. `openai`) |
 | `output` | `TEXT` | The agent's response text |
 | `tokens_in` | `INTEGER` | Input tokens consumed |

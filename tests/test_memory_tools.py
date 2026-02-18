@@ -18,7 +18,7 @@ def _minimal_role_data() -> dict:
         "metadata": {"name": "test-agent", "description": "A test agent"},
         "spec": {
             "role": "You are a test agent.",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
         },
     }
 
@@ -156,7 +156,7 @@ class TestMemoryConfigBackwardCompat:
             "metadata": {"name": "test-agent", "description": "A test agent"},
             "spec": {
                 "role": "You are a test agent.",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
                 "memory": {
                     "episodic": {"enabled": True, "max_episodes": 100},
                     "semantic": {"enabled": True, "max_memories": 500},

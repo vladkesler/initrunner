@@ -35,7 +35,7 @@ initrunner setup --skip-test
 
 | Provider | Env Var | Install Extra | Default Model |
 |----------|---------|---------------|---------------|
-| `openai` | `OPENAI_API_KEY` | *(included in core)* | `gpt-4o-mini` |
+| `openai` | `OPENAI_API_KEY` | *(included in core)* | `gpt-5-mini` |
 | `anthropic` | `ANTHROPIC_API_KEY` | `initrunner[anthropic]` | `claude-sonnet-4-5-20250929` |
 | `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-2.0-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
@@ -88,7 +88,7 @@ For most providers, a numbered menu of curated models is displayed (sourced from
 
 ```
 Select a model:
-  1. gpt-4o-mini — Fast, affordable (default)
+  1. gpt-5-mini — Fast, affordable (default)
   2. gpt-4o — High capability GPT-4
   3. gpt-4.1 — Latest GPT-4.1
   4. gpt-4.1-mini — Small GPT-4.1

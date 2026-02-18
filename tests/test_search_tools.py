@@ -29,7 +29,7 @@ def _make_ctx():
             "metadata": {"name": "test-agent", "description": "test"},
             "spec": {
                 "role": "test",
-                "model": {"provider": "openai", "name": "gpt-4o-mini"},
+                "model": {"provider": "openai", "name": "gpt-5-mini"},
             },
         }
     )
@@ -86,7 +86,7 @@ class TestSearchConfig:
     def test_in_agent_spec(self):
         spec_data = {
             "role": "Test agent",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
             "tools": [{"type": "search"}],
         }
         spec = AgentSpec.model_validate(spec_data)
@@ -96,7 +96,7 @@ class TestSearchConfig:
     def test_in_agent_spec_with_provider(self):
         spec_data = {
             "role": "Test agent",
-            "model": {"provider": "openai", "name": "gpt-4o-mini"},
+            "model": {"provider": "openai", "name": "gpt-5-mini"},
             "tools": [
                 {
                     "type": "search",

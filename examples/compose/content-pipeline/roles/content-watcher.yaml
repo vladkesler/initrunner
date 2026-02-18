@@ -24,7 +24,7 @@ spec:
     find supporting data, examples, and citations.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.1
   tools:
     - type: filesystem

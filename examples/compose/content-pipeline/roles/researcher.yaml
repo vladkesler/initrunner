@@ -32,7 +32,7 @@ spec:
     Be thorough but concise. The writer and reviewer both depend on your output.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
     temperature: 0.3
   tools:
     - type: web_reader
