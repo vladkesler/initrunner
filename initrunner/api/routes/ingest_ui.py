@@ -7,7 +7,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from initrunner.api._helpers import resolve_role_path
+from initrunner.api._helpers import load_role_async, resolve_role_path
 
 router = APIRouter(tags=["ingest-ui"])
 
@@ -17,9 +17,7 @@ async def ingest_page(request: Request, role_id: str):
     """Ingestion management page."""
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     if role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 

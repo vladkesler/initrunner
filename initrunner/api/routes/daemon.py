@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
-from initrunner.api._helpers import BUILD_TIMEOUT, resolve_role_path
+from initrunner.api._helpers import BUILD_TIMEOUT, load_role_async, resolve_role_path
 
 router = APIRouter(prefix="/api/daemon", tags=["daemon"])
 _logger = logging.getLogger(__name__)
@@ -49,11 +49,7 @@ async def start_daemon(role_id: str, request: Request):
                     del _dispatchers[role_id]
             return {"status": "cancelled"}
 
-        from initrunner.agent.loader import load_role
-
-        role = await asyncio.wait_for(
-            asyncio.to_thread(load_role, role_path), timeout=BUILD_TIMEOUT
-        )
+        role = await load_role_async(role_path)
         if not role.spec.triggers:
             with _dispatcher_lock:
                 if _dispatchers.get(role_id) is state:
@@ -146,16 +142,14 @@ async def daemon_websocket(websocket: WebSocket, role_id: str):
         await websocket.close()
         return
 
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     if not role.spec.triggers:
         await websocket.send_json({"type": "error", "data": {"message": "No triggers configured"}})
         await websocket.close()
         return
 
     event_queue: asyncio.Queue[dict | None] = asyncio.Queue()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def on_event(event):
         import time

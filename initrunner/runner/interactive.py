@@ -64,8 +64,7 @@ def run_interactive(
                 "[yellow]Session token budget exhausted. Stopping further execution.[/yellow]"
             )
             break
-        if budget_status.warning:
-            assert session_budget is not None
+        if budget_status.warning and session_budget is not None:
             pct = int(cumulative_tokens / session_budget * 100)
             console.print(
                 f"[yellow]Warning: {pct}% of session token budget consumed "

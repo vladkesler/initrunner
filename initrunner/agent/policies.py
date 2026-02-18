@@ -176,10 +176,14 @@ def _check_profanity(text: str) -> ValidationResult:
     try:
         from better_profanity import profanity  # type: ignore[import-not-found]
     except ImportError:
-        raise RuntimeError(
-            "Profanity filter requires 'better-profanity'. "
-            "Install with: pip install initrunner[safety]"
-        ) from None
+        return ValidationResult(
+            valid=False,
+            reason=(
+                "Profanity filter requires 'better-profanity'. "
+                "Install with: pip install initrunner[safety]"
+            ),
+            validator="profanity",
+        )
 
     if profanity.contains_profanity(text):
         return ValidationResult(

@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.datastructures import UploadFile
 
 from initrunner._ids import generate_id
-from initrunner.api._helpers import resolve_role_path, run_in_thread
+from initrunner.api._helpers import load_role_async, resolve_role_path, run_in_thread
 from initrunner.api.state import sessions
 
 router = APIRouter(tags=["chat-ui"])
@@ -35,10 +35,7 @@ _upload_lock = asyncio.Lock()
 async def chat_page(request: Request, role_id: str):
     """Chat interface page."""
     role_path = await resolve_role_path(request, role_id)
-
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
 
     model_name = role.spec.model.to_model_string()
     has_memory = role.spec.memory is not None
@@ -190,7 +187,7 @@ async def chat_stream(
         from initrunner.services import execute_run_stream_sync
 
         token_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def on_token(chunk: str) -> None:
             try:
@@ -295,10 +292,9 @@ async def list_chat_sessions(request: Request, role_id: str):
     """List stored sessions for a role."""
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.agent.loader import load_role
     from initrunner.services import list_sessions_sync
 
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     if role.spec.memory is None:
         return JSONResponse([])
 
@@ -321,10 +317,9 @@ async def delete_chat_session(request: Request, role_id: str, session_id: str):
     """Delete a stored session."""
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.agent.loader import load_role
     from initrunner.services import delete_session_sync
 
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     ok = await asyncio.to_thread(delete_session_sync, role, session_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -367,10 +362,9 @@ async def get_session_messages(request: Request, role_id: str, session_id: str):
     # 2. Fall back to SQLite (roles with memory configured)
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.agent.loader import load_role
     from initrunner.services import load_session_by_id_sync
 
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     messages = await asyncio.to_thread(load_session_by_id_sync, role, session_id)
     if messages is None:
         raise HTTPException(status_code=404, detail="Session not found")

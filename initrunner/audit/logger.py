@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from initrunner._log import get_logger
 from initrunner._paths import ensure_private_dir, secure_database
@@ -296,15 +296,17 @@ _RECORD_FIELDS = [
 ]
 
 
-def record_to_dict(record: AuditRecord, *, parse_trigger_metadata: bool = False) -> dict:
+def record_to_dict(record: AuditRecord, *, parse_trigger_metadata: bool = False) -> dict[str, Any]:
     """Convert an AuditRecord to a dict suitable for JSON/CSV export."""
-    d: dict = {f: getattr(record, f) for f in _RECORD_FIELDS}
+    d: dict[str, Any] = {f: getattr(record, f) for f in _RECORD_FIELDS}
     if parse_trigger_metadata and record.trigger_metadata:
         d["trigger_metadata"] = json.loads(record.trigger_metadata)
     return d
 
 
 _AUTO_PRUNE_INTERVAL = 1000
+
+_ALLOWED_TABLES: frozenset[str] = frozenset({"audit_log", "security_events", "delegate_events"})
 
 _T = TypeVar("_T")
 
@@ -410,6 +412,8 @@ class AuditLogger:
         row_mapper: Callable[[sqlite3.Row], _T],
     ) -> list[_T]:
         """Generic filtered query on *table*. Skips clauses whose value is ``None``."""
+        if table not in _ALLOWED_TABLES:
+            raise ValueError(f"Unknown audit table: {table!r}")
         filters = [(clause, val) for clause, val in filter_clauses if val is not None]
         where, params = _build_where(filters)
         sql = f"SELECT * FROM {table} {where} ORDER BY timestamp DESC LIMIT ?"

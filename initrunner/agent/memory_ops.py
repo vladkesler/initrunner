@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
@@ -43,7 +43,7 @@ def clear_memories(
         return True
 
 
-def export_memories(role: RoleDefinition) -> list[dict]:
+def export_memories(role: RoleDefinition) -> list[dict[str, Any]]:
     """Export all memories as a list of dicts."""
     from initrunner.stores.factory import open_memory_store
 

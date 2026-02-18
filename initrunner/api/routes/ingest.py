@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from initrunner.api._helpers import BUILD_TIMEOUT, resolve_role_path
+from initrunner.api._helpers import load_role_async, resolve_role_path
 from initrunner.api.models import IngestSourceResponse, IngestSourcesResponse
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
@@ -19,10 +19,7 @@ router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 async def list_sources(role_id: str, request: Request):
     """List files that would be ingested for this role."""
     role_path = await resolve_role_path(request, role_id)
-
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.wait_for(asyncio.to_thread(load_role, role_path), timeout=BUILD_TIMEOUT)
+    role = await load_role_async(role_path)
     if role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 
@@ -53,10 +50,7 @@ async def run_ingestion(
 ):
     """Run ingestion pipeline with SSE progress updates."""
     role_path = await resolve_role_path(request, role_id)
-
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.wait_for(asyncio.to_thread(load_role, role_path), timeout=BUILD_TIMEOUT)
+    role = await load_role_async(role_path)
     if role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 
@@ -69,7 +63,7 @@ async def run_ingestion(
 
     async def event_stream():
         progress_queue: asyncio.Queue[dict | None] = asyncio.Queue(maxsize=500)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def on_progress(path: Path, status) -> None:
             try:
@@ -88,7 +82,7 @@ async def run_ingestion(
 
             return run_ingest_sync(role, role_path, force=force, progress_callback=on_progress)
 
-        ingest_task = asyncio.get_event_loop().run_in_executor(None, run_ingest)
+        ingest_task = asyncio.get_running_loop().run_in_executor(None, run_ingest)
 
         current = 0
         while not ingest_task.done():
