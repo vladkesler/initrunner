@@ -414,12 +414,35 @@ def run_setup(
         )
     )
 
-    console.print("[bold]Next steps:[/bold]")
+    _role = str(output)
+    _next: list[str] = []
+
     if template_key == "rag":
-        console.print(f"  initrunner ingest {output}          # index your documents first")
-    console.print(f'  initrunner run {output} -p "Ask me anything"')
-    console.print(f"  initrunner run {output} -i          # interactive REPL")
-    console.print(f"  initrunner validate {output}")
-    console.print("  initrunner init --template rag     # more templates")
-    console.print("  initrunner tui                     # terminal dashboard")
-    console.print("  initrunner ui                      # web dashboard")
+        _next += [
+            "  [dim]Index your documents first:[/dim]",
+            f"  [bold]initrunner ingest {_role}[/bold]",
+            "",
+        ]
+
+    _next += [
+        "  [dim]Create your agent:[/dim]",
+        "  [bold]initrunner examples list[/bold]         [dim]# 1. browse agents[/dim]",
+        "  [bold]initrunner examples copy <name>[/bold]  [dim]# 2. copy one locally[/dim]",
+        "  [bold]initrunner run <name>/role.yaml[/bold]  [dim]# 3. run it[/dim]",
+        "",
+        "  [dim]Or run the role setup just created:[/dim]",
+        f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
+        f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
+        "",
+        "  [dim]Interfaces:[/dim]",
+        "  [bold]initrunner tui[/bold]                   [dim]# terminal dashboard[/dim]",
+        "  [bold]initrunner ui[/bold]                    [dim]# web dashboard[/dim]",
+    ]
+
+    console.print(
+        Panel(
+            "\n".join(_next),
+            title="Next steps",
+            border_style="cyan",
+        )
+    )

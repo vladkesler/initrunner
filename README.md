@@ -22,7 +22,7 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **v1.1.3** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.1.4** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## Table of Contents
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.4] - 2026-02-18
+
+### Changed
+- **ux:** `setup` "Next steps" panel restructured into three sections (Create your agent / Or run the scaffold / Interfaces); examples discovery (`examples list` → `examples copy` → `run`) replaces the broken `init --template rag` hint
+
 ## [1.1.3] - 2026-02-18
 
 ### Fixed
