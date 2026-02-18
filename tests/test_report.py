@@ -17,7 +17,7 @@ from tests.conftest import make_role
 
 
 def _make_run_result(**kwargs) -> RunResult:
-    defaults = {
+    defaults: dict[str, object] = {
         "run_id": "test-run-001",
         "output": "Hello, world!",
         "tokens_in": 10,
@@ -29,12 +29,12 @@ def _make_run_result(**kwargs) -> RunResult:
         "error": None,
     }
     defaults.update(kwargs)
-    return RunResult(**defaults)
+    return RunResult(**defaults)  # type: ignore[invalid-argument-type]
 
 
 def _make_autonomous_result(**kwargs) -> AutonomousResult:
     iteration = _make_run_result(run_id="iter-001")
-    defaults = {
+    defaults: dict[str, object] = {
         "run_id": "auto-run-001",
         "iterations": [iteration],
         "final_output": "Done.",
@@ -50,7 +50,7 @@ def _make_autonomous_result(**kwargs) -> AutonomousResult:
         "error": None,
     }
     defaults.update(kwargs)
-    return AutonomousResult(**defaults)
+    return AutonomousResult(**defaults)  # type: ignore[invalid-argument-type]
 
 
 class TestBuildReportContext:

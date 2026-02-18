@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from rich.table import Table
@@ -16,11 +16,16 @@ from initrunner.cli._helpers import (
     resolve_skill_dirs,
 )
 
+if TYPE_CHECKING:
+    from initrunner.agent.executor import AutonomousResult, RunResult
+    from initrunner.agent.prompt import UserPrompt
+    from initrunner.agent.schema.role import RoleDefinition
+
 
 def _maybe_export_report(
-    role: object,
-    result: object,
-    prompt: object,
+    role: RoleDefinition,
+    result: RunResult | AutonomousResult,
+    prompt: UserPrompt | None,
     output_path: Path,
     template_name: str,
     dry_run: bool,
@@ -30,7 +35,7 @@ def _maybe_export_report(
         from initrunner.agent.prompt import extract_text_from_prompt
         from initrunner.report import export_report
 
-        prompt_text = extract_text_from_prompt(prompt)
+        prompt_text = extract_text_from_prompt(prompt or "")
         path = export_report(
             role, result, prompt_text, output_path, template_name=template_name, dry_run=dry_run
         )

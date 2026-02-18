@@ -57,13 +57,13 @@ class _FakeSnippet:
 
 
 def _make_yt_mock(
-    entries: list[dict] | None = None,
+    entries: list[dict[str, str | float]] | None = None,
     list_side_effect: Exception | None = None,
     find_side_effect: Exception | None = None,
 ) -> tuple[MagicMock, MagicMock]:
     """Return (mock_yt_module, mock_errors) for patching sys.modules."""
     raw = entries or [{"text": "Hello world", "start": 0.0, "duration": 1.0}]
-    snippets = [_FakeSnippet(**e) for e in raw]
+    snippets = [_FakeSnippet(**e) for e in raw]  # type: ignore[invalid-argument-type]
 
     mock_transcript = MagicMock()
     mock_transcript.fetch.return_value = snippets
