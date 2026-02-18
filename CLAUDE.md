@@ -94,3 +94,5 @@ Detailed docs live in `docs/`. Key references:
 | Role generation & wizards | `docs/agents/role_generation.md` |
 | Provider configuration | `docs/configuration/providers.md`, `docs/configuration/ollama.md` |
 | Multimodal input | `docs/core/multimodal.md` |
+| Report export | `docs/core/reports.md` |
+| Doctor command | `docs/operations/doctor.md` |

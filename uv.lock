@@ -1302,6 +1302,7 @@ source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "croniter" },
+    { name = "jinja2" },
     { name = "markdownify" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["fastmcp", "openai"] },
@@ -1382,6 +1383,7 @@ requires-dist = [
     { name = "duckduckgo-search", marker = "extra == 'search'", specifier = ">=7.0.0" },
     { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.115.0" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
+    { name = "jinja2", specifier = ">=3.1" },
     { name = "jinja2", marker = "extra == 'dashboard'", specifier = ">=3.1" },
     { name = "markdownify", specifier = ">=1.2.2" },
     { name = "openpyxl", marker = "extra == 'ingest'", specifier = ">=3.1.5" },

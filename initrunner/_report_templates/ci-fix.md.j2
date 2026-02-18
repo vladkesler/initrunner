@@ -1,0 +1,57 @@
+# CI Fix Analysis
+
+| Field | Value |
+|-------|-------|
+| **Agent** | {{ agent_name }} |
+| **Model** | {{ model }} |
+| **Run ID** | `{{ run_id }}` |
+| **Timestamp** | {{ timestamp }} |
+| **Status** | {{ "Success" if success else "Failed" }} |
+{% if dry_run %}| **Mode** | dry-run |
+{% endif %}{% if autonomous %}| **Mode** | autonomous ({{ iteration_count }} iterations) |
+{% endif %}
+{% if autonomous %}
+## Iteration Details
+
+{% for iter in iterations %}
+### Iteration {{ loop.index }}
+
+| Metric | Value |
+|--------|-------|
+| Tokens | {{ iter.total_tokens }} |
+| Tool Calls | {{ iter.tool_calls }} |
+| Duration | {{ iter.duration_ms }}ms |
+| Status | {{ "OK" if iter.success else "Error" }} |
+
+{% if iter.output %}
+{{ iter.output[:500] }}{% if iter.output|length > 500 %}...{% endif %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+
+## Analysis
+
+{% if success %}
+{{ output }}
+{% else %}
+**Error:** {{ error }}
+
+{% if output %}
+### Partial Output
+
+{{ output }}
+{% endif %}
+{% endif %}
+
+## Metrics
+
+| Tokens In | Tokens Out | Total | Tool Calls | Duration |
+|-----------|------------|-------|------------|----------|
+| {{ tokens_in }} | {{ tokens_out }} | {{ total_tokens }} | {{ tool_calls }} | {{ duration_ms }}ms |
+{% if finish_summary %}
+
+## Summary
+
+{{ finish_summary }}
+{% endif %}

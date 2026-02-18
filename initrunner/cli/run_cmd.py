@@ -17,6 +17,28 @@ from initrunner.cli._helpers import (
 )
 
 
+def _maybe_export_report(
+    role: object,
+    result: object,
+    prompt: object,
+    output_path: Path,
+    template_name: str,
+    dry_run: bool,
+) -> None:
+    """Try to export a report; warn on failure, never crash."""
+    try:
+        from initrunner.agent.prompt import extract_text_from_prompt
+        from initrunner.report import export_report
+
+        prompt_text = extract_text_from_prompt(prompt)
+        path = export_report(
+            role, result, prompt_text, output_path, template_name=template_name, dry_run=dry_run
+        )
+        console.print(f"[green]Report exported:[/green] {path}")
+    except Exception as e:
+        console.print(f"[yellow]Warning:[/yellow] Report export failed: {e}")
+
+
 def run(
     role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
@@ -47,6 +69,20 @@ def run(
             help="Attach file or URL (repeatable, supports images/audio/video/docs)",
         ),
     ] = None,
+    export_report: Annotated[
+        bool, typer.Option("--export-report", help="Export markdown report after run")
+    ] = False,
+    report_path: Annotated[
+        Path,
+        typer.Option("--report-path", help="Report output path (default: ./initrunner-report.md)"),
+    ] = Path("initrunner-report.md"),
+    report_template: Annotated[
+        str,
+        typer.Option(
+            "--report-template",
+            help="Report template: default, pr-review, changelog, ci-fix",
+        ),
+    ] = "default",
 ) -> None:
     """Run an agent with a role definition."""
     if autonomous and not prompt:
@@ -55,6 +91,16 @@ def run(
     if autonomous and interactive:
         console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
         raise typer.Exit(1)
+
+    if export_report:
+        from initrunner.report import BUILT_IN_TEMPLATES
+
+        if report_template not in BUILT_IN_TEMPLATES:
+            console.print(
+                f"[red]Error:[/red] Unknown template '{report_template}'. "
+                f"Available: {', '.join(BUILT_IN_TEMPLATES)}"
+            )
+            raise typer.Exit(1)
 
     import sys
 
@@ -92,10 +138,11 @@ def run(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         message_history = None
+        run_result = None  # RunResult or AutonomousResult
 
         if autonomous:
             assert user_prompt is not None  # guarded above
-            run_autonomous(
+            run_result = run_autonomous(
                 agent,
                 role,
                 user_prompt,
@@ -106,7 +153,7 @@ def run(
                 max_iterations_override=max_iterations,
             )
         elif user_prompt and not interactive:
-            run_single(
+            run_result, _ = run_single(
                 agent,
                 role,
                 user_prompt,
@@ -115,7 +162,7 @@ def run(
                 model_override=model_override,
             )
         elif user_prompt and interactive:
-            _, message_history = run_single(
+            run_result, message_history = run_single(
                 agent,
                 role,
                 user_prompt,
@@ -123,6 +170,10 @@ def run(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
             )
+            if export_report:
+                _maybe_export_report(
+                    role, run_result, user_prompt, report_path, report_template, dry_run
+                )
             run_interactive(
                 agent,
                 role,
@@ -142,6 +193,12 @@ def run(
                 resume=resume,
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
+            )
+
+        # Export for non-interactive branches (after run completes)
+        if export_report and run_result is not None and not (user_prompt and interactive):
+            _maybe_export_report(
+                role, run_result, user_prompt, report_path, report_template, dry_run
             )
 
 

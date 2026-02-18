@@ -466,6 +466,9 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 | `ingest <role.yaml>` | Ingest documents into vector store |
 | `daemon <role.yaml>` | Run in trigger-driven daemon mode |
 | `run <role.yaml> -p "..." -A file.png` | Attach files or URLs to prompt |
+| `run <role.yaml> -p "..." --export-report` | Export a markdown report after the run |
+| `doctor` | Check provider config, API keys, connectivity |
+| `doctor --quickstart` | End-to-end smoke test with a real API call |
 | `serve <role.yaml>` | Serve as OpenAI-compatible API |
 | `tui` | Launch terminal dashboard |
 | `ui` | Launch web dashboard |
@@ -504,7 +507,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
-| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
 
