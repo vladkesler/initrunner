@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-02-18
+
+### Breaking Changes
+- **Schema package split**: `initrunner.agent.schema` is now a package (`schema/`) with domain sub-modules (`role`, `tools`, `triggers`, `memory`, `guardrails`, `security`, `ingestion`, `sinks`, `autonomy`, `observability`, `output`, `base`). Direct imports from `initrunner.agent.schema` must be updated to the specific sub-module (e.g. `from initrunner.agent.schema.role import RoleDefinition`).
+
+### Added
+- **Audio tool**: YouTube transcript fetching via `get_youtube_transcript` and local audio/video file transcription via `transcribe_audio` with multimodal model support
+- `AudioToolConfig` with configurable languages, timestamps, transcription model override, file size limits, and output truncation
+- `audio-assistant` bundled example role demonstrating YouTube and local audio workflows
+- Audio tool documentation in `docs/agents/tools.md`
+- RAG quickstart guide (`docs/getting-started/rag-quickstart.md`)
+- Embedding provider guidance in `docs/configuration/providers.md`
+- Setup wizard RAG improvements with better ingestion flow
+
+### Fixed
+- Update `youtube-transcript-api` v1.2.4 compatibility (instance-based API, attribute access on transcript snippets)
+- Fix real bugs from code audit: profanity filter missing-dependency guard, compose trigger typing, file watcher error handling, audit logger thread safety, API route error responses
+- Fix `TriggerConfig` import path after schema split in compose module
+- Resolve `ty` type checker errors in observability module
+
+### Changed
+- Default OpenAI model changed from `gpt-4o-mini` to `gpt-5-mini` across all templates, examples, docs, and CLI defaults
+- DRY improvements: deduplicate API route patterns, simplify interactive/TUI run logic
+
+### Documentation
+- Complete audio tool reference with options, install instructions, security, and examples
+- Improved RAG setup documentation with quickstart and embedding guidance
+- Updated all code examples and references to use `gpt-5-mini`
+
 ## [0.5.0] - 2026-02-17
 
 ### Added
