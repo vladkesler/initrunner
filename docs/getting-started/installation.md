@@ -38,7 +38,7 @@ pipx install initrunner
 | `mistral` | `pip install initrunner[mistral]` | Mistral provider |
 | `all-models` | `pip install initrunner[all-models]` | All providers |
 | `ingest` | `pip install initrunner[ingest]` | Additional formats: PDF, DOCX, XLSX (base text ingestion is built-in) |
-| `local-embeddings` | `pip install initrunner[local-embeddings]` | Local embeddings via fastembed (no API key needed) |
+| `local-embeddings` | `pip install initrunner[local-embeddings]` | Local embeddings via fastembed — **not yet implemented**; use [Ollama](../configuration/ollama.md) for local embeddings |
 | `safety` | `pip install initrunner[safety]` | Profanity filter for content policy |
 | `search` | `pip install initrunner[search]` | Web search via DuckDuckGo (free, no API key) |
 | `dashboard` | `pip install initrunner[dashboard]` | Web dashboard (FastAPI + Next.js) |

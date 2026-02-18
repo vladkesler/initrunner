@@ -185,6 +185,65 @@ This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that expos
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |
 | `max_tokens` | int | `4096` | Maximum tokens per response (1-128000) |
 
+## Embedding Configuration
+
+When using RAG (`spec.ingest`) or memory (`spec.memory`), InitRunner needs an embedding model to generate vectors. The embedding provider is resolved separately from the agent's LLM provider.
+
+### Default Resolution
+
+The embedding model is determined by the agent's `spec.model.provider` unless overridden:
+
+| Agent Provider | Default Embedding Model | Requires |
+|---------------|------------------------|----------|
+| `openai` | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
+| `anthropic` | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
+| `google` | `google:text-embedding-004` | `GOOGLE_API_KEY` |
+| `ollama` | `ollama:nomic-embed-text` | Ollama running locally |
+| All others | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
+
+> **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic`, you still need `OPENAI_API_KEY` set for embeddings. This only applies when using RAG or memory — pure chat agents don't need it.
+
+### Overriding the Embedding Model
+
+Set `embeddings.provider` and `embeddings.model` in your `ingest` or `memory` config:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+  ingest:
+    sources: ["./docs/**/*.md"]
+    embeddings:
+      provider: openai
+      model: text-embedding-3-large
+```
+
+### Custom Embedding Endpoints
+
+For self-hosted or third-party embedding services, use `base_url` and `api_key_env`:
+
+```yaml
+spec:
+  ingest:
+    embeddings:
+      provider: openai
+      model: my-embedding-model
+      base_url: https://my-embedding-service.example.com/v1
+      api_key_env: MY_EMBEDDING_API_KEY
+```
+
+### Embedding Config Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
+| `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
+| `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
+| `api_key_env` | `str` | `""` | Env var holding the API key for custom endpoints. |
+
+See [Ingestion: Embedding Models](../core/ingestion.md#embedding-models) for the full embedding model reference and [RAG Guide: Embedding Model Options](../core/rag-guide.md#embedding-model-options) for a comparison table.
+
 ## Full role example
 
 A complete role definition showing model, tools, ingestion, triggers, and guardrails:
