@@ -2,6 +2,13 @@
 
 ## [1.1.3] - 2026-02-18
 
+### Fixed
+- **fix:** `install_extra` now correctly reinstalls into uv tool environments
+  (`uv tool install --force`) and pipx environments (`pipx install --force`)
+  instead of failing with `uv pip install` which has no target environment
+- **fix:** Rich markup escaping in `install_extra` failure warning —
+  `[tui]`/`[dashboard]` brackets now appear literally instead of being silently dropped
+
 ## [1.1.2] - 2026-02-18
 
 ### Added
