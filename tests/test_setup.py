@@ -322,8 +322,59 @@ class TestSdkInstall:
             )
         assert result.exit_code == 0
 
+    def test_uv_tool_env_uses_uv_tool_install(self, clean_env):
+        """When sys.executable is in a uv tool env and uv is on PATH, use uv tool install."""
+        with (
+            patch("sys.executable", "/home/user/.local/share/uv/tools/initrunner/bin/python"),
+            patch("shutil.which", return_value="/usr/bin/uv"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            from initrunner.cli._helpers import install_extra
+
+            install_extra("tui")
+            cmd = mock_run.call_args[0][0]
+            assert cmd == ["uv", "tool", "install", "--force", "initrunner[tui]"]
+
+    def test_pipx_env_uses_pipx_install(self, clean_env):
+        """When sys.executable is in a pipx venv and pipx is on PATH, use pipx install --force."""
+
+        def which_side_effect(name):
+            return "/usr/bin/pipx" if name == "pipx" else None
+
+        with (
+            patch(
+                "sys.executable",
+                "/home/user/.local/share/pipx/venvs/initrunner/bin/python",
+            ),
+            patch("shutil.which", side_effect=which_side_effect),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            from initrunner.cli._helpers import install_extra
+
+            install_extra("tui")
+            cmd = mock_run.call_args[0][0]
+            assert cmd == ["pipx", "install", "--force", "initrunner[tui]"]
+
+    def test_pipx_env_without_pipx_falls_back_to_interpreter_pip(self, clean_env):
+        """When sys.executable is in a pipx venv but pipx not on PATH, use sys.executable -m pip."""
+        fake_exe = "/home/user/.local/share/pipx/venvs/initrunner/bin/python"
+        with (
+            patch("sys.executable", fake_exe),
+            patch("shutil.which", return_value=None),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            from initrunner.cli._helpers import install_extra
+
+            install_extra("tui")
+            cmd = mock_run.call_args[0][0]
+            assert cmd[0] == fake_exe
+            assert cmd[1:] == ["-m", "pip", "install", "initrunner[tui]"]
+
     def test_uv_preferred_over_pip(self, clean_env):
-        """When uv is on PATH, should use uv pip install."""
+        """When uv is on PATH (non-tool env), should use uv pip install."""
         with (
             patch("shutil.which", return_value="/usr/bin/uv"),
             patch("subprocess.run") as mock_run,
@@ -335,6 +386,32 @@ class TestSdkInstall:
             cmd = mock_run.call_args[0][0]
             assert cmd[0] == "uv"
             assert "pip" in cmd
+
+    def test_failure_output_escapes_extras_brackets(self, clean_env):
+        """When install fails, [extra] brackets must appear literally in the warning."""
+        import subprocess
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        recorded_console = Console(file=buf, no_color=True)
+
+        with (
+            patch("initrunner.cli._helpers.console", recorded_console),
+            patch("shutil.which", return_value=None),
+            patch(
+                "subprocess.run",
+                side_effect=subprocess.CalledProcessError(1, ["pip"]),
+            ),
+        ):
+            from initrunner.cli._helpers import install_extra
+
+            result = install_extra("tui")
+            output = buf.getvalue()
+
+        assert result is False
+        assert "[tui]" in output
 
     def test_pip_fallback(self, clean_env):
         """When uv is not on PATH, should use pip."""

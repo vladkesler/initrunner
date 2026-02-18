@@ -28,7 +28,16 @@ def install_extra(extra: str) -> bool:
 
     pkg = f"initrunner[{extra}]"
     pkg_display = escape(pkg)
-    if shutil.which("uv"):
+
+    exe = sys.executable.replace("\\", "/")
+    if "/uv/tools/" in exe and shutil.which("uv"):
+        cmd = ["uv", "tool", "install", "--force", pkg]
+    elif "/pipx/venvs/" in exe:
+        if shutil.which("pipx"):
+            cmd = ["pipx", "install", "--force", pkg]
+        else:
+            cmd = [sys.executable, "-m", "pip", "install", pkg]
+    elif shutil.which("uv"):
         cmd = ["uv", "pip", "install", pkg]
     else:
         cmd = [sys.executable, "-m", "pip", "install", pkg]
@@ -40,8 +49,8 @@ def install_extra(extra: str) -> bool:
         return True
     except (subprocess.CalledProcessError, OSError) as exc:
         console.print(
-            f"[yellow]Warning:[/yellow] Could not install {pkg_display}: {exc}\n"
-            f"Install manually: [bold]{' '.join(cmd)}[/bold]"
+            f"[yellow]Warning:[/yellow] Could not install {pkg_display}: {escape(str(exc))}\n"
+            f"Install manually: [bold]{escape(' '.join(cmd))}[/bold]"
         )
         return False
 
