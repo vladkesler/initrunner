@@ -305,6 +305,7 @@ There are several ways to create a role — pick whichever fits:
 
 | Method | Command | Best for |
 |--------|---------|----------|
+| Copy an example | `initrunner examples list` then `initrunner examples copy <name>` | Complete, working agents ready to run ([docs](docs/getting-started/cli.md)) |
 | Guided wizard | `initrunner setup` | First-time setup ([docs](docs/getting-started/setup.md)) |
 | Interactive scaffold | `initrunner init -i` | Prompted step-by-step creation ([docs](docs/getting-started/cli.md)) |
 | AI generation | `initrunner create "code reviewer for Python"` | Describe what you want in natural language ([docs](docs/agents/role_generation.md)) |
