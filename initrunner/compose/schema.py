@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from initrunner.agent.schema import TriggerConfig
+from initrunner.agent.schema.triggers import TriggerConfig
 from initrunner.stores.base import StoreBackend
 
 
