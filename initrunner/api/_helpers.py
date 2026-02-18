@@ -42,13 +42,17 @@ async def resolve_role_path(request: Request, role_id: str) -> Path:
     return path
 
 
+async def load_role_async(role_path: Path) -> RoleDefinition:
+    """Load a role from *role_path* in a thread with BUILD_TIMEOUT."""
+    from initrunner.agent.loader import load_role
+
+    return await asyncio.wait_for(asyncio.to_thread(load_role, role_path), timeout=BUILD_TIMEOUT)
+
+
 async def load_role_with_memory(role_id: str, request: Request) -> tuple[RoleDefinition, Path]:
     """Load a role by ID, raising 400 if it has no memory config."""
     role_path = await resolve_role_path(request, role_id)
-
-    from initrunner.agent.loader import load_role
-
-    role = await asyncio.to_thread(load_role, role_path)
+    role = await load_role_async(role_path)
     if role.spec.memory is None:
         raise HTTPException(status_code=400, detail="No memory config in this role")
     return role, role_path

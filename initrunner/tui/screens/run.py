@@ -364,8 +364,7 @@ class RunScreen(RoleScreen):
         budget_status = check_token_budget(self._cumulative_total_tokens, session_budget)
         if budget_status.exceeded:
             self.notify("Session token budget exhausted", severity="error")
-        elif budget_status.warning:
-            assert session_budget is not None
+        elif budget_status.warning and session_budget is not None:
             pct = int(self._cumulative_total_tokens / session_budget * 100)
             self.notify(f"Session budget {pct}% consumed", severity="warning")
 

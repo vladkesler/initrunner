@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from initrunner.agent.schema import TriggerConfig
 from initrunner.stores.base import StoreBackend
 
 
@@ -44,7 +45,7 @@ class SharedMemoryConfig(BaseModel):
 
 class ComposeServiceConfig(BaseModel):
     role: str
-    trigger: dict | None = None
+    trigger: TriggerConfig | None = None
     sink: DelegateSinkConfig | None = None
     depends_on: list[str] = []
     health_check: HealthCheckConfig = HealthCheckConfig()

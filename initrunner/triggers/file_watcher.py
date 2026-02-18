@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from watchfiles import watch
 
 from initrunner.agent.schema.triggers import FileWatchTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
+
+_logger = logging.getLogger(__name__)
 
 
 class FileWatchTrigger(TriggerBase):
@@ -32,6 +35,11 @@ class FileWatchTrigger(TriggerBase):
             for watch_path in self._config.paths:
                 p = Path(watch_path)
                 if not p.is_dir():
+                    _logger.warning(
+                        "FileWatchTrigger: configured path %r does not exist or is not a directory"
+                        " — skipping process_existing scan",
+                        watch_path,
+                    )
                     continue
                 for child in sorted(p.iterdir()):
                     if self._stop_event.is_set():

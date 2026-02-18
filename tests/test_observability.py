@@ -204,7 +204,7 @@ class TestTraceContextPropagation:
         pytest.importorskip("opentelemetry.sdk")
 
         from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
 
         import initrunner.observability as obs
         from initrunner.observability import (

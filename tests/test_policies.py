@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from initrunner.agent.policies import (
     ValidationResult,
     redact_text,
@@ -76,11 +74,13 @@ class TestPromptLength:
 
 
 class TestProfanityFilter:
-    def test_profanity_not_installed_raises(self):
+    def test_profanity_not_installed_returns_invalid(self):
         policy = ContentPolicy(profanity_filter=True)
         with patch.dict("sys.modules", {"better_profanity": None}):
-            with pytest.raises(RuntimeError, match="better-profanity"):
-                validate_input("hello", policy)
+            result = validate_input("hello", policy)
+        assert result.valid is False
+        assert result.validator == "profanity"
+        assert "better-profanity" in (result.reason or "")
 
     @patch("initrunner.agent.policies._check_profanity")
     def test_profanity_detected_blocks(self, mock_check):
