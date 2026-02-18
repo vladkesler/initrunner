@@ -44,7 +44,22 @@ class ModelConfig(BaseModel):
         return self.provider == "ollama" or self.base_url is not None
 
     def is_reasoning_model(self) -> bool:
-        """Return True for OpenAI o-series reasoning models that don't support temperature."""
-        return self.provider.lower() == "openai" and self.name.lower().startswith(
-            ("o1", "o3", "o4")
-        )
+        """Return True for OpenAI models that drop sampling params when reasoning is active.
+
+        Mirrors pydantic_ai's openai_model_profile() reasoning detection:
+        - o-series (any model starting with 'o') always uses reasoning
+        - gpt-5 (excluding gpt-5.1+/gpt-5.2+ and gpt-5-chat) always uses reasoning
+        - gpt-5.1+ defaults to reasoning_effort='none' so sampling params are allowed
+        """
+        if self.provider.lower() != "openai":
+            return False
+        name = self.name.lower()
+        if name.startswith("o"):
+            return True
+        if (
+            name.startswith("gpt-5")
+            and not name.startswith(("gpt-5.1", "gpt-5.2"))
+            and "gpt-5-chat" not in name
+        ):
+            return True
+        return False

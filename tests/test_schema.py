@@ -175,8 +175,36 @@ class TestModelConfig:
         mc = ModelConfig(provider="OpenAI", name="O3-Mini")
         assert mc.is_reasoning_model() is True
 
-    def test_is_reasoning_model_gpt_is_false(self):
+    def test_is_reasoning_model_o2(self):
+        mc = ModelConfig(provider="openai", name="o2")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_gpt5_is_true(self):
         mc = ModelConfig(provider="openai", name="gpt-5-mini")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_gpt5(self):
+        mc = ModelConfig(provider="openai", name="gpt-5")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_gpt5_turbo(self):
+        mc = ModelConfig(provider="openai", name="gpt-5-turbo")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_gpt5_chat_is_false(self):
+        mc = ModelConfig(provider="openai", name="gpt-5-chat")
+        assert mc.is_reasoning_model() is False
+
+    def test_is_reasoning_model_gpt51_is_false(self):
+        mc = ModelConfig(provider="openai", name="gpt-5.1")
+        assert mc.is_reasoning_model() is False
+
+    def test_is_reasoning_model_gpt52_turbo_is_false(self):
+        mc = ModelConfig(provider="openai", name="gpt-5.2-turbo")
+        assert mc.is_reasoning_model() is False
+
+    def test_is_reasoning_model_gpt4o_is_false(self):
+        mc = ModelConfig(provider="openai", name="gpt-4o")
         assert mc.is_reasoning_model() is False
 
     def test_is_reasoning_model_non_openai_provider(self):

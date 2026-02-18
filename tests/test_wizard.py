@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 import yaml
 
@@ -226,3 +228,87 @@ class TestTemplateModelName:
     def test_rag_without_model_name(self):
         result = template_rag("test", "anthropic")
         assert "claude-sonnet-4-5-20250929" in result
+
+
+class TestWizardEmbeddingWarning:
+    """Tests for Anthropic + memory/ingest embedding key warning in the wizard."""
+
+    def _run_wizard_with_inputs(
+        self, provider, template="basic", enable_memory=False, enable_ingest=False, *, tmp_path
+    ):
+        """Run the wizard with mocked prompts and return captured console output."""
+        import io
+
+        from rich.console import Console
+
+        output_path = str(tmp_path / "role.yaml")
+
+        # Capture console output
+        buf = io.StringIO()
+        mock_console = Console(file=buf, width=120, force_terminal=False)
+
+        def mock_ask(prompt, **kwargs):
+            if "Agent name" in prompt:
+                return "test-agent"
+            if "Description" in prompt:
+                return ""
+            if "Provider" in prompt:
+                return provider
+            if "Template" in prompt:
+                return template
+            if "Tools" in prompt:
+                return ""
+            if "Ingest sources glob" in prompt:
+                return "./docs/**/*.md"
+            if "Output file" in prompt:
+                return output_path
+            return kwargs.get("default", "")
+
+        def mock_confirm(prompt, **kwargs):
+            if "memory" in prompt.lower():
+                return enable_memory
+            if "ingest" in prompt.lower() or "rag" in prompt.lower():
+                return enable_ingest
+            if "overwrite" in prompt.lower():
+                return True
+            return kwargs.get("default", False)
+
+        model = "claude-sonnet-4-5-20250929" if provider == "anthropic" else "gpt-5-mini"
+        with (
+            patch("initrunner.cli.wizard.Prompt.ask", side_effect=mock_ask),
+            patch("initrunner.cli.wizard.typer.confirm", side_effect=mock_confirm),
+            patch("initrunner.cli.wizard.console", mock_console),
+            patch(
+                "initrunner.cli._helpers.prompt_model_selection",
+                return_value=model,
+            ),
+        ):
+            from initrunner.cli.wizard import run_wizard
+
+            run_wizard()
+
+        return buf.getvalue()
+
+    def test_warning_shown_for_anthropic_with_memory(self, tmp_path):
+        """Anthropic + memory should show embedding key warning."""
+        output = self._run_wizard_with_inputs("anthropic", enable_memory=True, tmp_path=tmp_path)
+        assert "OPENAI_API_KEY" in output
+        assert "Anthropic does not provide an embeddings API" in output
+
+    def test_warning_shown_for_anthropic_with_ingest(self, tmp_path):
+        """Anthropic + ingestion should show embedding key warning."""
+        output = self._run_wizard_with_inputs("anthropic", template="rag", tmp_path=tmp_path)
+        assert "OPENAI_API_KEY" in output
+        assert "Anthropic does not provide an embeddings API" in output
+
+    def test_no_warning_for_anthropic_without_memory_or_ingest(self, tmp_path):
+        """Anthropic without memory/ingest should NOT show embedding warning."""
+        output = self._run_wizard_with_inputs(
+            "anthropic", enable_memory=False, enable_ingest=False, tmp_path=tmp_path
+        )
+        assert "Anthropic does not provide an embeddings API" not in output
+
+    def test_no_warning_for_openai_with_memory(self, tmp_path):
+        """OpenAI + memory should NOT show Anthropic embedding warning."""
+        output = self._run_wizard_with_inputs("openai", enable_memory=True, tmp_path=tmp_path)
+        assert "Anthropic does not provide an embeddings API" not in output

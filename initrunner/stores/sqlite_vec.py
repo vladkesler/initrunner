@@ -179,8 +179,8 @@ def _open_sqlite_vec(db_path: Path) -> sqlite3.Connection:
         conn.enable_load_extension(True)
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)
-        conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=30000;")
+        _retry_on_locked(conn, lambda c: c.execute("PRAGMA journal_mode=WAL;"))
     except Exception:
         conn.close()
         raise
@@ -393,8 +393,11 @@ def _init_store_common(
             c.commit()
 
         _retry_on_locked(conn, _init)
-        _migrate_legacy_dimensions(conn, vec_table_name)
-        resolved = _resolve_dimensions(conn, db_path, dimensions, allow_none=allow_none)
+        _retry_on_locked(conn, lambda c: _migrate_legacy_dimensions(c, vec_table_name))
+        resolved = _retry_on_locked(
+            conn,
+            lambda c: _resolve_dimensions(c, db_path, dimensions, allow_none=allow_none),
+        )
     except Exception:
         conn.close()
         raise

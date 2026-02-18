@@ -111,7 +111,7 @@ spec:
 | `provider` | `str` | `""` | Embedding provider. Set to `"ollama"` for local embeddings. Empty inherits from `spec.model.provider`. |
 | `model` | `str` | `""` | Embedding model name. Empty uses provider default (`nomic-embed-text` for Ollama). |
 | `base_url` | `str` | `""` | Custom endpoint URL. Defaults to `http://localhost:11434/v1` when provider is `ollama`. |
-| `api_key_env` | `str` | `""` | Env var name holding the API key for custom endpoints. Empty uses provider default. |
+| `api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (not needed for Ollama). |
 
 ### Default Embedding Models
 

@@ -178,6 +178,16 @@ def run_wizard() -> None:
             },
         }
 
+    # --- Embedding key warning for Anthropic ---
+    if provider == "anthropic" and (enable_memory or enable_ingest):
+        console.print()
+        console.print(
+            "[bold yellow]Warning:[/bold yellow] Anthropic does not provide an embeddings API. "
+            "RAG and memory features require [bold]OPENAI_API_KEY[/bold] for embeddings.\n"
+            "You can override this in your role.yaml under "
+            "[bold]spec.ingest.embeddings[/bold] or [bold]spec.memory.embeddings[/bold]."
+        )
+
     # --- Output file ---
     console.print()
     output_str = Prompt.ask("Output file", default="role.yaml")

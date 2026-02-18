@@ -54,6 +54,14 @@ Each selected tool prompts for its key configuration fields. For example, `files
 
 The wizard validates the generated YAML against the `RoleDefinition` schema before writing and warns if there are issues.
 
+### Anthropic Embedding Warning
+
+When the wizard detects that `anthropic` is selected as the provider **and** memory or ingestion is enabled, it displays a warning:
+
+> **Warning:** Anthropic does not provide an embeddings API. RAG and memory features require `OPENAI_API_KEY` for embeddings.
+
+The warning also mentions that the embedding provider can be overridden via `spec.ingest.embeddings` or `spec.memory.embeddings` in the generated role file.
+
 ## AI-Powered Generation
 
 Generate a complete `role.yaml` from a natural language description:

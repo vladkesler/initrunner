@@ -69,6 +69,27 @@ def doctor(
 
     console.print(table)
 
+    # ----- Embedding Providers -----
+    from initrunner.ingestion.embeddings import _PROVIDER_EMBEDDING_KEY_DEFAULTS
+
+    embed_table = Table(title="Embedding Providers")
+    embed_table.add_column("Provider", style="cyan")
+    embed_table.add_column("Embedding Key Env")
+    embed_table.add_column("Status")
+
+    for emb_provider, emb_env in _PROVIDER_EMBEDDING_KEY_DEFAULTS.items():
+        emb_key_set = bool(os.environ.get(emb_env))
+        emb_status = "[green]Set[/green]" if emb_key_set else "[dim]Missing[/dim]"
+        embed_table.add_row(emb_provider, emb_env, emb_status)
+
+    embed_table.add_row("ollama", "[dim]—[/dim]", "[dim]No key needed[/dim]")
+
+    console.print()
+    console.print(embed_table)
+    console.print(
+        "[dim]Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.[/dim]"
+    )
+
     if not quickstart:
         return
 

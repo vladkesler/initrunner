@@ -135,7 +135,7 @@ spec:
 | `embeddings.provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
 | `embeddings.model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `embeddings.base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
-| `embeddings.api_key_env` | `str` | `""` | Env var name holding the API key for custom endpoints. Empty uses provider default. |
+| `embeddings.api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (e.g. `OPENAI_API_KEY` for OpenAI/Anthropic, `GOOGLE_API_KEY` for Google). |
 
 ### Episodic Options
 

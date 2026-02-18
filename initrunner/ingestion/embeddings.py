@@ -15,6 +15,39 @@ _DEFAULT_MODELS: dict[str, str] = {
     "ollama": "ollama:nomic-embed-text",
 }
 
+_PROVIDER_EMBEDDING_KEY_DEFAULTS: dict[str, str] = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+}
+
+
+def _default_embedding_key_env(provider: str) -> str:
+    """Return the default environment variable name for embedding API keys."""
+    return _PROVIDER_EMBEDDING_KEY_DEFAULTS.get(provider, "OPENAI_API_KEY")
+
+
+def _require_embedding_key(env_var: str, provider: str) -> str:
+    """Validate that *env_var* is set and return its value.
+
+    Raises a clear ``ValueError`` when the key is missing, explaining that
+    embedding keys may differ from LLM keys.
+    """
+    value = os.environ.get(env_var)
+    if value:
+        return value
+    hint = (
+        f"Embedding API key not found: set the {env_var} environment variable.\n"
+        f"Note: embedding keys may differ from LLM keys"
+    )
+    if provider == "anthropic":
+        hint += " (Anthropic has no embeddings API; OpenAI is used by default)"
+    hint += (
+        ".\nYou can override the key variable with "
+        "ingest.embeddings.api_key_env or memory.embeddings.api_key_env in your role.yaml."
+    )
+    raise ValueError(hint)
+
 
 def create_embedder(
     provider: str = "", model: str = "", base_url: str = "", api_key_env: str = ""
@@ -30,11 +63,40 @@ def create_embedder(
     if provider == "ollama" or base_url:
         return _create_custom_embedder(provider, model, base_url, api_key_env=api_key_env)
 
+    # Resolve model string and provider prefix
     if model:
         model_str = model if ":" in model else f"{provider}:{model}"
     else:
         model_str = _DEFAULT_MODELS.get(provider, "openai:text-embedding-3-small")
+
+    resolved_provider = model_str.split(":")[0] if ":" in model_str else provider
+
+    # For standard providers, validate and inject the embedding API key
+    if resolved_provider in _PROVIDER_EMBEDDING_KEY_DEFAULTS or api_key_env:
+        key_env = api_key_env or _default_embedding_key_env(resolved_provider)
+        api_key = _require_embedding_key(key_env, provider or resolved_provider)
+        return _create_standard_embedder(resolved_provider, model_str, api_key)
+
     return Embedder(model_str)
+
+
+def _create_standard_embedder(resolved_provider: str, model_str: str, api_key: str) -> Embedder:
+    """Build an Embedder for a standard provider with an explicit API key."""
+    model_name = model_str.split(":", 1)[-1] if ":" in model_str else model_str
+
+    if resolved_provider == "google":
+        from pydantic_ai.embeddings.google import GoogleEmbeddingModel
+        from pydantic_ai.providers.google import GoogleProvider
+
+        embed_model = GoogleEmbeddingModel(model_name, provider=GoogleProvider(api_key=api_key))
+        return Embedder(embed_model)
+
+    # OpenAI-family (covers openai, anthropic default, and others)
+    from pydantic_ai.embeddings.openai import OpenAIEmbeddingModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    embed_model = OpenAIEmbeddingModel(model_name, provider=OpenAIProvider(api_key=api_key))
+    return Embedder(embed_model)
 
 
 def _create_custom_embedder(

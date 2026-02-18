@@ -51,6 +51,32 @@ Example output:
 
 The scan loads `.env` files before checking, so keys defined in `.env` files (project-local or `~/.initrunner/.env`) are detected. If `--role` is provided, the `.env` in the role's directory is loaded first.
 
+## Embedding Providers
+
+After the provider table, `doctor` shows an **Embedding Providers** section that checks whether the API keys needed for embeddings (RAG and memory) are configured. This is separate from the LLM provider table because embedding keys can differ from LLM keys.
+
+| Check | What it verifies |
+|-------|------------------|
+| **Embedding Key Env** | The environment variable name used for embedding API keys for each provider |
+| **Status** | Whether the embedding key is set (`Set`), missing (`Missing`), or not needed (`No key needed` for Ollama) |
+
+Example output:
+
+```
+               Embedding Providers
+┏━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Provider  ┃ Embedding Key Env ┃ Status        ┃
+┡━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ openai    │ OPENAI_API_KEY    │ Set           │
+│ anthropic │ OPENAI_API_KEY    │ Set           │
+│ google    │ GOOGLE_API_KEY    │ Missing       │
+│ ollama    │ —                 │ No key needed │
+└───────────┴───────────────────┴───────────────┘
+Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.
+```
+
+> **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic` with RAG or memory, you need `OPENAI_API_KEY` set for embeddings — even though `ANTHROPIC_API_KEY` handles the LLM. The doctor output makes this explicit.
+
 ## Quickstart Smoke Test
 
 With `--quickstart`, the doctor runs a real agent prompt after the config scan:

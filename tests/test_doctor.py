@@ -45,6 +45,96 @@ class TestDoctorConfigScan:
         assert "Ready" in result.output
 
 
+class TestDoctorEmbeddingProviders:
+    def test_embedding_section_displayed(self, monkeypatch):
+        """Doctor should show an 'Embedding Providers' table."""
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "Embedding Providers" in result.output
+
+    def test_embedding_key_set_status(self, monkeypatch):
+        """When OPENAI_API_KEY is set, embedding status for openai/anthropic shows 'Set'."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        for var in ("GROQ_API_KEY", "MISTRAL_API_KEY", "CO_API_KEY"):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        # OPENAI_API_KEY appears in embedding section
+        assert "OPENAI_API_KEY" in result.output
+
+    def test_embedding_key_missing_status(self, monkeypatch):
+        """When GOOGLE_API_KEY is missing, embedding status for google shows 'Missing'."""
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        for var in ("GROQ_API_KEY", "MISTRAL_API_KEY", "CO_API_KEY"):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "Missing" in result.output
+
+    def test_anthropic_note_displayed(self, monkeypatch):
+        """Doctor should show note about Anthropic using OpenAI embeddings."""
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "Anthropic uses OpenAI embeddings" in result.output
+
+    def test_ollama_no_key_needed(self, monkeypatch):
+        """Ollama row should show 'No key needed'."""
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "No key needed" in result.output
+
+
 class TestDoctorQuickstart:
     def test_quickstart_success(self, monkeypatch):
         """--quickstart with mocked successful run shows pass message."""

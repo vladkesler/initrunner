@@ -172,7 +172,7 @@ spec:
 
 This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that exposes the OpenAI chat completions format.
 
-> **Embedding endpoints:** `api_key_env` also works for custom embedding endpoints via `ingest.embeddings.api_key_env` or `memory.embeddings.api_key_env`. See [Ingestion: Embedding Options](../core/ingestion.md#embedding-options) for details.
+> **Embedding endpoints:** `api_key_env` works for all embedding providers (standard and custom) via `ingest.embeddings.api_key_env` or `memory.embeddings.api_key_env`. When set, InitRunner validates the key at startup and fails fast with an actionable error if it's missing. See [Ingestion: Embedding Options](../core/ingestion.md#embedding-options) for details.
 
 ## Model config reference
 
@@ -240,7 +240,7 @@ spec:
 | `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
-| `api_key_env` | `str` | `""` | Env var holding the API key for custom endpoints. |
+| `api_key_env` | `str` | `""` | Env var holding the embedding API key. Works for all providers (not just custom endpoints). When empty, the default key for the resolved provider is used automatically. |
 
 See [Ingestion: Embedding Models](../core/ingestion.md#embedding-models) for the full embedding model reference and [RAG Guide: Embedding Model Options](../core/rag-guide.md#embedding-model-options) for a comparison table.
 

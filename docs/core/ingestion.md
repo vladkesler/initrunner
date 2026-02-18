@@ -100,7 +100,7 @@ spec:
 | `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
-| `api_key_env` | `str` | `""` | Env var name holding the API key for custom endpoints. Empty uses provider default. |
+| `api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (e.g. `OPENAI_API_KEY` for OpenAI/Anthropic, `GOOGLE_API_KEY` for Google). |
 
 ## URL Sources
 
@@ -379,11 +379,15 @@ uv pip install initrunner[ingest]
 
 ### API key not set
 
-Embedding providers require credentials. If you see authentication errors:
+Embedding providers require credentials. InitRunner validates embedding keys at startup and raises a clear error if they're missing. The error message names the required env var, explains that embedding keys may differ from LLM keys, and points to the `api_key_env` override.
+
 - **OpenAI**: Set `OPENAI_API_KEY` in your environment.
+- **Anthropic**: Anthropic has no embeddings API — set `OPENAI_API_KEY` (used for OpenAI embeddings by default). Run `initrunner doctor` to see embedding key status.
 - **Google**: Set `GOOGLE_API_KEY` or configure Application Default Credentials.
 - **Custom endpoint**: Set the env var specified in `embeddings.api_key_env`.
 - **Ollama**: No API key needed — runs locally.
+
+You can override which env var is used for the embedding key by setting `embeddings.api_key_env` in your `ingest` or `memory` config.
 
 ### `sqlite-vec` not available
 
