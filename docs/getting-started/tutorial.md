@@ -649,6 +649,7 @@ spec:
 
 Now that you've built a complete agent, explore more of what InitRunner can do:
 
+- **Pre-built templates**: Run three dev workflow agents (PR review, changelog, CI explainer) in 10 minutes — see [Templates Tutorial](template-tutorial.md)
 - **More tools**: [git](../agents/tools.md), [shell](../agents/tools.md), [sql](../agents/tools.md), [http](../agents/tools.md), [slack](../agents/tools.md), [MCP servers](../agents/tools.md), and [custom tools](../agents/tool_creation.md)
 - **Multi-agent delegation**: Have agents call other agents — see [Delegation](../orchestration/delegation.md)
 - **Compose pipelines**: Orchestrate multiple agents with `compose.yaml` — see [Agent Composer](../orchestration/agent_composer.md)

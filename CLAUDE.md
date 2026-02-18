@@ -96,3 +96,4 @@ Detailed docs live in `docs/`. Key references:
 | Multimodal input | `docs/core/multimodal.md` |
 | Report export | `docs/core/reports.md` |
 | Doctor command | `docs/operations/doctor.md` |
+| Shareable templates | `docs/getting-started/shareable-templates.md`, `docs/getting-started/template-tutorial.md` |

@@ -339,6 +339,9 @@ Proven patterns from the example roles:
 | **DevOps reporting** | shell + git + slack + datetime | cron | [`deploy-notifier.yaml`](../examples/roles/deploy-notifier.yaml) |
 | **API integration** | api + datetime | — (interactive) | [`github-tracker.yaml`](../examples/roles/github-tracker.yaml) |
 | **Code review** | git + filesystem (both read-only) | — (interactive) | [`code-reviewer.yaml`](../examples/roles/code-reviewer.yaml) |
+| **PR review** | git + filesystem (both read-only) | — (one-shot) | [`pr-reviewer.yaml`](../examples/roles/pr-reviewer.yaml) |
+| **Slack changelog** | git + shell + datetime | — (one-shot) | [`changelog-slack.yaml`](../examples/roles/changelog-slack.yaml) |
+| **CI explainer** | filesystem + git (both read-only) | — (one-shot) | [`ci-explainer.yaml`](../examples/roles/ci-explainer.yaml) |
 | **Webhook routing** | http + slack + datetime | webhook | [`webhook-processor.yaml`](../examples/roles/webhook-processor.yaml) |
 | **Web monitoring** | web_scraper + datetime | cron | [`web-monitor.yaml`](../examples/roles/web-monitor.yaml) |
 | **Changelog** | git + filesystem + datetime | — (interactive) | [`changelog-generator.yaml`](../examples/roles/changelog-generator.yaml) |
