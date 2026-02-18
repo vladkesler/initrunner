@@ -37,7 +37,7 @@ def setup_tracing(config: ObservabilityConfig, agent_name: str) -> Any:
 
     require_observability()
 
-    from opentelemetry import trace  # type: ignore[import-not-found]
+    from opentelemetry import trace
     from opentelemetry.sdk.resources import Resource  # type: ignore[import-not-found]
     from opentelemetry.sdk.trace import TracerProvider  # type: ignore[import-not-found]
     from opentelemetry.sdk.trace.sampling import TraceIdRatioBased  # type: ignore[import-not-found]
