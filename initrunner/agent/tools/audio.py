@@ -77,7 +77,8 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
 
         langs = [language] if language else config.youtube_languages
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            ytt = YouTubeTranscriptApi()
+            transcript_list = ytt.list(video_id)
             try:
                 transcript = transcript_list.find_transcript(langs)
             except NoTranscriptFound:
@@ -92,9 +93,9 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
 
         parts: list[str] = []
         for entry in entries:
-            text = entry["text"]
+            text = entry.text
             if config.include_timestamps:
-                text = f"[{entry['start']:.1f}s] {text}"
+                text = f"[{entry.start:.1f}s] {text}"
             parts.append(text)
 
         result = " ".join(parts)

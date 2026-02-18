@@ -47,16 +47,26 @@ def _make_ctx(provider: str = "openai", name: str = "gpt-4o") -> ToolBuildContex
     return ToolBuildContext(role=role)
 
 
+class _FakeSnippet:
+    """Mimics FetchedTranscriptSnippet with attribute access."""
+
+    def __init__(self, text: str, start: float, duration: float):
+        self.text = text
+        self.start = start
+        self.duration = duration
+
+
 def _make_yt_mock(
     entries: list[dict] | None = None,
     list_side_effect: Exception | None = None,
     find_side_effect: Exception | None = None,
 ) -> tuple[MagicMock, MagicMock]:
     """Return (mock_yt_module, mock_errors) for patching sys.modules."""
-    entries = entries or [{"text": "Hello world", "start": 0.0, "duration": 1.0}]
+    raw = entries or [{"text": "Hello world", "start": 0.0, "duration": 1.0}]
+    snippets = [_FakeSnippet(**e) for e in raw]
 
     mock_transcript = MagicMock()
-    mock_transcript.fetch.return_value = entries
+    mock_transcript.fetch.return_value = snippets
 
     mock_tlist = MagicMock()
     if find_side_effect is not None:
@@ -66,14 +76,16 @@ def _make_yt_mock(
         mock_tlist.find_transcript.return_value = mock_transcript
         mock_tlist.find_generated_transcript.return_value = mock_transcript
 
-    mock_api = MagicMock()
+    mock_instance = MagicMock()
     if list_side_effect is not None:
-        mock_api.list_transcripts.side_effect = list_side_effect
+        mock_instance.list.side_effect = list_side_effect
     else:
-        mock_api.list_transcripts.return_value = mock_tlist
+        mock_instance.list.return_value = mock_tlist
+
+    mock_api_class = MagicMock(return_value=mock_instance)
 
     mock_yt_mod = MagicMock()
-    mock_yt_mod.YouTubeTranscriptApi = mock_api
+    mock_yt_mod.YouTubeTranscriptApi = mock_api_class
 
     mock_errors = MagicMock()
     mock_errors.NoTranscriptFound = _FakeNoTranscriptFound
@@ -257,7 +269,7 @@ class TestGetYoutubeTranscript:
             {"youtube_transcript_api": mock_yt, "youtube_transcript_api._errors": mock_errors},
         ):
             self._fn()(url="https://youtu.be/dQw4w9WgXcQ", language="es")
-        mock_yt.YouTubeTranscriptApi.list_transcripts.assert_called_once()
+        mock_yt.YouTubeTranscriptApi.return_value.list.assert_called_once()
 
     def test_generic_error(self):
         mock_yt, mock_errors = _make_yt_mock(list_side_effect=RuntimeError("network error"))
