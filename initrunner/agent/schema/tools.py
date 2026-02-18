@@ -321,6 +321,18 @@ class SearchToolConfig(ToolConfigBase):
         return f"search: {self.provider}"
 
 
+class AudioToolConfig(ToolConfigBase):
+    type: Literal["audio"] = "audio"
+    youtube_languages: list[str] = ["en"]
+    include_timestamps: bool = False
+    transcription_model: str | None = None
+    max_audio_mb: float = 20.0
+    max_transcript_chars: int = 50_000
+
+    def summary(self) -> str:
+        return "audio"
+
+
 class PluginToolConfig(ToolConfigBase):
     type: str
     config: dict[str, Any] = {}
