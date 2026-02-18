@@ -19,7 +19,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 # Read current version
-CURRENT=$(python -c "
+CURRENT=$(python3 -c "
 import re, pathlib
 m = re.search(r'__version__\s*=\s*\"(.+?)\"', pathlib.Path('initrunner/__init__.py').read_text())
 print(m.group(1))
