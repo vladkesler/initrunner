@@ -55,7 +55,7 @@ spec:
   role: |
     You are a senior engineer. Review code for correctness and readability.
     Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-4o-mini }
+  model: { provider: openai, name: gpt-5-mini }
   tools:
     - type: git
       repo_path: .
@@ -308,7 +308,7 @@ There are several ways to create a role — pick whichever fits:
 | Guided wizard | `initrunner setup` | First-time setup ([docs](docs/getting-started/setup.md)) |
 | Interactive scaffold | `initrunner init -i` | Prompted step-by-step creation ([docs](docs/getting-started/cli.md)) |
 | AI generation | `initrunner create "code reviewer for Python"` | Describe what you want in natural language ([docs](docs/agents/role_generation.md)) |
-| CLI flags | `initrunner init --name my-agent --model gpt-4o-mini` | Quick one-liner ([docs](docs/getting-started/cli.md)) |
+| CLI flags | `initrunner init --name my-agent --model gpt-5-mini` | Quick one-liner ([docs](docs/getting-started/cli.md)) |
 | Manual YAML | Copy the [example above](#see-it-in-action) | Full control |
 
 See the hands-on [Tutorial](docs/getting-started/tutorial.md) for a complete walkthrough.
@@ -372,7 +372,7 @@ metadata:
   description: What this agent does
 spec:
   role: "System prompt goes here."
-  model: { provider: openai, name: gpt-4o-mini }
+  model: { provider: openai, name: gpt-5-mini }
   tools: [...]
   guardrails:
     max_tool_calls: 20
@@ -381,7 +381,7 @@ spec:
     autonomous_token_budget: 200000
 ```
 
-Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-4o-mini`.
+Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-5-mini`.
 
 ### Tools
 

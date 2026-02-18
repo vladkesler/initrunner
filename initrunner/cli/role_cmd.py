@@ -128,7 +128,7 @@ def init(
     provider: Annotated[str, typer.Option(help="Model provider")] = "openai",
     model: Annotated[
         str | None,
-        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
     ] = None,
     interactive: Annotated[
         bool, typer.Option("--interactive", "-i", help="Launch interactive wizard")
@@ -218,7 +218,7 @@ def create(
     name: Annotated[str | None, typer.Option(help="Agent name (auto-derived if omitted)")] = None,
     model: Annotated[
         str | None,
-        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
     ] = None,
     no_confirm: Annotated[bool, typer.Option("--no-confirm", help="Skip preview")] = False,
 ) -> None:
@@ -278,7 +278,7 @@ def setup(
     ] = None,
     model: Annotated[
         str | None,
-        typer.Option(help="Model name (e.g. gpt-4o, claude-sonnet-4-5-20250929)"),
+        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
     ] = None,
     skip_test: Annotated[bool, typer.Option("--skip-test", help="Skip connectivity test")] = False,
     output: Annotated[Path, typer.Option(help="Role output path")] = Path("role.yaml"),

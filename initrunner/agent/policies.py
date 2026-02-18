@@ -214,7 +214,7 @@ def _get_classifier_agent(model_override: Model | str | None = None):
     from pydantic_ai import Agent
     from pydantic_ai.settings import ModelSettings
 
-    model = model_override or "openai:gpt-4o-mini"
+    model = model_override or "openai:gpt-5-mini"
     cache_key = str(model)
 
     with _classifier_cache_lock:

@@ -10,7 +10,7 @@ from typing import Any
 # Users can always type a custom model name not in this list.
 PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     "openai": [
-        ("gpt-4o-mini", "Fast, affordable"),
+        ("gpt-5-mini", "Fast, affordable"),
         ("gpt-4o", "High capability GPT-4"),
         ("gpt-4.1", "Latest GPT-4.1"),
         ("gpt-4.1-mini", "Small GPT-4.1"),

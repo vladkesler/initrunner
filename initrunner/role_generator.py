@@ -180,7 +180,7 @@ spec:
   role: You are a helpful assistant.
   model:
     provider: openai
-    name: gpt-4o-mini
+    name: gpt-5-mini
   guardrails:
     timeout_seconds: 30
 ```
