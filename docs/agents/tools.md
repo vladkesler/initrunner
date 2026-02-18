@@ -23,6 +23,7 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `slack` | Send messages to Slack via incoming webhooks |
 | `web_scraper` | Fetch, chunk, embed, and store web pages in the document store |
 | `search` | Search the web and news via DuckDuckGo, SerpAPI, Brave, or Tavily |
+| `audio` | Fetch YouTube transcripts and transcribe local audio files |
 | *(plugin)* | Any other type is resolved via the [plugin registry](tool_creation.md#plugin-registry) |
 
 ## Quick Example
@@ -915,6 +916,118 @@ tools:
     provider: brave
     api_key: ${BRAVE_API_KEY}
     max_results: 5
+```
+
+## Audio Tool
+
+Fetches YouTube video transcripts and transcribes local audio/video files. YouTube transcripts are pulled from YouTube's caption data (no API key required). Local file transcription sends audio to a multimodal model via PydanticAI.
+
+```yaml
+tools:
+  - type: audio
+    youtube_languages: ["en"]        # default: ["en"]
+    include_timestamps: false        # default: false
+    transcription_model: null        # default: null (uses the role's model)
+    max_audio_mb: 20.0               # default: 20.0
+    max_transcript_chars: 50000      # default: 50000
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `youtube_languages` | `list[str]` | `["en"]` | Language codes for YouTube transcripts, in descending priority. Falls back to auto-generated captions if manual ones aren't available. |
+| `include_timestamps` | `bool` | `false` | Prefix each transcript segment with its timestamp (e.g. `[5.0s] Hello`). |
+| `transcription_model` | `str \| null` | `null` | Model for local audio transcription. Must support audio input (e.g. `openai:gpt-4o-audio-preview`). `null` uses the role's configured model. |
+| `max_audio_mb` | `float` | `20.0` | Maximum local audio file size in MB. |
+| `max_transcript_chars` | `int` | `50000` | Maximum transcript length. Longer transcripts are truncated with a `[truncated]` marker. |
+
+### Registered Functions
+
+- **`get_youtube_transcript(url: str, language: str = "") -> str`** — Fetch the transcript/captions for a YouTube video. Supports standard, short, and embed URL formats. Pass `language` to override the configured language list for a single call. Falls back to auto-generated captions when manual transcripts aren't available.
+- **`transcribe_audio(file_path: str) -> str`** — Transcribe a local audio or video file to text using the configured model. Supported formats: `.mp3`, `.mp4`, `.m4a`, `.wav`, `.ogg`, `.webm`, `.mpeg`, `.flac`.
+
+### Install
+
+The YouTube transcript feature requires the optional `audio` extra:
+
+```bash
+pip install initrunner[audio]
+# or with uv:
+uv sync --extra audio
+```
+
+If the package is not installed, `get_youtube_transcript` returns an error message directing the user to install the extra. The `transcribe_audio` function does not require additional packages — it uses PydanticAI's built-in multimodal support.
+
+### YouTube URL Formats
+
+All of the following URL formats are recognized:
+
+- `https://www.youtube.com/watch?v=VIDEO_ID`
+- `https://youtu.be/VIDEO_ID`
+- `https://www.youtube.com/embed/VIDEO_ID`
+- `https://www.youtube.com/shorts/VIDEO_ID`
+
+### Security
+
+- **File validation** — Local file paths are resolved with `.expanduser().resolve()`. Only files with supported audio extensions are accepted.
+- **Size limit** — Files exceeding `max_audio_mb` are rejected before being read into memory.
+- **Output bounded** — Transcripts exceeding `max_transcript_chars` are truncated with a `[truncated]` marker.
+
+### Resource Limits
+
+| Tool | Limit | Behavior |
+|------|-------|----------|
+| `get_youtube_transcript` | `max_transcript_chars` (50 KB default) | Transcript truncated with `[truncated]` |
+| `transcribe_audio` | `max_audio_mb` (20 MB default) | File rejected before reading |
+| `transcribe_audio` | `max_transcript_chars` (50 KB default) | Output truncated with `[truncated]` |
+
+### Examples
+
+**YouTube transcript agent:**
+
+```yaml
+# Fetch and summarize YouTube videos
+spec:
+  role: You summarize YouTube videos from their transcripts.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+  tools:
+    - type: audio
+      youtube_languages: ["en", "es"]
+      include_timestamps: true
+```
+
+**Audio transcription agent:**
+
+```yaml
+# Transcribe local audio files
+spec:
+  role: You transcribe and summarize audio recordings.
+  model:
+    provider: openai
+    name: gpt-4o
+  tools:
+    - type: audio
+      transcription_model: openai:gpt-4o-audio-preview
+      max_audio_mb: 50.0
+```
+
+**Combined with search and web reader:**
+
+```yaml
+# Research agent that can watch videos and read the web
+spec:
+  role: You are a research assistant.
+  model:
+    provider: openai
+    name: gpt-4o
+  tools:
+    - type: audio
+    - type: search
+      provider: duckduckgo
+    - type: web_reader
 ```
 
 ## Plugin Tools
