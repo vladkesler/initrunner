@@ -283,7 +283,9 @@ class TestBuildAgent:
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
-    def test_temperature_included_for_standard_model(self, mock_require, mock_agent_cls, valid_yaml):
+    def test_temperature_included_for_standard_model(
+        self, mock_require, mock_agent_cls, valid_yaml
+    ):
         role = load_role(valid_yaml)
         build_agent(role)
         call_kwargs = mock_agent_cls.call_args
