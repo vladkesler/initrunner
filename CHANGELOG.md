@@ -2,7 +2,25 @@
 
 ## [1.1.1] - 2026-02-18
 
+### Changed
+- **Services package split**: Reorganize `initrunner/services.py` into a `services/` package with domain submodules (`discovery`, `execution`, `memory`, `roles`, `api_models`, `operations`). All public imports remain available from `initrunner.services`. Internal refactor only — no public API changes.
+
 ## [1.1.0] - 2026-02-18
+
+### Added
+- Shareable role templates with `init export-template` / `init import-template`
+- `--export-report` and `--report-template` flags for structured run output
+- `doctor --quickstart` command for guided first-run setup
+
+### Fixed
+- Suppress temperature warning for OpenAI reasoning models (o1, o3, etc.)
+- Resolve `ty` type-check errors across codebase
+- Wrap store migration queries with `_retry_on_locked` for CI stability
+- Wrap long test method signature to satisfy ruff line-length
+
+### Documentation
+- Shareable templates tutorial and example roles
+- Updated README version to 1.1.0
 
 All notable changes to this project will be documented in this file.
 
