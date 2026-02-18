@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.2] - 2026-02-18
+
+### Added
+- **feat:** `api_key_env` now works for standard embedding providers (openai, anthropic, google), not just custom endpoints
+- **feat:** `doctor` command shows Embedding Providers table with key status and Anthropic note
+- **feat:** Wizard warns when Anthropic is selected with RAG/memory about needing `OPENAI_API_KEY`
+
+### Fixed
+- **fix:** Missing embedding API keys now fail fast with actionable error messages naming the required env var
+- **fix:** `is_reasoning_model()` now correctly detects gpt-5 as a reasoning model (excluding gpt-5.1+, gpt-5-chat)
+- **fix:** Wrap sqlite_vec migration queries with `_retry_on_locked` for robustness
+
+### Changed
+- **chore:** Bump hello-world example `max_tokens` from 256 to 1024
+
+### Documentation
+- **docs:** Updated embedding key documentation in ingestion, memory, providers, ollama, doctor, and role generation docs
+
 ## [1.1.1] - 2026-02-18
 
 ### Changed
