@@ -134,13 +134,13 @@ def _create_agent(
     instrument: Any = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
+    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}
+    if not role.spec.model.is_reasoning_model():
+        model_settings_kwargs["temperature"] = role.spec.model.temperature
     kwargs: dict[str, Any] = {
         "output_type": output_type,
         "system_prompt": system_prompt,
-        "model_settings": ModelSettings(
-            temperature=role.spec.model.temperature,
-            max_tokens=role.spec.model.max_tokens,
-        ),
+        "model_settings": ModelSettings(**model_settings_kwargs),
         "toolsets": toolsets if toolsets else None,
     }
     if instrument is not None:
