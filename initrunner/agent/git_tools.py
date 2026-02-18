@@ -10,7 +10,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._subprocess import SubprocessTimeout, run_subprocess_text
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent.schema import GitToolConfig
+from initrunner.agent.schema.tools import GitToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _ALLOWED_LOG_FORMATS = {"oneline", "short", "medium", "full", "compact"}

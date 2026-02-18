@@ -12,7 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from initrunner.agent._env import resolve_env_vars
-from initrunner.agent.schema import AgentSpec, EmailToolConfig
+from initrunner.agent.schema.role import AgentSpec
+from initrunner.agent.schema.tools import EmailToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.agent.tools.email_tools import (
     _decode_header,
@@ -24,7 +25,7 @@ from initrunner.agent.tools.email_tools import (
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

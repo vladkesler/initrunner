@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from pydantic_ai.messages import ModelMessage, ModelResponse
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 def trim_message_history(

@@ -7,7 +7,7 @@ from pydantic_ai.models import Model
 
 from initrunner.agent.executor import RunResult, execute_run
 from initrunner.agent.prompt import UserPrompt, extract_text_from_prompt
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import _display_result, console
 from initrunner.sinks.dispatcher import SinkDispatcher

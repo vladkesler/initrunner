@@ -7,15 +7,9 @@ from initrunner.agent.executor import (
     execute_run,
     execute_run_stream,
 )
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    Guardrails,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.audit.logger import AuditLogger
 
 

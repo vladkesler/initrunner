@@ -12,17 +12,13 @@ from initrunner.agent.reflection import (
     ReflectionState,
     format_reflection_state,
 )
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    AutonomyConfig,
+from initrunner.agent.schema.autonomy import AutonomyConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
     FileWatchTriggerConfig,
-    Guardrails,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
     WebhookTriggerConfig,
 )
 
@@ -310,7 +306,7 @@ class TestAutonomousRoleValidation:
                 max_iterations: 15
                 autonomous_token_budget: 200000
         """)
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(__import__("yaml").safe_load(yaml_content))
         assert role.spec.autonomy is not None

@@ -33,21 +33,16 @@ def build_schema_reference() -> str:
     always stays in sync with the code. Returns ~2-3K tokens of terse
     reference text.
     """
-    from initrunner.agent.schema import (
-        AgentSpec,
-        ChunkingConfig,
+    from initrunner.agent.schema.base import Metadata, ModelConfig
+    from initrunner.agent.schema.guardrails import Guardrails
+    from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, IngestConfig
+    from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.role import AgentSpec
+    from initrunner.agent.schema.sinks import CustomSinkConfig, FileSinkConfig, WebhookSinkConfig
+    from initrunner.agent.schema.tools import ToolConfigBase
+    from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
-        CustomSinkConfig,
-        EmbeddingConfig,
-        FileSinkConfig,
         FileWatchTriggerConfig,
-        Guardrails,
-        IngestConfig,
-        MemoryConfig,
-        Metadata,
-        ModelConfig,
-        ToolConfigBase,
-        WebhookSinkConfig,
         WebhookTriggerConfig,
     )
     from initrunner.agent.tools._registry import get_tool_types
@@ -209,7 +204,8 @@ def generate_role(
     from pydantic_ai import Agent
 
     from initrunner.agent.loader import _build_model
-    from initrunner.agent.schema import ModelConfig, RoleDefinition
+    from initrunner.agent.schema.base import ModelConfig
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.templates import _default_model_name
 
     if model_name is None:

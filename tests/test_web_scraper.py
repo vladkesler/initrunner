@@ -2,7 +2,8 @@
 
 from unittest.mock import patch
 
-from initrunner.agent.schema import RoleDefinition, WebScraperToolConfig
+from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.agent.tools.web_scraper import build_web_scraper_toolset
 

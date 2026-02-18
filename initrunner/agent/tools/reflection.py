@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent.reflection import PlanStep, ReflectionState
-from initrunner.agent.schema import AutonomyConfig
+from initrunner.agent.schema.autonomy import AutonomyConfig
 
 
 def build_reflection_toolset(

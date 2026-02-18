@@ -50,7 +50,7 @@ def _make_compose_data(services: dict | None = None) -> dict:
 
 class TestComposeService:
     def test_creation(self):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         agent = MagicMock()
@@ -70,7 +70,7 @@ class TestComposeService:
         assert not svc.is_alive
 
     def test_add_sink(self):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         agent = MagicMock()
@@ -89,7 +89,7 @@ class TestComposeService:
         assert svc._sink_dispatcher.count == 1
 
     def test_start_stop(self):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         agent = MagicMock()
@@ -113,7 +113,7 @@ class TestComposeService:
     @patch("initrunner.compose.orchestrator.execute_run")
     def test_handles_delegate_event(self, mock_execute):
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         mock_execute.return_value = (
             RunResult(run_id="r1", output="response", success=True),
@@ -154,7 +154,7 @@ class TestComposeService:
     @patch("initrunner.compose.orchestrator.execute_run")
     def test_dispatches_to_sinks(self, mock_execute):
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         mock_execute.return_value = (
             RunResult(run_id="r1", output="response", success=True),
@@ -194,7 +194,7 @@ class TestComposeService:
     @patch("initrunner.compose.orchestrator.execute_run")
     def test_error_count_incremented(self, mock_execute):
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         mock_execute.return_value = (
             RunResult(run_id="r1", success=False, error="fail"),
@@ -275,7 +275,7 @@ class TestComposeOrchestrator:
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_build_services(self, mock_load):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_load.return_value = (role, MagicMock())
@@ -290,7 +290,7 @@ class TestComposeOrchestrator:
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_wire_delegates(self, mock_load):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_load.return_value = (role, MagicMock())
@@ -307,7 +307,7 @@ class TestComposeOrchestrator:
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_context_manager(self, mock_load):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_load.return_value = (role, MagicMock())
@@ -330,7 +330,7 @@ class TestComposeOrchestrator:
     def test_end_to_end_delegation(self, mock_load, mock_execute):
         """Producer output flows to consumer inbox via DelegateSink."""
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_agent = MagicMock()
@@ -369,7 +369,7 @@ class TestComposeOrchestrator:
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_role_sinks_built_when_no_compose_sink(self, mock_load, mock_build_sink):
         """Role with sinks and no compose sink: role sinks are active."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role_data = _make_role_data()
         role_data["spec"]["sinks"] = [{"type": "file", "path": "out.json"}]
@@ -393,7 +393,7 @@ class TestComposeOrchestrator:
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_role_sinks_dropped_when_delegate_without_keep(self, mock_load):
         """Role with sinks + delegate sink (keep=false): role sinks not built."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role_data = _make_role_data()
         role_data["spec"]["sinks"] = [{"type": "file", "path": "out.json"}]
@@ -422,7 +422,7 @@ class TestComposeOrchestrator:
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_role_sinks_kept_with_keep_existing(self, mock_load, mock_build_sink):
         """Role with sinks + delegate sink (keep=true): role sinks built alongside delegate."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role_data = _make_role_data()
         role_data["spec"]["sinks"] = [{"type": "file", "path": "out.json"}]
@@ -457,7 +457,7 @@ class TestComposeOrchestrator:
     def test_session_pruning_called(self, mock_execute):
         """Memory session pruning is called after each execution."""
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role_data = _make_role_data()
         role_data["spec"]["memory"] = {}  # enable memory with defaults
@@ -509,7 +509,7 @@ class TestComposeOrchestrator:
 class TestDelegateHealth:
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_delegate_health_returns_per_sink_info(self, mock_load):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_load.return_value = (role, MagicMock())
@@ -528,7 +528,7 @@ class TestDelegateHealth:
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_audit_logger_passed_to_sinks(self, mock_load, tmp_path):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
         from initrunner.audit.logger import AuditLogger
 
         role = RoleDefinition.model_validate(_make_role_data())
@@ -547,7 +547,7 @@ class TestDelegateHealth:
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_stop_flushes_delegate_sinks(self, mock_load, tmp_path):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
         from initrunner.audit.logger import AuditLogger
 
         role = RoleDefinition.model_validate(_make_role_data())
@@ -574,7 +574,7 @@ class TestComposeServiceThreadSafety:
     def test_concurrent_handle_prompt_counter_accuracy(self, mock_execute):
         """N threads calling _handle_prompt — run_count and error_count must be exact."""
         from initrunner.agent.executor import RunResult
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         n_threads = 16
         calls_per_thread = 20
@@ -656,7 +656,7 @@ class TestSharedMemory:
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
     def test_shared_memory_patches_store_path(self, mock_dotenv, mock_load, mock_build):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
 
@@ -683,7 +683,7 @@ class TestSharedMemory:
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
     def test_shared_memory_default_path(self, mock_dotenv, mock_load, mock_build):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
 
@@ -710,7 +710,7 @@ class TestSharedMemory:
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
     def test_shared_memory_max_memories_propagated(self, mock_dotenv, mock_load, mock_build):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
 
@@ -736,7 +736,7 @@ class TestSharedMemory:
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
     def test_shared_memory_overrides_existing_role_memory(self, mock_dotenv, mock_load, mock_build):
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
 
@@ -767,7 +767,7 @@ class TestSharedMemory:
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_no_shared_memory_uses_load_and_build(self, mock_load):
         """Without shared memory, the standard load_and_build path is used."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_make_role_data())
         mock_load.return_value = (role, MagicMock())

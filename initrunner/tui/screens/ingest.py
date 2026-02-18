@@ -13,7 +13,7 @@ from initrunner.tui.screens.base import RoleScreen
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class IngestScreen(RoleScreen):

@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, create_model
 
-from initrunner.agent.schema import OutputConfig
+from initrunner.agent.schema.output import OutputConfig
 
 # JSON Schema type string → Python type
 _JS_TYPE_MAP: dict[str, type] = {

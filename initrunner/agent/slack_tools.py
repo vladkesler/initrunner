@@ -9,7 +9,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent.schema import SlackToolConfig
+from initrunner.agent.schema.tools import SlackToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 

@@ -10,18 +10,10 @@ from starlette.testclient import TestClient
 from typer.testing import CliRunner
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    Guardrails,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RateLimitConfig,
-    RoleDefinition,
-    SecurityPolicy,
-    ServerConfig,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+from initrunner.agent.schema.security import RateLimitConfig, SecurityPolicy, ServerConfig
 from initrunner.cli.main import app as cli_app
 from initrunner.server.conversations import ConversationStore
 from initrunner.server.convert import openai_messages_to_pydantic

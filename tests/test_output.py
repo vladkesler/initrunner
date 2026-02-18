@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from initrunner.agent.output import build_output_model, resolve_output_type
-from initrunner.agent.schema import OutputConfig
+from initrunner.agent.schema.output import OutputConfig
 
 
 def _minimal_role_data(**spec_overrides: object) -> dict:
@@ -379,7 +379,7 @@ class TestExecutorBaseModelSerialization:
 class TestStreamingGuard:
     def test_streaming_with_structured_output_raises(self):
         """execute_run_stream raises ValueError when output.type is json_schema."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_minimal_role_data(**_json_schema_output_spec()))
 
@@ -391,7 +391,7 @@ class TestStreamingGuard:
 
     def test_streaming_with_text_output_does_not_raise(self):
         """execute_run_stream does not raise for text output (normal path)."""
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_minimal_role_data(output={"type": "text"}))
 
@@ -422,7 +422,7 @@ class TestPipelinePrecedence:
     def test_pipeline_text_overrides_role_json_schema(self, mock_require, mock_agent_cls):
         """Pipeline step output_format=text → output_type=str, overriding role json_schema."""
         from initrunner.agent.loader import build_agent
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_minimal_role_data(**_json_schema_output_spec()))
 
@@ -437,7 +437,7 @@ class TestPipelinePrecedence:
     def test_pipeline_json_overrides_role_json_schema(self, mock_require, mock_agent_cls):
         """Pipeline step output_format=json → output_type=dict, overriding role json_schema."""
         from initrunner.agent.loader import build_agent
-        from initrunner.agent.schema import RoleDefinition
+        from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_minimal_role_data(**_json_schema_output_spec()))
 

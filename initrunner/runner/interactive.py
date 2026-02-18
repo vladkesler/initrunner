@@ -8,7 +8,7 @@ from pydantic_ai.models import Model
 from initrunner.agent.executor import check_token_budget
 from initrunner.agent.memory_ops import finalize_turn, load_session
 from initrunner.agent.prompt import UserPrompt, build_multimodal_prompt
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import _display_budget_warning, _display_save_warning, console
 from initrunner.runner.single import run_single

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from textual.app import ComposeResult
 
     from initrunner.agent.executor import RunResult
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.stores.base import SessionSummary
 
 from initrunner.agent.executor import check_token_budget

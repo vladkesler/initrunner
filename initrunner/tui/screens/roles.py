@@ -14,7 +14,7 @@ from initrunner.tui.services import DiscoveredRole
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class RolesScreen(FilterableScreen):

@@ -12,7 +12,7 @@ from initrunner.tui.screens.base import BaseScreen
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class MemoryScreen(BaseScreen):

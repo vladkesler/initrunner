@@ -7,14 +7,8 @@ import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.eval.runner import (
     CaseResult,
     SuiteLoadError,

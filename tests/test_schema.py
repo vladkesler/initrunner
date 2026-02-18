@@ -4,35 +4,29 @@ import pytest
 from pydantic import ValidationError
 
 from initrunner import __version__
-from initrunner.agent.schema import (
-    ApiVersion,
-    ChunkingConfig,
-    CronTriggerConfig,
-    CustomSinkConfig,
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, IngestConfig
+from initrunner.agent.schema.output import OutputConfig
+from initrunner.agent.schema.role import RoleDefinition, parse_tool_list
+from initrunner.agent.schema.sinks import CustomSinkConfig, FileSinkConfig, WebhookSinkConfig
+from initrunner.agent.schema.tools import (
     CustomToolConfig,
     DateTimeToolConfig,
     DelegateAgentRef,
     DelegateToolConfig,
-    EmbeddingConfig,
-    FileSinkConfig,
     FileSystemToolConfig,
-    FileWatchTriggerConfig,
     GitToolConfig,
-    Guardrails,
     HttpToolConfig,
-    IngestConfig,
-    Kind,
     McpToolConfig,
-    Metadata,
-    ModelConfig,
-    OutputConfig,
     PythonToolConfig,
-    RoleDefinition,
     SqlToolConfig,
-    WebhookSinkConfig,
-    WebhookTriggerConfig,
     WebReaderToolConfig,
-    parse_tool_list,
+)
+from initrunner.agent.schema.triggers import (
+    CronTriggerConfig,
+    FileWatchTriggerConfig,
+    WebhookTriggerConfig,
 )
 
 
@@ -265,7 +259,7 @@ class TestToolConfig:
         data = _minimal_role_data()
         data["spec"]["tools"] = [{"type": "unknown_tool", "api_key": "test"}]
         role = RoleDefinition.model_validate(data)
-        from initrunner.agent.schema import PluginToolConfig
+        from initrunner.agent.schema.tools import PluginToolConfig
 
         assert isinstance(role.spec.tools[0], PluginToolConfig)
         assert role.spec.tools[0].type == "unknown_tool"
@@ -670,7 +664,7 @@ class TestParseToolList:
         assert isinstance(result[0], DateTimeToolConfig)
 
     def test_parses_unknown_as_plugin(self):
-        from initrunner.agent.schema import PluginToolConfig
+        from initrunner.agent.schema.tools import PluginToolConfig
 
         result = parse_tool_list([{"type": "custom_xyz", "key": "val"}])
         assert len(result) == 1

@@ -6,7 +6,8 @@ from typing import Literal
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent.schema import MemoryConfig, ToolSandboxConfig
+from initrunner.agent.schema.memory import MemoryConfig
+from initrunner.agent.schema.security import ToolSandboxConfig
 from initrunner.agent.tools.retrieval import _validate_store_path
 from initrunner.ingestion.embeddings import embed_single as _embed_single
 

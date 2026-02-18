@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import sqlite3
 
-from initrunner.agent.schema import SqlToolConfig
+from initrunner.agent.schema.tools import SqlToolConfig
 from initrunner.agent.sql_tools import build_sql_toolset
 from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

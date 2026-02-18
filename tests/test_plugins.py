@@ -9,14 +9,14 @@ from pydantic import BaseModel
 from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent.plugins import PluginRegistry, ToolPlugin
-from initrunner.agent.schema import PluginToolConfig
+from initrunner.agent.schema.tools import PluginToolConfig
 from initrunner.agent.tools import _build_plugin_toolset
 from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

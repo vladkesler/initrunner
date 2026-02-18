@@ -10,7 +10,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner._html import fetch_url_as_markdown
 from initrunner.agent._urls import SSRFBlocked
-from initrunner.agent.schema import WebScraperToolConfig
+from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 from initrunner.ingestion.chunker import chunk_text
 from initrunner.ingestion.embeddings import embed_single as _embed_single

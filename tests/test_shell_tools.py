@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from initrunner.agent.schema import ShellToolConfig
+from initrunner.agent.schema.tools import ShellToolConfig
 from initrunner.agent.shell_tools import (
     _check_for_shell_operators,
     _parse_command,
@@ -17,7 +17,7 @@ from initrunner.agent.tools._registry import ToolBuildContext
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

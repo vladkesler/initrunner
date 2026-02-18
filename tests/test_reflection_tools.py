@@ -7,7 +7,7 @@ from initrunner.agent.reflection import (
     ReflectionState,
     format_reflection_state,
 )
-from initrunner.agent.schema import AutonomyConfig
+from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.tools.reflection import build_reflection_toolset
 
 

@@ -8,12 +8,8 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent.schema import (
-    CustomToolConfig,
-    DelegateToolConfig,
-    PluginToolConfig,
-    ToolSandboxConfig,
-)
+from initrunner.agent.schema.security import ToolSandboxConfig
+from initrunner.agent.schema.tools import CustomToolConfig, DelegateToolConfig, PluginToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 if TYPE_CHECKING:

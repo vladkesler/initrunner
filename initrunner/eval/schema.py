@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from initrunner.agent.schema import ApiVersion
+from initrunner.agent.schema.base import ApiVersion
 
 
 class TestSuiteKind:

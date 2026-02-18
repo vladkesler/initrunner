@@ -22,7 +22,7 @@ from starlette.routing import Route
 from initrunner.agent.executor import execute_run, execute_run_stream
 from initrunner.agent.policies import validate_input
 from initrunner.agent.prompt import extract_text_from_prompt
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.server.conversations import ConversationStore
 from initrunner.server.convert import openai_messages_to_pydantic

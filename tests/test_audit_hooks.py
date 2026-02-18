@@ -15,7 +15,7 @@ from initrunner.agent.sandbox import (
     sandbox_scope,
     set_audit_logger,
 )
-from initrunner.agent.schema import ToolSandboxConfig
+from initrunner.agent.schema.security import ToolSandboxConfig
 
 
 @pytest.fixture(autouse=True, scope="session")

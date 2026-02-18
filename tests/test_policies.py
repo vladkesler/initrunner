@@ -12,7 +12,7 @@ from initrunner.agent.policies import (
     validate_input,
     validate_output,
 )
-from initrunner.agent.schema import ContentPolicy
+from initrunner.agent.schema.security import ContentPolicy
 
 
 class TestDefaultPolicyIsNoOp:

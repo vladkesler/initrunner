@@ -9,13 +9,13 @@ from pathlib import Path
 import pytest
 
 from initrunner.agent.git_tools import build_git_toolset
-from initrunner.agent.schema import GitToolConfig
+from initrunner.agent.schema.tools import GitToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
     """Build a minimal ToolBuildContext for tests."""
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
         {

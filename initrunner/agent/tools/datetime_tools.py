@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent.schema import DateTimeToolConfig
+from initrunner.agent.schema.tools import DateTimeToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 

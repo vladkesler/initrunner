@@ -204,7 +204,7 @@ def run_wizard() -> None:
     # Validate before writing
     import yaml
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
     try:
         raw = yaml.safe_load(yaml_content)

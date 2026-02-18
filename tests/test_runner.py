@@ -4,16 +4,10 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema import (
-    AgentSpec,
-    ApiVersion,
-    AutonomyConfig,
-    Guardrails,
-    Kind,
-    Metadata,
-    ModelConfig,
-    RoleDefinition,
-)
+from initrunner.agent.schema.autonomy import AutonomyConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.runner import DaemonTokenTracker, run_autonomous, run_single
 
 

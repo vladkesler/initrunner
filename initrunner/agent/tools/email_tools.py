@@ -16,7 +16,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent.schema import EmailToolConfig
+from initrunner.agent.schema.tools import EmailToolConfig
 from initrunner.agent.tools._registry import register_tool
 
 if TYPE_CHECKING:

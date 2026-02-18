@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pydantic_ai import Agent
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 _SESSION_TTL = 3600  # 1 hour
 _CLEANUP_INTERVAL = 300  # 5 minutes

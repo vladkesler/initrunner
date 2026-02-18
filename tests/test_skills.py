@@ -9,17 +9,19 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from initrunner.agent.schema import (
+from initrunner.agent.schema.base import ModelConfig
+from initrunner.agent.schema.role import (
     AgentSpec,
-    DateTimeToolConfig,
-    FileSystemToolConfig,
-    HttpToolConfig,
-    ModelConfig,
     RequiresConfig,
     SkillDefinition,
     SkillFrontmatter,
-    WebReaderToolConfig,
     parse_tool_list,
+)
+from initrunner.agent.schema.tools import (
+    DateTimeToolConfig,
+    FileSystemToolConfig,
+    HttpToolConfig,
+    WebReaderToolConfig,
 )
 from initrunner.agent.skills import (
     ResolvedSkill,

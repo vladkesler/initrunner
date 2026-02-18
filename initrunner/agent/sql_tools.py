@@ -10,7 +10,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._paths import _INITRUNNER_DIR, validate_path_within
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent.schema import SqlToolConfig
+from initrunner.agent.schema.tools import SqlToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _BLOCKED_ATTACH = re.compile(r"\bATTACH\s+DATABASE\b", re.IGNORECASE)

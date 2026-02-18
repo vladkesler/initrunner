@@ -11,7 +11,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._urls import SSRFBlocked, SSRFSafeTransport
-from initrunner.agent.schema import ApiEndpoint, ApiToolConfig
+from initrunner.agent.schema.tools import ApiEndpoint, ApiToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _JSON_SCHEMA_TO_PYTHON: dict[str, type] = {

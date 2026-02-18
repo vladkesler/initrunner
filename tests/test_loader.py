@@ -14,7 +14,7 @@ from initrunner.agent.loader import (
     build_agent,
     load_role,
 )
-from initrunner.agent.schema import ModelConfig
+from initrunner.agent.schema.base import ModelConfig
 
 
 @pytest.fixture

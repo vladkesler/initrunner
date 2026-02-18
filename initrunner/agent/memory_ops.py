@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.stores.base import MemoryStoreBase, MemoryType, SessionSummary
 
 _logger = logging.getLogger(__name__)

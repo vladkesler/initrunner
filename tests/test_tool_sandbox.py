@@ -11,7 +11,9 @@ from unittest.mock import patch
 import pytest
 
 from initrunner.agent._paths import validate_path_within
-from initrunner.agent.schema import McpToolConfig, RoleDefinition, ToolSandboxConfig
+from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.schema.security import ToolSandboxConfig
+from initrunner.agent.schema.tools import McpToolConfig
 from initrunner.agent.tools import (
     _validate_custom_tool_imports,
     _validate_store_path,

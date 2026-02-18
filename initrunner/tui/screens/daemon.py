@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pydantic_ai import Agent
     from textual.app import ComposeResult
 
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
 
 _MAX_EVENT_LOG_LINES = 5000
 

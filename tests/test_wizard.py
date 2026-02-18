@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from initrunner.agent.schema import RoleDefinition
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.templates import (
     PROVIDER_MODELS,
     TOOL_DESCRIPTIONS,

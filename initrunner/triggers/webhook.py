@@ -13,7 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from initrunner.agent.schema import WebhookTriggerConfig
+from initrunner.agent.schema.triggers import WebhookTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
 
 logger = logging.getLogger(__name__)

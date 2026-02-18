@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from initrunner.agent.schema import McpToolConfig
+from initrunner.agent.schema.tools import McpToolConfig
 
 
 def list_mcp_tools(

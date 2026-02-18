@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from pydantic_ai.models import Model
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import ContentPolicy
+    from initrunner.agent.schema.security import ContentPolicy
 
 _logger = logging.getLogger(__name__)
 

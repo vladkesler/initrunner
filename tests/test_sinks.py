@@ -8,12 +8,8 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema import (
-    CustomSinkConfig,
-    FileSinkConfig,
-    RoleDefinition,
-    WebhookSinkConfig,
-)
+from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.schema.sinks import CustomSinkConfig, FileSinkConfig, WebhookSinkConfig
 from initrunner.sinks.base import SinkPayload
 from initrunner.sinks.dispatcher import SinkDispatcher
 

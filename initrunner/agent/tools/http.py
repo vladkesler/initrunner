@@ -7,7 +7,7 @@ from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner.agent._truncate import truncate_output
 from initrunner.agent._urls import SSRFBlocked, SSRFSafeTransport
-from initrunner.agent.schema import HttpToolConfig
+from initrunner.agent.schema.tools import HttpToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
 _MAX_HTTP_RESPONSE_BYTES = 102_400  # 100 KB

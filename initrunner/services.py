@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from initrunner.agent.executor import AutonomousResult, RunResult
     from initrunner.agent.prompt import UserPrompt
-    from initrunner.agent.schema import RoleDefinition
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger, AuditRecord
     from initrunner.ingestion.pipeline import FileStatus, IngestStats
     from initrunner.stores.base import Memory, MemoryStoreBase, MemoryType, SessionSummary
@@ -437,7 +437,7 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
     """
     import yaml
 
-    from initrunner.agent.schema import RoleDefinition as RoleDef
+    from initrunner.agent.schema.role import RoleDefinition as RoleDef
 
     # Parse and validate first
     try:

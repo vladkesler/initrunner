@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 
-from initrunner.agent.schema import AutonomyConfig
+from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.tools.scheduling import build_scheduling_toolset
 from initrunner.triggers.base import TriggerEvent
 from initrunner.triggers.schedule_queue import ScheduleQueue

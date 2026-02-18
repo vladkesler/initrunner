@@ -10,7 +10,7 @@ from initrunner.agent._paths import _INITRUNNER_DIR, validate_path_within
 from initrunner.stores.base import StoreConfig
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema import ToolSandboxConfig
+    from initrunner.agent.schema.security import ToolSandboxConfig
 
 
 from initrunner.ingestion.embeddings import embed_single as _embed_single

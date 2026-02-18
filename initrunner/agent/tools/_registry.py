@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
-    from initrunner.agent.schema import RoleDefinition, ToolConfigBase
+    from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.agent.schema.tools import ToolConfigBase
 
 # ---------------------------------------------------------------------------
 # Build context passed to every builder
