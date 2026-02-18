@@ -457,10 +457,14 @@ class SqliteVecDocumentStore(DocumentStore):
 
     def _migrate(self) -> None:
         """Run schema migrations for existing databases."""
-        columns = {row[1] for row in self._conn.execute("PRAGMA table_info(chunks)").fetchall()}
-        if "ingested_at" not in columns:
-            self._conn.execute("ALTER TABLE chunks ADD COLUMN ingested_at TEXT NOT NULL DEFAULT ''")
-            self._conn.commit()
+
+        def _do(c):
+            columns = {row[1] for row in c.execute("PRAGMA table_info(chunks)").fetchall()}
+            if "ingested_at" not in columns:
+                c.execute("ALTER TABLE chunks ADD COLUMN ingested_at TEXT NOT NULL DEFAULT ''")
+                c.commit()
+
+        _retry_on_locked(self._conn, _do)
 
     @property
     def dimensions(self) -> int | None:
@@ -701,23 +705,25 @@ class SqliteVecMemoryStore(MemoryStoreBase):
 
     def _migrate_memory_columns(self) -> None:
         """Add memory_type, metadata_json, consolidated_at columns to existing DBs."""
-        columns = {row[1] for row in self._conn.execute("PRAGMA table_info(memories)").fetchall()}
-        if "memory_type" not in columns:
-            self._conn.execute(
-                "ALTER TABLE memories ADD COLUMN memory_type TEXT NOT NULL DEFAULT 'semantic'"
+
+        def _do(c):
+            columns = {row[1] for row in c.execute("PRAGMA table_info(memories)").fetchall()}
+            if "memory_type" not in columns:
+                c.execute(
+                    "ALTER TABLE memories ADD COLUMN memory_type TEXT NOT NULL DEFAULT 'semantic'"
+                )
+            if "metadata_json" not in columns:
+                c.execute("ALTER TABLE memories ADD COLUMN metadata_json TEXT")
+            if "consolidated_at" not in columns:
+                c.execute("ALTER TABLE memories ADD COLUMN consolidated_at TEXT")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_memories_type ON memories (memory_type);")
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_memories_type_category "
+                "ON memories (memory_type, category);"
             )
-        if "metadata_json" not in columns:
-            self._conn.execute("ALTER TABLE memories ADD COLUMN metadata_json TEXT")
-        if "consolidated_at" not in columns:
-            self._conn.execute("ALTER TABLE memories ADD COLUMN consolidated_at TEXT")
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_memories_type ON memories (memory_type);"
-        )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_memories_type_category "
-            "ON memories (memory_type, category);"
-        )
-        self._conn.commit()
+            c.commit()
+
+        _retry_on_locked(self._conn, _do)
 
     def _ensure_vec_table(self, dimensions: int) -> None:
         """Lazily create the memories_vec table when dimensions become known."""
