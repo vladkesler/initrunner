@@ -159,6 +159,30 @@ class TestModelConfig:
         mc = ModelConfig(provider="anthropic", name="claude-sonnet-4-5-20250929")
         assert mc.needs_custom_provider() is False
 
+    def test_is_reasoning_model_o3_mini(self):
+        mc = ModelConfig(provider="openai", name="o3-mini")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_o1_preview(self):
+        mc = ModelConfig(provider="openai", name="o1-preview")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_o4_mini(self):
+        mc = ModelConfig(provider="openai", name="o4-mini")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_case_insensitive(self):
+        mc = ModelConfig(provider="OpenAI", name="O3-Mini")
+        assert mc.is_reasoning_model() is True
+
+    def test_is_reasoning_model_gpt_is_false(self):
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
+        assert mc.is_reasoning_model() is False
+
+    def test_is_reasoning_model_non_openai_provider(self):
+        mc = ModelConfig(provider="anthropic", name="o3-mini")
+        assert mc.is_reasoning_model() is False
+
 
 class TestGuardrails:
     def test_defaults(self):

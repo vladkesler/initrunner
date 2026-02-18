@@ -42,3 +42,9 @@ class ModelConfig(BaseModel):
 
     def needs_custom_provider(self) -> bool:
         return self.provider == "ollama" or self.base_url is not None
+
+    def is_reasoning_model(self) -> bool:
+        """Return True for OpenAI o-series reasoning models that don't support temperature."""
+        return self.provider.lower() == "openai" and self.name.lower().startswith(
+            ("o1", "o3", "o4")
+        )

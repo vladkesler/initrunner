@@ -280,6 +280,39 @@ class TestBuildAgent:
         with pytest.raises(RoleLoadError, match="Provider 'anthropic' requires extra"):
             build_agent(role)
 
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_temperature_included_for_standard_model(self, mock_require, mock_agent_cls, valid_yaml):
+        role = load_role(valid_yaml)
+        build_agent(role)
+        call_kwargs = mock_agent_cls.call_args
+        assert "temperature" in call_kwargs.kwargs["model_settings"]
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_temperature_omitted_for_reasoning_model(self, mock_require, mock_agent_cls, tmp_path):
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: reasoning-agent
+              description: Test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role)
+        call_kwargs = mock_agent_cls.call_args
+        assert "temperature" not in call_kwargs.kwargs["model_settings"]
+        assert "max_tokens" in call_kwargs.kwargs["model_settings"]
+
 
 class TestApiKeyValidation:
     def test_missing_openai_key_raises(self, monkeypatch):
