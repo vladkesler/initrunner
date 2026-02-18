@@ -5,8 +5,31 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from initrunner import services
-from initrunner.services import DiscoveredRole  # re-export for TUI screens
+from initrunner.services.discovery import (
+    DiscoveredRole,  # re-export for TUI screens
+    discover_roles_sync,
+    validate_role_sync,
+)
+from initrunner.services.execution import (
+    build_agent_sync,
+    execute_run_stream_sync,
+    execute_run_sync,
+)
+from initrunner.services.memory import (
+    clear_memories_sync,
+    delete_session_sync,
+    export_memories_sync,
+    list_memories_sync,
+    list_sessions_sync,
+    load_session_by_id_sync,
+    load_session_sync,
+    save_session_sync,
+)
+from initrunner.services.operations import (
+    query_audit_sync,
+    run_ingest_sync,
+    start_triggers_sync,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,7 +47,7 @@ __all__ = ["DiscoveredRole", "ServiceBridge"]
 
 
 class ServiceBridge:
-    """Async bridge wrapping shared services.* functions via asyncio.to_thread().
+    """Async bridge wrapping shared services functions via asyncio.to_thread().
 
     Each method wraps a sync operation in asyncio.to_thread() so it can
     be awaited from Textual's async event loop without blocking the UI.
@@ -32,15 +55,15 @@ class ServiceBridge:
 
     @staticmethod
     async def discover_roles(dirs: list[Path]) -> list[DiscoveredRole]:
-        return await asyncio.to_thread(services.discover_roles_sync, dirs)
+        return await asyncio.to_thread(discover_roles_sync, dirs)
 
     @staticmethod
     async def validate_role(path: Path) -> DiscoveredRole:
-        return await asyncio.to_thread(services.validate_role_sync, path)
+        return await asyncio.to_thread(validate_role_sync, path)
 
     @staticmethod
     async def build_agent(path: Path) -> tuple[RoleDefinition, Agent]:
-        return await asyncio.to_thread(services.build_agent_sync, path)
+        return await asyncio.to_thread(build_agent_sync, path)
 
     @staticmethod
     async def run_agent(
@@ -52,7 +75,7 @@ class ServiceBridge:
         message_history: list | None = None,
     ) -> tuple[RunResult, list]:
         return await asyncio.to_thread(
-            services.execute_run_sync,
+            execute_run_sync,
             agent,
             role,
             prompt,
@@ -75,7 +98,7 @@ class ServiceBridge:
         Uses execute_run_stream_sync() to stream tokens with full guardrails,
         audit logging, and content policy enforcement.
         """
-        return services.execute_run_stream_sync(
+        return execute_run_stream_sync(
             agent,
             role,
             prompt,
@@ -93,7 +116,7 @@ class ServiceBridge:
         limit: int = 100,
     ) -> list[AuditRecord]:
         return await asyncio.to_thread(
-            services.query_audit_sync,
+            query_audit_sync,
             agent_name=agent_name,
             since=since,
             until=until,
@@ -109,7 +132,7 @@ class ServiceBridge:
         progress_callback: Callable[[Path, Any], None] | None = None,
     ) -> Any:
         return await asyncio.to_thread(
-            services.run_ingest_sync,
+            run_ingest_sync,
             role,
             role_path,
             force=force,
@@ -124,7 +147,7 @@ class ServiceBridge:
         limit: int = 100,
     ) -> list[Memory]:
         return await asyncio.to_thread(
-            services.list_memories_sync,
+            list_memories_sync,
             role,
             category=category,
             limit=limit,
@@ -138,7 +161,7 @@ class ServiceBridge:
         memories_only: bool = False,
     ) -> None:
         return await asyncio.to_thread(
-            services.clear_memories_sync,
+            clear_memories_sync,
             role,
             sessions_only=sessions_only,
             memories_only=memories_only,
@@ -146,7 +169,7 @@ class ServiceBridge:
 
     @staticmethod
     async def export_memories(role: RoleDefinition) -> list[dict]:
-        return await asyncio.to_thread(services.export_memories_sync, role)
+        return await asyncio.to_thread(export_memories_sync, role)
 
     @staticmethod
     async def save_session(
@@ -155,7 +178,7 @@ class ServiceBridge:
         messages: list,
     ) -> bool:
         return await asyncio.to_thread(
-            services.save_session_sync,
+            save_session_sync,
             role,
             session_id,
             messages,
@@ -168,7 +191,7 @@ class ServiceBridge:
         max_messages: int | None = None,
     ) -> list | None:
         return await asyncio.to_thread(
-            services.load_session_sync,
+            load_session_sync,
             role,
             max_messages=max_messages,
         )
@@ -179,7 +202,7 @@ class ServiceBridge:
         limit: int = 20,
     ) -> list[SessionSummary]:
         return await asyncio.to_thread(
-            services.list_sessions_sync,
+            list_sessions_sync,
             role,
             limit=limit,
         )
@@ -191,7 +214,7 @@ class ServiceBridge:
         max_messages: int | None = None,
     ) -> list | None:
         return await asyncio.to_thread(
-            services.load_session_by_id_sync,
+            load_session_by_id_sync,
             role,
             session_id,
             max_messages=max_messages,
@@ -203,7 +226,7 @@ class ServiceBridge:
         session_id: str,
     ) -> bool:
         return await asyncio.to_thread(
-            services.delete_session_sync,
+            delete_session_sync,
             role,
             session_id,
         )
@@ -215,7 +238,7 @@ class ServiceBridge:
     ) -> Any:
         """Build and start triggers. Returns TriggerDispatcher."""
         return await asyncio.to_thread(
-            services.start_triggers_sync,
+            start_triggers_sync,
             role,
             callback,
         )

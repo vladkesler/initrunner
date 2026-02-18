@@ -24,7 +24,7 @@ async def list_memories(
     """List memories for a role."""
     role = (await load_role_with_memory(role_id, request))[0]
 
-    from initrunner.services import list_memories_sync
+    from initrunner.services.memory import list_memories_sync
 
     memories = await asyncio.to_thread(list_memories_sync, role, category=category, limit=limit)
 
@@ -46,7 +46,7 @@ async def clear_memories(role_id: str, request: Request):
     """Clear all memories for a role."""
     role = (await load_role_with_memory(role_id, request))[0]
 
-    from initrunner.services import clear_memories_sync
+    from initrunner.services.memory import clear_memories_sync
 
     await asyncio.to_thread(clear_memories_sync, role)
     return {"status": "ok"}
@@ -57,7 +57,7 @@ async def export_memories(role_id: str, request: Request):
     """Export memories as a downloadable JSON file."""
     role = (await load_role_with_memory(role_id, request))[0]
 
-    from initrunner.services import export_memories_sync
+    from initrunner.services.memory import export_memories_sync
 
     data = await asyncio.to_thread(export_memories_sync, role)
     content = json.dumps(data, indent=2)

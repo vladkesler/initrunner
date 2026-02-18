@@ -63,7 +63,7 @@ class RolesScreen(FilterableScreen):
         self._load_roles()
 
     def _scan_dirs(self) -> list[Path]:
-        from initrunner.services import get_default_role_dirs
+        from initrunner.services.discovery import get_default_role_dirs
 
         return get_default_role_dirs(self._role_dir)
 

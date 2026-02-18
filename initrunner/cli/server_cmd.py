@@ -281,7 +281,7 @@ def ui(
             console.print("Install manually: [bold]pip install 'initrunner[dashboard]'[/bold]")
             raise typer.Exit(1) from None
 
-    from initrunner.services import get_default_role_dirs
+    from initrunner.services.discovery import get_default_role_dirs
 
     explicit = role_dir.resolve() if role_dir else None
     role_dirs = [d.resolve() for d in get_default_role_dirs(explicit)]

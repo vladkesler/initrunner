@@ -35,7 +35,7 @@ async def roles_list(
     q: Annotated[str | None, Query(description="Filter roles by name")] = None,
 ):
     """Roles listing page."""
-    from initrunner.services import role_to_summary
+    from initrunner.services.api_models import role_to_summary
 
     registry = _registry(request)
     discovered = await asyncio.to_thread(registry.discover)
@@ -56,7 +56,7 @@ async def roles_table_fragment(
     q: Annotated[str | None, Query(description="Filter roles by name")] = None,
 ):
     """HTMX fragment: filtered roles table body."""
-    from initrunner.services import role_to_summary
+    from initrunner.services.api_models import role_to_summary
 
     registry = _registry(request)
     discovered = await asyncio.to_thread(registry.discover)
@@ -88,7 +88,7 @@ async def role_create_page(request: Request):
 @router.get("/roles/{role_id}", response_class=HTMLResponse)
 async def role_detail(request: Request, role_id: str):
     """Role detail page."""
-    from initrunner.services import role_to_detail
+    from initrunner.services.api_models import role_to_detail
 
     path = await resolve_role_path(request, role_id)
 
@@ -113,7 +113,7 @@ async def audit_page(
     limit: Annotated[int, Query(ge=1, le=1000)] = 50,
 ):
     """Audit log page."""
-    from initrunner.services import query_audit_sync
+    from initrunner.services.operations import query_audit_sync
 
     audit_logger = getattr(request.app.state, "audit_logger", None)
     records = await asyncio.to_thread(
@@ -142,7 +142,7 @@ async def audit_table_fragment(
     limit: Annotated[int, Query(ge=1, le=1000)] = 50,
 ):
     """HTMX fragment: filtered audit table body."""
-    from initrunner.services import query_audit_sync
+    from initrunner.services.operations import query_audit_sync
 
     audit_logger = getattr(request.app.state, "audit_logger", None)
     records = await asyncio.to_thread(
@@ -158,7 +158,7 @@ async def audit_table_fragment(
 @router.get("/audit/{run_id}", response_class=HTMLResponse)
 async def audit_detail_fragment(request: Request, run_id: str):
     """HTMX fragment: audit record detail panel."""
-    from initrunner.services import query_audit_sync
+    from initrunner.services.operations import query_audit_sync
 
     audit_logger = getattr(request.app.state, "audit_logger", None)
     records = await asyncio.to_thread(query_audit_sync, limit=500, audit_logger=audit_logger)

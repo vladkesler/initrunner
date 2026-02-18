@@ -223,7 +223,7 @@ def create(
     no_confirm: Annotated[bool, typer.Option("--no-confirm", help="Skip preview")] = False,
 ) -> None:
     """Generate a role.yaml from a natural language description using AI."""
-    from initrunner.services import generate_role_sync
+    from initrunner.services.roles import generate_role_sync
 
     model_label = provider or "auto-detected"
     console.print(f"[dim]Generating role.yaml using {model_label} provider...[/dim]")
@@ -254,7 +254,7 @@ def create(
             raise typer.Exit()
 
     # Validate before writing
-    from initrunner.services import save_role_yaml_sync
+    from initrunner.services.roles import save_role_yaml_sync
 
     try:
         save_role_yaml_sync(output, yaml_text)

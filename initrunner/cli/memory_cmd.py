@@ -100,7 +100,7 @@ def memory_list(
     limit: Annotated[int, typer.Option("--limit", help="Maximum number of results")] = 20,
 ) -> None:
     """List memories for an agent."""
-    from initrunner.services import list_memories_sync
+    from initrunner.services.memory import list_memories_sync
 
     role = load_role_or_exit(role_file)
 

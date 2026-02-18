@@ -101,7 +101,7 @@ def role_path_to_id(path: Path) -> str:
 
 def find_role_path(role_id: str, search_dirs: list[Path] | None = None) -> Path | None:
     """Resolve a role ID to a filesystem path by scanning directories."""
-    from initrunner.services import discover_roles_sync
+    from initrunner.services.discovery import discover_roles_sync
 
     dirs = search_dirs or [Path(".")]
     for d in discover_roles_sync(dirs):
@@ -133,7 +133,7 @@ class RoleRegistry:
 
     def discover(self):
         """Return cached discovery results, refreshing if stale."""
-        from initrunner.services import DiscoveredRole, discover_roles_sync
+        from initrunner.services.discovery import DiscoveredRole, discover_roles_sync
 
         now = time.monotonic()
         with self._lock:

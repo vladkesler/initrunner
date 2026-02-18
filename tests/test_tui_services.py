@@ -54,7 +54,7 @@ def non_role_yaml(tmp_path: Path) -> Path:
 
 class TestDiscoverRolesSync:
     def test_discovers_valid_role(self, valid_role_yaml: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         results = discover_roles_sync([valid_role_yaml.parent])
         assert len(results) == 1
@@ -63,7 +63,7 @@ class TestDiscoverRolesSync:
         assert results[0].error is None
 
     def test_discovers_invalid_role(self, invalid_role_yaml: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         results = discover_roles_sync([invalid_role_yaml.parent])
         assert len(results) == 1
@@ -71,32 +71,32 @@ class TestDiscoverRolesSync:
         assert results[0].error is not None
 
     def test_skips_non_role_yaml(self, non_role_yaml: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         results = discover_roles_sync([non_role_yaml.parent])
         assert len(results) == 0
 
     def test_empty_dir(self, tmp_path: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         results = discover_roles_sync([tmp_path])
         assert results == []
 
     def test_nonexistent_dir(self):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         results = discover_roles_sync([Path("/nonexistent/path")])
         assert results == []
 
     def test_deduplicates(self, valid_role_yaml: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         # Pass same dir twice
         results = discover_roles_sync([valid_role_yaml.parent, valid_role_yaml.parent])
         assert len(results) == 1
 
     def test_discovers_role_in_subdirectory(self, tmp_path: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         subdir = tmp_path / "my-agent"
         subdir.mkdir()
@@ -120,7 +120,7 @@ class TestDiscoverRolesSync:
         assert results[0].role.metadata.name == "nested-agent"
 
     def test_multiple_roles(self, tmp_path: Path):
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         for name in ("alpha", "bravo"):
             content = textwrap.dedent(f"""\
@@ -145,14 +145,14 @@ class TestDiscoverRolesSync:
 
 class TestValidateRoleSync:
     def test_valid(self, valid_role_yaml: Path):
-        from initrunner.services import validate_role_sync
+        from initrunner.services.discovery import validate_role_sync
 
         result = validate_role_sync(valid_role_yaml)
         assert result.role is not None
         assert result.error is None
 
     def test_invalid(self, invalid_role_yaml: Path):
-        from initrunner.services import validate_role_sync
+        from initrunner.services.discovery import validate_role_sync
 
         result = validate_role_sync(invalid_role_yaml)
         assert result.role is None
@@ -161,7 +161,7 @@ class TestValidateRoleSync:
 
 class TestQueryAuditSync:
     def test_no_db(self):
-        from initrunner.services import query_audit_sync
+        from initrunner.services.operations import query_audit_sync
 
         # Should return empty when no audit DB exists
         records = query_audit_sync(limit=10)
@@ -176,7 +176,7 @@ class TestRunAgentStreamed:
 
         from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
         from initrunner.agent.schema.role import AgentSpec, RoleDefinition
-        from initrunner.services import execute_run_stream_sync
+        from initrunner.services.execution import execute_run_stream_sync
 
         mock_agent = MagicMock()
         role = RoleDefinition(

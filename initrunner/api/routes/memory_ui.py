@@ -17,7 +17,7 @@ async def memory_page(request: Request, role_id: str):
     """Memory management page."""
     role, _path = await load_role_with_memory(role_id, request)
 
-    from initrunner.services import list_memories_sync
+    from initrunner.services.memory import list_memories_sync
 
     memories = await asyncio.to_thread(list_memories_sync, role, limit=100)
 
@@ -50,7 +50,7 @@ async def memory_table_fragment(
     """HTMX fragment: filtered memory table body."""
     role, _path = await load_role_with_memory(role_id, request)
 
-    from initrunner.services import list_memories_sync
+    from initrunner.services.memory import list_memories_sync
 
     memories = await asyncio.to_thread(
         list_memories_sync, role, category=category if category else None, limit=100
@@ -81,7 +81,7 @@ async def memory_clear(request: Request, role_id: str):
     """HTMX action: clear all memories, return empty table body."""
     role, _path = await load_role_with_memory(role_id, request)
 
-    from initrunner.services import clear_memories_sync
+    from initrunner.services.memory import clear_memories_sync
 
     await asyncio.to_thread(clear_memories_sync, role)
 

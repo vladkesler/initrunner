@@ -33,7 +33,7 @@ initrunner/              # main package (flat layout)
 ├── stores/              # DocumentStore + MemoryStore ABCs and sqlite-vec impls
 ├── triggers/            # cron, file watcher, webhook triggers
 ├── tui/                 # Textual terminal UI
-├── services.py          # shared sync business logic (CLI, API, TUI all use this)
+├── services/            # shared sync business logic (CLI, API, TUI all use this)
 ├── _templates/          # Jinja2 HTML templates (HTMX + DaisyUI)
 ├── _static/             # static assets (HTMX, Tailwind, DaisyUI CSS, app.js)
 ├── _compat.py           # optional dependency helpers
@@ -52,7 +52,7 @@ These rules apply to every task in this codebase:
 - **Lazy imports in CLI**: CLI commands use lazy imports so `--help` stays fast. Don't add top-level imports in `cli/main.py`.
 - **`audit.log()` never raises**: audit failures must not crash agent runs.
 - **Dataclasses for DTOs, Pydantic for config**: internal data (RunResult, AuditRecord) uses dataclasses. Role definitions and API schemas use Pydantic.
-- **`services.py` is the shared layer**: all business logic lives here. CLI, API, and TUI are thin wrappers that call into `services.*`.
+- **`services/` is the shared layer**: all business logic lives here. CLI, API, and TUI are thin wrappers that call into `services.<submodule>.*`.
 
 ## Coding Conventions
 

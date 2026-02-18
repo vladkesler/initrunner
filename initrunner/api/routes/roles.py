@@ -18,7 +18,7 @@ from initrunner.api.models import (
     ValidationResponse,
 )
 from initrunner.api.state import RoleRegistry, role_path_to_id
-from initrunner.services import role_to_detail, role_to_summary
+from initrunner.services.api_models import role_to_detail, role_to_summary
 
 router = APIRouter(prefix="/api/roles", tags=["roles"])
 
@@ -56,7 +56,7 @@ async def list_roles(
     import asyncio
 
     if dirs:
-        from initrunner.services import discover_roles_sync
+        from initrunner.services.discovery import discover_roles_sync
 
         search_dirs = _validate_search_dirs(dirs)
         discovered = await asyncio.to_thread(discover_roles_sync, search_dirs)
@@ -90,7 +90,7 @@ async def validate_role(req: ValidateRequest, request: Request):
     """Validate a role definition file."""
     import asyncio
 
-    from initrunner.services import validate_role_sync
+    from initrunner.services.discovery import validate_role_sync
 
     path = Path(req.path).resolve()
 
@@ -119,7 +119,7 @@ async def create_role(req: RoleCreateRequest, request: Request):
 
     import yaml
 
-    from initrunner.services import save_role_yaml_sync
+    from initrunner.services.roles import save_role_yaml_sync
 
     # Parse YAML to extract name for file path
     try:
@@ -171,7 +171,7 @@ async def generate_role_yaml(req: RoleGenerateRequest, request: Request):
     """Generate role YAML from a natural language description using AI."""
     import asyncio
 
-    from initrunner.services import generate_role_sync
+    from initrunner.services.roles import generate_role_sync
 
     try:
         yaml_text = await asyncio.to_thread(
@@ -191,7 +191,7 @@ async def update_role(role_id: str, req: RoleYamlUpdateRequest, request: Request
     """Update an existing role's YAML content."""
     import asyncio
 
-    from initrunner.services import save_role_yaml_sync
+    from initrunner.services.roles import save_role_yaml_sync
 
     registry = _get_registry(request)
     path = await resolve_role_path(request, role_id)

@@ -23,7 +23,7 @@ def list_tools(
     """List tools available from MCP servers configured in a role."""
     from rich.table import Table
 
-    from initrunner.services import list_mcp_tools_sync
+    from initrunner.services.operations import list_mcp_tools_sync
 
     try:
         results = list_mcp_tools_sync(role_file, index=index)

@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 
 from initrunner.api.models import AuditListResponse, AuditRecordResponse
-from initrunner.services import query_audit_sync
+from initrunner.services.operations import query_audit_sync
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 

@@ -62,7 +62,7 @@ async def start_daemon(role_id: str, request: Request):
                     del _dispatchers[role_id]
             return {"status": "cancelled"}
 
-        from initrunner.services import start_triggers_sync
+        from initrunner.services.operations import start_triggers_sync
 
         def on_event(event):
             _logger.info("Trigger event for %s: %s", role_id, event)
@@ -161,7 +161,7 @@ async def daemon_websocket(websocket: WebSocket, role_id: str):
         }
         loop.call_soon_threadsafe(event_queue.put_nowait, data)
 
-    from initrunner.services import start_triggers_sync
+    from initrunner.services.operations import start_triggers_sync
 
     # Prevent duplicate dispatcher creation via sentinel
     with _dispatcher_lock:

@@ -120,7 +120,8 @@ async def chat_stream(
     if session is None:
         # Try to recover from SQLite if session_id was provided
         if session_id:
-            from initrunner.services import build_agent_sync, load_session_by_id_sync
+            from initrunner.services.execution import build_agent_sync
+            from initrunner.services.memory import load_session_by_id_sync
 
             role, agent = await run_in_thread(
                 build_agent_sync, role_path, error_msg="Failed to build agent"
@@ -133,10 +134,10 @@ async def chat_stream(
                 sid, role_id, agent, role, role_path, message_history=recovered
             )
         else:
-            from initrunner.services import build_agent_sync
+            from initrunner.services.execution import build_agent_sync as _build_agent
 
             role, agent = await run_in_thread(
-                build_agent_sync, role_path, error_msg="Failed to build agent"
+                _build_agent, role_path, error_msg="Failed to build agent"
             )
 
             session = sessions.create(sid, role_id, agent, role, role_path)
@@ -184,7 +185,7 @@ async def chat_stream(
         user_prompt = prompt
 
     async def event_stream():
-        from initrunner.services import execute_run_stream_sync
+        from initrunner.services.execution import execute_run_stream_sync
 
         token_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
         loop = asyncio.get_running_loop()
@@ -248,7 +249,7 @@ async def chat_stream(
             # Persist to SQLite if memory is configured
             if session.role.spec.memory is not None:
                 try:
-                    from initrunner.services import save_session_sync
+                    from initrunner.services.memory import save_session_sync
 
                     await asyncio.to_thread(
                         save_session_sync, session.role, sid, session.message_history
@@ -292,7 +293,7 @@ async def list_chat_sessions(request: Request, role_id: str):
     """List stored sessions for a role."""
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.services import list_sessions_sync
+    from initrunner.services.memory import list_sessions_sync
 
     role = await load_role_async(role_path)
     if role.spec.memory is None:
@@ -317,7 +318,7 @@ async def delete_chat_session(request: Request, role_id: str, session_id: str):
     """Delete a stored session."""
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.services import delete_session_sync
+    from initrunner.services.memory import delete_session_sync
 
     role = await load_role_async(role_path)
     ok = await asyncio.to_thread(delete_session_sync, role, session_id)
@@ -362,7 +363,7 @@ async def get_session_messages(request: Request, role_id: str, session_id: str):
     # 2. Fall back to SQLite (roles with memory configured)
     role_path = await resolve_role_path(request, role_id)
 
-    from initrunner.services import load_session_by_id_sync
+    from initrunner.services.memory import load_session_by_id_sync
 
     role = await load_role_async(role_path)
     messages = await asyncio.to_thread(load_session_by_id_sync, role, session_id)

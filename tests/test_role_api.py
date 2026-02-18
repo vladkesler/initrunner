@@ -173,7 +173,7 @@ class TestRoleCreatePage:
 
 class TestServicesLayer:
     def test_save_role_yaml_sync_valid(self, tmp_path):
-        from initrunner.services import save_role_yaml_sync
+        from initrunner.services.roles import save_role_yaml_sync
 
         path = tmp_path / "out.yaml"
         role = save_role_yaml_sync(path, _VALID_YAML)
@@ -181,14 +181,14 @@ class TestServicesLayer:
         assert path.exists()
 
     def test_save_role_yaml_sync_invalid(self, tmp_path):
-        from initrunner.services import save_role_yaml_sync
+        from initrunner.services.roles import save_role_yaml_sync
 
         path = tmp_path / "out.yaml"
         with pytest.raises(ValueError):
             save_role_yaml_sync(path, "not yaml: [[")
 
     def test_save_role_yaml_sync_creates_backup(self, tmp_path):
-        from initrunner.services import save_role_yaml_sync
+        from initrunner.services.roles import save_role_yaml_sync
 
         path = tmp_path / "out.yaml"
         path.write_text("original content")
@@ -198,7 +198,7 @@ class TestServicesLayer:
         assert bak.read_text() == "original content"
 
     def test_build_role_yaml_sync(self):
-        from initrunner.services import build_role_yaml_sync
+        from initrunner.services.roles import build_role_yaml_sync
 
         result = build_role_yaml_sync(name="test-agent")
         assert "test-agent" in result

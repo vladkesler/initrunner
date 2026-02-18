@@ -86,7 +86,7 @@ def doctor(
             from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
             from initrunner.agent.schema.guardrails import Guardrails
             from initrunner.agent.schema.role import AgentSpec, RoleDefinition
-            from initrunner.services import _detect_provider
+            from initrunner.services.roles import _detect_provider
             from initrunner.templates import _default_model_name
 
             detected_provider = _detect_provider()

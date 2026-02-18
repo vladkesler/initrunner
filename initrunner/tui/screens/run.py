@@ -447,7 +447,7 @@ class RunScreen(RoleScreen):
             self.notify("No conversation to export", severity="warning")
             return
 
-        from initrunner.services import export_session_markdown_sync
+        from initrunner.services.memory import export_session_markdown_sync
 
         md = export_session_markdown_sync(self._role, self._message_history)
         filename = f"{self._role.metadata.name}-{self._session_id[:8]}.md"

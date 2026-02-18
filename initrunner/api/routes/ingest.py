@@ -78,7 +78,7 @@ async def run_ingestion(
                 pass  # client is slow or gone, drop progress update
 
         def run_ingest():
-            from initrunner.services import run_ingest_sync
+            from initrunner.services.operations import run_ingest_sync
 
             return run_ingest_sync(role, role_path, force=force, progress_callback=on_progress)
 
