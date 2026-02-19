@@ -22,7 +22,7 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **v1.1.4** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.1.5** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## Table of Contents
 
@@ -426,8 +426,19 @@ Third-party packages can register new tool types via the `initrunner.tools` entr
 | Single-shot | `initrunner run role.yaml -p "prompt"` | One question, one answer |
 | Interactive | `initrunner run role.yaml -i` | Multi-turn chat (REPL) |
 | Autonomous | `initrunner run role.yaml -p "prompt" -a` | Multi-step agentic loop with self-reflection |
+| **Intent Sensing** | `initrunner run --sense -p "prompt"` | Pick the best role automatically from discovered roles |
 | Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook) |
 | API server | `initrunner serve role.yaml` | OpenAI-compatible HTTP API |
+
+#### Intent Sensing options
+
+| Flag | Description |
+|------|-------------|
+| `--sense` | Sense the best role for the given prompt |
+| `--role-dir PATH` | Directory to search for roles (used with `--sense`) |
+| `--confirm-role` | Confirm the sensed role before running |
+
+See [Intent Sensing](docs/core/intent_sensing.md) for algorithm details, role tagging tips, and troubleshooting.
 
 ### Guardrails
 
@@ -459,6 +470,9 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 | `run <role.yaml> -i` | Interactive REPL |
 | `run <role.yaml> -p "..." -a` | Autonomous agentic loop |
 | `run <role.yaml> -p "..." -a --max-iterations N` | Autonomous with iteration limit |
+| `run --sense -p "..."` | Sense best role and run |
+| `run --sense --role-dir PATH -p "..."` | Sense best role from a specific directory |
+| `run --sense --confirm-role -p "..."` | Sense best role with confirmation prompt |
 | `validate <role.yaml>` | Validate a role definition |
 | `init --name <name> [--model <model>]` | Scaffold a new role from CLI flags |
 | `init -i` | Interactive role-creation wizard |
@@ -506,7 +520,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
+| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
 | Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 

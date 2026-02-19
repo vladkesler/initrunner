@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+## [1.1.5] - 2026-02-19
+
+### Added
+- **feat:** `--sense` flag for intent sensing — picks the best matching role using keyword
+  scoring + optional LLM tiebreaker. New flags: `--sense`, `--role-dir PATH`, `--confirm-role`.
+- **feat:** `csv_analysis` tool — inspect, summarize, and query CSV files within a sandboxed
+  directory. Three tools: `inspect_csv` (schema + preview), `summarize_csv` (column stats),
+  `query_csv` (filter + column projection). Config: `root_path`, `max_rows`, `max_file_size_mb`,
+  `delimiter`.
+- **docs:** `docs/core/intent_sensing.md` — full reference for Intent Sensing: algorithm
+  internals, role discovery paths, scoring weights, selection methods, tagging guide, examples,
+  troubleshooting.
+- **example:** `examples/roles/csv-analyst/` — ready-to-run CSV analyst role with sample data.
+
 ## [1.1.4] - 2026-02-18
 
 ### Changed

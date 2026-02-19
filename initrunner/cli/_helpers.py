@@ -16,8 +16,50 @@ if TYPE_CHECKING:
 
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger
+    from initrunner.services.role_selector import SelectionResult
 
 console = Console()
+
+
+def display_sense_result(result: SelectionResult) -> None:
+    """Render the intent-sensed role in a Rich panel."""
+    from rich.panel import Panel
+    from rich.table import Table
+
+    c = result.candidate
+
+    # Relative path if possible
+    try:
+        display_path = str(c.path.relative_to(Path.cwd()))
+    except ValueError:
+        display_path = str(c.path)
+
+    # Method label
+    method = result.method
+    if method == "only_one":
+        method_str = "[dim]only role available[/dim]"
+    elif method == "keyword":
+        method_str = (
+            f"[green]keyword match[/green] (score: {result.top_score:.2f}, gap: {result.gap:.2f})"
+        )
+    elif method == "llm":
+        method_str = "[yellow]LLM selection[/yellow]"
+    else:
+        method_str = "[yellow]fallback — no strong match[/yellow]"
+
+    tags_str = ", ".join(c.tags) if c.tags else "[dim]none[/dim]"
+
+    table = Table.grid(padding=(0, 1))
+    table.add_column(style="dim", no_wrap=True)
+    table.add_column()
+    table.add_row("Name", f"[cyan]{escape(c.name)}[/cyan]")
+    table.add_row("File", escape(display_path))
+    table.add_row("Tags", tags_str)
+    table.add_row("Method", method_str)
+    if c.reason:
+        table.add_row("Reason", escape(c.reason))
+
+    console.print(Panel(table, title="[bold]Intent Sensing[/bold]", border_style="dim"))
 
 
 def install_extra(extra: str) -> bool:

@@ -222,6 +222,171 @@ class TestRun:
         assert result.exit_code == 0
         mock_run_single.assert_called_once()
 
+    def test_no_role_no_sense_errors(self):
+        """Running without a role file and without --sense should error."""
+        result = runner.invoke(app, ["run", "-p", "hello"])
+        assert result.exit_code == 1
+        assert "--sense" in result.output
+
+    def test_role_and_sense_mutually_exclusive(self, tmp_path):
+        """Providing both a role file and --sense should error."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+        result = runner.invoke(app, ["run", str(role_file), "--sense", "-p", "hello"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output
+
+    def test_sense_requires_prompt(self):
+        """--sense without -p should error."""
+        result = runner.invoke(app, ["run", "--sense"])
+        assert result.exit_code == 1
+        assert "--sense requires --prompt" in result.output
+
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    @patch("initrunner.services.role_selector.select_role_sync")
+    def test_auto_selects_and_executes(self, mock_select, mock_load, mock_run_single, tmp_path):
+        """--sense resolves a role and runs it."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.services.role_selector import RoleCandidate, SelectionResult
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        cand = RoleCandidate(
+            path=role_file,
+            name="test-agent",
+            description="A test agent",
+            tags=["test"],
+        )
+        mock_select.return_value = SelectionResult(candidate=cand, method="keyword")
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        agent = MagicMock()
+        mock_load.return_value = (role, agent)
+        mock_run_single.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        result = runner.invoke(app, ["run", "--sense", "-p", "test task", "--no-audit"])
+        assert result.exit_code == 0
+        mock_select.assert_called_once_with("test task", role_dir=None, allow_llm=True)
+        mock_run_single.assert_called_once()
+
+    @patch("initrunner.services.role_selector.select_role_sync")
+    def test_auto_dry_run_passes_allow_llm_false(self, mock_select, tmp_path):
+        """--dry-run with --sense passes allow_llm=False to select_role_sync."""
+        from initrunner.services.role_selector import NoRolesFoundError
+
+        mock_select.side_effect = NoRolesFoundError("no roles")
+        result = runner.invoke(app, ["run", "--sense", "--dry-run", "-p", "task"])
+        assert result.exit_code == 1
+        mock_select.assert_called_once_with("task", role_dir=None, allow_llm=False)
+
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    @patch("initrunner.services.role_selector.select_role_sync")
+    def test_auto_confirm_role_interactive_yes(
+        self, mock_select, mock_load, mock_run_single, tmp_path
+    ):
+        """--confirm-role with 'y' on a TTY-like stdin proceeds."""
+        import io
+
+        from initrunner.agent.executor import RunResult
+        from initrunner.services.role_selector import RoleCandidate, SelectionResult
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        cand = RoleCandidate(
+            path=role_file,
+            name="test-agent",
+            description="desc",
+            tags=[],
+        )
+        mock_select.return_value = SelectionResult(candidate=cand, method="keyword")
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        mock_load.return_value = (role, MagicMock())
+        mock_run_single.return_value = (
+            RunResult(run_id="x", output="ok", success=True),
+            [],
+        )
+
+        # Use a custom stream that reports isatty()=True; Click passes non-string
+        # inputs through directly as sys.stdin inside isolation()
+        class _FakeTTY(io.BytesIO):
+            def isatty(self):
+                return True
+
+        result = runner.invoke(
+            app,
+            ["run", "--sense", "--confirm-role", "-p", "task", "--no-audit"],
+            input=_FakeTTY(b"y\n"),
+        )
+        assert result.exit_code == 0
+
+    @patch("initrunner.services.role_selector.select_role_sync")
+    def test_auto_confirm_role_non_tty_errors(self, mock_select, tmp_path):
+        """--confirm-role in a non-TTY environment (CliRunner default) should error."""
+        from initrunner.services.role_selector import RoleCandidate, SelectionResult
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        cand = RoleCandidate(
+            path=role_file,
+            name="test-agent",
+            description="desc",
+            tags=[],
+        )
+        mock_select.return_value = SelectionResult(candidate=cand, method="keyword")
+
+        # No stdin patch: CliRunner provides a BytesIO stdin with isatty()=False
+        result = runner.invoke(
+            app,
+            ["run", "--sense", "--confirm-role", "-p", "task"],
+        )
+        assert result.exit_code == 1
+        assert "interactive terminal" in result.output
+
+    @patch("initrunner.services.role_selector.select_role_sync")
+    def test_auto_confirm_role_interactive_no(self, mock_select, tmp_path):
+        """--confirm-role with 'n' on a TTY-like stdin cancels the run (exit 0)."""
+        import io
+
+        from initrunner.services.role_selector import RoleCandidate, SelectionResult
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        cand = RoleCandidate(
+            path=role_file,
+            name="test-agent",
+            description="desc",
+            tags=[],
+        )
+        mock_select.return_value = SelectionResult(candidate=cand, method="keyword")
+
+        class _FakeTTY(io.BytesIO):
+            def isatty(self):
+                return True
+
+        result = runner.invoke(
+            app,
+            ["run", "--sense", "--confirm-role", "-p", "task"],
+            input=_FakeTTY(b"n\n"),
+        )
+        # typer.Exit() without code = 0
+        assert result.exit_code == 0
+
 
 class TestIngest:
     def test_missing_role_file(self):

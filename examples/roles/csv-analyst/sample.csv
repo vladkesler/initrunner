@@ -1,0 +1,26 @@
+date,product,category,quantity,unit_price,region
+2024-01-03,Laptop Pro,Electronics,2,1299.99,West
+2024-01-05,Wireless Mouse,Accessories,15,29.99,East
+2024-01-07,Standing Desk,Furniture,3,449.00,North
+2024-01-08,USB-C Hub,Accessories,22,49.99,West
+2024-01-10,Monitor 27in,Electronics,5,379.00,South
+2024-01-12,Laptop Pro,Electronics,1,1299.99,East
+2024-01-14,Keyboard Mech,Accessories,8,129.00,West
+2024-01-15,Desk Chair,Furniture,4,289.00,South
+2024-01-17,USB-C Hub,Accessories,30,49.99,North
+2024-01-18,Webcam HD,Electronics,12,89.99,East
+2024-01-20,Standing Desk,Furniture,2,449.00,West
+2024-01-22,Wireless Mouse,Accessories,18,29.99,South
+2024-01-23,Monitor 27in,Electronics,3,379.00,North
+2024-01-25,Laptop Pro,Electronics,4,1299.99,West
+2024-01-27,Keyboard Mech,Accessories,10,129.00,East
+2024-01-28,Desk Chair,Furniture,6,289.00,West
+2024-02-01,Webcam HD,Electronics,9,89.99,South
+2024-02-03,USB-C Hub,Accessories,25,49.99,East
+2024-02-05,Wireless Mouse,Accessories,20,29.99,West
+2024-02-07,Laptop Pro,Electronics,3,1299.99,North
+2024-02-09,Monitor 27in,Electronics,7,379.00,East
+2024-02-11,Standing Desk,Furniture,1,449.00,South
+2024-02-13,Keyboard Mech,Accessories,14,129.00,West
+2024-02-15,Desk Chair,Furniture,2,289.00,North
+2024-02-17,Webcam HD,Electronics,6,89.99,East

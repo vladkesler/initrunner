@@ -45,7 +45,10 @@ def _maybe_export_report(
 
 
 def run(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[
+        Path | None,
+        typer.Argument(help="Path to role.yaml. Omit with --sense to select automatically."),
+    ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
     interactive: Annotated[
         bool, typer.Option("-i", "--interactive", help="Interactive REPL mode")
@@ -88,8 +91,56 @@ def run(
             help="Report template: default, pr-review, changelog, ci-fix",
         ),
     ] = "default",
+    sense: Annotated[
+        bool, typer.Option("--sense", help="Sense the best role for the given prompt")
+    ] = False,
+    role_dir: Annotated[
+        Path | None,
+        typer.Option("--role-dir", help="Directory to search for roles (used with --sense)"),
+    ] = None,
+    confirm_role: Annotated[
+        bool,
+        typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
+    ] = False,
 ) -> None:
     """Run an agent with a role definition."""
+    # --- Intent Sensing resolution ---
+    if role_file is not None and sense:
+        console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
+        raise typer.Exit(1)
+    if role_file is None and not sense:
+        console.print("[red]Error:[/red] Provide a role file path or use --sense.")
+        raise typer.Exit(1)
+    if sense and not prompt:
+        console.print("[red]Error:[/red] --sense requires --prompt (-p).")
+        raise typer.Exit(1)
+
+    if sense:
+        import sys
+
+        from initrunner.cli._helpers import display_sense_result
+        from initrunner.services.role_selector import NoRolesFoundError, select_role_sync
+
+        try:
+            with console.status("[dim]Sensing best role...[/dim]"):
+                selection = select_role_sync(
+                    prompt,  # type: ignore[arg-type]  # guarded by sense+prompt check above
+                    role_dir=role_dir,
+                    allow_llm=not dry_run,
+                )
+        except (NoRolesFoundError, ValueError) as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+        display_sense_result(selection)
+        if confirm_role:
+            if not sys.stdin.isatty():
+                console.print("[red]Error:[/red] --confirm-role requires an interactive terminal.")
+                raise typer.Exit(1)
+            if not typer.confirm("Use this role?", default=True):
+                raise typer.Exit()
+        role_file = selection.candidate.path
+    # --- End Intent Sensing ---
+
     if autonomous and not prompt:
         console.print("[red]Error:[/red] --autonomous requires --prompt (-p).")
         raise typer.Exit(1)
@@ -133,6 +184,8 @@ def run(
         except (FileNotFoundError, ValueError) as e:
             console.print(f"[red]Attachment error:[/red] {e}")
             raise typer.Exit(1) from None
+
+    assert role_file is not None  # guaranteed by resolution block above
 
     with command_context(
         role_file,

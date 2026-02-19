@@ -24,6 +24,7 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `web_scraper` | Fetch, chunk, embed, and store web pages in the document store |
 | `search` | Search the web and news via DuckDuckGo, SerpAPI, Brave, or Tavily |
 | `audio` | Fetch YouTube transcripts and transcribe local audio files |
+| `csv_analysis` | Inspect, summarize, and query CSV files within a sandboxed directory |
 | *(plugin)* | Any other type is resolved via the [plugin registry](tool_creation.md#plugin-registry) |
 
 ## Quick Example

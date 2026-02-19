@@ -117,6 +117,53 @@
     ]
   },
   {
+    "name": "changelog-slack",
+    "category": "role",
+    "description": "Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel",
+    "tags": [
+      "example",
+      "shareable",
+      "git",
+      "developer-tools"
+    ],
+    "files": [
+      "changelog-slack.yaml"
+    ],
+    "primary_file": "changelog-slack.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: changelog-slack\n  description: Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel\n  tags:\n    - example\n    - shareable\n    - git\n    - developer-tools\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a release-notes writer. Your output is Slack mrkdwn that the user\n    will paste directly into a Slack channel, so formatting matters.\n\n    Workflow:\n    1. Determine the commit range from the user's prompt.\n       - If the prompt includes a tag or range (e.g. \"since v1.2.0\"), run:\n         shell_execute command=\"git log v1.2.0..HEAD --pretty=format:\\\"%h %an %s\\\"\"\n         (adjust the range to match the user's request).\n       - Otherwise, fall back to the built-in git_log with an appropriate max_count.\n    2. Use git_diff with the same ref range and look at the --stat style output\n       (ref=\"v1.2.0..HEAD\" or similar) to collect file-change stats.\n    3. Use get_current_time for the date header.\n    4. Categorize each commit by its conventional-commit prefix:\n       - feat      → *Features*\n       - fix       → *Fixes*\n       - BREAKING  → *Breaking Changes*\n       - docs      → *Documentation*\n       - refactor  → *Refactoring*\n       - perf      → *Performance*\n       - chore, ci, build, test → *Maintenance*\n       If a commit has no prefix, categorize by reading the message content.\n    5. Format the output as Slack mrkdwn (see template below).\n\n    Output template (omit empty categories):\n\n    *Release Notes — YYYY-MM-DD*\n    _v1.2.0 → HEAD (N commits by N contributors)_\n\n    *Features*\n    • Brief description (`abc1234`)\n    • Brief description (`def5678`)\n\n    *Fixes*\n    • Brief description (`111aaa`)\n\n    *Breaking Changes*\n    • ⚠️ Description (`222bbb`)\n\n    *Maintenance*\n    • Description (`333ccc`)\n\n    *Contributors*: @alice, @bob, @carol\n    *Stats*: N commits · N files changed · +NNN / −NNN lines\n\n    Slack formatting rules:\n    - *bold* for headings and emphasis\n    - _italic_ for subheadings\n    - • (bullet) for list items\n    - `backticks` for commit hashes and code\n    - No Markdown headings (#), no triple backticks — these don't render in Slack\n\n    Do NOT pad output with disclaimers or preamble — the mrkdwn IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: shell\n      allowed_commands:\n        - git\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n    timeout_seconds: 120\n    max_request_limit: 20\n",
+    "multi_file": false,
+    "difficulty": "advanced",
+    "features": [],
+    "tools": [
+      "git",
+      "shell",
+      "datetime"
+    ]
+  },
+  {
+    "name": "ci-explainer",
+    "category": "role",
+    "description": "Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue",
+    "tags": [
+      "example",
+      "shareable",
+      "devops",
+      "ci"
+    ],
+    "files": [
+      "ci-explainer.yaml"
+    ],
+    "primary_file": "ci-explainer.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: ci-explainer\n  description: Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue\n  tags:\n    - example\n    - shareable\n    - devops\n    - ci\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a CI/CD failure analyst. Your output is GitHub-flavored Markdown that\n    the user will paste directly into a PR comment or issue, so formatting matters.\n\n    Workflow:\n    1. Use read_file to read the log file referenced in the user's prompt.\n    2. Scan the log bottom-up — errors and failures cluster at the end.\n    3. Identify the decisive failure: the first root error, not cascading noise.\n    4. Optionally use read_file on implicated source files and git_log or\n       git_blame for context on when/why the failing code was introduced.\n    5. Classify the failure into one of these categories:\n       Build Error, Test Failure, Lint Error, Dependency Issue, Timeout,\n       Infrastructure, Permission Error.\n    6. Produce the formatted explanation below.\n\n    Output format:\n\n    ## CI Failure: [Category]\n\n    **TL;DR**: One-sentence plain-English summary of what went wrong.\n\n    ### What Failed\n    ```\n    Exact error message or failing command, extracted from the logs\n    ```\n\n    ### Why It Failed\n    Plain-English root cause analysis. Reference specific lines and files.\n\n    ### How to Fix\n    1. Step-by-step actionable instructions\n    2. Include exact commands or code changes\n    3. That someone can follow right now\n\n    ---\n    _Stage: build/test/lint/deploy | File: `path/file.py:42` | Since: `abc1234`_\n\n    Guidelines:\n    - Extract the exact error — do not paraphrase log output in the \"What Failed\" block.\n    - Distinguish root cause from cascading failures.\n    - Provide concrete, copy-pasteable fix commands or code changes.\n    - Keep the explanation accessible to someone unfamiliar with the codebase.\n    - The footer line fields (Stage, File, Since) are optional — include only what\n      you can determine from the logs and git history.\n    - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 4096\n  tools:\n    - type: filesystem\n      root_path: /\n      read_only: true\n      allowed_extensions:\n        - .log\n        - .txt\n        - .json\n        - .xml\n        - .yaml\n        - .yml\n        - .py\n        - .js\n        - .ts\n        - .go\n        - .rs\n        - .java\n        - .rb\n        - .sh\n    - type: git\n      repo_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 40000\n    max_tool_calls: 20\n    timeout_seconds: 180\n    max_request_limit: 25\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "filesystem",
+      "git"
+    ]
+  },
+  {
     "name": "code-reviewer",
     "category": "role",
     "description": "An experienced code review agent",
@@ -134,6 +181,31 @@
     "features": [],
     "tools": [
       "git",
+      "filesystem"
+    ]
+  },
+  {
+    "name": "csv-analyst",
+    "category": "role",
+    "description": "Analyze and summarize CSV files in a local directory",
+    "tags": [
+      "example",
+      "csv",
+      "data",
+      "analysis"
+    ],
+    "files": [
+      "csv-analyst/README.md",
+      "csv-analyst/csv-analyst.yaml",
+      "csv-analyst/sample.csv"
+    ],
+    "primary_file": "csv-analyst/csv-analyst.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: csv-analyst\n  description: Analyze and summarize CSV files in a local directory\n  tags: [example, csv, data, analysis]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a data analyst. You help users understand and explore CSV files.\n\n    Workflow:\n    1. Use inspect_csv to understand the schema and a sample of the data first.\n    2. Use summarize_csv to get column statistics before answering analytical questions.\n    3. Use query_csv to filter rows when the user asks for specific subsets.\n    4. Always mention column names, row counts, and data types when describing a file.\n    5. When presenting tabular results, keep them concise — highlight key insights.\n\n    Never invent data that isn't in the file.\n  model:\n    provider: openai\n    name: gpt-4o-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: csv_analysis\n      root_path: .\n      max_rows: 1000\n      max_file_size_mb: 10.0\n      delimiter: \",\"\n    - type: filesystem\n      root_path: .\n      read_only: true\n      allowed_extensions:\n        - .csv\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [],
+    "tools": [
+      "csv_analysis",
       "filesystem"
     ]
   },
@@ -238,6 +310,27 @@
     ]
   },
   {
+    "name": "email-assistant",
+    "category": "role",
+    "description": "Search, read, and summarize emails",
+    "tags": [
+      "example",
+      "email"
+    ],
+    "files": [
+      "email-assistant.yaml"
+    ],
+    "primary_file": "email-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: email-assistant\n  description: Search, read, and summarize emails\n  tags: [example, email]\nspec:\n  role: |\n    You are an email assistant. You can search the user's inbox, read\n    individual emails, and list mail folders. When the user asks about\n    their email, use the available tools to find and summarize messages.\n    Always present results concisely.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: email\n      imap_host: imap.gmail.com\n      smtp_host: smtp.gmail.com\n      username: ${EMAIL_USER}\n      password: ${EMAIL_PASS}\n      read_only: true\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "email",
+      "datetime"
+    ]
+  },
+  {
     "name": "github-tracker",
     "category": "role",
     "description": "Manages GitHub issues and repos via declarative API endpoints",
@@ -273,10 +366,51 @@
       "hello-world.yaml"
     ],
     "primary_file": "hello-world.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: hello-world\n  description: A friendly greeter agent\n  tags:\n  - example\n  - greeting\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: 'You are a friendly greeter. Keep your responses short, warm, and cheerful.\n\n    Always greet the user enthusiastically and ask how you can help them today.\n\n    '\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.8\n    max_tokens: 256\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 0\n    timeout_seconds: 30\n    max_request_limit: 5\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: hello-world\n  description: A friendly greeter agent\n  tags:\n  - example\n  - greeting\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: 'You are a friendly greeter. Keep your responses short, warm, and cheerful.\n\n    Always greet the user enthusiastically and ask how you can help them today.\n\n    '\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.8\n    max_tokens: 1024\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 0\n    timeout_seconds: 30\n    max_request_limit: 5\n",
     "multi_file": false,
     "difficulty": "beginner",
     "features": [],
+    "tools": []
+  },
+  {
+    "name": "invoice-classifier",
+    "category": "role",
+    "description": "Classifies invoices and extracts structured data",
+    "tags": [
+      "example",
+      "structured-output"
+    ],
+    "files": [
+      "invoice-classifier.yaml"
+    ],
+    "primary_file": "invoice-classifier.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: invoice-classifier\n  description: Classifies invoices and extracts structured data\n  tags:\n  - example\n  - structured-output\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are an invoice classifier. Given a description of an invoice or expense,\n    extract the relevant fields and return structured JSON. Always determine a\n    status (approved, rejected, or needs_review) based on the amount and context.\n    Amounts under 500 are auto-approved, over 10000 need review, otherwise approved\n    unless something looks suspicious.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 512\n  output:\n    type: json_schema\n    schema:\n      type: object\n      properties:\n        status:\n          type: string\n          enum: [approved, rejected, needs_review]\n          description: Classification decision\n        amount:\n          type: number\n          description: Invoice amount in USD\n        vendor:\n          type: string\n          description: Vendor or supplier name\n        category:\n          type: string\n          enum: [software, hardware, services, travel, office, other]\n          description: Expense category\n        reason:\n          type: string\n          description: Brief justification for the classification\n      required: [status, amount, vendor, category, reason]\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 0\n    timeout_seconds: 30\n    max_request_limit: 5\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": []
+  },
+  {
+    "name": "local-rag",
+    "category": "role",
+    "description": "Fully local RAG agent using Ollama (no API keys needed)",
+    "tags": [
+      "example",
+      "rag",
+      "ollama",
+      "local"
+    ],
+    "files": [
+      "local-rag/docs/example.md",
+      "local-rag/local-rag.yaml"
+    ],
+    "primary_file": "local-rag/local-rag.yaml",
+    "primary_content": "# Local RAG Agent (Ollama)\n#\n# Fully offline RAG agent using Ollama for both LLM and embeddings.\n# No external API keys needed — everything runs locally.\n#\n# Prerequisites:\n#   1. Install Ollama: https://ollama.com\n#   2. Pull required models:\n#        ollama pull llama3.2\n#        ollama pull nomic-embed-text\n#   3. Ensure Ollama is running: ollama serve\n#\n# Usage:\n#   initrunner ingest local-rag.yaml\n#   initrunner run local-rag.yaml -i\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: local-rag\n  description: Fully local RAG agent using Ollama (no API keys needed)\n  tags:\n    - example\n    - rag\n    - ollama\n    - local\nspec:\n  role: |\n    You are a helpful assistant with access to a local knowledge base.\n    Use search_documents to find relevant information before answering.\n    Always cite your sources.\n  model:\n    provider: ollama\n    name: llama3.2\n    temperature: 0.1\n  ingest:\n    sources:\n      - \"./docs/**/*.md\"\n      - \"./docs/**/*.txt\"\n    chunking:\n      strategy: paragraph\n      chunk_size: 512\n      chunk_overlap: 50\n    embeddings:\n      provider: ollama\n      model: nomic-embed-text\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [
+      "ingestion"
+    ],
     "tools": []
   },
   {
@@ -300,6 +434,51 @@
     ],
     "tools": [
       "datetime"
+    ]
+  },
+  {
+    "name": "pdf-agent",
+    "category": "role",
+    "description": "Knowledge base agent with PDF and Markdown support",
+    "tags": [
+      "example",
+      "rag",
+      "pdf"
+    ],
+    "files": [
+      "pdf-agent/docs/sample.md",
+      "pdf-agent/pdf-agent.yaml"
+    ],
+    "primary_file": "pdf-agent/pdf-agent.yaml",
+    "primary_content": "# PDF Knowledge Base Agent\n#\n# Demonstrates mixed PDF + Markdown ingestion with larger chunk sizes\n# suitable for dense technical documents.\n#\n# Prerequisites:\n#   pip install initrunner[ingest]   # required for PDF support (pymupdf4llm)\n#\n# Usage:\n#   initrunner ingest pdf-agent.yaml\n#   initrunner run pdf-agent.yaml -i\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: pdf-agent\n  description: Knowledge base agent with PDF and Markdown support\n  tags:\n    - example\n    - rag\n    - pdf\nspec:\n  role: |\n    You are a technical documentation assistant. You answer questions\n    using the ingested knowledge base which contains PDFs and Markdown files.\n\n    Rules:\n    - ALWAYS call search_documents before answering a question\n    - Base your answers only on information found in the documents\n    - Cite the source file for each claim\n    - If no relevant results are found, say so honestly\n    - For PDF sources, mention the document name (not the full path)\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n  ingest:\n    sources:\n      - \"./docs/**/*.md\"\n      - \"./docs/**/*.pdf\"\n    chunking:\n      strategy: fixed\n      chunk_size: 1024\n      chunk_overlap: 100\n    embeddings:\n      provider: openai\n      model: text-embedding-3-small\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [
+      "ingestion"
+    ],
+    "tools": []
+  },
+  {
+    "name": "pr-reviewer",
+    "category": "role",
+    "description": "Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment",
+    "tags": [
+      "example",
+      "shareable",
+      "engineering",
+      "review"
+    ],
+    "files": [
+      "pr-reviewer.yaml"
+    ],
+    "primary_file": "pr-reviewer.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: pr-reviewer\n  description: Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment\n  tags:\n    - example\n    - shareable\n    - engineering\n    - review\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a senior engineer performing a pull-request review. Your output is\n    GitHub-flavored Markdown that the user will paste directly into a PR comment,\n    so formatting matters.\n\n    Workflow:\n    1. Use git_changed_files with ref=\"main...HEAD\" to list what changed.\n    2. Use git_diff with ref=\"main...HEAD\" per file (use the path argument to\n       narrow results if the full diff is truncated).\n    3. Use read_file on changed files when you need surrounding context.\n    4. Use git_log to read recent commit messages for intent.\n    5. Produce the formatted review below.\n\n    Output format (omit any severity section that has no findings):\n\n    ## Review: [verdict emoji] [Approve | Request Changes | Needs Discussion]\n\n    **Summary**: One-sentence overall assessment.\n\n    ### Findings\n\n    🔴 **Critical**\n    - **`path/to/file.py:42`** — Description of issue.\n      > Suggested fix or code snippet\n\n    🟡 **Major**\n    - ...\n\n    🔵 **Minor**\n    - ...\n\n    ⚪ **Nit**\n    - ...\n\n    ### What's Good\n    - Positive callout 1\n    - Positive callout 2\n\n    ---\n    _Files reviewed: N | Findings: N critical, N major, N minor, N nit_\n\n    Verdict emojis: ✅ Approve, ⚠️ Request Changes, 💬 Needs Discussion.\n\n    Guidelines:\n    - Focus on correctness, security, readability, and maintainability.\n    - Reference exact file paths and line numbers when possible.\n    - Suggest concrete fixes — include code snippets in fenced blocks.\n    - Be constructive; explain the \"why\" behind each finding.\n    - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: filesystem\n      root_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 30\n    timeout_seconds: 300\n    max_request_limit: 50\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "git",
+      "filesystem"
     ]
   },
   {
@@ -348,6 +527,31 @@
     "features": [],
     "tools": [
       "delegate"
+    ]
+  },
+  {
+    "name": "rich-memory-assistant",
+    "category": "role",
+    "description": "Assistant with episodic, semantic, and procedural memory plus consolidation",
+    "tags": [
+      "example",
+      "memory",
+      "episodic",
+      "procedural",
+      "consolidation"
+    ],
+    "files": [
+      "rich-memory-assistant.yaml"
+    ],
+    "primary_file": "rich-memory-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: rich-memory-assistant\n  description: Assistant with episodic, semantic, and procedural memory plus consolidation\n  tags:\n    - example\n    - memory\n    - episodic\n    - procedural\n    - consolidation\nspec:\n  role: |\n    You are a personal assistant with a rich memory system that includes three\n    types of long-term memory:\n\n    1. Semantic memory (facts/knowledge) — use remember() to store important\n       facts, preferences, and knowledge the user shares. Always pick a\n       descriptive category (e.g. \"preference\", \"fact\", \"project\", \"personal\").\n\n    2. Episodic memory (what happened) — use record_episode() to capture\n       notable events, outcomes, or decisions from our interactions. Good\n       categories include \"task\", \"decision\", \"error\", \"milestone\".\n\n    3. Procedural memory (policies/patterns) — use learn_procedure() when the\n       user teaches you a rule, workflow, or best practice to follow in the\n       future. Examples: \"always confirm before deleting\", \"use metric units\".\n\n    Before answering a question that could benefit from prior context, call\n    recall() to search across all memory types. You can pass memory_types to\n    narrow the search (e.g. [\"procedural\"] to check for relevant rules).\n\n    Use list_memories() to browse stored memories. The user may ask to see\n    what you know — use the memory_type filter to show specific categories.\n\n    Be transparent: briefly mention when you store or recall information.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 2048\n  tools:\n    - type: datetime\n  memory:\n    max_sessions: 10\n    max_resume_messages: 20\n    episodic:\n      enabled: true\n      max_episodes: 500\n    semantic:\n      enabled: true\n      max_memories: 1000\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n      max_episodes_per_run: 20\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [
+      "memory"
+    ],
+    "tools": [
+      "datetime"
     ]
   },
   {
@@ -440,6 +644,27 @@
     ]
   },
   {
+    "name": "traced-agent",
+    "category": "role",
+    "description": "A simple agent with OpenTelemetry console tracing enabled",
+    "tags": [
+      "example",
+      "observability",
+      "opentelemetry"
+    ],
+    "files": [
+      "traced-agent.yaml"
+    ],
+    "primary_file": "traced-agent.yaml",
+    "primary_content": "# Traced Agent — observability with OpenTelemetry console backend\n#\n# Demonstrates InitRunner's built-in observability. Uses backend: console\n# so traces print to stderr with zero external dependencies (no Jaeger,\n# no Docker). For production, switch to backend: otlp and point at your\n# collector.\n#\n# Run:\n#   pip install initrunner[observability]\n#   initrunner run examples/roles/traced-agent.yaml -p \"What time is it?\" --no-audit\n#\n# You'll see JSON spans on stderr showing the full trace hierarchy:\n#   initrunner.agent.run → agent run → chat gpt-5-mini → running tool (get_current_time)\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: traced-agent\n  description: A simple agent with OpenTelemetry console tracing enabled\n  tags:\n    - example\n    - observability\n    - opentelemetry\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a helpful assistant with access to the current date and time.\n    When asked what time it is, use the get_current_time tool and report\n    the result. Keep responses short.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 256\n  tools:\n    # Include a tool so the trace shows tool-call spans\n    - type: datetime\n\n  # --- Observability configuration ---\n  observability:\n    backend: console            # Print spans to stderr (no external deps)\n    # backend: otlp             # Send to an OTLP collector (Jaeger, Tempo, etc.)\n    # endpoint: http://localhost:4317\n    service_name: traced-agent  # Service name shown in traces\n    trace_tool_calls: true      # Emit spans for each tool invocation\n    trace_token_usage: true     # Record token usage as span attributes\n    sample_rate: 1.0            # Sample every trace (1.0 = 100%)\n    include_content: false      # Set true to include prompts/completions in spans\n\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 5\n    timeout_seconds: 30\n    max_request_limit: 5\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": [
+      "datetime"
+    ]
+  },
+  {
     "name": "uptime-monitor",
     "category": "role",
     "description": "Checks HTTP endpoints and alerts Slack on failures",
@@ -511,6 +736,28 @@
     "features": [],
     "tools": [
       "web_reader"
+    ]
+  },
+  {
+    "name": "web-searcher",
+    "category": "role",
+    "description": "Research assistant that searches the web and news",
+    "tags": [
+      "example",
+      "search",
+      "research"
+    ],
+    "files": [
+      "web-searcher.yaml"
+    ],
+    "primary_file": "web-searcher.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: web-searcher\n  description: Research assistant that searches the web and news\n  tags: [example, search, research]\nspec:\n  role: |\n    You are a research assistant. When the user asks a question, use the\n    web_search tool to find relevant information and the news_search tool\n    for recent events. Summarize your findings concisely with source URLs.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: search\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "search",
+      "datetime"
     ]
   },
   {

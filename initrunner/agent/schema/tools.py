@@ -333,6 +333,17 @@ class AudioToolConfig(ToolConfigBase):
         return "audio"
 
 
+class CsvAnalysisToolConfig(ToolConfigBase):
+    type: Literal["csv_analysis"] = "csv_analysis"
+    root_path: str = "."
+    max_rows: int = 1000
+    max_file_size_mb: float = 10.0
+    delimiter: str = ","
+
+    def summary(self) -> str:
+        return f"csv_analysis: {self.root_path}"
+
+
 class PluginToolConfig(ToolConfigBase):
     type: str
     config: dict[str, Any] = {}

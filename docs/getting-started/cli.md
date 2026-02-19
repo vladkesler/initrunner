@@ -45,6 +45,10 @@
 
 ## Run options
 
+Synopsis: `initrunner run [role.yaml] [OPTIONS]`
+
+The `role.yaml` argument is optional when `--sense` is used.
+
 | Flag | Description |
 |------|-------------|
 | `-p, --prompt TEXT` | Single prompt to send |
@@ -60,6 +64,33 @@
 | `--export-report` | Export a markdown report after the run. See [Report Export](../core/reports.md). |
 | `--report-path PATH` | Report output path (default: `initrunner-report.md`). |
 | `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. |
+| `--sense` | Sense the best role for the given prompt (replaces `role.yaml` argument). |
+| `--role-dir PATH` | Directory to search for roles when using `--sense`. |
+| `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
+
+### Intent Sensing examples
+
+```bash
+# Let initrunner pick the best role for your task
+initrunner run --sense -p "analyze this CSV and summarize"
+
+# Search a specific directory for roles
+initrunner run --sense --role-dir ./roles/ -p "search the web for AI news"
+
+# Review the sensed role before running
+initrunner run --sense --confirm-role -p "review my code for bugs"
+
+# Dry-run: discover + score roles without any LLM calls
+initrunner run --sense --dry-run -p "task description"
+```
+
+Intent Sensing uses a two-pass strategy:
+1. **Keyword/tag scoring** — zero API calls. Selects confidently when one role clearly matches.
+2. **LLM tiebreaker** — compact call used only when the top two candidates are too close. Skipped when `--dry-run` is set.
+
+Set `INITRUNNER_DEFAULT_MODEL` to override the model used for the LLM tiebreaker (default: `openai:gpt-4o-mini`).
+
+See [Intent Sensing](../core/intent_sensing.md) for the full algorithm reference, role tagging guide, and troubleshooting.
 
 Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `spec.guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 

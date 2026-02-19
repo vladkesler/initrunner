@@ -1,0 +1,41 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: csv-analyst
+  description: Analyze and summarize CSV files in a local directory
+  tags: [example, csv, data, analysis]
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are a data analyst. You help users understand and explore CSV files.
+
+    Workflow:
+    1. Use inspect_csv to understand the schema and a sample of the data first.
+    2. Use summarize_csv to get column statistics before answering analytical questions.
+    3. Use query_csv to filter rows when the user asks for specific subsets.
+    4. Always mention column names, row counts, and data types when describing a file.
+    5. When presenting tabular results, keep them concise — highlight key insights.
+
+    Never invent data that isn't in the file.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: csv_analysis
+      root_path: .
+      max_rows: 1000
+      max_file_size_mb: 10.0
+      delimiter: ","
+    - type: filesystem
+      root_path: .
+      read_only: true
+      allowed_extensions:
+        - .csv
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 20
+    timeout_seconds: 120
+    max_request_limit: 30

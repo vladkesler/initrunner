@@ -457,4 +457,39 @@ initrunner compose validate examples/compose/ci-pipeline/compose.yaml
 initrunner compose up examples/compose/ci-pipeline/compose.yaml
 ```
 
+---
+
+## CSV Analysis Tool — Tabular Data Exploration
+
+Inspect, summarize, and query CSV files within a sandboxed directory. Uses only Python's stdlib — no extra dependencies required.
+
+```yaml
+tools:
+  - type: csv_analysis
+    root_path: .
+    max_rows: 1000
+    max_file_size_mb: 10.0
+    delimiter: ","
+```
+
+> `root_path` is the sandbox boundary — the agent cannot read CSV files outside it. `max_rows` is a hard cap applied on every call to bound memory usage. `max_file_size_mb` rejects oversized files before they are read into memory. Set `delimiter: "\t"` for TSV files.
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `root_path` | `str` | `"."` | Root directory for CSV file access. Paths cannot escape this directory. |
+| `max_rows` | `int` | `1000` | Maximum rows read per tool call. |
+| `max_file_size_mb` | `float` | `10.0` | Files larger than this (in MB) are rejected before reading. |
+| `delimiter` | `str` | `","` | CSV field delimiter. Use `"\t"` for TSV files. |
+
+### Registered tools
+
+- **`inspect_csv(path)`** — Show column names, inferred types (int/float/string), row count, and first 5 rows as a markdown table.
+- **`summarize_csv(path, column="")`** — For a named column: numeric stats (min, max, mean, median, stdev) or categorical stats (unique count, top-10 values with counts). Leave `column` empty for a one-liner per column.
+- **`query_csv(path, filter_column="", filter_value="", columns="", limit=50)`** — Filter rows by exact match and return a markdown table. `columns` narrows output to a comma-separated subset of fields.
+
+- Full example: [`examples/roles/csv-analyst/`](../../examples/roles/csv-analyst/)
+- Reference: [tools.md — Tool Types](tools.md#tool-types)
+
 - Full example: [`examples/compose/ci-pipeline/`](../examples/compose/ci-pipeline/)
