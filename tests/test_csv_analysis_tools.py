@@ -272,9 +272,16 @@ class TestInspectCsv:
 
             return os.stat_result(
                 (
-                    s.st_mode, s.st_ino, s.st_dev, s.st_nlink,
-                    s.st_uid, s.st_gid, 200 * 1024 * 1024,
-                    s.st_atime, s.st_mtime, s.st_ctime,
+                    s.st_mode,
+                    s.st_ino,
+                    s.st_dev,
+                    s.st_nlink,
+                    s.st_uid,
+                    s.st_gid,
+                    200 * 1024 * 1024,
+                    s.st_atime,
+                    s.st_mtime,
+                    s.st_ctime,
                 )
             )
 
