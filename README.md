@@ -31,6 +31,7 @@ Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and mult
 - [From Simple to Powerful](#from-simple-to-powerful)
 - [Community Roles](#community-roles)
 - [Install & Quickstart](#install--quickstart)
+- [Creating Roles](#creating-roles)
 - [Docker](#docker)
 - [Core Concepts](#core-concepts)
 - [CLI Quick Reference](#cli-quick-reference)
@@ -344,18 +345,24 @@ initrunner run my-agent.yaml -p "Hello!"   # single-shot prompt
 initrunner run my-agent.yaml -i            # interactive chat
 ```
 
-There are several ways to create a role — pick whichever fits:
+See [Creating Roles](#creating-roles) for all the ways to build roles (CLI wizards, AI generation, web dashboard, TUI, and more), or jump to the hands-on [Tutorial](docs/getting-started/tutorial.md).
 
-| Method | Command | Best for |
-|--------|---------|----------|
-| Copy an example | `initrunner examples list` then `initrunner examples copy <name>` | Complete, working agents ready to run ([docs](docs/getting-started/cli.md)) |
-| Guided wizard | `initrunner setup` | First-time setup ([docs](docs/getting-started/setup.md)) |
-| Interactive scaffold | `initrunner init -i` | Prompted step-by-step creation ([docs](docs/getting-started/cli.md)) |
-| AI generation | `initrunner create "code reviewer for Python"` | Describe what you want in natural language ([docs](docs/agents/role_generation.md)) |
-| CLI flags | `initrunner init --name my-agent --model gpt-5-mini` | Quick one-liner ([docs](docs/getting-started/cli.md)) |
-| Manual YAML | Copy the [example above](#see-it-in-action) | Full control |
+## Creating Roles
 
-See the hands-on [Tutorial](docs/getting-started/tutorial.md) for a complete walkthrough.
+| Method | How | Best for |
+|--------|-----|----------|
+| **Guided wizard** | `initrunner setup` | First-time setup — configures provider, API key, and creates a role |
+| **Interactive scaffold** | `initrunner init -i` | Step-by-step prompted creation with tool and feature selection |
+| **Template scaffold** | `initrunner init --template rag` | One-liner from a template (`basic`, `rag`, `memory`, `daemon`, `ollama`, `tool`, `api`, `skill`) |
+| **CLI flags** | `initrunner init --name my-agent --model gpt-5-mini` | Quick one-liner when you know what you want |
+| **AI generation** | `initrunner create "code reviewer for Python"` | Describe what you want in plain English — AI writes the YAML |
+| **Copy an example** | `initrunner examples copy code-reviewer` | Production-ready agents you can run immediately |
+| **Install community role** | `initrunner install user/repo` | Reuse roles shared by others ([details](#community-roles)) |
+| **Web dashboard** | `initrunner ui` → New Role → Form Builder / AI Generate | Form builder with live YAML preview, or describe and generate (requires `initrunner[dashboard]`) |
+| **Terminal UI** | `initrunner tui` → press `n` | Template picker in a keyboard-driven interface (requires `initrunner[tui]`) |
+| **Manual YAML** | Copy the [example above](#see-it-in-action) | Full control — write the YAML yourself |
+
+Validate any role file with `initrunner validate role.yaml`. See [Role Generation docs](docs/agents/role_generation.md) for the full reference.
 
 ## Docker
 
@@ -571,6 +578,7 @@ Beyond the CLI, InitRunner includes a terminal UI and a web dashboard for visual
 |---|---|---|
 | **Launch** | `initrunner tui` | `initrunner ui` |
 | **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
+| **Roles** | Create from template, edit sections via forms | Form builder with live preview, AI generate, YAML editor |
 | **Chat** | Streaming chat with token counts | SSE streaming chat with file attachments |
 | **Audit** | Browse & filter audit records | Audit log with detail panel |
 | **Memory** | View, export, delete memories | View, filter, export, clear memories |
