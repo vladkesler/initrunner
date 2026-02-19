@@ -5,8 +5,6 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-import pytest
-
 from initrunner.agent.schema.role import AgentSpec
 from initrunner.agent.schema.tools import CsvAnalysisToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
@@ -273,7 +271,11 @@ class TestInspectCsv:
             import os
 
             return os.stat_result(
-                (s.st_mode, s.st_ino, s.st_dev, s.st_nlink, s.st_uid, s.st_gid, 200 * 1024 * 1024, s.st_atime, s.st_mtime, s.st_ctime)
+                (
+                    s.st_mode, s.st_ino, s.st_dev, s.st_nlink,
+                    s.st_uid, s.st_gid, 200 * 1024 * 1024,
+                    s.st_atime, s.st_mtime, s.st_ctime,
+                )
             )
 
         monkeypatch.setattr(Path, "stat", fake_stat)
@@ -459,7 +461,7 @@ class TestQueryCsv:
         assert "dept" in result
         # salary and id should not appear in column headers
         lines = result.split("\n")
-        header_line = next((l for l in lines if "name" in l and "|" in l), "")
+        header_line = next((line for line in lines if "name" in line and "|" in line), "")
         assert "salary" not in header_line
         assert "id" not in header_line
 
@@ -493,7 +495,7 @@ class TestQueryCsv:
         # limit=200 should be capped at max_rows=20
         result = fn(path="data.csv", limit=200)
         # Should not have more than 20 data rows (plus header and separator)
-        table_lines = [l for l in result.split("\n") if l.startswith("|")]
+        table_lines = [line for line in result.split("\n") if line.startswith("|")]
         # header + separator = 2, so at most max_rows + 2 table lines
         assert len(table_lines) <= 22
 
