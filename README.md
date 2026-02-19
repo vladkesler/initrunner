@@ -68,7 +68,19 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate. The same file also runs as an interactive chat (`-i`), a trigger-driven daemon, or an OpenAI-compatible API server.
+That's it. No Python, no boilerplate.
+
+Using Claude? Install the Anthropic extra and swap the model line:
+
+```bash
+pip install "initrunner[anthropic]"
+```
+
+```yaml
+model: { provider: anthropic, name: claude-opus-4-6 }
+```
+
+The same file also runs as an interactive chat (`-i`), a trigger-driven daemon, or an OpenAI-compatible API server.
 
 <p align="center">
   <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
@@ -117,6 +129,23 @@ spec:
 ```
 
 The agent inherits each skill's tools and prompt instructions automatically.
+
+A `SKILL.md` file has a YAML frontmatter block defining the tools it provides, followed by markdown guidelines the agent will follow:
+
+```markdown
+---
+name: my-skill
+description: What this skill does
+tools:
+  - type: web_reader
+    timeout_seconds: 15
+  - type: search
+---
+Use the web_reader tool to fetch pages as markdown before answering.
+Cite URLs in your responses.
+```
+
+Run `initrunner init --skill my-skill` to scaffold one.
 
 ### 3. Add triggers
 
@@ -289,12 +318,23 @@ Common extras:
 |-------|--------------|
 | `initrunner[anthropic]` | Anthropic provider (Claude) |
 | `initrunner[ingest]` | PDF, DOCX, XLSX ingestion |
-| `initrunner[dashboard]` | Web dashboard (FastAPI + Next.js) |
+| `initrunner[dashboard]` | FastAPI web dashboard (HTMX + DaisyUI) |
 | `initrunner[search]` | Web search (DuckDuckGo) |
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 
-**2. Create your first agent and run it**
+**2. Set your API key**
+
+Before running an agent, set your provider API key:
+
+```bash
+export OPENAI_API_KEY=sk-...          # OpenAI (default)
+export ANTHROPIC_API_KEY=sk-ant-...   # Claude (requires initrunner[anthropic])
+```
+
+`initrunner setup` walks through this interactively and stores the key in your shell profile.
+
+**3. Create your first agent and run it**
 
 The fastest way to get started — `setup` walks you through provider, API key, model, and agent creation in one step:
 
@@ -321,6 +361,8 @@ See the hands-on [Tutorial](docs/getting-started/tutorial.md) for a complete wal
 
 Run InitRunner without installing Python — just Docker:
 
+Before running, create a `./roles/` directory and add a role YAML file — the examples below reference it as `/roles/my-agent.yaml`. No role yet? Run `initrunner examples copy hello-world` if you have InitRunner installed, or copy [hello-world.yaml](examples/roles/hello-world.yaml) from this repo.
+
 ```bash
 # One-shot prompt
 docker run --rm -e OPENAI_API_KEY \
@@ -332,20 +374,26 @@ docker run --rm -it -e OPENAI_API_KEY \
     -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
     run /roles/my-agent.yaml -i
 
-# Web dashboard
+# Web dashboard — open http://localhost:8420 after starting
 docker run -d -e OPENAI_API_KEY \
-    -v ./roles:/roles -v initrunner-data:/data \
+    -v ./roles:/roles \
+    -v initrunner-data:/data \
     -p 8420:8420 ghcr.io/vladkesler/initrunner:latest \
     ui --role-dir /roles
+# ./roles          — your local role files (mounted read/write into /roles)
+# initrunner-data  — named volume: audit log, embeddings, memory (persists across restarts)
 ```
+
+`-e OPENAI_API_KEY` forwards the variable from your current shell — make sure it's exported first (`export OPENAI_API_KEY=sk-...`). Prefer a file? Copy `examples/.env.example` to `.env`, fill in your key, and replace `-e OPENAI_API_KEY` with `--env-file .env`.
 
 The image is also available on Docker Hub: `vladkesler/initrunner`
 
 Or use the included `docker-compose.yml` to start the dashboard with persistent storage:
 
 ```bash
-# Set API keys in .env or export them, then:
+# Copy examples/.env.example → .env, add your key, then:
 docker compose up
+# Dashboard is now at http://localhost:8420
 ```
 
 Build the image locally:
@@ -355,7 +403,9 @@ docker build -t initrunner .
 docker run --rm initrunner --version
 ```
 
-The default image includes dashboard, ingestion, all model providers, and safety extras. Override with `--build-arg EXTRAS="dashboard,anthropic"` to customize. Using Ollama on the host? Use `http://host.docker.internal:11434/v1` as the model endpoint.
+The default image includes dashboard, ingestion, all model providers, and safety extras. Override with `--build-arg EXTRAS="dashboard,anthropic"` to customize.
+
+Using Ollama on the host? Set the model endpoint to `http://host.docker.internal:11434/v1` in your role YAML.
 
 ## Core Concepts
 
@@ -386,6 +436,15 @@ spec:
 ```
 
 Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-5-mini`.
+
+`metadata.tags` are used by intent sensing (`--sense`) and community search. Specific, task-oriented tags improve role selection:
+
+```yaml
+metadata:
+  name: web-searcher
+  description: Research assistant that searches the web
+  tags: [search, web, research, summarize, browse]
+```
 
 ### Tools
 
@@ -441,6 +500,8 @@ Third-party packages can register new tool types via the `initrunner.tools` entr
 | `--role-dir PATH` | Directory to search for roles (used with `--sense`) |
 | `--confirm-role` | Confirm the sensed role before running |
 
+Without `--role-dir`, roles are discovered from the current directory (`.`), `./examples/roles/`, and `~/.config/initrunner/roles/` (the global roles directory).
+
 See [Intent Sensing](docs/core/intent_sensing.md) for algorithm details, role tagging tips, and troubleshooting.
 
 ### Guardrails
@@ -455,6 +516,8 @@ Control costs and runaway agents with `spec.guardrails`:
 | `autonomous_token_budget` | — | Total tokens across all autonomous iterations |
 | `session_token_budget` | — | Cumulative limit for an interactive session |
 | `daemon_daily_token_budget` | — | Daily token cap for daemon mode |
+
+When any limit is reached the run stops immediately and raises an error. In autonomous mode, the partial result up to that point is returned.
 
 See [Guardrails](docs/configuration/guardrails.md) and [Token Control](docs/configuration/token_control.md) for the full reference.
 
@@ -530,6 +593,13 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 See [`docs/`](docs/) for the full index.
 
 ## Examples
+
+Browse and copy any example locally:
+
+```bash
+initrunner examples list              # see all available examples
+initrunner examples copy code-reviewer   # copy to current directory
+```
 
 The `examples/` directory includes 20+ ready-to-run agents, skills, and compose pipelines covering real-world scenarios:
 
