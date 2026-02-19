@@ -144,6 +144,9 @@ Orchestrate multiple agents into a pipeline. One agent's output feeds into the n
 ```yaml
 apiVersion: initrunner/v1
 kind: Compose
+metadata:
+  name: email-pipeline
+  description: Multi-agent email processing pipeline
 spec:
   services:
     inbox-watcher:
