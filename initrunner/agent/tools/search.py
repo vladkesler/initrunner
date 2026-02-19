@@ -36,43 +36,43 @@ def _search_duckduckgo(
 ) -> list[dict[str, str]]:
     """Search using DuckDuckGo (free, no API key required)."""
     try:
-        from duckduckgo_search import DDGS  # type: ignore[import-not-found]
+        from ddgs import DDGS  # type: ignore[import-not-found]
     except ImportError:
-        raise ImportError("duckduckgo-search is required: pip install initrunner[search]") from None
+        raise ImportError(
+            "ddgs is required: pip install ddgs or pip install initrunner[search]"
+        ) from None
 
     safesearch = "moderate" if safe_search else "off"
+    ddgs = DDGS()
 
-    with DDGS() as ddgs:
-        if news:
-            if days_back <= 1:
-                timelimit = "d"
-            elif days_back <= 7:
-                timelimit = "w"
-            else:
-                timelimit = "m"
-            raw = list(
-                ddgs.news(
-                    query, max_results=max_results, timelimit=timelimit, safesearch=safesearch
-                )
-            )
-            return [
-                {
-                    "title": r.get("title", ""),
-                    "url": r.get("url", ""),
-                    "snippet": r.get("body", ""),
-                }
-                for r in raw
-            ]
+    if news:
+        if days_back <= 1:
+            timelimit = "d"
+        elif days_back <= 7:
+            timelimit = "w"
         else:
-            raw = list(ddgs.text(query, max_results=max_results, safesearch=safesearch))
-            return [
-                {
-                    "title": r.get("title", ""),
-                    "url": r.get("href", ""),
-                    "snippet": r.get("body", ""),
-                }
-                for r in raw
-            ]
+            timelimit = "m"
+        raw = list(
+            ddgs.news(query, max_results=max_results, timelimit=timelimit, safesearch=safesearch)
+        )
+        return [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("url", ""),
+                "snippet": r.get("body", ""),
+            }
+            for r in raw
+        ]
+    else:
+        raw = list(ddgs.text(query, max_results=max_results, safesearch=safesearch))
+        return [
+            {
+                "title": r.get("title", ""),
+                "url": r.get("href", ""),
+                "snippet": r.get("body", ""),
+            }
+            for r in raw
+        ]
 
 
 def _search_serpapi(

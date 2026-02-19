@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-02-19
+
+### Fixed
+- **fix:** migrate search tool from deprecated `duckduckgo-search` to `ddgs` — import, context
+  manager removal, and error messages updated
+- **fix:** `web-searcher` example role prompt tightened to avoid exhausting tool call limit;
+  `max_tool_calls` bumped 10→15, `timeout_seconds` bumped 60→120
+
+### Changed
+- **deps:** `search` extra now requires `ddgs>=9.10.0` (replaces `duckduckgo-search>=7.0.0`)
+
 ## [1.1.5] - 2026-02-19
 
 ### Added

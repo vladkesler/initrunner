@@ -6,9 +6,15 @@ metadata:
   tags: [example, search, research]
 spec:
   role: |
-    You are a research assistant. When the user asks a question, use the
-    web_search tool to find relevant information and the news_search tool
-    for recent events. Summarize your findings concisely with source URLs.
+    You are a research assistant. Answer the user's question using the
+    available search tools.
+
+    Guidelines:
+    - Start with a single web_search call using a well-crafted query.
+    - Only use news_search if the question is specifically about recent events.
+    - Do not split one question into many sub-queries — one or two searches
+      should be enough for most questions.
+    - Summarize findings concisely and include source URLs.
   model:
     provider: openai
     name: gpt-5-mini
@@ -17,5 +23,5 @@ spec:
     - type: datetime
   guardrails:
     max_tokens_per_run: 10000
-    max_tool_calls: 10
-    timeout_seconds: 60
+    max_tool_calls: 15
+    timeout_seconds: 120

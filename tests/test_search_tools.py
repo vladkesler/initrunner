@@ -37,17 +37,14 @@ def _make_ctx():
 
 
 def _mock_ddgs_module(mock_ddgs):
-    """Create a mock duckduckgo_search module with the given DDGS instance."""
+    """Create a mock ddgs module with the given DDGS instance."""
     mock_mod = MagicMock(DDGS=MagicMock(return_value=mock_ddgs))
-    return {"duckduckgo_search": mock_mod}
+    return {"ddgs": mock_mod}
 
 
 def _make_ddgs_mock():
-    """Create a mock DDGS context manager."""
-    mock_ddgs = MagicMock()
-    mock_ddgs.__enter__ = MagicMock(return_value=mock_ddgs)
-    mock_ddgs.__exit__ = MagicMock(return_value=False)
-    return mock_ddgs
+    """Create a mock DDGS instance."""
+    return MagicMock()
 
 
 # ---------------------------------------------------------------------------
@@ -387,10 +384,10 @@ class TestSerpAPIProvider:
 
 
 class TestSearchErrorHandling:
-    def test_missing_duckduckgo_package(self):
-        """When duckduckgo-search is not installed, error message is returned."""
+    def test_missing_ddgs_package(self):
+        """When ddgs is not installed, error message is returned."""
         config = SearchToolConfig()
-        err_msg = "duckduckgo-search is required: pip install initrunner[search]"
+        err_msg = "ddgs is required: pip install ddgs or pip install initrunner[search]"
 
         with patch(
             "initrunner.agent.tools.search._PROVIDERS",
@@ -399,7 +396,7 @@ class TestSearchErrorHandling:
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
             result = fn(query="test")
-            assert "duckduckgo-search is required" in result
+            assert "ddgs is required" in result
 
     def test_search_api_error(self):
         """API errors are returned as error messages."""
