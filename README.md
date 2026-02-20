@@ -12,10 +12,11 @@
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
+  <a href="https://discord.gg/GRTZmVcW"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
-  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
+  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
 **Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon.**
@@ -626,6 +627,7 @@ See `examples/roles/skill-demo.yaml` for a role composing multiple skills.
 
 ## Community & Support
 
+- [Discord — InitRunner Hub](https://discord.gg/GRTZmVcW) — Chat, ask questions, share roles
 - [GitHub Issues](https://github.com/vladkesler/initrunner/issues) — Bug reports and feature requests
 - [Changelog](CHANGELOG.md) — Release notes and version history
 
