@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -12,6 +13,20 @@ from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.tools._registry import ToolBuildContext
+
+# zvec's native extension may use CPU instructions unavailable on CI runners
+# (causes SIGILL at import time).  Set SKIP_ZVEC_TESTS=1 to skip those files.
+_ZVEC_TEST_FILES = [
+    "test_incremental_ingest.py",
+    "test_memory_store.py",
+    "test_store_dimensions.py",
+    "test_store_factory.py",
+    "test_vectorstore.py",
+]
+
+collect_ignore: list[str] = []
+if os.environ.get("SKIP_ZVEC_TESTS") == "1":
+    collect_ignore.extend(_ZVEC_TEST_FILES)
 
 
 def make_role(

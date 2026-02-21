@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -31,6 +31,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --dev
       - run: uv run pytest tests/ -v
+        env:
+          SKIP_ZVEC_TESTS: "1"
 
   build:
     needs: [lint, test]

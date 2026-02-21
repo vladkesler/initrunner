@@ -3,7 +3,8 @@
 ## [Unreleased]
 
 ### Changed
-- Python version constraint tightened to `>=3.12,<3.13` — zvec cp311 wheel crashes with illegal instruction on CI runners and cp313 wheel does not exist yet
+- Python version constraint tightened to `>=3.11,<3.13` — zvec does not yet ship Python 3.13 wheels
+- Zvec-dependent tests skipped in CI (`SKIP_ZVEC_TESTS=1`) — zvec native extension triggers illegal instruction on GitHub Actions runners
 
 ## [1.3.0] - 2026-02-22
 
