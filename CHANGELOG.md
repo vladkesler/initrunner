@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Python version constraint tightened to `>=3.11,<3.13` — zvec does not yet ship Python 3.13 wheels
+
 ## [1.3.0] - 2026-02-22
 
 ### Breaking Changes
