@@ -19,6 +19,8 @@ _PATTERNS = [
     r"SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}",  # SendGrid
     r"SK[a-f0-9]{32}",  # Twilio
     r"Bearer\s+[A-Za-z0-9_\-.]{20,}",  # Bearer tokens
+    r"\d{8,}:[A-Za-z0-9_-]{35}",  # Telegram bot tokens
+    r"[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}",  # Discord bot tokens
 ]
 
 _COMBINED_RE = re.compile("|".join(_PATTERNS))
