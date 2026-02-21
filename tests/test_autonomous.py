@@ -559,9 +559,7 @@ class TestConversationalTriggerEarlyExit:
             role = _make_role(max_iterations=10)
             agent = MagicMock()
 
-            auto_result = run_autonomous(
-                agent, role, "hello", trigger_type="discord"
-            )
+            auto_result = run_autonomous(agent, role, "hello", trigger_type="discord")
 
         assert auto_result.final_status == "completed"
         assert auto_result.iteration_count == 1
@@ -595,9 +593,7 @@ class TestConversationalTriggerEarlyExit:
             role = _make_role(max_iterations=3)
             agent = MagicMock()
 
-            auto_result = run_autonomous(
-                agent, role, "run scheduled task", trigger_type="cron"
-            )
+            auto_result = run_autonomous(agent, role, "run scheduled task", trigger_type="cron")
 
         # Should hit max_iterations, not early-exit
         assert auto_result.final_status == "max_iterations"
