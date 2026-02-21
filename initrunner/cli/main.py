@@ -74,9 +74,17 @@ def main(
 
     if needs_setup():
         # TTY + no config: run setup wizard
+        from pathlib import Path
+
         from initrunner.cli.setup_cmd import run_setup
 
-        run_setup()
+        run_setup(
+            provider=None,
+            name="my-agent",
+            template=None,
+            skip_test=False,
+            output=Path("role.yaml"),
+        )
     else:
         # TTY + configured: start ephemeral chat
         from initrunner.cli.chat_cmd import _chat_auto_detect
@@ -95,6 +103,7 @@ def main(
             model=None,
             prompt=None,
             tool_profile="minimal",
+            extra_tools=[],
             audit_db=None,
             no_audit=False,
         )
