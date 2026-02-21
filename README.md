@@ -82,7 +82,7 @@ pip install "initrunner[anthropic]"
 model: { provider: anthropic, name: claude-opus-4-6 }
 ```
 
-The same file also runs as an interactive chat (`-i`), a trigger-driven daemon, or an OpenAI-compatible API server.
+Or just run `initrunner chat` — no YAML needed. When you're ready, the same role file runs as a daemon, a Telegram or Discord bot, or an OpenAI-compatible API server.
 
 <p align="center">
   <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
