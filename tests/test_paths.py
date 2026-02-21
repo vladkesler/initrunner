@@ -1,5 +1,6 @@
 """Tests for initrunner._paths secure-path helpers."""
 
+import os
 import stat
 import sys
 
@@ -50,6 +51,7 @@ def test_audit_logger_creates_private_dir(tmp_path):
         logger.close()
 
 
+@pytest.mark.skipif(os.environ.get("SKIP_ZVEC_TESTS") == "1", reason="zvec SIGILL on CI runners")
 def test_zvec_store_creates_private_dir(tmp_path):
     from initrunner.stores.zvec_store import ZvecDocumentStore
 
