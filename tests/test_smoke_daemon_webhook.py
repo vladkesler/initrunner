@@ -528,7 +528,7 @@ class TestWebhookSecurityEnhancements:
         port = _get_free_port()
         config = WebhookTriggerConfig(port=port)
         trigger = WebhookTrigger(config, lambda e: None)
-        with patch("initrunner.triggers.webhook.logger") as mock_logger:
+        with patch("initrunner.triggers.webhook._logger") as mock_logger:
             trigger.start()
             try:
                 _wait_for_port(port)

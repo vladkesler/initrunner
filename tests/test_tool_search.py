@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -377,7 +377,9 @@ class TestToolSearchConfig:
 
 
 class TestBuildAgentIntegration:
-    def test_build_agent_with_tool_search(self, monkeypatch):
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_build_agent_with_tool_search(self, mock_require, mock_agent_cls, monkeypatch):
         """build_agent with tool_search.enabled produces an agent with prepare_tools."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
@@ -388,12 +390,15 @@ class TestBuildAgentIntegration:
             tools=[{"type": "datetime"}],
         )
         role = RoleDefinition.model_validate(data)
-        agent = build_agent(role)
+        build_agent(role)
 
-        # Agent should have _prepare_tools set (non-None)
-        assert agent._prepare_tools is not None
+        # Agent constructor should have received a prepare_tools callback
+        call_kwargs = mock_agent_cls.call_args
+        assert call_kwargs.kwargs.get("prepare_tools") is not None
 
-    def test_build_agent_without_tool_search(self, monkeypatch):
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_build_agent_without_tool_search(self, mock_require, mock_agent_cls, monkeypatch):
         """build_agent without tool_search leaves prepare_tools as None."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
@@ -401,6 +406,7 @@ class TestBuildAgentIntegration:
 
         data = _minimal_role_data()
         role = RoleDefinition.model_validate(data)
-        agent = build_agent(role)
+        build_agent(role)
 
-        assert agent._prepare_tools is None
+        call_kwargs = mock_agent_cls.call_args
+        assert call_kwargs.kwargs.get("prepare_tools") is None
