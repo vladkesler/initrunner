@@ -100,8 +100,10 @@ class DaemonScreen(RoleScreen):
                     return
                 badge_colors = {
                     "cron": COLOR_PRIMARY,
-                    "file": COLOR_SECONDARY,
+                    "file_watch": COLOR_SECONDARY,
                     "webhook": COLOR_SUCCESS,
+                    "telegram": "#0088cc",
+                    "discord": "#5865F2",
                 }
                 badge_bg = badge_colors.get(event.trigger_type, COLOR_SECONDARY)
                 log.write(

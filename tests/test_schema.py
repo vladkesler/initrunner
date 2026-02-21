@@ -25,7 +25,9 @@ from initrunner.agent.schema.tools import (
 )
 from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
+    DiscordTriggerConfig,
     FileWatchTriggerConfig,
+    TelegramTriggerConfig,
     WebhookTriggerConfig,
 )
 
@@ -340,6 +342,68 @@ class TestTriggerConfig:
         data["spec"]["triggers"] = [{"type": "cron", "schedule": "daily", "prompt": "run"}]
         role = RoleDefinition.model_validate(data)
         assert isinstance(role.spec.triggers[0], CronTriggerConfig)
+
+    def test_telegram_trigger(self):
+        tc = TelegramTriggerConfig()
+        assert tc.type == "telegram"
+        assert tc.token_env == "TELEGRAM_BOT_TOKEN"
+        assert tc.allowed_users == []
+        assert tc.prompt_template == "{message}"
+        assert tc.autonomous is False
+
+    def test_telegram_trigger_custom(self):
+        tc = TelegramTriggerConfig(
+            token_env="MY_TG_TOKEN",
+            allowed_users=["alice", "bob"],
+        )
+        assert tc.token_env == "MY_TG_TOKEN"
+        assert tc.allowed_users == ["alice", "bob"]
+
+    def test_telegram_trigger_summary(self):
+        tc = TelegramTriggerConfig(allowed_users=["alice"])
+        assert "alice" in tc.summary()
+
+    def test_telegram_trigger_summary_all(self):
+        tc = TelegramTriggerConfig()
+        assert "all" in tc.summary()
+
+    def test_discord_trigger(self):
+        tc = DiscordTriggerConfig()
+        assert tc.type == "discord"
+        assert tc.token_env == "DISCORD_BOT_TOKEN"
+        assert tc.channel_ids == []
+        assert tc.allowed_roles == []
+        assert tc.prompt_template == "{message}"
+        assert tc.autonomous is False
+
+    def test_discord_trigger_custom(self):
+        tc = DiscordTriggerConfig(
+            channel_ids=["123", "456"],
+            allowed_roles=["Admin"],
+        )
+        assert tc.channel_ids == ["123", "456"]
+        assert tc.allowed_roles == ["Admin"]
+
+    def test_discord_trigger_summary_with_channels(self):
+        tc = DiscordTriggerConfig(channel_ids=["123"])
+        assert "123" in tc.summary()
+
+    def test_discord_trigger_summary_no_channels(self):
+        tc = DiscordTriggerConfig()
+        assert "mention/DM" in tc.summary()
+
+    def test_telegram_discriminated_union(self):
+        data = _minimal_role_data()
+        data["spec"]["triggers"] = [{"type": "telegram"}]
+        role = RoleDefinition.model_validate(data)
+        assert isinstance(role.spec.triggers[0], TelegramTriggerConfig)
+
+    def test_discord_discriminated_union(self):
+        data = _minimal_role_data()
+        data["spec"]["triggers"] = [{"type": "discord", "channel_ids": ["123"]}]
+        role = RoleDefinition.model_validate(data)
+        assert isinstance(role.spec.triggers[0], DiscordTriggerConfig)
+        assert role.spec.triggers[0].channel_ids == ["123"]
 
     def test_invalid_trigger_type(self):
         data = _minimal_role_data()

@@ -8,7 +8,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-710+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2260+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -21,7 +21,7 @@
 
 **Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon.**
 
-Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
+Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, a Telegram or Discord bot, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
 > **v1.1.6** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
@@ -101,7 +101,37 @@ The same file also runs as an interactive chat (`-i`), a trigger-driven daemon, 
 
 Start with the code-reviewer above. Each step adds one capability — no rewrites, just add a section to your YAML.
 
-### 1. Add knowledge & memory
+### 1. Start chatting — zero config
+
+No YAML needed. `initrunner chat` auto-detects your provider and starts an interactive session:
+
+```bash
+initrunner chat                  # auto-detects provider, starts chatting
+initrunner chat role.yaml        # chat with a specific role
+```
+
+Want a bot? One flag turns your agent into a Telegram or Discord bot:
+
+```bash
+initrunner chat --telegram       # Telegram bot (requires TELEGRAM_BOT_TOKEN)
+initrunner chat --discord        # Discord bot (requires DISCORD_BOT_TOKEN)
+```
+
+Key options:
+
+```bash
+initrunner chat --tool-profile all    # enable all tools (search, Python, filesystem, git, shell, slack)
+initrunner chat --tools git --tools shell  # cherry-pick specific tools
+initrunner chat --provider anthropic  # override auto-detected provider
+initrunner chat -p "summarize this repo"  # send prompt then enter REPL
+initrunner chat --list-tools          # show available extra tools
+```
+
+> Tool profiles: `minimal` (default — datetime, web reader), `all` (every available tool), `none`. Use `--tools` to cherry-pick individual tools.
+
+See [Chat docs](docs/getting-started/chat.md) for all options.
+
+### 2. Add knowledge & memory
 
 Point at your docs for RAG — a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
 
@@ -119,7 +149,7 @@ initrunner ingest role.yaml   # extract | chunk | embed | store
 initrunner run role.yaml -i --resume   # search_documents + memory ready
 ```
 
-### 2. Add skills
+### 3. Add skills
 
 Compose reusable bundles of tools and prompts. Each skill is a `SKILL.md` file — reference it by path:
 
@@ -149,7 +179,7 @@ Cite URLs in your responses.
 
 Run `initrunner init --skill my-skill` to scaffold one.
 
-### 3. Add triggers
+### 4. Add triggers
 
 Turn it into a daemon that reacts to events:
 
@@ -168,7 +198,23 @@ spec:
 initrunner daemon role.yaml   # runs until stopped
 ```
 
-### 4. Compose agents
+Or connect your agent to a messaging platform — one trigger turns it into a bot:
+
+```yaml
+spec:
+  triggers:
+    - type: telegram
+      prompt_template: "{message}"
+```
+
+```bash
+export TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+initrunner daemon role.yaml   # now a live Telegram bot
+```
+
+Discord works the same way (`type: discord` + `DISCORD_BOT_TOKEN`). See [Telegram docs](docs/getting-started/telegram.md) · [Discord docs](docs/getting-started/discord.md) for the full setup.
+
+### 5. Compose agents
 
 Orchestrate multiple agents into a pipeline. One agent's output feeds into the next:
 
@@ -191,7 +237,7 @@ spec:
 initrunner compose up pipeline.yaml
 ```
 
-### 5. Serve as an API
+### 6. Serve as an API
 
 Turn any agent into an OpenAI-compatible endpoint. Drop-in for Open WebUI, Vercel AI SDK, or any OpenAI-compatible client:
 
@@ -222,7 +268,7 @@ docker run -d --name open-webui --network host \
 
 See [Server docs](docs/interfaces/server.md#open-webui-integration) for the full walkthrough.
 
-### 6. Attach files and media
+### 7. Attach files and media
 
 Send images, audio, video, and documents alongside your prompts — from the CLI, REPL, API, or dashboard:
 
@@ -250,7 +296,7 @@ Queued attachment: notes.pdf
 
 The API server accepts multimodal content in the standard OpenAI format. See [Multimodal Input](docs/core/multimodal.md) for the full reference.
 
-### 7. Get structured output
+### 8. Get structured output
 
 Force the agent to return validated JSON matching a schema — ideal for pipelines and automation:
 
@@ -322,6 +368,8 @@ Common extras:
 | `initrunner[ingest]` | PDF, DOCX, XLSX ingestion |
 | `initrunner[dashboard]` | FastAPI web dashboard (HTMX + DaisyUI) |
 | `initrunner[search]` | Web search (DuckDuckGo) |
+| `initrunner[telegram]` | Telegram bot trigger |
+| `initrunner[discord]` | Discord bot trigger |
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 
@@ -334,7 +382,7 @@ export OPENAI_API_KEY=sk-...          # OpenAI (default)
 export ANTHROPIC_API_KEY=sk-ant-...   # Claude (requires initrunner[anthropic])
 ```
 
-`initrunner setup` walks through this interactively and stores the key in your shell profile.
+`initrunner setup` walks through this interactively and stores the key in `~/.initrunner/.env`. You can also edit this file directly — it's loaded automatically by all commands. Keys set in the environment take precedence over `.env` values.
 
 **3. Create your first agent and run it**
 
@@ -493,11 +541,12 @@ Third-party packages can register new tool types via the `initrunner.tools` entr
 
 | Mode | Command | Use case |
 |------|---------|----------|
+| Chat | `initrunner chat` | Zero-config interactive chat (auto-detects provider) |
 | Single-shot | `initrunner run role.yaml -p "prompt"` | One question, one answer |
 | Interactive | `initrunner run role.yaml -i` | Multi-turn chat (REPL) |
 | Autonomous | `initrunner run role.yaml -p "prompt" -a` | Multi-step agentic loop with self-reflection |
 | **Intent Sensing** | `initrunner run --sense -p "prompt"` | Pick the best role automatically from discovered roles |
-| Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook) |
+| Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook, telegram, discord) |
 | API server | `initrunner serve role.yaml` | OpenAI-compatible HTTP API |
 
 #### Intent Sensing options
@@ -540,6 +589,9 @@ For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#fr
 
 | Command | Description |
 |---------|-------------|
+| `chat` | Zero-config interactive chat (auto-detects provider) |
+| `chat <role.yaml>` | Chat with a specific role |
+| `chat --telegram` / `chat --discord` | One-command Telegram or Discord bot |
 | `run <role.yaml> -p "..."` | Single-shot prompt |
 | `run <role.yaml> -i` | Interactive REPL |
 | `run <role.yaml> -p "..." -a` | Autonomous agentic loop |
@@ -592,8 +644,8 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 
 | Area | Key docs |
 |------|----------|
-| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
-| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
+| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Chat](docs/getting-started/chat.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
+| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
@@ -612,7 +664,7 @@ initrunner examples copy code-reviewer   # copy to current directory
 
 The `examples/` directory includes 20+ ready-to-run agents, skills, and compose pipelines covering real-world scenarios:
 
-**Role definitions** (`examples/roles/`) — single-agent configs for support bots, code reviewers, changelog generators, deploy notifiers, web monitors, data analysts, and more.
+**Role definitions** (`examples/roles/`) — single-agent configs for support bots, code reviewers, changelog generators, deploy notifiers, web monitors, data analysts, Discord assistants, Telegram assistants, and more.
 
 **Skills** (`examples/skills/`) — reusable capability bundles:
 - `web-researcher/` — web research tools (fetch pages, HTTP requests)

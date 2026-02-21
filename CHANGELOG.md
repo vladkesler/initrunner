@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-21
+
+### Added
+- Telegram long-polling bot trigger with username-based access control and message chunking (4096 chars)
+- Discord WebSocket bot trigger with role/channel-based access control and message chunking (2000 chars)
+- Multi-turn conversation persistence for messaging triggers (LRU store, TTL expiry)
+- `chat` command — zero-config REPL with provider auto-detection, tool profiles (`none`/`minimal`/`all`), and one-command bot mode (`--telegram`/`--discord`)
+- `tool_search` meta-tool — BM25 keyword search over tool catalog; hides tools behind on-demand discovery to reduce context for large (10+) tool sets
+- Provider auto-detection service (`services/providers.py`) — priority-ordered key detection (Anthropic → OpenAI → Google → Groq → Mistral → Cohere → Ollama)
+- Bot token redaction for Discord and Telegram in sensitive env scrubbing
+- Example roles: `discord-assistant.yaml`, `telegram-assistant.yaml`
+- Docs: Discord quickstart, Telegram quickstart, chat quickstart, tool search reference
+
+### Changed
+- Daemon runner: messaging triggers reply immediately before post-processing (display, sinks, episode capture)
+- Messaging triggers skip autonomous mode even when `autonomous: true` is set — use direct execution for low-latency replies
+- Daemon concurrency limited to 4 simultaneous trigger executions with backpressure
+
+### Dependencies
+- New optional extras: `telegram` (`python-telegram-bot>=21.0`), `discord` (`discord.py>=2.3`), `channels` (both)
+
 ## [1.1.6] - 2026-02-19
 
 ### Fixed

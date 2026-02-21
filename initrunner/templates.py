@@ -354,6 +354,75 @@ spec:
 """
 
 
+def template_telegram(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
+    return f"""\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: {name}
+  description: Telegram bot agent
+  tags:
+    - telegram
+    - daemon
+spec:
+  role: |
+    You are a helpful assistant responding to Telegram messages.
+    Keep responses concise and well-formatted for mobile reading.
+  model:
+    provider: {provider}
+    name: {model_name}
+    temperature: 0.1
+    max_tokens: 4096
+  triggers:
+    - type: telegram
+      token_env: TELEGRAM_BOT_TOKEN
+      allowed_users: []  # add usernames to restrict access
+      prompt_template: "{{message}}"
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50
+    daemon_daily_token_budget: 200000
+"""
+
+
+def template_discord(name: str, provider: str, model_name: str | None = None) -> str:
+    model_name = model_name or _default_model_name(provider)
+    return f"""\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: {name}
+  description: Discord bot agent
+  tags:
+    - discord
+    - daemon
+spec:
+  role: |
+    You are a helpful assistant responding to Discord messages.
+    Keep responses concise. You respond to DMs and @mentions.
+  model:
+    provider: {provider}
+    name: {model_name}
+    temperature: 0.1
+    max_tokens: 4096
+  triggers:
+    - type: discord
+      token_env: DISCORD_BOT_TOKEN
+      channel_ids: []     # restrict to specific channels
+      allowed_roles: []   # restrict to specific roles
+      prompt_template: "{{message}}"
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50
+    daemon_daily_token_budget: 200000
+"""
+
+
 def template_skill(name: str, provider: str) -> str:
     return f"""\
 ---
@@ -394,6 +463,8 @@ TEMPLATES: dict[str, Callable[..., str]] = {
     "ollama": template_ollama,
     "tool": template_tool,
     "api": template_api,
+    "telegram": template_telegram,
+    "discord": template_discord,
     "skill": template_skill,
 }
 

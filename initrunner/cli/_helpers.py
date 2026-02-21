@@ -194,6 +194,38 @@ def resolve_memory_path(role: RoleDefinition) -> Path:
 
 
 @contextmanager
+def ephemeral_context(
+    role: RoleDefinition,
+    agent: Agent,
+    *,
+    audit_db: Path | None = None,
+    no_audit: bool = False,
+    with_memory: bool = False,
+):
+    """Context manager for ephemeral (in-memory) roles.
+
+    Like command_context() but accepts pre-built RoleDefinition + Agent.
+    Skips sinks and observability.
+    """
+    audit_logger = create_audit_logger(audit_db, no_audit)
+
+    memory_store = None
+    if with_memory and role.spec.memory is not None:
+        from initrunner.stores.factory import create_memory_store
+
+        mem_path = resolve_memory_path(role)
+        memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
+
+    try:
+        yield role, agent, audit_logger, memory_store
+    finally:
+        if memory_store is not None:
+            memory_store.close()
+        if audit_logger is not None:
+            audit_logger.close()
+
+
+@contextmanager
 def command_context(
     role_file: Path,
     *,

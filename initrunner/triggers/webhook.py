@@ -16,7 +16,7 @@ from starlette.routing import Route
 from initrunner.agent.schema.triggers import WebhookTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 _MAX_BODY_BYTES = 1_048_576  # 1 MB
 
@@ -36,7 +36,7 @@ class WebhookTrigger(TriggerBase):
 
         config = self._config
         if config.secret:
-            logger.debug(
+            _logger.debug(
                 "Webhook secret configured (X-Hub-Signature-256), length=%d",
                 len(config.secret),
             )
@@ -95,7 +95,7 @@ class WebhookTrigger(TriggerBase):
                 self._server.force_exit = True
             self._thread.join(timeout=5)
             if self._thread.is_alive():
-                logger.warning(
+                _logger.warning(
                     "Webhook server thread still alive after forced stop"
                     " (port %d may remain bound)",
                     self._config.port,

@@ -83,6 +83,10 @@ Detailed docs live in `docs/`. Key references:
 | RAG quickstart | `docs/getting-started/rag-quickstart.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook) | `docs/core/triggers.md` |
+| Tool search meta-tool | `docs/core/tool-search.md` |
+| Discord bot quickstart | `docs/getting-started/discord.md` |
+| Telegram bot quickstart | `docs/getting-started/telegram.md` |
+| Chat & quick start | `docs/getting-started/chat.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |

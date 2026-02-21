@@ -16,6 +16,7 @@ class AutonomyConfig(BaseModel):
     max_history_messages: int = 40
     max_plan_steps: int = 20
     iteration_delay_seconds: float = 0
+    max_no_tool_call_iterations: int = 2
     max_scheduled_per_run: int = 3
     max_scheduled_total: int = 50
     max_schedule_delay_seconds: int = 86400  # 24h

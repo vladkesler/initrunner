@@ -353,3 +353,253 @@ class TestRunAutonomousCLIValidation:
             app, ["run", "nonexistent.yaml", "--autonomous", "--interactive", "-p", "test"]
         )
         assert result.exit_code != 0
+
+
+class TestRunAutonomousMessageHistory:
+    """Test that run_autonomous accepts and passes message_history."""
+
+    def test_message_history_passed_to_first_iteration(self):
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        prior_history = [{"role": "user", "content": "previous message"}]
+
+        result = RunResult(run_id="r1", output="done", tool_calls=1)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(result, [{"role": "assistant", "content": "done"}]),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=1)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(
+                agent,
+                role,
+                "follow-up question",
+                message_history=prior_history,
+            )
+
+            # First execute_run call should receive the prior history
+            call_kwargs = mock_execute.call_args
+            assert call_kwargs.kwargs["message_history"] == prior_history
+            assert auto_result.final_messages is not None
+
+
+class TestSpinGuard:
+    """Test the consecutive no-tool-call spin guard."""
+
+    def test_stops_after_consecutive_no_tool_calls(self):
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        no_tools_result = RunResult(run_id="r1", output="I need more info", tool_calls=0)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(
+                    no_tools_result,
+                    [{"role": "assistant", "content": "I need more info"}],
+                ),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=10)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(agent, role, "do something")
+
+        assert auto_result.final_status == "blocked"
+        assert auto_result.iteration_count == 2
+        assert mock_execute.call_count == 2
+
+    def test_counter_resets_on_tool_use(self):
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return (
+                    RunResult(run_id="r1", output="thinking...", tool_calls=0),
+                    [{"role": "assistant", "content": "thinking..."}],
+                )
+            elif call_count == 2:
+                return (
+                    RunResult(run_id="r2", output="used tool", tool_calls=1),
+                    [{"role": "assistant", "content": "used tool"}],
+                )
+            elif call_count == 3:
+                return (
+                    RunResult(run_id="r3", output="thinking again...", tool_calls=0),
+                    [{"role": "assistant", "content": "thinking again..."}],
+                )
+            else:
+                return (
+                    RunResult(run_id="r4", output="still thinking...", tool_calls=0),
+                    [{"role": "assistant", "content": "still thinking..."}],
+                )
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                side_effect=side_effect,
+            ),
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=10)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(agent, role, "do something")
+
+        # 4 iterations: no-tool, tool, no-tool, no-tool(blocked)
+        assert auto_result.iteration_count == 4
+        assert auto_result.final_status == "blocked"
+
+    def test_max_no_tool_call_iterations_configurable(self):
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        no_tools_result = RunResult(run_id="r1", output="thinking...", tool_calls=0)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(
+                    no_tools_result,
+                    [{"role": "assistant", "content": "thinking..."}],
+                ),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            config = AutonomyConfig(max_no_tool_call_iterations=3)
+            role = _make_role(autonomy=config, max_iterations=10)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(agent, role, "do something")
+
+        assert auto_result.final_status == "blocked"
+        assert auto_result.iteration_count == 3
+        assert mock_execute.call_count == 3
+
+
+class TestConversationalTriggerEarlyExit:
+    """Conversational triggers (telegram/discord) should exit after 1 iteration."""
+
+    def test_telegram_single_iteration_with_tools(self):
+        """When trigger_type='telegram', only 1 iteration runs even if the agent used tools."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        result_with_tools = RunResult(run_id="r1", output="Here's your answer", tool_calls=2)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(
+                    result_with_tools,
+                    [{"role": "assistant", "content": "Here's your answer"}],
+                ),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=10)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(
+                agent, role, "what is the weather?", trigger_type="telegram"
+            )
+
+        assert auto_result.final_status == "completed"
+        assert auto_result.iteration_count == 1
+        assert mock_execute.call_count == 1
+
+    def test_discord_single_iteration(self):
+        """Discord trigger also exits after 1 iteration."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        result_no_tools = RunResult(run_id="r1", output="Done", tool_calls=0)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(
+                    result_no_tools,
+                    [{"role": "assistant", "content": "Done"}],
+                ),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=10)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(
+                agent, role, "hello", trigger_type="discord"
+            )
+
+        assert auto_result.final_status == "completed"
+        assert auto_result.iteration_count == 1
+        assert mock_execute.call_count == 1
+
+    def test_non_conversational_trigger_still_loops(self):
+        """Non-conversational triggers (e.g. cron) should NOT early-exit."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return (
+                RunResult(run_id=f"r{call_count}", output="working...", tool_calls=1),
+                [{"role": "assistant", "content": "working..."}],
+            )
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                side_effect=side_effect,
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=3)
+            agent = MagicMock()
+
+            auto_result = run_autonomous(
+                agent, role, "run scheduled task", trigger_type="cron"
+            )
+
+        # Should hit max_iterations, not early-exit
+        assert auto_result.final_status == "max_iterations"
+        assert auto_result.iteration_count == 3
+        assert mock_execute.call_count == 3
