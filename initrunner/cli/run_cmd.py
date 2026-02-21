@@ -387,7 +387,7 @@ def ingest(
                 max_total_ingest_mb=resource_limits.max_total_ingest_mb,
             )
         except Exception as exc:
-            from initrunner.stores.sqlite_vec import EmbeddingModelChangedError
+            from initrunner.stores.base import EmbeddingModelChangedError
 
             if not isinstance(exc, EmbeddingModelChangedError):
                 raise

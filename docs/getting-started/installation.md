@@ -30,19 +30,82 @@ pipx install initrunner
 
 ## Extras
 
-| Extra | Install command | What it adds |
-|-------|----------------|--------------|
-| `anthropic` | `pip install initrunner[anthropic]` | Anthropic provider |
-| `google` | `pip install initrunner[google]` | Google provider |
-| `groq` | `pip install initrunner[groq]` | Groq provider |
-| `mistral` | `pip install initrunner[mistral]` | Mistral provider |
-| `all-models` | `pip install initrunner[all-models]` | All providers |
-| `ingest` | `pip install initrunner[ingest]` | Additional formats: PDF, DOCX, XLSX (base text ingestion is built-in) |
-| `local-embeddings` | `pip install initrunner[local-embeddings]` | Local embeddings via fastembed — **not yet implemented**; use [Ollama](../configuration/ollama.md) for local embeddings |
-| `safety` | `pip install initrunner[safety]` | Profanity filter for content policy |
-| `search` | `pip install initrunner[search]` | Web search via DuckDuckGo (free, no API key) |
-| `dashboard` | `pip install initrunner[dashboard]` | Web dashboard (FastAPI + Next.js) |
-| `tui` | `pip install initrunner[tui]` | Terminal TUI dashboard (Textual) |
+> **Tip:** Not sure which extras you need? Install `[all]` — it includes every provider, feature, and interface so everything just works out of the box.
+
+### Install all extras (recommended)
+
+```bash
+# pip
+pip install "initrunner[all]"
+
+# uv
+uv tool install "initrunner[all]"
+# or in a venv:
+uv pip install "initrunner[all]"
+
+# pipx
+pipx install "initrunner[all]"
+
+# shell installer
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+```
+
+### Pick and choose
+
+You can combine specific extras with commas:
+
+```bash
+# pip
+pip install "initrunner[ingest,search,dashboard]"
+
+# uv
+uv tool install "initrunner[ingest,search,dashboard]"
+
+# pipx
+pipx install "initrunner[ingest,search,dashboard]"
+
+# shell installer (comma-separated)
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest,search,dashboard
+```
+
+### Available extras
+
+#### LLM Providers
+
+| Extra | What it adds |
+|-------|--------------|
+| `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
+| `anthropic` | Anthropic provider (Claude) |
+| `google` | Google provider (Gemini) |
+| `groq` | Groq provider |
+| `mistral` | Mistral provider |
+
+#### Features
+
+| Extra | What it adds |
+|-------|--------------|
+| `ingest` | PDF, DOCX, XLSX ingestion (base text ingestion is built-in) |
+| `search` | Web search via DuckDuckGo (free, no API key) |
+| `audio` | YouTube transcript extraction |
+| `safety` | Profanity filter for content policy |
+| `observability` | OpenTelemetry tracing and metrics export |
+
+#### Messaging Triggers
+
+| Extra | What it adds |
+|-------|--------------|
+| `telegram` | Telegram bot trigger |
+| `discord` | Discord bot trigger |
+| `channels` | Both Telegram and Discord |
+
+#### Interfaces
+
+| Extra | What it adds |
+|-------|--------------|
+| `tui` | Terminal TUI dashboard (Textual) |
+| `dashboard` | Web dashboard (FastAPI + HTMX + DaisyUI) |
+
+> **Note:** `local-embeddings` (fastembed) is defined but **not yet implemented**. Use [Ollama](../configuration/ollama.md) for local embeddings instead.
 
 ## Development setup
 

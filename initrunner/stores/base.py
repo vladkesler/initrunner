@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class StoreBackend(StrEnum):
-    SQLITE_VEC = "sqlite-vec"
+    ZVEC = "zvec"
 
 
 class MemoryType(StrEnum):
@@ -29,7 +29,7 @@ class StoreConfig:
     db_path: Path
     embed_provider: str
     embed_model: str
-    store_backend: StoreBackend = StoreBackend.SQLITE_VEC
+    store_backend: StoreBackend = StoreBackend.ZVEC
     chunking_strategy: str = "fixed"
     chunk_size: int = 512
     chunk_overlap: int = 50
@@ -95,14 +95,18 @@ DEFAULT_STORES_DIR: _LazyDir | Path = _LazyDir("get_stores_dir")
 DEFAULT_MEMORY_DIR: _LazyDir | Path = _LazyDir("get_memory_dir")
 
 
+class EmbeddingModelChangedError(Exception):
+    """Raised when the embedding model has changed and the store must be wiped."""
+
+
 def resolve_store_path(store_path: str | None, agent_name: str) -> Path:
     """Resolve the document store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_STORES_DIR / f"{agent_name}.db"
+    return Path(store_path) if store_path else DEFAULT_STORES_DIR / f"{agent_name}.zvec"
 
 
 def resolve_memory_path(store_path: str | None, agent_name: str) -> Path:
     """Resolve the memory store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_MEMORY_DIR / f"{agent_name}.db"
+    return Path(store_path) if store_path else DEFAULT_MEMORY_DIR / f"{agent_name}.zvec"
 
 
 class FileMetadataStore(abc.ABC):
@@ -179,6 +183,12 @@ class DocumentStore(FileMetadataStore):
         content_hash: str,
         last_modified: float,
     ) -> int: ...
+
+    @abc.abstractmethod
+    def read_store_meta(self, key: str) -> str | None: ...
+
+    @abc.abstractmethod
+    def write_store_meta(self, key: str, value: str) -> None: ...
 
     @abc.abstractmethod
     def close(self) -> None: ...

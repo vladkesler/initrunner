@@ -50,13 +50,9 @@ def test_audit_logger_creates_private_dir(tmp_path):
         logger.close()
 
 
-def test_open_sqlite_vec_creates_private_dir(tmp_path):
-    from initrunner.stores.sqlite_vec import _open_sqlite_vec
+def test_zvec_store_creates_private_dir(tmp_path):
+    from initrunner.stores.zvec_store import ZvecDocumentStore
 
-    db_path = tmp_path / "sub" / "store.db"
-    conn = _open_sqlite_vec(db_path)
-    try:
-        assert stat.S_IMODE(db_path.parent.stat().st_mode) == 0o700
-        assert stat.S_IMODE(db_path.stat().st_mode) == 0o600
-    finally:
-        conn.close()
+    store_path = tmp_path / "sub" / "store.zvec"
+    with ZvecDocumentStore(store_path, dimensions=4):
+        assert stat.S_IMODE(store_path.stat().st_mode) == 0o700

@@ -427,7 +427,7 @@ initrunner validate role.yaml
 initrunner ingest role.yaml
 ```
 
-The ingestion pipeline reads all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local SQLite vector database. This auto-registers a `search_documents(query)` tool for the agent.
+The ingestion pipeline reads all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local Zvec vector database. This auto-registers a `search_documents(query)` tool for the agent.
 
 Now query your report history:
 

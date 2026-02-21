@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+- **Vector store backend migrated from sqlite-vec to Zvec** — existing `.db` store files are not compatible; users must re-ingest documents (`initrunner ingest --force`) and memory stores will start fresh. Store paths change from `<name>.db` to `<name>.zvec`.
+
+### Added
+- Zvec-backed `ZvecDocumentStore` and `ZvecMemoryStore` implementations (`stores/zvec_store.py`)
+- Reference-counted memory store registry (`register_memory_store` / `unregister_memory_store`) preventing collection lock conflicts when tools and system prompts share a store
+- `[all]` extras group — meta-dependency that bundles all provider and feature extras
+- `read_store_meta()` / `write_store_meta()` abstract methods on `DocumentStore` ABC
+- `EmbeddingModelChangedError` exported from `initrunner.stores` (moved from deleted sqlite_vec module)
+
+### Changed
+- Default `StoreBackend` enum value: `SQLITE_VEC` → `ZVEC` across all config schemas (IngestConfig, MemoryConfig, SharedMemoryConfig, StoreConfig)
+- Ingestion pipeline uses factory-based store creation instead of low-level sqlite3 calls
+- `build_memory_system_prompt()` accepts optional `store` parameter to reuse an already-open store
+- Agent loader passes existing memory store to procedural-memory system prompt callback
+- Memory store `close()` is now reference-counted — only releases underlying zvec collections when the last reference is closed
+
+### Fixed
+- Memory tools (`remember`, `recall`, `list_memories`, `learn_procedure`, `record_episode`) no longer crash with "Can't lock read-write collection" when called during an agent run
+
+### Dependencies
+- Removed: `sqlite-vec>=0.1.6`
+- Added: `zvec>=0.2.0`
+- New extras group: `[all]` (bundles ingest, search, audio, safety, all-models, observability, channels, tui, dashboard)
+
+### Documentation
+- Rewritten ingestion docs — Zvec collection schemas replace SQL table descriptions
+- Rewritten memory docs — Zvec store format, locking model, directory layout
+- Expanded installation docs — restructured extras into categorised tables (Providers, Features, Messaging, Interfaces), added `[all]` install examples
+- Updated provider, orchestration, and delegation docs for zvec references
+- Updated README extras section
+- Updated CLAUDE.md tech stack
+
 ## [1.2.0] - 2026-02-21
 
 ### Added

@@ -60,7 +60,7 @@ spec:
     enabled: false
     store_path: null
     max_memories: 1000
-    store_backend: sqlite-vec
+    store_backend: zvec
 ```
 
 ### Top-Level Fields
@@ -74,9 +74,9 @@ spec:
 | `spec.services` | `dict[str, ServiceConfig]` | *(required)* | Map of service name to configuration. Must contain at least one service. |
 | `spec.shared_memory` | `SharedMemoryConfig` | disabled | Shared memory configuration across services. |
 | `spec.shared_memory.enabled` | `bool` | `false` | Enable shared memory across all services. |
-| `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory DB. Default: `~/.initrunner/memory/{name}-shared.db`. |
+| `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.zvec`. |
 | `spec.shared_memory.max_memories` | `int` | `1000` | Maximum number of memories in the shared store. |
-| `spec.shared_memory.store_backend` | `str` | `"sqlite-vec"` | Store backend. Currently only `sqlite-vec` is supported. |
+| `spec.shared_memory.store_backend` | `str` | `"zvec"` | Store backend. Uses Zvec, an in-process vector database. |
 
 ## Service Configuration
 
@@ -307,7 +307,7 @@ When `spec.shared_memory.enabled` is `true`, all services in the compose orchest
 spec:
   shared_memory:
     enabled: true
-    store_path: ./shared-memory.db   # optional, default: ~/.initrunner/memory/{name}-shared.db
+    store_path: ./shared-memory.zvec   # optional, default: ~/.initrunner/memory/{name}-shared.zvec
     max_memories: 500                # optional, default: 1000
   services:
     researcher:
@@ -321,7 +321,7 @@ spec:
 When `store_path` is not set, the shared database is created at:
 
 ```
-~/.initrunner/memory/{compose-name}-shared.db
+~/.initrunner/memory/{compose-name}-shared.zvec
 ```
 
 Where `{compose-name}` comes from `metadata.name`.
@@ -339,7 +339,7 @@ All services sharing a memory store must use compatible embedding models (same d
 
 ### Concurrency
 
-SQLite WAL mode and `busy_timeout` handle concurrent reads and writes from multiple service threads safely. No additional locking is needed.
+Zvec handles concurrent access from multiple service threads via internal locking. No additional configuration is needed.
 
 ## CLI Commands
 

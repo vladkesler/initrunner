@@ -144,21 +144,32 @@ def delete_session(role: RoleDefinition, session_id: str) -> bool:
         return store.delete_session(session_id, role.metadata.name)
 
 
-def build_memory_system_prompt(role: RoleDefinition) -> str:
-    """Build a system prompt section from procedural memories. Never raises."""
+def build_memory_system_prompt(
+    role: RoleDefinition,
+    store: MemoryStoreBase | None = None,
+) -> str:
+    """Build a system prompt section from procedural memories. Never raises.
+
+    If *store* is provided it is used directly (avoids re-opening and
+    hitting zvec collection locks).  Otherwise a temporary store is opened.
+    """
     try:
         from initrunner.stores.base import MemoryType
-        from initrunner.stores.factory import open_memory_store
 
         if role.spec.memory is None:
             return ""
         if not role.spec.memory.procedural.enabled:
             return ""
 
-        with open_memory_store(role.spec.memory, role.metadata.name) as store:
-            if store is None:
-                return ""
+        if store is not None:
             procedures = store.list_memories(limit=20, memory_type=MemoryType.PROCEDURAL)
+        else:
+            from initrunner.stores.factory import open_memory_store
+
+            with open_memory_store(role.spec.memory, role.metadata.name) as _store:
+                if _store is None:
+                    return ""
+                procedures = _store.list_memories(limit=20, memory_type=MemoryType.PROCEDURAL)
 
         if not procedures:
             return ""

@@ -34,7 +34,7 @@ class ConsolidationConfig(BaseModel):
 
 class MemoryConfig(BaseModel):
     store_path: str | None = None  # default: ~/.initrunner/memory/{agent-name}.db
-    store_backend: StoreBackend = StoreBackend.SQLITE_VEC
+    store_backend: StoreBackend = StoreBackend.ZVEC
     max_sessions: int = 10
     max_memories: int = 1000  # deprecated: use semantic.max_memories
     max_resume_messages: int = 20  # limit history loaded on --resume

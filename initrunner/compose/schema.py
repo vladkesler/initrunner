@@ -39,7 +39,7 @@ class RestartPolicy(BaseModel):
 class SharedMemoryConfig(BaseModel):
     enabled: bool = False
     store_path: str | None = None
-    store_backend: StoreBackend = StoreBackend.SQLITE_VEC
+    store_backend: StoreBackend = StoreBackend.ZVEC
     max_memories: int = 1000
 
 

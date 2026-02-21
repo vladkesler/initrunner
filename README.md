@@ -23,7 +23,7 @@
 
 Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, a Telegram or Discord bot, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
 
-> **v1.2.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.3.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## Table of Contents
 
@@ -360,16 +360,24 @@ uv tool install initrunner
 pipx install initrunner
 ```
 
-Common extras:
+Install with extras:
+
+```bash
+pip install "initrunner[all]"          # everything
+pip install "initrunner[all-models]"   # all LLM providers
+pip install "initrunner[ingest,search,dashboard]"  # pick and choose
+```
 
 | Extra | What it adds |
 |-------|--------------|
-| `initrunner[anthropic]` | Anthropic provider (Claude) |
-| `initrunner[ingest]` | PDF, DOCX, XLSX ingestion |
-| `initrunner[dashboard]` | FastAPI web dashboard (HTMX + DaisyUI) |
-| `initrunner[search]` | Web search (DuckDuckGo) |
-| `initrunner[telegram]` | Telegram bot trigger |
-| `initrunner[discord]` | Discord bot trigger |
+| `all` | **Everything below** (recommended for getting started) |
+| `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
+| `anthropic` | Anthropic provider (Claude) |
+| `ingest` | PDF, DOCX, XLSX ingestion |
+| `dashboard` | FastAPI web dashboard |
+| `search` | Web search (DuckDuckGo) |
+| `telegram` | Telegram bot trigger |
+| `discord` | Discord bot trigger |
 
 See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
 

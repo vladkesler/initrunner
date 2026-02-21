@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -17,31 +18,64 @@ from initrunner.stores.base import (
 if TYPE_CHECKING:
     from initrunner.agent.schema.memory import MemoryConfig
 
+# ---------------------------------------------------------------------------
+# Active memory-store registry
+# ---------------------------------------------------------------------------
+# When a long-lived owner (e.g. ``command_context``) opens a memory store it
+# registers it here.  Subsequent callers (tools, system-prompt callbacks) get
+# back the *same* instance via ``acquire()`` so that zvec collection locks are
+# not violated.  ``close()`` on borrowed references is a ref-counted no-op —
+# only the final owner actually releases the underlying collections.
+
+_active_memory_stores: dict[str, MemoryStoreBase] = {}
+_registry_lock = threading.Lock()
+
+
+def register_memory_store(db_path: Path, store: MemoryStoreBase) -> None:
+    """Register an already-open store so subsequent callers reuse it."""
+    with _registry_lock:
+        _active_memory_stores[str(db_path)] = store
+
+
+def unregister_memory_store(db_path: Path) -> None:
+    """Remove a store from the registry (called on cleanup)."""
+    with _registry_lock:
+        _active_memory_stores.pop(str(db_path), None)
+
 
 def create_document_store(
-    backend: StoreBackend = StoreBackend.SQLITE_VEC,
+    backend: StoreBackend = StoreBackend.ZVEC,
     db_path: Path = Path(),
     dimensions: int | None = None,
 ) -> DocumentStore:
     """Create a DocumentStore for the given backend."""
-    if backend == StoreBackend.SQLITE_VEC:
-        from initrunner.stores.sqlite_vec import SqliteVecDocumentStore
+    from initrunner.stores.zvec_store import ZvecDocumentStore
 
-        return SqliteVecDocumentStore(db_path, dimensions=dimensions)
-    raise ValueError(f"Unknown document store backend: {backend}")
+    return ZvecDocumentStore(db_path, dimensions=dimensions)
 
 
 def create_memory_store(
-    backend: StoreBackend = StoreBackend.SQLITE_VEC,
+    backend: StoreBackend = StoreBackend.ZVEC,
     db_path: Path = Path(),
     dimensions: int | None = None,
 ) -> MemoryStoreBase:
-    """Create a MemoryStoreBase for the given backend."""
-    if backend == StoreBackend.SQLITE_VEC:
-        from initrunner.stores.sqlite_vec import SqliteVecMemoryStore
+    """Create or reuse a MemoryStoreBase for the given backend.
 
-        return SqliteVecMemoryStore(db_path, dimensions=dimensions)
-    raise ValueError(f"Unknown memory store backend: {backend}")
+    If a store for *db_path* is already registered (via
+    :func:`register_memory_store`), it is returned with its reference count
+    incremented so that the caller's ``close()`` won't release the underlying
+    collections.
+    """
+    key = str(db_path)
+    with _registry_lock:
+        existing = _active_memory_stores.get(key)
+        if existing is not None:
+            existing.acquire()  # type: ignore[attr-defined]
+            return existing
+
+    from initrunner.stores.zvec_store import ZvecMemoryStore
+
+    return ZvecMemoryStore(db_path, dimensions=dimensions)
 
 
 @contextmanager

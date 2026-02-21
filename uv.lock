@@ -1500,12 +1500,30 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rich" },
-    { name = "sqlite-vec" },
     { name = "typer" },
     { name = "watchfiles" },
+    { name = "zvec" },
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "better-profanity" },
+    { name = "ddgs" },
+    { name = "discord-py" },
+    { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "openpyxl" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-instrumentation-logging" },
+    { name = "opentelemetry-sdk" },
+    { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"] },
+    { name = "pymupdf4llm" },
+    { name = "python-docx" },
+    { name = "python-telegram-bot" },
+    { name = "textual" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "youtube-transcript-api" },
+]
 all-models = [
     { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"] },
 ]
@@ -1579,42 +1597,58 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.2" },
+    { name = "better-profanity", marker = "extra == 'all'", specifier = ">=0.7.0" },
     { name = "better-profanity", marker = "extra == 'safety'", specifier = ">=0.7.0" },
     { name = "croniter", specifier = ">=6.0.0" },
+    { name = "ddgs", marker = "extra == 'all'", specifier = ">=9.10.0" },
     { name = "ddgs", marker = "extra == 'search'", specifier = ">=9.10.0" },
+    { name = "discord-py", marker = "extra == 'all'", specifier = ">=2.3" },
     { name = "discord-py", marker = "extra == 'channels'", specifier = ">=2.3" },
     { name = "discord-py", marker = "extra == 'discord'", specifier = ">=2.3" },
+    { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.115.0" },
     { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.115.0" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "jinja2", marker = "extra == 'all'", specifier = ">=3.1" },
     { name = "jinja2", marker = "extra == 'dashboard'", specifier = ">=3.1" },
     { name = "markdownify", specifier = ">=1.2.2" },
+    { name = "openpyxl", marker = "extra == 'all'", specifier = ">=3.1.5" },
     { name = "openpyxl", marker = "extra == 'ingest'", specifier = ">=3.1.5" },
+    { name = "opentelemetry-exporter-otlp", marker = "extra == 'all'", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'observability'", specifier = ">=1.20.0" },
+    { name = "opentelemetry-instrumentation-logging", marker = "extra == 'all'", specifier = ">=0.41b0" },
     { name = "opentelemetry-instrumentation-logging", marker = "extra == 'observability'", specifier = ">=0.41b0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'all'", specifier = ">=1.20.0" },
     { name = "opentelemetry-sdk", marker = "extra == 'observability'", specifier = ">=1.20.0" },
     { name = "pydantic", specifier = ">=2.11" },
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=1.56.0" },
+    { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all-models'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["fastmcp", "openai"], specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["groq"], marker = "extra == 'groq'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=1.56.0" },
+    { name = "pymupdf4llm", marker = "extra == 'all'", specifier = ">=0.2.9" },
     { name = "pymupdf4llm", marker = "extra == 'ingest'", specifier = ">=0.2.9" },
+    { name = "python-docx", marker = "extra == 'all'", specifier = ">=1.2.0" },
     { name = "python-docx", marker = "extra == 'ingest'", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-telegram-bot", marker = "extra == 'all'", specifier = ">=21.0" },
     { name = "python-telegram-bot", marker = "extra == 'channels'", specifier = ">=21.0" },
     { name = "python-telegram-bot", marker = "extra == 'telegram'", specifier = ">=21.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=14.3.2" },
-    { name = "sqlite-vec", specifier = ">=0.1.6" },
+    { name = "textual", marker = "extra == 'all'", specifier = ">=7.5.0" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=7.5.0" },
     { name = "typer", specifier = ">=0.21.1" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'all'", specifier = ">=0.34.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'dashboard'", specifier = ">=0.34.0" },
     { name = "watchfiles", specifier = ">=1.1.1" },
+    { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
+    { name = "zvec", specifier = ">=0.2.0" },
 ]
-provides-extras = ["all-models", "anthropic", "audio", "channels", "dashboard", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "telegram", "tui"]
+provides-extras = ["all", "all-models", "anthropic", "audio", "channels", "dashboard", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "telegram", "tui"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -4048,18 +4082,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sqlite-vec"
-version = "0.1.6"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/ed/aabc328f29ee6814033d008ec43e44f2c595447d9cccd5f2aabe60df2933/sqlite_vec-0.1.6-py3-none-macosx_10_6_x86_64.whl", hash = "sha256:77491bcaa6d496f2acb5cc0d0ff0b8964434f141523c121e313f9a7d8088dee3", size = 164075, upload-time = "2024-11-20T16:40:29.847Z" },
-    { url = "https://files.pythonhosted.org/packages/a7/57/05604e509a129b22e303758bfa062c19afb020557d5e19b008c64016704e/sqlite_vec-0.1.6-py3-none-macosx_11_0_arm64.whl", hash = "sha256:fdca35f7ee3243668a055255d4dee4dea7eed5a06da8cad409f89facf4595361", size = 165242, upload-time = "2024-11-20T16:40:31.206Z" },
-    { url = "https://files.pythonhosted.org/packages/f2/48/dbb2cc4e5bad88c89c7bb296e2d0a8df58aab9edc75853728c361eefc24f/sqlite_vec-0.1.6-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7b0519d9cd96164cd2e08e8eed225197f9cd2f0be82cb04567692a0a4be02da3", size = 103704, upload-time = "2024-11-20T16:40:33.729Z" },
-    { url = "https://files.pythonhosted.org/packages/80/76/97f33b1a2446f6ae55e59b33869bed4eafaf59b7f4c662c8d9491b6a714a/sqlite_vec-0.1.6-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux1_x86_64.whl", hash = "sha256:823b0493add80d7fe82ab0fe25df7c0703f4752941aee1c7b2b02cec9656cb24", size = 151556, upload-time = "2024-11-20T16:40:35.387Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/98/e8bc58b178266eae2fcf4c9c7a8303a8d41164d781b32d71097924a6bebe/sqlite_vec-0.1.6-py3-none-win_amd64.whl", hash = "sha256:c65bcfd90fa2f41f9000052bcb8bb75d38240b2dae49225389eca6c3136d3f0c", size = 281540, upload-time = "2024-11-20T16:40:37.296Z" },
-]
-
-[[package]]
 name = "sse-starlette"
 version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4736,4 +4758,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e3/02/0f2892c661036d50ede074e376733dca2ae7c6eb617489437771209d4180/zipp-3.23.0.tar.gz", hash = "sha256:a07157588a12518c9d4034df3fbbee09c814741a33ff63c05fa29d26a2404166", size = 25547, upload-time = "2025-06-08T17:06:39.4Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2e/54/647ade08bf0db230bfea292f893923872fd20be6ac6f53b2b936ba839d75/zipp-3.23.0-py3-none-any.whl", hash = "sha256:071652d6115ed432f5ce1d34c336c0adfd6a884660d1e9712a256d3d3bd4b14e", size = 10276, upload-time = "2025-06-08T17:06:38.034Z" },
+]
+
+[[package]]
+name = "zvec"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/ef/8c23c7ff6a459fbd7132ee40cd5b9d4a323257313389b82e5500b671cf9b/zvec-0.2.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:a487195adaccc22f0802a7cbedc662b2c7a58252c0f5df291d085f2bc8aa0b5c", size = 12739184, upload-time = "2026-02-13T02:19:49.582Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/f5/02aceaf72a62f5b8757dfef4f2f7390704c412c8718ca5072eb55f48d351/zvec-0.2.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:6c5927ceb281653aa4ac7c98ea206f7160e994dc231e32b979ad10f470d2a0f0", size = 18417790, upload-time = "2026-02-13T02:16:28.081Z" },
+    { url = "https://files.pythonhosted.org/packages/57/fb/e1de47a5c2e0d5c8a98d539f05c88d54d1f7ba9f131863ab7ef7ec589b32/zvec-0.2.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:c06e38f7aad5e8cd51ba84784981627a1fc9e1aef54d4bb4a7d7a673cc1a7f2a", size = 20393746, upload-time = "2026-02-13T03:35:34.438Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/d3/4914de3a352ce8e3d176cb7fcb7d1bfa5d6a9bec56b31480bb7a77f8acb2/zvec-0.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:5a602477b48c31aadb470098f80f4bb5f5f17d8aa96be131fa7d7458367fd8c5", size = 12740381, upload-time = "2026-02-13T02:20:00.111Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/75/6d1878b22eea22eff0835bb3c3ba1a29d55d285265105cf53eaeb258fb56/zvec-0.2.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:1d84cd275b4fd5f70829a74f3b7a6907f8b633cf2bc7292a3eb7dbae2c0e1ca3", size = 18411239, upload-time = "2026-02-13T02:16:33.168Z" },
+    { url = "https://files.pythonhosted.org/packages/36/b1/775d04fa886616f47f859bd5f98a9c892e65ace52dd48d8b71e5d11eae00/zvec-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4cbb6173a59e6fa09a7106eda819ce1088b6e13278739fb48919ea8294100267", size = 20389189, upload-time = "2026-02-13T03:35:47.942Z" },
 ]

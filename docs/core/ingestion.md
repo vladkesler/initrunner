@@ -1,6 +1,6 @@
 # Document Ingestion
 
-InitRunner's ingestion pipeline extracts text from source files, splits it into chunks, generates embeddings, and stores vectors in a local SQLite database. Once ingested, an agent can search these documents at runtime via the auto-registered `search_documents` tool.
+InitRunner's ingestion pipeline extracts text from source files, splits it into chunks, generates embeddings, and stores vectors in a local Zvec vector database. Once ingested, an agent can search these documents at runtime via the auto-registered `search_documents` tool.
 
 ## Quick Start
 
@@ -47,7 +47,7 @@ resolve sources (globs + URLs) → extract text → chunk → embed → store
 2. **Extract text** — Each file is passed through a format-specific extractor based on its extension.
 3. **Chunk text** — Extracted text is split into overlapping chunks using the configured strategy.
 4. **Embed** — Chunks are converted to vector embeddings using the configured embedding model.
-5. **Store** — Embeddings and text are stored in a SQLite database backed by `sqlite-vec`.
+5. **Store** — Embeddings and text are stored in a local Zvec vector database.
 
 ## Configuration
 
@@ -70,8 +70,8 @@ spec:
       model: ""                 # default: "" (uses provider default)
       base_url: ""              # default: "" (custom endpoint URL)
       api_key_env: ""           # default: "" (env var holding API key)
-    store_backend: sqlite-vec   # default: "sqlite-vec"
-    store_path: null            # default: ~/.initrunner/stores/<agent-name>.db
+    store_backend: zvec         # default: "zvec"
+    store_path: null            # default: ~/.initrunner/stores/<agent-name>.zvec
 ```
 
 ### Ingest Options
@@ -82,8 +82,8 @@ spec:
 | `watch` | `bool` | `false` | Reserved for future use. |
 | `chunking` | `ChunkingConfig` | See below | Chunking strategy and parameters. |
 | `embeddings` | `EmbeddingConfig` | See below | Embedding provider and model. |
-| `store_backend` | `str` | `"sqlite-vec"` | Vector store backend. Currently only `sqlite-vec` is supported. |
-| `store_path` | `str \| null` | `null` | Custom path for the vector store database. Default: `~/.initrunner/stores/<agent-name>.db`. |
+| `store_backend` | `str` | `"zvec"` | Vector store backend. Uses Zvec, an in-process vector database. |
+| `store_path` | `str \| null` | `null` | Custom path for the vector store directory. Default: `~/.initrunner/stores/<agent-name>.zvec`. |
 
 ### Chunking Options
 
@@ -222,20 +222,20 @@ If no match is found, falls back to `openai:text-embedding-3-small`.
 
 ## Vector Store
 
-Documents are stored in a SQLite database using a configurable backend (default: `sqlite-vec`). The store is dimension-agnostic — embedding dimensions are auto-detected from the model on first ingestion and persisted in a `store_meta` table.
+Documents are stored in a local Zvec vector database using a configurable backend (default: `zvec`). The store is dimension-agnostic — embedding dimensions are auto-detected from the model on first ingestion and persisted in the `_meta` collection.
 
 ### Backends
 
 | Backend | Config value | Description |
 |---------|-------------|-------------|
-| sqlite-vec | `sqlite-vec` | Default. Local SQLite with the `sqlite-vec` extension for vector similarity search. |
+| Zvec | `zvec` | Default. In-process vector database built on Alibaba's Proxima engine. Uses HNSW indexing with cosine similarity. |
 
-Set `store_backend` in the ingest config to select a backend. Future backends (e.g. Chroma, Pinecone) can be added as new enum members.
+Set `store_backend` in the ingest config to select a backend.
 
 ### Default Location
 
 ```
-~/.initrunner/stores/<agent-name>.db
+~/.initrunner/stores/<agent-name>.zvec
 ```
 
 Override with `store_path` in the ingest config.
@@ -244,43 +244,45 @@ Override with `store_path` in the ingest config.
 
 The store tracks both embedding dimensions and the embedding model identity:
 
-- **First ingestion**: dimensions are detected from the embedding output, and the model identity string is recorded in `store_meta` under the `embedding_model` key.
+- **First ingestion**: dimensions are detected from the embedding output, and the model identity string is recorded in the `_meta` collection under the `embedding_model` key.
 - **Model identity format**: `provider:model` (e.g. `openai:text-embedding-3-small`) or `provider:model:url_hash` for custom `base_url` endpoints.
 - **Model change detection**: on subsequent ingestions, the store compares the current model identity against the stored value. If they differ, an `EmbeddingModelChangedError` is raised.
 - **Interactive prompt**: in the CLI, the error triggers a `typer.confirm()` prompt asking whether to wipe the store and re-ingest with the new model.
 - **`--force` flag**: skips the interactive prompt — the store is automatically wiped and re-ingested with the new model.
-- **Legacy stores**: stores created before model identity tracking (no `embedding_model` key in `store_meta`) record the identity on the next ingest without triggering a wipe. Dimension checks still apply.
-- **Migration**: pre-existing stores created before dimension tracking was added default to 1536 (the previous hard-coded value).
+- **Legacy stores**: stores created before model identity tracking (no `embedding_model` key in `_meta`) record the identity on the next ingest without triggering a wipe. Dimension checks still apply.
 
-### Schema
+### Collections
 
-The store contains three tables:
+The store directory contains three zvec collections:
 
-**`store_meta`** — Key-value metadata (e.g. dimensions, embedding model):
+**`_meta`** — Key-value metadata (e.g. dimensions, embedding model):
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `key` | `TEXT PRIMARY KEY` | Metadata key (e.g. `"dimensions"`, `"embedding_model"`) |
-| `value` | `TEXT` | Metadata value (e.g. `"1536"`, `"openai:text-embedding-3-small"`) |
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | Metadata key (e.g. `"dimensions"`, `"embedding_model"`) |
+| `value` | STRING | Metadata value |
 
-**`chunks`** — Text content and metadata:
+**`chunks`** — Text content and vector embeddings:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `INTEGER PRIMARY KEY` | Auto-incrementing chunk ID |
-| `text` | `TEXT` | Chunk text content |
-| `source` | `TEXT` | Source file path |
-| `chunk_index` | `INTEGER` | Position within the source file |
-| `ingested_at` | `TEXT` | ISO 8601 ingestion timestamp |
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | Auto-incrementing chunk ID |
+| `text` | STRING | Chunk text content |
+| `source` | STRING (indexed) | Source file path |
+| `chunk_index` | INT32 | Position within the source file |
+| `ingested_at` | STRING | ISO 8601 ingestion timestamp |
+| `embedding` | VECTOR_FP32 | Vector embedding (dimension auto-detected from model) |
 
-**`chunks_vec`** — Virtual table for vector search:
+**`file_metadata`** — Incremental ingestion tracking:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `rowid` | `INTEGER` | Matches `chunks.id` |
-| `embedding` | `float[N]` | Vector embedding (dimension auto-detected from model) |
-
-An index on `chunks(source)` enables efficient deletion by source.
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | SHA-256 hash of the source path |
+| `source` | STRING | Original source file path |
+| `content_hash` | STRING | SHA-256 hash of file content |
+| `last_modified` | DOUBLE | File modification time |
+| `ingested_at` | STRING | ISO 8601 ingestion timestamp |
+| `chunk_count` | INT32 | Number of chunks from this source |
 
 ### Re-indexing Behavior
 
@@ -389,13 +391,13 @@ Embedding providers require credentials. InitRunner validates embedding keys at 
 
 You can override which env var is used for the embedding key by setting `embeddings.api_key_env` in your `ingest` or `memory` config.
 
-### `sqlite-vec` not available
+### `zvec` not available
 
-The default vector store backend requires the `sqlite-vec` extension. Install it:
+The vector store backend requires the `zvec` package. Install it:
 ```bash
-pip install sqlite-vec
+pip install zvec
 # or with uv:
-uv pip install sqlite-vec
+uv pip install zvec
 ```
 
 ## Scaffold a RAG Role

@@ -624,19 +624,11 @@ def run_ingest(
             embed_provider, config.embeddings.model, config.embeddings.base_url
         )
         if db_path.exists():
-            from initrunner.stores.sqlite_vec import (
-                EmbeddingModelChangedError,
-                _open_sqlite_vec,
-                _read_meta,
-                _write_meta,
-                wipe_document_store,
-            )
+            from initrunner.stores.base import EmbeddingModelChangedError
+            from initrunner.stores.zvec_store import wipe_document_store
 
-            check_conn = _open_sqlite_vec(db_path)
-            try:
-                stored_identity = _read_meta(check_conn, "embedding_model")
-            finally:
-                check_conn.close()
+            with create_document_store(config.store_backend, db_path) as check_store:
+                stored_identity = check_store.read_store_meta("embedding_model")
 
             if stored_identity is None:
                 # Legacy store — record current identity, don't wipe
@@ -645,11 +637,8 @@ def run_ingest(
                     "Recording '%s' for future change detection.",
                     current_identity,
                 )
-                rec_conn = _open_sqlite_vec(db_path)
-                try:
-                    _write_meta(rec_conn, "embedding_model", current_identity)
-                finally:
-                    rec_conn.close()
+                with create_document_store(config.store_backend, db_path) as rec_store:
+                    rec_store.write_store_meta("embedding_model", current_identity)
             elif stored_identity != current_identity:
                 if force:
                     logging.getLogger(__name__).warning(
@@ -730,16 +719,11 @@ def run_ingest(
 
             # Record the embedding model identity after successful ingestion
             if db_path.exists() and (stats.new or stats.updated or force):
-                from initrunner.stores.sqlite_vec import (
-                    _open_sqlite_vec,
-                    _write_meta,
-                )
-
-                write_conn = _open_sqlite_vec(db_path)
-                try:
-                    _write_meta(write_conn, "embedding_model", current_identity)
-                finally:
-                    write_conn.close()
+                if store is not None:
+                    store.write_store_meta("embedding_model", current_identity)
+                else:
+                    with create_document_store(config.store_backend, db_path) as write_store:
+                        write_store.write_store_meta("embedding_model", current_identity)
     finally:
         lock.release()
 

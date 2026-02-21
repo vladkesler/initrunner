@@ -305,8 +305,8 @@ graph TD
     B --> C[Agent - PydanticAI]
     C --> D[Tools]
     C --> E[Triggers]
-    C --> F[Document Store - sqlite-vec]
-    C --> G[Memory Store - sqlite-vec]
+    C --> F[Document Store - Zvec]
+    C --> G[Memory Store - Zvec]
     C --> H[Audit Logger - SQLite]
 
     D --> D1[filesystem]

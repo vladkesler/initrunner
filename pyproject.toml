@@ -26,7 +26,7 @@ dependencies = [
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
     "rich>=14.3.2",
-    "sqlite-vec>=0.1.6",
+    "zvec>=0.2.0",
     "watchfiles>=1.1.1",
     "croniter>=6.0.0",
     "beautifulsoup4>=4.13.2",
@@ -56,6 +56,17 @@ discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 tui = ["textual>=7.5.0"]
 dashboard = ["fastapi>=0.115.0", "uvicorn[standard]>=0.34.0", "jinja2>=3.1"]
+all = [
+    "initrunner[ingest]",
+    "initrunner[search]",
+    "initrunner[audio]",
+    "initrunner[safety]",
+    "initrunner[all-models]",
+    "initrunner[observability]",
+    "initrunner[channels]",
+    "initrunner[tui]",
+    "initrunner[dashboard]",
+]
 
 [project.scripts]
 initrunner = "initrunner.cli.main:app_entry"

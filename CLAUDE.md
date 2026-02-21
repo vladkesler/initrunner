@@ -4,7 +4,7 @@ YAML-first AI agent platform. Define agents as declarative `role.yaml` files —
 
 ## Tech Stack
 
-Python 3.11+ · PydanticAI (agent framework) · Pydantic (config/validation) · Typer + Rich (CLI) · SQLite + sqlite-vec (audit, vector stores) · Jinja2 + HTMX + DaisyUI (dashboard) · hatchling (build) · uv (package manager)
+Python 3.11+ · PydanticAI (agent framework) · Pydantic (config/validation) · Typer + Rich (CLI) · SQLite (audit) · Zvec (vector stores) · Jinja2 + HTMX + DaisyUI (dashboard) · hatchling (build) · uv (package manager)
 
 ## Development Workflow
 
@@ -30,7 +30,7 @@ initrunner/              # main package (flat layout)
 ├── ingestion/           # extract → chunk → embed → store pipeline
 ├── mcp/                 # MCP server integration
 ├── runner/              # single-shot, REPL, autonomous, daemon modes
-├── stores/              # DocumentStore + MemoryStore ABCs and sqlite-vec impls
+├── stores/              # DocumentStore + MemoryStore ABCs and zvec impls
 ├── triggers/            # cron, file watcher, webhook triggers
 ├── tui/                 # Textual terminal UI
 ├── services/            # shared sync business logic (CLI, API, TUI all use this)

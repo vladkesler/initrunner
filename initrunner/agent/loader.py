@@ -209,13 +209,17 @@ def build_agent(
         prepare_tools=prepare_tools,
     )
 
-    # Register dynamic system prompt for procedural memory injection
+    # Register dynamic system prompt for procedural memory injection.
+    # The closure reads ``_memory_store`` from the agent so the already-open
+    # store is reused instead of opening a second handle (which would hit
+    # zvec collection locks).
     if role.spec.memory is not None and role.spec.memory.procedural.enabled:
         from initrunner.agent.memory_ops import build_memory_system_prompt
 
         @agent.system_prompt
         def _procedural_context() -> str:
-            return build_memory_system_prompt(role)
+            store = getattr(agent, "_memory_store", None)
+            return build_memory_system_prompt(role, store=store)
 
     return agent
 

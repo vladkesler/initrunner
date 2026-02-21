@@ -6,7 +6,7 @@ InitRunner's memory system gives agents three capabilities: **short-term session
 - **Episodic memory** — what happened during tasks (e.g. "deployed v2.1 to staging, rollback needed")
 - **Procedural memory** — learned policies and patterns (e.g. "always run tests before deploying")
 
-All memory types are backed by a single database per agent using a configurable store backend (default: `sqlite-vec` for vector similarity search). The store is dimension-agnostic — embedding dimensions are auto-detected on first use.
+All memory types are backed by a single store per agent using a configurable store backend (default: `zvec`, an in-process vector database). The store is dimension-agnostic — embedding dimensions are auto-detected on first use.
 
 ## Quick Start
 
@@ -95,8 +95,8 @@ spec:
     max_sessions: 10              # default: 10
     max_memories: 1000            # deprecated — use semantic.max_memories
     max_resume_messages: 20       # default: 20
-    store_backend: sqlite-vec     # default: "sqlite-vec"
-    store_path: null              # default: ~/.initrunner/memory/<agent-name>.db
+    store_backend: zvec           # default: "zvec"
+    store_path: null              # default: ~/.initrunner/memory/<agent-name>.zvec
     embeddings:
       provider: ""                # default: "" (derives from spec.model.provider)
       model: ""                   # default: "" (uses provider default)
@@ -125,8 +125,8 @@ spec:
 | `max_sessions` | `int` | `10` | Maximum number of sessions to keep. Oldest sessions are pruned on REPL exit. |
 | `max_memories` | `int` | `1000` | **Deprecated.** Use `semantic.max_memories`. If set to a non-default value and `semantic.max_memories` is at default, the value is synced for backward compatibility. |
 | `max_resume_messages` | `int` | `20` | Maximum number of messages loaded when using `--resume`. |
-| `store_backend` | `str` | `"sqlite-vec"` | Memory store backend. Currently only `sqlite-vec` is supported. |
-| `store_path` | `str \| null` | `null` | Custom path for the memory database. Default: `~/.initrunner/memory/<agent-name>.db`. |
+| `store_backend` | `str` | `"zvec"` | Memory store backend. Uses Zvec, an in-process vector database. |
+| `store_path` | `str \| null` | `null` | Custom path for the memory store directory. Default: `~/.initrunner/memory/<agent-name>.zvec`. |
 
 ### Embedding Options
 
@@ -326,58 +326,41 @@ When `procedural.enabled` is `true`, procedural memories are automatically loade
 
 This injection happens transparently — the agent sees these as part of its system prompt and follows them as standing instructions.
 
-## Database Schema
+## Store Schema
 
-The memory database contains four tables:
+The memory store directory contains three zvec collections:
 
-### `store_meta`
+### `_meta`
 
 Key-value metadata (e.g. dimensions, embedding model):
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `key` | `TEXT PRIMARY KEY` | Metadata key (e.g. `"dimensions"`, `"embedding_model"`) |
-| `value` | `TEXT` | Metadata value (e.g. `"1536"`, `"openai:text-embedding-3-small"`) |
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | Metadata key (e.g. `"dimensions"`, `"embedding_model"`) |
+| `value` | STRING | Metadata value |
 
 ### `sessions`
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `INTEGER PRIMARY KEY` | Auto-incrementing row ID |
-| `session_id` | `TEXT` | Unique session identifier |
-| `agent_name` | `TEXT` | Agent name from `metadata.name` |
-| `timestamp` | `TEXT` | ISO 8601 timestamp |
-| `messages_json` | `TEXT` | JSON-serialized PydanticAI message history |
-
-Indexed on `(agent_name, timestamp DESC)` for fast latest-session lookups.
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | Auto-incrementing row ID |
+| `session_id` | STRING (indexed) | Unique session identifier |
+| `agent_name` | STRING (indexed) | Agent name from `metadata.name` |
+| `timestamp` | STRING | ISO 8601 timestamp |
+| `messages_json` | STRING | JSON-serialized PydanticAI message history |
 
 ### `memories`
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | `INTEGER PRIMARY KEY` | Auto-incrementing memory ID |
-| `content` | `TEXT` | Memory content |
-| `category` | `TEXT` | Category label (default: `"general"`) |
-| `created_at` | `TEXT` | ISO 8601 creation timestamp |
-| `memory_type` | `TEXT` | One of `episodic`, `semantic`, `procedural`. Default: `semantic`. Has a `CHECK` constraint. |
-| `metadata_json` | `TEXT` | Optional JSON metadata (e.g. `{"trigger_type": "cron"}`, `{"source": "consolidation"}`) |
-| `consolidated_at` | `TEXT` | ISO 8601 timestamp when the episode was consolidated. `NULL` for unconsolidated or non-episodic memories. |
-
-Indexes:
-- `idx_memories_category` on `(category)`
-- `idx_memories_type` on `(memory_type)`
-- `idx_memories_type_category` on `(memory_type, category)`
-
-Existing databases are auto-migrated: the `memory_type`, `metadata_json`, and `consolidated_at` columns are added via `ALTER TABLE` if missing, and new indexes are created.
-
-### `memories_vec`
-
-Virtual table for vector similarity search (created lazily on first `remember()`, `learn_procedure()`, or `record_episode()` call):
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `rowid` | `INTEGER` | Matches `memories.id` |
-| `embedding` | `float[N]` | Vector embedding (dimension auto-detected from model) |
+| Field | Type | Description |
+|-------|------|-------------|
+| Doc ID | string | Auto-incrementing memory ID |
+| `content` | STRING | Memory content |
+| `category` | STRING (indexed) | Category label (default: `"general"`) |
+| `created_at` | STRING | ISO 8601 creation timestamp |
+| `memory_type` | STRING (indexed) | One of `episodic`, `semantic`, `procedural`. Default: `semantic`. |
+| `metadata_json` | STRING (nullable) | Optional JSON metadata |
+| `consolidated_at` | STRING (nullable) | ISO 8601 timestamp when consolidated. Empty for unconsolidated. |
+| `embedding` | VECTOR_FP32 | Vector embedding (dimension auto-detected from model) |
 
 ## CLI Commands
 
@@ -476,7 +459,7 @@ This command always runs consolidation regardless of the `consolidation.interval
 ## Store Location
 
 ```
-~/.initrunner/memory/<agent-name>.db
+~/.initrunner/memory/<agent-name>.zvec
 ```
 
 Override with `store_path` in the memory config. The directory is created automatically if it doesn't exist.
@@ -488,18 +471,17 @@ Multiple agents can share a single memory database, allowing one agent's `rememb
 - **Compose**: set `spec.shared_memory.enabled: true` in a compose definition to give all services a common store. See [Agent Composer: Shared Memory](../orchestration/agent_composer.md#shared-memory).
 - **Delegation**: set `shared_memory.store_path` on a delegate tool to share memory between inline sub-agents. See [Delegation: Shared Memory](../orchestration/delegation.md#shared-memory).
 
-Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same SQLite database.
+Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same zvec store directory.
 
-Concurrent access from multiple service threads is safe — SQLite WAL mode and `busy_timeout` handle contention without additional locking.
+Concurrent access from multiple service threads is safe — zvec handles contention via internal locking.
 
 ## Dimension & Model Identity Tracking
 
 The memory store tracks embedding dimensions and model identity the same way as the [ingestion store](ingestion.md#dimension--model-identity-tracking):
 
-- **Session-only usage**: the store works without knowing dimensions — the `memories_vec` table is created lazily on the first `remember()` call.
-- **First `remember()` call**: dimensions and the embedding model identity are detected and written to `store_meta`.
-- **Subsequent opens**: dimensions and model identity are read from `store_meta`. An `EmbeddingModelChangedError` is raised if the model has changed; a `DimensionMismatchError` is raised if dimensions conflict.
-- **Migration**: pre-existing stores default to 1536.
+- **Session-only usage**: the store works without knowing dimensions — the `memories` collection is created lazily on the first `remember()` call.
+- **First `remember()` call**: dimensions and the embedding model identity are detected and written to the `_meta` collection.
+- **Subsequent opens**: dimensions and model identity are read from `_meta`. An `EmbeddingModelChangedError` is raised if the model has changed; a `DimensionMismatchError` is raised if dimensions conflict.
 
 See [Ingestion: Dimension & Model Identity Tracking](ingestion.md#dimension--model-identity-tracking) for details on the model identity format and interactive prompt behavior.
 

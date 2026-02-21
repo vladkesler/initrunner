@@ -36,5 +36,5 @@ class IngestConfig(BaseModel):
     watch: bool = False
     chunking: ChunkingConfig = ChunkingConfig()
     embeddings: EmbeddingConfig = EmbeddingConfig()
-    store_backend: StoreBackend = StoreBackend.SQLITE_VEC
+    store_backend: StoreBackend = StoreBackend.ZVEC
     store_path: str | None = None  # default: ~/.initrunner/stores/{agent-name}.db
