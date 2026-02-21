@@ -84,12 +84,14 @@ def run_autonomous(
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
+    message_history: list | None = None,
 ) -> AutonomousResult:
     """Execute an autonomous agentic loop until completion or budget exhaustion."""
     from initrunner._ids import generate_id
     from initrunner.agent.history import trim_message_history
     from initrunner.agent.reflection import ReflectionState, format_reflection_state
     from initrunner.agent.tools.reflection import build_reflection_toolset
+    from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES
 
     autonomous_run_id = generate_id()
     autonomy_config = role.spec.autonomy or AutonomyConfig()
@@ -105,7 +107,7 @@ def run_autonomous(
         all_extra.extend(extra_toolsets)
 
     session_id = generate_id()
-    message_history: list | None = None
+    consecutive_no_tool_calls = 0
     cumulative_tokens = 0
     iterations: list[RunResult] = []
     final_status = "completed"
@@ -139,6 +141,15 @@ def run_autonomous(
         else:
             state_text = format_reflection_state(reflection_state)
             iter_prompt = f"{autonomy_config.continuation_prompt}\n\nCURRENT STATUS:\n{state_text}"
+
+            # Stronger nudge for messaging triggers when agent didn't use tools
+            if consecutive_no_tool_calls > 0 and trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+                iter_prompt += (
+                    "\n\nIMPORTANT: You did not use any tools in your last response. "
+                    "If you cannot proceed without additional user input, call "
+                    "finish_task(summary='...', status='blocked') immediately. "
+                    "Do NOT repeat your question — the user will send a new message."
+                )
 
         # Execute iteration
         t_meta = dict(trigger_metadata or {})
@@ -187,9 +198,27 @@ def run_autonomous(
             error_msg = result.error
             break
 
-        # Nudge if no tool calls (agent may be done but forgot finish_task)
-        if result.tool_calls == 0 and iteration < max_iterations:
-            _logger.debug("No tool calls in iteration %d, will nudge next iteration", iteration)
+        # Conversational triggers: single iteration is sufficient — the agent
+        # already had full tool access within this run.  Further iterations
+        # would just produce a continuation prompt the user never asked for.
+        if trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+            final_status = "completed"
+            break
+
+        # Spin guard: stop if no tool calls for N consecutive iterations
+        if result.tool_calls == 0:
+            consecutive_no_tool_calls += 1
+            if consecutive_no_tool_calls >= autonomy_config.max_no_tool_call_iterations:
+                reflection_state.completed = True
+                reflection_state.status = "blocked"
+                reflection_state.summary = (
+                    "Stopped: no tool calls for "
+                    f"{consecutive_no_tool_calls} consecutive iterations."
+                )
+                final_status = "blocked"
+                break
+        else:
+            consecutive_no_tool_calls = 0
 
         # Rate limiting
         if autonomy_config.iteration_delay_seconds > 0 and iteration < max_iterations:
@@ -228,6 +257,8 @@ def run_autonomous(
     # Dispatch to sinks (final output only)
     if sink_dispatcher is not None and iterations:
         sink_dispatcher.dispatch(iterations[-1], extract_text_from_prompt(prompt))
+
+    auto_result.final_messages = message_history
 
     _display_autonomous_summary(
         auto_result, reflection_state.summary, max_iterations, cumulative_tokens

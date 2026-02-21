@@ -31,7 +31,7 @@ def register_trigger_builder(
 
 
 def _register_builtins() -> None:
-    """Register the three built-in trigger types.
+    """Register the built-in trigger types.
 
     Wrapped in a function to keep the config-type imports lazy — the
     individual trigger modules are still only imported when a trigger
@@ -39,7 +39,9 @@ def _register_builtins() -> None:
     """
     from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
+        DiscordTriggerConfig,
         FileWatchTriggerConfig,
+        TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
 
@@ -60,6 +62,18 @@ def _register_builtins() -> None:
         from initrunner.triggers.webhook import WebhookTrigger
 
         return WebhookTrigger(config, callback)
+
+    @register_trigger_builder(TelegramTriggerConfig)
+    def _build_telegram(config, callback):
+        from initrunner.triggers.telegram import TelegramTrigger
+
+        return TelegramTrigger(config, callback)
+
+    @register_trigger_builder(DiscordTriggerConfig)
+    def _build_discord(config, callback):
+        from initrunner.triggers.discord import DiscordTrigger
+
+        return DiscordTrigger(config, callback)
 
 
 _register_builtins()

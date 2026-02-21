@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
+from collections import OrderedDict
 
 from pydantic_ai import Agent
 
@@ -15,9 +17,46 @@ from initrunner.runner.budget import DaemonTokenTracker
 from initrunner.runner.display import _display_daemon_header, _display_result, console
 from initrunner.sinks.dispatcher import SinkDispatcher
 from initrunner.stores.base import MemoryStoreBase
-from initrunner.triggers.base import TriggerEvent
+from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES, TriggerEvent
 
 _logger = logging.getLogger(__name__)
+
+
+class _ConversationStore:
+    """Thread-safe, LRU-bounded store for per-conversation message histories."""
+
+    def __init__(self, *, max_conversations: int = 200, ttl_seconds: float = 3600) -> None:
+        self._max = max_conversations
+        self._ttl = ttl_seconds
+        self._lock = threading.Lock()
+        self._data: OrderedDict[str, tuple[float, list]] = OrderedDict()
+
+    def get(self, key: str | None) -> list | None:
+        """Return stored history if not expired, or None."""
+        if key is None:
+            return None
+        with self._lock:
+            entry = self._data.get(key)
+            if entry is None:
+                return None
+            ts, messages = entry
+            if time.monotonic() - ts > self._ttl:
+                del self._data[key]
+                return None
+            # Mark as recently used
+            self._data.move_to_end(key)
+            return messages
+
+    def put(self, key: str | None, messages: list) -> None:
+        """Store history with current timestamp, evicting oldest if at capacity."""
+        if key is None:
+            return
+        with self._lock:
+            if key in self._data:
+                self._data.move_to_end(key)
+            self._data[key] = (time.monotonic(), messages)
+            while len(self._data) > self._max:
+                self._data.popitem(last=False)
 
 
 class DaemonRunner:
@@ -54,6 +93,7 @@ class DaemonRunner:
         self._schedule_queue = None
         self._scheduling_toolset = None
         self._autonomous_trigger_types: set[str] = set()
+        self._conversations = _ConversationStore()
 
     def run(self) -> None:
         """Start the daemon: set up triggers, handle events, block until stopped."""
@@ -125,6 +165,9 @@ class DaemonRunner:
 
     def _on_trigger_inner(self, event: TriggerEvent) -> None:
         """Process a single trigger event."""
+        from initrunner.agent.history import trim_message_history
+        from initrunner.agent.schema.autonomy import AutonomyConfig
+
         allowed, reason = self._tracker.check_before_run()
         if not allowed:
             console.print(f"\n[yellow]Budget exceeded — skipping trigger: {reason}[/yellow]")
@@ -142,6 +185,15 @@ class DaemonRunner:
             or event.trigger_type == "scheduled"
         ) and self._role.spec.autonomy is not None
 
+        if event.trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+            use_autonomous = False
+
+        # Retrieve prior conversation history for messaging triggers
+        conv_key = event.conversation_key
+        prior_history = self._conversations.get(conv_key) if conv_key else None
+
+        autonomy_config = self._role.spec.autonomy or AutonomyConfig()
+
         with self._in_flight_cond:
             self._in_flight_count += 1
         try:
@@ -156,22 +208,72 @@ class DaemonRunner:
                     extra_toolsets=extra_ts if extra_ts else None,
                     trigger_type=event.trigger_type,
                     trigger_metadata=event.metadata or {},
+                    message_history=prior_history,
                 )
                 self._tracker.record_usage(auto_result.total_tokens)
+
+                # Store updated conversation history
+                if conv_key and auto_result.final_messages:
+                    trimmed = trim_message_history(
+                        auto_result.final_messages,
+                        autonomy_config.max_history_messages,
+                    )
+                    self._conversations.put(conv_key, trimmed)
+
+                # Reply to originating channel (messaging triggers)
+                if event.reply_fn is not None:
+                    if conv_key is not None:
+                        # Conversational: send only the final output
+                        reply_text = auto_result.final_output
+                    else:
+                        # Non-conversational (scheduled, etc.): join all outputs
+                        reply_text = "\n\n".join(
+                            r.output for r in auto_result.iterations if r.output
+                        )
+                    if reply_text:
+                        try:
+                            event.reply_fn(reply_text)
+                        except Exception:
+                            _logger.warning(
+                                "Failed to deliver reply for trigger %s",
+                                event.trigger_type,
+                                exc_info=True,
+                            )
             else:
-                result, _ = execute_run(
+                result, new_messages = execute_run(
                     self._agent,
                     self._role,
                     event.prompt,
                     audit_logger=self._audit_logger,
+                    message_history=prior_history,
                     trigger_type=event.trigger_type,
                     trigger_metadata=event.metadata or {},
                     extra_toolsets=extra_ts if extra_ts else None,
                 )
                 self._tracker.record_usage(result.total_tokens)
+
+                # Reply first, post-process after
+                if event.reply_fn is not None and result.output:
+                    try:
+                        event.reply_fn(result.output)
+                    except Exception:
+                        _logger.warning(
+                            "Failed to deliver reply for trigger %s",
+                            event.trigger_type,
+                            exc_info=True,
+                        )
+
                 _display_result(result)
                 self._dispatch_sink(result, event)
                 self._capture_episode(result, event)
+
+                # Store updated conversation history
+                if conv_key and new_messages:
+                    trimmed = trim_message_history(
+                        new_messages,
+                        autonomy_config.max_history_messages,
+                    )
+                    self._conversations.put(conv_key, trimmed)
 
             self._maybe_prune_sessions()
         finally:

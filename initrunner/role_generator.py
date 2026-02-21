@@ -42,7 +42,9 @@ def build_schema_reference() -> str:
     from initrunner.agent.schema.tools import ToolConfigBase
     from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
+        DiscordTriggerConfig,
         FileWatchTriggerConfig,
+        TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
     from initrunner.agent.tools._registry import get_tool_types
@@ -96,7 +98,13 @@ def build_schema_reference() -> str:
 
     # Triggers
     trigger_lines = ["# Trigger types (spec.triggers list):"]
-    for cls in [CronTriggerConfig, FileWatchTriggerConfig, WebhookTriggerConfig]:
+    for cls in [
+        CronTriggerConfig,
+        FileWatchTriggerConfig,
+        WebhookTriggerConfig,
+        TelegramTriggerConfig,
+        DiscordTriggerConfig,
+    ]:
         type_field = cls.model_fields.get("type")
         type_name = type_field.default if type_field else "?"
         fields = []

@@ -230,7 +230,9 @@ def tool_fields(tool: Any) -> list[FieldSpec]:
 def trigger_fields(trigger: Any) -> list[FieldSpec]:
     from initrunner.agent.schema.triggers import (
         CronTriggerConfig,
+        DiscordTriggerConfig,
         FileWatchTriggerConfig,
+        TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
 
@@ -263,6 +265,36 @@ def trigger_fields(trigger: Any) -> list[FieldSpec]:
                 "Rate Limit (rpm)", "rate_limit_rpm", str(trigger.rate_limit_rpm), FieldKind.INT
             )
         )
+    elif isinstance(trigger, TelegramTriggerConfig):
+        fields.append(FieldSpec("Token Env", "token_env", trigger.token_env))
+        fields.append(
+            FieldSpec(
+                "Allowed Users",
+                "allowed_users",
+                ", ".join(trigger.allowed_users),
+                FieldKind.CSV,
+            )
+        )
+        fields.append(FieldSpec("Prompt Template", "prompt_template", trigger.prompt_template))
+    elif isinstance(trigger, DiscordTriggerConfig):
+        fields.append(FieldSpec("Token Env", "token_env", trigger.token_env))
+        fields.append(
+            FieldSpec(
+                "Channel IDs",
+                "channel_ids",
+                ", ".join(trigger.channel_ids),
+                FieldKind.CSV,
+            )
+        )
+        fields.append(
+            FieldSpec(
+                "Allowed Roles",
+                "allowed_roles",
+                ", ".join(trigger.allowed_roles),
+                FieldKind.CSV,
+            )
+        )
+        fields.append(FieldSpec("Prompt Template", "prompt_template", trigger.prompt_template))
     return fields
 
 

@@ -1,0 +1,33 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: discord-assistant
+  description: A Discord bot that responds to DMs and @mentions
+  tags:
+    - discord
+    - daemon
+spec:
+  role: |
+    You are a sarcastic super-smart grump. Dry humor, gentle roasts, a little
+    bragging, occasional silly catchphrases. (sigh) You eye-roll at nonsense
+    and keep it real, but you still nail every helpful answer. Life's dumb
+    — answers aren't.
+    Never ask clarifying questions — answer directly with your best take.
+    Keep responses concise. Use Discord markdown formatting where appropriate.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.7
+    max_tokens: 4096
+  triggers:
+    - type: discord
+      token_env: DISCORD_BOT_TOKEN
+      channel_ids: []     # restrict to specific channels
+      allowed_roles: []   # restrict to specific roles
+      prompt_template: "{message}"
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50
+    daemon_daily_token_budget: 200000

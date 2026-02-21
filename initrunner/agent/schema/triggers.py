@@ -51,7 +51,37 @@ class WebhookTriggerConfig(BaseModel):
         return f"webhook: :{self.port}{self.path}"
 
 
+class TelegramTriggerConfig(BaseModel):
+    type: Literal["telegram"] = "telegram"
+    token_env: str = "TELEGRAM_BOT_TOKEN"
+    allowed_users: list[str] = []
+    prompt_template: str = "{message}"
+    autonomous: bool = False
+
+    def summary(self) -> str:
+        users = ", ".join(self.allowed_users) if self.allowed_users else "all"
+        return f"telegram: users={users}"
+
+
+class DiscordTriggerConfig(BaseModel):
+    type: Literal["discord"] = "discord"
+    token_env: str = "DISCORD_BOT_TOKEN"
+    channel_ids: list[str] = []
+    allowed_roles: list[str] = []
+    prompt_template: str = "{message}"
+    autonomous: bool = False
+
+    def summary(self) -> str:
+        if self.channel_ids:
+            return f"discord: channels={', '.join(self.channel_ids)}"
+        return "discord: all channels (mention/DM)"
+
+
 TriggerConfig = Annotated[
-    CronTriggerConfig | FileWatchTriggerConfig | WebhookTriggerConfig,
+    CronTriggerConfig
+    | FileWatchTriggerConfig
+    | WebhookTriggerConfig
+    | TelegramTriggerConfig
+    | DiscordTriggerConfig,
     Field(discriminator="type"),
 ]

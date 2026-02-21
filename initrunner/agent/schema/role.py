@@ -48,6 +48,15 @@ def parse_tool_list(v: Any) -> list:
     return result
 
 
+class ToolSearchConfig(BaseModel):
+    """Configuration for the tool search meta-tool."""
+
+    enabled: bool = False
+    always_available: list[str] = Field(default_factory=list)
+    max_results: int = Field(default=5, ge=1, le=20)
+    threshold: float = Field(default=0.0, ge=0.0)
+
+
 class AgentSpec(BaseModel):
     role: str
     model: ModelConfig
@@ -63,6 +72,7 @@ class AgentSpec(BaseModel):
     resources: ResourceConfig = ResourceConfig()
     security: SecurityPolicy = SecurityPolicy()
     observability: ObservabilityConfig | None = None
+    tool_search: ToolSearchConfig = ToolSearchConfig()
 
     @field_validator("tools", mode="before")
     @classmethod

@@ -132,6 +132,7 @@ def _create_agent(
     toolsets: list,
     output_type: type,
     instrument: Any = None,
+    prepare_tools: Any = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
     model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}
@@ -145,6 +146,8 @@ def _create_agent(
     }
     if instrument is not None:
         kwargs["instrument"] = instrument
+    if prepare_tools is not None:
+        kwargs["prepare_tools"] = prepare_tools
     return Agent(_build_model(role.spec.model), **kwargs)
 
 
@@ -168,13 +171,43 @@ def build_agent(
 
     toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
 
+    # Tool search meta-tool — hides tools behind BM25 search to reduce context
+    prepare_tools = None
+    if role.spec.tool_search.enabled:
+        from initrunner.agent.tools.tool_search import (
+            ToolSearchManager,
+            build_tool_search_toolset,
+        )
+
+        ts_config = role.spec.tool_search
+        manager = ToolSearchManager(
+            always_available=ts_config.always_available,
+            max_results=ts_config.max_results,
+            threshold=ts_config.threshold,
+        )
+        toolsets.append(build_tool_search_toolset(manager))
+        prepare_tools = manager.prepare_tools_callback
+        system_prompt += (
+            "\n\nYou have a large number of tools available, but most are hidden "
+            "to save context. Use the `search_tools` function to discover tools "
+            "by describing what you need (e.g. 'send slack message', 'read csv'). "
+            "Matching tools will then become available for you to call."
+        )
+
     instrument = None
     if role.spec.observability is not None:
         from initrunner.observability import get_instrumentation_settings
 
         instrument = get_instrumentation_settings(role.spec.observability)
 
-    agent = _create_agent(role, system_prompt, toolsets, output_type, instrument=instrument)
+    agent = _create_agent(
+        role,
+        system_prompt,
+        toolsets,
+        output_type,
+        instrument=instrument,
+        prepare_tools=prepare_tools,
+    )
 
     # Register dynamic system prompt for procedural memory injection
     if role.spec.memory is not None and role.spec.memory.procedural.enabled:

@@ -4,6 +4,7 @@
 
 | Command | Description |
 |---------|-------------|
+| `initrunner chat [role.yaml]` | Start an ephemeral chat REPL or launch a bot |
 | `initrunner run <role.yaml>` | Run an agent (single-shot or interactive) |
 | `initrunner validate <role.yaml>` | Validate a role definition |
 | `initrunner init` | Scaffold a template role, tool module, or skill |
@@ -42,6 +43,27 @@
 | `initrunner compose logs <name>` | Show journald logs |
 | `initrunner compose events` | Query delegate routing events |
 | `initrunner --version` | Print version |
+
+## Chat options
+
+Synopsis: `initrunner chat [role.yaml] [OPTIONS]`
+
+Start an ephemeral chat REPL, load a role for interactive use, or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide.
+
+Running `initrunner` with no subcommand in a TTY starts chat automatically (or the setup wizard if unconfigured).
+
+| Flag | Description |
+|------|-------------|
+| `--provider TEXT` | Model provider (overrides auto-detection) |
+| `--model TEXT` | Model name (overrides auto-detection) |
+| `-p, --prompt TEXT` | Send prompt then enter REPL |
+| `--telegram` | Launch as Telegram bot |
+| `--discord` | Launch as Discord bot |
+| `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default), `all` |
+| `--tools TEXT` | Extra tool types to enable (repeatable). See [Extra Tools](chat.md#extra-tools). |
+| `--list-tools` | List available extra tool types and exit |
+| `--audit-db PATH` | Custom audit database path |
+| `--no-audit` | Disable audit logging |
 
 ## Run options
 

@@ -106,6 +106,7 @@ class AutonomousResult:
     iteration_count: int = 0
     success: bool = True
     error: str | None = None
+    final_messages: list | None = None
 
 
 @dataclass

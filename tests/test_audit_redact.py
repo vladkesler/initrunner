@@ -119,6 +119,34 @@ class TestBearerTokens:
         assert "[REDACTED]" in result
 
 
+class TestTelegramTokens:
+    def test_telegram_bot_token(self):
+        text = "token: 123456789:ABCDefGhIJKlmnOPQRSTuvwxyz123456789"
+        result = scrub_secrets(text)
+        assert "123456789:" not in result
+        assert "[REDACTED]" in result
+        assert result == "token: [REDACTED]"
+
+    def test_surrounding_text_preserved(self):
+        text = "before 987654321:ABCDefGhIJKlmnOPQRSTuvwxyz123456789 after"
+        result = scrub_secrets(text)
+        assert result == "before [REDACTED] after"
+
+
+class TestDiscordTokens:
+    def test_discord_bot_token(self):
+        text = "token: FAKE_TOKEN_aaaBBBcccDDD11.G1a2b3.xyzXYZ-fake_test_0123456789a"
+        result = scrub_secrets(text)
+        assert "FAKE_TOKEN" not in result
+        assert "[REDACTED]" in result
+        assert result == "token: [REDACTED]"
+
+    def test_surrounding_text_preserved(self):
+        text = "before FAKE_TOKEN_aaaBBBcccDDD11.G1a2b3.xyzXYZ-fake_test_0123456789a after"
+        result = scrub_secrets(text)
+        assert result == "before [REDACTED] after"
+
+
 class TestEdgeCases:
     def test_empty_string(self):
         assert scrub_secrets("") == ""

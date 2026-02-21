@@ -17,7 +17,7 @@ from initrunner.cli.skill_cmd import app as skill_app
 app = typer.Typer(
     name="initrunner",
     help="A lightweight AI agent runner.",
-    no_args_is_help=True,
+    no_args_is_help=False,
 )
 
 # Sub-app registrations
@@ -42,8 +42,9 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Annotated[
         bool | None,
         typer.Option("--version", callback=version_callback, is_eager=True),
@@ -58,11 +59,52 @@ def main(
 
     setup_logging(verbose=verbose)
 
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # No subcommand — handle based on environment
+    import sys
+
+    if not sys.stdin.isatty():
+        # Non-TTY (piped/scripted): show help and exit
+        console.print(ctx.get_help())
+        raise typer.Exit()
+
+    from initrunner.cli.setup_cmd import needs_setup
+
+    if needs_setup():
+        # TTY + no config: run setup wizard
+        from initrunner.cli.setup_cmd import run_setup
+
+        run_setup()
+    else:
+        # TTY + configured: start ephemeral chat
+        from initrunner.cli.chat_cmd import _chat_auto_detect
+        from initrunner.services.providers import detect_bot_tokens
+
+        tokens = detect_bot_tokens()
+        if tokens:
+            platforms = ", ".join(tokens)
+            console.print(
+                f"[dim]Hint: bot tokens detected ({platforms}). "
+                f"Use --telegram or --discord to launch a bot.[/dim]"
+            )
+
+        _chat_auto_detect(
+            provider=None,
+            model=None,
+            prompt=None,
+            tool_profile="minimal",
+            audit_db=None,
+            no_audit=False,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Command registrations — plain functions from *_cmd modules
 # ---------------------------------------------------------------------------
 
+from initrunner.cli.chat_cmd import chat  # noqa: E402
 from initrunner.cli.doctor_cmd import doctor  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
@@ -77,6 +119,7 @@ from initrunner.cli.role_cmd import create, init, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import daemon, ingest, run, test  # noqa: E402
 from initrunner.cli.server_cmd import pipeline, serve, tui, ui  # noqa: E402
 
+app.command()(chat)
 app.command()(validate)
 app.command()(init)
 app.command()(create)

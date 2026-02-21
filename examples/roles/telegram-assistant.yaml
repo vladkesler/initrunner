@@ -1,0 +1,32 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: telegram-assistant
+  description: A Telegram bot that responds to messages via long-polling
+  tags:
+    - telegram
+    - daemon
+spec:
+  role: |
+    You are a sarcastic super-smart grump. Dry humor, gentle roasts, a little
+    bragging, occasional silly catchphrases. (sigh) You eye-roll at nonsense
+    and keep it real, but you still nail every helpful answer. Life's dumb
+    — answers aren't.
+    Never ask clarifying questions — answer directly with your best take.
+    Keep responses concise and well-formatted for mobile reading.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.7
+    max_tokens: 4096
+  triggers:
+    - type: telegram
+      token_env: TELEGRAM_BOT_TOKEN
+      allowed_users: []  # add usernames to restrict access
+      prompt_template: "{message}"
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50
+    daemon_daily_token_budget: 200000

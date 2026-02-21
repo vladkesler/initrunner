@@ -1,6 +1,6 @@
 # Triggers — Configuration Reference
 
-Triggers allow agents to run automatically in response to events — cron schedules, file changes, or incoming webhooks. They are configured in the `spec.triggers` list and activated with the `initrunner daemon` command.
+Triggers allow agents to run automatically in response to events — cron schedules, file changes, incoming webhooks, or messaging platforms. They are configured in the `spec.triggers` list and activated with the `initrunner daemon` command.
 
 Triggers follow the same discriminated-union pattern as tools and sinks, keyed on the `type` field.
 
@@ -11,6 +11,8 @@ Triggers follow the same discriminated-union pattern as tools and sinks, keyed o
 | `cron` | Fire on a cron schedule |
 | `file_watch` | Fire when files change in watched directories |
 | `webhook` | Fire on incoming HTTP requests (localhost only) |
+| `telegram` | Respond to Telegram messages via long-polling (outbound only) |
+| `discord` | Respond to Discord DMs and @mentions via WebSocket (outbound only) |
 
 ## Quick Example
 
@@ -209,9 +211,10 @@ initrunner daemon role.yaml --no-audit
 
 1. The role is loaded and the agent is built.
 2. All triggers are started in daemon threads via `TriggerDispatcher`.
-3. When a trigger fires, the prompt is sent to the agent synchronously.
-4. The result is displayed and dispatched to any configured sinks.
-5. The daemon continues until interrupted.
+3. When a trigger fires, the prompt is sent to the agent.
+4. **Messaging triggers** (Telegram, Discord) always use the direct execution path — `autonomous: true` on the trigger config is ignored. The agent's reply is sent back to the originating channel immediately, *before* display, sinks, and episode capture run.
+5. **Other triggers** (cron, file watch, webhook) use the autonomous loop when `autonomous: true` is set. The result is displayed and dispatched to sinks after the run completes.
+6. The daemon continues until interrupted.
 
 ### Signal Handling
 
@@ -228,7 +231,95 @@ Every trigger fires a `TriggerEvent` containing:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `trigger_type` | `str` | `"cron"`, `"file_watch"`, or `"webhook"` |
+| `trigger_type` | `str` | `"cron"`, `"file_watch"`, `"webhook"`, `"telegram"`, or `"discord"` |
 | `prompt` | `str` | The prompt to send to the agent |
 | `timestamp` | `str` | ISO 8601 timestamp of when the event was created |
-| `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, etc.) |
+| `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, user, etc.) |
+| `reply_fn` | `Callable \| None` | Optional callback to send the agent's response back to the originating channel |
+
+## Telegram Trigger
+
+Responds to Telegram messages using long-polling via [python-telegram-bot](https://python-telegram-bot.org/). Outbound HTTPS only — no ports opened, no inbound connections required.
+
+### Setup
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
+2. Set the token as an environment variable: `export TELEGRAM_BOT_TOKEN=your-token`.
+3. Install the optional dependency: `pip install initrunner[telegram]`.
+
+```yaml
+triggers:
+  - type: telegram
+    token_env: TELEGRAM_BOT_TOKEN      # default
+    allowed_users: ["alice", "bob"]    # empty = allow all
+    prompt_template: "{message}"       # default
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `token_env` | `str` | `"TELEGRAM_BOT_TOKEN"` | Environment variable holding the bot token. |
+| `allowed_users` | `list[str]` | `[]` | Telegram usernames allowed to interact. Empty list allows all users. |
+| `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
+
+### Behavior
+
+- Uses long-polling (outbound HTTPS) — no ports opened, no webhooks to configure.
+- Only text messages are processed (commands like `/start` are ignored).
+- When `allowed_users` is set, messages from other users are silently dropped.
+- The agent's response is sent back to the originating chat, automatically chunked to Telegram's 4096-character message limit.
+- Chunks are split at newline boundaries when possible for cleaner output.
+- The trigger event includes `metadata: {"user": "...", "chat_id": "..."}`.
+
+### Security
+
+- **Store the bot token securely** — use environment variables or a secrets manager, never commit it to version control.
+- **Use `allowed_users`** to restrict access to known usernames. An empty list means anyone can interact with the bot.
+- **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.
+
+## Discord Trigger
+
+Responds to Discord DMs and @mentions via WebSocket client using [discord.py](https://discordpy.readthedocs.io/). Outbound only — no ports opened.
+
+### Setup
+
+1. Create a bot in the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Enable the **Message Content Intent** under Bot settings.
+3. Invite the bot to your server with the `bot` scope and `Send Messages` + `Read Message History` permissions.
+4. Set the token: `export DISCORD_BOT_TOKEN=your-token`.
+5. Install the optional dependency: `pip install initrunner[discord]`.
+
+```yaml
+triggers:
+  - type: discord
+    token_env: DISCORD_BOT_TOKEN       # default
+    channel_ids: ["123456789"]         # empty = all channels
+    allowed_roles: ["Admin", "Bot-User"]  # empty = all roles
+    prompt_template: "{message}"       # default
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `token_env` | `str` | `"DISCORD_BOT_TOKEN"` | Environment variable holding the bot token. |
+| `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty list allows all channels. |
+| `allowed_roles` | `list[str]` | `[]` | Role names required to interact. Empty list allows all users. |
+| `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
+
+### Behavior
+
+- Uses WebSocket client connection — outbound only, no ports opened.
+- Responds to **DMs** and **@mentions** only (not every message in every channel).
+- When `allowed_roles` is set, **DMs are denied** (DMs have no role context, so allowing them would bypass the role filter).
+- Bot @mention is stripped from the message content using the mention ID pattern for robustness.
+- The agent's response is sent back to the originating channel, automatically chunked to Discord's 2000-character message limit.
+- The trigger event includes `metadata: {"user": "...", "channel_id": "..."}`.
+
+### Security
+
+- **Store the bot token securely** — never commit it to version control.
+- **Use `channel_ids`** to restrict the bot to specific channels.
+- **Use `allowed_roles`** to restrict access to specific server roles. Note that DMs are automatically denied when roles are configured.
+- **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.

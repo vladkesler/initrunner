@@ -2,7 +2,12 @@
 
 import time
 
-from initrunner.agent.schema.triggers import CronTriggerConfig, FileWatchTriggerConfig
+from initrunner.agent.schema.triggers import (
+    CronTriggerConfig,
+    DiscordTriggerConfig,
+    FileWatchTriggerConfig,
+    TelegramTriggerConfig,
+)
 from initrunner.triggers.base import TriggerEvent
 from initrunner.triggers.cron import CronTrigger
 from initrunner.triggers.dispatcher import TriggerDispatcher
@@ -16,6 +21,51 @@ class TestTriggerEvent:
         assert event.prompt == "test"
         assert event.timestamp  # auto-populated
         assert event.metadata == {}
+
+    def test_reply_fn_default_none(self):
+        event = TriggerEvent(trigger_type="cron", prompt="test")
+        assert event.reply_fn is None
+
+    def test_reply_fn_can_be_set(self):
+        fn = lambda text: None  # noqa: E731
+        event = TriggerEvent(trigger_type="telegram", prompt="hi", reply_fn=fn)
+        assert event.reply_fn is fn
+
+    def test_backward_compatible_without_reply_fn(self):
+        """Existing code that doesn't pass reply_fn still works."""
+        event = TriggerEvent(
+            trigger_type="cron",
+            prompt="test",
+            metadata={"schedule": "* * * * *"},
+        )
+        assert event.reply_fn is None
+
+    def test_conversation_key_telegram(self):
+        event = TriggerEvent(
+            trigger_type="telegram",
+            prompt="hi",
+            metadata={"chat_id": "12345"},
+        )
+        assert event.conversation_key == "telegram:12345"
+
+    def test_conversation_key_discord(self):
+        event = TriggerEvent(
+            trigger_type="discord",
+            prompt="hi",
+            metadata={"channel_id": "67890"},
+        )
+        assert event.conversation_key == "discord:67890"
+
+    def test_conversation_key_cron_returns_none(self):
+        event = TriggerEvent(trigger_type="cron", prompt="test")
+        assert event.conversation_key is None
+
+    def test_conversation_key_missing_metadata_returns_none(self):
+        event = TriggerEvent(trigger_type="telegram", prompt="hi")
+        assert event.conversation_key is None
+
+        event2 = TriggerEvent(trigger_type="discord", prompt="hi")
+        assert event2.conversation_key is None
 
 
 class TestCronTrigger:
@@ -136,5 +186,17 @@ class TestTriggerDispatcher:
 
     def test_builds_cron_trigger(self):
         configs = [CronTriggerConfig(schedule="0 0 1 1 *", prompt="test")]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        assert dispatcher.count == 1
+
+    def test_builds_telegram_trigger(self, monkeypatch):
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+        configs = [TelegramTriggerConfig()]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        assert dispatcher.count == 1
+
+    def test_builds_discord_trigger(self, monkeypatch):
+        monkeypatch.setenv("DISCORD_BOT_TOKEN", "fake-token")
+        configs = [DiscordTriggerConfig()]
         dispatcher = TriggerDispatcher(configs, lambda e: None)
         assert dispatcher.count == 1

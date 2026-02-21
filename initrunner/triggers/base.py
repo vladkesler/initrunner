@@ -8,6 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+CONVERSATIONAL_TRIGGER_TYPES: frozenset[str] = frozenset({"telegram", "discord"})
+
 
 @dataclass
 class TriggerEvent:
@@ -15,6 +17,36 @@ class TriggerEvent:
     prompt: str
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, str] = field(default_factory=dict)
+    reply_fn: Callable[[str], None] | None = None
+
+    @property
+    def conversation_key(self) -> str | None:
+        """Unique key for conversational triggers, None for stateless ones."""
+        if self.trigger_type == "telegram":
+            chat_id = self.metadata.get("chat_id")
+            return f"telegram:{chat_id}" if chat_id else None
+        if self.trigger_type == "discord":
+            channel_id = self.metadata.get("channel_id")
+            return f"discord:{channel_id}" if channel_id else None
+        return None
+
+
+def _chunk_text(text: str, limit: int) -> list[str]:
+    """Split text into chunks that fit within platform message limit."""
+    if len(text) <= limit:
+        return [text]
+    chunks: list[str] = []
+    while text:
+        if len(text) <= limit:
+            chunks.append(text)
+            break
+        # Split at last newline before limit, or hard-cut at limit
+        split_at = text.rfind("\n", 0, limit)
+        if split_at <= 0:
+            split_at = limit
+        chunks.append(text[:split_at])
+        text = text[split_at:].lstrip("\n")
+    return chunks
 
 
 class TriggerBase(ABC):

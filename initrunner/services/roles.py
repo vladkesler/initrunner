@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -97,9 +96,9 @@ def build_role_yaml_sync(
 
 def _detect_provider() -> str:
     """Auto-detect which provider has an API key available."""
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+    from initrunner.services.providers import detect_provider_and_model
 
-    for prov, env_var in _PROVIDER_API_KEY_ENVS.items():
-        if os.environ.get(env_var):
-            return prov
+    detected = detect_provider_and_model()
+    if detected is not None:
+        return detected.provider
     return "openai"
