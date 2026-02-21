@@ -43,7 +43,7 @@ __all__ = [
     "create_memory_store",
     "open_memory_store",
     "register_memory_store",
-    "unregister_memory_store",
     "resolve_memory_path",
     "resolve_store_path",
+    "unregister_memory_store",
 ]
