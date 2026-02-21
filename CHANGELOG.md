@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-22
+
 ### Breaking Changes
 - **Vector store backend migrated from sqlite-vec to Zvec** — existing `.db` store files are not compatible; users must re-ingest documents (`initrunner ingest --force`) and memory stores will start fresh. Store paths change from `<name>.db` to `<name>.zvec`.
 
