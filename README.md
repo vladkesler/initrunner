@@ -21,9 +21,9 @@
 
 **Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 40+ tools. Any model.**
 
-One YAML file is all it takes to go from idea to running agent — with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
+One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.4.1** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.4.1** - Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## 30-Second Quickstart
 
@@ -81,7 +81,7 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 
 <p align="center">
   <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
-  <em>Interactive REPL — chat with any agent from the terminal</em>
+  <em>Interactive REPL - chat with any agent from the terminal</em>
 </p>
 
 ## Why InitRunner
@@ -100,19 +100,19 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 |---|---|---|---|
 | **Setup** | `pip install initrunner` + API key | Install 5-10 packages, write glue code | `pip install langchain` + adapters |
 | **Agent config** | One YAML file | Python classes + wiring | Python chains + config objects |
-| **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt — DIY | Loaders → splitters → vectorstore chain |
+| **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt - DIY | Loaders > splitters > vectorstore chain |
 | **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
 | **Model switching** | Change `model.provider` in YAML | Rewrite client code | Swap LLM class + adjust prompts |
 | **Multi-agent** | `compose.yaml` with delegation | Custom orchestration layer | Agent executor + custom routing |
 
 ## What Can You Build?
 
-- **A Telegram bot that answers questions about your codebase** — point it at your repo, deploy with one flag
-- **A cron job that monitors competitors and sends daily digests** — cron trigger + web scraper + Slack sink
-- **A document Q&A agent for your team's knowledge base** — ingest PDFs and Markdown, serve as an API
-- **A code review bot triggered by new commits** — file-watch trigger + git tools + structured output
-- **A multi-agent pipeline: inbox watcher → triager → responder** — define in `compose.yaml`, run with one command
-- **A personal assistant that remembers everything** — persistent memory across sessions, no setup
+- **A Telegram bot that answers questions about your codebase** - point it at your repo, deploy with one flag
+- **A cron job that monitors competitors and sends daily digests** - cron trigger + web scraper + Slack sink
+- **A document Q&A agent for your team's knowledge base** - ingest PDFs and Markdown, serve as an API
+- **A code review bot triggered by new commits** - file-watch trigger + git tools + structured output
+- **A multi-agent pipeline: inbox watcher > triager > responder** - define in `compose.yaml`, run with one command
+- **A personal assistant that remembers everything** - persistent memory across sessions, no setup
 
 ## Quickstart
 
@@ -139,9 +139,9 @@ export OPENAI_API_KEY=sk-...          # OpenAI (default)
 export ANTHROPIC_API_KEY=sk-ant-...   # Claude
 ```
 
-You can also store keys in `~/.initrunner/.env` — it's loaded automatically by all commands. Environment variables set in the shell take precedence over `.env` values.
+You can also store keys in `~/.initrunner/.env` - it's loaded automatically by all commands. Environment variables set in the shell take precedence over `.env` values.
 
-> Or run `initrunner setup` — it walks through provider, key, and first role interactively, and stores the key in `~/.initrunner/.env` for you.
+> Or run `initrunner setup` - it walks through provider, key, and first role interactively, and stores the key in `~/.initrunner/.env` for you.
 
 ### 3. Start chatting
 
@@ -156,15 +156,15 @@ initrunner run role.yaml -p "Hello!"   # one-shot prompt
 initrunner run role.yaml -i            # interactive REPL
 ```
 
-Memory is on by default — the agent remembers facts across sessions. Use `--no-memory` to disable. See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
+Memory is on by default - the agent remembers facts across sessions. Use `--no-memory` to disable. See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
 
 ## From Simple to Powerful
 
-Start with the code-reviewer above. Each step adds one capability — no rewrites, just add a section to your YAML.
+Start with the code-reviewer above. Each step adds one capability - no rewrites, just add a section to your YAML.
 
 ### 1. Add knowledge & memory
 
-Point at your docs for RAG — a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
+Point at your docs for RAG - a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
 
 ```yaml
 spec:
@@ -184,7 +184,7 @@ See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG
 
 ### 2. Add skills
 
-Compose reusable bundles of tools and prompts. Each skill is a `SKILL.md` file — reference it by path:
+Compose reusable bundles of tools and prompts. Each skill is a `SKILL.md` file - reference it by path:
 
 ```yaml
 spec:
@@ -197,7 +197,7 @@ The agent inherits each skill's tools and prompt instructions automatically. Run
 
 ### 3. Add triggers
 
-Turn it into a daemon that reacts to events — cron, file watch, webhook, Telegram, or Discord:
+Turn it into a daemon that reacts to events - cron, file watch, webhook, Telegram, or Discord:
 
 ```yaml
 spec:
@@ -218,7 +218,7 @@ See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegra
 
 ### 4. Compose agents
 
-Orchestrate multiple agents into a pipeline — one agent's output feeds into the next:
+Orchestrate multiple agents into a pipeline - one agent's output feeds into the next:
 
 ```yaml
 apiVersion: initrunner/v1
@@ -236,7 +236,7 @@ Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration
 
 ### 5. Serve as an API
 
-Turn any agent into an OpenAI-compatible endpoint — drop-in for Open WebUI, Vercel AI SDK, or any OpenAI client:
+Turn any agent into an OpenAI-compatible endpoint - drop-in for Open WebUI, Vercel AI SDK, or any OpenAI client:
 
 ```bash
 initrunner serve support-agent.yaml --port 3000
@@ -257,11 +257,11 @@ In the REPL, use `/attach` to queue files. See [Multimodal Input](docs/core/mult
 
 ### 7. Get structured output
 
-Force the agent to return validated JSON matching a schema — ideal for pipelines and automation. Add an `output` section with a JSON schema and the agent's response is validated against it:
+Force the agent to return validated JSON matching a schema - ideal for pipelines and automation. Add an `output` section with a JSON schema and the agent's response is validated against it:
 
 ```bash
 initrunner run classifier.yaml -p "Acme Corp invoice for $250"
-# → {"status": "approved", "amount": 250.0}
+# => {"status": "approved", "amount": 250.0}
 ```
 
 See [Structured Output](docs/core/structured-output.md) for inline schemas, external schema files, and pipeline integration.
@@ -315,12 +315,12 @@ docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
     -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest \
     chat --telegram
 
-# OpenAI-compatible API server — port 8000
+# OpenAI-compatible API server on port 8000
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles \
     -p 8000:8000 ghcr.io/vladkesler/initrunner:latest \
     serve /roles/my-agent.yaml --host 0.0.0.0
 
-# Web dashboard — http://localhost:8420
+# Web dashboard at http://localhost:8420
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
     -p 8420:8420 ghcr.io/vladkesler/initrunner:latest ui --role-dir /roles
 ```
@@ -364,16 +364,16 @@ The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills,
 
 ## Community & Support
 
-- [Discord — InitRunner Hub](https://discord.gg/GRTZmVcW) — Chat, ask questions, share roles
-- [GitHub Issues](https://github.com/vladkesler/initrunner/issues) — Bug reports and feature requests
-- [Changelog](CHANGELOG.md) — Release notes and version history
+- [Discord - InitRunner Hub](https://discord.gg/GRTZmVcW) - Chat, ask questions, share roles
+- [GitHub Issues](https://github.com/vladkesler/initrunner/issues) - Bug reports and feature requests
+- [Changelog](CHANGELOG.md) - Release notes and version history
 
-If you find InitRunner useful, consider giving it a star — it helps others discover the project.
+If you find InitRunner useful, consider giving it a star - it helps others discover the project.
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR guidelines, and quality checks. Share your roles by pushing to a public GitHub repo — anyone can install them with `initrunner install user/repo`. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR guidelines, and quality checks. Share your roles by pushing to a public GitHub repo - anyone can install them with `initrunner install user/repo`. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT - see [LICENSE](LICENSE) for details.
