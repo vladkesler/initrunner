@@ -210,16 +210,26 @@ def ephemeral_context(
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     memory_store = None
+    mem_path = None
     if with_memory and role.spec.memory is not None:
-        from initrunner.stores.factory import create_memory_store
+        from initrunner.stores.factory import (
+            create_memory_store,
+            register_memory_store,
+        )
 
         mem_path = resolve_memory_path(role)
         memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
+        register_memory_store(mem_path, memory_store)
+        agent._memory_store = memory_store  # type: ignore[attr-defined]
 
     try:
         yield role, agent, audit_logger, memory_store
     finally:
         if memory_store is not None:
+            from initrunner.stores.factory import unregister_memory_store
+
+            assert mem_path is not None
+            unregister_memory_store(mem_path)
             memory_store.close()
         if audit_logger is not None:
             audit_logger.close()

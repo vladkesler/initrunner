@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.agent.schema.ingestion import IngestConfig
+    from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.role import RoleDefinition, ToolSearchConfig
     from initrunner.agent.schema.triggers import TriggerConfig
 
 _logger = logging.getLogger(__name__)
@@ -111,6 +113,22 @@ def detect_bot_tokens() -> dict[str, str]:
     }
 
 
+_MEMORY_SYSTEM_PROMPT = (
+    "\n\nYou have persistent long-term memory across conversations.\n\n"
+    "Before answering, use recall() to check for relevant context about the user or topic.\n"
+    "When the user shares preferences, facts, or important decisions, "
+    "use remember() to store them.\n"
+    "When you learn a useful pattern or policy, use learn_procedure() to record it.\n"
+    "Do this naturally without announcing it."
+)
+
+_INGEST_SYSTEM_PROMPT = (
+    "\n\nYou have access to ingested documents via the search_documents() tool. "
+    "When the user asks about document content, ALWAYS call search_documents() "
+    "first to find relevant passages before answering. Cite sources when possible."
+)
+
+
 def build_ephemeral_role(
     provider: str,
     model: str,
@@ -125,12 +143,21 @@ def build_ephemeral_role(
     tools: list[dict] | None = None,
     autonomy: dict | None = None,
     guardrails: dict | None = None,
+    memory: MemoryConfig | None = None,
+    ingest: IngestConfig | None = None,
+    tool_search: ToolSearchConfig | None = None,
 ) -> RoleDefinition:
     """Create an in-memory RoleDefinition without writing YAML."""
     from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
     from initrunner.agent.schema.guardrails import Guardrails
     from initrunner.agent.schema.role import AgentSpec
     from initrunner.agent.schema.role import RoleDefinition as RoleDef
+
+    if memory is not None:
+        system_prompt += _MEMORY_SYSTEM_PROMPT
+
+    if ingest is not None:
+        system_prompt += _INGEST_SYSTEM_PROMPT
 
     spec_kwargs: dict = {
         "role": system_prompt,
@@ -150,6 +177,15 @@ def build_ephemeral_role(
         from initrunner.agent.schema.autonomy import AutonomyConfig
 
         spec_kwargs["autonomy"] = AutonomyConfig(**autonomy)
+
+    if memory is not None:
+        spec_kwargs["memory"] = memory
+
+    if ingest is not None:
+        spec_kwargs["ingest"] = ingest
+
+    if tool_search is not None:
+        spec_kwargs["tool_search"] = tool_search
 
     return RoleDef(
         apiVersion=ApiVersion.V1,

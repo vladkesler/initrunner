@@ -49,6 +49,53 @@ def install_audit_hooks(role: RoleDefinition) -> None:
         install_audit_hook()
 
 
+def resolve_func_names(tool_configs: list[dict]) -> list[str]:
+    """Resolve tool config dicts to registered function names.
+
+    Builds each tool using its registered builder with a minimal context
+    and inspects the resulting toolset to extract function names.
+    Used to compute always_available for ToolSearchConfig.
+    """
+    from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+    from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+
+    dummy_role = RoleDefinition(
+        apiVersion=ApiVersion.V1,
+        kind=Kind.AGENT,
+        metadata=Metadata(name="introspect", description=""),
+        spec=AgentSpec(
+            role="",
+            model=ModelConfig(provider="openai", name="dummy"),
+        ),
+    )
+    dummy_ctx = ToolBuildContext(role=dummy_role)
+
+    func_names: list[str] = []
+    for cfg in tool_configs:
+        type_name = cfg.get("type")
+        if not type_name:
+            continue
+        builder = get_builder(type_name)
+        if builder is None:
+            continue
+        # Parse the config dict into the registered config class
+        from initrunner.agent.tools._registry import get_tool_types
+
+        config_classes = get_tool_types()
+        config_cls = config_classes.get(type_name)
+        if config_cls is None:
+            continue
+        try:
+            config_obj = config_cls.model_validate(cfg)
+            toolset = builder(config_obj, dummy_ctx)
+            if hasattr(toolset, "tools"):
+                func_names.extend(toolset.tools.keys())  # type: ignore[union-attr]
+        except Exception:
+            # Builder may fail with dummy context — skip gracefully
+            pass
+    return func_names
+
+
 def build_toolsets(
     tools: list[ToolConfig],
     role: RoleDefinition,

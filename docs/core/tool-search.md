@@ -48,6 +48,34 @@ Model sees and calls the actual tool (e.g. send_slack_message)
 - **Discovered tools persist** across turns — once found, a tool stays available for the session
 - **Runtime tools pass through** — tools added dynamically (e.g. reflection, scheduling) are always visible
 
+## Ephemeral Chat
+
+Tool search is **automatically enabled** in ephemeral chat mode (`initrunner chat`). You don't need a `role.yaml` — the CLI wires it up for you.
+
+### How it works
+
+All tools from the built-in extras (`datetime`, `web_reader`, `search`, `python`, `filesystem`, `slack`, `git`, `shell`) are registered but **hidden** behind tool search. The tools from your selected `--tool-profile` are set as `always_available`, so the agent sees them on every turn. Everything else is discoverable via `search_tools()`.
+
+| Profile | Always visible | Discoverable via search |
+|---------|---------------|------------------------|
+| `none` | `search_tools` only | All built-in extras |
+| `minimal` | `current_time`, `parse_date`, `fetch_page` + `search_tools` | `web_search`, `run_python`, `read_file`, `shell_exec`, etc. |
+| `all` | Every tool registered as always-visible | Nothing hidden (no search needed) |
+
+### Example
+
+```bash
+initrunner chat --tool-profile minimal
+```
+
+The agent sees `current_time`, `parse_date`, `fetch_page`, and `search_tools`. When the user asks "search the web for Python 3.13 release notes", the agent calls `search_tools("web search")`, discovers `web_search`, and then calls it — all in the same turn.
+
+Tools added with `--tools` are also set as always-visible. For example, `--tool-profile minimal --tools git` makes `git_log`, `git_diff`, etc. always visible alongside the datetime and web_reader tools.
+
+### Relationship to `--tool-profile all`
+
+The `all` profile registers every tool as always-visible, so `search_tools` has nothing to discover. This is fine for local use, but the context overhead grows with the number of tools. For bots and resource-constrained models, `minimal` (the default) keeps context tight and relies on tool search for anything beyond the basics.
+
 ## Best Practices
 
 - **Enable when you have 10+ tools** — below that, the overhead isn't worth it

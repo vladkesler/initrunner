@@ -6,7 +6,10 @@ from pathlib import Path
 
 from initrunner.config import get_home_dir
 
-_INITRUNNER_DIR = get_home_dir()
+
+def _get_initrunner_dir() -> Path:
+    """Return the InitRunner home directory (not cached at module level)."""
+    return get_home_dir()
 
 
 def validate_path_within(

@@ -59,8 +59,13 @@ Running `initrunner` with no subcommand in a TTY starts chat automatically (or t
 | `-p, --prompt TEXT` | Send prompt then enter REPL |
 | `--telegram` | Launch as Telegram bot |
 | `--discord` | Launch as Discord bot |
+| `--allowed-users TEXT` | Restrict bot to these usernames (repeatable). Requires `--telegram` or `--discord`. |
+| `--allowed-user-ids TEXT` | Restrict bot to these user IDs (repeatable). Requires `--telegram` or `--discord`. |
 | `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default), `all` |
 | `--tools TEXT` | Extra tool types to enable (repeatable). See [Extra Tools](chat.md#extra-tools). |
+| `--memory / --no-memory` | Enable or disable persistent memory (default: enabled) |
+| `--resume` | Resume the previous session (loads history + recalls relevant memories) |
+| `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable) |
 | `--list-tools` | List available extra tool types and exit |
 | `--audit-db PATH` | Custom audit database path |
 | `--no-audit` | Disable audit logging |

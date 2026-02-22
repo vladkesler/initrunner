@@ -144,6 +144,73 @@ def delete_session(role: RoleDefinition, session_id: str) -> bool:
         return store.delete_session(session_id, role.metadata.name)
 
 
+def auto_recall_for_resume(
+    role: RoleDefinition,
+    messages: list[ModelMessage],
+    store: MemoryStoreBase | None = None,
+) -> str:
+    """Build a context string from memories relevant to a resumed session.
+
+    Extracts text from recent user messages, embeds a combined query,
+    searches the memory store, and returns a formatted string (or empty
+    if no matches).  Never raises.
+    """
+    try:
+        if role.spec.memory is None or store is None:
+            return ""
+
+        from pydantic_ai.messages import ModelRequest, UserPromptPart
+
+        # Extract text from the last N user messages
+        user_texts: list[str] = []
+        for msg in reversed(messages):
+            if len(user_texts) >= 5:
+                break
+            if isinstance(msg, ModelRequest):
+                for part in msg.parts:
+                    if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                        user_texts.append(part.content)
+
+        if not user_texts:
+            return ""
+
+        combined_query = " ".join(reversed(user_texts))[:500]
+
+        from initrunner.ingestion.embeddings import embed_single as _embed_single
+        from initrunner.stores.base import MemoryType
+
+        embed_provider = (
+            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"
+        )
+        embed_model = role.spec.memory.embeddings.model
+        query_embedding = _embed_single(
+            embed_provider,
+            embed_model,
+            combined_query,
+            base_url=role.spec.memory.embeddings.base_url,
+            api_key_env=role.spec.memory.embeddings.api_key_env,
+            input_type="query",
+        )
+
+        results = store.search_memories(
+            query_embedding,
+            top_k=10,
+            memory_types=[MemoryType.SEMANTIC, MemoryType.EPISODIC],
+        )
+
+        if not results:
+            return ""
+
+        lines = ["## Recalled Memories (from previous sessions)", ""]
+        for mem, _score in results:
+            lines.append(f"- [{mem.memory_type.value}] {mem.content}")
+
+        return "\n".join(lines)
+    except Exception:
+        _logger.warning("Failed to auto-recall memories for resume", exc_info=True)
+        return ""
+
+
 def build_memory_system_prompt(
     role: RoleDefinition,
     store: MemoryStoreBase | None = None,

@@ -56,20 +56,32 @@ class TestExtractors:
     def test_pdf_requires_extra(self, tmp_path):
         f = tmp_path / "test.pdf"
         f.write_text("fake pdf")
-        with pytest.raises(RuntimeError, match="pip install initrunner"):
-            extract_text(f)
+        with patch(
+            "initrunner._compat.require_ingest",
+            side_effect=RuntimeError("pip install initrunner[ingest]"),
+        ):
+            with pytest.raises(RuntimeError, match="pip install initrunner"):
+                extract_text(f)
 
     def test_docx_requires_extra(self, tmp_path):
         f = tmp_path / "test.docx"
         f.write_text("fake docx")
-        with pytest.raises(RuntimeError, match="pip install initrunner"):
-            extract_text(f)
+        with patch(
+            "initrunner._compat.require_ingest",
+            side_effect=RuntimeError("pip install initrunner[ingest]"),
+        ):
+            with pytest.raises(RuntimeError, match="pip install initrunner"):
+                extract_text(f)
 
     def test_xlsx_requires_extra(self, tmp_path):
         f = tmp_path / "test.xlsx"
         f.write_text("fake xlsx")
-        with pytest.raises(RuntimeError, match="pip install initrunner"):
-            extract_text(f)
+        with patch(
+            "initrunner._compat.require_ingest",
+            side_effect=RuntimeError("pip install initrunner[ingest]"),
+        ):
+            with pytest.raises(RuntimeError, match="pip install initrunner"):
+                extract_text(f)
 
 
 class TestExtractUrl:

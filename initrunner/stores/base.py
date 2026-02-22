@@ -65,17 +65,16 @@ class _LazyDir:
 
     def __init__(self, getter_name: str) -> None:
         self._getter_name = getter_name
-        self._value: Path | None = None
 
     def __fspath__(self) -> str:
         return str(self._resolve())
 
     def _resolve(self) -> Path:
-        if self._value is None:
-            from initrunner import config
+        # Delegate to config functions directly; they use @lru_cache which
+        # handles caching (and can be cleared in tests).
+        from initrunner import config
 
-            self._value = getattr(config, self._getter_name)()
-        return self._value
+        return getattr(config, self._getter_name)()
 
     def __truediv__(self, other: str) -> Path:
         return self._resolve() / other

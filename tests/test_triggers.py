@@ -200,3 +200,177 @@ class TestTriggerDispatcher:
         configs = [DiscordTriggerConfig()]
         dispatcher = TriggerDispatcher(configs, lambda e: None)
         assert dispatcher.count == 1
+
+    def test_builds_telegram_trigger_with_user_ids(self, monkeypatch):
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+        configs = [TelegramTriggerConfig(allowed_user_ids=[12345])]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        assert dispatcher.count == 1
+
+    def test_builds_discord_trigger_with_user_ids(self, monkeypatch):
+        monkeypatch.setenv("DISCORD_BOT_TOKEN", "fake-token")
+        configs = [DiscordTriggerConfig(allowed_user_ids=["111222333"])]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        assert dispatcher.count == 1
+
+
+class TestTelegramFiltering:
+    """Unit tests for the Telegram filter logic inside on_message."""
+
+    @staticmethod
+    def _make_update(username, user_id, text="hello"):
+        """Build a minimal mock Update object."""
+        from unittest.mock import MagicMock
+
+        update = MagicMock()
+        update.message.text = text
+        user = MagicMock()
+        user.username = username
+        user.id = user_id
+        update.effective_user = user
+        update.effective_chat.id = 999
+        return update
+
+    @staticmethod
+    def _should_allow(config, username, user_id):
+        """Simulate the filter logic from telegram.py without running async."""
+        allowed_usernames = set(config.allowed_users)
+        allowed_user_ids = set(config.allowed_user_ids)
+        if allowed_usernames or allowed_user_ids:
+            username_ok = bool(allowed_usernames and username in allowed_usernames)
+            user_id_ok = bool(allowed_user_ids and user_id in allowed_user_ids)
+            return username_ok or user_id_ok
+        return True
+
+    def test_telegram_allows_all_when_no_filters(self):
+        cfg = TelegramTriggerConfig()
+        assert self._should_allow(cfg, "anyone", 99999) is True
+
+    def test_telegram_allows_by_username(self):
+        cfg = TelegramTriggerConfig(allowed_users=["alice"])
+        assert self._should_allow(cfg, "alice", 11111) is True
+
+    def test_telegram_rejects_wrong_username(self):
+        cfg = TelegramTriggerConfig(allowed_users=["alice"])
+        assert self._should_allow(cfg, "bob", 22222) is False
+
+    def test_telegram_allows_by_user_id(self):
+        cfg = TelegramTriggerConfig(allowed_user_ids=[12345])
+        assert self._should_allow(cfg, "anyone", 12345) is True
+
+    def test_telegram_rejects_wrong_user_id(self):
+        cfg = TelegramTriggerConfig(allowed_user_ids=[12345])
+        assert self._should_allow(cfg, "anyone", 99999) is False
+
+    def test_telegram_union_username_passes(self):
+        cfg = TelegramTriggerConfig(allowed_users=["alice"], allowed_user_ids=[12345])
+        assert self._should_allow(cfg, "alice", 99999) is True
+
+    def test_telegram_union_user_id_passes(self):
+        cfg = TelegramTriggerConfig(allowed_users=["alice"], allowed_user_ids=[12345])
+        assert self._should_allow(cfg, "bob", 12345) is True
+
+    def test_telegram_union_neither_rejects(self):
+        cfg = TelegramTriggerConfig(allowed_users=["alice"], allowed_user_ids=[12345])
+        assert self._should_allow(cfg, "bob", 99999) is False
+
+    def test_telegram_user_without_username_allowed_by_id(self):
+        cfg = TelegramTriggerConfig(allowed_user_ids=[12345])
+        assert self._should_allow(cfg, None, 12345) is True
+
+
+class TestDiscordFiltering:
+    """Unit tests for the Discord _check_discord_access helper."""
+
+    @staticmethod
+    def _check(**kwargs):
+        from initrunner.triggers.discord import _check_discord_access
+
+        defaults = {
+            "is_dm": False,
+            "author_roles": set(),
+            "author_id": "100",
+            "channel_id": "999",
+            "allowed_channels": set(),
+            "allowed_roles": set(),
+            "allowed_user_ids": set(),
+        }
+        defaults.update(kwargs)
+        return _check_discord_access(**defaults)  # type: ignore[invalid-argument-type]
+
+    def test_discord_allows_all_when_no_filters(self):
+        assert self._check() is True
+
+    def test_discord_role_only_allows_matching_role(self):
+        assert self._check(allowed_roles={"Admin"}, author_roles={"Admin", "@everyone"}) is True
+
+    def test_discord_role_only_rejects_wrong_role(self):
+        assert self._check(allowed_roles={"Admin"}, author_roles={"Member", "@everyone"}) is False
+
+    def test_discord_role_only_denies_dm(self):
+        assert self._check(is_dm=True, allowed_roles={"Admin"}) is False
+
+    def test_discord_user_id_allows_matching_id(self):
+        assert self._check(allowed_user_ids={"123"}, author_id="123") is True
+
+    def test_discord_user_id_rejects_wrong_id(self):
+        assert self._check(allowed_user_ids={"123"}, author_id="456") is False
+
+    def test_discord_user_id_allows_dm(self):
+        assert self._check(is_dm=True, allowed_user_ids={"123"}, author_id="123") is True
+
+    def test_discord_user_id_rejects_dm_wrong_id(self):
+        assert self._check(is_dm=True, allowed_user_ids={"123"}, author_id="456") is False
+
+    def test_discord_role_or_id_guild_role_passes(self):
+        assert (
+            self._check(
+                allowed_roles={"Admin"},
+                allowed_user_ids={"123"},
+                author_roles={"Admin"},
+                author_id="456",
+            )
+            is True
+        )
+
+    def test_discord_role_or_id_guild_id_passes(self):
+        assert (
+            self._check(
+                allowed_roles={"Admin"},
+                allowed_user_ids={"123"},
+                author_roles={"Member"},
+                author_id="123",
+            )
+            is True
+        )
+
+    def test_discord_role_or_id_dm_id_passes(self):
+        assert (
+            self._check(
+                is_dm=True,
+                allowed_roles={"Admin"},
+                allowed_user_ids={"123"},
+                author_id="123",
+            )
+            is True
+        )
+
+    def test_discord_role_or_id_dm_no_id_rejects(self):
+        assert (
+            self._check(
+                is_dm=True,
+                allowed_roles={"Admin"},
+                allowed_user_ids={"123"},
+                author_id="456",
+            )
+            is False
+        )
+
+    def test_discord_channel_ids_guild_allowed(self):
+        assert self._check(allowed_channels={"999"}, channel_id="999") is True
+
+    def test_discord_channel_ids_guild_rejected(self):
+        assert self._check(allowed_channels={"999"}, channel_id="888") is False
+
+    def test_discord_channel_ids_dm_not_affected(self):
+        assert self._check(is_dm=True, allowed_channels={"999"}, channel_id="888") is True

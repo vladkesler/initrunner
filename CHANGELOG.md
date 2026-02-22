@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-22
+
+### Added
+- Persistent memory for `initrunner chat` — enabled by default, remembers facts across sessions. Use `--no-memory` to disable
+- `--ingest PATH` flag (repeatable) for zero-config document Q&A — runs ingestion pipeline before REPL, auto-handles embedding model changes
+- `--resume` flag to load previous session history with auto-recall of relevant memories
+- Tool search auto-enabled in ephemeral chat — tools behind on-demand discovery to reduce context overhead
+- `resolve_func_names()` in tool registry for extracting function names for tool search `always_available` list
+- `auto_recall_for_resume()` in `memory_ops` — embeds recent messages, searches memory store, returns formatted recalled context
+- Chat configuration file (`~/.initrunner/chat.yaml`) for persistent chat defaults (provider, model, tool_profile, ingest paths, personality, name)
+- `allowed_user_ids` for Telegram trigger — user-ID-based access control with union semantics (match either username or user ID); user ID included in trigger event metadata
+- `allowed_user_ids` for Discord trigger — user-ID-based access control that works in both guild channels and DMs; extracted `_check_discord_access()` helper for testability
+- `--allowed-users` and `--allowed-user-ids` CLI flags for `chat --telegram` and `chat --discord`
+- Security headers middleware: X-Frame-Options, X-Content-Type-Options, Content-Security-Policy on all API responses
+- Open redirect prevention in auth UI — rejects absolute URLs, protocol-relative URLs, javascript: schemes
+- Regex complexity validation with 1s timeout to detect catastrophic backtracking in guardrail patterns
+
+### Changed
+- `_INITRUNNER_DIR` changed from module-level constant to `_get_initrunner_dir()` function for testability
+- Tool profile envvar checking now runs for all profiles to maximize tool search discoverability
+- Tool search system prompt more assertive: "ALWAYS call `search_tools`" when no visible tool fits
+- `ephemeral_context()` now registers/unregisters memory stores for proper multiplexing
+- Auth cookies support configurable `secure` flag for HTTPS deployments
+- Discord access control refactored into standalone `_check_discord_access()` function
+- Telegram and Discord trigger `summary()` methods now include user IDs and roles
+
+### Fixed
+- Memory tools no longer crash with collection lock conflicts when called during ephemeral chat runs
+- Removed stale `# type: ignore` comments from extractors and telegram trigger
+
+### Documentation
+- README: new "Try It" section, "Define Agent Roles in YAML" heading, "Zero config to start" bullet
+- Expanded chat, memory, ingestion, tool-search, RAG quickstart, Telegram, and Discord docs for zero-config features
+- Telegram and Discord docs updated with `allowed_user_ids` configuration, union semantics, and security recommendations
+- New "Chat Configuration File" section in chat docs
+
 ## [1.3.0] - 2026-02-22
 
 ### Breaking Changes

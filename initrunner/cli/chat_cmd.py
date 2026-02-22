@@ -147,9 +147,9 @@ def chat(
         typer.Option("--discord", help="Launch as Discord bot"),
     ] = False,
     tool_profile: Annotated[
-        str,
+        str | None,
         typer.Option("--tool-profile", help="Tool profile: minimal, all, none"),
-    ] = "minimal",
+    ] = None,
     audit_db: Annotated[
         Path | None,
         typer.Option(help="Path to audit database"),
@@ -166,10 +166,31 @@ def chat(
         bool,
         typer.Option(help="Disable audit logging"),
     ] = False,
+    memory: Annotated[
+        bool | None,
+        typer.Option("--memory/--no-memory", help="Enable/disable persistent memory"),
+    ] = None,
+    resume: Annotated[
+        bool,
+        typer.Option("--resume", help="Resume previous session"),
+    ] = False,
+    ingest: Annotated[
+        list[str] | None,
+        typer.Option("--ingest", help="Paths/globs to ingest for RAG (repeatable)"),
+    ] = None,
+    allowed_users: Annotated[
+        list[str] | None,
+        typer.Option("--allowed-users", help="Restrict bot to these usernames (repeatable)"),
+    ] = None,
+    allowed_user_ids: Annotated[
+        list[str] | None,
+        typer.Option("--allowed-user-ids", help="Restrict bot to these user IDs (repeatable)"),
+    ] = None,
 ) -> None:
     """Start an ephemeral chat REPL or launch a bot.
 
-    Without arguments, auto-detects your API provider and starts a REPL.
+    Without arguments, auto-detects your API provider and starts a REPL
+    with persistent memory enabled by default.
     With a role file, loads it and starts interactive mode.
     With --telegram or --discord, launches a bot daemon.
     """
@@ -181,6 +202,40 @@ def chat(
         console.print("[red]Error:[/red] --telegram and --discord are mutually exclusive.")
         raise typer.Exit(1)
 
+    if (allowed_users or allowed_user_ids) and not (telegram or discord):
+        console.print(
+            "[red]Error:[/red] --allowed-users/--allowed-user-ids requires --telegram or --discord."
+        )
+        raise typer.Exit(1)
+
+    # Load chat.yaml config (only applied when no role_file)
+    from initrunner.cli.chat_config import load_chat_config
+
+    chat_cfg = load_chat_config()
+
+    # Apply chat.yaml defaults for ephemeral modes (no role_file)
+    if role_file is None:
+        if tool_profile is None:
+            tool_profile = chat_cfg.tool_profile
+        if memory is None:
+            memory = chat_cfg.memory
+        if provider is None and chat_cfg.provider:
+            provider = chat_cfg.provider
+        if model is None and chat_cfg.model:
+            model = chat_cfg.model
+        if extra_tools is None and chat_cfg.tools:
+            extra_tools = chat_cfg.tools
+        if ingest is None and chat_cfg.ingest:
+            from initrunner.cli.chat_config import resolve_ingest_paths
+
+            ingest = resolve_ingest_paths(chat_cfg.ingest)
+    else:
+        # With role file: chat.yaml not applied
+        if tool_profile is None:
+            tool_profile = "minimal"
+        if memory is None:
+            memory = True
+
     if tool_profile not in _TOOL_PROFILES:
         console.print(
             f"[red]Error:[/red] Unknown tool profile '{tool_profile}'. "
@@ -191,23 +246,40 @@ def chat(
     # Compute profile tools early so we can filter for missing env vars.
     profile_tools = list(_TOOL_PROFILES.get(tool_profile, []))
 
-    if tool_profile == "all":
-        from initrunner.services.providers import _load_env
+    # Always load env and check for missing tool env vars so tool search
+    # can register every available tool (minus those with unset credentials).
+    from initrunner.services.providers import _load_env
 
-        _load_env()
-        skip = _check_profile_envs()
-        if skip:
-            profile_tools = [t for t in profile_tools if t["type"] not in skip]
+    _load_env()
+    skip = _check_profile_envs()
+    if skip and tool_profile == "all":
+        profile_tools = [t for t in profile_tools if t["type"] not in skip]
 
     # Resolve extra tools (validates names and env vars, exits on error)
     extras = _resolve_extra_tools(extra_tools) if extra_tools else []
 
+    # Build the full set of ephemeral tools (skipping those with missing env)
+    # and determine which ones the agent sees immediately (always_available).
+    all_ephemeral_tools = [
+        t for t in _EPHEMERAL_EXTRA_TOOL_DEFAULTS.values() if t["type"] not in skip
+    ]
+    from initrunner.agent.tools.registry import resolve_func_names
+
+    always_available = resolve_func_names(_merge_tools(profile_tools, extras))
+
     bot_mode = "telegram" if telegram else "discord" if discord else None
+
+    # Resolve ephemeral name from chat.yaml (only for non-role-file modes)
+    ephemeral_name = chat_cfg.name if role_file is None else "ephemeral-chat"
+    # Resolve personality from chat.yaml
+    personality = chat_cfg.personality if role_file is None else None
 
     if role_file is not None:
         if extras:
             console.print("[dim]Info:[/dim] --tools ignored because role file defines tools.")
-        _chat_with_role_file(role_file, prompt=prompt, audit_db=audit_db, no_audit=no_audit)
+        _chat_with_role_file(
+            role_file, prompt=prompt, audit_db=audit_db, no_audit=no_audit, resume=resume
+        )
     elif bot_mode is not None:
         _chat_bot_mode(
             bot_mode,
@@ -215,8 +287,16 @@ def chat(
             model=model,
             profile_tools=profile_tools,
             extra_tools=extras,
+            all_tools=all_ephemeral_tools,
+            always_available=always_available,
             audit_db=audit_db,
             no_audit=no_audit,
+            with_memory=memory if memory is not None else True,
+            ingest_paths=ingest,
+            name=ephemeral_name,
+            personality=personality,
+            allowed_users=allowed_users,
+            allowed_user_ids=allowed_user_ids,
         )
     else:
         _chat_auto_detect(
@@ -225,8 +305,15 @@ def chat(
             prompt=prompt,
             profile_tools=profile_tools,
             extra_tools=extras,
+            all_tools=all_ephemeral_tools,
+            always_available=always_available,
             audit_db=audit_db,
             no_audit=no_audit,
+            with_memory=memory if memory is not None else True,
+            resume=resume,
+            ingest_paths=ingest,
+            name=ephemeral_name,
+            personality=personality,
         )
 
 
@@ -236,6 +323,7 @@ def _chat_with_role_file(
     prompt: str | None,
     audit_db: Path | None,
     no_audit: bool,
+    resume: bool = False,
 ) -> None:
     """Mode A: chat with an existing role.yaml file."""
     from initrunner.cli._helpers import command_context
@@ -257,6 +345,7 @@ def _chat_with_role_file(
             audit_logger=audit_logger,
             message_history=message_history,
             memory_store=memory_store,
+            resume=resume,
         )
 
 
@@ -267,8 +356,15 @@ def _chat_auto_detect(
     prompt: str | None,
     profile_tools: list[dict],
     extra_tools: list[dict],
+    all_tools: list[dict],
+    always_available: list[str],
     audit_db: Path | None,
     no_audit: bool,
+    with_memory: bool = True,
+    resume: bool = False,
+    ingest_paths: list[str] | None = None,
+    name: str = "ephemeral-chat",
+    personality: str | None = None,
 ) -> None:
     """Mode B: auto-detect provider, build ephemeral role, start REPL."""
     from initrunner.agent.loader import build_agent
@@ -299,13 +395,50 @@ def _chat_auto_detect(
 
     from initrunner.services.providers import build_ephemeral_role
 
-    tools = _merge_tools(profile_tools, extra_tools)
-    role = build_ephemeral_role(prov, mod, tools=tools if tools else None)
+    # Build memory config
+    memory_config = None
+    if with_memory:
+        from initrunner.agent.schema.memory import MemoryConfig
+
+        memory_config = MemoryConfig()
+
+    # Build ingest config
+    ingest_config = None
+    if ingest_paths:
+        from initrunner.agent.schema.ingestion import IngestConfig
+
+        ingest_config = IngestConfig(sources=ingest_paths)
+
+    from initrunner.agent.schema.role import ToolSearchConfig
+
+    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
+
+    build_kwargs: dict = {
+        "name": name,
+        "tools": all_tools if all_tools else None,
+        "memory": memory_config,
+        "ingest": ingest_config,
+        "tool_search": tool_search,
+    }
+    if personality:
+        build_kwargs["system_prompt"] = (
+            personality + "\n"
+            "Never ask clarifying questions — answer directly with your best take. "
+            "Keep responses concise."
+        )
+
+    role = build_ephemeral_role(prov, mod, **build_kwargs)
     agent = build_agent(role)
 
     console.print(f"[dim]Using {prov}:{mod}[/dim]")
 
-    with ephemeral_context(role, agent, audit_db=audit_db, no_audit=no_audit) as (
+    # Run ingestion if configured
+    if ingest_config is not None:
+        _run_ephemeral_ingest(role, prov)
+
+    with ephemeral_context(
+        role, agent, audit_db=audit_db, no_audit=no_audit, with_memory=with_memory
+    ) as (
         role,
         agent,
         audit_logger,
@@ -321,6 +454,51 @@ def _chat_auto_detect(
             audit_logger=audit_logger,
             message_history=message_history,
             memory_store=memory_store,
+            resume=resume,
+        )
+
+
+def _run_ephemeral_ingest(role, provider: str) -> None:
+    """Run ingestion for ephemeral chat mode. Auto-forces on model change."""
+    from initrunner.ingestion.pipeline import run_ingest
+
+    assert role.spec.ingest is not None
+    resource_limits = role.spec.security.resources
+
+    try:
+        with console.status("[dim]Ingesting documents...[/dim]"):
+            stats = run_ingest(
+                role.spec.ingest,
+                role.metadata.name,
+                provider=provider,
+                base_dir=Path.cwd(),
+                max_file_size_mb=resource_limits.max_file_size_mb,
+                max_total_ingest_mb=resource_limits.max_total_ingest_mb,
+            )
+    except Exception as exc:
+        from initrunner.stores.base import EmbeddingModelChangedError
+
+        if isinstance(exc, EmbeddingModelChangedError):
+            console.print("[dim]Embedding model changed — re-ingesting...[/dim]")
+            with console.status("[dim]Re-ingesting documents...[/dim]"):
+                stats = run_ingest(
+                    role.spec.ingest,
+                    role.metadata.name,
+                    provider=provider,
+                    base_dir=Path.cwd(),
+                    force=True,
+                    max_file_size_mb=resource_limits.max_file_size_mb,
+                    max_total_ingest_mb=resource_limits.max_total_ingest_mb,
+                )
+        else:
+            raise
+
+    total = stats.new + stats.updated + stats.skipped + stats.errored
+    if total > 0:
+        console.print(
+            f"[dim]Ingested {total} file(s): "
+            f"{stats.new} new, {stats.updated} updated, "
+            f"{stats.skipped} unchanged, {stats.errored} error(s)[/dim]"
         )
 
 
@@ -348,8 +526,16 @@ def _chat_bot_mode(
     model: str | None,
     profile_tools: list[dict],
     extra_tools: list[dict],
+    all_tools: list[dict],
+    always_available: list[str],
     audit_db: Path | None,
     no_audit: bool,
+    with_memory: bool = True,
+    ingest_paths: list[str] | None = None,
+    name: str = "ephemeral-chat",
+    personality: str | None = None,
+    allowed_users: list[str] | None = None,
+    allowed_user_ids: list[str] | None = None,
 ) -> None:
     """Mode C: launch a Telegram or Discord bot daemon."""
     from initrunner.services.providers import (
@@ -395,8 +581,14 @@ def _chat_bot_mode(
     trigger: dict = {"type": platform, "autonomous": True}
     if platform == "telegram":
         trigger["token_env"] = "TELEGRAM_BOT_TOKEN"
+        if allowed_users:
+            trigger["allowed_users"] = allowed_users
+        if allowed_user_ids:
+            trigger["allowed_user_ids"] = [int(uid) for uid in allowed_user_ids]
     else:
         trigger["token_env"] = "DISCORD_BOT_TOKEN"
+        if allowed_user_ids:
+            trigger["allowed_user_ids"] = allowed_user_ids
 
     from initrunner.agent.schema.triggers import (
         DiscordTriggerConfig,
@@ -409,28 +601,80 @@ def _chat_bot_mode(
         else DiscordTriggerConfig(**trigger)
     )
 
-    tools = _merge_tools(profile_tools, extra_tools)
-    role = build_ephemeral_role(
-        prov,
-        mod,
-        name=f"{platform}-bot",
-        system_prompt=_get_bot_prompt(platform),
-        triggers=[trigger_config],
-        tools=tools if tools else None,
-        autonomy={},  # Default AutonomyConfig values
-        guardrails={"daemon_daily_token_budget": 200_000},
-    )
+    # Build memory config
+    memory_config = None
+    if with_memory:
+        from initrunner.agent.schema.memory import MemoryConfig
+
+        memory_config = MemoryConfig()
+
+    # Build ingest config
+    ingest_config = None
+    if ingest_paths:
+        from initrunner.agent.schema.ingestion import IngestConfig
+
+        ingest_config = IngestConfig(sources=ingest_paths)
+
+    bot_name = name if name != "ephemeral-chat" else f"{platform}-bot"
+
+    from initrunner.agent.schema.role import ToolSearchConfig
+
+    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
+
+    build_kwargs: dict = {
+        "name": bot_name,
+        "system_prompt": _get_bot_prompt(platform)
+        if not personality
+        else (
+            personality + "\n"
+            "Never ask clarifying questions — answer directly with your best take. "
+            "Keep responses concise."
+        ),
+        "triggers": [trigger_config],
+        "tools": all_tools if all_tools else None,
+        "autonomy": {},
+        "guardrails": {"daemon_daily_token_budget": 200_000},
+        "memory": memory_config,
+        "ingest": ingest_config,
+        "tool_search": tool_search,
+    }
+
+    role = build_ephemeral_role(prov, mod, **build_kwargs)
 
     from initrunner.agent.loader import build_agent
-    from initrunner.cli._helpers import create_audit_logger
+    from initrunner.cli._helpers import create_audit_logger, resolve_memory_path
     from initrunner.runner import run_daemon
 
     agent = build_agent(role)
     audit_logger = create_audit_logger(audit_db, no_audit)
 
+    # Run ingestion if configured
+    if ingest_config is not None:
+        _run_ephemeral_ingest(role, prov)
+
+    # Set up memory store for daemon
+    memory_store = None
+    mem_path = None
+    if with_memory and role.spec.memory is not None:
+        from initrunner.stores.factory import (
+            create_memory_store,
+            register_memory_store,
+        )
+
+        mem_path = resolve_memory_path(role)
+        memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
+        register_memory_store(mem_path, memory_store)
+        agent._memory_store = memory_store  # type: ignore[attr-defined]
+
     try:
-        run_daemon(agent, role, audit_logger=audit_logger)
+        run_daemon(agent, role, audit_logger=audit_logger, memory_store=memory_store)
     finally:
+        if memory_store is not None:
+            from initrunner.stores.factory import unregister_memory_store
+
+            assert mem_path is not None
+            unregister_memory_store(mem_path)
+            memory_store.close()
         if audit_logger is not None:
             audit_logger.close()
 
@@ -439,7 +683,7 @@ def _verify_bot_sdk(platform: str) -> None:
     """Verify the platform SDK is importable, with install hint on failure."""
     if platform == "telegram":
         try:
-            import telegram  # type: ignore[import-not-found]  # noqa: F401
+            import telegram  # noqa: F401
         except ImportError:
             console.print(
                 "[red]Error:[/red] python-telegram-bot is not installed.\n"

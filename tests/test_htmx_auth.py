@@ -53,6 +53,48 @@ class TestLoginFlow:
         assert resp.headers["location"] == "/audit"
 
 
+class TestOpenRedirectPrevention:
+    def test_absolute_url_rejected(self):
+        c = _client()
+        resp = c.post(
+            "/login",
+            data={"api_key": _TEST_KEY, "next": "https://evil.com"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/roles"
+
+    def test_protocol_relative_url_rejected(self):
+        c = _client()
+        resp = c.post(
+            "/login",
+            data={"api_key": _TEST_KEY, "next": "//evil.com"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/roles"
+
+    def test_javascript_scheme_rejected(self):
+        c = _client()
+        resp = c.post(
+            "/login",
+            data={"api_key": _TEST_KEY, "next": "javascript:alert(1)"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/roles"
+
+    def test_safe_relative_path_allowed(self):
+        c = _client()
+        resp = c.post(
+            "/login",
+            data={"api_key": _TEST_KEY, "next": "/audit"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "/audit"
+
+
 class TestLogout:
     def test_logout_clears_cookie(self):
         c = _client()

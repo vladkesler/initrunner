@@ -188,9 +188,10 @@ def build_agent(
         toolsets.append(build_tool_search_toolset(manager))
         prepare_tools = manager.prepare_tools_callback
         system_prompt += (
-            "\n\nYou have a large number of tools available, but most are hidden "
-            "to save context. Use the `search_tools` function to discover tools "
-            "by describing what you need (e.g. 'send slack message', 'read csv'). "
+            "\n\nIMPORTANT: You have many tools available beyond what you currently see. "
+            "Most are hidden to save context. When no visible tool obviously fits the "
+            "user's request, ALWAYS call `search_tools` before saying you cannot do "
+            "something (e.g. search_tools('send slack message'), search_tools('read csv')). "
             "Matching tools will then become available for you to call."
         )
 
@@ -220,6 +221,15 @@ def build_agent(
         def _procedural_context() -> str:
             store = getattr(agent, "_memory_store", None)
             return build_memory_system_prompt(role, store=store)
+
+    # Register dynamic system prompt for resume context injection.
+    # The ``_resume_context`` attribute is set by interactive.py when
+    # resuming a session with memory available.
+    if role.spec.memory is not None:
+
+        @agent.system_prompt
+        def _resume_context() -> str:
+            return getattr(agent, "_resume_context", "")
 
     return agent
 

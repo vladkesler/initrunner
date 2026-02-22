@@ -27,8 +27,8 @@ class TelegramTrigger(TriggerBase):
     def _run(self) -> None:
         import asyncio
 
-        from telegram import Update  # type: ignore[import-not-found]
-        from telegram.ext import (  # type: ignore[import-not-found]
+        from telegram import Update
+        from telegram.ext import (
             ApplicationBuilder,
             MessageHandler,
             filters,
@@ -41,7 +41,8 @@ class TelegramTrigger(TriggerBase):
             )
             return
 
-        allowed = set(self._config.allowed_users)
+        allowed_usernames = set(self._config.allowed_users)
+        allowed_user_ids = set(self._config.allowed_user_ids)
         loop: asyncio.AbstractEventLoop | None = None
 
         async def on_message(update: Update, context) -> None:
@@ -49,10 +50,21 @@ class TelegramTrigger(TriggerBase):
                 return
             user = update.effective_user
             username = user.username if user else None
-            if allowed and username not in allowed:
-                return
+            user_id = user.id if user else None
 
-            chat_id = update.effective_chat.id  # type: ignore[union-attribute]
+            # Union semantics: match either username OR user ID. Empty = allow all.
+            if allowed_usernames or allowed_user_ids:
+                username_ok = bool(allowed_usernames and username in allowed_usernames)
+                user_id_ok = bool(allowed_user_ids and user_id in allowed_user_ids)
+                if not username_ok and not user_id_ok:
+                    _logger.debug(
+                        "Telegram message rejected: user=%s (id=%s) not in allowed list",
+                        username,
+                        user_id,
+                    )
+                    return
+
+            chat_id = update.effective_chat.id
             bot = context.bot
 
             def reply_fn(text: str) -> None:
@@ -69,7 +81,11 @@ class TelegramTrigger(TriggerBase):
             event = TriggerEvent(
                 trigger_type="telegram",
                 prompt=prompt,
-                metadata={"user": username or "", "chat_id": str(chat_id)},
+                metadata={
+                    "user": username or "",
+                    "chat_id": str(chat_id),
+                    "user_id": str(user_id or ""),
+                },
                 reply_fn=reply_fn,
             )
             await asyncio.get_running_loop().run_in_executor(None, self._callback, event)
@@ -81,12 +97,12 @@ class TelegramTrigger(TriggerBase):
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
             await app.initialize()
             await app.start()
-            await app.updater.start_polling()  # type: ignore[union-attribute]
+            await app.updater.start_polling()
             _logger.info("Telegram bot started polling")
             # Block until stop signal
             while not self._stop_event.is_set():
                 await asyncio.sleep(1)
-            await app.updater.stop()  # type: ignore[union-attribute]
+            await app.updater.stop()
             await app.stop()
             await app.shutdown()
 

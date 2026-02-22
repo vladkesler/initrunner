@@ -48,6 +48,37 @@ initrunner chat -p "Explain Python decorators"
 initrunner chat --provider anthropic --model claude-sonnet-4-5-20250929
 ```
 
+### Persistent memory (enabled by default)
+
+Memory is on by default — the agent remembers facts across sessions:
+
+```bash
+# Memory is automatic — just chat
+initrunner chat
+> Remember that I prefer dark mode
+> What are my preferences?   # agent recalls "dark mode" from memory
+
+# Resume a previous session
+initrunner chat --resume
+
+# Disable memory for a clean session
+initrunner chat --no-memory
+```
+
+### Document Q&A without a role file
+
+Ingest documents into the chat session for instant RAG:
+
+```bash
+# Chat with your docs
+initrunner chat --ingest "./docs/**/*.md"
+
+# Combine with tools
+initrunner chat --ingest ./notes/ --tool-profile all
+```
+
+The `--ingest` flag runs the ingestion pipeline before the REPL starts and auto-registers the `search_documents` tool.
+
 ## Role-Based Chat
 
 Load an existing role file with tools, memory, guardrails, and everything else defined in YAML:
@@ -56,12 +87,15 @@ Load an existing role file with tools, memory, guardrails, and everything else d
 initrunner chat role.yaml
 ```
 
-When a role file is provided, the `--provider`, `--model`, `--tool-profile`, and `--tools` flags are ignored — the role file controls everything.
+When a role file is provided, the `--provider`, `--model`, `--tool-profile`, and `--tools` flags are ignored — the role file controls everything. The `--resume` flag works with role files too.
 
 Combine with `-p` to send an initial prompt then continue interactively:
 
 ```bash
 initrunner chat role.yaml -p "Summarize today's news"
+
+# Resume a previous role-based session
+initrunner chat role.yaml --resume
 ```
 
 ## One-Command Bot Mode
@@ -76,6 +110,10 @@ initrunner chat --telegram
 # Discord bot
 export DISCORD_BOT_TOKEN="your-token"
 initrunner chat --discord
+
+# Restrict access by user ID
+initrunner chat --telegram --allowed-user-ids 123456789
+initrunner chat --discord --allowed-user-ids 111222333444555666
 ```
 
 ### What it creates
@@ -94,9 +132,9 @@ Bot mode builds an ephemeral role in memory with:
 |---|---|---|
 | **Config** | Auto-generated in memory | Full YAML with all options |
 | **Tools** | Tool profile + `--tools` extras | Any tools from the registry |
-| **Access control** | None — responds to everyone | `allowed_users` / `allowed_roles` |
+| **Access control** | `--allowed-users` / `--allowed-user-ids` flags | `allowed_users` / `allowed_roles` / `allowed_user_ids` |
 | **Token budget** | 200k daily (hardcoded) | Configurable in guardrails |
-| **Memory** | None | Configurable |
+| **Memory** | Enabled by default (opt out with `--no-memory`) | Configurable |
 | **Use case** | Prototyping, personal use | Production, shared bots |
 
 **Recommendation:** Use `chat --telegram` / `--discord` for quick testing. Switch to a `role.yaml` with `initrunner daemon` for anything shared or long-running.
@@ -113,8 +151,13 @@ Synopsis: `initrunner chat [role.yaml] [OPTIONS]`
 | `-p, --prompt TEXT` | Send a prompt then enter REPL (or launch bot with this context). |
 | `--telegram` | Launch as a Telegram bot daemon. |
 | `--discord` | Launch as a Discord bot daemon. |
+| `--allowed-users TEXT` | Restrict bot to these usernames (repeatable). Requires `--telegram` or `--discord`. |
+| `--allowed-user-ids TEXT` | Restrict bot to these user IDs (repeatable). Requires `--telegram` or `--discord`. |
 | `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default), `all`. |
 | `--tools TEXT` | Extra tool types to enable (repeatable). See [Extra Tools](#extra-tools). |
+| `--memory / --no-memory` | Enable or disable persistent memory. Default: enabled. |
+| `--resume` | Resume the previous session (loads history + recalls relevant memories). |
+| `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable). |
 | `--list-tools` | List available extra tool types and exit. |
 | `--audit-db PATH` | Path to audit database. |
 | `--no-audit` | Disable audit logging. |
@@ -136,6 +179,14 @@ initrunner chat --tool-profile none
 # Chat with every available tool
 SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner chat --tool-profile all
 ```
+
+### Tool search
+
+All profiles automatically include the `search_tools` meta-tool, which lets the agent discover tools that aren't in its always-visible set. This means even `--tool-profile none` isn't completely unarmed — the agent can find and use tools on demand when the conversation requires them.
+
+With `minimal`, the agent always sees datetime and web_reader tools; if the user asks something that needs `python` or `git`, the agent calls `search_tools()` to discover them. With `all`, every tool is always-visible so search has nothing to discover.
+
+For details on how tool search works, see [Tool Search](../core/tool-search.md).
 
 ## Extra Tools
 
@@ -211,6 +262,87 @@ initrunner chat --provider openai --model gpt-4o
 
 Environment variables can also be set in `~/.initrunner/.env` or a `.env` file in the current directory. Running `initrunner setup` writes the provider key there automatically.
 
+## Persistent Memory
+
+Memory is enabled by default in ephemeral chat mode. The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools automatically.
+
+### How it works
+
+1. The agent's system prompt includes instructions to use `recall()` before answering and `remember()` when the user shares preferences or important facts.
+2. Memories are stored at `~/.initrunner/memory/<agent-name>.zvec` (default name: `ephemeral-chat`).
+3. On `--resume`, the previous session's message history is loaded **and** relevant long-term memories are automatically recalled and injected into the system prompt.
+
+### Disable memory
+
+```bash
+initrunner chat --no-memory
+```
+
+No memory tools are registered, no files are written to `~/.initrunner/memory/`.
+
+### Resume a session
+
+```bash
+initrunner chat --resume
+```
+
+This loads the most recent session (up to `max_resume_messages` messages) and performs an auto-recall: it searches long-term memory for context relevant to the resumed conversation and injects matching memories into the system prompt.
+
+## Document Q&A (`--ingest`)
+
+Ingest files directly from the command line for instant RAG:
+
+```bash
+initrunner chat --ingest "./docs/**/*.md"
+initrunner chat --ingest ./notes/ --ingest ./data/*.csv
+```
+
+The ingestion pipeline runs before the REPL starts:
+- Files are extracted, chunked, embedded, and stored in a local vector database.
+- A `search_documents` tool is auto-registered on the agent.
+- If the embedding model has changed since a previous ingestion, the store is automatically wiped and re-ingested (no interactive prompt in ephemeral mode).
+
+Paths are resolved relative to the current working directory.
+
+## Chat Configuration File
+
+Create `~/.initrunner/chat.yaml` to set persistent defaults for ephemeral chat:
+
+```yaml
+# ~/.initrunner/chat.yaml
+provider: anthropic            # default provider (overridden by --provider)
+model: claude-sonnet-4-5-20250929  # default model (overridden by --model)
+tool_profile: all              # default tool profile (overridden by --tool-profile)
+tools: [git, shell]            # extra tools always enabled
+memory: true                   # enable persistent memory (default: true)
+ingest:                        # auto-ingest these paths every session
+  - "./my-docs/**/*.md"
+personality: |                 # custom system prompt personality
+  You are a friendly coding assistant.
+name: my-assistant             # agent name (affects memory store path)
+```
+
+### Precedence
+
+CLI flags always win over `chat.yaml` values, which win over built-in defaults:
+
+```
+CLI flags  >  chat.yaml  >  built-in defaults
+```
+
+### When chat.yaml is ignored
+
+`chat.yaml` is **not** applied when a role file is provided:
+
+```bash
+initrunner chat role.yaml   # chat.yaml ignored — role file controls everything
+initrunner chat              # chat.yaml applied
+```
+
+### Ingest path resolution
+
+Relative paths in `chat.yaml`'s `ingest` list are resolved from the config file directory (`~/.initrunner/`), not the current working directory. CLI `--ingest` paths are resolved from the current directory.
+
 ## Security
 
 - **Tool profiles control agent capabilities.** The `none` profile is safest for untrusted environments. The `minimal` default gives time and web reading. The `all` profile enables every tool including `python`, `shell`, and `slack`.
@@ -218,7 +350,7 @@ Environment variables can also be set in `~/.initrunner/.env` or a `.env` file i
 - **`--tools shell` grants shell access.** Like `python`, the `shell` tool allows arbitrary command execution. Only use it in trusted, local contexts.
 - **`--tools slack` sends messages to a real channel.** The Slack webhook URL is a secret — treat it like a token. Anyone with the URL can post to the channel.
 - **Bot tokens are secrets.** Store them in environment variables or `.env` files. Never commit tokens to version control. Anyone with the token can impersonate the bot.
-- **Ephemeral bots respond to everyone.** Bot mode does not set `allowed_users` or `allowed_roles` by default. Every user who can message the bot can use it — and invoke its tools.
+- **Ephemeral bots respond to everyone by default.** Use `--allowed-users` or `--allowed-user-ids` to restrict access. Without these flags, every user who can message the bot can use it — and invoke its tools.
 - **Daily token budget is a cost firewall.** Bot mode defaults to 200,000 tokens/day. For production, tune `daemon_daily_token_budget` in your role's `spec.guardrails` to match expected usage and budget.
 - **Use `role.yaml` for production bots.** The `chat` shortcuts are designed for prototyping and personal use. Production bots should use a role file with explicit access control, token budgets, and tool configuration.
 
@@ -264,6 +396,14 @@ Error: Tool 'slack' requires SLACK_WEBHOOK_URL.
 ```
 
 Some tools require environment variables. Set the variable before running the command.
+
+### --allowed-users/--allowed-user-ids requires --telegram or --discord
+
+```
+Error: --allowed-users/--allowed-user-ids requires --telegram or --discord.
+```
+
+The `--allowed-users` and `--allowed-user-ids` flags only apply to bot mode. Add `--telegram` or `--discord` to use them.
 
 ### --telegram and --discord are mutually exclusive
 

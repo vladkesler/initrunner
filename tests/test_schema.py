@@ -411,6 +411,58 @@ class TestTriggerConfig:
         with pytest.raises(ValidationError):
             RoleDefinition.model_validate(data)
 
+    def test_telegram_trigger_allowed_user_ids_default(self):
+        tc = TelegramTriggerConfig()
+        assert tc.allowed_user_ids == []
+
+    def test_telegram_trigger_allowed_user_ids_custom(self):
+        tc = TelegramTriggerConfig(allowed_user_ids=[123456, 789012])
+        assert tc.allowed_user_ids == [123456, 789012]
+
+    def test_telegram_trigger_summary_with_user_ids(self):
+        tc = TelegramTriggerConfig(allowed_user_ids=[123456])
+        s = tc.summary()
+        assert "user_ids=123456" in s
+
+    def test_telegram_trigger_summary_both(self):
+        tc = TelegramTriggerConfig(allowed_users=["alice"], allowed_user_ids=[123456])
+        s = tc.summary()
+        assert "users=alice" in s
+        assert "user_ids=123456" in s
+
+    def test_discord_trigger_allowed_user_ids_default(self):
+        tc = DiscordTriggerConfig()
+        assert tc.allowed_user_ids == []
+
+    def test_discord_trigger_allowed_user_ids_custom(self):
+        tc = DiscordTriggerConfig(allowed_user_ids=["111222333"])
+        assert tc.allowed_user_ids == ["111222333"]
+
+    def test_discord_trigger_summary_with_user_ids(self):
+        tc = DiscordTriggerConfig(allowed_user_ids=["111222333"])
+        s = tc.summary()
+        assert "user_ids=111222333" in s
+
+    def test_discord_trigger_summary_roles_and_user_ids(self):
+        tc = DiscordTriggerConfig(allowed_roles=["Admin"], allowed_user_ids=["111222333"])
+        s = tc.summary()
+        assert "roles=Admin" in s
+        assert "user_ids=111222333" in s
+
+    def test_telegram_discriminated_union_with_user_ids(self):
+        data = _minimal_role_data()
+        data["spec"]["triggers"] = [{"type": "telegram", "allowed_user_ids": [123456]}]
+        role = RoleDefinition.model_validate(data)
+        assert isinstance(role.spec.triggers[0], TelegramTriggerConfig)
+        assert role.spec.triggers[0].allowed_user_ids == [123456]
+
+    def test_discord_discriminated_union_with_user_ids(self):
+        data = _minimal_role_data()
+        data["spec"]["triggers"] = [{"type": "discord", "allowed_user_ids": ["111222333"]}]
+        role = RoleDefinition.model_validate(data)
+        assert isinstance(role.spec.triggers[0], DiscordTriggerConfig)
+        assert role.spec.triggers[0].allowed_user_ids == ["111222333"]
+
 
 class TestIngestConfig:
     def test_minimal_ingest(self):

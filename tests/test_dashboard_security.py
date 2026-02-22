@@ -209,6 +209,49 @@ class TestWebSocketAuth:
 # ---------------------------------------------------------------------------
 
 
+class TestSecurityHeaders:
+    def test_html_page_has_security_headers(self):
+        c = _client(api_key=None)
+        resp = c.get("/roles")
+        assert resp.headers["X-Frame-Options"] == "DENY"
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert "default-src 'self'" in resp.headers["Content-Security-Policy"]
+
+    def test_api_response_has_security_headers(self):
+        c = _client(api_key=None)
+        resp = c.get("/api/health")
+        assert resp.headers["X-Frame-Options"] == "DENY"
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert "default-src 'self'" in resp.headers["Content-Security-Policy"]
+
+    def test_csp_allows_unsafe_inline(self):
+        c = _client(api_key=None)
+        resp = c.get("/roles")
+        csp = resp.headers["Content-Security-Policy"]
+        assert "'unsafe-inline'" in csp
+
+
+class TestSecureCookies:
+    def test_secure_flag_set_when_enabled(self):
+        app = create_dashboard_app(api_key=_TEST_KEY, secure_cookies=True)
+        app.state.auth_nonce = "nonce-123"
+        c = TestClient(app)
+        resp = c.get("/auth/session?nonce=nonce-123", follow_redirects=False)
+        cookie_header = resp.headers.get("set-cookie", "")
+        assert "secure" in cookie_header.lower()
+
+    def test_secure_flag_absent_by_default(self):
+        app = create_dashboard_app(api_key=_TEST_KEY)
+        app.state.auth_nonce = "nonce-456"
+        c = TestClient(app)
+        resp = c.get("/auth/session?nonce=nonce-456", follow_redirects=False)
+        cookie_header = resp.headers.get("set-cookie", "")
+        # "secure" should not appear as a standalone flag
+        # (it may appear as part of other words, so check carefully)
+        parts = [p.strip().lower() for p in cookie_header.split(";")]
+        assert "secure" not in parts
+
+
 class TestAppState:
     def test_api_key_stored_on_app_state(self):
         app = _make_app(api_key="my-key")

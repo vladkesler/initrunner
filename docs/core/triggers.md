@@ -252,6 +252,7 @@ triggers:
   - type: telegram
     token_env: TELEGRAM_BOT_TOKEN      # default
     allowed_users: ["alice", "bob"]    # empty = allow all
+    allowed_user_ids: [123456789]      # empty = allow all
     prompt_template: "{message}"       # default
 ```
 
@@ -261,21 +262,22 @@ triggers:
 |-------|------|---------|-------------|
 | `token_env` | `str` | `"TELEGRAM_BOT_TOKEN"` | Environment variable holding the bot token. |
 | `allowed_users` | `list[str]` | `[]` | Telegram usernames allowed to interact. Empty list allows all users. |
+| `allowed_user_ids` | `list[int]` | `[]` | Telegram user IDs allowed to interact. Empty list allows all users. Prefer over `allowed_users` — usernames are mutable, IDs are not. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
 
 ### Behavior
 
 - Uses long-polling (outbound HTTPS) — no ports opened, no webhooks to configure.
 - Only text messages are processed (commands like `/start` are ignored).
-- When `allowed_users` is set, messages from other users are silently dropped.
+- When `allowed_users` or `allowed_user_ids` is set, messages from unmatched users are silently dropped. Access is granted if the user matches **either** field (union semantics).
 - The agent's response is sent back to the originating chat, automatically chunked to Telegram's 4096-character message limit.
 - Chunks are split at newline boundaries when possible for cleaner output.
-- The trigger event includes `metadata: {"user": "...", "chat_id": "..."}`.
+- The trigger event includes `metadata: {"user": "...", "chat_id": "...", "user_id": "..."}`.
 
 ### Security
 
 - **Store the bot token securely** — use environment variables or a secrets manager, never commit it to version control.
-- **Use `allowed_users`** to restrict access to known usernames. An empty list means anyone can interact with the bot.
+- **Prefer `allowed_user_ids`** over `allowed_users` — user IDs are immutable. Use `allowed_users` as a convenience alongside IDs.
 - **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.
 
 ## Discord Trigger
@@ -296,6 +298,7 @@ triggers:
     token_env: DISCORD_BOT_TOKEN       # default
     channel_ids: ["123456789"]         # empty = all channels
     allowed_roles: ["Admin", "Bot-User"]  # empty = all roles
+    allowed_user_ids: ["111222333444555666"]  # empty = allow all
     prompt_template: "{message}"       # default
 ```
 
@@ -304,22 +307,26 @@ triggers:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `token_env` | `str` | `"DISCORD_BOT_TOKEN"` | Environment variable holding the bot token. |
-| `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty list allows all channels. |
-| `allowed_roles` | `list[str]` | `[]` | Role names required to interact. Empty list allows all users. |
+| `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty list allows all channels. Only applies to guild channels — DMs are not affected. |
+| `allowed_roles` | `list[str]` | `[]` | Role names required to interact. Empty list allows all users. DMs are denied when only roles are configured. |
+| `allowed_user_ids` | `list[str]` | `[]` | Discord user IDs allowed to interact. Works in both guild channels and DMs. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
 
 ### Behavior
 
 - Uses WebSocket client connection — outbound only, no ports opened.
 - Responds to **DMs** and **@mentions** only (not every message in every channel).
-- When `allowed_roles` is set, **DMs are denied** (DMs have no role context, so allowing them would bypass the role filter).
+- When only `allowed_roles` is set, **DMs are denied** (DMs have no role context). When `allowed_user_ids` is also set, a user ID match grants DM access.
+- `channel_ids` restricts guild channels only — DMs are not affected by the channel filter.
+- When both `allowed_roles` and `allowed_user_ids` are set, access is granted if either matches (union semantics for guild messages; user ID only for DMs).
 - Bot @mention is stripped from the message content using the mention ID pattern for robustness.
 - The agent's response is sent back to the originating channel, automatically chunked to Discord's 2000-character message limit.
-- The trigger event includes `metadata: {"user": "...", "channel_id": "..."}`.
+- The trigger event includes `metadata: {"user": "...", "channel_id": "...", "user_id": "..."}`.
 
 ### Security
 
 - **Store the bot token securely** — never commit it to version control.
-- **Use `channel_ids`** to restrict the bot to specific channels.
-- **Use `allowed_roles`** to restrict access to specific server roles. Note that DMs are automatically denied when roles are configured.
+- **Use `allowed_user_ids`** for reliable per-user access control that works in both guild channels and DMs.
+- **Use `channel_ids`** to restrict the bot to specific guild channels.
+- **Use `allowed_roles`** to restrict access to specific server roles. Note that DMs are automatically denied when only roles are configured.
 - **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.

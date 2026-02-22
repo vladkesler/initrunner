@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent._paths import _INITRUNNER_DIR, validate_path_within
+from initrunner.agent._paths import _get_initrunner_dir, validate_path_within
 from initrunner.stores.base import StoreConfig
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ def _validate_store_path(db_path: object, restrict: bool) -> None:
 
     if not restrict:
         return
-    err, _ = validate_path_within(Path(str(db_path)), [_INITRUNNER_DIR])
+    err, _ = validate_path_within(Path(str(db_path)), [_get_initrunner_dir()])
     if err:
         raise ValueError(
             f"Store path '{db_path}' is outside ~/.initrunner/. "

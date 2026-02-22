@@ -81,6 +81,16 @@ initrunner ingest role.yaml
 initrunner run role.yaml -i
 ```
 
+## Quick Alternative: `chat --ingest`
+
+Skip the role file entirely — ingest and chat in one command:
+
+```bash
+initrunner chat --ingest "./my-docs/**/*.md"
+```
+
+This auto-detects your provider, runs ingestion, and starts a REPL with `search_documents` available. See [Chat & Quick Start](chat.md#document-qa---ingest) for details.
+
 ## What's Next
 
 - [RAG Patterns & Guide](../core/rag-guide.md) — common patterns, source filtering, auto re-indexing

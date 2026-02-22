@@ -295,7 +295,7 @@ class TestChatBotMode:
         assert "filesystem" in tool_types
 
     def test_bot_tool_profile_none(self, clean_env, monkeypatch):
-        """--tool-profile none gives no tools."""
+        """--tool-profile none registers all tools but always_available is empty."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
 
@@ -312,7 +312,11 @@ class TestChatBotMode:
         assert result.exit_code == 0
         call_args = mock_daemon.call_args
         role = call_args[0][1]
-        assert role.spec.tools == []
+        # All ephemeral tools are registered for tool search discovery
+        assert len(role.spec.tools) > 0
+        # But none are always_available (profile "none")
+        assert role.spec.tool_search.enabled is True
+        assert role.spec.tool_search.always_available == []
 
     def test_bot_no_api_key(self, clean_env, monkeypatch):
         """Bot mode without API key should fail."""
@@ -512,3 +516,140 @@ class TestNoArgsCallback:
             result = runner.invoke(app, [])
 
         assert result.exit_code == 0
+
+
+class TestAlwaysAvailableResolution:
+    """Verify always_available contains function names, not type names."""
+
+    def test_always_available_uses_func_names(self, clean_env, monkeypatch):
+        """With --tool-profile minimal, always_available has function names."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+        with (
+            _MOCK_LOAD_ENV,
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_interactive"),
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--tool-profile", "minimal"])
+
+        assert result.exit_code == 0
+        role = mock_build.call_args[0][0]
+        aa = role.spec.tool_search.always_available
+        # Must contain function names, not type names
+        assert "current_time" in aa
+        assert "parse_date" in aa
+        assert "fetch_page" in aa
+
+    def test_always_available_no_type_names(self, clean_env, monkeypatch):
+        """Regression: no entry in always_available matches a type name."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+        from initrunner.cli.chat_cmd import _EPHEMERAL_EXTRA_TOOL_DEFAULTS
+
+        with (
+            _MOCK_LOAD_ENV,
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_interactive"),
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--tool-profile", "minimal"])
+
+        assert result.exit_code == 0
+        role = mock_build.call_args[0][0]
+        aa = set(role.spec.tool_search.always_available)
+        type_names = set(_EPHEMERAL_EXTRA_TOOL_DEFAULTS.keys())
+        overlap = aa & type_names
+        assert aa.isdisjoint(type_names), f"Type names leaked: {overlap}"
+
+    def test_main_fallback_always_available(self, clean_env, monkeypatch):
+        """TTY fallback path produces function names in always_available."""
+        from initrunner.agent.tools.registry import resolve_func_names
+        from initrunner.cli.chat_cmd import _TOOL_PROFILES
+
+        profile_tools = list(_TOOL_PROFILES["minimal"])
+        aa = resolve_func_names(profile_tools)
+        # Must contain function names from the minimal profile
+        assert "current_time" in aa
+        assert "parse_date" in aa
+        assert "fetch_page" in aa
+        # Must NOT contain type names
+        assert "datetime" not in aa
+        assert "web_reader" not in aa
+
+    def test_every_ephemeral_type_resolves(self):
+        """Every tool type in _EPHEMERAL_EXTRA_TOOL_DEFAULTS resolves to at least one func."""
+        from initrunner.agent.tools.registry import resolve_func_names
+        from initrunner.cli.chat_cmd import _EPHEMERAL_EXTRA_TOOL_DEFAULTS
+
+        for type_name, cfg in _EPHEMERAL_EXTRA_TOOL_DEFAULTS.items():
+            names = resolve_func_names([cfg])
+            assert len(names) >= 1, f"Tool type '{type_name}' resolved to zero function names"
+
+
+class TestAllowedUsersFlags:
+    def test_telegram_allowed_users_passed(self, clean_env, monkeypatch):
+        """--allowed-users alice sets trigger.allowed_users for Telegram."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
+
+        mock_telegram = MagicMock()
+        with (
+            _MOCK_LOAD_ENV,
+            patch.dict("sys.modules", {"telegram": mock_telegram}),
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_daemon") as mock_daemon,
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--telegram", "--allowed-users", "alice"])
+
+        assert result.exit_code == 0
+        role = mock_daemon.call_args[0][1]
+        trigger = role.spec.triggers[0]
+        assert trigger.allowed_users == ["alice"]
+
+    def test_telegram_allowed_user_ids_passed(self, clean_env, monkeypatch):
+        """--allowed-user-ids 12345 sets trigger.allowed_user_ids for Telegram."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
+
+        mock_telegram = MagicMock()
+        with (
+            _MOCK_LOAD_ENV,
+            patch.dict("sys.modules", {"telegram": mock_telegram}),
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_daemon") as mock_daemon,
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--telegram", "--allowed-user-ids", "12345"])
+
+        assert result.exit_code == 0
+        role = mock_daemon.call_args[0][1]
+        trigger = role.spec.triggers[0]
+        assert trigger.allowed_user_ids == [12345]
+
+    def test_discord_allowed_user_ids_passed(self, clean_env, monkeypatch):
+        """--allowed-user-ids 111222 sets trigger.allowed_user_ids for Discord."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("DISCORD_BOT_TOKEN", "token-abc")
+
+        mock_discord = MagicMock()
+        with (
+            _MOCK_LOAD_ENV,
+            patch.dict("sys.modules", {"discord": mock_discord}),
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_daemon") as mock_daemon,
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--discord", "--allowed-user-ids", "111222"])
+
+        assert result.exit_code == 0
+        role = mock_daemon.call_args[0][1]
+        trigger = role.spec.triggers[0]
+        assert trigger.allowed_user_ids == ["111222"]
+
+    def test_allowed_users_without_bot_mode_errors(self, clean_env):
+        """--allowed-users without --telegram/--discord fails."""
+        result = runner.invoke(app, ["chat", "--allowed-users", "alice"])
+        assert result.exit_code == 1
+        assert "--allowed-users/--allowed-user-ids requires" in result.output

@@ -13,6 +13,28 @@ from initrunner.agent._subprocess import (
 )
 
 
+def _probe_regex_safe(pattern: str, timeout: float = 1.0) -> bool:
+    """Return True if *pattern* completes a probe match within *timeout* seconds.
+
+    Uses a subprocess to avoid GIL issues with CPython's ``re`` module.
+    """
+    import multiprocessing
+
+    def _run(pat: str) -> None:
+        import re as _re
+
+        _re.search(_re.compile(pat), "a" * 100 + "!")
+
+    proc = multiprocessing.Process(target=_run, args=(pattern,))
+    proc.start()
+    proc.join(timeout=timeout)
+    if proc.is_alive():
+        proc.kill()
+        proc.join()
+        return False
+    return proc.exitcode == 0
+
+
 class ContentPolicy(BaseModel):
     profanity_filter: bool = False
     blocked_input_patterns: list[str] = []
@@ -35,6 +57,13 @@ class ContentPolicy(BaseModel):
                 re.compile(pattern)
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern '{pattern}': {e}") from e
+
+            # Probe for catastrophic backtracking using a subprocess
+            # (threads don't work because re holds the GIL)
+            if not _probe_regex_safe(pattern):
+                raise ValueError(
+                    f"Regex pattern '{pattern}' is too complex (timed out on probe input)"
+                )
         return v
 
 

@@ -1,4 +1,4 @@
-# InitRunner — AI Agent Roles as YAML
+# InitRunner
 
 <p align="center"><img src="https://raw.githubusercontent.com/vladkesler/initrunner/main/assets/mascot.png" alt="InitRunner mascot" width="300"></p>
 
@@ -19,15 +19,30 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**Define AI agent roles in YAML and run them anywhere — CLI, API server, or autonomous daemon.**
+**An AI assistant in your terminal with persistent memory, document search, and extensible tools. Scale up to autonomous agents, bots, and pipelines when you need them.**
 
-Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and multimodal input — all config, not code. Deploy it as a CLI tool, a cron-driven daemon, a Telegram or Discord bot, or an OpenAI-compatible API. Compose agents into pipelines. RAG and long-term memory come batteries-included. Manage, chat, and audit from a web dashboard or terminal TUI.
+`initrunner chat` gives you an AI assistant that remembers across sessions, searches your documents, and discovers tools on demand. No config needed. When you need more, define agent roles in YAML: custom tools, triggers, guardrails, multimodal input, and RAG. Deploy as CLI tools, Telegram/Discord bots, cron daemons, or serve them as OpenAI-compatible APIs. Compose agents into pipelines. Manage and audit from a web dashboard or TUI.
 
-> **v1.3.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.4.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
-## See It in Action
+## Try It
 
-A code reviewer that can read your files and inspect git history — one YAML file:
+```bash
+initrunner chat                    # start chatting, memory on by default
+>>> remember that the deploy key is in 1Password
+Noted.
+
+>>> what's the deploy key location?
+You told me the deploy key is in 1Password.
+
+>>> /quit
+```
+
+No YAML, no config files. Add `--ingest ./docs/` to search your documents, or `--tool-profile all` to enable every built-in tool.
+
+## Define Agent Roles in YAML
+
+When you need more control, define an agent as a YAML file:
 
 ```yaml
 apiVersion: initrunner/v1
@@ -61,11 +76,13 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 
 ## Why InitRunner
 
-**Config, not code** — Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 16 built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, and more) work out of the box. Need a custom tool? One file, one decorator.
+**Zero config to start.** `initrunner chat` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
 
-**Version-control your agents** — Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
+**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 16 built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, and more) work out of the box. Need a custom tool? One file, one decorator.
 
-**Prototype to production** — Same YAML runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. No rewrite when you're ready to deploy.
+**Version-control your agents.** Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
+
+**Prototype to production.** Same YAML runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. No rewrite when you're ready to deploy.
 
 ## Quickstart
 
@@ -99,14 +116,17 @@ You can also store keys in `~/.initrunner/.env` — it's loaded automatically by
 ### 3. Start chatting
 
 ```bash
-initrunner chat                        # zero-config chat (auto-detects provider)
+initrunner chat                        # zero-config chat with persistent memory
+initrunner chat --resume               # resume previous session + auto-recall memories
+initrunner chat --ingest ./docs/       # chat with your documents (instant RAG)
 initrunner chat --tool-profile all     # chat with all tools enabled
 initrunner chat --telegram             # one-command Telegram bot
+initrunner chat --telegram --allowed-user-ids 123456789  # restrict access
 initrunner run role.yaml -p "Hello!"   # one-shot prompt
 initrunner run role.yaml -i            # interactive REPL
 ```
 
-See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
+Memory is on by default — the agent remembers facts across sessions. Use `--no-memory` to disable. See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
 
 ## From Simple to Powerful
 

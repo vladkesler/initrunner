@@ -91,6 +91,7 @@ def make_auth_dispatch(
     allow_cookie: bool = False,
     cookie_name: str = "initrunner_token",
     login_redirect: str | None = None,
+    secure_cookies: bool = False,
 ):
     """Bearer token auth with timing-safe comparison.
 
@@ -119,7 +120,7 @@ def make_auth_dispatch(
                         value=token,
                         httponly=True,
                         samesite="strict",
-                        secure=False,
+                        secure=secure_cookies,
                     )
                     return resp
             if not token and allow_cookie:
@@ -181,6 +182,28 @@ def make_body_size_dispatch(
                     except ValueError:
                         pass
         return await call_next(request)
+
+    return dispatch
+
+
+def make_security_headers_dispatch():
+    """Add standard security headers to all responses."""
+
+    _HEADERS = {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'"
+        ),
+    }
+
+    async def dispatch(request: Request, call_next) -> Response:
+        response = await call_next(request)
+        for key, value in _HEADERS.items():
+            response.headers[key] = value
+        return response
 
     return dispatch
 

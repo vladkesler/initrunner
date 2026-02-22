@@ -1,5 +1,7 @@
 """Tests for the _compat module."""
 
+from unittest.mock import patch
+
 import pytest
 
 from initrunner._compat import require_ingest, require_provider
@@ -24,5 +26,6 @@ class TestRequireProvider:
 
 class TestRequireIngest:
     def test_missing_package_gives_hint(self):
-        with pytest.raises(RuntimeError, match="pip install initrunner\\[ingest\\]"):
-            require_ingest("pymupdf4llm")
+        with patch("importlib.import_module", side_effect=ImportError("not installed")):
+            with pytest.raises(RuntimeError, match="pip install initrunner\\[ingest\\]"):
+                require_ingest("pymupdf4llm")

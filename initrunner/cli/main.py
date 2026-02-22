@@ -87,8 +87,13 @@ def main(
         )
     else:
         # TTY + configured: start ephemeral chat
-        from initrunner.cli.chat_cmd import _chat_auto_detect
-        from initrunner.services.providers import detect_bot_tokens
+        from initrunner.cli.chat_cmd import (
+            _EPHEMERAL_EXTRA_TOOL_DEFAULTS,
+            _TOOL_PROFILES,
+            _chat_auto_detect,
+            _check_profile_envs,
+        )
+        from initrunner.services.providers import _load_env, detect_bot_tokens
 
         tokens = detect_bot_tokens()
         if tokens:
@@ -98,12 +103,23 @@ def main(
                 f"Use --telegram or --discord to launch a bot.[/dim]"
             )
 
+        _load_env()
+        skip = _check_profile_envs()
+        profile_tools = list(_TOOL_PROFILES["minimal"])
+        all_tools = [t for t in _EPHEMERAL_EXTRA_TOOL_DEFAULTS.values() if t["type"] not in skip]
+
+        from initrunner.agent.tools.registry import resolve_func_names
+
+        always_available = resolve_func_names(profile_tools)
+
         _chat_auto_detect(
             provider=None,
             model=None,
             prompt=None,
-            profile_tools=[{"type": "datetime"}, {"type": "web_reader"}],
+            profile_tools=profile_tools,
             extra_tools=[],
+            all_tools=all_tools,
+            always_available=always_available,
             audit_db=None,
             no_audit=False,
         )

@@ -36,6 +36,14 @@ def run_interactive(
         if loaded:
             message_history = loaded
             console.print(f"[dim]Resumed session with {len(loaded)} messages.[/dim]")
+
+            if memory_store is not None:
+                from initrunner.agent.memory_ops import auto_recall_for_resume
+
+                context = auto_recall_for_resume(role, loaded, store=memory_store)
+                if context:
+                    agent._resume_context = context  # type: ignore[attr-defined]
+                    console.print("[dim]Loaded relevant memories from previous sessions.[/dim]")
         else:
             console.print("[dim]No previous session found.[/dim]")
 

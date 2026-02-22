@@ -73,7 +73,7 @@ To test without creating a role file:
 initrunner chat --telegram
 ```
 
-Auto-detects your provider, launches an ephemeral bot with minimal tools. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
+Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
 
 ```bash
 # Enable every available tool
@@ -81,6 +81,13 @@ SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner chat --telegram --too
 
 # Or add specific extras
 initrunner chat --telegram --tools git --tools shell
+
+# Restrict to specific users by ID (recommended) or username
+initrunner chat --telegram --allowed-user-ids 123456789
+initrunner chat --telegram --allowed-users alice --allowed-users bob
+
+# Disable memory if not needed
+initrunner chat --telegram --no-memory
 ```
 
 Run `initrunner chat --list-tools` to see all available tool types.
@@ -101,6 +108,7 @@ All options go under `spec.triggers[].`:
 |-------|------|---------|-------------|
 | `token_env` | `str` | `"TELEGRAM_BOT_TOKEN"` | Environment variable holding the bot token. |
 | `allowed_users` | `list[str]` | `[]` | Telegram usernames allowed to interact. Empty = allow everyone. |
+| `allowed_user_ids` | `list[int]` | `[]` | Telegram user IDs allowed to interact. Empty = allow everyone. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's text. |
 
 Example with restrictions:
@@ -110,6 +118,7 @@ triggers:
   - type: telegram
     token_env: TELEGRAM_BOT_TOKEN
     allowed_users: ["alice", "bob"]
+    allowed_user_ids: [123456789, 987654321]
     prompt_template: "Telegram user asks: {message}"
 ```
 
@@ -117,7 +126,9 @@ triggers:
 
 By default the bot responds to **anyone** who messages it. Lock it down before making it available to others:
 
-- **Use `allowed_users`** to restrict access to specific Telegram usernames. When the list is non-empty, messages from all other users are silently ignored.
+- **Prefer `allowed_user_ids` over `allowed_users`.** Usernames are mutable — users can change them at any time. User IDs are permanent. Find your ID via [@userinfobot](https://t.me/userinfobot).
+- **Use `allowed_users`** to restrict access by Telegram username. When either `allowed_users` or `allowed_user_ids` is non-empty, messages from unmatched users are silently ignored.
+- **Union semantics:** access is granted if the user matches **either** `allowed_users` or `allowed_user_ids`. Both fields can be set together.
 - **Set `daemon_daily_token_budget`** in guardrails to cap API costs. Without a budget, a public bot can run up unlimited charges.
 - **Keep the bot token secret.** Anyone with the token can impersonate the bot. Never commit it to version control — use environment variables or a secrets manager.
 - If the bot has access to tools (filesystem, HTTP, shell, etc.), **restrict to known users only**. An unrestricted bot lets strangers invoke those tools through the bot.

@@ -94,7 +94,7 @@ To test without creating a role file:
 initrunner chat --discord
 ```
 
-Auto-detects your provider, launches an ephemeral bot with minimal tools. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
+Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
 
 ```bash
 # Enable every available tool
@@ -102,6 +102,12 @@ SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner chat --discord --tool
 
 # Or add specific extras
 initrunner chat --discord --tools git --tools shell
+
+# Restrict to specific users by ID (works in DMs and guild channels)
+initrunner chat --discord --allowed-user-ids 111222333444555666
+
+# Disable memory if not needed
+initrunner chat --discord --no-memory
 ```
 
 Run `initrunner chat --list-tools` to see all available tool types.
@@ -121,8 +127,9 @@ All options go under `spec.triggers[].`:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `token_env` | `str` | `"DISCORD_BOT_TOKEN"` | Environment variable holding the bot token. |
-| `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty = all channels. |
-| `allowed_roles` | `list[str]` | `[]` | Server role names required to interact. Empty = allow everyone. |
+| `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty = all channels. Does not affect DMs. |
+| `allowed_roles` | `list[str]` | `[]` | Server role names required to interact. Empty = allow everyone. DMs are denied when only roles are configured. |
+| `allowed_user_ids` | `list[str]` | `[]` | Discord user IDs allowed to interact. Works in both guild channels and DMs. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's text. |
 
 Example with restrictions:
@@ -133,6 +140,7 @@ triggers:
     token_env: DISCORD_BOT_TOKEN
     channel_ids: ["1234567890"]
     allowed_roles: ["Bot-User", "Admin"]
+    allowed_user_ids: ["111222333444555666"]
     prompt_template: "Discord user asks: {message}"
 ```
 
@@ -140,8 +148,9 @@ triggers:
 
 By default the bot responds to **anyone** who can DM it or @mention it in a shared server. This means every member of every server the bot is in can use it. Lock it down before making it available to others:
 
-- **Always set `allowed_roles`** in production to restrict access to specific server roles. When roles are configured, DMs are automatically denied (DMs have no role context).
-- **Use `channel_ids`** to confine the bot to specific channels instead of responding server-wide.
+- **Use `allowed_user_ids`** for the most reliable access control. Unlike `allowed_roles`, user IDs work in DMs. When both `allowed_roles` and `allowed_user_ids` are set, a user ID match grants DM access. To find a user ID: enable Developer Mode (Settings > Advanced), right-click a user > Copy User ID.
+- **Use `allowed_roles`** to restrict access to specific server roles. When only roles are configured, DMs are automatically denied (DMs have no role context).
+- **Use `channel_ids`** to confine the bot to specific guild channels. `channel_ids` restricts guild channels only — DMs are not affected.
 - **Set `daemon_daily_token_budget`** in guardrails to cap API costs. Without a budget, a public bot can run up unlimited charges.
 - **Keep the bot token secret.** Anyone with the token can impersonate the bot. Never commit it to version control — use environment variables or a secrets manager.
 - **Limit server exposure.** If the bot has access to tools (filesystem, HTTP, shell, etc.), keep it in a private server only. A public server lets strangers invoke those tools through the bot.

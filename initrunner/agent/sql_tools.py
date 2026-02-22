@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner.agent._paths import _INITRUNNER_DIR, validate_path_within
+from initrunner.agent._paths import _get_initrunner_dir, validate_path_within
 from initrunner.agent._truncate import truncate_output
 from initrunner.agent.schema.tools import SqlToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
@@ -36,7 +36,7 @@ def _validate_db_path(db_path: Path, role_dir: Path | None) -> str | None:
     """Validate that the database path is under role_dir or ~/.initrunner/."""
     if str(db_path) == ":memory:":
         return None
-    allowed_roots = [_INITRUNNER_DIR]
+    allowed_roots = [_get_initrunner_dir()]
     if role_dir is not None:
         allowed_roots.append(role_dir)
     err, _ = validate_path_within(db_path, allowed_roots)

@@ -40,6 +40,7 @@ def create_dashboard_app(
     api_key: str | None = None,
     role_dirs: list[Path] | None = None,
     audit_logger: AuditLogger | None = None,
+    secure_cookies: bool = False,
 ) -> FastAPI:
     """Build the FastAPI application with all dashboard routes.
 
@@ -56,6 +57,7 @@ def create_dashboard_app(
         make_auth_dispatch,
         make_body_size_dispatch,
         make_rate_limit_dispatch,
+        make_security_headers_dispatch,
         prefix_predicate,
     )
     from initrunner.server.rate_limiter import TokenBucketRateLimiter
@@ -73,6 +75,7 @@ def create_dashboard_app(
     app.state.role_dirs = role_dirs or [Path(".")]
     app.state.role_registry = RoleRegistry(app.state.role_dirs)
     app.state.audit_logger = audit_logger
+    app.state.secure_cookies = secure_cookies
 
     # Jinja2 templates
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
@@ -132,8 +135,15 @@ def create_dashboard_app(
                 allow_query_param=True,
                 allow_cookie=True,
                 login_redirect="/login",
+                secure_cookies=secure_cookies,
             ),
         )
+
+    # Security headers on all responses
+    app.add_middleware(
+        BaseHTTPMiddleware,  # type: ignore[arg-type]
+        dispatch=make_security_headers_dispatch(),
+    )
 
     # --- Mount static files ---
     if _STATIC_DIR.is_dir():
@@ -171,11 +181,17 @@ def run_dashboard(
     api_key: str | None = None,
     role_dirs: list[Path] | None = None,
     audit_logger: AuditLogger | None = None,
+    secure_cookies: bool = False,
 ) -> None:
     """Start the dashboard server (blocking)."""
     import uvicorn
 
-    app = create_dashboard_app(api_key=api_key, role_dirs=role_dirs, audit_logger=audit_logger)
+    app = create_dashboard_app(
+        api_key=api_key,
+        role_dirs=role_dirs,
+        audit_logger=audit_logger,
+        secure_cookies=secure_cookies,
+    )
 
     if open_browser:
         import threading

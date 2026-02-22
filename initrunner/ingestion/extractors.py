@@ -80,7 +80,7 @@ def _extract_pdf(path: Path) -> str:
     from initrunner._compat import require_ingest
 
     require_ingest("pymupdf4llm")
-    import pymupdf4llm  # type: ignore[import-not-found]
+    import pymupdf4llm  # type: ignore[unresolved-import]
 
     return pymupdf4llm.to_markdown(str(path))
 
@@ -90,7 +90,7 @@ def _extract_docx(path: Path) -> str:
     from initrunner._compat import require_ingest
 
     require_ingest("docx")
-    import docx  # type: ignore[import-not-found]
+    import docx  # type: ignore[unresolved-import]
 
     doc = docx.Document(str(path))
     return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
@@ -108,7 +108,7 @@ def _extract_xlsx(path: Path) -> str:
     from initrunner._compat import require_ingest
 
     require_ingest("openpyxl")
-    import openpyxl  # type: ignore[import-not-found]
+    import openpyxl  # type: ignore[unresolved-import]
 
     wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
     try:

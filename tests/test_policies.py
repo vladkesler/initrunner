@@ -13,6 +13,24 @@ from initrunner.agent.policies import (
 from initrunner.agent.schema.security import ContentPolicy
 
 
+class TestRegexComplexityValidation:
+    def test_catastrophic_backtracking_rejected(self):
+        import pytest
+
+        with pytest.raises(Exception, match="too complex"):
+            ContentPolicy(blocked_input_patterns=["(a+)+$"])
+
+    def test_normal_regex_accepted(self):
+        policy = ContentPolicy(blocked_input_patterns=[r"ignore previous instructions"])
+        assert policy.blocked_input_patterns == ["ignore previous instructions"]
+
+    def test_invalid_regex_rejected(self):
+        import pytest
+
+        with pytest.raises(Exception, match="Invalid regex"):
+            ContentPolicy(blocked_input_patterns=["(unclosed"])
+
+
 class TestDefaultPolicyIsNoOp:
     def test_default_policy_passes_everything(self):
         policy = ContentPolicy()

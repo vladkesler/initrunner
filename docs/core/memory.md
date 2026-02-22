@@ -39,6 +39,32 @@ spec:
       interval: after_session
 ```
 
+### Zero-config chat memory
+
+`initrunner chat` enables memory by default — no YAML needed:
+
+```bash
+# Memory is on automatically
+initrunner chat
+
+# Resume with auto-recall of relevant memories
+initrunner chat --resume
+
+# Disable memory
+initrunner chat --no-memory
+```
+
+The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools. Memories are stored at `~/.initrunner/memory/ephemeral-chat.zvec`. Customize the agent name (and thus the memory path) via `~/.initrunner/chat.yaml`:
+
+```yaml
+# ~/.initrunner/chat.yaml
+name: my-assistant   # stored at ~/.initrunner/memory/my-assistant.zvec
+```
+
+See [Chat & Quick Start](../getting-started/chat.md) for all chat options.
+
+### Role-based config
+
 Minimal backward-compatible config still works — a bare `memory:` section with just `max_memories` enables semantic memory with defaults for all other types:
 
 ```yaml
@@ -202,6 +228,20 @@ Old sessions beyond `max_sessions` are deleted (oldest first). Pruning runs auto
 - **Daemon mode**: after each trigger execution (when memory is configured).
 
 This keeps the memory database from growing indefinitely.
+
+### Auto-Recall on Resume
+
+When `--resume` is used with memory enabled, the interactive runner automatically:
+
+1. Loads the most recent session (up to `max_resume_messages` messages).
+2. Extracts text from the last few user messages in the loaded history.
+3. Embeds a combined query from those messages.
+4. Searches the memory store for relevant semantic and episodic memories.
+5. Injects matching memories into the system prompt as a `## Recalled Memories` section.
+
+This means the agent starts the resumed session aware of both the conversation history **and** any relevant long-term memories — without the user needing to ask.
+
+Auto-recall follows a never-raises pattern: if embedding or search fails, the session resumes normally without recalled memories.
 
 ### Never-Raises Guarantee
 

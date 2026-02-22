@@ -275,6 +275,14 @@ def trigger_fields(trigger: Any) -> list[FieldSpec]:
                 FieldKind.CSV,
             )
         )
+        fields.append(
+            FieldSpec(
+                "Allowed User IDs",
+                "allowed_user_ids",
+                ", ".join(str(i) for i in trigger.allowed_user_ids),
+                FieldKind.CSV,
+            )
+        )
         fields.append(FieldSpec("Prompt Template", "prompt_template", trigger.prompt_template))
     elif isinstance(trigger, DiscordTriggerConfig):
         fields.append(FieldSpec("Token Env", "token_env", trigger.token_env))
@@ -291,6 +299,14 @@ def trigger_fields(trigger: Any) -> list[FieldSpec]:
                 "Allowed Roles",
                 "allowed_roles",
                 ", ".join(trigger.allowed_roles),
+                FieldKind.CSV,
+            )
+        )
+        fields.append(
+            FieldSpec(
+                "Allowed User IDs",
+                "allowed_user_ids",
+                ", ".join(trigger.allowed_user_ids),
                 FieldKind.CSV,
             )
         )

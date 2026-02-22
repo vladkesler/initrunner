@@ -14,6 +14,50 @@ _logger = logging.getLogger(__name__)
 _DISCORD_MAX_MESSAGE = 2000
 
 
+def _check_discord_access(
+    *,
+    is_dm: bool,
+    author_roles: set[str],
+    author_id: str,
+    channel_id: str,
+    allowed_channels: set[str],
+    allowed_roles: set[str],
+    allowed_user_ids: set[str],
+) -> bool:
+    """Return True if the message should be processed, False to drop it.
+
+    This is extracted from the on_message handler so it can be unit-tested
+    without a real Discord client.
+    """
+    user_id_passed = bool(allowed_user_ids and author_id in allowed_user_ids)
+
+    # DM handling: roles require guild context, user IDs work everywhere
+    if is_dm:
+        if allowed_roles and not allowed_user_ids:
+            # Only roles configured — DMs denied (no role context)
+            return False
+        if allowed_user_ids and not user_id_passed:
+            # User IDs configured but sender not listed
+            return False
+        # If both configured: user_id match allows DM even without role check
+        if allowed_roles and allowed_user_ids and not user_id_passed:
+            return False
+        # No identity filters at all, or user_id matched — allow
+        return True
+
+    # Channel filter — only applies to guild channels, not DMs
+    if allowed_channels and channel_id not in allowed_channels:
+        return False
+
+    # Role/user_id filter for guild messages
+    if allowed_roles or allowed_user_ids:
+        role_passed = bool(allowed_roles and (author_roles & allowed_roles))
+        if not role_passed and not user_id_passed:
+            return False
+
+    return True
+
+
 class DiscordTrigger(TriggerBase):
     """Trigger that listens for Discord messages via WebSocket client."""
 
@@ -39,6 +83,7 @@ class DiscordTrigger(TriggerBase):
 
         allowed_channels = set(self._config.channel_ids)
         allowed_roles = set(self._config.allowed_roles)
+        allowed_user_ids = set(self._config.allowed_user_ids)
         intents = discord.Intents.default()
         intents.message_content = True
         client = discord.Client(intents=intents)
@@ -54,19 +99,26 @@ class DiscordTrigger(TriggerBase):
             if not is_dm and not is_mentioned:
                 return
 
-            # When allowed_roles is set, deny DMs (no role context available)
-            if allowed_roles and is_dm:
-                return
+            # Build role set for guild members
+            author_roles: set[str] = set()
+            if isinstance(message.author, discord.Member):
+                author_roles = {r.name for r in message.author.roles}
 
-            # Channel filter
-            if allowed_channels and str(message.channel.id) not in allowed_channels:
+            if not _check_discord_access(
+                is_dm=is_dm,
+                author_roles=author_roles,
+                author_id=str(message.author.id),
+                channel_id=str(message.channel.id),
+                allowed_channels=allowed_channels,
+                allowed_roles=allowed_roles,
+                allowed_user_ids=allowed_user_ids,
+            ):
+                _logger.debug(
+                    "Discord message rejected: user=%s (id=%s)",
+                    message.author,
+                    message.author.id,
+                )
                 return
-
-            # Role filter (guild messages only — DMs already denied above when roles set)
-            if allowed_roles and isinstance(message.author, discord.Member):
-                user_roles = {r.name for r in message.author.roles}
-                if not user_roles & allowed_roles:
-                    return
 
             channel = message.channel
             loop = asyncio.get_running_loop()
@@ -92,6 +144,7 @@ class DiscordTrigger(TriggerBase):
                 metadata={
                     "user": str(message.author),
                     "channel_id": str(message.channel.id),
+                    "user_id": str(message.author.id),
                 },
                 reply_fn=reply_fn,
             )
