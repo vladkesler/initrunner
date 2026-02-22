@@ -33,6 +33,11 @@ def _validate_search_dirs(raw_dirs: str | None) -> list[Path]:
         if not d:
             continue
         p = Path(d)
+        if p.is_absolute():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Absolute paths not allowed: {d}",
+            )
         # Reject traversal components
         if ".." in p.parts:
             raise HTTPException(

@@ -44,20 +44,27 @@ class TestHealthEndpoint:
 
 
 class TestRolesEndpoint:
-    def test_list_roles_empty_dir(self, client, tmp_path):
-        resp = client.get(f"/api/roles?dirs={tmp_path}")
+    def test_list_roles_empty_dir(self, client, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        resp = client.get("/api/roles?dirs=.")
         assert resp.status_code == 200
         data = resp.json()
         assert "roles" in data
         assert isinstance(data["roles"], list)
 
-    def test_list_roles_with_valid_role(self, client, role_dir):
-        resp = client.get(f"/api/roles?dirs={role_dir}")
+    def test_list_roles_with_valid_role(self, client, role_dir, monkeypatch):
+        monkeypatch.chdir(role_dir)
+        resp = client.get("/api/roles?dirs=.")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["roles"]) == 1
         assert data["roles"][0]["name"] == "test-agent"
         assert data["roles"][0]["valid"] is True
+
+    def test_list_roles_absolute_path_rejected(self, client):
+        resp = client.get("/api/roles?dirs=/etc")
+        assert resp.status_code == 400
+        assert "Absolute paths not allowed" in resp.json()["detail"]
 
     def test_get_role_not_found(self, client):
         resp = client.get("/api/roles/nonexistent-id")

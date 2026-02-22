@@ -9,8 +9,11 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from initrunner._log import get_logger
 from initrunner.api._helpers import load_role_async, resolve_role_path
 from initrunner.api.models import IngestSourceResponse, IngestSourcesResponse
+
+logger = get_logger("api.ingest")
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
@@ -121,8 +124,10 @@ async def run_ingestion(
         except RuntimeError as e:
             # Concurrent ingestion guard
             yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
-        except Exception as e:
-            yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+        except Exception:
+            logger.exception("Ingestion failed")
+            msg = "Ingestion failed due to an internal error."
+            yield f"event: error\ndata: {json.dumps({'message': msg})}\n\n"
 
     return StreamingResponse(
         event_stream(),

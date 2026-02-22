@@ -138,6 +138,28 @@ def _resolve_dimensions(
     )
 
 
+def _esc(val: str) -> str:
+    """Escape single quotes in zvec filter values."""
+    return val.replace("'", "''")
+
+
+def _parse_memory_fields(f: dict) -> tuple[dict | None, MemoryType]:
+    """Parse metadata_json and memory_type from a zvec doc, tolerating corruption."""
+    meta_raw = f.get("metadata_json", "")
+    try:
+        meta = json.loads(meta_raw) if meta_raw else None
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("Corrupt metadata_json, defaulting to None")
+        meta = None
+    mem_type_raw = f.get("memory_type", "semantic")
+    try:
+        mem_type = MemoryType(mem_type_raw) if mem_type_raw else MemoryType.SEMANTIC
+    except ValueError:
+        logger.warning("Unknown memory_type %r, defaulting to semantic", mem_type_raw)
+        mem_type = MemoryType.SEMANTIC
+    return meta, mem_type
+
+
 def _safe_id(key: str) -> str:
     """Convert an arbitrary string (e.g. file path) to a valid zvec doc ID."""
     return hashlib.sha256(key.encode()).hexdigest()
@@ -149,8 +171,8 @@ def _release_collection(col: zvec.Collection | None) -> None:
         return
     try:
         col.flush()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to flush collection: %s", exc)
     col._obj = None
     col._querier = None
     col._schema = None
@@ -311,10 +333,10 @@ class ZvecDocumentStore(DocumentStore):
                 is_glob = "*" in source_filter or "?" in source_filter
 
                 if not is_glob:
-                    filter_expr = f"source = '{source_filter}'"
+                    filter_expr = f"source = '{_esc(source_filter)}'"
                 elif "[" not in source_filter:
                     like_pattern = _glob_to_sql_like(source_filter)
-                    filter_expr = f"source like '{like_pattern}'"
+                    filter_expr = f"source like '{_esc(like_pattern)}'"
                 else:
                     # Bracket glob: over-fetch + fnmatch post-filter
                     use_fnmatch = True
@@ -364,11 +386,11 @@ class ZvecDocumentStore(DocumentStore):
                 return 0
             # Count matching docs before deleting (delete_by_filter returns None)
             matching = self._chunks_col.query(
-                filter=f"source = '{source}'", topk=1024, output_fields=[]
+                filter=f"source = '{_esc(source)}'", topk=1024, output_fields=[]
             )
             if not matching:
                 return 0
-            self._chunks_col.delete_by_filter(filter=f"source = '{source}'")
+            self._chunks_col.delete_by_filter(filter=f"source = '{_esc(source)}'")
             return len(matching)
 
     # --- File metadata methods ---
@@ -439,7 +461,7 @@ class ZvecDocumentStore(DocumentStore):
     ) -> int:
         with self._lock:
             if self._chunks_col is not None:
-                self._chunks_col.delete_by_filter(filter=f"source = '{source}'")
+                self._chunks_col.delete_by_filter(filter=f"source = '{_esc(source)}'")
 
                 ids = self._alloc_ids(len(texts))
                 docs = [
@@ -654,7 +676,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         with self._lock:
             assert self._sessions_col is not None
             results = self._sessions_col.query(
-                filter=f"agent_name = '{agent_name}'",
+                filter=f"agent_name = '{_esc(agent_name)}'",
                 topk=1024,
                 output_fields=["timestamp", "messages_json"],
             )
@@ -669,7 +691,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         with self._lock:
             assert self._sessions_col is not None
             results = self._sessions_col.query(
-                filter=f"agent_name = '{agent_name}'",
+                filter=f"agent_name = '{_esc(agent_name)}'",
                 topk=1024,
                 output_fields=["timestamp"],
             )
@@ -685,7 +707,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         with self._lock:
             assert self._sessions_col is not None
             results = self._sessions_col.query(
-                filter=f"agent_name = '{agent_name}'",
+                filter=f"agent_name = '{_esc(agent_name)}'",
                 topk=1024,
                 output_fields=["session_id", "timestamp", "messages_json"],
             )
@@ -739,7 +761,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         with self._lock:
             assert self._sessions_col is not None
             results = self._sessions_col.query(
-                filter=f"session_id = '{session_id}' AND agent_name = '{agent_name}'",
+                filter=f"session_id = '{_esc(session_id)}' AND agent_name = '{_esc(agent_name)}'",
                 topk=1024,
                 output_fields=["timestamp", "messages_json"],
             )
@@ -753,7 +775,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         with self._lock:
             assert self._sessions_col is not None
             results = self._sessions_col.query(
-                filter=f"session_id = '{session_id}' AND agent_name = '{agent_name}'",
+                filter=f"session_id = '{_esc(session_id)}' AND agent_name = '{_esc(agent_name)}'",
                 topk=1024,
                 output_fields=[],
             )
@@ -824,7 +846,7 @@ class ZvecMemoryStore(MemoryStoreBase):
             }
 
             if memory_types is not None:
-                type_clauses = [f"memory_type = '{t}'" for t in memory_types]
+                type_clauses = [f"memory_type = '{_esc(str(t))}'" for t in memory_types]
                 kwargs["filter"] = " OR ".join(type_clauses)
 
             results = self._memories_col.query(
@@ -840,10 +862,7 @@ class ZvecMemoryStore(MemoryStoreBase):
         out: list[tuple[Memory, float]] = []
         for doc in docs:
             f = doc.fields
-            meta_raw = f.get("metadata_json", "")
-            meta = json.loads(meta_raw) if meta_raw else None
-            mem_type_raw = f.get("memory_type", "semantic")
-            mem_type = MemoryType(mem_type_raw) if mem_type_raw else MemoryType.SEMANTIC
+            meta, mem_type = _parse_memory_fields(f)
             consolidated = f.get("consolidated_at", "")
             out.append(
                 (
@@ -874,9 +893,10 @@ class ZvecMemoryStore(MemoryStoreBase):
 
             conditions: list[str] = []
             if category:
-                conditions.append(f"category = '{category}'")
+                conditions.append(f"category = '{_esc(category)}'")
             if memory_type is not None:
-                conditions.append(f"memory_type = '{memory_type}'")
+                conditions.append(f"memory_type = '{_esc(str(memory_type))}'")
+
             filter_expr = " AND ".join(conditions) if conditions else None
 
             kwargs: dict = {
@@ -898,10 +918,7 @@ class ZvecMemoryStore(MemoryStoreBase):
             memories: list[Memory] = []
             for doc in results:
                 f = doc.fields
-                meta_raw = f.get("metadata_json", "")
-                meta = json.loads(meta_raw) if meta_raw else None
-                mem_type_raw = f.get("memory_type", "semantic")
-                mem_type = MemoryType(mem_type_raw) if mem_type_raw else MemoryType.SEMANTIC
+                meta, mem_type = _parse_memory_fields(f)
                 consolidated = f.get("consolidated_at", "")
                 memories.append(
                     Memory(
@@ -926,7 +943,7 @@ class ZvecMemoryStore(MemoryStoreBase):
 
             if memory_type is not None:
                 results = self._memories_col.query(
-                    filter=f"memory_type = '{memory_type}'",
+                    filter=f"memory_type = '{_esc(str(memory_type))}'",
                     topk=1024,
                     output_fields=[],
                 )
@@ -947,7 +964,7 @@ class ZvecMemoryStore(MemoryStoreBase):
                 "output_fields": ["created_at"],
             }
             if memory_type is not None:
-                kwargs["filter"] = f"memory_type = '{memory_type}'"
+                kwargs["filter"] = f"memory_type = '{_esc(str(memory_type))}'"
 
             results = self._memories_col.query(**kwargs)
 
@@ -1002,8 +1019,7 @@ class ZvecMemoryStore(MemoryStoreBase):
                 consolidated = f.get("consolidated_at", "")
                 if consolidated:
                     continue
-                meta_raw = f.get("metadata_json", "")
-                meta = json.loads(meta_raw) if meta_raw else None
+                meta, _ = _parse_memory_fields(f)
                 unconsolidated.append(
                     Memory(
                         id=int(doc.id),

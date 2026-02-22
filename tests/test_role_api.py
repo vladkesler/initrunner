@@ -102,9 +102,10 @@ class TestCreateRole:
 
 
 class TestUpdateRole:
-    def test_update_role(self, client, role_dir):
+    def test_update_role(self, client, role_dir, monkeypatch):
         # First get the role ID
-        resp = client.get(f"/api/roles?dirs={role_dir}")
+        monkeypatch.chdir(role_dir)
+        resp = client.get("/api/roles?dirs=.")
         role_id = resp.json()["roles"][0]["id"]
 
         updated_yaml = textwrap.dedent("""\
@@ -128,8 +129,9 @@ class TestUpdateRole:
         # Verify .bak was created
         assert (role_dir / "test-agent.yaml.bak").exists()
 
-    def test_update_role_invalid_yaml(self, client, role_dir):
-        resp = client.get(f"/api/roles?dirs={role_dir}")
+    def test_update_role_invalid_yaml(self, client, role_dir, monkeypatch):
+        monkeypatch.chdir(role_dir)
+        resp = client.get("/api/roles?dirs=.")
         role_id = resp.json()["roles"][0]["id"]
 
         resp = client.put(f"/api/roles/{role_id}", json={"yaml_content": "bad: [["})
@@ -139,9 +141,10 @@ class TestUpdateRole:
         resp = client.put("/api/roles/nonexistent", json={"yaml_content": _VALID_YAML})
         assert resp.status_code == 404
 
-    def test_update_preserves_file_on_invalid(self, client, role_dir):
+    def test_update_preserves_file_on_invalid(self, client, role_dir, monkeypatch):
         """Invalid YAML should not overwrite the file."""
-        resp = client.get(f"/api/roles?dirs={role_dir}")
+        monkeypatch.chdir(role_dir)
+        resp = client.get("/api/roles?dirs=.")
         role_id = resp.json()["roles"][0]["id"]
 
         original = (role_dir / "test-agent.yaml").read_text()
