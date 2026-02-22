@@ -19,11 +19,21 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**An AI assistant in your terminal with persistent memory, document search, and extensible tools. Scale up to autonomous agents, bots, and pipelines when you need them.**
+**Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 40+ tools. Any model.**
 
-`initrunner chat` gives you an AI assistant that remembers across sessions, searches your documents, and discovers tools on demand. No config needed. When you need more, define agent roles in YAML: custom tools, triggers, guardrails, multimodal input, and RAG. Deploy as CLI tools, Telegram/Discord bots, cron daemons, or serve them as OpenAI-compatible APIs. Compose agents into pipelines. Manage and audit from a web dashboard or TUI.
+One YAML file is all it takes to go from idea to running agent — with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
 > **v1.4.1** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+
+## 30-Second Quickstart
+
+```bash
+pip install "initrunner[all]"
+export OPENAI_API_KEY=sk-...
+initrunner chat --ingest ./my-docs/
+```
+
+That's it. You have an AI agent that knows your docs and remembers across sessions.
 
 ## Try It
 
@@ -83,6 +93,26 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 **Version-control your agents.** Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
 
 **Prototype to production.** Same YAML runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. No rewrite when you're ready to deploy.
+
+## How It Compares
+
+|  | InitRunner | Build from scratch | LangChain |
+|---|---|---|---|
+| **Setup** | `pip install initrunner` + API key | Install 5-10 packages, write glue code | `pip install langchain` + adapters |
+| **Agent config** | One YAML file | Python classes + wiring | Python chains + config objects |
+| **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt — DIY | Loaders → splitters → vectorstore chain |
+| **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
+| **Model switching** | Change `model.provider` in YAML | Rewrite client code | Swap LLM class + adjust prompts |
+| **Multi-agent** | `compose.yaml` with delegation | Custom orchestration layer | Agent executor + custom routing |
+
+## What Can You Build?
+
+- **A Telegram bot that answers questions about your codebase** — point it at your repo, deploy with one flag
+- **A cron job that monitors competitors and sends daily digests** — cron trigger + web scraper + Slack sink
+- **A document Q&A agent for your team's knowledge base** — ingest PDFs and Markdown, serve as an API
+- **A code review bot triggered by new commits** — file-watch trigger + git tools + structured output
+- **A multi-agent pipeline: inbox watcher → triager → responder** — define in `compose.yaml`, run with one command
+- **A personal assistant that remembers everything** — persistent memory across sessions, no setup
 
 ## Quickstart
 
