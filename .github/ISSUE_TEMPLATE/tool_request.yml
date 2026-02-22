@@ -1,0 +1,34 @@
+name: Tool Request
+description: Request or propose a new built-in tool
+title: "[Tool] "
+labels: ["tool-request"]
+body:
+  - type: input
+    id: tool-name
+    attributes:
+      label: Tool name
+      description: Short identifier for the tool (e.g. `jira`, `slack`, `github_issues`).
+      placeholder: my_tool
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-it-does
+    attributes:
+      label: What it does
+      description: Describe what the tool should do and when an agent would use it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example-config
+    attributes:
+      label: Example config YAML
+      description: Show the desired `tools:` block in a role file.
+      render: yaml
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing alternatives
+      description: Other tools or workarounds that partially solve this today?
