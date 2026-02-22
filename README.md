@@ -25,24 +25,6 @@ Your agent is a YAML file. Its tools, knowledge base, memory, triggers, and mult
 
 > **v1.3.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
-## Table of Contents
-
-- [See It in Action](#see-it-in-action)
-- [Why InitRunner](#why-initrunner)
-- [From Simple to Powerful](#from-simple-to-powerful)
-- [Community Roles](#community-roles)
-- [Install & Quickstart](#install--quickstart)
-- [Creating Roles](#creating-roles)
-- [Docker](#docker)
-- [Core Concepts](#core-concepts)
-- [CLI Quick Reference](#cli-quick-reference)
-- [User Interfaces](#user-interfaces)
-- [Documentation](#documentation)
-- [Examples](#examples)
-- [Community & Support](#community--support)
-- [Contributing](#contributing)
-- [License](#license)
-
 ## See It in Action
 
 A code reviewer that can read your files and inspect git history — one YAML file:
@@ -70,19 +52,7 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate.
-
-Using Claude? Install the Anthropic extra and swap the model line:
-
-```bash
-pip install "initrunner[anthropic]"
-```
-
-```yaml
-model: { provider: anthropic, name: claude-opus-4-6 }
-```
-
-Or just run `initrunner chat` — no YAML needed. When you're ready, the same role file runs as a daemon, a Telegram or Discord bot, or an OpenAI-compatible API server.
+That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-opus-4-6 }`.
 
 <p align="center">
   <img src="assets/screenshot-repl.png" alt="InitRunner CLI REPL" width="700"><br>
@@ -97,43 +67,52 @@ Or just run `initrunner chat` — no YAML needed. When you're ready, the same ro
 
 **Prototype to production** — Same YAML runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. No rewrite when you're ready to deploy.
 
+## Quickstart
+
+### 1. Install
+
+```bash
+curl -fsSL https://initrunner.ai/install.sh | sh
+```
+
+Or with a package manager:
+
+```bash
+pip install "initrunner[all]"       # everything included
+pip install initrunner              # core only (OpenAI)
+uv tool install initrunner          # or with uv
+```
+
+Common extras: `anthropic` (Claude), `ingest` (PDF/DOCX), `dashboard` (web UI), `all` (everything). See [Installation docs](docs/getting-started/installation.md) for the full extras table and platform notes.
+
+### 2. Set your API key
+
+```bash
+export OPENAI_API_KEY=sk-...          # OpenAI (default)
+export ANTHROPIC_API_KEY=sk-ant-...   # Claude
+```
+
+You can also store keys in `~/.initrunner/.env` — it's loaded automatically by all commands. Environment variables set in the shell take precedence over `.env` values.
+
+> Or run `initrunner setup` — it walks through provider, key, and first role interactively, and stores the key in `~/.initrunner/.env` for you.
+
+### 3. Start chatting
+
+```bash
+initrunner chat                        # zero-config chat (auto-detects provider)
+initrunner chat --tool-profile all     # chat with all tools enabled
+initrunner chat --telegram             # one-command Telegram bot
+initrunner run role.yaml -p "Hello!"   # one-shot prompt
+initrunner run role.yaml -i            # interactive REPL
+```
+
+See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
+
 ## From Simple to Powerful
 
 Start with the code-reviewer above. Each step adds one capability — no rewrites, just add a section to your YAML.
 
-### 1. Start chatting — zero config
-
-No YAML needed. `initrunner chat` auto-detects your provider and starts an interactive session:
-
-```bash
-initrunner chat                  # auto-detects provider, starts chatting
-initrunner chat role.yaml        # chat with a specific role
-```
-
-Want a bot? One flag turns your agent into a Telegram or Discord bot:
-
-```bash
-initrunner chat --telegram       # Telegram bot (requires TELEGRAM_BOT_TOKEN)
-initrunner chat --discord        # Discord bot (requires DISCORD_BOT_TOKEN)
-```
-
-> Install the extras first: `pip install "initrunner[telegram]"` or `pip install "initrunner[discord]"` (or `[channels]` for both).
-
-Key options:
-
-```bash
-initrunner chat --tool-profile all    # enable all tools (search, Python, filesystem, git, shell, slack)
-initrunner chat --tools git --tools shell  # cherry-pick specific tools
-initrunner chat --provider anthropic  # override auto-detected provider
-initrunner chat -p "summarize this repo"  # send prompt then enter REPL
-initrunner chat --list-tools          # show available extra tools
-```
-
-> Tool profiles: `minimal` (default — datetime, web reader), `all` (every available tool), `none`. Use `--tools` to cherry-pick individual tools.
-
-See [Chat docs](docs/getting-started/chat.md) for all options.
-
-### 2. Add knowledge & memory
+### 1. Add knowledge & memory
 
 Point at your docs for RAG — a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
 
@@ -151,7 +130,9 @@ initrunner ingest role.yaml   # extract | chunk | embed | store
 initrunner run role.yaml -i --resume   # search_documents + memory ready
 ```
 
-### 3. Add skills
+See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
+
+### 2. Add skills
 
 Compose reusable bundles of tools and prompts. Each skill is a `SKILL.md` file — reference it by path:
 
@@ -162,28 +143,11 @@ spec:
     - ../skills/code-tools.md
 ```
 
-The agent inherits each skill's tools and prompt instructions automatically.
+The agent inherits each skill's tools and prompt instructions automatically. Run `initrunner init --skill my-skill` to scaffold one. See [Skills](docs/agents/skills_feature.md).
 
-A `SKILL.md` file has a YAML frontmatter block defining the tools it provides, followed by markdown guidelines the agent will follow:
+### 3. Add triggers
 
-```markdown
----
-name: my-skill
-description: What this skill does
-tools:
-  - type: web_reader
-    timeout_seconds: 15
-  - type: search
----
-Use the web_reader tool to fetch pages as markdown before answering.
-Cite URLs in your responses.
-```
-
-Run `initrunner init --skill my-skill` to scaffold one.
-
-### 4. Add triggers
-
-Turn it into a daemon that reacts to events:
+Turn it into a daemon that reacts to events — cron, file watch, webhook, Telegram, or Discord:
 
 ```yaml
 spec:
@@ -200,234 +164,72 @@ spec:
 initrunner daemon role.yaml   # runs until stopped
 ```
 
-Or connect your agent to a messaging platform — one trigger turns it into a bot:
+See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
 
-```yaml
-spec:
-  triggers:
-    - type: telegram
-      prompt_template: "{message}"
-```
+### 4. Compose agents
 
-```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-initrunner daemon role.yaml   # now a live Telegram bot
-```
-
-Discord works the same way (`type: discord` + `DISCORD_BOT_TOKEN`). See [Telegram docs](docs/getting-started/telegram.md) · [Discord docs](docs/getting-started/discord.md) for the full setup.
-
-### 5. Compose agents
-
-Orchestrate multiple agents into a pipeline. One agent's output feeds into the next:
+Orchestrate multiple agents into a pipeline — one agent's output feeds into the next:
 
 ```yaml
 apiVersion: initrunner/v1
 kind: Compose
-metadata:
-  name: email-pipeline
-  description: Multi-agent email processing pipeline
+metadata: { name: email-pipeline }
 spec:
   services:
     inbox-watcher:
       role: roles/inbox-watcher.yaml
       sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
+    triager: { role: roles/triager.yaml }
 ```
 
-```bash
-initrunner compose up pipeline.yaml
-```
+Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
-### 6. Serve as an API
+### 5. Serve as an API
 
-Turn any agent into an OpenAI-compatible endpoint. Drop-in for Open WebUI, Vercel AI SDK, or any OpenAI-compatible client:
+Turn any agent into an OpenAI-compatible endpoint — drop-in for Open WebUI, Vercel AI SDK, or any OpenAI client:
 
 ```bash
 initrunner serve support-agent.yaml --port 3000
 ```
 
-```python
-from openai import OpenAI
+See [Server docs](docs/interfaces/server.md) for client examples and Open WebUI integration.
 
-client = OpenAI(base_url="http://localhost:3000/v1", api_key="unused")
-response = client.chat.completions.create(
-    model="support-agent",
-    messages=[{"role": "user", "content": "How do I reset my password?"}],
-)
-```
+### 6. Attach files and media
 
-Or connect [Open WebUI](https://github.com/open-webui/open-webui) for a full chat interface:
+Send images, audio, video, and documents alongside your prompts:
 
 ```bash
-docker run -d --name open-webui --network host \
-  -e OPENAI_API_BASE_URL=http://127.0.0.1:3000/v1 \
-  -e OPENAI_API_KEY=unused \
-  -v open-webui:/app/backend/data \
-  ghcr.io/open-webui/open-webui:main
-# Open http://localhost:8080 and select the support-agent model
-```
-
-See [Server docs](docs/interfaces/server.md#open-webui-integration) for the full walkthrough.
-
-### 7. Attach files and media
-
-Send images, audio, video, and documents alongside your prompts — from the CLI, REPL, API, or dashboard:
-
-```bash
-# Attach an image to a prompt
 initrunner run role.yaml -p "Describe this image" -A photo.png
-
-# Multiple attachments
 initrunner run role.yaml -p "Compare these" -A before.png -A after.png
-
-# URL attachment
-initrunner run role.yaml -p "What's in this image?" -A https://example.com/photo.jpg
 ```
 
-In the interactive REPL, use `/attach` to queue files:
+In the REPL, use `/attach` to queue files. See [Multimodal Input](docs/core/multimodal.md).
 
-```
-> /attach diagram.png
-Queued attachment: diagram.png
-> /attach notes.pdf
-Queued attachment: notes.pdf
-> What do these show?
-[assistant response with both attachments]
-```
+### 7. Get structured output
 
-The API server accepts multimodal content in the standard OpenAI format. See [Multimodal Input](docs/core/multimodal.md) for the full reference.
-
-### 8. Get structured output
-
-Force the agent to return validated JSON matching a schema — ideal for pipelines and automation:
-
-```yaml
-spec:
-  output:
-    type: json_schema
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [approved, rejected, needs_review]
-        amount:
-          type: number
-        vendor:
-          type: string
-      required: [status, amount, vendor]
-```
+Force the agent to return validated JSON matching a schema — ideal for pipelines and automation. Add an `output` section with a JSON schema and the agent's response is validated against it:
 
 ```bash
 initrunner run classifier.yaml -p "Acme Corp invoice for $250"
-# → {"status": "approved", "amount": 250.0, "vendor": "Acme Corp"}
+# → {"status": "approved", "amount": 250.0}
 ```
 
 See [Structured Output](docs/core/structured-output.md) for inline schemas, external schema files, and pipeline integration.
 
 ## Community Roles
 
-Browse, install, and run roles shared by the community — no copy-paste needed:
+Browse, install, and run roles shared by the community:
 
 ```bash
-initrunner search "code review"       # browse the community index
-initrunner install code-reviewer      # download, validate, confirm
-initrunner run ~/.initrunner/roles/code-reviewer.yaml -i
+initrunner search "code review"                          # browse the community index
+initrunner install code-reviewer                         # download, validate, confirm
+initrunner install user/repo:roles/agent.yaml@v1.0       # install from any GitHub repo
+initrunner run ~/.initrunner/roles/code-reviewer.yaml -i # run an installed role
 ```
 
-Install directly from any GitHub repo:
-
-```bash
-initrunner install user/repo:roles/support-agent.yaml@v1.0
-```
-
-Every install shows a security summary (tools, model, author) and asks for confirmation before saving. See [docs/agents/registry.md](docs/agents/registry.md) for source formats, the community index, and update workflows.
-
-## Install & Quickstart
-
-**1. Install**
-
-```bash
-curl -fsSL https://initrunner.ai/install.sh | sh
-```
-
-Or with a package manager:
-
-```bash
-pip install initrunner
-# or
-uv tool install initrunner
-# or
-pipx install initrunner
-```
-
-Install with extras:
-
-```bash
-pip install "initrunner[all]"          # everything
-pip install "initrunner[all-models]"   # all LLM providers
-pip install "initrunner[ingest,search,dashboard]"  # pick and choose
-```
-
-| Extra | What it adds |
-|-------|--------------|
-| `all` | **Everything below** (recommended for getting started) |
-| `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
-| `anthropic` | Anthropic provider (Claude) |
-| `ingest` | PDF, DOCX, XLSX ingestion |
-| `dashboard` | FastAPI web dashboard |
-| `search` | Web search (DuckDuckGo) |
-| `telegram` | Telegram bot trigger |
-| `discord` | Discord bot trigger |
-
-See [docs/getting-started/installation.md](docs/getting-started/installation.md) for the full extras table, dev setup, and environment configuration.
-
-**2. Set your API key**
-
-Before running an agent, set your provider API key:
-
-```bash
-export OPENAI_API_KEY=sk-...          # OpenAI (default)
-export ANTHROPIC_API_KEY=sk-ant-...   # Claude (requires initrunner[anthropic])
-```
-
-`initrunner setup` walks through this interactively and stores the key in `~/.initrunner/.env`. You can also edit this file directly — it's loaded automatically by all commands. Keys set in the environment take precedence over `.env` values.
-
-**3. Create your first agent and run it**
-
-The fastest way to get started — `setup` walks you through provider, API key, model, and agent creation in one step:
-
-```bash
-initrunner setup                # guided wizard — picks provider, stores API key, creates a role
-initrunner run my-agent.yaml -p "Hello!"   # single-shot prompt
-initrunner run my-agent.yaml -i            # interactive chat
-```
-
-See [Creating Roles](#creating-roles) for all the ways to build roles (CLI wizards, AI generation, web dashboard, TUI, and more), or jump to the hands-on [Tutorial](docs/getting-started/tutorial.md).
-
-## Creating Roles
-
-| Method | How | Best for |
-|--------|-----|----------|
-| **Guided wizard** | `initrunner setup` | First-time setup — configures provider, API key, and creates a role |
-| **Interactive scaffold** | `initrunner init -i` | Step-by-step prompted creation with tool and feature selection |
-| **Template scaffold** | `initrunner init --template rag` | One-liner from a template (`basic`, `rag`, `memory`, `daemon`, `ollama`, `tool`, `api`, `skill`) |
-| **CLI flags** | `initrunner init --name my-agent --model gpt-5-mini` | Quick one-liner when you know what you want |
-| **AI generation** | `initrunner create "code reviewer for Python"` | Describe what you want in plain English — AI writes the YAML |
-| **Copy an example** | `initrunner examples copy code-reviewer` | Production-ready agents you can run immediately |
-| **Install community role** | `initrunner install user/repo` | Reuse roles shared by others ([details](#community-roles)) |
-| **Web dashboard** | `initrunner ui` → New Role → Form Builder / AI Generate | Form builder with live YAML preview, or describe and generate (requires `initrunner[dashboard]`) |
-| **Terminal UI** | `initrunner tui` → press `n` | Template picker in a keyboard-driven interface (requires `initrunner[tui]`) |
-| **Manual YAML** | Copy the [example above](#see-it-in-action) | Full control — write the YAML yourself |
-
-Validate any role file with `initrunner validate role.yaml`. See [Role Generation docs](docs/agents/role_generation.md) for the full reference.
+Every install shows a security summary and asks for confirmation. See [docs/agents/registry.md](docs/agents/registry.md) for details.
 
 ## Docker
-
-Run InitRunner without installing Python — just Docker:
-
-Before running, create a `./roles/` directory and add a role YAML file — the examples below reference it as `/roles/my-agent.yaml`. No role yet? Run `initrunner examples copy hello-world` if you have InitRunner installed, or copy [hello-world.yaml](examples/roles/hello-world.yaml) from this repo.
 
 ```bash
 # One-shot prompt
@@ -435,217 +237,24 @@ docker run --rm -e OPENAI_API_KEY \
     -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
     run /roles/my-agent.yaml -p "Hello"
 
-# Interactive chat
-docker run --rm -it -e OPENAI_API_KEY \
-    -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
-    run /roles/my-agent.yaml -i
-
-# Web dashboard — open http://localhost:8420 after starting
+# Web dashboard — open http://localhost:8420
 docker run -d -e OPENAI_API_KEY \
-    -v ./roles:/roles \
-    -v initrunner-data:/data \
+    -v ./roles:/roles -v initrunner-data:/data \
     -p 8420:8420 ghcr.io/vladkesler/initrunner:latest \
     ui --role-dir /roles
-# ./roles          — your local role files (mounted read/write into /roles)
-# initrunner-data  — named volume: audit log, embeddings, memory (persists across restarts)
 ```
 
-`-e OPENAI_API_KEY` forwards the variable from your current shell — make sure it's exported first (`export OPENAI_API_KEY=sk-...`). Prefer a file? Copy `examples/.env.example` to `.env`, fill in your key, and replace `-e OPENAI_API_KEY` with `--env-file .env`.
-
-The image is also available on Docker Hub: `vladkesler/initrunner`
-
-Or use the included `docker-compose.yml` to start the dashboard with persistent storage:
-
-```bash
-# Copy examples/.env.example → .env, add your key, then:
-docker compose up
-# Dashboard is now at http://localhost:8420
-```
-
-Build the image locally:
-
-```bash
-docker build -t initrunner .
-docker run --rm initrunner --version
-```
-
-The default image includes dashboard, ingestion, all model providers, and safety extras. Override with `--build-arg EXTRAS="dashboard,anthropic"` to customize.
-
-Using Ollama on the host? Set the model endpoint to `http://host.docker.internal:11434/v1` in your role YAML.
-
-## Core Concepts
-
-<p align="center">
-  <img src="assets/screenshot-dashboard.png" alt="InitRunner web dashboard — Create New Role" width="700"><br>
-  <em>Web dashboard — create and manage roles with a live YAML preview</em>
-</p>
-
-### Role files
-
-Every agent is a YAML file with four top-level keys:
-
-```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-  description: What this agent does
-spec:
-  role: "System prompt goes here."
-  model: { provider: openai, name: gpt-5-mini }
-  tools: [...]
-  guardrails:
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_tokens_per_run: 50000
-    autonomous_token_budget: 200000
-```
-
-Validate with `initrunner validate role.yaml` or scaffold one with `initrunner init --name my-agent --model gpt-5-mini`.
-
-`metadata.tags` are used by intent sensing (`--sense`) and community search. Specific, task-oriented tags improve role selection:
-
-```yaml
-metadata:
-  name: web-searcher
-  description: Research assistant that searches the web
-  tags: [search, web, research, summarize, browse]
-```
-
-### Tools
-
-Tools give your agent capabilities beyond text generation. Configure them in `spec.tools`.
-
-#### Built-in tools
-
-| Type | What it does |
-|------|-------------|
-| `filesystem` | Read/write files within a root directory |
-| `git` | Git log, diff, blame, show (read-only by default) |
-| `shell` | Run shell commands with allowlist/blocklist |
-| `python` | Run Python in an isolated subprocess |
-| `sql` | Query SQLite databases (read-only by default) |
-| `http` | HTTP requests to a base URL |
-| `web_reader` | Fetch web pages and convert to markdown |
-| `web_scraper` | Scrape, chunk, embed, and store web pages |
-| `search` | Web and news search (DuckDuckGo, SerpAPI, Brave, Tavily) |
-| `email` | Search, read, and send email via IMAP/SMTP |
-| `slack` | Send messages to Slack channels |
-| `api` | Declarative REST API endpoints from YAML |
-| `datetime` | Get current time and parse dates |
-| `mcp` | Connect to MCP servers (stdio, SSE, streamable-http) |
-| `delegate` | Hand off to other agents |
-| `custom` | Load tool functions from external Python modules |
-
-See [docs/agents/tools.md](docs/agents/tools.md) for the full reference.
-
-#### Custom tools
-
-Add a built-in tool by creating a single file in `initrunner/agent/tools/` with a config class and a `@register_tool` decorated builder function — it's auto-discovered and immediately available in role YAML. Alternatively, load your own Python functions with `type: custom` and a `module` path pointing to any importable module. See [docs/agents/tool_creation.md](docs/agents/tool_creation.md) for the full guide.
-
-#### Plugin registry
-
-Third-party packages can register new tool types via the `initrunner.tools` entry point. Once installed (`pip install initrunner-<name>`), the tool type is available in YAML like any built-in. Run `initrunner plugins` to list discovered plugins. See the [plugin section of the tool creation guide](docs/agents/tool_creation.md) for details.
-
-### Run modes
-
-| Mode | Command | Use case |
-|------|---------|----------|
-| Chat | `initrunner chat` | Zero-config interactive chat (auto-detects provider) |
-| Single-shot | `initrunner run role.yaml -p "prompt"` | One question, one answer |
-| Interactive | `initrunner run role.yaml -i` | Multi-turn chat (REPL) |
-| Autonomous | `initrunner run role.yaml -p "prompt" -a` | Multi-step agentic loop with self-reflection |
-| **Intent Sensing** | `initrunner run --sense -p "prompt"` | Pick the best role automatically from discovered roles |
-| Daemon | `initrunner daemon role.yaml` | Trigger-driven (cron, file watch, webhook, telegram, discord) |
-| API server | `initrunner serve role.yaml` | OpenAI-compatible HTTP API |
-
-#### Intent Sensing options
-
-| Flag | Description |
-|------|-------------|
-| `--sense` | Sense the best role for the given prompt |
-| `--role-dir PATH` | Directory to search for roles (used with `--sense`) |
-| `--confirm-role` | Confirm the sensed role before running |
-
-Without `--role-dir`, roles are discovered from the current directory (`.`), `./examples/roles/`, and `~/.config/initrunner/roles/` (the global roles directory).
-
-See [Intent Sensing](docs/core/intent_sensing.md) for algorithm details, role tagging tips, and troubleshooting.
-
-### Guardrails
-
-Control costs and runaway agents with `spec.guardrails`:
-
-| Setting | Default | Scope |
-|---------|---------|-------|
-| `max_tokens_per_run` | 50 000 | Output tokens per single LLM call |
-| `max_tool_calls` | 20 | Tool invocations per run |
-| `timeout_seconds` | 300 | Wall-clock timeout per run |
-| `autonomous_token_budget` | — | Total tokens across all autonomous iterations |
-| `session_token_budget` | — | Cumulative limit for an interactive session |
-| `daemon_daily_token_budget` | — | Daily token cap for daemon mode |
-
-When any limit is reached the run stops immediately and raises an error. In autonomous mode, the partial result up to that point is returned.
-
-See [Guardrails](docs/configuration/guardrails.md) and [Token Control](docs/configuration/token_control.md) for the full reference.
-
-<p align="center">
-  <img src="assets/screenshot-audit.png" alt="InitRunner audit log — agent runs with tokens, duration, and trigger modes" width="700"><br>
-  <em>Audit log — track every agent run with tokens, duration, and trigger mode</em>
-</p>
-
-For RAG, memory, triggers, compose, and skills see [From Simple to Powerful](#from-simple-to-powerful) above. Full references: [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Triggers](docs/core/triggers.md) · [Compose](docs/orchestration/agent_composer.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md)
-
-## CLI Quick Reference
-
-| Command | Description |
-|---------|-------------|
-| `chat` | Zero-config interactive chat (auto-detects provider) |
-| `chat <role.yaml>` | Chat with a specific role |
-| `chat --telegram` / `chat --discord` | One-command Telegram or Discord bot |
-| `run <role.yaml> -p "..."` | Single-shot prompt |
-| `run <role.yaml> -i` | Interactive REPL |
-| `run <role.yaml> -p "..." -a` | Autonomous agentic loop |
-| `run <role.yaml> -p "..." -a --max-iterations N` | Autonomous with iteration limit |
-| `run --sense -p "..."` | Sense best role and run |
-| `run --sense --role-dir PATH -p "..."` | Sense best role from a specific directory |
-| `run --sense --confirm-role -p "..."` | Sense best role with confirmation prompt |
-| `validate <role.yaml>` | Validate a role definition |
-| `init --name <name> [--model <model>]` | Scaffold a new role from CLI flags |
-| `init -i` | Interactive role-creation wizard |
-| `create "<description>"` | AI-generate a role from a description |
-| `setup` | Guided provider + API key + role setup |
-| `ingest <role.yaml>` | Ingest documents into vector store |
-| `daemon <role.yaml>` | Run in trigger-driven daemon mode |
-| `run <role.yaml> -p "..." -A file.png` | Attach files or URLs to prompt |
-| `run <role.yaml> -p "..." --export-report` | Export a markdown report after the run |
-| `doctor` | Check provider config, API keys, connectivity |
-| `doctor --quickstart` | End-to-end smoke test with a real API call |
-| `serve <role.yaml>` | Serve as OpenAI-compatible API |
-| `tui` | Launch terminal dashboard |
-| `ui` | Launch web dashboard |
-| `compose up <compose.yaml>` | Run multi-agent orchestration |
-| `install <source>` | Install a community role from GitHub |
-| `uninstall <name>` | Remove an installed role |
-| `search <query>` | Search the community role index |
-| `info <source>` | Inspect a role before installing |
-| `list` | Show installed roles |
-| `update [name] / --all` | Update installed roles |
-
-See [docs/getting-started/cli.md](docs/getting-started/cli.md) for the full command list and all options.
+Or use `docker compose up` with the included `docker-compose.yml` (copy `examples/.env.example` to `.env` first). Also available on Docker Hub: `vladkesler/initrunner`. See [hello-world.yaml](examples/roles/hello-world.yaml) for a starter role.
 
 ## User Interfaces
-
-Beyond the CLI, InitRunner includes a terminal UI and a web dashboard for visual agent management.
 
 | | Terminal UI (`tui`) | Web Dashboard (`ui`) |
 |---|---|---|
 | **Launch** | `initrunner tui` | `initrunner ui` |
 | **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
-| **Roles** | Create from template, edit sections via forms | Form builder with live preview, AI generate, YAML editor |
-| **Chat** | Streaming chat with token counts | SSE streaming chat with file attachments |
-| **Audit** | Browse & filter audit records | Audit log with detail panel |
-| **Memory** | View, export, delete memories | View, filter, export, clear memories |
-| **Daemon** | Real-time trigger event log | WebSocket trigger monitor |
+| **Roles** | Create from template, edit via forms | Form builder with live preview, AI generate |
+| **Chat** | Streaming chat with token counts | SSE streaming with file attachments |
+| **Extras** | Audit log, memory, daemon event log | Audit detail panel, memory, trigger monitor |
 | **Style** | k9s-style keyboard-driven (Textual) | Server-rendered HTML (HTMX + DaisyUI) |
 
 See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashboard.md) · [API Server docs](docs/interfaces/server.md)
@@ -665,27 +274,12 @@ See [`docs/`](docs/) for the full index.
 
 ## Examples
 
-Browse and copy any example locally:
-
 ```bash
-initrunner examples list              # see all available examples
-initrunner examples copy code-reviewer   # copy to current directory
+initrunner examples list               # see all available examples
+initrunner examples copy code-reviewer # copy to current directory
 ```
 
-The `examples/` directory includes 20+ ready-to-run agents, skills, and compose pipelines covering real-world scenarios:
-
-**Role definitions** (`examples/roles/`) — single-agent configs for support bots, code reviewers, changelog generators, deploy notifiers, web monitors, data analysts, Discord assistants, Telegram assistants, and more.
-
-**Skills** (`examples/skills/`) — reusable capability bundles:
-- `web-researcher/` — web research tools (fetch pages, HTTP requests)
-- `code-tools.md` — code execution and file browsing tools
-
-See `examples/roles/skill-demo.yaml` for a role composing multiple skills.
-
-**Compose pipelines** (`examples/compose/`) — multi-agent orchestration:
-- `email-pipeline/` — cron-driven email triage with fan-out to researcher and responder
-- `content-pipeline/` — file-watch-driven content creation with `process_existing` startup scan
-- `ci-pipeline/` — webhook-driven CI build analysis with notifications
+The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose pipelines covering code review, support bots, data analysis, web monitoring, and multi-agent orchestration.
 
 ## Community & Support
 
@@ -697,13 +291,7 @@ If you find InitRunner useful, consider giving it a star — it helps others dis
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR guidelines, and quality checks.
-
-### Share a role
-
-Push your `role.yaml` to a public GitHub repo — anyone can install it with `initrunner install user/repo`. To list it in the community index so users can `initrunner install my-role` by name, open a PR to [vladkesler/community-roles](https://github.com/vladkesler/community-roles) adding an entry to `index.yaml`. See [docs/agents/registry.md](docs/agents/registry.md) for details.
-
-For security vulnerabilities, please see [SECURITY.md](SECURITY.md).
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR guidelines, and quality checks. Share your roles by pushing to a public GitHub repo — anyone can install them with `initrunner install user/repo`. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
 
 ## License
 
