@@ -28,17 +28,17 @@
 ## Try It
 
 ```bash
-initrunner chat                    # start chatting, memory on by default
->>> remember that the deploy key is in 1Password
-Noted.
+initrunner chat --ingest ./docs/   # chat with your docs, memory on by default
+>>> summarize the getting started guide
+The guide covers installation, creating your first agent with a role.yaml file, ...
 
->>> what's the deploy key location?
-You told me the deploy key is in 1Password.
+>>> what retrieval strategies does it mention?
+The docs describe three strategies: full-text search, semantic similarity, ...
 
 >>> /quit
 ```
 
-No YAML, no config files. Add `--ingest ./docs/` to search your documents, or `--tool-profile all` to enable every built-in tool.
+No YAML, no config files. Add `--tool-profile all` to enable every built-in tool.
 
 ## Define Agent Roles in YAML
 
