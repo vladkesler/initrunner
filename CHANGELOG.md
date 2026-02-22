@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Security
+- Escape single quotes in all zvec filter expressions to prevent filter injection
+- Block absolute paths in roles API directory scanning to prevent filesystem traversal
+- Sanitize generic exception messages in ingestion SSE stream to avoid leaking internal details
+
+### Fixed
+- Memory deserialization now tolerates corrupt `metadata_json` and unknown `memory_type` values instead of crashing
+- `_release_collection` logs flush failures instead of silently swallowing them
+
 ## [1.4.1] - 2026-02-22
 
 ### Changed
