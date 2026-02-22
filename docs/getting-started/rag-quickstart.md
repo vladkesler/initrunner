@@ -2,6 +2,8 @@
 
 Get a document Q&A agent running with three commands. For the full reference, see [RAG Patterns & Guide](../core/rag-guide.md) and [Ingestion](../core/ingestion.md).
 
+> **Before you start:** `initrunner ingest` needs an embedding model. The default is OpenAI `text-embedding-3-small` -- set `OPENAI_API_KEY` to use it, or set `embeddings.provider` to switch providers (Google, Ollama, and more). No API keys? Jump to [Local RAG with Ollama](#local-rag-with-ollama).
+
 ## Prerequisites
 
 - InitRunner installed (`pip install initrunner` or `uv tool install initrunner`)
@@ -33,6 +35,17 @@ initrunner ingest role.yaml
 ```
 
 This extracts text, splits it into chunks, generates embeddings, and stores vectors locally. A `search_documents` tool is auto-registered on your agent.
+
+## Embedding API Key
+
+| Provider | Default env var | Notes |
+|----------|-----------------|-------|
+| `openai` | `OPENAI_API_KEY` | |
+| `anthropic` | `OPENAI_API_KEY` | Anthropic has no embeddings API -- falls back to OpenAI by default |
+| `google` | `GOOGLE_API_KEY` | |
+| `ollama` | *(none)* | Runs locally |
+
+**Anthropic users:** set `OPENAI_API_KEY` for the default embedding model, or set `embeddings.provider: google` or `embeddings.provider: ollama` to avoid needing an OpenAI key.
 
 ## Step 3: Ask questions
 

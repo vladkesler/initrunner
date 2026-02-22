@@ -35,6 +35,8 @@ initrunner chat --ingest ./my-docs/
 
 That's it. You have an AI agent that knows your docs and remembers across sessions.
 
+> `--ingest` embeds documents with OpenAI by default. Using another provider? See [RAG Quickstart](docs/getting-started/rag-quickstart.md#embedding-api-key) to configure embeddings.
+
 ## Try It
 
 ```bash
@@ -155,6 +157,8 @@ initrunner chat --telegram --allowed-user-ids 123456789  # restrict access
 initrunner run role.yaml -p "Hello!"   # one-shot prompt
 initrunner run role.yaml -i            # interactive REPL
 ```
+
+> **Embedding note:** `--ingest` uses OpenAI embeddings by default (`text-embedding-3-small`). Anthropic and other non-OpenAI users also need `OPENAI_API_KEY` set, or can switch embedding providers in their role YAML. See [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
 Memory is on by default - the agent remembers facts across sessions. Use `--no-memory` to disable. See [Chat docs](docs/getting-started/chat.md) for all options, and [CLI Reference](docs/getting-started/cli.md) for the full command list.
 
