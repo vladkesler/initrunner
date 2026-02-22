@@ -2,10 +2,6 @@
 
 ## [Unreleased]
 
-### Changed
-- Python version constraint tightened to `>=3.11,<3.13` — zvec does not yet ship Python 3.13 wheels
-- Zvec-dependent tests skipped in CI (`SKIP_ZVEC_TESTS=1`) — zvec native extension triggers illegal instruction on GitHub Actions runners
-
 ## [1.3.0] - 2026-02-22
 
 ### Breaking Changes
@@ -19,6 +15,8 @@
 - `EmbeddingModelChangedError` exported from `initrunner.stores` (moved from deleted sqlite_vec module)
 
 ### Changed
+- Python version constraint tightened to `>=3.11,<3.13` — zvec does not yet ship Python 3.13 wheels
+- Zvec-dependent tests skipped in CI (`SKIP_ZVEC_TESTS=1`) — zvec native extension triggers illegal instruction on GitHub Actions runners
 - Default `StoreBackend` enum value: `SQLITE_VEC` → `ZVEC` across all config schemas (IngestConfig, MemoryConfig, SharedMemoryConfig, StoreConfig)
 - Ingestion pipeline uses factory-based store creation instead of low-level sqlite3 calls
 - `build_memory_system_prompt()` accepts optional `store` parameter to reuse an already-open store
@@ -26,6 +24,7 @@
 - Memory store `close()` is now reference-counted — only releases underlying zvec collections when the last reference is closed
 
 ### Fixed
+- `chat --tool-profile all` no longer fails when optional tool env vars (e.g. `SLACK_WEBHOOK_URL`) are missing — tools are skipped with a warning
 - Memory tools (`remember`, `recall`, `list_memories`, `learn_procedure`, `record_episode`) no longer crash with "Can't lock read-write collection" when called during an agent run
 
 ### Dependencies

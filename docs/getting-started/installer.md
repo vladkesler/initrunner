@@ -27,7 +27,7 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 ## Requirements
 
 - **curl** — used to fetch the installer and verify PyPI connectivity
-- **Python >= 3.11** — detected automatically (`python3`, `python3.13`, `python3.12`, `python3.11`, `python`)
+- **Python >= 3.11** — detected automatically (`python3`, `python3.12`, `python3.11`, `python`)
 - **Linux or macOS** — WSL is detected and supported; other platforms are rejected
 
 ## Options Reference
@@ -66,7 +66,7 @@ Detects the OS (`linux` or `macos`), architecture (`uname -m`), and current shel
 
 ### 3. Python Detection
 
-Searches for a suitable Python in this order: `python3`, `python3.13`, `python3.12`, `python3.11`, `python`. The first binary with version >= 3.11 is selected. If none is found, the installer prints platform-specific install instructions (`brew`, `apt-get`, `dnf`, `pacman`, or `python.org`) and exits.
+Searches for a suitable Python in this order: `python3`, `python3.12`, `python3.11`, `python`. The first binary with version >= 3.11 is selected. If none is found, the installer prints platform-specific install instructions (`brew`, `apt-get`, `dnf`, `pacman`, or `python.org`) and exits.
 
 On Apple Silicon Macs, the installer warns if the detected Python is running under Rosetta (x86_64 binary on arm64 hardware).
 

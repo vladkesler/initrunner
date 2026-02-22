@@ -79,20 +79,20 @@ def _resolve_extra_tools(extra_types: list[str]) -> list[dict]:
     return result
 
 
-def _check_profile_envs() -> None:
+def _check_profile_envs() -> set[str]:
     """Check required env vars for all tools in the ``all`` profile.
 
-    Exits with code 1 and an actionable message on the first missing var.
+    Returns tool names that should be skipped due to missing env vars.
+    Prints a warning for each skipped tool.
     """
+    skip: set[str] = set()
     for tool_name, env_vars in _TOOL_REQUIRED_ENVS.items():
-        for env_var in env_vars:
-            if not os.environ.get(env_var):
-                console.print(
-                    f"[red]Error:[/red] Tool '{tool_name}' requires {env_var}.\n"
-                    f"  Export it or add it to your .env file:\n"
-                    f"  export {env_var}=your-value"
-                )
-                raise typer.Exit(1)
+        missing = [v for v in env_vars if not os.environ.get(v)]
+        if missing:
+            env_list = ", ".join(missing)
+            console.print(f"[dim]Skipping tool '{tool_name}' — missing {env_list}[/dim]")
+            skip.add(tool_name)
+    return skip
 
 
 def _merge_tools(profile_tools: list[dict], extras: list[dict]) -> list[dict]:
@@ -188,11 +188,16 @@ def chat(
         )
         raise typer.Exit(1)
 
+    # Compute profile tools early so we can filter for missing env vars.
+    profile_tools = list(_TOOL_PROFILES.get(tool_profile, []))
+
     if tool_profile == "all":
         from initrunner.services.providers import _load_env
 
         _load_env()
-        _check_profile_envs()
+        skip = _check_profile_envs()
+        if skip:
+            profile_tools = [t for t in profile_tools if t["type"] not in skip]
 
     # Resolve extra tools (validates names and env vars, exits on error)
     extras = _resolve_extra_tools(extra_tools) if extra_tools else []
@@ -208,7 +213,7 @@ def chat(
             bot_mode,
             provider=provider,
             model=model,
-            tool_profile=tool_profile,
+            profile_tools=profile_tools,
             extra_tools=extras,
             audit_db=audit_db,
             no_audit=no_audit,
@@ -218,7 +223,7 @@ def chat(
             provider=provider,
             model=model,
             prompt=prompt,
-            tool_profile=tool_profile,
+            profile_tools=profile_tools,
             extra_tools=extras,
             audit_db=audit_db,
             no_audit=no_audit,
@@ -260,7 +265,7 @@ def _chat_auto_detect(
     provider: str | None,
     model: str | None,
     prompt: str | None,
-    tool_profile: str,
+    profile_tools: list[dict],
     extra_tools: list[dict],
     audit_db: Path | None,
     no_audit: bool,
@@ -294,7 +299,6 @@ def _chat_auto_detect(
 
     from initrunner.services.providers import build_ephemeral_role
 
-    profile_tools = _TOOL_PROFILES.get(tool_profile, [])
     tools = _merge_tools(profile_tools, extra_tools)
     role = build_ephemeral_role(prov, mod, tools=tools if tools else None)
     agent = build_agent(role)
@@ -342,7 +346,7 @@ def _chat_bot_mode(
     *,
     provider: str | None,
     model: str | None,
-    tool_profile: str,
+    profile_tools: list[dict],
     extra_tools: list[dict],
     audit_db: Path | None,
     no_audit: bool,
@@ -405,7 +409,6 @@ def _chat_bot_mode(
         else DiscordTriggerConfig(**trigger)
     )
 
-    profile_tools = _TOOL_PROFILES.get(tool_profile, [])
     tools = _merge_tools(profile_tools, extra_tools)
     role = build_ephemeral_role(
         prov,

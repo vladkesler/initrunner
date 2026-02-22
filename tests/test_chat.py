@@ -79,12 +79,28 @@ class TestChatToolProfile:
         }
         assert tool_types == expected
 
-    def test_all_profile_missing_env_fails(self, clean_env, monkeypatch):
-        """--tool-profile all without SLACK_WEBHOOK_URL exits with actionable error."""
+    def test_all_profile_missing_env_warns_and_skips(self, clean_env, monkeypatch):
+        """--tool-profile all without SLACK_WEBHOOK_URL warns and excludes slack."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
-        result = runner.invoke(app, ["chat", "--tool-profile", "all"])
-        assert result.exit_code == 1
+
+        with (
+            _MOCK_LOAD_ENV,
+            patch("initrunner.agent.loader.build_agent") as mock_build,
+            patch("initrunner.runner.run_interactive"),
+        ):
+            mock_build.return_value = MagicMock()
+            result = runner.invoke(app, ["chat", "--tool-profile", "all"])
+
+        assert result.exit_code == 0
         assert "SLACK_WEBHOOK_URL" in result.output
+        assert "Skipping" in result.output
+        role = mock_build.call_args[0][0]
+        tool_types = {t.type for t in role.spec.tools}
+        assert "slack" not in tool_types
+        # Other tools should still be present
+        assert "datetime" in tool_types
+        assert "python" in tool_types
 
 
 class TestChatAutoDetect:

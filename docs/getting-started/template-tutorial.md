@@ -8,7 +8,7 @@ This tutorial walks through all three with hands-on exercises. No YAML editing r
 
 ## Prerequisites
 
-- **Python 3.11+** installed
+- **Python 3.11–3.12** installed
 - **InitRunner** installed — see [Installation](installation.md)
 - **An API key** configured — see [Setup](setup.md)
 - **A git repository** with some commit history (your own project works)

@@ -6,7 +6,7 @@ Each step builds on the previous one and shows the **complete YAML** so you can 
 
 ## Prerequisites
 
-- **Python 3.11+** installed
+- **Python 3.11–3.12** installed
 - **InitRunner** installed — see [Installation](installation.md)
 - **An API key** configured — see [Setup](setup.md)
 
