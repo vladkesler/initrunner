@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-02-22
+
+### Changed
+- Docker image now ships with all extras pre-installed (`EXTRAS="all"`)
+
+### Documentation
+- Expanded Docker section in README with examples for chat, tools, RAG ingestion, Telegram bot, and API server
+
 ## [1.4.0] - 2026-02-22
 
 ### Added

@@ -23,7 +23,7 @@
 
 `initrunner chat` gives you an AI assistant that remembers across sessions, searches your documents, and discovers tools on demand. No config needed. When you need more, define agent roles in YAML: custom tools, triggers, guardrails, multimodal input, and RAG. Deploy as CLI tools, Telegram/Discord bots, cron daemons, or serve them as OpenAI-compatible APIs. Compose agents into pipelines. Manage and audit from a web dashboard or TUI.
 
-> **v1.4.0** — Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.4.1** — Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## Try It
 
@@ -251,20 +251,51 @@ Every install shows a security summary and asks for confirmation. See [docs/agen
 
 ## Docker
 
-```bash
-# One-shot prompt
-docker run --rm -e OPENAI_API_KEY \
-    -v ./roles:/roles ghcr.io/vladkesler/initrunner:latest \
-    run /roles/my-agent.yaml -p "Hello"
+Available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Docker Hub](https://hub.docker.com/r/vladkesler/initrunner). The image ships with all extras pre-installed.
 
-# Web dashboard — open http://localhost:8420
-docker run -d -e OPENAI_API_KEY \
+```bash
+# Interactive chat with memory
+docker run --rm -it -e OPENAI_API_KEY \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest chat
+
+# Chat with cherry-picked tools
+docker run --rm -it -e OPENAI_API_KEY \
+    -v initrunner-data:/data -v .:/workspace \
+    ghcr.io/vladkesler/initrunner:latest \
+    chat --tools git --tools filesystem
+
+# Enable all built-in tools at once
+#   chat --tool-profile all
+
+# Chat with your documents (instant RAG)
+docker run --rm -it -e OPENAI_API_KEY \
+    -v initrunner-data:/data -v ./docs:/docs \
+    ghcr.io/vladkesler/initrunner:latest chat --ingest /docs
+
+# Ingest documents for a role, then query
+docker run --rm -e OPENAI_API_KEY \
+    -v ./roles:/roles -v ./docs:/docs -v initrunner-data:/data \
+    ghcr.io/vladkesler/initrunner:latest ingest /roles/rag-agent.yaml
+docker run --rm -it -e OPENAI_API_KEY \
     -v ./roles:/roles -v initrunner-data:/data \
-    -p 8420:8420 ghcr.io/vladkesler/initrunner:latest \
-    ui --role-dir /roles
+    ghcr.io/vladkesler/initrunner:latest run /roles/rag-agent.yaml -i
+
+# Telegram bot
+docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest \
+    chat --telegram
+
+# OpenAI-compatible API server — port 8000
+docker run -d -e OPENAI_API_KEY -v ./roles:/roles \
+    -p 8000:8000 ghcr.io/vladkesler/initrunner:latest \
+    serve /roles/my-agent.yaml --host 0.0.0.0
+
+# Web dashboard — http://localhost:8420
+docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
+    -p 8420:8420 ghcr.io/vladkesler/initrunner:latest ui --role-dir /roles
 ```
 
-Or use `docker compose up` with the included `docker-compose.yml` (copy `examples/.env.example` to `.env` first). Also available on Docker Hub: `vladkesler/initrunner`. See [hello-world.yaml](examples/roles/hello-world.yaml) for a starter role.
+Or use `docker compose up` with the included [`docker-compose.yml`](docker-compose.yml) (copy [`examples/.env.example`](examples/.env.example) to `.env` first). See [hello-world.yaml](examples/roles/hello-world.yaml) for a starter role.
 
 ## User Interfaces
 
