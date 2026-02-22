@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -14,8 +15,16 @@ from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.tools._registry import ToolBuildContext
 
-# zvec's native extension may use CPU instructions unavailable on CI runners
-# (causes SIGILL at import time).  Set SKIP_ZVEC_TESTS=1 to skip those files.
+# ---------------------------------------------------------------------------
+# zvec stub for CI
+# ---------------------------------------------------------------------------
+# zvec's native extension uses CPU instructions unavailable on GitHub Actions
+# runners (SIGILL).  When SKIP_ZVEC_TESTS=1, inject a lightweight stub into
+# sys.modules so that `import zvec` never loads the real native code.  Tests
+# that directly exercise zvec stores are skipped via collect_ignore below;
+# tests that merely *transit* through zvec (e.g. ingestion pipeline) get the
+# stub and won't crash.
+
 _ZVEC_TEST_FILES = [
     "test_incremental_ingest.py",
     "test_memory_store.py",
@@ -27,6 +36,14 @@ _ZVEC_TEST_FILES = [
 collect_ignore: list[str] = []
 if os.environ.get("SKIP_ZVEC_TESTS") == "1":
     collect_ignore.extend(_ZVEC_TEST_FILES)
+
+    # Insert a MagicMock as the zvec package so that any attribute access
+    # (zvec.DataType.STRING, zvec.CollectionSchema(...), etc.) succeeds
+    # without loading the real native extension.
+    _zvec_mock = MagicMock()
+    _zvec_mock.__path__ = []  # make importlib treat it as a package
+    for _name in ("zvec", "zvec.model", "zvec.model.collection"):
+        sys.modules.setdefault(_name, _zvec_mock)
 
 
 def make_role(
