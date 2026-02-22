@@ -102,7 +102,7 @@ def main(
             provider=None,
             model=None,
             prompt=None,
-            tool_profile="minimal",
+            profile_tools=[{"type": "datetime"}, {"type": "web_reader"}],
             extra_tools=[],
             audit_db=None,
             no_audit=False,

@@ -117,6 +117,8 @@ initrunner chat --telegram       # Telegram bot (requires TELEGRAM_BOT_TOKEN)
 initrunner chat --discord        # Discord bot (requires DISCORD_BOT_TOKEN)
 ```
 
+> Install the extras first: `pip install "initrunner[telegram]"` or `pip install "initrunner[discord]"` (or `[channels]` for both).
+
 Key options:
 
 ```bash

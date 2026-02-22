@@ -52,7 +52,7 @@ class TelegramTrigger(TriggerBase):
             if allowed and username not in allowed:
                 return
 
-            chat_id = update.effective_chat.id  # type: ignore[possibly-missing-attribute]
+            chat_id = update.effective_chat.id  # type: ignore[union-attribute]
             bot = context.bot
 
             def reply_fn(text: str) -> None:
@@ -81,12 +81,12 @@ class TelegramTrigger(TriggerBase):
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
             await app.initialize()
             await app.start()
-            await app.updater.start_polling()  # type: ignore[possibly-missing-attribute]
+            await app.updater.start_polling()  # type: ignore[union-attribute]
             _logger.info("Telegram bot started polling")
             # Block until stop signal
             while not self._stop_event.is_set():
                 await asyncio.sleep(1)
-            await app.updater.stop()  # type: ignore[possibly-missing-attribute]
+            await app.updater.stop()  # type: ignore[union-attribute]
             await app.stop()
             await app.shutdown()
 
