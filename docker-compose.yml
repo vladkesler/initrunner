@@ -23,6 +23,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}  # persistent dashboard key
     restart: unless-stopped
     command: ["ui", "--role-dir", "/roles"]
 
