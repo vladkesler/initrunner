@@ -683,7 +683,7 @@ def _verify_bot_sdk(platform: str) -> None:
     """Verify the platform SDK is importable, with install hint on failure."""
     if platform == "telegram":
         try:
-            import telegram  # noqa: F401
+            import telegram  # type: ignore[unresolved-import]  # noqa: F401
         except ImportError:
             console.print(
                 "[red]Error:[/red] python-telegram-bot is not installed.\n"
@@ -692,7 +692,7 @@ def _verify_bot_sdk(platform: str) -> None:
             raise typer.Exit(1) from None
     elif platform == "discord":
         try:
-            import discord  # type: ignore[import-not-found]  # noqa: F401
+            import discord  # type: ignore[unresolved-import]  # noqa: F401
         except ImportError:
             console.print(
                 "[red]Error:[/red] discord.py is not installed.\n"

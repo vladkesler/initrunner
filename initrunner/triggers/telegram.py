@@ -27,8 +27,8 @@ class TelegramTrigger(TriggerBase):
     def _run(self) -> None:
         import asyncio
 
-        from telegram import Update
-        from telegram.ext import (
+        from telegram import Update  # type: ignore[unresolved-import]
+        from telegram.ext import (  # type: ignore[unresolved-import]
             ApplicationBuilder,
             MessageHandler,
             filters,

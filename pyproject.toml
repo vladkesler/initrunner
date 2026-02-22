@@ -123,5 +123,8 @@ known-first-party = ["initrunner"]
 [tool.ruff.format]
 quote-style = "double"
 
+[tool.ty.rules]
+unused-type-ignore-comment = "ignore"
+
 [tool.ty.environment]
 python-version = "3.13"

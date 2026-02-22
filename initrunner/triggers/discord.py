@@ -72,7 +72,7 @@ class DiscordTrigger(TriggerBase):
     def _run(self) -> None:
         import asyncio
 
-        import discord  # type: ignore[import-not-found]
+        import discord  # type: ignore[unresolved-import]
 
         token = os.environ.get(self._config.token_env)
         if not token:
