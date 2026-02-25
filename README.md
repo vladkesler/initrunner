@@ -8,7 +8,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-2260+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2320+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -23,7 +23,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.5.0** - Stable release. See the [Changelog](CHANGELOG.md) for details.
+> **v1.6.0** - Stable release. See the [Changelog](CHANGELOG.md) for details.
 
 ## 30-Second Quickstart
 
@@ -238,7 +238,41 @@ spec:
 
 Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
-### 5. Serve as an API
+### 5. Team up agents
+
+Run multiple personas on the same task in a single file - each persona sees the previous output:
+
+```yaml
+apiVersion: initrunner/v1
+kind: Team
+metadata:
+  name: code-review-team
+  description: Multi-perspective code review
+spec:
+  model: { provider: openai, name: gpt-5-mini }
+  personas:
+    architect: "review for design patterns, SOLID principles, and architecture issues"
+    security: "find security vulnerabilities, injection risks, auth issues"
+    maintainer: "check readability, naming, test coverage gaps, docs"
+  tools:
+    - type: filesystem
+      root_path: .
+      read_only: true
+    - type: git
+      repo_path: .
+      read_only: true
+  guardrails:
+    max_tokens_per_run: 50000
+    team_token_budget: 150000
+```
+
+```bash
+initrunner run team.yaml -p "Review the latest commit"
+```
+
+See [Team Mode](docs/orchestration/team_mode.md).
+
+### 6. Serve as an API
 
 Turn any agent into an OpenAI-compatible endpoint - drop-in for Open WebUI, Vercel AI SDK, or any OpenAI client:
 
@@ -248,7 +282,7 @@ initrunner serve support-agent.yaml --port 3000
 
 See [Server docs](docs/interfaces/server.md) for client examples and Open WebUI integration.
 
-### 6. Attach files and media
+### 7. Attach files and media
 
 Send images, audio, video, and documents alongside your prompts:
 
@@ -259,7 +293,7 @@ initrunner run role.yaml -p "Compare these" -A before.png -A after.png
 
 In the REPL, use `/attach` to queue files. See [Multimodal Input](docs/core/multimodal.md).
 
-### 7. Get structured output
+### 8. Get structured output
 
 Force the agent to return validated JSON matching a schema - ideal for pipelines and automation. Add an `output` section with a JSON schema and the agent's response is validated against it:
 
@@ -351,7 +385,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Chat](docs/getting-started/chat.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
+| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
 | Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 

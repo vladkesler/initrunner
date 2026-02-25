@@ -1,8 +1,16 @@
 # Changelog
 
-## [1.5.0] - 2026-02-22
+## [1.6.0] - 2026-02-26
 
-## [Unreleased]
+### Added
+- **Team mode** (`kind: Team`) — single-file, one-shot multi-agent collaboration. Define personas as `name: "description"` pairs; they run sequentially with output handoff, prompt injection framing, and cumulative budget controls
+- `--task` CLI option as alias for `--prompt` (`-p`) on the `run` command
+- `detect_yaml_kind()` helper for dispatching Team/Compose/Agent files before full validation
+- Team guardrails: per-persona `max_tokens_per_run`/`max_tool_calls`/`timeout_seconds`, cumulative `team_token_budget` and `team_timeout_seconds`
+- Team validation via `initrunner validate team.yaml`
+- Team audit logging with `trigger_type="team"` and metadata for team_name, team_run_id, agent_name
+- `examples/teams/code-review.yaml` example
+- `docs/orchestration/team_mode.md` documentation
 
 ### Security
 - Escape single quotes in all zvec filter expressions to prevent filter injection
@@ -12,6 +20,8 @@
 ### Fixed
 - Memory deserialization now tolerates corrupt `metadata_json` and unknown `memory_type` values instead of crashing
 - `_release_collection` logs flush failures instead of silently swallowing them
+
+## [1.5.0] - 2026-02-22
 
 ## [1.4.1] - 2026-02-22
 

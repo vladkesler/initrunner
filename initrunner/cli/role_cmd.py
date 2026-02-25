@@ -18,6 +18,13 @@ def validate(
     ] = None,
 ) -> None:
     """Validate a role definition file."""
+    from initrunner.cli._helpers import detect_yaml_kind
+
+    kind = detect_yaml_kind(role_file)
+    if kind == "Team":
+        _validate_team(role_file)
+        return
+
     from initrunner.agent.loader import RoleLoadError, load_role
 
     try:
@@ -304,3 +311,52 @@ def setup(
         interfaces=interfaces,
         model=model,
     )
+
+
+def _validate_team(team_file: Path) -> None:
+    """Validate a team definition file and display its info."""
+    from initrunner.team.loader import TeamLoadError, load_team
+
+    try:
+        team = load_team(team_file)
+    except TeamLoadError as e:
+        console.print(f"[red]Invalid:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    table = Table(title=f"Team: {team.metadata.name}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("API Version", team.apiVersion.value)
+    table.add_row("Kind", team.kind)
+    table.add_row("Name", team.metadata.name)
+    table.add_row("Description", team.metadata.description or "(none)")
+    table.add_row("Tags", ", ".join(team.metadata.tags) if team.metadata.tags else "(none)")
+    table.add_row("Model", team.spec.model.to_model_string())
+    table.add_row("Personas", str(len(team.spec.personas)))
+    table.add_row("Persona Names", ", ".join(team.spec.personas.keys()))
+
+    if team.spec.tools:
+        table.add_row("Tools", "\n".join(t.summary() for t in team.spec.tools))
+    else:
+        table.add_row("Tools", "0")
+
+    table.add_row("Timeout/persona", f"{team.spec.guardrails.timeout_seconds}s")
+    table.add_row("Max Tokens/persona", str(team.spec.guardrails.max_tokens_per_run))
+    table.add_row("Max Tool Calls/persona", str(team.spec.guardrails.max_tool_calls))
+    if team.spec.guardrails.team_token_budget is not None:
+        table.add_row("Team Token Budget", f"{team.spec.guardrails.team_token_budget:,}")
+    if team.spec.guardrails.team_timeout_seconds is not None:
+        table.add_row("Team Timeout", f"{team.spec.guardrails.team_timeout_seconds}s")
+    table.add_row("Handoff Max Chars", str(team.spec.handoff_max_chars))
+
+    try:
+        from initrunner._compat import require_provider
+
+        require_provider(team.spec.model.provider)
+        table.add_row("Provider Status", "[green]available[/green]")
+    except RuntimeError as e:
+        table.add_row("Provider Status", f"[yellow]{e}[/yellow]")
+
+    console.print(table)
+    console.print("[green]Valid[/green]")

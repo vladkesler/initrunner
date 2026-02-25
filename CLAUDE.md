@@ -89,6 +89,7 @@ Detailed docs live in `docs/`. Key references:
 | Chat & quick start | `docs/getting-started/chat.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
+| Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Web dashboard | `docs/interfaces/dashboard.md` |
 | Textual TUI | `docs/interfaces/tui.md` |

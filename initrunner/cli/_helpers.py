@@ -144,6 +144,24 @@ def check_ollama_running() -> None:
         )
 
 
+def detect_yaml_kind(path: Path) -> str:
+    """Peek at a YAML file's ``kind`` field without full validation.
+
+    Returns the kind string (e.g. ``"Agent"``, ``"Team"``, ``"Compose"``).
+    Defaults to ``"Agent"`` on any failure.
+    """
+    import yaml
+
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        if isinstance(data, dict):
+            return data.get("kind", "Agent")
+    except Exception:
+        pass
+    return "Agent"
+
+
 def load_role_or_exit(role_file: Path) -> RoleDefinition:
     from initrunner.agent.loader import RoleLoadError, load_role
 

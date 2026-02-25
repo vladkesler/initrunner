@@ -11,6 +11,7 @@ from rich.table import Table
 from initrunner.cli._helpers import (
     command_context,
     console,
+    detect_yaml_kind,
     load_and_build_or_exit,
     load_role_or_exit,
     resolve_skill_dirs,
@@ -102,8 +103,12 @@ def run(
         bool,
         typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
     ] = False,
+    task: Annotated[str | None, typer.Option("--task", help="Task prompt (alias for -p)")] = None,
 ) -> None:
     """Run an agent with a role definition."""
+    # --task is an alias for --prompt
+    prompt = prompt or task
+
     # --- Intent Sensing resolution ---
     if role_file is not None and sense:
         console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
@@ -140,6 +145,21 @@ def run(
                 raise typer.Exit()
         role_file = selection.candidate.path
     # --- End Intent Sensing ---
+
+    # --- Team mode dispatch ---
+    if role_file is not None and detect_yaml_kind(role_file) == "Team":
+        _run_team(
+            role_file,
+            prompt,
+            dry_run,
+            audit_db,
+            no_audit,
+            export_report,
+            report_path,
+            report_template,
+        )
+        return
+    # --- End Team mode ---
 
     if autonomous and not prompt:
         console.print("[red]Error:[/red] --autonomous requires --prompt (-p).")
@@ -258,6 +278,201 @@ def run(
             _maybe_export_report(
                 role, run_result, user_prompt, report_path, report_template, dry_run
             )
+
+
+def _display_team_result(team_result: object) -> None:
+    """Display team run results."""
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+
+    from initrunner.team.runner import TeamResult
+
+    tr: TeamResult = team_result  # type: ignore[assignment]
+
+    for name, agent_result in zip(tr.agent_names, tr.agent_results, strict=True):
+        status = "[green]OK[/green]" if agent_result.success else "[red]FAIL[/red]"
+        console.print(
+            f"  {status} {name}  "
+            f"{agent_result.tokens_in}in/{agent_result.tokens_out}out  "
+            f"{agent_result.duration_ms}ms"
+        )
+
+    if tr.success and tr.final_output:
+        subtitle = (
+            f"tokens: {tr.total_tokens_in}in/{tr.total_tokens_out}out | {tr.total_duration_ms}ms"
+        )
+        console.print(
+            Panel(
+                Markdown(tr.final_output),
+                title="Team Result",
+                subtitle=subtitle,
+                border_style="green",
+            )
+        )
+    elif not tr.success:
+        console.print(Panel(f"[red]{tr.error}[/red]", title="Team Error", border_style="red"))
+
+
+def _run_team(
+    team_file: Path,
+    prompt: str | None,
+    dry_run: bool,
+    audit_db: Path | None,
+    no_audit: bool,
+    export_report: bool,
+    report_path: Path,
+    report_template: str,
+) -> None:
+    """Run a team YAML file."""
+    if not prompt:
+        console.print("[red]Error:[/red] Team mode requires --prompt (-p) or --task.")
+        raise typer.Exit(1)
+
+    from initrunner.cli._helpers import create_audit_logger
+    from initrunner.team.loader import TeamLoadError, load_team
+
+    try:
+        team = load_team(team_file)
+    except TeamLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    audit_logger = create_audit_logger(audit_db, no_audit)
+
+    dry_run_model = None
+    if dry_run:
+        from pydantic_ai.models.test import TestModel
+
+        dry_run_model = TestModel(custom_output_text="[dry-run] Simulated response.", call_tools=[])
+
+    persona_names = list(team.spec.personas.keys())
+    console.print(f"[bold]Team mode[/bold] -- team: [cyan]{team.metadata.name}[/cyan]")
+    console.print(f"  Personas: {', '.join(persona_names)}")
+    console.print()
+
+    with console.status("[dim]Running team pipeline...[/dim]") as status:
+        import time
+
+        from initrunner._ids import generate_id
+        from initrunner.agent.executor import execute_run as _orig_execute_run
+        from initrunner.agent.loader import _load_dotenv, build_agent
+        from initrunner.team.runner import (
+            TeamResult,
+            _build_agent_prompt,
+            _persona_to_role,
+        )
+
+        team_run_id = generate_id()
+        result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
+        _load_dotenv(team_file.parent)
+
+        prior_outputs: list[tuple[str, str]] = []
+        wall_start = time.monotonic()
+
+        for persona_name, description in team.spec.personas.items():
+            status.update(f"[dim]Running persona: {persona_name}...[/dim]")
+
+            # Check cumulative token budget
+            if team.spec.guardrails.team_token_budget is not None:
+                if result.total_tokens >= team.spec.guardrails.team_token_budget:
+                    result.success = False
+                    result.error = (
+                        f"Team token budget exceeded: {result.total_tokens} >= "
+                        f"{team.spec.guardrails.team_token_budget}"
+                    )
+                    break
+
+            # Check team timeout
+            if team.spec.guardrails.team_timeout_seconds is not None:
+                elapsed_s = time.monotonic() - wall_start
+                if elapsed_s >= team.spec.guardrails.team_timeout_seconds:
+                    result.success = False
+                    result.error = (
+                        f"Team timeout exceeded: {elapsed_s:.0f}s >= "
+                        f"{team.spec.guardrails.team_timeout_seconds}s"
+                    )
+                    break
+
+            role = _persona_to_role(persona_name, description, team)
+            agent = build_agent(role, role_dir=team_file.parent)
+
+            agent_prompt = _build_agent_prompt(
+                prompt, persona_name, prior_outputs, team.spec.handoff_max_chars
+            )
+
+            trigger_metadata = {
+                "team_name": team.metadata.name,
+                "team_run_id": team_run_id,
+                "agent_name": persona_name,
+            }
+
+            run_result, _ = _orig_execute_run(
+                agent,
+                role,
+                agent_prompt,
+                audit_logger=audit_logger,
+                model_override=dry_run_model,
+                trigger_type="team",
+                trigger_metadata=trigger_metadata,
+            )
+
+            result.agent_results.append(run_result)
+            result.agent_names.append(persona_name)
+            result.total_tokens_in += run_result.tokens_in
+            result.total_tokens_out += run_result.tokens_out
+            result.total_tokens += run_result.total_tokens
+            result.total_tool_calls += run_result.tool_calls
+            result.total_duration_ms += run_result.duration_ms
+
+            if not run_result.success:
+                result.success = False
+                result.error = f"Persona '{persona_name}' failed: {run_result.error}"
+                break
+
+            prior_outputs.append((persona_name, run_result.output))
+
+        if result.agent_results:
+            last = result.agent_results[-1]
+            if last.success:
+                result.final_output = last.output
+
+    _display_team_result(result)
+
+    if export_report and result.agent_results:
+        # Synthesize a RunResult for report export
+        from initrunner.agent.executor import RunResult as _RunResult
+
+        synthetic = _RunResult(
+            run_id=result.team_run_id,
+            output=result.final_output,
+            tokens_in=result.total_tokens_in,
+            tokens_out=result.total_tokens_out,
+            total_tokens=result.total_tokens,
+            tool_calls=result.total_tool_calls,
+            duration_ms=result.total_duration_ms,
+            success=result.success,
+            error=result.error,
+        )
+        # Build a synthetic role for the report
+        synthetic_role = _persona_to_role(
+            team.metadata.name,
+            team.metadata.description or "Team run",
+            team,
+        )
+        _maybe_export_report(
+            synthetic_role,
+            synthetic,
+            prompt,
+            report_path,
+            report_template,
+            dry_run,
+        )
+
+    if audit_logger is not None:
+        audit_logger.close()
+
+    if not result.success:
+        raise typer.Exit(1)
 
 
 def _display_suite_result(suite_result: object, verbose: bool = False) -> None:
