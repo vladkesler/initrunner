@@ -83,7 +83,7 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-opus-4-6 }`.
 
 <p align="center">
-  <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="700"><br>
+  <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
   <em>Quick Chat - ask a question, send the answer to Slack</em>
 </p>
 
