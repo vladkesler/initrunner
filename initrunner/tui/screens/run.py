@@ -9,7 +9,7 @@ from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Static
 
-from initrunner.tui.screens.base import RoleScreen
+from initrunner.tui.screens.base import BaseScreen, RoleScreen
 from initrunner.tui.theme import COLOR_PRIMARY
 
 if TYPE_CHECKING:
@@ -118,7 +118,7 @@ class RunScreen(RoleScreen):
         Binding("escape", "exit_chat", "Back", show=True),
     ]
 
-    def __init__(self, *, role_path: Path, role: RoleDefinition) -> None:
+    def __init__(self, *, role_path: Path | None = None, role: RoleDefinition) -> None:
         super().__init__(role_path=role_path, role=role)
         self._agent: Agent | None = None
         self._message_history: list | None = None
@@ -153,10 +153,13 @@ class RunScreen(RoleScreen):
         from initrunner.tui.services import ServiceBridge
 
         try:
-            _, self._agent = await ServiceBridge.build_agent(self._role_path)
+            if self._role_path is not None:
+                _, self._agent = await ServiceBridge.build_agent(self._role_path)
+            else:
+                self._agent = await ServiceBridge.build_agent_from_role(self._role)
             self.notify(f"Agent ready: {self._role.metadata.name}")
         except Exception as e:
-            self.notify(f"Failed to build agent: {e}", severity="error")
+            self.notify(f"Failed to build agent: {e}", severity="error", markup=False)
 
     def on_text_area_changed(self, event) -> None:
         # Auto-resize text area based on content lines
@@ -199,7 +202,7 @@ class RunScreen(RoleScreen):
             try:
                 user_prompt = build_multimodal_prompt(text, self._pending_attachments)
             except (FileNotFoundError, ValueError) as e:
-                self.notify(f"Attachment error: {e}", severity="error")
+                self.notify(f"Attachment error: {e}", severity="error", markup=False)
                 self._busy = False
                 return
             display_text = f"{text} [{len(self._pending_attachments)} attachment(s)]"
@@ -313,6 +316,8 @@ class RunScreen(RoleScreen):
         bar.update(self._format_status_bar())
 
     def _save_session(self) -> None:
+        if self._role_path is None:
+            return  # ephemeral sessions don't persist
         if self._role.spec.memory is None or self._message_history is None:
             return
         self.run_worker(self._save_session_worker())
@@ -330,6 +335,9 @@ class RunScreen(RoleScreen):
             )
 
     def action_resume_session(self) -> None:
+        if self._role_path is None:
+            self.notify("Ephemeral sessions cannot be resumed", severity="warning")
+            return
         if self._role.spec.memory is None:
             self.notify("No memory config — cannot resume", severity="warning")
             return
@@ -405,6 +413,9 @@ class RunScreen(RoleScreen):
         self.notify("New conversation started")
 
     def action_show_history(self) -> None:
+        if self._role_path is None:
+            self.notify("Ephemeral sessions have no history", severity="warning")
+            return
         if self._role.spec.memory is None:
             self.notify("No memory config — cannot browse history", severity="warning")
             return
@@ -486,3 +497,27 @@ class RunScreen(RoleScreen):
 
     def action_exit_chat(self) -> None:
         self.app.pop_screen()
+
+
+class QuickChatLoadingScreen(BaseScreen):
+    """Transient screen: detect provider, build ephemeral role, push RunScreen."""
+
+    SUB_TITLE = "Quick Chat"
+
+    def compose_content(self) -> ComposeResult:
+        yield Static("Detecting provider...", id="loading-msg")
+
+    def on_mount(self) -> None:
+        self.run_worker(self._detect_and_launch())
+
+    async def _detect_and_launch(self) -> None:
+        from initrunner.tui.services import ServiceBridge
+
+        try:
+            role, _provider, _model = await ServiceBridge.build_quick_chat_role()
+        except Exception as e:
+            self.notify(f"Quick Chat unavailable: {e}", severity="error", markup=False)
+            self.app.pop_screen()
+            return
+
+        self.app.switch_screen(RunScreen(role_path=None, role=role))

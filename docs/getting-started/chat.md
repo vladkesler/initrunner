@@ -455,6 +455,18 @@ Auto-detection uses the priority order listed above. If you have multiple API ke
 initrunner chat --provider anthropic
 ```
 
+## Quick Chat in Other Interfaces
+
+The same zero-config Quick Chat experience is available in the Web UI and TUI:
+
+### Web Dashboard
+
+Navigate to `/chat` (the default landing page) to start chatting immediately. The page auto-detects your provider and model. If roles exist, a **Sense** button lets you auto-select the best role for your task. See [Web Dashboard](../interfaces/dashboard.md#quick-chat) for details.
+
+### TUI
+
+Press `c` from any screen to start Quick Chat. Press `s` from the Roles Screen to use Sense. See [TUI Dashboard](../interfaces/tui.md#quick-chat) for details.
+
 ## What's Next
 
 - [CLI Reference](cli.md) — full command and flag reference

@@ -21,6 +21,7 @@ from initrunner.agent.schema.tools import (
     McpToolConfig,
     PythonToolConfig,
     SqlToolConfig,
+    ToolPermissions,
     WebReaderToolConfig,
 )
 from initrunner.agent.schema.triggers import (
@@ -948,3 +949,35 @@ class TestOutputConfig:
             }
         )
         assert config.schema_ is not None
+
+
+class TestToolPermissionsRoundTrip:
+    def test_permissions_in_role_round_trip(self):
+        data = _minimal_role_data()
+        data["spec"]["tools"] = [
+            {
+                "type": "shell",
+                "working_dir": ".",
+                "permissions": {
+                    "default": "deny",
+                    "allow": ["command=ls *", "command=cat *"],
+                    "deny": ["command=rm *"],
+                },
+            }
+        ]
+        role = RoleDefinition.model_validate(data)
+        from initrunner.agent.schema.tools import ShellToolConfig
+
+        tool = role.spec.tools[0]
+        assert isinstance(tool, ShellToolConfig)
+        assert tool.permissions is not None
+        assert isinstance(tool.permissions, ToolPermissions)
+        assert tool.permissions.default == "deny"
+        assert tool.permissions.allow == ["command=ls *", "command=cat *"]
+        assert tool.permissions.deny == ["command=rm *"]
+
+    def test_permissions_none_by_default(self):
+        data = _minimal_role_data()
+        data["spec"]["tools"] = [{"type": "filesystem"}]
+        role = RoleDefinition.model_validate(data)
+        assert role.spec.tools[0].permissions is None

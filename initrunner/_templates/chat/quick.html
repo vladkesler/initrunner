@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Quick Chat — InitRunner{% endblock %}
+
+{% block content %}
+{% if not provider_detected %}
+<div class="hero min-h-[60vh]">
+    <div class="hero-content text-center">
+        <div class="max-w-md">
+            <h1 class="text-3xl font-bold mb-4">No API Key Configured</h1>
+            <p class="mb-6 text-base-content/70">
+                Run <code class="kbd kbd-sm">initrunner setup</code> or set an API key environment variable
+                (e.g. <code class="kbd kbd-sm">ANTHROPIC_API_KEY</code>).
+            </p>
+            <a href="/roles" class="btn btn-primary">Browse Roles</a>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-4">
+        {# Toolbar #}
+        <div class="flex items-center gap-2 mb-3">
+            <h2 class="text-lg font-bold flex-1">Quick Chat</h2>
+            <button id="btn-new-chat" class="btn btn-sm btn-outline" title="Start new conversation">New Chat</button>
+            <button id="btn-export" class="btn btn-sm btn-ghost" title="Export conversation as markdown">Export</button>
+            {% if has_roles %}
+            <button id="btn-sense" class="btn btn-sm btn-ghost" title="Find best role for your task">Sense</button>
+            {% endif %}
+        </div>
+
+        {# Status bar #}
+        <div id="chat-status-bar" class="flex items-center gap-3 text-xs text-base-content/60 mb-3 px-1">
+            <span class="font-mono">{{ model_name }}</span>
+            <span class="opacity-50">|</span>
+            <span><span id="status-tokens-in" class="font-bold text-primary">0</span> in</span>
+            <span><span id="status-tokens-out" class="font-bold text-primary">0</span> out</span>
+        </div>
+
+        {# Sense result card (hidden by default) #}
+        {% if has_roles %}
+        <div id="sense-result" class="alert shadow-sm mb-3" style="display:none;">
+            <div class="flex-1">
+                <div class="font-bold"><span id="sense-role-name"></span></div>
+                <div class="text-xs text-base-content/60">
+                    <span id="sense-method"></span> &middot; score: <span id="sense-score"></span>
+                </div>
+                <div class="text-sm mt-1" id="sense-description"></div>
+            </div>
+            <div class="flex gap-1">
+                <button id="sense-use" class="btn btn-sm btn-primary">Use this role</button>
+                <button id="sense-dismiss" class="btn btn-sm btn-ghost">Dismiss</button>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Messages area #}
+        <template id="assistant-avatar">{{ facehash("quick-chat", 32) }}</template>
+        <div id="chat-messages" class="chat-messages min-h-[400px] max-h-[60vh] space-y-2 mb-4">
+        </div>
+
+        {# Attachment chips #}
+        <div id="attachment-chips" class="flex flex-wrap gap-1 mb-2" style="display:none;"></div>
+
+        {# Input form #}
+        <form id="chat-form" class="flex gap-2" hx-boost="false">
+            <input type="file" id="file-upload" class="hidden" multiple
+                   accept="image/*,audio/*,video/*,.pdf,.docx,.xlsx,.txt,.md,.csv,.html" />
+            <button type="button" id="btn-attach-file" class="btn btn-sm btn-ghost" title="Attach file">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+            </button>
+            <textarea name="prompt" rows="1"
+                      class="textarea textarea-bordered flex-1 resize-none"
+                      placeholder="Type a message..."
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea>
+            <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    var chatApi = initChatStream("chat-form", "chat-messages", "/chat/stream", {
+        roleId: "__quick_chat__",
+        modelName: {{ model_name | tojson }},
+        sessionTokenBudget: null,
+        uploadUrl: "/chat/upload"
+    });
+
+    if (chatApi) {
+        // No restoreSession() — ephemeral sessions
+
+        document.getElementById("btn-new-chat").addEventListener("click", function() {
+            chatApi.resetSession();
+        });
+
+        document.getElementById("btn-export").addEventListener("click", function() {
+            chatApi.exportConversation("quick-chat");
+        });
+    }
+
+    {% if has_roles %}
+    // Sense feature — auto-redirect to matched role's chat
+    var senseBtn = document.getElementById("btn-sense");
+
+    if (senseBtn) {
+        senseBtn.addEventListener("click", function() {
+            var input = document.querySelector("#chat-form textarea");
+            var prompt = input ? input.value.trim() : "";
+            if (!prompt) {
+                alert("Type a task description first, then click Sense.");
+                return;
+            }
+            senseBtn.disabled = true;
+            senseBtn.textContent = "Sensing...";
+            senseRequest("/chat/sense", prompt, function(data) {
+                senseBtn.disabled = false;
+                senseBtn.textContent = "Sense";
+                if (data.error) {
+                    alert("Sense: " + data.error);
+                    return;
+                }
+                // Auto-redirect to the matched role's chat with prompt
+                var url = "/roles/" + data.role_id + "/chat?prompt=" + encodeURIComponent(prompt);
+                window.location.href = url;
+            });
+        });
+    }
+    {% endif %}
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -39,7 +39,7 @@ class BaseScreen(Screen):
 class RoleScreen(BaseScreen):
     """Base for screens that operate on a specific role."""
 
-    def __init__(self, *, role_path: Path, role: RoleDefinition) -> None:
+    def __init__(self, *, role_path: Path | None = None, role: RoleDefinition) -> None:
         super().__init__()
         self._role_path = role_path
         self._role = role

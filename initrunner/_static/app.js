@@ -61,6 +61,17 @@ function createMessageBubble(content, role) {
     return wrapper;
 }
 
+/** POST a prompt to a sense endpoint and invoke callback with the JSON result. */
+function senseRequest(url, prompt, callback) {
+    fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({prompt: prompt})
+    })
+    .then(function(r) { return r.json(); })
+    .then(callback);
+}
+
 /** Set up chat streaming via EventSource. Returns an API object. */
 function initChatStream(formId, messagesId, streamUrl, options) {
     var form = document.getElementById(formId);

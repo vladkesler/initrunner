@@ -23,6 +23,7 @@ from initrunner.api.routes.ingest_ui import router as ingest_ui_router
 from initrunner.api.routes.memory import router as memory_router
 from initrunner.api.routes.memory_ui import router as memory_ui_router
 from initrunner.api.routes.pages import router as pages_router
+from initrunner.api.routes.quick_chat import router as quick_chat_router
 from initrunner.api.routes.roles import router as roles_router
 
 _logger = logging.getLogger(__name__)
@@ -95,13 +96,20 @@ def create_dashboard_app(
     rate_limiter = TokenBucketRateLimiter(rate=120 / 60.0, burst=20)
     api_predicate = prefix_predicate("/api/", exclude={"/api/health"})
 
-    # Body size limit on all paths except health
+    # Body size limit on all paths except health and upload endpoints
+    _base_body_predicate = all_paths_predicate(exclude={"/api/health"})
+
+    def _body_size_applies(request) -> bool:
+        if request.url.path.endswith("/chat/upload"):
+            return False
+        return _base_body_predicate(request)
+
     app.add_middleware(
         BaseHTTPMiddleware,  # type: ignore[arg-type]
         dispatch=make_body_size_dispatch(
             max_bytes=_MAX_BODY_BYTES,
             error_response=detail_error_response,
-            applies_to=all_paths_predicate(exclude={"/api/health"}),
+            applies_to=_body_size_applies,
         ),
     )
 
@@ -159,6 +167,7 @@ def create_dashboard_app(
     # --- HTML page routes ---
     app.include_router(auth_ui_router)
     app.include_router(pages_router)
+    app.include_router(quick_chat_router)
     app.include_router(chat_ui_router)
     app.include_router(memory_ui_router)
     app.include_router(ingest_ui_router)

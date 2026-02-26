@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.7.0] - 2026-02-26
+
+### Added
+- Tool permission system: declarative allow/deny rules for tool calls with fnmatch glob patterns, deny-wins evaluation, and sanitized denial messages
+- `ToolPermissions` schema with `default`, `allow`, `deny` fields on any tool config
+- `PermissionToolset` wrapper auto-applied by tool registry when permissions are configured
+- Quick Chat in web dashboard: zero-config `/chat` page with provider auto-detection, SSE streaming, and file upload (20 MB limit)
+- Quick Chat in TUI: press `c` from any screen for ephemeral chat with auto-detected provider
+- Sense (auto-role selection) in TUI (`s` key) and web dashboard (`/chat/sense`) for matching prompts to roles
+- `build_agent_from_role_sync()` for building agents from in-memory RoleDefinition without a file path
+- `build_quick_chat_role_sync()` one-shot builder for ephemeral roles with provider detection and tool filtering
+- Sense redirect in role chat page: auto-fills and submits prompt when redirected with `?prompt=` query param
+- `sandboxed-dev-assistant.yaml` example role demonstrating tool permissions
+- `docs/security/tool_permission_system.md` documentation
+
+### Fixed
+- Sense LLM tiebreaker now evaluates top 15 candidates instead of top 5 for better role matching accuracy
+
+### Changed
+- Default web dashboard landing page changed from `/roles` to `/chat`
+- `ChatSession.role_path` now optional to support ephemeral sessions
+- Chat command refactored to delegate to shared `build_quick_chat_role_sync()` service
+- Shared tool constants (`EPHEMERAL_TOOL_DEFAULTS`, `TOOL_REQUIRED_ENVS`, `TOOL_PROFILES`) moved to `services.providers`
+
+### Documentation
+- New Quick Chat sections in web dashboard and TUI docs
+- New Sense (auto-role selection) sections in dashboard and TUI docs
+- Updated chat getting-started guide with Quick Chat links
+
 ## [1.6.0] - 2026-02-26
 
 ### Added

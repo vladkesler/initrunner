@@ -11,6 +11,7 @@ from initrunner.services.discovery import (
     validate_role_sync,
 )
 from initrunner.services.execution import (
+    build_agent_from_role_sync,
     build_agent_sync,
     execute_run_stream_sync,
     execute_run_sync,
@@ -64,6 +65,22 @@ class ServiceBridge:
     @staticmethod
     async def build_agent(path: Path) -> tuple[RoleDefinition, Agent]:
         return await asyncio.to_thread(build_agent_sync, path)
+
+    @staticmethod
+    async def build_quick_chat_role() -> tuple[RoleDefinition, str, str]:
+        from initrunner.services.providers import build_quick_chat_role_sync
+
+        return await asyncio.to_thread(build_quick_chat_role_sync)
+
+    @staticmethod
+    async def build_agent_from_role(role: RoleDefinition) -> Agent:
+        return await asyncio.to_thread(build_agent_from_role_sync, role)
+
+    @staticmethod
+    async def sense_role(prompt: str, role_dir: Path | None = None) -> Any:
+        from initrunner.services.role_selector import select_role_sync
+
+        return await asyncio.to_thread(select_role_sync, prompt, role_dir=role_dir)
 
     @staticmethod
     async def run_agent(

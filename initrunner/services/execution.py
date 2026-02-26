@@ -25,6 +25,13 @@ def build_agent_sync(path: Path) -> tuple[RoleDefinition, Agent]:
     return load_and_build(path)
 
 
+def build_agent_from_role_sync(role: RoleDefinition) -> Agent:
+    """Build an agent from an in-memory RoleDefinition (no file path)."""
+    from initrunner.agent.loader import build_agent
+
+    return build_agent(role)
+
+
 def execute_run_sync(
     agent: Agent,
     role: RoleDefinition,

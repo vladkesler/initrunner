@@ -110,7 +110,12 @@ def build_toolsets(
     for tool in tools:
         builder = get_builder(tool.type)
         if builder:
-            toolsets.append(builder(tool, ctx))
+            toolset = builder(tool, ctx)
+            if tool.permissions is not None:
+                from initrunner.agent.permissions import PermissionToolset
+
+                toolset = PermissionToolset(toolset, tool.permissions, tool.type)
+            toolsets.append(toolset)
 
     # Auto-tools (retrieval, memory) — not user-configured, wired from role spec
     if role.spec.ingest is not None:

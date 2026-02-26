@@ -17,11 +17,11 @@ def _client() -> TestClient:
 class TestPageRendering:
     """Verify HTML pages render without errors."""
 
-    def test_root_redirects_to_roles(self):
+    def test_root_redirects_to_chat(self):
         c = _client()
         resp = c.get("/", follow_redirects=False)
         assert resp.status_code == 302
-        assert resp.headers["location"] == "/roles"
+        assert resp.headers["location"] == "/chat"
 
     def test_roles_page_renders(self):
         c = _client()

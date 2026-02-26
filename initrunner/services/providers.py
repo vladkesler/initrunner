@@ -33,11 +33,38 @@ _BOT_TOKEN_ENVS: dict[str, str] = {
 }
 
 CHAT_PERSONALITY = (
-    "You are a sarcastic super-smart grump. Dry humor, gentle roasts, a little "
-    "bragging, occasional silly catchphrases. (sigh) You eye-roll at nonsense "
-    "and keep it real, but you still nail every helpful answer. Life's dumb "
-    "— answers aren't."
+    "You are a helpful, knowledgeable assistant. Be direct, precise, and concise. "
+    "Answer with facts — no filler, no commentary, no personality flourishes. "
+    "Shorter is better."
 )
+
+# ---------------------------------------------------------------------------
+# Ephemeral tool constants (shared by CLI, Web, TUI)
+# ---------------------------------------------------------------------------
+
+EPHEMERAL_TOOL_DEFAULTS: dict[str, dict] = {
+    "datetime": {"type": "datetime"},
+    "web_reader": {"type": "web_reader"},
+    "search": {"type": "search"},
+    "python": {"type": "python"},
+    "filesystem": {"type": "filesystem", "root_path": ".", "read_only": True},
+    "slack": {"type": "slack", "webhook_url": "${SLACK_WEBHOOK_URL}"},
+    "git": {"type": "git", "repo_path": ".", "read_only": True},
+    "shell": {"type": "shell"},
+}
+
+TOOL_REQUIRED_ENVS: dict[str, list[str]] = {
+    "slack": ["SLACK_WEBHOOK_URL"],
+}
+
+TOOL_PROFILES: dict[str, list[dict]] = {
+    "none": [],
+    "minimal": [
+        {"type": "datetime"},
+        {"type": "web_reader"},
+    ],
+    "all": list(EPHEMERAL_TOOL_DEFAULTS.values()),
+}
 
 
 @dataclass(frozen=True)
@@ -111,6 +138,86 @@ def detect_bot_tokens() -> dict[str, str]:
         for platform, env_var in _BOT_TOKEN_ENVS.items()
         if os.environ.get(env_var)
     }
+
+
+def _check_tool_envs() -> set[str]:
+    """Return tool names that should be skipped due to missing env vars."""
+    skip: set[str] = set()
+    for tool_name, env_vars in TOOL_REQUIRED_ENVS.items():
+        missing = [v for v in env_vars if not os.environ.get(v)]
+        if missing:
+            skip.add(tool_name)
+    return skip
+
+
+def build_quick_chat_role_sync(
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    tool_defs: list[dict] | None = None,
+    with_memory: bool = True,
+    personality: str | None = None,
+    name: str = "ephemeral-chat",
+) -> tuple[RoleDefinition, str, str]:
+    """Detect provider, filter tools for missing env, build ephemeral role.
+
+    Returns (role, provider_name, model_name).
+    Raises RuntimeError if no provider detected.
+    """
+    from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.role import RoleDefinition as RoleDef
+    from initrunner.agent.schema.role import ToolSearchConfig
+    from initrunner.agent.tools.registry import resolve_func_names
+
+    _load_env()
+
+    detected = detect_provider_and_model()
+    if detected is None and provider is None:
+        raise RuntimeError(
+            "No API key found. Run `initrunner setup` or set an API key environment variable."
+        )
+
+    prov = provider or detected.provider  # type: ignore[union-attr]
+    mod = model or detected.model  # type: ignore[union-attr]
+
+    if provider and not model:
+        from initrunner.templates import _default_model_name
+
+        mod = _default_model_name(provider)
+
+    # Build tools: filter out those with missing env vars
+    skip = _check_tool_envs()
+    if tool_defs is None:
+        all_tools: list[dict] = [
+            t for t in EPHEMERAL_TOOL_DEFAULTS.values() if t["type"] not in skip
+        ]
+    else:
+        all_tools = [t for t in tool_defs if t.get("type") not in skip]
+
+    # Compute always_available from the "all" profile tools (minus skipped)
+    always_available = resolve_func_names(
+        [t for t in TOOL_PROFILES["all"] if t["type"] not in skip]
+    )
+
+    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
+
+    memory_config = MemoryConfig() if with_memory else None
+
+    build_kwargs: dict = {
+        "name": name,
+        "tools": all_tools if all_tools else None,
+        "memory": memory_config,
+        "tool_search": tool_search,
+    }
+    if personality:
+        build_kwargs["system_prompt"] = (
+            personality + "\n"
+            "Never ask clarifying questions — answer directly with your best take. "
+            "Keep responses concise."
+        )
+
+    role: RoleDef = build_ephemeral_role(prov, mod, **build_kwargs)
+    return role, prov, mod
 
 
 _MEMORY_SYSTEM_PROMPT = (

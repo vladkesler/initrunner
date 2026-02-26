@@ -6,15 +6,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from textual.binding import Binding
+from textual.screen import ModalScreen
 from textual.widgets import DataTable, Input, Static
 
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.tui.screens.base import BaseScreen, FilterableScreen
 from initrunner.tui.services import DiscoveredRole
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
-
-    from initrunner.agent.schema.role import RoleDefinition
 
 
 class RolesScreen(FilterableScreen):
@@ -27,6 +27,8 @@ class RolesScreen(FilterableScreen):
         Binding("enter", "open_role", "Open", show=True, priority=True),
         Binding("ctrl+r", "fast_run", "Fast Run", show=True),
         Binding("n", "new_role", "New Role", show=True),
+        Binding("c", "quick_chat", "Quick Chat", show=True),
+        Binding("s", "sense", "Sense", show=True),
     ]
 
     def __init__(self, *, role_dir: Path | None = None) -> None:
@@ -183,7 +185,7 @@ class RolesScreen(FilterableScreen):
         if dr is None:
             return
         if dr.role is None:
-            self.notify(f"Cannot open invalid role: {dr.error}", severity="error")
+            self.notify(f"Cannot open invalid role: {dr.error}", severity="error", markup=False)
             return
         from initrunner.tui.screens.detail import RoleDetailScreen
 
@@ -194,7 +196,7 @@ class RolesScreen(FilterableScreen):
         if dr is None:
             return
         if dr.role is None:
-            self.notify(f"Cannot run invalid role: {dr.error}", severity="error")
+            self.notify(f"Cannot run invalid role: {dr.error}", severity="error", markup=False)
             return
         from initrunner.tui.screens.run import RunScreen
 
@@ -218,8 +220,121 @@ class RolesScreen(FilterableScreen):
         self._filter_text = ""
         self._load_roles()
 
+    def action_quick_chat(self) -> None:
+        self.app.action_quick_chat()  # type: ignore[possibly-missing-attribute]
+
+    def action_sense(self) -> None:
+        self.app.push_screen(SenseModal(role_dir=self._role_dir), callback=self._on_sense_result)
+
+    def _on_sense_result(self, result: tuple[Path, RoleDefinition] | None) -> None:
+        if result is not None:
+            path, role = result
+            from initrunner.tui.screens.run import RunScreen
+
+            self.app.push_screen(RunScreen(role_path=path, role=role))
+
     def action_refresh(self) -> None:
         self._load_roles()
+
+
+class SenseModal(ModalScreen[tuple[Path, RoleDefinition] | None]):
+    """Enter a prompt to auto-select the best role."""
+
+    BINDINGS = [Binding("escape", "cancel", "Close", show=True)]
+
+    DEFAULT_CSS = """
+    SenseModal {
+        align: center middle;
+    }
+    SenseModal > #sense-container {
+        width: 80;
+        height: 20;
+        background: $surface;
+        border: thick $primary;
+        padding: 1 2;
+    }
+    SenseModal > #sense-container > #sense-title {
+        text-align: center;
+        text-style: bold;
+        margin-bottom: 1;
+    }
+    """
+
+    def __init__(self, *, role_dir: Path | None = None) -> None:
+        super().__init__()
+        self._role_dir = role_dir
+
+    def compose(self) -> ComposeResult:
+        from textual.containers import Vertical
+        from textual.widgets import Button
+
+        with Vertical(id="sense-container"):
+            yield Static("Sense — Find Best Role", id="sense-title")
+            yield Input(placeholder="Describe your task...", id="sense-input")
+            yield Button("Find Role", variant="primary", id="sense-submit")
+            yield Static("", id="sense-result")
+
+    def on_button_pressed(self, event) -> None:
+        if event.button.id == "sense-submit":
+            prompt = self.query_one("#sense-input", Input).value.strip()
+            if not prompt:
+                self.notify("Enter a task description", severity="warning")
+                return
+            self.run_worker(self._run_sense(prompt))
+        elif event.button.id == "sense-use":
+            if hasattr(self, "_sense_path") and hasattr(self, "_sense_role"):
+                self.dismiss((self._sense_path, self._sense_role))
+
+    def on_input_submitted(self, event) -> None:
+        if isinstance(event, Input.Submitted) and event.input.id == "sense-input":
+            prompt = event.value.strip()
+            if prompt:
+                self.run_worker(self._run_sense(prompt))
+
+    async def _run_sense(self, prompt: str) -> None:
+        from textual.widgets import Button
+
+        result_area = self.query_one("#sense-result", Static)
+        result_area.update("Sensing...")
+
+        from initrunner.tui.services import ServiceBridge
+
+        try:
+            sr = await ServiceBridge.sense_role(prompt, self._role_dir)
+        except Exception as e:
+            result_area.update(f"Error: {e}")
+            return
+
+        # Load the full role
+        from initrunner.tui.services import ServiceBridge as SB
+
+        try:
+            dr = await SB.validate_role(sr.candidate.path)
+        except Exception:
+            result_area.update("Failed to load matched role")
+            return
+
+        if dr.role is None:
+            result_area.update(f"Matched role is invalid: {dr.error}")
+            return
+
+        self._sense_path = sr.candidate.path
+        self._sense_role = dr.role
+
+        result_area.update(
+            f"[bold]{sr.candidate.name}[/bold] "
+            f"({sr.method}, score: {sr.top_score:.2f})\n"
+            f"{sr.candidate.description[:120]}"
+        )
+
+        # Add "Use" button
+        container = self.query_one("#sense-container")
+        existing_use = container.query("#sense-use")
+        if not existing_use:
+            container.mount(Button("Use this role", variant="success", id="sense-use"))
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class YamlViewerModal(BaseScreen):

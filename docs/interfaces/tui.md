@@ -35,6 +35,7 @@ These work on every screen:
 | Key | Action |
 |-----|--------|
 | `?` | Open help screen (keyboard shortcut reference) |
+| `c` | Quick Chat — auto-detect provider and start ephemeral chat |
 | `a` | Open audit log |
 | `q` | Quit application |
 | `Escape` | Go back / close modal |
@@ -70,6 +71,8 @@ Discovered roles are displayed in a table:
 | `Enter` | Open role detail screen |
 | `Ctrl+R` | Fast run — bypass detail, open chat directly |
 | `n` | Scaffold new role from template |
+| `c` | Quick Chat — auto-detect provider and start ephemeral chat |
+| `s` | Sense — enter a task description to auto-select the best role |
 | `/` | Toggle filter bar — filter roles by name |
 | `r` | Refresh role list |
 
@@ -80,6 +83,33 @@ Pressing `n` opens a template picker where you can choose a name and template (`
 #### YAML Viewer Modal
 
 Pressing `e` opens a read-only modal showing the full YAML content of the selected role.
+
+### Quick Chat
+
+Press `c` from any screen to start a Quick Chat session. This mirrors the `initrunner chat` CLI experience:
+
+1. A loading screen appears ("Detecting provider...")
+2. The provider is auto-detected from environment variables (same priority order as the CLI)
+3. An ephemeral role is built with all available tools, tool search, and memory
+4. The Run Screen opens with `role_path=None` — sessions are ephemeral
+
+If no provider is detected, a notification appears and you're returned to the previous screen.
+
+Ephemeral sessions have these differences from role-based chat:
+- **No session persistence** — `Ctrl+R` (Resume) and `Ctrl+H` (History) show informational messages
+- **Export still works** — `Ctrl+E` exports the current conversation as markdown
+
+### Sense
+
+Press `s` from the Roles Screen to open the Sense modal. Sense auto-selects the best role for your task:
+
+1. Type a task description (e.g., "research recent AI papers")
+2. Press Enter or click "Find Role"
+3. The backend scores all discovered roles using keyword matching + LLM tiebreaker
+4. The result shows the matched role name, method, and score
+5. Click "Use this role" to open a chat with the matched role
+
+If no roles are found or the prompt is too short, an error message is shown.
 
 ### Role Detail Screen
 
@@ -309,9 +339,9 @@ initrunner/tui/
 ├── screens/
 │   ├── __init__.py
 │   ├── base.py            # BaseScreen, RoleScreen, DataTableScreen ABCs
-│   ├── roles.py           # RolesScreen (home) + YamlViewerModal + TemplatePickerModal
+│   ├── roles.py           # RolesScreen (home) + SenseModal + YamlViewerModal + TemplatePickerModal
 │   ├── detail.py          # RoleDetailScreen + SectionPickerModal + FieldEditModal + TextEditModal
-│   ├── run.py             # RunScreen — streaming chat
+│   ├── run.py             # RunScreen — streaming chat + QuickChatLoadingScreen
 │   ├── audit.py           # AuditScreen + AuditDetailModal
 │   ├── daemon.py          # DaemonScreen — monitor triggers
 │   ├── memory.py          # MemoryScreen + ConfirmClearModal

@@ -215,3 +215,6 @@ MagicMock/
 # Dashboard build artifacts
 initrunner/_dashboard_static/
 package-lock.json
+
+# Dev role file
+role.yaml

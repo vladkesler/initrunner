@@ -31,6 +31,8 @@ class DaemonScreen(RoleScreen):
         Binding("escape", "go_back", "Back", show=True),
     ]
 
+    _role_path: Path
+
     def __init__(self, *, role_path: Path, role: RoleDefinition) -> None:
         super().__init__(role_path=role_path, role=role)
         self._agent: Agent | None = None

@@ -124,6 +124,19 @@
                 }
             });
         }
+
+        // If ?prompt= query param is present (from Sense redirect), pre-fill and auto-submit
+        var urlParams = new URLSearchParams(window.location.search);
+        var sensePrompt = urlParams.get("prompt");
+        if (sensePrompt) {
+            var textarea = document.querySelector("#chat-form textarea");
+            if (textarea) {
+                textarea.value = sensePrompt;
+                document.getElementById("chat-form").requestSubmit();
+                // Clean URL without reloading
+                history.replaceState(null, "", window.location.pathname);
+            }
+        }
     }
 })();
 

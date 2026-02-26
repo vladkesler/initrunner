@@ -79,7 +79,8 @@ Key design decisions:
 initrunner/api/routes/
 ├── pages.py          # HTML pages: roles list, role detail, audit log
 ├── auth_ui.py        # Login page + cookie-based auth flow
-├── chat_ui.py        # Chat page + SSE streaming endpoint
+├── quick_chat.py     # Quick Chat page + SSE streaming + Sense endpoint
+├── chat_ui.py        # Role-based chat page + SSE streaming endpoint
 ├── memory_ui.py      # Memory page + HTMX fragments (filter, clear)
 ├── ingest_ui.py      # Ingestion page (delegates to SSE API)
 ├── daemon_ui.py      # Daemon control page (delegates to WebSocket API)
@@ -95,7 +96,7 @@ initrunner/api/routes/
 ```
 initrunner/_templates/
 ├── base.html         # Base layout: dark theme, DaisyUI, HTMX, app.js
-├── _nav.html         # Navbar with active page highlighting + mobile menu
+├── _nav.html         # Navbar (Chat, Roles, Audit) with active page highlighting + mobile menu
 ├── _macros.html      # Reusable macros: badge(), stat_card(), empty_state(), etc.
 ├── auth/
 │   └── login.html    # Standalone login page (no base layout)
@@ -108,7 +109,8 @@ initrunner/_templates/
 │   ├── _table.html   # HTMX fragment: filtered audit table body
 │   └── _detail.html  # HTMX fragment: audit detail side panel
 ├── chat/
-│   └── page.html     # Chat interface with SSE streaming
+│   ├── page.html     # Role-based chat interface with SSE streaming
+│   └── quick.html    # Quick Chat — ephemeral chat with auto-detected provider
 ├── memory/
 │   └── page.html     # Memory list with filter, clear modal, export link
 ├── ingest/
@@ -153,7 +155,10 @@ All routes delegate to sync functions in `services.py`. The TUI's
 | `discover_roles_sync()` | Roles, Chat, Ingest, Memory, Daemon |
 | `validate_role_sync()` | Roles |
 | `build_agent_sync()` | Chat |
-| `execute_run_stream_sync()` | Chat |
+| `build_agent_from_role_sync()` | Quick Chat |
+| `build_quick_chat_role_sync()` | Quick Chat |
+| `execute_run_stream_sync()` | Chat, Quick Chat |
+| `select_role_sync()` | Quick Chat (Sense) |
 | `query_audit_sync()` | Audit |
 | `run_ingest_sync()` | Ingest |
 | `list_memories_sync()` | Memory |
@@ -165,7 +170,11 @@ All routes delegate to sync functions in `services.py`. The TUI's
 
 | Route | Template | Description |
 |-------|----------|-------------|
-| `/` | — | Redirects to `/roles` |
+| `/` | — | Redirects to `/chat` |
+| `/chat` | `chat/quick.html` | Quick Chat — auto-detected ephemeral chat (default landing page) |
+| `/chat/stream` | — | SSE streaming for quick chat (GET) |
+| `/chat/sense` | — | Sense endpoint — auto-select best role for a prompt (POST) |
+| `/chat/upload` | — | File upload for quick chat attachments (POST) |
 | `/roles` | `roles/list.html` | Role listing with search filter |
 | `/roles/table` | `roles/_table.html` | HTMX fragment: filtered table body |
 | `/roles/{role_id}` | `roles/detail.html` | Role detail — config cards, system prompt, YAML tabs |
@@ -181,6 +190,36 @@ All routes delegate to sync functions in `services.py`. The TUI's
 | `/audit` | `audit/list.html` | Audit log with filters and detail slide-out |
 | `/audit/table` | `audit/_table.html` | HTMX fragment: filtered audit rows |
 | `/audit/{run_id}` | `audit/_detail.html` | HTMX fragment: audit detail panel |
+
+## Quick Chat
+
+The default landing page (`/chat`) provides zero-config ephemeral chat — the same experience as `initrunner chat` in the terminal, but in the browser. On load, the page auto-detects your API provider and model from environment variables.
+
+- **Provider detected**: Shows the chat interface with the detected `provider:model` in the status bar. Type a message and get streaming responses immediately.
+- **No provider**: Shows setup instructions ("Run `initrunner setup` or set an API key environment variable").
+
+Quick Chat sessions are ephemeral — no persistent history, no session restoration. The New Chat button resets the conversation. Export works client-side (downloads a markdown file).
+
+### Sense
+
+If roles exist in the scanned directories, a **Sense** button appears in the Quick Chat toolbar. Sense auto-selects the best matching role for your task:
+
+1. Type a task description in the input field
+2. Click **Sense** — the backend scores all discovered roles against your prompt using keyword matching and an optional LLM tiebreaker
+3. A result card shows the matched role name, method (keyword/llm/fallback), and score
+4. Click **Use this role** to navigate to the matched role's chat page, or **Dismiss** to continue with ephemeral chat
+
+The sense endpoint (`POST /chat/sense`) returns:
+
+```json
+{
+  "role_id": "abc123",
+  "name": "researcher",
+  "description": "Research agent...",
+  "method": "keyword",
+  "score": 0.85
+}
+```
 
 ## File Attachments
 
@@ -327,7 +366,7 @@ rate limiting → auth):
 |------------|-------|---------|
 | Authentication | All paths except `/api/health`, `/login`, `/logout`, `/static/*` | Timing-safe `hmac.compare_digest()` comparison |
 | Rate limiting | `/api/*` except `/api/health` | Token bucket: 120 req/min, 20 burst |
-| Body size limit | All paths except `/api/health` | 2 MB max on POST/PUT/PATCH |
+| Body size limit | All paths except `/api/health` and `*/chat/upload` | 2 MB max on POST/PUT/PATCH (upload endpoints exempt) |
 
 Middleware factories live in `initrunner/middleware.py` and are shared with the
 OpenAI-compatible server (`initrunner serve`).

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from textual.binding import Binding
@@ -34,6 +35,8 @@ from initrunner.tui.theme import COLOR_SECONDARY
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
+    from initrunner.agent.schema.role import RoleDefinition
+
 
 # ── Screen ───────────────────────────────────────────────────
 
@@ -53,6 +56,11 @@ class RoleDetailScreen(RoleScreen):
         Binding("m", "memory", "Memory", show=True),
         Binding("e", "view_yaml", "View YAML", show=True),
     ]
+
+    _role_path: Path
+
+    def __init__(self, *, role_path: Path, role: RoleDefinition) -> None:
+        super().__init__(role_path=role_path, role=role)
 
     def compose_content(self) -> ComposeResult:
         yield Static(self._build_status_bar(), id="detail-status-bar")
@@ -331,7 +339,7 @@ class RoleDetailScreen(RoleScreen):
         try:
             converted = convert_values(values, model_fields(self._role))
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         model_data: dict[str, object] = {}
         for key, val in converted.items():
@@ -347,7 +355,7 @@ class RoleDetailScreen(RoleScreen):
         try:
             converted = convert_values(values, guardrails_fields(self._role))
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         save_yaml_field(self._role_path, "spec.guardrails", converted)
         self.run_worker(self._reload_role())
@@ -365,7 +373,7 @@ class RoleDetailScreen(RoleScreen):
             specs = ingest_fields(self._role)
             converted = convert_values(values, specs)
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         # Separate flat keys into top-level and nested chunking keys
         ingest_data: dict[str, object] = {}
@@ -386,7 +394,7 @@ class RoleDetailScreen(RoleScreen):
         try:
             converted = convert_values(values, memory_fields(self._role))
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         save_yaml_field(self._role_path, "spec.memory", converted)
         self.run_worker(self._reload_role())
@@ -405,7 +413,7 @@ class RoleDetailScreen(RoleScreen):
         try:
             converted = convert_values(values, specs)
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         save_yaml_list_item(self._role_path, f"spec.{section}", index, converted)
         self.run_worker(self._reload_role())
@@ -419,7 +427,7 @@ class RoleDetailScreen(RoleScreen):
             await self._refresh_content()
             self.notify("Saved", severity="information")
         else:
-            self.notify(f"Save error: {result.error}", severity="error")
+            self.notify(f"Save error: {result.error}", severity="error", markup=False)
 
     def action_run_chat(self) -> None:
         from initrunner.tui.screens.run import RunScreen
@@ -436,7 +444,7 @@ class RoleDetailScreen(RoleScreen):
         if result.role is not None:
             self.notify(f"{result.role.metadata.name}: Valid", severity="information")
         else:
-            self.notify(f"{self._role_path.name}: {result.error}", severity="error")
+            self.notify(f"{self._role_path.name}: {result.error}", severity="error", markup=False)
 
     def action_ingest(self) -> None:
         if self._role.spec.ingest is None:

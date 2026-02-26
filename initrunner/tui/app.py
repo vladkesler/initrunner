@@ -19,6 +19,7 @@ class InitRunnerApp(App):
 
     BINDINGS = [
         Binding("question_mark", "help", "Help"),
+        Binding("c", "quick_chat", "Chat"),
         Binding("a", "audit", "Audit"),
         Binding("q", "quit", "Quit"),
     ]
@@ -37,6 +38,11 @@ class InitRunnerApp(App):
         from initrunner.tui.screens.help import HelpScreen
 
         self.push_screen(HelpScreen())
+
+    def action_quick_chat(self) -> None:
+        from initrunner.tui.screens.run import QuickChatLoadingScreen
+
+        self.push_screen(QuickChatLoadingScreen())
 
     def action_audit(self) -> None:
         from initrunner.tui.screens.audit import AuditScreen

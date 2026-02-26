@@ -10,32 +10,16 @@ import typer
 
 from initrunner.cli._helpers import console
 
-# Extra tools that can be added via --tools with safe ephemeral defaults.
-_EPHEMERAL_EXTRA_TOOL_DEFAULTS: dict[str, dict] = {
-    "datetime": {"type": "datetime"},
-    "web_reader": {"type": "web_reader"},
-    "search": {"type": "search"},
-    "python": {"type": "python"},
-    "filesystem": {"type": "filesystem", "root_path": ".", "read_only": True},
-    "slack": {"type": "slack", "webhook_url": "${SLACK_WEBHOOK_URL}"},
-    "git": {"type": "git", "repo_path": ".", "read_only": True},
-    "shell": {"type": "shell"},
-}
-
-# Environment variables required for certain extra tools.
-_TOOL_REQUIRED_ENVS: dict[str, list[str]] = {
-    "slack": ["SLACK_WEBHOOK_URL"],
-}
-
-# Tool profile definitions
-_TOOL_PROFILES: dict[str, list[dict]] = {
-    "none": [],
-    "minimal": [
-        {"type": "datetime"},
-        {"type": "web_reader"},
-    ],
-    "all": list(_EPHEMERAL_EXTRA_TOOL_DEFAULTS.values()),
-}
+# Import shared tool constants from service layer
+from initrunner.services.providers import (
+    EPHEMERAL_TOOL_DEFAULTS as _EPHEMERAL_EXTRA_TOOL_DEFAULTS,
+)
+from initrunner.services.providers import (
+    TOOL_PROFILES as _TOOL_PROFILES,
+)
+from initrunner.services.providers import (
+    TOOL_REQUIRED_ENVS as _TOOL_REQUIRED_ENVS,
+)
 
 
 def _resolve_extra_tools(extra_types: list[str]) -> list[dict]:
@@ -370,64 +354,46 @@ def _chat_auto_detect(
     from initrunner.agent.loader import build_agent
     from initrunner.cli._helpers import ephemeral_context
     from initrunner.runner import run_interactive, run_single
-    from initrunner.services.providers import detect_provider_and_model
+    from initrunner.services.providers import build_quick_chat_role_sync
 
-    detected = detect_provider_and_model()
-    if detected is None and provider is None:
-        console.print(
-            "[red]Error:[/red] No API key found. Run [bold]initrunner setup[/bold] "
-            "or set an API key environment variable."
+    try:
+        role, prov, mod = build_quick_chat_role_sync(
+            provider=provider,
+            model=model,
+            tool_defs=all_tools if all_tools else None,
+            with_memory=with_memory,
+            personality=personality,
+            name=name,
         )
-        raise typer.Exit(1)
+    except RuntimeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
-    prov = provider or detected.provider  # type: ignore[union-attr]
-    mod = model or detected.model  # type: ignore[union-attr]
-
-    if provider and not model and detected:
-        # Provider overridden but no model specified — use default for that provider
-        from initrunner.templates import _default_model_name
-
-        mod = _default_model_name(provider)
-    elif provider and not model and not detected:
-        from initrunner.templates import _default_model_name
-
-        mod = _default_model_name(provider)
-
-    from initrunner.services.providers import build_ephemeral_role
-
-    # Build memory config
-    memory_config = None
-    if with_memory:
-        from initrunner.agent.schema.memory import MemoryConfig
-
-        memory_config = MemoryConfig()
-
-    # Build ingest config
-    ingest_config = None
+    # Layer on ingest config (CLI-specific, not in shared builder)
     if ingest_paths:
         from initrunner.agent.schema.ingestion import IngestConfig
 
         ingest_config = IngestConfig(sources=ingest_paths)
+        from initrunner.services.providers import build_ephemeral_role
 
-    from initrunner.agent.schema.role import ToolSearchConfig
+        # Rebuild with ingest config included
+        build_kwargs: dict = {
+            "name": name,
+            "tools": all_tools if all_tools else None,
+            "memory": role.spec.memory,
+            "ingest": ingest_config,
+            "tool_search": role.spec.tool_search,
+        }
+        if personality:
+            build_kwargs["system_prompt"] = (
+                personality + "\n"
+                "Never ask clarifying questions — answer directly with your best take. "
+                "Keep responses concise."
+            )
+        role = build_ephemeral_role(prov, mod, **build_kwargs)
+    else:
+        ingest_config = None
 
-    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
-
-    build_kwargs: dict = {
-        "name": name,
-        "tools": all_tools if all_tools else None,
-        "memory": memory_config,
-        "ingest": ingest_config,
-        "tool_search": tool_search,
-    }
-    if personality:
-        build_kwargs["system_prompt"] = (
-            personality + "\n"
-            "Never ask clarifying questions — answer directly with your best take. "
-            "Keep responses concise."
-        )
-
-    role = build_ephemeral_role(prov, mod, **build_kwargs)
     agent = build_agent(role)
 
     console.print(f"[dim]Using {prov}:{mod}[/dim]")

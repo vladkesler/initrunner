@@ -4,6 +4,7 @@
     </div>
     <div class="navbar-center hidden md:flex">
         <ul class="menu menu-horizontal px-1 gap-1">
+            <li><a href="/chat" class="{% if active_page == 'chat' %}active{% endif %}">Chat</a></li>
             <li><a href="/roles" class="{% if active_page == 'roles' %}active{% endif %}">Roles</a></li>
             <li><a href="/audit" class="{% if active_page == 'audit' %}active{% endif %}">Audit</a></li>
         </ul>
@@ -16,6 +17,7 @@
                 </svg>
             </div>
             <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
+                <li><a href="/chat">Chat</a></li>
                 <li><a href="/roles">Roles</a></li>
                 <li><a href="/audit">Audit</a></li>
             </ul>

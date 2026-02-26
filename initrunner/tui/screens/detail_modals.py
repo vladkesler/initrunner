@@ -112,7 +112,7 @@ class FieldEditModal(ModalScreen[dict[str, str] | None]):
         try:
             convert_values(values, self._fields)
         except ValueError as exc:
-            self.notify(f"Invalid value: {exc}", severity="error")
+            self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
         self.dismiss(values)
 

@@ -26,6 +26,8 @@ class IngestScreen(RoleScreen):
         Binding("r", "refresh", "Refresh", show=True),
     ]
 
+    _role_path: Path
+
     def __init__(self, *, role_path: Path, role: RoleDefinition) -> None:
         super().__init__(role_path=role_path, role=role)
         self._ingesting = False
@@ -147,7 +149,7 @@ class IngestScreen(RoleScreen):
             self.notify("Ingestion complete")
         except Exception as e:
             status.update(f" Error: {e}")
-            self.notify(f"Ingestion failed: {e}", severity="error")
+            self.notify(f"Ingestion failed: {e}", severity="error", markup=False)
         finally:
             self._ingesting = False
             progress_bar.styles.display = "none"  # type: ignore[invalid-assignment]

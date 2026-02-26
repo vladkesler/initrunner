@@ -27,7 +27,7 @@ class ChatSession:
     role_id: str
     agent: Agent
     role: RoleDefinition
-    role_path: Path
+    role_path: Path | None
     message_history: list = field(default_factory=list)
     last_active: float = field(default_factory=time.monotonic)
 
@@ -53,7 +53,7 @@ class SessionStore:
         role_id: str,
         agent: Any,
         role: Any,
-        role_path: Path,
+        role_path: Path | None = None,
         message_history: list | None = None,
     ) -> ChatSession:
         session = ChatSession(

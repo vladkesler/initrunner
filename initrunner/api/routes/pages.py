@@ -23,10 +23,10 @@ def _registry(request: Request):
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Redirect root to roles list."""
+    """Redirect root to quick chat."""
     from starlette.responses import RedirectResponse
 
-    return RedirectResponse("/roles", status_code=302)
+    return RedirectResponse("/chat", status_code=302)
 
 
 @router.get("/roles", response_class=HTMLResponse)

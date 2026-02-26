@@ -297,7 +297,7 @@ def select_role_sync(
         )
 
     try:
-        winner = _llm_select(prompt, scored[:5])
+        winner = _llm_select(prompt, scored[:15])
         return SelectionResult(
             candidate=winner,
             method="llm",

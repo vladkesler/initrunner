@@ -24,7 +24,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.6.0** — Team mode: multi-agent collaboration in one YAML file. See the [Changelog](CHANGELOG.md) for details.
+> **v1.7.0** -- Quick Chat, tool permissions, and Sense auto-role selection. See the [Changelog](CHANGELOG.md) for details.
 
 ## 30-Second Quickstart
 

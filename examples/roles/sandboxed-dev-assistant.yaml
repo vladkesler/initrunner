@@ -1,0 +1,60 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: sandboxed-dev-assistant
+  description: Developer assistant with fine-grained tool permissions — safe shell, filesystem with secret file blocking
+  tags: [example, security, permissions]
+spec:
+  role: |
+    You are a developer assistant with restricted tool access. You can explore
+    code, read files, and run safe shell commands — but you cannot delete files,
+    read secrets, or run dangerous commands.
+
+    Use the shell to run tests, lint, or inspect the project.
+    Use the filesystem to read source files and configs.
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    # Shell: allowlist of safe commands, explicit deny for destructive ones
+    - type: shell
+      working_dir: .
+      require_confirmation: false
+      permissions:
+        default: deny
+        allow:
+          - "command=ls *"
+          - "command=cat *"
+          - "command=grep *"
+          - "command=find *"
+          - "command=wc *"
+          - "command=head *"
+          - "command=tail *"
+          - "command=python *"
+          - "command=uv run *"
+          - "command=git *"
+        deny:
+          - "command=rm *"
+          - "command=sudo *"
+          - "command=chmod *"
+          - "command=curl *"
+
+    # Filesystem: allow everything except secrets and credentials
+    - type: filesystem
+      root_path: .
+      read_only: true
+      permissions:
+        default: allow
+        deny:
+          - "path=*.env"
+          - "path=*.env.*"
+          - "path=*credentials*"
+          - "path=*secret*"
+          - "path=*.pem"
+          - "path=*.key"
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 25
+    timeout_seconds: 180
