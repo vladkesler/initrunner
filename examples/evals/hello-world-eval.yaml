@@ -1,0 +1,36 @@
+apiVersion: initrunner/v1
+kind: TestSuite
+metadata:
+  name: hello-world-eval
+cases:
+  - name: basic-greeting
+    prompt: "Hello!"
+    # expected_output is used as the simulated response in --dry-run mode
+    expected_output: "Hello there! How can I help you today?"
+    assertions:
+      - type: contains
+        value: "hello"
+        case_insensitive: true
+      - type: not_contains
+        value: "error"
+      - type: max_tokens
+        limit: 5000
+
+  - name: help-request
+    prompt: "Can you help me with something?"
+    expected_output: "Of course! I'm happy to help you with anything."
+    assertions:
+      - type: regex
+        pattern: "(?i)(help|assist|happy to)"
+      - type: max_latency
+        limit_ms: 30000
+
+  - name: farewell
+    prompt: "Goodbye, have a nice day!"
+    tags: [polite]
+    expected_output: "Goodbye! Have a wonderful day!"
+    assertions:
+      - type: not_contains
+        value: "error"
+      - type: max_tokens
+        limit: 5000

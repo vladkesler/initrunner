@@ -5,10 +5,14 @@ from pydantic import ValidationError
 
 from initrunner.eval.schema import (
     ContainsAssertion,
+    LLMJudgeAssertion,
+    MaxLatencyAssertion,
+    MaxTokensAssertion,
     NotContainsAssertion,
     RegexAssertion,
     TestCase,
     TestSuiteDefinition,
+    ToolCallsAssertion,
 )
 
 
@@ -89,6 +93,16 @@ class TestTestSuiteDefinition:
                 }
             )
 
+    def test_cases_default_factory(self):
+        """Verify cases uses Field(default_factory=list)."""
+        s1 = TestSuiteDefinition.model_validate(
+            {"apiVersion": "initrunner/v1", "kind": "TestSuite", "metadata": {"name": "a"}}
+        )
+        s2 = TestSuiteDefinition.model_validate(
+            {"apiVersion": "initrunner/v1", "kind": "TestSuite", "metadata": {"name": "b"}}
+        )
+        assert s1.cases is not s2.cases
+
 
 class TestAssertionTypes:
     def test_contains_assertion(self):
@@ -110,12 +124,47 @@ class TestAssertionTypes:
         assert a.type == "regex"
         assert a.pattern == r"\d+"
 
+    def test_llm_judge_assertion(self):
+        a = LLMJudgeAssertion(criteria=["Is helpful", "Is accurate"])
+        assert a.type == "llm_judge"
+        assert a.model == "openai:gpt-4o-mini"
+        assert len(a.criteria) == 2
+
+    def test_llm_judge_custom_model(self):
+        a = LLMJudgeAssertion(criteria=["test"], model="anthropic:claude-sonnet-4-6")
+        assert a.model == "anthropic:claude-sonnet-4-6"
+
+    def test_tool_calls_assertion(self):
+        a = ToolCallsAssertion(expected=["web_search", "file_read"])
+        assert a.type == "tool_calls"
+        assert a.mode == "subset"
+        assert a.expected == ["web_search", "file_read"]
+
+    def test_tool_calls_exact_mode(self):
+        a = ToolCallsAssertion(expected=["search"], mode="exact")
+        assert a.mode == "exact"
+
+    def test_tool_calls_superset_mode(self):
+        a = ToolCallsAssertion(expected=["a", "b"], mode="superset")
+        assert a.mode == "superset"
+
+    def test_max_tokens_assertion(self):
+        a = MaxTokensAssertion(limit=2000)
+        assert a.type == "max_tokens"
+        assert a.limit == 2000
+
+    def test_max_latency_assertion(self):
+        a = MaxLatencyAssertion(limit_ms=5000)
+        assert a.type == "max_latency"
+        assert a.limit_ms == 5000
+
 
 class TestTestCase:
     def test_minimal_case(self):
         tc = TestCase(name="basic", prompt="hello")
         assert tc.expected_output is None
         assert tc.assertions == []
+        assert tc.tags == []
 
     def test_case_with_expected_output(self):
         tc = TestCase(name="math", prompt="2+2?", expected_output="4")
@@ -133,6 +182,22 @@ class TestTestCase:
         assert len(tc.assertions) == 2
         assert isinstance(tc.assertions[0], ContainsAssertion)
         assert isinstance(tc.assertions[1], RegexAssertion)
+
+    def test_case_with_tags(self):
+        tc = TestCase(name="tagged", prompt="hello", tags=["search", "fast"])
+        assert tc.tags == ["search", "fast"]
+
+    def test_tags_default_factory(self):
+        """Verify tags uses Field(default_factory=list)."""
+        tc1 = TestCase(name="a", prompt="p")
+        tc2 = TestCase(name="b", prompt="p")
+        assert tc1.tags is not tc2.tags
+
+    def test_assertions_default_factory(self):
+        """Verify assertions uses Field(default_factory=list)."""
+        tc1 = TestCase(name="a", prompt="p")
+        tc2 = TestCase(name="b", prompt="p")
+        assert tc1.assertions is not tc2.assertions
 
     def test_invalid_assertion_type_rejected(self):
         with pytest.raises(ValidationError):
@@ -194,3 +259,108 @@ class TestDiscriminatedUnion:
             }
         )
         assert isinstance(suite.cases[0].assertions[0], RegexAssertion)
+
+    def test_discriminated_union_llm_judge(self):
+        suite = TestSuiteDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "TestSuite",
+                "metadata": {"name": "union-test"},
+                "cases": [
+                    {
+                        "name": "t",
+                        "prompt": "p",
+                        "assertions": [
+                            {"type": "llm_judge", "criteria": ["is good"]},
+                        ],
+                    }
+                ],
+            }
+        )
+        assert isinstance(suite.cases[0].assertions[0], LLMJudgeAssertion)
+
+    def test_discriminated_union_tool_calls(self):
+        suite = TestSuiteDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "TestSuite",
+                "metadata": {"name": "union-test"},
+                "cases": [
+                    {
+                        "name": "t",
+                        "prompt": "p",
+                        "assertions": [
+                            {"type": "tool_calls", "expected": ["search"]},
+                        ],
+                    }
+                ],
+            }
+        )
+        assert isinstance(suite.cases[0].assertions[0], ToolCallsAssertion)
+
+    def test_discriminated_union_max_tokens(self):
+        suite = TestSuiteDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "TestSuite",
+                "metadata": {"name": "union-test"},
+                "cases": [
+                    {
+                        "name": "t",
+                        "prompt": "p",
+                        "assertions": [
+                            {"type": "max_tokens", "limit": 1000},
+                        ],
+                    }
+                ],
+            }
+        )
+        assert isinstance(suite.cases[0].assertions[0], MaxTokensAssertion)
+
+    def test_discriminated_union_max_latency(self):
+        suite = TestSuiteDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "TestSuite",
+                "metadata": {"name": "union-test"},
+                "cases": [
+                    {
+                        "name": "t",
+                        "prompt": "p",
+                        "assertions": [
+                            {"type": "max_latency", "limit_ms": 5000},
+                        ],
+                    }
+                ],
+            }
+        )
+        assert isinstance(suite.cases[0].assertions[0], MaxLatencyAssertion)
+
+    def test_round_trip_all_types(self):
+        """Verify all assertion types survive model_validate → model_dump round-trip."""
+        data = {
+            "apiVersion": "initrunner/v1",
+            "kind": "TestSuite",
+            "metadata": {"name": "round-trip"},
+            "cases": [
+                {
+                    "name": "all",
+                    "prompt": "p",
+                    "tags": ["a", "b"],
+                    "assertions": [
+                        {"type": "contains", "value": "x"},
+                        {"type": "not_contains", "value": "y"},
+                        {"type": "regex", "pattern": "z"},
+                        {"type": "llm_judge", "criteria": ["c1"]},
+                        {"type": "tool_calls", "expected": ["t1"], "mode": "exact"},
+                        {"type": "max_tokens", "limit": 100},
+                        {"type": "max_latency", "limit_ms": 500},
+                    ],
+                }
+            ],
+        }
+        suite = TestSuiteDefinition.model_validate(data)
+        dumped = suite.model_dump()
+        restored = TestSuiteDefinition.model_validate(dumped)
+        assert len(restored.cases[0].assertions) == 7
+        assert restored.cases[0].tags == ["a", "b"]

@@ -16,6 +16,7 @@ _ALL_YAMLS = sorted(EXAMPLES_DIR.rglob("*.yaml"))
 _ROLE_YAMLS = []
 _COMPOSE_YAMLS = []
 _TEAM_YAMLS = []
+_SUITE_YAMLS = []
 
 for _p in _ALL_YAMLS:
     with open(_p) as _f:
@@ -24,6 +25,8 @@ for _p in _ALL_YAMLS:
         _COMPOSE_YAMLS.append(_p)
     elif isinstance(_data, dict) and _data.get("kind") == "Team":
         _TEAM_YAMLS.append(_p)
+    elif isinstance(_data, dict) and _data.get("kind") == "TestSuite":
+        _SUITE_YAMLS.append(_p)
     else:
         _ROLE_YAMLS.append(_p)
 
@@ -72,3 +75,14 @@ def test_team_yaml_validates(path: Path) -> None:
     team = TeamDefinition.model_validate(data)
     assert team.metadata.name
     assert len(team.spec.personas) >= 2
+
+
+@pytest.mark.parametrize("path", _SUITE_YAMLS, ids=[_rel(p) for p in _SUITE_YAMLS])
+def test_suite_yaml_validates(path: Path) -> None:
+    from initrunner.eval.schema import TestSuiteDefinition
+
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    suite = TestSuiteDefinition.model_validate(data)
+    assert suite.metadata.name
+    assert len(suite.cases) >= 1

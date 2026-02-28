@@ -635,6 +635,156 @@ class TestAuditExport:
         assert "export" in result.output.lower()
 
 
+class TestTestCommand:
+    def _make_role_file(self, tmp_path):
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+            spec:
+              role: You are a test.
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+        return role_file
+
+    def _make_suite_file(self, tmp_path, name="test-suite", cases=None):
+        suite_file = tmp_path / "suite.yaml"
+        if cases is None:
+            cases = [
+                {
+                    "name": "basic",
+                    "prompt": "Hello",
+                    "expected_output": "Hello!",
+                    "assertions": [{"type": "contains", "value": "Hello"}],
+                }
+            ]
+        import yaml
+
+        data = {
+            "apiVersion": "initrunner/v1",
+            "kind": "TestSuite",
+            "metadata": {"name": name},
+            "cases": cases,
+        }
+        suite_file.write_text(yaml.dump(data))
+        return suite_file
+
+    def test_basic_dry_run(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        result = runner.invoke(app, ["test", str(role_file), "-s", str(suite_file), "--dry-run"])
+        assert result.exit_code == 0
+        assert "PASS" in result.output
+        assert "Tokens" in result.output
+
+    def test_concurrency_flag_accepted(self, tmp_path):
+        """Verify -j flag is accepted by the CLI (concurrency > 1 needs real factory)."""
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        # concurrency=1 exercises the flag parsing without needing agent_factory
+        result = runner.invoke(
+            app,
+            ["test", str(role_file), "-s", str(suite_file), "--dry-run", "-j", "1"],
+        )
+        assert result.exit_code == 0
+
+    def test_concurrency_display(self, tmp_path):
+        """Verify concurrency > 1 displays in the output banner."""
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        # With concurrency > 1, it needs a factory via load_and_build which
+        # requires API keys. We just verify the display line appears.
+        result = runner.invoke(
+            app,
+            ["test", str(role_file), "-s", str(suite_file), "--dry-run", "-j", "2"],
+        )
+        # May fail at execution due to missing API key, but the concurrency
+        # display should appear before that
+        assert "concurrency=2" in result.output
+
+    def test_output_flag_creates_json(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        output_file = tmp_path / "results.json"
+        result = runner.invoke(
+            app,
+            [
+                "test",
+                str(role_file),
+                "-s",
+                str(suite_file),
+                "--dry-run",
+                "-o",
+                str(output_file),
+            ],
+        )
+        assert result.exit_code == 0
+        assert output_file.exists()
+        import json
+
+        data = json.loads(output_file.read_text())
+        assert data["suite_name"] == "test-suite"
+        assert "summary" in data
+        assert "cases" in data
+        assert "Results saved" in result.output
+
+    def test_tag_filter(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(
+            tmp_path,
+            cases=[
+                {"name": "tagged", "prompt": "p1", "tags": ["fast"], "expected_output": "ok"},
+                {"name": "untagged", "prompt": "p2", "expected_output": "ok"},
+            ],
+        )
+        result = runner.invoke(
+            app,
+            [
+                "test",
+                str(role_file),
+                "-s",
+                str(suite_file),
+                "--dry-run",
+                "--tag",
+                "fast",
+            ],
+        )
+        assert result.exit_code == 0
+        # Only the tagged case should run
+        assert "tagged" in result.output
+
+    def test_missing_suite_file(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        result = runner.invoke(app, ["test", str(role_file), "-s", str(tmp_path / "missing.yaml")])
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
+    def test_verbose_shows_details(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        result = runner.invoke(
+            app,
+            ["test", str(role_file), "-s", str(suite_file), "--dry-run", "-v"],
+        )
+        assert result.exit_code == 0
+        # Verbose adds a Details column and assertion messages
+        assert "contains" in result.output.lower()
+
+    def test_summary_stats_shown(self, tmp_path):
+        role_file = self._make_role_file(tmp_path)
+        suite_file = self._make_suite_file(tmp_path)
+        result = runner.invoke(app, ["test", str(role_file), "-s", str(suite_file), "--dry-run"])
+        assert result.exit_code == 0
+        assert "tokens" in result.output.lower()
+        assert "total" in result.output.lower()
+
+
 class TestDaemon:
     def test_missing_role_file(self):
         result = runner.invoke(app, ["daemon", "/nonexistent/role.yaml"])

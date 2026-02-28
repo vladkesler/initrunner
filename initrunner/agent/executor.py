@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FuturesTimeout
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -89,6 +89,7 @@ class RunResult:
     duration_ms: int = 0
     success: bool = True
     error: str | None = None
+    tool_call_names: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -363,6 +364,7 @@ def execute_run(
             result.total_tokens = usage.total_tokens or 0
             result.tool_calls = usage.tool_calls or 0
             new_messages = agent_result.all_messages()
+            result.tool_call_names = _extract_tool_call_names(new_messages)
         except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
             _handle_run_error(result, e)
 
@@ -382,6 +384,19 @@ def execute_run(
     )
 
     return result, new_messages
+
+
+def _extract_tool_call_names(messages: list) -> list[str]:
+    """Extract tool call names from message history."""
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+
+    return [
+        part.tool_name
+        for msg in messages
+        if isinstance(msg, ModelResponse)
+        for part in msg.parts
+        if isinstance(part, ToolCallPart)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +483,7 @@ def execute_run_stream(
                 timeout=role.spec.guardrails.timeout_seconds,
             )
             new_messages = stream_state["messages"]
+            result.tool_call_names = _extract_tool_call_names(new_messages)
             usage = stream_state["usage"]
 
             result.output = "".join(output_parts)

@@ -1,0 +1,44 @@
+apiVersion: initrunner/v1
+kind: TestSuite
+metadata:
+  name: web-searcher-eval
+cases:
+  - name: basic-search
+    prompt: "What is Docker?"
+    tags: [search, docker]
+    assertions:
+      - type: contains
+        value: "container"
+        case_insensitive: true
+      - type: tool_calls
+        expected: ["web_search"]
+        mode: subset
+      - type: max_tokens
+        limit: 10000
+      - type: max_latency
+        limit_ms: 60000
+
+  - name: specific-query
+    prompt: "Find information about Docker volumes"
+    tags: [search, docker]
+    assertions:
+      - type: contains
+        value: "volume"
+        case_insensitive: true
+      - type: not_contains
+        value: "I don't know"
+      - type: tool_calls
+        expected: ["web_search"]
+        mode: subset
+
+  - name: no-unnecessary-tools
+    prompt: "What is 2 + 2?"
+    tags: [math, no-tools]
+    assertions:
+      - type: contains
+        value: "4"
+      - type: tool_calls
+        expected: []
+        mode: superset
+      - type: max_tokens
+        limit: 5000

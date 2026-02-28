@@ -1,0 +1,31 @@
+apiVersion: initrunner/v1
+kind: TestSuite
+metadata:
+  name: quality-eval
+cases:
+  - name: helpful-response
+    prompt: "Explain what a REST API is in simple terms"
+    tags: [quality, explanation]
+    assertions:
+      - type: contains
+        value: "API"
+      - type: not_contains
+        value: "error"
+      - type: llm_judge
+        criteria:
+          - "The explanation is beginner-friendly and avoids excessive jargon"
+          - "The response includes at least one concrete example"
+          - "The response is well-structured with clear paragraphs or bullet points"
+      - type: max_tokens
+        limit: 5000
+
+  - name: concise-answer
+    prompt: "What is the capital of France?"
+    tags: [quality, factual]
+    assertions:
+      - type: contains
+        value: "Paris"
+      - type: max_tokens
+        limit: 1000
+      - type: max_latency
+        limit_ms: 10000

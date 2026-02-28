@@ -30,8 +30,36 @@ class RegexAssertion(BaseModel):
     pattern: str
 
 
+class LLMJudgeAssertion(BaseModel):
+    type: Literal["llm_judge"] = "llm_judge"
+    criteria: list[str]
+    model: str = "openai:gpt-4o-mini"
+
+
+class ToolCallsAssertion(BaseModel):
+    type: Literal["tool_calls"] = "tool_calls"
+    expected: list[str]
+    mode: Literal["exact", "subset", "superset"] = "subset"
+
+
+class MaxTokensAssertion(BaseModel):
+    type: Literal["max_tokens"] = "max_tokens"
+    limit: int
+
+
+class MaxLatencyAssertion(BaseModel):
+    type: Literal["max_latency"] = "max_latency"
+    limit_ms: int
+
+
 Assertion = Annotated[
-    ContainsAssertion | NotContainsAssertion | RegexAssertion,
+    ContainsAssertion
+    | NotContainsAssertion
+    | RegexAssertion
+    | LLMJudgeAssertion
+    | ToolCallsAssertion
+    | MaxTokensAssertion
+    | MaxLatencyAssertion,
     Field(discriminator="type"),
 ]
 
@@ -40,7 +68,8 @@ class TestCase(BaseModel):
     name: str
     prompt: str
     expected_output: str | None = None
-    assertions: list[Assertion] = []
+    assertions: list[Assertion] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class TestSuiteMetadata(BaseModel):
@@ -51,4 +80,4 @@ class TestSuiteDefinition(BaseModel):
     apiVersion: ApiVersion
     kind: Literal["TestSuite"]
     metadata: TestSuiteMetadata
-    cases: list[TestCase] = []
+    cases: list[TestCase] = Field(default_factory=list)
