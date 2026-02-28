@@ -19,5 +19,6 @@ docs/
 CLAUDE.md
 .claude/
 examples/
+!examples/roles/
 docker-compose.yml
 Dockerfile
