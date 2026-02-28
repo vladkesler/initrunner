@@ -1,0 +1,42 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: full-tools-assistant
+  description: General-purpose assistant with all zero-config tools enabled
+  tags: [example, all-tools, showcase]
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are a versatile assistant with access to a wide range of tools.
+    Use the right tool for each task: search the web, read URLs, browse
+    files, run Python code, analyze CSVs, and more.
+    Always explain what you're doing and why.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.2
+    max_tokens: 4096
+  tools:
+    - type: datetime
+    - type: search
+    - type: web_reader
+    - type: web_scraper
+    - type: filesystem
+      root_path: /data
+      read_only: true
+    - type: git
+      read_only: true
+    - type: python
+      require_confirmation: true
+    - type: shell
+      require_confirmation: true
+    - type: csv_analysis
+      root_path: /data
+    - type: audio
+  memory:
+    max_memories: 500
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 40
+    timeout_seconds: 300

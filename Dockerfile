@@ -48,7 +48,19 @@ LABEL org.opencontainers.image.title="InitRunner" \
 
 EXPOSE 8000 8420
 
+# Seed example roles for cloud/Docker first-boot
+COPY examples/roles/hello-world.yaml \
+     examples/roles/web-searcher.yaml \
+     examples/roles/memory-assistant.yaml \
+     examples/roles/code-reviewer.yaml \
+     examples/roles/full-tools-assistant.yaml \
+     /opt/initrunner/example-roles/
+
+COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8420/api/health')" || exit 1
 
-ENTRYPOINT ["initrunner"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["initrunner", "--help"]

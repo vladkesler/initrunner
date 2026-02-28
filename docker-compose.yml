@@ -17,15 +17,16 @@ services:
       - "8420:8420"
       - "8000:8000"
     volumes:
-      - ./roles:/roles
+      # Mount custom roles here to override seeded examples:
+      # - ./roles:/data/roles
       - initrunner-data:/data
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}  # persistent dashboard key
+      - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}
     restart: unless-stopped
-    command: ["ui", "--role-dir", "/roles"]
+    command: ["initrunner", "ui", "--role-dir", "/data/roles"]
 
 volumes:
   initrunner-data:

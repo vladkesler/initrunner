@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: initrunner
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: INITRUNNER_DASHBOARD_API_KEY
+        sync: false
+      - key: INITRUNNER_HOME
+        value: /data
+    disk:
+      name: initrunner-data
+      mountPath: /data
+      sizeGB: 1
+    dockerCommand: >-
+      initrunner ui --role-dir /data/roles --host 0.0.0.0 --port 8420 --no-browser

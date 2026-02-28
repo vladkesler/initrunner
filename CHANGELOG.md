@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0] - 2026-02-28
+
+### Added
+- One-click cloud deploy templates for Railway (`railway.json`), Render (`render.yaml`), and Fly.io (`deploy/fly.toml`)
+- Docker entrypoint script (`deploy/docker-entrypoint.sh`) that seeds 5 example roles on first boot when `/data/roles` is empty
+- `full-tools-assistant.yaml` example role with all zero-config tools enabled (datetime, search, web_reader, web_scraper, filesystem, git, python, shell, csv_analysis, audio)
+- Cloud deployment guide (`docs/getting-started/cloud-deploy.md`)
+
+### Changed
+- Dockerfile: `ENTRYPOINT` changed from `["initrunner"]` to `["docker-entrypoint.sh"]` with `CMD ["initrunner", "--help"]` to avoid double-prefix on cloud platforms
+- `docker-compose.yml`: roles now served from `/data/roles` (was `/roles`); example roles seeded automatically; command includes `initrunner` prefix
+
+### Documentation
+- New Cloud Deploy section in README with Railway and Render deploy buttons
+- Cloud deployment doc added to CLAUDE.md documentation index
+
 ## [1.7.0] - 2026-02-26
 
 ### Added

@@ -102,3 +102,4 @@ Detailed docs live in `docs/`. Key references:
 | Report export | `docs/core/reports.md` |
 | Doctor command | `docs/operations/doctor.md` |
 | Shareable templates | `docs/getting-started/shareable-templates.md`, `docs/getting-started/template-tutorial.md` |
+| Cloud deployment | `docs/getting-started/cloud-deploy.md` |

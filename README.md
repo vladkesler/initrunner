@@ -24,7 +24,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.7.0** -- Quick Chat, tool permissions, and Sense auto-role selection. See the [Changelog](CHANGELOG.md) for details.
+> **v1.8.0** -- Cloud deploy templates (Railway, Render, Fly.io) and auto-seeded example roles. See the [Changelog](CHANGELOG.md) for details.
 
 ## 30-Second Quickstart
 
@@ -364,7 +364,18 @@ docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
     -p 8420:8420 ghcr.io/vladkesler/initrunner:latest ui --role-dir /roles
 ```
 
-Or use `docker compose up` with the included [`docker-compose.yml`](docker-compose.yml) (copy [`examples/.env.example`](examples/.env.example) to `.env` first). See [hello-world.yaml](examples/roles/hello-world.yaml) for a starter role.
+Or use `docker compose up` with the included [`docker-compose.yml`](docker-compose.yml) (copy [`examples/.env.example`](examples/.env.example) to `.env` first). Example roles are seeded automatically on first boot. To use your own roles, uncomment the `./roles:/data/roles` volume mount in the compose file.
+
+## Cloud Deploy
+
+Deploy the InitRunner dashboard to a cloud platform with one click:
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
+
+**Fly.io:** See [Cloud Deployment Guide](docs/getting-started/cloud-deploy.md#deploy-to-flyio).
+
+All deploys include the web dashboard with example roles pre-loaded. Set your LLM provider API key and a dashboard password during setup. See the [full guide](docs/getting-started/cloud-deploy.md).
 
 ## User Interfaces
 
