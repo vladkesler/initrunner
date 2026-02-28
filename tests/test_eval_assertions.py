@@ -1,9 +1,8 @@
 """Tests for eval assertion evaluators."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from initrunner.eval.assertions import (
-    AssertionResult,
     EvalContext,
     evaluate_assertion,
     evaluate_assertions,

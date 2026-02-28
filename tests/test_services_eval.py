@@ -1,9 +1,8 @@
 """Tests for eval services layer."""
 
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
