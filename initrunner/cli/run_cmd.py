@@ -540,7 +540,14 @@ def test(
     from initrunner.eval.runner import SuiteLoadError, load_suite
     from initrunner.services.eval import run_suite_sync, save_result
 
-    role, agent = load_and_build_or_exit(role_file)
+    if dry_run:
+        from pydantic_ai import Agent
+        from pydantic_ai.models.test import TestModel
+
+        role = load_role_or_exit(role_file)
+        agent = Agent(TestModel())
+    else:
+        role, agent = load_and_build_or_exit(role_file)
 
     try:
         test_suite = load_suite(suite)

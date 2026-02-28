@@ -2,6 +2,10 @@
 
 ## [1.9.0] - 2026-02-28
 
+### Fixed
+- `test --dry-run` no longer requires an API key — uses `TestModel` directly instead of building the real model
+- Suppress `PytestCollectionWarning` for `TestCase` and `TestSuiteDefinition` schema classes
+
 ### Added
 - **Agent evals**: LLM-as-judge (`llm_judge`), tool call verification (`tool_calls` with exact/subset/superset modes), token budget (`max_tokens`), and latency cap (`max_latency`) assertion types
 - `EvalContext` dataclass for passing extended run metadata (tool calls, tokens, latency) to assertion evaluators

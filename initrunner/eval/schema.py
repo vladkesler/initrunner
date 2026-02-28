@@ -65,6 +65,8 @@ Assertion = Annotated[
 
 
 class TestCase(BaseModel):
+    __test__ = False
+
     name: str
     prompt: str
     expected_output: str | None = None
@@ -77,6 +79,8 @@ class TestSuiteMetadata(BaseModel):
 
 
 class TestSuiteDefinition(BaseModel):
+    __test__ = False
+
     apiVersion: ApiVersion
     kind: Literal["TestSuite"]
     metadata: TestSuiteMetadata
