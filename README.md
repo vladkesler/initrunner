@@ -9,7 +9,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-2320+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2490+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -24,7 +24,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.8.1** -- Cloud deploy templates (Railway, Render, Fly.io) and auto-seeded example roles. See the [Changelog](CHANGELOG.md) for details.
+> **v1.9.0** -- Agent evals with LLM-as-judge, tool call verification, performance assertions, and concurrent execution. See the [Changelog](CHANGELOG.md) for details.
 
 ## 30-Second Quickstart
 
@@ -305,6 +305,30 @@ initrunner run classifier.yaml -p "Acme Corp invoice for $250"
 
 See [Structured Output](docs/core/structured-output.md) for inline schemas, external schema files, and pipeline integration.
 
+### 9. Test your agents
+
+Define eval suites in YAML to verify output quality, tool usage, and performance:
+
+```yaml
+# eval-suite.yaml
+cases:
+  - name: search-test
+    prompt: "Find info about Docker"
+    assertions:
+      - type: tool_calls
+        expected: ["web_search"]
+      - type: llm_judge
+        criteria: ["Response explains Docker clearly"]
+      - type: max_latency
+        limit_ms: 30000
+```
+
+```bash
+initrunner test role.yaml -s eval-suite.yaml -v -j 4 -o results.json
+```
+
+See [Evals](docs/core/evals.md).
+
 ## Community Roles
 
 Browse, install, and run roles shared by the community:
@@ -399,7 +423,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) |
-| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
 

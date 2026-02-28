@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.9.0] - 2026-02-28
+
+### Added
+- **Agent evals**: LLM-as-judge (`llm_judge`), tool call verification (`tool_calls` with exact/subset/superset modes), token budget (`max_tokens`), and latency cap (`max_latency`) assertion types
+- `EvalContext` dataclass for passing extended run metadata (tool calls, tokens, latency) to assertion evaluators
+- `eval/judge.py`: thread-safe cached LLM judge with defensive JSON parsing
+- Concurrent eval execution (`-j/--concurrency` flag) with deterministic result ordering via `ThreadPoolExecutor`
+- Tag-based case filtering (`--tag` flag) for selective eval runs
+- JSON result export (`-o/--output` flag) with stable schema for CI integration
+- `SuiteResult.to_dict()` with summary stats (total tokens, duration)
+- `tool_call_names` field on `RunResult` extracted from `ToolCallPart` messages
+- `services/eval.py` thin services layer following existing CLI/API/TUI pattern
+- `docs/core/evals.md` comprehensive documentation
+- Example eval suites in `examples/evals/`
+
+### Changed
+- `evaluate_assertion()` signature changed from `(assertion, output: str)` to `(assertion, ctx: EvalContext)` (internal API)
+- `_display_suite_result()` now shows Tokens column and summary stats line
+- `TestCase` and `TestSuiteDefinition` list fields normalized to `Field(default_factory=list)`
+
 ## [1.8.1] - 2026-02-28
 
 ## [1.8.0] - 2026-02-28
