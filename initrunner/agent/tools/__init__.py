@@ -33,7 +33,9 @@ from initrunner.agent.tools.retrieval import (
 from initrunner.agent.tools.retrieval import (
     build_retrieval_toolset as _build_retrieval_toolset,
 )
+from initrunner.agent.tools.script import build_script_toolset
 from initrunner.agent.tools.search import build_search_toolset
+from initrunner.agent.tools.think import build_think_toolset
 from initrunner.agent.tools.web_reader import build_web_reader_toolset
 from initrunner.agent.tools.web_scraper import build_web_scraper_toolset
 
@@ -68,7 +70,9 @@ __all__ = [
     "build_datetime_toolset",
     "build_filesystem_toolset",
     "build_http_toolset",
+    "build_script_toolset",
     "build_search_toolset",
+    "build_think_toolset",
     "build_toolsets",
     "build_web_reader_toolset",
     "build_web_scraper_toolset",

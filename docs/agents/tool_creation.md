@@ -461,5 +461,7 @@ For reference, the builtin tool types that are always available:
 | `shell` | Subprocess shell with allowlist/blocklist | [tools.md](tools.md#shell-tool) |
 | `slack` | Slack webhook messaging with Block Kit | [tools.md](tools.md#slack-tool) |
 | `web_scraper` | Scrape, chunk, embed, and store web pages | [tools.md](tools.md#web-scraper-tool) |
+| `think` | Internal reasoning scratchpad | [tools.md](tools.md#think-tool) |
+| `script` | Inline shell scripts as named tools | [tools.md](tools.md#script-tool) |
 
 Any other `type` value is routed to the plugin registry.

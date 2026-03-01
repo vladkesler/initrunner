@@ -372,6 +372,83 @@ class CsvAnalysisToolConfig(ToolConfigBase):
         return f"csv_analysis: {self.root_path}"
 
 
+class ThinkToolConfig(ToolConfigBase):
+    type: Literal["think"] = "think"
+
+    def summary(self) -> str:
+        return "think"
+
+
+class ScriptParameter(BaseModel):
+    """A parameter for a script tool, injected as an uppercase env var."""
+
+    name: str
+    description: str = ""
+    required: bool = False
+    default: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _valid_identifier(cls, v: str) -> str:
+        if not v.isidentifier():
+            raise ValueError(f"'{v}' is not a valid Python identifier")
+        return v
+
+
+class ScriptDefinition(BaseModel):
+    """A single inline script that becomes a tool function."""
+
+    name: str
+    description: str = ""
+    body: str
+    interpreter: str | None = None  # None → inherit from parent
+    parameters: list[ScriptParameter] = []
+    timeout_seconds: int | None = None  # None → inherit from parent
+    allowed_commands: list[str] = []  # optional: when set, validate first token per line
+
+    @field_validator("name")
+    @classmethod
+    def _valid_identifier(cls, v: str) -> str:
+        if not v.isidentifier():
+            raise ValueError(f"'{v}' is not a valid Python identifier")
+        return v
+
+    @field_validator("body")
+    @classmethod
+    def _non_empty_body(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("script body must not be empty")
+        return v
+
+
+class ScriptToolConfig(ToolConfigBase):
+    type: Literal["script"] = "script"
+    scripts: list[ScriptDefinition]
+    interpreter: str = "/bin/sh"
+    timeout_seconds: int = 30
+    max_output_bytes: int = 102_400
+    working_dir: str | None = None
+
+    @field_validator("scripts")
+    @classmethod
+    def _at_least_one(cls, v: list[ScriptDefinition]) -> list[ScriptDefinition]:
+        if not v:
+            raise ValueError("at least one script must be defined")
+        return v
+
+    @model_validator(mode="after")
+    def _unique_names(self) -> ScriptToolConfig:
+        names = [s.name for s in self.scripts]
+        if len(names) != len(set(names)):
+            raise ValueError("script names must be unique")
+        return self
+
+    def summary(self) -> str:
+        names = ", ".join(s.name for s in self.scripts[:3])
+        suffix = f" +{len(self.scripts) - 3} more" if len(self.scripts) > 3 else ""
+        return f"script: {names}{suffix}"
+
+
 class PluginToolConfig(ToolConfigBase):
     type: str
     config: dict[str, Any] = {}

@@ -328,6 +328,60 @@ tools:
 
 ---
 
+## Think Tool — Step-by-Step Reasoning
+
+Give the agent an internal scratchpad for planning and reasoning before acting. Thoughts are not shown to the user.
+
+```yaml
+tools:
+  - type: think
+  - type: datetime
+    default_timezone: UTC
+```
+
+> The think tool returns a constant `"Thought recorded."` — the agent's reasoning is preserved in the tool call arguments, not echoed back. Pair it with other tools when you want the agent to plan before acting. Zero overhead: no API calls, no subprocesses.
+
+- Full example: [`examples/roles/thinker.yaml`](../examples/roles/thinker.yaml)
+- Reference: [tools.md — Think Tool](tools.md#think-tool)
+
+---
+
+## Script Tool — Inline Shell Scripts
+
+Define named shell scripts directly in YAML. Each script becomes a separate tool with typed parameters injected as uppercase env vars.
+
+```yaml
+tools:
+  - type: script
+    timeout_seconds: 15
+    scripts:
+      - name: disk_usage
+        description: Check disk usage for a path
+        interpreter: /bin/bash
+        allowed_commands: [df]
+        body: |
+          df -h "$TARGET_PATH"
+        parameters:
+          - name: target_path
+            description: Filesystem path to check
+            required: true
+      - name: system_info
+        description: Show basic system information
+        interpreter: /bin/bash
+        body: |
+          echo "Hostname: $(hostname)"
+          echo "Kernel: $(uname -r)"
+          echo "Memory:"
+          free -h 2>/dev/null || echo "free not available"
+```
+
+> Key features: `interpreter` can be overridden per script (default `/bin/sh`). Parameters like `target_path` are injected as `$TARGET_PATH` in the environment. `allowed_commands: [df]` restricts `disk_usage` to only the `df` command — lines with other commands or shell operators are rejected before execution. Scripts without `allowed_commands` trust the role author and allow any commands. The script body is piped to the interpreter via stdin (no temp files, no `shell=True`). Sensitive env vars are scrubbed.
+
+- Full example: [`examples/roles/script-runner.yaml`](../examples/roles/script-runner.yaml)
+- Reference: [tools.md — Script Tool](tools.md#script-tool)
+
+---
+
 ## Common Tool Combinations
 
 Proven patterns from the example roles:
@@ -347,6 +401,8 @@ Proven patterns from the example roles:
 | **Changelog** | git + filesystem + datetime | — (interactive) | [`changelog-generator.yaml`](../examples/roles/changelog-generator.yaml) |
 | **Web research** | search + datetime | — (interactive) | [`web-searcher.yaml`](../examples/roles/web-searcher.yaml) |
 | **Custom utilities** | custom + datetime | — (interactive) | [`custom-tools-demo/`](../examples/roles/custom-tools-demo/) |
+| **Careful reasoning** | think + datetime | — (interactive) | [`thinker.yaml`](../examples/roles/thinker.yaml) |
+| **Sysadmin scripts** | script | — (interactive) | [`script-runner.yaml`](../examples/roles/script-runner.yaml) |
 
 ---
 

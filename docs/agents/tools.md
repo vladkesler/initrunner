@@ -25,6 +25,8 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `search` | Search the web and news via DuckDuckGo, SerpAPI, Brave, or Tavily |
 | `audio` | Fetch YouTube transcripts and transcribe local audio files |
 | `csv_analysis` | Inspect, summarize, and query CSV files within a sandboxed directory |
+| `think` | Internal reasoning scratchpad — agent thinks step-by-step without user-visible output |
+| `script` | Inline shell scripts defined in YAML as named, parameterized tools |
 | *(plugin)* | Any other type is resolved via the [plugin registry](tool_creation.md#plugin-registry) |
 
 ## Quick Example
@@ -1029,6 +1031,196 @@ spec:
     - type: search
       provider: duckduckgo
     - type: web_reader
+```
+
+## Think Tool
+
+Gives the agent an internal reasoning scratchpad. The agent can think step-by-step before acting — its thoughts are preserved in the tool call arguments but the tool returns a constant acknowledgment, so thought content does not appear in tool results, audit logs, or user-facing output.
+
+```yaml
+tools:
+  - type: think
+```
+
+### Options
+
+The think tool has no configurable options beyond the base `permissions` field shared by all tools.
+
+### Registered Functions
+
+- **`think(thought: str) -> str`** — Record a thought. The `thought` parameter captures the agent's reasoning; the return value is always `"Thought recorded."`. Use for breaking down complex tasks, planning multi-step approaches, reasoning about which tool to use next, or reflecting on results before responding.
+
+### When to Use
+
+Add the think tool when you want the agent to reason more carefully before acting. It is especially useful for:
+
+- **Complex multi-tool tasks** — the agent can plan which tools to call and in what order.
+- **Decision-making** — the agent can weigh options before committing to an action.
+- **Self-correction** — the agent can reflect on intermediate results and adjust its approach.
+
+The think tool has zero overhead — it does not make any external calls, spawn subprocesses, or consume API tokens beyond the tool call itself.
+
+### Example
+
+```yaml
+# Careful reasoning agent
+spec:
+  role: >
+    You are a careful, methodical assistant. Before answering any question
+    or taking any action, always use the think tool to reason step-by-step.
+  model:
+    provider: openai
+    name: gpt-5-mini
+  tools:
+    - type: think
+    - type: datetime
+```
+
+## Script Tool
+
+Defines inline shell scripts in YAML as named, parameterized agent tools. Each script becomes a separate tool function with typed parameters. Script bodies are piped to an interpreter via stdin — no temporary files, no `shell=True`.
+
+```yaml
+tools:
+  - type: script
+    interpreter: /bin/sh           # default interpreter
+    timeout_seconds: 30            # default timeout per script
+    max_output_bytes: 102400       # default: 100 KB
+    working_dir: null              # default: role directory
+    scripts:
+      - name: disk_usage
+        description: Check disk usage for a path
+        interpreter: /bin/bash     # override per script
+        body: |
+          df -h "$TARGET_PATH"
+        parameters:
+          - name: target_path
+            description: Filesystem path to check
+            required: true
+```
+
+### Top-Level Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `scripts` | `list[ScriptDefinition]` | *(required)* | One or more script definitions. Names must be unique. |
+| `interpreter` | `str` | `"/bin/sh"` | Default interpreter for scripts that don't specify their own. |
+| `timeout_seconds` | `int` | `30` | Default timeout for scripts that don't specify their own. |
+| `max_output_bytes` | `int` | `102400` | Maximum output size (100 KB). Truncated output includes a `[truncated]` marker. |
+| `working_dir` | `str \| null` | `null` | Working directory for all scripts. `null` uses the role file's directory. |
+
+### Script Definition
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | *(required)* | Tool function name. Must be a valid Python identifier. |
+| `description` | `str` | `""` | Tool description shown to the LLM. Falls back to `"Run the '<name>' script"`. |
+| `body` | `str` | *(required)* | The script source. Piped to the interpreter via stdin. Must not be empty. |
+| `interpreter` | `str \| null` | `null` | Override the top-level interpreter for this script. `null` inherits from parent. |
+| `parameters` | `list[ScriptParameter]` | `[]` | Parameters injected as uppercase environment variables. |
+| `timeout_seconds` | `int \| null` | `null` | Override the top-level timeout for this script. `null` inherits from parent. |
+| `allowed_commands` | `list[str]` | `[]` | When non-empty, validates that every command line in the body uses one of these commands. Empty list skips validation. |
+
+### Script Parameter
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name` | `str` | *(required)* | Parameter name. Must be a valid Python identifier. Injected as `NAME` (uppercased) in the subprocess environment. |
+| `description` | `str` | `""` | Parameter description for the LLM. |
+| `required` | `bool` | `false` | Whether the parameter is required. |
+| `default` | `str` | `""` | Default value for optional parameters. |
+
+### Parameter Injection
+
+Parameters are injected as **uppercase environment variables**. A parameter named `target_path` becomes `$TARGET_PATH` in the script body:
+
+```yaml
+parameters:
+  - name: target_path
+    description: Filesystem path to check
+    required: true
+```
+
+```bash
+# In the script body:
+df -h "$TARGET_PATH"
+```
+
+Default values are always applied to the environment, so scripts work correctly even when the LLM omits optional parameters.
+
+### Constrained Execution (`allowed_commands`)
+
+When `allowed_commands` is set on a script definition, the script body is validated **before execution**:
+
+1. Each line is split into tokens with `shlex.split`.
+2. Blank lines and comment lines (starting with `#`) are skipped.
+3. The first token of each line is checked against the allowed list (using the base command name, so `/usr/bin/echo` matches `echo`).
+4. Lines containing shell operators (`|`, `&&`, `;`, `>`, `<`, etc.) are rejected.
+5. On any violation, the tool returns an error string without executing.
+
+When `allowed_commands` is empty (the default), no validation is performed — the role author is trusted.
+
+**Important:** `allowed_commands` is defense-in-depth, not a sandbox. It validates the first token per line and catches obvious misuse, but it does not parse shell syntax deeply. Subshell expansions like `$(...)` run inside the interpreter and are not statically validated. For untrusted input, use the `shell` tool (which runs commands without a shell) instead.
+
+### Security
+
+- **No `shell=True`** — Scripts are piped to the interpreter via stdin, not passed through a shell.
+- **Env scrubbing** — Sensitive environment variables (`OPENAI_API_KEY`, `AWS_SECRET`, etc.) are removed from the subprocess environment.
+- **Output bounded** — Output exceeding `max_output_bytes` is truncated with a `[truncated]` marker.
+- **Timeout enforcement** — Scripts that exceed their timeout are killed and a `SubprocessTimeout` error is raised.
+- **Working directory isolation** — When `working_dir` is set, all scripts execute in that directory. Falls back to the role file's directory.
+
+### Examples
+
+**Single-command scripts with `allowed_commands`:**
+
+```yaml
+tools:
+  - type: script
+    scripts:
+      - name: disk_usage
+        description: Check disk usage for a path
+        allowed_commands: [df]
+        body: |
+          df -h "$TARGET_PATH"
+        parameters:
+          - name: target_path
+            required: true
+```
+
+**Multi-command scripts (no `allowed_commands` — trusts the role author):**
+
+```yaml
+tools:
+  - type: script
+    scripts:
+      - name: system_info
+        description: Show basic system information
+        interpreter: /bin/bash
+        body: |
+          echo "Hostname: $(hostname)"
+          echo "Kernel: $(uname -r)"
+          echo "Uptime: $(uptime -p 2>/dev/null || uptime)"
+          echo "Memory:"
+          free -h 2>/dev/null || echo "free not available"
+```
+
+**Python interpreter:**
+
+```yaml
+tools:
+  - type: script
+    scripts:
+      - name: calculate
+        description: Evaluate a math expression
+        interpreter: python3
+        body: |
+          import os, ast
+          print(ast.literal_eval(os.environ["EXPR"]))
+        parameters:
+          - name: expr
+            description: Math expression to evaluate
+            required: true
 ```
 
 ## Plugin Tools

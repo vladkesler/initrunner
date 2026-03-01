@@ -1,4 +1,4 @@
-"""Audit queries, ingestion, triggers, and MCP introspection."""
+"""Audit queries, ingestion, triggers, MCP introspection, and MCP gateway."""
 
 from __future__ import annotations
 
@@ -90,3 +90,28 @@ def list_mcp_tools_sync(
     from initrunner.mcp.introspect import list_mcp_tools
 
     return list_mcp_tools(role_path, index=index)
+
+
+# ---------------------------------------------------------------------------
+# MCP gateway
+# ---------------------------------------------------------------------------
+
+
+def build_mcp_gateway_sync(
+    role_paths: list[Path],
+    *,
+    server_name: str = "initrunner",
+    audit_logger: AuditLogger | None = None,
+    pass_through: bool = False,
+    extra_skill_dirs: list[Path] | None = None,
+) -> object:
+    """Build an MCP gateway server (sync). Returns a FastMCP instance."""
+    from initrunner.mcp.gateway import build_mcp_gateway
+
+    return build_mcp_gateway(
+        role_paths,
+        server_name=server_name,
+        audit_logger=audit_logger,
+        pass_through=pass_through,
+        extra_skill_dirs=extra_skill_dirs,
+    )

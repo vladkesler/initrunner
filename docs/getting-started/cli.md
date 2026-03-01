@@ -42,6 +42,8 @@
 | `initrunner compose status <name>` | Show systemd service status |
 | `initrunner compose logs <name>` | Show journald logs |
 | `initrunner compose events` | Query delegate routing events |
+| `initrunner mcp list-tools <role.yaml>` | List tools from MCP servers in a role |
+| `initrunner mcp serve <role.yaml>...` | Expose agents as an MCP server |
 | `initrunner --version` | Print version |
 
 ## Chat options
@@ -175,6 +177,23 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 | `--skill-dir PATH` | Extra skill search directory |
 
 See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-turn conversations, and usage examples.
+
+## MCP serve options
+
+Synopsis: `initrunner mcp serve ROLE_FILES... [OPTIONS]`
+
+| Flag | Description |
+|------|-------------|
+| `--transport, -t TEXT` | Transport: `stdio`, `sse`, `streamable-http` (default: `stdio`) |
+| `--host TEXT` | Host to bind to (default: `127.0.0.1`, sse/http only) |
+| `--port INT` | Port to listen on (default: `8080`, sse/http only) |
+| `--server-name TEXT` | MCP server name (default: `initrunner`) |
+| `--pass-through` | Also expose agent MCP tools directly |
+| `--audit-db PATH` | Custom audit database path |
+| `--no-audit` | Disable audit logging |
+| `--skill-dir PATH` | Extra skill search directory |
+
+See [MCP Gateway](../interfaces/mcp-gateway.md) for transport details, client configuration, pass-through mode, and usage examples.
 
 ## Compose events options
 

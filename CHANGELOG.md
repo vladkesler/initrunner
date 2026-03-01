@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.10.0] - 2026-03-01
+
+### Added
+- **Think tool** (`type: think`): zero-overhead reasoning scratchpad; thoughts preserved in tool call args for tracing, constant `"Thought recorded."` return; no API calls or subprocesses
+- **Script tool** (`type: script`): define inline shell scripts in YAML as named agent tools; parameters injected as uppercase env vars; per-script interpreter override, `allowed_commands` validation, and configurable timeouts
+- **MCP Gateway** (`initrunner mcp serve`): expose one or more agents as an MCP server over stdio, SSE, or streamable-http transport; compatible with Claude Desktop, Claude Code, and Cursor
+- `--pass-through` flag for MCP gateway to also expose agents' own MCP sub-tools directly (with full sandbox checks)
+- Example roles: `thinker.yaml`, `script-runner.yaml`
+- MCP gateway documentation (`docs/interfaces/mcp-gateway.md`)
+
+### Documentation
+- Added think and script tools to builtin tools reference in `docs/agents/tools.md` and `docs/agents/tool_creation.md`
+- Added think and script examples to `docs/agents/example_tools.md`
+- Added `mcp serve` options to CLI reference (`docs/getting-started/cli.md`)
+- Added MCP gateway to CLAUDE.md documentation index
+
 ## [1.9.0] - 2026-02-28
 
 ### Fixed

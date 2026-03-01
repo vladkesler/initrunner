@@ -1,0 +1,58 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: script-runner
+  description: A sysadmin agent with inline script tools
+  tags:
+  - example
+  - script
+  - sysadmin
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: >
+    You are a system administrator assistant. Use the provided script tools
+    to inspect disk usage, count files, and gather system information.
+    Report results clearly and suggest actions when thresholds are exceeded.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.2
+    max_tokens: 2048
+  tools:
+  - type: script
+    timeout_seconds: 15
+    scripts:
+    - name: disk_usage
+      description: Check disk usage for a path
+      interpreter: /bin/bash
+      allowed_commands: [df]
+      body: |
+        df -h "$TARGET_PATH"
+      parameters:
+      - name: target_path
+        description: Filesystem path to check
+        required: true
+    - name: count_files
+      description: Count files in a directory (returns the count)
+      interpreter: /bin/bash
+      body: |
+        count=$(find "$DIR" -type f 2>/dev/null | wc -l)
+        echo "$count files found in $DIR"
+      parameters:
+      - name: dir
+        description: Directory path
+        required: true
+    - name: system_info
+      description: Show basic system information
+      interpreter: /bin/bash
+      body: |
+        echo "Hostname: $(hostname)"
+        echo "Kernel: $(uname -r)"
+        echo "Uptime: $(uptime -p 2>/dev/null || uptime)"
+        echo "Memory:"
+        free -h 2>/dev/null || echo "free not available"
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 10
+    timeout_seconds: 60

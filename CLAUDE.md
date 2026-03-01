@@ -92,6 +92,7 @@ Detailed docs live in `docs/`. Key references:
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Web dashboard | `docs/interfaces/dashboard.md` |
+| MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
 | Textual TUI | `docs/interfaces/tui.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Auth & guardrails | `docs/security/auth.md`, `docs/configuration/guardrails.md` |
