@@ -274,12 +274,15 @@ class TestRunMcpGateway:
 
 class TestMcpServeCli:
     def test_serve_help(self):
+        import re
+
         from initrunner.cli.main import app
 
         result = runner.invoke(app, ["mcp", "serve", "--help"])
         assert result.exit_code == 0
-        assert "serve" in result.output.lower()
-        assert "--transport" in result.output
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "serve" in plain.lower()
+        assert "--transport" in plain
 
     def test_serve_invalid_transport(self, tmp_path):
         from initrunner.cli.main import app
