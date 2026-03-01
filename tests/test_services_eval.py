@@ -1,6 +1,7 @@
 """Tests for eval services layer."""
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 from pydantic_ai import Agent
@@ -64,7 +65,9 @@ class TestRunSuiteSync:
         agent = Agent(TestModel())
         suite = _make_suite()
 
-        run_suite_sync(agent, role, suite, dry_run=True, concurrency=2, role_file="/fake/role.yaml")
+        run_suite_sync(
+            agent, role, suite, dry_run=True, concurrency=2, role_file=Path("/fake/role.yaml")
+        )
         mock_run_suite.assert_called_once()
         call_kwargs = mock_run_suite.call_args
         assert call_kwargs.kwargs.get("concurrency") == 2

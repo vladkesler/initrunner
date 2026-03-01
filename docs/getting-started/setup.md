@@ -1,18 +1,27 @@
 # Setup Wizard
 
-The `initrunner setup` command is a guided wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml`.
+The `initrunner setup` command is a guided, intent-driven wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml` plus a `~/.initrunner/chat.yaml` for `initrunner chat`.
 
 ## Quick Start
 
 ```bash
-# Interactive setup (prompts for provider, key, and template)
+# Interactive setup (prompts for intent, provider, key, tools)
 initrunner setup
 
 # Non-interactive with all options specified
-initrunner setup --provider openai --model gpt-4o --template chatbot --name my-agent
+initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test -y
+
+# RAG agent with knowledge base
+initrunner setup --intent knowledge --provider openai --skip-test -y
+
+# Telegram bot
+initrunner setup --intent telegram-bot --provider anthropic --skip-test -y
+
+# Browse and copy a bundled example
+initrunner setup --intent from-example -y
 
 # Local Ollama setup (no API key needed)
-initrunner setup --provider ollama
+initrunner setup --provider ollama --intent chatbot -y
 
 # Skip the connectivity test
 initrunner setup --skip-test
@@ -24,12 +33,14 @@ initrunner setup --skip-test
 |------|------|---------|-------------|
 | `--provider` | `str` | *(interactive)* | Provider name. Skips the interactive selection prompt. |
 | `--name` | `str` | `my-agent` | Agent name used in the generated role YAML. |
-| `--template` | `str` | *(interactive)* | Starter template: `chatbot`, `rag`, `memory`, or `daemon`. |
+| `--intent` | `str` | *(interactive)* | What to build: `chatbot`, `knowledge`, `memory`, `telegram-bot`, `discord-bot`, `api-agent`, `daemon`, or `from-example`. |
+| `--template` | `str` | — | **Deprecated.** Maps to `--intent` internally (`rag` -> `knowledge`, others pass through). |
 | `--model` | `str` | *(interactive)* | Model name. Skips the interactive model selection prompt. |
 | `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
 | `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
 | `-y, --accept-risks` | `bool` | `false` | Accept security disclaimer without prompting. |
 | `--interfaces` | `str` | *(interactive)* | Install interfaces: `tui`, `dashboard`, `both`, or `skip`. |
+| `--skip-chat-yaml` | `bool` | `false` | Skip `chat.yaml` generation. |
 
 ## Supported Providers
 
@@ -42,7 +53,7 @@ initrunner setup --skip-test
 | `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
 | `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-r-plus` |
 | `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
-| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-3` |
+| `xai` | `XAI_API_KEY` | *(uses openai SDK)* | `grok-3` |
 | `ollama` | *(none)* | *(included in core)* | `llama3.2` |
 
 ## How It Works
@@ -51,123 +62,140 @@ initrunner setup --skip-test
 
 The wizard checks whether any known provider API key is already set, looking in two places:
 
-1. **Environment variables** — checks each provider's env var (e.g. `OPENAI_API_KEY`).
-2. **Global `.env` file** — reads `~/.initrunner/.env` via `dotenv_values()`.
+1. **Environment variables** -- checks each provider's env var (e.g. `OPENAI_API_KEY`).
+2. **Global `.env` file** -- reads `~/.initrunner/.env` via `dotenv_values()`.
 
-If a key is found, the wizard reports which variable was detected and asks whether to run setup again. If declined, the wizard exits.
+If a key is found, the wizard reports which variable was detected and uses that provider as the default.
 
-### 2. Provider Selection
+### 2. Intent Selection
 
-When `--provider` is not passed, an interactive prompt lists all supported providers with `openai` as the default. When `--provider` is passed, the value is validated against the supported list. Unknown providers cause an immediate error.
+The first interactive question is "What do you want to build?":
 
-### 3. Dependency Check
+| # | Intent | Description |
+|---|--------|-------------|
+| 1 | `chatbot` | Conversational AI assistant |
+| 2 | `knowledge` | Answer questions from your documents (RAG) |
+| 3 | `memory` | Assistant that remembers across conversations |
+| 4 | `telegram-bot` | Telegram bot powered by AI |
+| 5 | `discord-bot` | Discord bot powered by AI |
+| 6 | `api-agent` | Agent with REST API tool access |
+| 7 | `daemon` | Runs on a schedule or watches for changes |
+| 8 | `from-example` | Browse and copy a bundled example |
 
-For **Ollama**, the wizard checks that the Ollama server is running and queries `http://localhost:11434/api/tags` for available models. If no models are found, it suggests running `ollama pull llama3.2`.
+The intent determines which subsequent steps are shown, which tools are pre-selected, and what role YAML template is generated.
 
-For all other providers, the wizard checks whether the provider SDK is importable. If not:
+### 3. Provider Selection
 
-1. Prompts to install it automatically (via `uv pip install` or `pip install`).
-2. If installation fails, offers to continue anyway.
-3. If declined, prints a manual install hint and exits.
+When `--provider` is not passed, an interactive prompt lists all 9 supported providers. When `--provider` is passed, the value is validated against the supported list. Unknown providers cause an immediate error.
 
-### 4. API Key Configuration
+### 4. SDK Check + Auto-Install
 
-Skipped for Ollama (no API key required). For other providers:
+For **Ollama**, the wizard checks that the server is running and queries for available models.
+
+For **Bedrock**, the wizard checks for `boto3` and provides guidance on AWS CLI configuration.
+
+For all other providers, the wizard checks whether the provider SDK is importable and offers to install it automatically.
+
+### 5. API Key / Credentials Entry
+
+Skipped for Ollama (no API key required). For Bedrock, prompts for AWS region. For other providers:
 
 1. Checks for an existing key in the environment, then in `~/.initrunner/.env`.
 2. If found, asks whether to keep it. If not found, prompts for entry (masked input).
 3. For OpenAI and Anthropic, validates the key with a lightweight API call.
-4. If validation fails, offers to re-enter the key.
-5. Saves the key to `~/.initrunner/.env` with `0600` permissions.
+4. Saves the key to `~/.initrunner/.env` with `0600` permissions.
 
-### 4b. Model Selection
+### 6. Model Selection
 
-After the API key is configured, the wizard prompts for a model. When `--model` is passed, this step is skipped.
+After the API key is configured, the wizard prompts for a model from a curated list.
 
-For most providers, a numbered menu of curated models is displayed (sourced from `PROVIDER_MODELS` in `templates.py`):
+### 7. Embedding Config (Conditional)
 
-```
-Select a model:
-  1. gpt-5-mini — Fast, affordable (default)
-  2. gpt-4o — High capability GPT-4
-  3. gpt-4.1 — Latest GPT-4.1
-  4. gpt-4.1-mini — Small GPT-4.1
-  5. gpt-4.1-nano — Fastest GPT-4.1
-  6. o3-mini — Reasoning model
-  Or type a custom model name (press Enter for default)
-```
+When `intent=knowledge` or `intent=memory` **and** the provider doesn't offer an embeddings API (Anthropic, Groq, Cohere, Bedrock, xAI, Ollama), the wizard warns the user and optionally prompts for an `OPENAI_API_KEY` for embeddings.
 
-You can pick a number, type a custom model name not in the list, or press Enter for the provider's default. Custom model names are always accepted — the curated list is a convenience, not a restriction.
+### 8. Tool Selection + Configure
 
-For **Ollama**, the wizard queries `http://localhost:11434/api/tags` for locally available models and shows those instead. If no local models are found, it falls back to the static curated list (`llama3.2`, `llama3.1`, `mistral`, `codellama`, `phi3`).
+A numbered tool menu is shown with intent-specific defaults pre-marked with `*`. Users pick tools by comma-separated numbers or press Enter for defaults. After selection, per-tool config prompts are shown (e.g., `filesystem` asks for `root_path` and `read_only`).
 
-### 5. Role Creation
+### 9. Intent-Specific Config
 
-If the output file already exists, role creation is skipped. Otherwise:
+- **knowledge**: Prompts for document sources glob (default: `./docs/**/*.md`)
+- **telegram-bot**: Prompts for `TELEGRAM_BOT_TOKEN`
+- **discord-bot**: Prompts for `DISCORD_BOT_TOKEN`
+- **daemon**: Prompts for trigger type (file_watch or cron) and schedule/paths
 
-When `--template` is not passed, an interactive menu presents four options:
+### 10. Interface Installation
 
-1. **chatbot** — Simple assistant, great for getting started.
-2. **rag** — Answers questions from your documents.
-3. **memory** — Remembers things across conversations.
-4. **daemon** — Runs on a schedule or watches files for changes.
+Optional installation of the TUI (Textual) and/or web dashboard (FastAPI).
 
-When `--provider ollama` is used, the wizard always uses the Ollama-specific template regardless of the template selection.
+### 11. Role + Chat YAML Generation
 
-The generated role YAML is written to the `--output` path (default: `role.yaml`).
+Generates `role.yaml` at the `--output` path and `~/.initrunner/chat.yaml` for `initrunner chat`. Use `--skip-chat-yaml` to skip chat.yaml generation.
 
-### 6. Connectivity Test
+### 12. Post-Generation Actions
 
-Unless `--skip-test` is passed, the wizard loads the generated role, builds an agent, and sends a test prompt (`"Hello, respond in one sentence."`). The first 200 characters of the response are displayed.
+- **knowledge**: Offers to run `initrunner ingest` immediately
+- **All intents**: Connectivity test (skippable with `--skip-test`)
 
-If the test fails, a warning is printed but setup is still considered complete.
+### 13. Summary + Next Steps
 
-### 7. Summary
+A summary panel shows the configured intent, provider, model, and file paths. Next-step commands are tailored to the chosen intent.
 
-A summary panel is displayed showing the configured provider, default model, config file path, and role file path. Next-step commands are printed:
+## "from-example" Flow
 
-```
-initrunner ingest role.yaml          # index your documents first (RAG template only)
-initrunner run role.yaml -p "Ask me anything"
-initrunner run role.yaml -i          # interactive REPL
-initrunner validate role.yaml
-initrunner init --template rag       # more templates
-initrunner tui                       # terminal dashboard
-initrunner ui                        # web dashboard
-```
+When selecting intent 8 (`from-example`), the wizard enters a separate flow:
 
-The `initrunner ingest` line only appears when the RAG template is selected — it reminds you to index your documents before querying the agent.
+1. Displays a numbered table of bundled examples (roles, compose files, skills)
+2. User selects an example by number or name
+3. Example files are copied to the current directory
+4. **No provider/key/model/role-generation steps** -- the example includes everything
+5. Summary shows copied files and next steps (validate, run)
 
-## Templates
+## Intents
 
-| Template | Internal Key | Description |
-|----------|-------------|-------------|
-| `chatbot` | `basic` | Minimal assistant with guardrails. No tools, ingestion, or triggers. |
-| `rag` | `rag` | Knowledge assistant with `ingest` config and `search_documents` tool. Sources default to `./docs/**/*.md` and `./docs/**/*.txt`. |
+| Intent | Template Key | Description |
+|--------|-------------|-------------|
+| `chatbot` | `basic` | Minimal assistant with guardrails. Pre-selects datetime + web_reader tools. |
+| `knowledge` | `rag` | Knowledge assistant with `ingest` config and `search_documents` tool. Prompts for document sources. |
 | `memory` | `memory` | Assistant with `memory` config. Auto-registers `remember()`, `recall()`, and `list_memories()` tools. |
-| `daemon` | `daemon` | Event-driven agent with `triggers` config. Includes a file watcher and a cron schedule. |
+| `telegram-bot` | `telegram` | Telegram bot with telegram trigger. Prompts for bot token. |
+| `discord-bot` | `discord` | Discord bot with discord trigger. Prompts for bot token. |
+| `api-agent` | `api` | Agent with declarative REST API tools. Pre-selects http + datetime tools. |
+| `daemon` | `daemon` | Event-driven agent with triggers. Prompts for trigger type and schedule. |
+| `from-example` | — | Browse and copy bundled examples. Separate flow. |
 
-All templates include guardrails (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) and use the default model for the selected provider.
-
-When `--provider ollama` is used, the `ollama` template is always used instead, which sets `provider: ollama` and `name: llama3.2` regardless of the template selection.
+All generated roles include guardrails (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) and use the default model for the selected provider.
 
 ## Non-Interactive Usage
 
 For CI, automation, or scripting, pass all options as flags to skip all prompts:
 
 ```bash
-# Fully non-interactive OpenAI setup
+# Fully non-interactive OpenAI chatbot
 export OPENAI_API_KEY="sk-..."
-initrunner setup --provider openai --model gpt-4o --template chatbot --name my-agent --skip-test
+initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test --interfaces skip -y
 
-# Ollama (no API key needed)
-initrunner setup --provider ollama --model llama3.2 --template chatbot --skip-test
+# Knowledge agent with Ollama
+initrunner setup --provider ollama --model llama3.2 --intent knowledge --skip-test --interfaces skip -y
 
-# Custom output path
-initrunner setup --provider anthropic --model claude-sonnet-4-5-20250929 --template rag --output agents/researcher.yaml --skip-test
+# Skip chat.yaml generation
+initrunner setup --provider openai --intent chatbot --skip-test --skip-chat-yaml --interfaces skip -y
 ```
 
 The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.
+
+## Backward Compatibility
+
+The `--template` flag is still accepted but deprecated. It maps to `--intent` internally:
+
+| `--template` | `--intent` |
+|---|---|
+| `chatbot` | `chatbot` |
+| `rag` | `knowledge` |
+| `memory` | `memory` |
+| `daemon` | `daemon` |
+
+A deprecation hint is printed when `--template` is used.
 
 ## Configuration Files
 
@@ -185,7 +213,19 @@ The file is created with `0600` permissions (owner read/write only). The path is
 2. `XDG_DATA_HOME/initrunner` (if `XDG_DATA_HOME` is set).
 3. `~/.initrunner` (default fallback).
 
-The `.env` file is loaded automatically by `initrunner run` and other commands via `dotenv`. Keys set directly in the environment take precedence over `.env` values.
+### Chat Config
+
+`~/.initrunner/chat.yaml` is generated during setup:
+
+```yaml
+provider: openai
+model: gpt-5-mini
+tool_profile: minimal
+memory: true
+name: ephemeral-chat
+```
+
+This file is loaded by `initrunner chat` to pre-configure the ephemeral chat session. See `cli/chat_config.py` for the full schema.
 
 ### Generated Role
 
@@ -196,18 +236,14 @@ The generated `role.yaml` (or custom `--output` path) is a standard InitRunner r
 ### Unknown provider
 
 ```
-Error: Unknown provider 'foo'. Choose from: openai, anthropic, google, groq, mistral, cohere, ollama
+Error: Unknown provider 'foo'. Choose from: openai, anthropic, google, groq, mistral, cohere, bedrock, xai, ollama
 ```
 
-The `--provider` value must be one of the supported providers listed above.
-
-### Unknown template
+### Unknown intent
 
 ```
-Error: Unknown template 'foo'. Choose from: chatbot, rag, memory, daemon
+Error: Unknown intent 'foo'. Choose from: chatbot, knowledge, memory, telegram-bot, discord-bot, api-agent, daemon, from-example
 ```
-
-The `--template` value must be one of the four setup templates.
 
 ### SDK installation failed
 
@@ -216,7 +252,14 @@ Warning: Could not install initrunner[anthropic]: ...
 Install manually: uv pip install initrunner[anthropic]
 ```
 
-The automatic SDK installation failed. Install the provider extra manually using the printed command, then re-run setup.
+### Embedding warning
+
+```
+Warning: anthropic does not provide an embeddings API.
+RAG and memory features require OPENAI_API_KEY for embeddings.
+```
+
+This appears when using a provider without embeddings support with the `knowledge` or `memory` intent. Set `OPENAI_API_KEY` for embeddings, or configure a custom embedding provider in your role.yaml.
 
 ### API key validation failed
 
@@ -224,22 +267,7 @@ The automatic SDK installation failed. Install the provider extra manually using
 Warning: API key validation failed.
 ```
 
-The API key could not be verified against the provider's API. This can happen if:
-
-- The key is invalid or expired.
-- The provider API is temporarily unreachable.
-- A proxy or firewall is blocking the request.
-
-You can re-enter the key when prompted, or continue with the current key and troubleshoot later.
-
-### Could not write .env file
-
-```
-Warning: Could not write ~/.initrunner/.env: [Errno 13] Permission denied
-Set it manually: export OPENAI_API_KEY=sk-...
-```
-
-The wizard could not write the API key to the global `.env` file. Set the environment variable manually in your shell profile instead.
+Re-enter the key when prompted, or continue with the current key and troubleshoot later.
 
 ### Test run failed
 
@@ -248,19 +276,4 @@ Warning: Test run failed: ...
 Setup is still complete -- check your configuration and try again.
 ```
 
-The connectivity test after setup failed. This does not invalidate the setup. Common causes:
-
-- API key is incorrect.
-- Provider SDK is not installed.
-- Ollama server is not running.
-- Network issues.
-
-Run `initrunner run role.yaml -p "hello"` manually to debug.
-
-### Output file already exists
-
-```
-role.yaml already exists, skipping role creation.
-```
-
-The wizard does not overwrite existing role files. Use `--output` to specify a different path, or delete the existing file first.
+The connectivity test failed but setup is still considered complete. Run `initrunner run role.yaml -p "hello"` manually to debug.

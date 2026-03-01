@@ -30,6 +30,7 @@ def clean_env(monkeypatch, tmp_path):
         "GROQ_API_KEY",
         "MISTRAL_API_KEY",
         "CO_API_KEY",
+        "XAI_API_KEY",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path / "home"))
@@ -42,7 +43,8 @@ def clean_env(monkeypatch, tmp_path):
 
 class TestNeedsSetup:
     def test_needs_setup_true_fresh(self, clean_env):
-        assert needs_setup() is True
+        with patch("initrunner.services.providers._is_ollama_running", return_value=False):
+            assert needs_setup() is True
 
     def test_needs_setup_false_env_var(self, clean_env, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
@@ -81,7 +83,7 @@ class TestFreshSetup:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key-12345\n",
+                input="sk-test-key-12345\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         assert output.exists()
@@ -114,6 +116,7 @@ class TestFreshSetup:
                 "--output",
                 str(output),
             ],
+            input="\n",  # accept default tools
         )
         assert result.exit_code == 0
         assert "Using existing" in result.output
@@ -140,6 +143,7 @@ class TestRerunDetection:
                 "--interfaces",
                 "skip",
             ],
+            input="\n",  # accept default tools
         )
         assert result.exit_code == 0
         assert "Using provider" in result.output
@@ -178,7 +182,7 @@ class TestProviderEnvVars:
                     "--output",
                     str(output),
                 ],
-                input="test-api-key\n",
+                input="test-api-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         env_path = tmp_path / "home" / ".env"
@@ -194,7 +198,7 @@ class TestOllama:
 
         with (
             patch("initrunner.cli.setup_cmd.check_ollama_running"),
-            patch("initrunner.cli.setup_cmd._check_ollama_models", return_value=["llama3.2"]),
+            patch("initrunner.cli.setup_cmd.check_ollama_models", return_value=["llama3.2"]),
         ):
             result = runner.invoke(
                 app,
@@ -213,6 +217,7 @@ class TestOllama:
                     "--output",
                     str(output),
                 ],
+                input="\n",  # accept default tools
             )
         assert result.exit_code == 0
         # No .env should have been created (no API key needed)
@@ -227,7 +232,7 @@ class TestOllama:
 
         with (
             patch("initrunner.cli.setup_cmd.check_ollama_running"),
-            patch("initrunner.cli.setup_cmd._check_ollama_models", return_value=[]),
+            patch("initrunner.cli.setup_cmd.check_ollama_models", return_value=[]),
         ):
             result = runner.invoke(
                 app,
@@ -246,6 +251,7 @@ class TestOllama:
                     "--output",
                     str(output),
                 ],
+                input="\n",  # accept default tools
             )
         assert result.exit_code == 0
         assert "No Ollama models found" in result.output
@@ -276,7 +282,7 @@ class TestSkipTest:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input="sk-test-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         assert "Running a quick test" not in result.output
@@ -317,8 +323,8 @@ class TestSdkInstall:
                     str(output),
                 ],
                 # "Install it now?" yes -> install fails -> "Continue anyway?" yes ->
-                # API key entry
-                input="y\ny\ntest-key\n",
+                # API key entry + accept default tools
+                input="y\ny\ntest-key\n\n",
             )
         assert result.exit_code == 0
 
@@ -484,7 +490,7 @@ class TestEnvFilePermissions:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input="sk-test-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         env_path = tmp_path / "home" / ".env"
@@ -522,7 +528,7 @@ class TestTestRunFailure:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input="sk-test-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         assert "Setup Complete" in result.output
@@ -556,6 +562,7 @@ class TestPartialSetupRecovery:
                     "--output",
                     str(output),
                 ],
+                input="\n",  # accept default tools
             )
         assert result.exit_code == 0
         assert "Using existing" in result.output
@@ -594,7 +601,7 @@ class TestWriteFailure:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input="sk-test-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         assert "export" in result.output
@@ -602,15 +609,17 @@ class TestWriteFailure:
 
 class TestTemplatePickerChoices:
     @pytest.mark.parametrize(
-        "template_choice,expected_content",
+        "template_choice,expected_content,extra_input",
         [
-            ("chatbot", "You are a helpful assistant"),
-            ("rag", "knowledge assistant"),
-            ("memory", "long-term memory"),
-            ("daemon", "monitoring assistant"),
+            ("chatbot", "You are a helpful assistant", ""),
+            ("rag", "knowledge assistant", "\n"),  # doc sources prompt
+            ("memory", "long-term memory", ""),
+            ("daemon", "monitoring assistant", "\n\n"),  # trigger type + watch paths
         ],
     )
-    def test_template_picker_choices(self, clean_env, template_choice, expected_content):
+    def test_template_picker_choices(
+        self, clean_env, template_choice, expected_content, extra_input
+    ):
         tmp_path = clean_env
         output = tmp_path / "role.yaml"
 
@@ -632,7 +641,7 @@ class TestTemplatePickerChoices:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input=f"sk-test-key\n\n{extra_input}",  # key + tools + intent-specific
             )
         assert result.exit_code == 0
         assert output.exists()
@@ -673,7 +682,7 @@ class TestSecurityDisclaimer:
                     "--output",
                     str(output),
                 ],
-                input="y\nsk-test-key\n",  # Accept disclaimer, enter key
+                input="y\nsk-test-key\n\n",  # Accept disclaimer, key, tools
             )
         assert result.exit_code == 0
         assert "Beta Software Notice" in result.output
@@ -702,7 +711,7 @@ class TestSecurityDisclaimer:
                     "--output",
                     str(output),
                 ],
-                input="sk-test-key\n",
+                input="sk-test-key\n\n",  # key + accept default tools
             )
         assert result.exit_code == 0
         assert "Beta Software Notice" not in result.output
@@ -734,6 +743,7 @@ class TestNextStepsIngestHint:
                 "--output",
                 str(output),
             ],
+            input="\n\n",  # accept default tools + default doc sources
         )
         assert result.exit_code == 0
         assert "initrunner ingest" in result.output
@@ -761,18 +771,19 @@ class TestNextStepsIngestHint:
                 "--output",
                 str(output),
             ],
+            input="\n",  # accept default tools
         )
         assert result.exit_code == 0
         assert "initrunner ingest" not in result.output
 
-    def test_ollama_rag_template_no_ingest_hint(self, clean_env):
-        """Ollama + RAG: no ingest hint (Ollama forces its own template)."""
+    def test_ollama_rag_template_shows_ingest_hint(self, clean_env):
+        """Ollama + RAG: ingest hint shown (bug fix — no longer overrides template)."""
         tmp_path = clean_env
         output = tmp_path / "role.yaml"
 
         with (
             patch("initrunner.cli.setup_cmd.check_ollama_running"),
-            patch("initrunner.cli.setup_cmd._check_ollama_models", return_value=["llama3.2"]),
+            patch("initrunner.cli.setup_cmd.check_ollama_models", return_value=["llama3.2"]),
         ):
             result = runner.invoke(
                 app,
@@ -791,9 +802,10 @@ class TestNextStepsIngestHint:
                     "--output",
                     str(output),
                 ],
+                input="n\n\n\n",  # decline embedding key + tools + doc sources
             )
         assert result.exit_code == 0
-        assert "initrunner ingest" not in result.output
+        assert "initrunner ingest" in result.output
 
 
 class TestInterfaceInstall:
@@ -822,7 +834,7 @@ class TestInterfaceInstall:
         output = tmp_path / "role.yaml"
 
         with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="skip"))
+            result = runner.invoke(app, self._base_args(output, interfaces="skip"), input="\n")
 
         assert result.exit_code == 0
         mock_install.assert_not_called()
@@ -834,7 +846,7 @@ class TestInterfaceInstall:
         output = tmp_path / "role.yaml"
 
         with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="tui"))
+            result = runner.invoke(app, self._base_args(output, interfaces="tui"), input="\n")
 
         assert result.exit_code == 0
         mock_install.assert_called_once_with("tui")
@@ -845,7 +857,7 @@ class TestInterfaceInstall:
         output = tmp_path / "role.yaml"
 
         with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="dashboard"))
+            result = runner.invoke(app, self._base_args(output, interfaces="dashboard"), input="\n")
 
         assert result.exit_code == 0
         mock_install.assert_called_once_with("dashboard")
@@ -857,7 +869,7 @@ class TestInterfaceInstall:
         output = tmp_path / "role.yaml"
 
         with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="both"))
+            result = runner.invoke(app, self._base_args(output, interfaces="both"), input="\n")
 
         assert result.exit_code == 0
         assert mock_install.call_count == 2
@@ -887,7 +899,7 @@ class TestInterfaceInstall:
                     "--output",
                     str(output),
                 ],
-                input="1\n",  # pick tui
+                input="\n1\n",  # tools + pick tui
             )
 
         assert result.exit_code == 0
@@ -915,7 +927,7 @@ class TestInterfaceInstall:
                     "--output",
                     str(output),
                 ],
-                input="4\n",  # skip
+                input="\n4\n",  # tools + skip
             )
 
         assert result.exit_code == 0
@@ -944,9 +956,237 @@ class TestInterfaceInstall:
                     "--output",
                     str(output),
                 ],
-                input="banana\n",
+                input="\nbanana\n",  # tools + invalid interface
             )
 
         assert result.exit_code == 0
         mock_install.assert_not_called()
         assert "Invalid choice" in result.output
+
+
+class TestIntentSetup:
+    """Tests for the new --intent flag."""
+
+    def test_intent_chatbot(self, clean_env, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--intent",
+                "chatbot",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n",  # accept default tools
+        )
+        assert result.exit_code == 0
+        assert output.exists()
+        content = output.read_text()
+        assert "You are a helpful assistant" in content
+
+    def test_intent_knowledge(self, clean_env, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--intent",
+                "knowledge",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n\n",  # accept default tools + default doc sources
+        )
+        assert result.exit_code == 0
+        assert output.exists()
+        content = output.read_text()
+        assert "knowledge assistant" in content.lower()
+        assert "ingest" in content
+
+    def test_intent_knowledge_provider_ollama(self, clean_env):
+        """--intent knowledge --provider ollama produces YAML with ingest section."""
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        with (
+            patch("initrunner.cli.setup_cmd.check_ollama_running"),
+            patch("initrunner.cli.setup_cmd.check_ollama_models", return_value=["llama3.2"]),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "ollama",
+                    "--model",
+                    "llama3.2",
+                    "--intent",
+                    "knowledge",
+                    "--skip-test",
+                    "--interfaces",
+                    "skip",
+                    "--skip-chat-yaml",
+                    "--output",
+                    str(output),
+                ],
+                input="n\n\n\n",  # decline embedding key + accept default tools + doc sources
+            )
+        assert result.exit_code == 0
+        assert output.exists()
+        import yaml
+
+        data = yaml.safe_load(output.read_text())
+        assert "ingest" in data["spec"]
+        assert data["spec"]["model"]["provider"] == "ollama"
+
+    def test_intent_telegram_bot(self, clean_env, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--intent",
+                "telegram-bot",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n",  # accept default tools
+        )
+        assert result.exit_code == 0
+        assert output.exists()
+        content = output.read_text()
+        assert "telegram" in content.lower()
+
+
+class TestBackwardCompat:
+    def test_template_rag_still_works(self, clean_env, monkeypatch):
+        """--template rag should still work (mapped to knowledge intent)."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--template",
+                "rag",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n\n",  # accept default tools + default doc sources
+        )
+        assert result.exit_code == 0
+        assert "deprecated" in result.output.lower()
+        assert output.exists()
+        content = output.read_text()
+        assert "ingest" in content
+
+    def test_template_chatbot_still_works(self, clean_env, monkeypatch):
+        """--template chatbot should still work (mapped to chatbot intent)."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--template",
+                "chatbot",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n",  # accept default tools
+        )
+        assert result.exit_code == 0
+        assert output.exists()
+
+
+class TestSkipChatYaml:
+    def test_skip_chat_yaml(self, clean_env, monkeypatch):
+        """--skip-chat-yaml should not create chat.yaml."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--intent",
+                "chatbot",
+                "--skip-test",
+                "--interfaces",
+                "skip",
+                "--skip-chat-yaml",
+                "--output",
+                str(output),
+            ],
+            input="\n",  # accept default tools
+        )
+        assert result.exit_code == 0
+        chat_yaml = tmp_path / "home" / "chat.yaml"
+        assert not chat_yaml.exists()

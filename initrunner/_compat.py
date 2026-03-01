@@ -11,6 +11,7 @@ _PROVIDER_PACKAGES: dict[str, str] = {
     "groq": "groq",
     "mistral": "mistralai",
     "cohere": "cohere",
+    "bedrock": "boto3",
 }
 
 _PROVIDER_EXTRAS: dict[str, str] = {
@@ -19,6 +20,7 @@ _PROVIDER_EXTRAS: dict[str, str] = {
     "groq": "groq",
     "mistral": "mistral",
     "cohere": "all-models",
+    "bedrock": "all-models",
 }
 
 _INGEST_PACKAGES: dict[str, str] = {
@@ -30,8 +32,8 @@ _INGEST_PACKAGES: dict[str, str] = {
 
 def require_provider(provider: str) -> None:
     """Check that the SDK for *provider* is importable, or raise with install hint."""
-    if provider in ("openai", "ollama"):
-        return  # openai SDK always available with core install; ollama uses it
+    if provider in ("openai", "ollama", "xai"):
+        return  # openai SDK always available with core install; ollama and xai use it
     module = _PROVIDER_PACKAGES.get(provider)
     if module is None:
         raise RuntimeError(f"Unknown provider '{provider}'")

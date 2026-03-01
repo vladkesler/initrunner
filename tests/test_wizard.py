@@ -293,22 +293,22 @@ class TestWizardEmbeddingWarning:
         """Anthropic + memory should show embedding key warning."""
         output = self._run_wizard_with_inputs("anthropic", enable_memory=True, tmp_path=tmp_path)
         assert "OPENAI_API_KEY" in output
-        assert "Anthropic does not provide an embeddings API" in output
+        assert "anthropic does not provide an embeddings API" in output
 
     def test_warning_shown_for_anthropic_with_ingest(self, tmp_path):
         """Anthropic + ingestion should show embedding key warning."""
         output = self._run_wizard_with_inputs("anthropic", template="rag", tmp_path=tmp_path)
         assert "OPENAI_API_KEY" in output
-        assert "Anthropic does not provide an embeddings API" in output
+        assert "anthropic does not provide an embeddings API" in output
 
     def test_no_warning_for_anthropic_without_memory_or_ingest(self, tmp_path):
         """Anthropic without memory/ingest should NOT show embedding warning."""
         output = self._run_wizard_with_inputs(
             "anthropic", enable_memory=False, enable_ingest=False, tmp_path=tmp_path
         )
-        assert "Anthropic does not provide an embeddings API" not in output
+        assert "anthropic does not provide an embeddings API" not in output
 
     def test_no_warning_for_openai_with_memory(self, tmp_path):
         """OpenAI + memory should NOT show Anthropic embedding warning."""
         output = self._run_wizard_with_inputs("openai", enable_memory=True, tmp_path=tmp_path)
-        assert "Anthropic does not provide an embeddings API" not in output
+        assert "anthropic does not provide an embeddings API" not in output

@@ -9,8 +9,11 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from initrunner.cli._helpers import check_ollama_running, console
-
-_PROVIDERS = ["openai", "anthropic", "google", "groq", "mistral", "cohere", "ollama"]
+from initrunner.services.setup import (
+    ALL_PROVIDERS,
+    check_ollama_models,
+    provider_needs_embeddings_warning,
+)
 
 
 def run_wizard() -> None:
@@ -39,12 +42,12 @@ def run_wizard() -> None:
 
     # --- Provider ---
     console.print()
-    for i, prov in enumerate(_PROVIDERS, 1):
+    for i, prov in enumerate(ALL_PROVIDERS, 1):
         default_tag = " (default)" if prov == "openai" else ""
         console.print(f"  {i}. {prov}{default_tag}")
     provider = Prompt.ask(
         "Provider",
-        choices=_PROVIDERS,
+        choices=ALL_PROVIDERS,
         default="openai",
     )
 
@@ -57,9 +60,7 @@ def run_wizard() -> None:
     ollama_models = None
     if provider == "ollama":
         try:
-            from initrunner.cli.setup_cmd import _check_ollama_models
-
-            ollama_models = _check_ollama_models() or None
+            ollama_models = check_ollama_models() or None
         except Exception:
             pass  # fall back to static PROVIDER_MODELS["ollama"]
 
@@ -178,11 +179,13 @@ def run_wizard() -> None:
             },
         }
 
-    # --- Embedding key warning for Anthropic ---
-    if provider == "anthropic" and (enable_memory or enable_ingest):
+    # --- Embedding key warning ---
+    # Determine intent-like label for the warning check
+    _intent = "knowledge" if enable_ingest else ("memory" if enable_memory else "chatbot")
+    if provider_needs_embeddings_warning(provider, _intent):
         console.print()
         console.print(
-            "[bold yellow]Warning:[/bold yellow] Anthropic does not provide an embeddings API. "
+            f"[bold yellow]Warning:[/bold yellow] {provider} does not provide an embeddings API. "
             "RAG and memory features require [bold]OPENAI_API_KEY[/bold] for embeddings.\n"
             "You can override this in your role.yaml under "
             "[bold]spec.ingest.embeddings[/bold] or [bold]spec.memory.embeddings[/bold]."

@@ -18,6 +18,14 @@ class TestRequireProvider:
         with pytest.raises(RuntimeError, match="Unknown provider"):
             require_provider("nonexistent")
 
+    def test_xai_always_available(self):
+        require_provider("xai")  # should not raise — uses openai SDK
+
+    def test_bedrock_known_provider(self):
+        """bedrock should get an import hint, not 'Unknown provider'."""
+        with pytest.raises(RuntimeError, match="pip install initrunner"):
+            require_provider("bedrock")
+
     def test_missing_provider_gives_install_hint(self):
         # groq is unlikely to be installed in test env
         with pytest.raises(RuntimeError, match="pip install initrunner"):

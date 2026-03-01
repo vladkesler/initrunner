@@ -10,6 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-2610+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.12.0-%2334D058" alt="v1.12.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -24,19 +25,18 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.11.0** -- MCP Toolkit: expose InitRunner tools directly as an MCP server — no agent, no LLM required. Plus think tool, script tool, and MCP gateway. See the [Changelog](CHANGELOG.md).
+> **v1.12.0** -- Intent-driven setup wizard: redesigned `initrunner setup` with 8 build intents, tool picker, and `chat.yaml` generation. Plus xAI and Bedrock provider support. See the [Changelog](CHANGELOG.md).
 
 ## 30-Second Quickstart
 
 ```bash
-pip install "initrunner[all]"
-export OPENAI_API_KEY=sk-...
-initrunner chat --ingest ./my-docs/
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+initrunner setup
 ```
 
-That's it. You have an AI agent that knows your docs and remembers across sessions.
+The wizard walks you through provider, API key, model, and first agent — you'll have a working role in under a minute.
 
-> `--ingest` embeds documents with OpenAI by default. Using another provider? See [RAG Quickstart](docs/getting-started/rag-quickstart.md#embedding-api-key) to configure embeddings.
+> **Prefer a package manager?** `uv tool install "initrunner[all]"`, `pipx install "initrunner[all]"`, or `pip install "initrunner[all]"` all work. Note that bare `pip install` may fail on modern Linux due to [PEP 668](https://peps.python.org/pep-0668/) — use `uv`, `pipx`, or the shell installer instead.
 
 ## Try It
 
@@ -80,7 +80,7 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-opus-4-6 }`.
+That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-opus-4-6 }`.
 
 <p align="center">
   <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
@@ -101,7 +101,7 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 
 |  | InitRunner | Build from scratch | LangChain |
 |---|---|---|---|
-| **Setup** | `pip install initrunner` + API key | Install 5-10 packages, write glue code | `pip install langchain` + adapters |
+| **Setup** | `curl -fsSL https://initrunner.ai/install.sh \| sh` + API key | Install 5-10 packages, write glue code | `pip install langchain` + adapters |
 | **Agent config** | One YAML file | Python classes + wiring | Python chains + config objects |
 | **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt - DIY | Loaders > splitters > vectorstore chain |
 | **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
@@ -122,29 +122,48 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 ### 1. Install
 
 ```bash
-curl -fsSL https://initrunner.ai/install.sh | sh
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
 ```
 
 Or with a package manager:
 
 ```bash
-pip install "initrunner[all]"       # everything included
-pip install initrunner              # core only (OpenAI)
-uv tool install initrunner          # or with uv
+uv tool install "initrunner[all]"   # recommended (fast, PEP 668-safe)
+pipx install "initrunner[all]"      # also PEP 668-safe
+pip install "initrunner[all]"       # may fail on modern Linux (PEP 668)
 ```
 
 Common extras: `anthropic` (Claude), `ingest` (PDF/DOCX), `dashboard` (web UI), `all` (everything). See [Installation docs](docs/getting-started/installation.md) for the full extras table and platform notes.
 
-### 2. Set your API key
+### 2. Run the setup wizard
+
+```bash
+initrunner setup
+```
+
+The wizard guides you through:
+- **Provider** — OpenAI, Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI, or Ollama
+- **API key** — auto-detects existing keys, validates, and saves to `~/.initrunner/.env`
+- **Model** — pick from a curated list for your provider
+- **Intent** — chatbot, knowledge/RAG, memory, Telegram bot, Discord bot, API agent, daemon, or bundled example
+- **Tools** — select and configure tools with intent-specific defaults
+- **Connectivity test** — verifies everything works before you start
+
+At the end you get a ready-to-run `role.yaml` and a configured `initrunner chat` session. See [Setup docs](docs/getting-started/setup.md) for all flags and non-interactive usage.
+
+<details>
+<summary>Alternative: manual configuration</summary>
+
+If you prefer to skip the wizard, set your API key directly:
 
 ```bash
 export OPENAI_API_KEY=sk-...          # OpenAI (default)
 export ANTHROPIC_API_KEY=sk-ant-...   # Claude
 ```
 
-You can also store keys in `~/.initrunner/.env` - it's loaded automatically by all commands. Environment variables set in the shell take precedence over `.env` values.
+You can also store keys in `~/.initrunner/.env` — it's loaded automatically by all commands. Environment variables set in the shell take precedence over `.env` values.
 
-> Or run `initrunner setup` - it walks through provider, key, and first role interactively, and stores the key in `~/.initrunner/.env` for you.
+</details>
 
 ### 3. Start chatting
 
@@ -331,7 +350,7 @@ See [Evals](docs/core/evals.md).
 
 ### 10. Expose as MCP tools
 
-Turn any agent into an MCP server that Claude Desktop, Claude Code, and Cursor can call directly:
+Turn any agent into an MCP server that Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and Windsurf can call directly:
 
 ```bash
 initrunner mcp serve researcher.yaml writer.yaml reviewer.yaml
@@ -362,7 +381,7 @@ initrunner mcp toolkit --tools sql --tools http  # add opt-in tools
 initrunner mcp toolkit -c toolkit.yaml        # YAML config with env var interpolation
 ```
 
-Add to Claude Code (`.mcp.json`) or Cursor:
+Compatible with Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and Windsurf. Add to your MCP config (`.mcp.json` for Claude Code, `claude_desktop_config.json` for Claude Desktop, etc.):
 
 ```json
 {
@@ -497,3 +516,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, PR 
 ## License
 
 MIT - see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center"><sub>v1.12.0</sub></p>

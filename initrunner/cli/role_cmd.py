@@ -280,9 +280,14 @@ def setup(
         str | None, typer.Option(help="Provider (skip interactive selection)")
     ] = None,
     name: Annotated[str, typer.Option(help="Agent name")] = "my-agent",
-    template: Annotated[
-        str | None, typer.Option(help="Template: chatbot, rag, memory, daemon")
+    intent: Annotated[
+        str | None,
+        typer.Option(
+            help="Intent: chatbot, knowledge, memory, telegram-bot, discord-bot, "
+            "api-agent, daemon, from-example"
+        ),
     ] = None,
+    template: Annotated[str | None, typer.Option(help="[deprecated] Use --intent instead")] = None,
     model: Annotated[
         str | None,
         typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
@@ -297,6 +302,10 @@ def setup(
         str | None,
         typer.Option(help="Install interfaces: tui, dashboard, both, skip"),
     ] = None,
+    skip_chat_yaml: Annotated[
+        bool,
+        typer.Option("--skip-chat-yaml", help="Skip chat.yaml generation"),
+    ] = False,
 ) -> None:
     """Guided setup wizard for first-time configuration."""
     from initrunner.cli.setup_cmd import run_setup
@@ -304,12 +313,14 @@ def setup(
     run_setup(
         provider=provider,
         name=name,
+        intent=intent,
         template=template,
         skip_test=skip_test,
         output=output,
         accept_risks=accept_risks,
         interfaces=interfaces,
         model=model,
+        skip_chat_yaml=skip_chat_yaml,
     )
 
 

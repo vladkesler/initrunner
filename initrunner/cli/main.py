@@ -81,7 +81,7 @@ def main(
         run_setup(
             provider=None,
             name="my-agent",
-            template=None,
+            intent=None,
             skip_test=False,
             output=Path("role.yaml"),
         )

@@ -1,6 +1,26 @@
 # Changelog
 
-## [1.11.0]
+## [1.12.0] - 2026-03-02
+
+### Added
+- **Intent-driven setup wizard** (`initrunner setup`): redesigned from 5-step to 13-step flow — intent selection ("What do you want to build?"), tool picker with per-intent defaults, embedding config warnings, intent-specific prompts (bot tokens, doc sources, daemon triggers), and `chat.yaml` generation
+- 8 intents: `chatbot`, `knowledge`, `memory`, `telegram-bot`, `discord-bot`, `api-agent`, `daemon`, `from-example` (bundled example browser)
+- `--intent` flag on `setup` command (replaces `--template`, which is retained as deprecated)
+- `--skip-chat-yaml` flag on `setup` command
+- **xAI provider support**: detected by `needs_setup()`, listed in provider picker, uses OpenAI SDK
+- **Bedrock provider support** in `_compat.py`: `require_provider("bedrock")` gives proper install hint (`pip install initrunner[all-models]`)
+- `initrunner/services/setup.py` — shared setup business logic (CLI, API, TUI all use this): `SetupConfig` dataclass, `needs_setup()`, `detect_existing_provider()`, `validate_api_key()`, `generate_role_yaml()`, `generate_chat_yaml()`, `save_chat_yaml()`, `run_connectivity_test()`
+
+### Fixed
+- Ollama + non-chatbot intent no longer silently overrides the selected template — `generate_role_yaml()` derives template from intent, not provider
+- xAI API key (`XAI_API_KEY`) now detected by `needs_setup()` so setup wizard doesn't re-prompt when already configured
+
+### Documentation
+- `docs/getting-started/setup.md` rewritten for 13-step intent-driven wizard
+- `docs/interfaces/mcp-gateway.md` expanded with per-client config sections (Gemini CLI, Codex CLI, Windsurf)
+- README install instructions updated for PEP 668: shell installer promoted as primary path, `uv`/`pipx` before bare `pip`
+
+## [1.11.0] - 2026-03-01
 
 ### Added
 - **MCP Toolkit** (`initrunner mcp toolkit`): expose InitRunner tools directly as an MCP server — no agent, no LLM, no API key required for default tools. Any MCP client (Claude Code, Cursor, Codex CLI, etc.) gets web search, page fetching, CSV analysis, and datetime tools instantly

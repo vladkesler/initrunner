@@ -11,7 +11,7 @@ InitRunner offers two ways to expose capabilities via [MCP (Model Context Protoc
 
 ## MCP Toolkit — Direct Tool Server
 
-The `initrunner mcp toolkit` command exposes InitRunner's built-in tools directly as MCP tools — no agent, no LLM, no API key required (for default tools). AI coding assistants like Claude Code, Cursor, Codex CLI, and others already have their own LLM — they just need additional **capabilities**.
+The `initrunner mcp toolkit` command exposes InitRunner's built-in tools directly as MCP tools — no agent, no LLM, no API key required (for default tools). AI coding assistants like Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, and Windsurf already have their own LLM — they just need additional **capabilities**.
 
 ### Quick Start
 
@@ -31,7 +31,9 @@ initrunner mcp toolkit --transport sse --port 8080
 
 ### Client Configuration
 
-Add to your `.mcp.json` (Claude Code, Cursor, or any MCP client):
+#### Claude Code / Cursor / Windsurf
+
+Add to your `.mcp.json`:
 
 ```json
 {
@@ -52,6 +54,51 @@ With specific tools:
     "initrunner-toolkit": {
       "command": "initrunner",
       "args": ["mcp", "toolkit", "--tools", "search,csv_analysis,datetime"]
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit"]
+    }
+  }
+}
+```
+
+#### Gemini CLI
+
+Add to your `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit"]
+    }
+  }
+}
+```
+
+#### Codex CLI
+
+Add to your `~/.codex/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit"]
     }
   }
 }
@@ -146,7 +193,7 @@ mcp = build_toolkit_sync(tool_names=["search", "csv_analysis"])
 
 ## MCP Gateway — Expose Agents as MCP Tools
 
-The `initrunner mcp serve` command exposes one or more InitRunner agents as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server. This lets Claude Desktop, Claude Code, Cursor, and any other MCP client call your agents directly as tools.
+The `initrunner mcp serve` command exposes one or more InitRunner agents as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server. This lets Claude Code, Claude Desktop, Gemini CLI, Codex CLI, Cursor, Windsurf, and any other MCP client call your agents directly as tools.
 
 InitRunner already supports MCP as a **client** (consuming external MCP servers as agent tools). The gateway adds the reverse direction — your agents become the server.
 
@@ -287,9 +334,39 @@ Add to your `.mcp.json`:
 }
 ```
 
-### Cursor
+### Cursor / Windsurf
 
-Add to your Cursor MCP settings:
+Add to your Cursor or Windsurf MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "initrunner": {
+      "command": "initrunner",
+      "args": ["mcp", "serve", "roles/agent.yaml"]
+    }
+  }
+}
+```
+
+### Gemini CLI
+
+Add to your `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "initrunner": {
+      "command": "initrunner",
+      "args": ["mcp", "serve", "roles/agent.yaml"]
+    }
+  }
+}
+```
+
+### Codex CLI
+
+Add to your `~/.codex/config.json`:
 
 ```json
 {

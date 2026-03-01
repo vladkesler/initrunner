@@ -26,6 +26,7 @@ def clean_env(monkeypatch, tmp_path):
         "GROQ_API_KEY",
         "MISTRAL_API_KEY",
         "CO_API_KEY",
+        "XAI_API_KEY",
         "TELEGRAM_BOT_TOKEN",
         "DISCORD_BOT_TOKEN",
     ):
@@ -83,6 +84,13 @@ class TestDetectProviderAndModel:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "cohere"
+
+    def test_xai_detected_from_env(self, clean_env, monkeypatch):
+        monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
+        with _MOCK_LOAD_ENV:
+            result = detect_provider_and_model()
+        assert result is not None
+        assert result.provider == "xai"
 
     def test_none_when_no_keys(self, clean_env):
         """Returns None when no API keys and no Ollama."""

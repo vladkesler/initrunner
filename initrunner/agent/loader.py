@@ -24,6 +24,7 @@ _PROVIDER_API_KEY_ENVS: dict[str, str] = {
     "groq": "GROQ_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "cohere": "CO_API_KEY",
+    "xai": "XAI_API_KEY",
 }
 
 
