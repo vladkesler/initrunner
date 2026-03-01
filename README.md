@@ -9,7 +9,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-2510+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2610+-%2334D058" alt="Tests"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -24,7 +24,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.10.0** -- Think tool, script tool, and MCP gateway mode. Expose agents to Claude Desktop, Cursor, and any MCP client. See the [Changelog](CHANGELOG.md).
+> **v1.11.0** -- MCP Toolkit: expose InitRunner tools directly as an MCP server — no agent, no LLM required. Plus think tool, script tool, and MCP gateway. See the [Changelog](CHANGELOG.md).
 
 ## 30-Second Quickstart
 
@@ -91,7 +91,7 @@ That's it. No Python, no boilerplate. Using Claude? `pip install "initrunner[ant
 
 **Zero config to start.** `initrunner chat` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
 
-**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 18 built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
+**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 20+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
 
 **Version-control your agents.** Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
 
@@ -351,6 +351,29 @@ Each role becomes a tool. Configure in Claude Desktop's `claude_desktop_config.j
 ```
 
 See [MCP Gateway docs](docs/interfaces/mcp-gateway.md) for SSE/HTTP transports, pass-through mode, and multi-agent setups.
+
+#### MCP Toolkit (no LLM required)
+
+Expose InitRunner tools directly as an MCP server — no agent, no API key needed for default tools:
+
+```bash
+initrunner mcp toolkit                        # web search, page fetch, CSV, datetime
+initrunner mcp toolkit --tools sql --tools http  # add opt-in tools
+initrunner mcp toolkit -c toolkit.yaml        # YAML config with env var interpolation
+```
+
+Add to Claude Code (`.mcp.json`) or Cursor:
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit"]
+    }
+  }
+}
+```
 
 ## Community Roles
 

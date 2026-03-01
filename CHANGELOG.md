@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0]
+
+### Added
+- **MCP Toolkit** (`initrunner mcp toolkit`): expose InitRunner tools directly as an MCP server — no agent, no LLM, no API key required for default tools. Any MCP client (Claude Code, Cursor, Codex CLI, etc.) gets web search, page fetching, CSV analysis, and datetime tools instantly
+- Default tools: `search` (web_search, news_search), `web_reader` (fetch_page), `csv_analysis` (inspect_csv, query_csv, summarize_csv), `datetime` (current_time, parse_date)
+- Opt-in tools: `sql`, `http`, `email`, `audio` (YouTube transcripts) — configurable via `toolkit.yaml` or `--tools` flag
+- `--config/-c` flag for YAML configuration with `${VAR}` env var interpolation
+- `build_toolkit_sync()` service wrapper in `services/operations.py`
+- MCP Toolkit documentation in `docs/interfaces/mcp-gateway.md`
+
+### Documentation
+- Updated README with MCP Toolkit section and test count
+
 ## [1.10.0] - 2026-03-01
 
 ### Added
