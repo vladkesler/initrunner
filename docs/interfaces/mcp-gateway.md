@@ -1,4 +1,150 @@
-# MCP Gateway — Expose Agents as MCP Tools
+# MCP Gateway & Toolkit — Expose Agents and Tools as MCP Servers
+
+InitRunner offers two ways to expose capabilities via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/):
+
+| Command | What it exposes | LLM required? | Use case |
+|---------|----------------|----------------|----------|
+| `initrunner mcp serve` | Agents (full LLM reasoning) | Yes — each tool call triggers an agent run | Expose specialized agents to MCP clients |
+| `initrunner mcp toolkit` | Raw tools (web search, CSV, SQL, etc.) | **No** — tools execute directly | Give AI coding assistants extra capabilities |
+
+---
+
+## MCP Toolkit — Direct Tool Server
+
+The `initrunner mcp toolkit` command exposes InitRunner's built-in tools directly as MCP tools — no agent, no LLM, no API key required (for default tools). AI coding assistants like Claude Code, Cursor, Codex CLI, and others already have their own LLM — they just need additional **capabilities**.
+
+### Quick Start
+
+```bash
+# Expose default tools (search, web reader, CSV analysis, datetime)
+initrunner mcp toolkit
+
+# Expose specific tools
+initrunner mcp toolkit --tools search,csv_analysis,sql
+
+# Use a config file for advanced options
+initrunner mcp toolkit --config toolkit.yaml
+
+# Network mode
+initrunner mcp toolkit --transport sse --port 8080
+```
+
+### Client Configuration
+
+Add to your `.mcp.json` (Claude Code, Cursor, or any MCP client):
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit"]
+    }
+  }
+}
+```
+
+With specific tools:
+
+```json
+{
+  "mcpServers": {
+    "initrunner-toolkit": {
+      "command": "initrunner",
+      "args": ["mcp", "toolkit", "--tools", "search,csv_analysis,datetime"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+**Default tools** (free, no API key, no external state):
+
+| Tool | MCP Functions | Description |
+|------|---------------|-------------|
+| `search` | `web_search`, `news_search` | DuckDuckGo search (free, no key). |
+| `web_reader` | `fetch_page` | Fetch URLs and return clean markdown with SSRF protection. |
+| `csv_analysis` | `inspect_csv`, `query_csv`, `summarize_csv` | CSV analysis without writing Python. |
+| `datetime` | `current_time`, `parse_date` | Timezone-aware time and date parsing. |
+
+**Opt-in tools** (require config/credentials):
+
+| Tool | MCP Functions | Requires |
+|------|---------------|----------|
+| `sql` | `sql_query` | `database` path in config |
+| `http` | `http_request` | `base_url` in config |
+| `email` | `search_inbox`, `read_email`, `list_folders`, `send_email` | IMAP/SMTP credentials |
+| `audio` | `get_youtube_transcript` | `youtube-transcript-api` package |
+
+### CLI Options
+
+Synopsis: `initrunner mcp toolkit [OPTIONS]`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--tools, -T` | `str` | *(defaults)* | Comma-separated list of tools to expose. |
+| `--config, -c` | `Path` | `None` | Path to `toolkit.yaml` config file. |
+| `--transport, -t` | `str` | `stdio` | Transport: `stdio`, `sse`, or `streamable-http`. |
+| `--host` | `str` | `127.0.0.1` | Host to bind to (sse/http only). |
+| `--port` | `int` | `8080` | Port to listen on (sse/http only). |
+| `--server-name` | `str` | `initrunner-toolkit` | MCP server name (overrides config). |
+
+### Config File Format
+
+For opt-in tools or customized defaults, create a `toolkit.yaml`:
+
+```yaml
+server_name: initrunner-toolkit
+tools:
+  search:
+    provider: duckduckgo        # or serpapi, brave, tavily
+  web_reader: {}                # empty = defaults
+  csv_analysis:
+    root_path: ./data
+  datetime:
+    default_timezone: America/New_York
+  sql:
+    database: ./myapp.db
+    read_only: true
+  email:
+    imap_host: imap.gmail.com
+    username: ${EMAIL_USER}     # env var interpolation
+    password: ${EMAIL_PASS}
+```
+
+Environment variable interpolation (`${VAR}`) works in config values — the same `resolve_env_vars()` pattern used elsewhere in InitRunner.
+
+### Programmatic API
+
+```python
+from initrunner.mcp.toolkit import ToolkitConfig, build_toolkit
+from initrunner.mcp.gateway import run_mcp_gateway
+
+# Default tools
+mcp = build_toolkit()
+
+# Selective tools
+mcp = build_toolkit(tool_names=["search", "datetime"])
+
+# With config
+config = ToolkitConfig(tools={"sql": {"database": "app.db"}})
+mcp = build_toolkit(config)
+
+run_mcp_gateway(mcp, transport="stdio")
+```
+
+Or via the services layer:
+
+```python
+from initrunner.services.operations import build_toolkit_sync
+
+mcp = build_toolkit_sync(tool_names=["search", "csv_analysis"])
+```
+
+---
+
+## MCP Gateway — Expose Agents as MCP Tools
 
 The `initrunner mcp serve` command exposes one or more InitRunner agents as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server. This lets Claude Desktop, Claude Code, Cursor, and any other MCP client call your agents directly as tools.
 

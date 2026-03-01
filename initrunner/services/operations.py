@@ -115,3 +115,27 @@ def build_mcp_gateway_sync(
         pass_through=pass_through,
         extra_skill_dirs=extra_skill_dirs,
     )
+
+
+# ---------------------------------------------------------------------------
+# MCP toolkit
+# ---------------------------------------------------------------------------
+
+
+def build_toolkit_sync(
+    *,
+    config_path: Path | None = None,
+    tool_names: list[str] | None = None,
+    server_name: str | None = None,
+) -> object:
+    """Build an MCP toolkit server (sync). Returns a FastMCP instance."""
+    from initrunner.mcp.toolkit import ToolkitConfig, build_toolkit, load_toolkit_config
+
+    config: ToolkitConfig | None = None
+    if config_path is not None:
+        config = load_toolkit_config(config_path)
+    if config is None:
+        config = ToolkitConfig()
+    if server_name is not None:
+        config.server_name = server_name
+    return build_toolkit(config, tool_names=tool_names)
