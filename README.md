@@ -27,6 +27,26 @@ One YAML file is all it takes to go from idea to running agent - with document s
 
 > **v1.13.0** -- Docker container sandbox for tool execution, shared streaming and transport modules, tool architecture refactoring for MCP reuse, and security hardening. See the [Changelog](CHANGELOG.md).
 
+## Contents
+
+- [30-Second Quickstart](#30-second-quickstart)
+- [Try It](#try-it)
+- [Define Agent Roles in YAML](#define-agent-roles-in-yaml)
+- [Why InitRunner](#why-initrunner)
+- [How It Compares](#how-it-compares)
+- [What Can You Build?](#what-can-you-build)
+- [Quickstart](#quickstart)
+- [From Simple to Powerful](#from-simple-to-powerful)
+- [Community Roles](#community-roles)
+- [Docker](#docker)
+- [Cloud Deploy](#cloud-deploy)
+- [User Interfaces](#user-interfaces)
+- [Documentation](#documentation)
+- [Examples](#examples)
+- [Community & Support](#community--support)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## 30-Second Quickstart
 
 ```bash
