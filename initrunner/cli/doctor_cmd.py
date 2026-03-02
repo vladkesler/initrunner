@@ -57,15 +57,22 @@ def doctor(
         table.add_row(provider, key_status, sdk_status, status)
 
     # Ollama row
-    try:
-        import urllib.request
+    from initrunner.services.providers import is_ollama_running
 
-        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
-        ollama_ready = "[green]Ready[/green]"
-    except Exception:
-        ollama_ready = "[dim]Not running[/dim]"
+    ollama_ready = "[green]Ready[/green]" if is_ollama_running() else "[dim]Not running[/dim]"
 
     table.add_row("ollama", "[dim]—[/dim]", "[dim]—[/dim]", ollama_ready)
+
+    # Docker row
+    try:
+        from initrunner.agent.docker_sandbox import check_docker_available
+
+        docker_status = (
+            "[green]Ready[/green]" if check_docker_available() else "[dim]Not available[/dim]"
+        )
+    except Exception:
+        docker_status = "[dim]Not available[/dim]"
+    table.add_row("docker", "[dim]—[/dim]", "[dim]—[/dim]", docker_status)
 
     console.print(table)
 

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+
+_logger = logging.getLogger(__name__)
 
 CONVERSATIONAL_TRIGGER_TYPES: frozenset[str] = frozenset({"telegram", "discord"})
 
@@ -66,6 +69,8 @@ class TriggerBase(ABC):
         self._stop_event.set()
         if self._thread is not None:
             self._thread.join(timeout=10)
+            if self._thread.is_alive():
+                _logger.warning("%s trigger thread still alive after stop", self.__class__.__name__)
 
     @abstractmethod
     def _run(self) -> None:

@@ -43,7 +43,9 @@ def _list_tools_for_config(config: McpToolConfig, role_dir: Path) -> list[tuple[
     """Connect to an MCP server and list its tools. Returns (name, description) pairs."""
     from fastmcp import Client
 
-    transport = _build_transport(config, role_dir)
+    from initrunner.mcp._transport import build_transport
+
+    transport = build_transport(config, role_dir)
 
     async def _fetch() -> list[tuple[str, str]]:
         async with Client(transport=transport) as client:
@@ -51,45 +53,3 @@ def _list_tools_for_config(config: McpToolConfig, role_dir: Path) -> list[tuple[
             return [(t.name, t.description or "") for t in mcp_tools]
 
     return asyncio.run(_fetch())
-
-
-def _build_transport(config: McpToolConfig, role_dir: Path):
-    """Build a transport for introspection (lightweight, no sandbox checks)."""
-    from initrunner.agent._env import resolve_env_vars
-    from initrunner.agent._subprocess import scrub_env
-
-    if config.transport == "stdio":
-        from fastmcp.client.transports import StdioTransport
-
-        kwargs: dict = {"command": config.command, "args": config.args}
-        base_env = scrub_env()
-        resolved_env = {k: resolve_env_vars(v) for k, v in config.env.items()}
-        kwargs["env"] = {**base_env, **resolved_env}
-        if config.cwd is not None:
-            cwd_path = Path(config.cwd)
-            if not cwd_path.is_absolute():
-                cwd_path = role_dir / cwd_path
-            kwargs["cwd"] = str(cwd_path)
-        if config.timeout is not None:
-            kwargs["timeout"] = config.timeout
-        return StdioTransport(**kwargs)
-    elif config.transport == "sse":
-        from fastmcp.client.transports import SSETransport
-
-        sse_kwargs: dict = {"url": config.url}
-        resolved_headers = {k: resolve_env_vars(v) for k, v in config.headers.items()}
-        if resolved_headers:
-            sse_kwargs["headers"] = resolved_headers
-        if config.timeout is not None:
-            sse_kwargs["timeout"] = config.timeout
-        return SSETransport(**sse_kwargs)
-    else:
-        from fastmcp.client.transports import StreamableHttpTransport
-
-        http_kwargs: dict = {"url": config.url}
-        resolved_headers = {k: resolve_env_vars(v) for k, v in config.headers.items()}
-        if resolved_headers:
-            http_kwargs["headers"] = resolved_headers
-        if config.timeout is not None:
-            http_kwargs["timeout"] = config.timeout
-        return StreamableHttpTransport(**http_kwargs)

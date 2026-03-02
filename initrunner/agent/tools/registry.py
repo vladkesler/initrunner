@@ -7,38 +7,12 @@ from typing import TYPE_CHECKING
 
 from initrunner.agent.schema.tools import ToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, get_builder
-from initrunner.stores.base import StoreConfig
+from initrunner.stores.base import make_store_config
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
     from initrunner.agent.schema.role import RoleDefinition
-
-
-def _make_store_config(role: RoleDefinition) -> StoreConfig:
-    """Build a StoreConfig from a role definition."""
-    from initrunner.stores.base import resolve_store_path
-
-    ingest = role.spec.ingest
-    provider = role.spec.model.provider
-    name = role.metadata.name
-    if ingest is not None:
-        return StoreConfig(
-            db_path=resolve_store_path(ingest.store_path, name),
-            embed_provider=ingest.embeddings.provider or provider,
-            embed_model=ingest.embeddings.model,
-            store_backend=ingest.store_backend,
-            chunking_strategy=ingest.chunking.strategy,
-            chunk_size=ingest.chunking.chunk_size,
-            chunk_overlap=ingest.chunking.chunk_overlap,
-            embed_base_url=ingest.embeddings.base_url,
-            embed_api_key_env=ingest.embeddings.api_key_env,
-        )
-    return StoreConfig(
-        db_path=resolve_store_path(None, name),
-        embed_provider=provider,
-        embed_model="",
-    )
 
 
 def install_audit_hooks(role: RoleDefinition) -> None:
@@ -107,6 +81,11 @@ def build_toolsets(
 
     install_audit_hooks(role)
 
+    if role.spec.security.docker.enabled:
+        from initrunner.agent.docker_sandbox import require_docker
+
+        require_docker()
+
     for tool in tools:
         builder = get_builder(tool.type)
         if builder:
@@ -122,7 +101,7 @@ def build_toolsets(
         from initrunner.agent.tools.retrieval import build_retrieval_toolset
 
         toolsets.append(
-            build_retrieval_toolset(_make_store_config(role), sandbox=role.spec.security.tools)
+            build_retrieval_toolset(make_store_config(role), sandbox=role.spec.security.tools)
         )
 
     if role.spec.memory is not None:

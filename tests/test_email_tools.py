@@ -19,6 +19,9 @@ from initrunner.agent.tools.email_tools import (
     _decode_header,
     _extract_body,
     _html_to_markdown,
+    _sanitize_header,
+    _sanitize_imap_input,
+    _validate_imap_query,
     build_email_toolset,
 )
 
@@ -867,3 +870,201 @@ class TestEmailHelpers:
                 sys.modules["markdownify"] = saved
             else:
                 sys.modules.pop("markdownify", None)
+
+    def test_sanitize_header_strips_crlf(self):
+        assert _sanitize_header("clean") == "clean"
+        assert _sanitize_header("has\r\nnewline") == "hasnewline"
+        assert _sanitize_header("has\rnewline") == "hasnewline"
+        assert _sanitize_header("has\nnewline") == "hasnewline"
+
+    def test_sanitize_header_empty(self):
+        assert _sanitize_header("") == ""
+
+    def test_sanitize_imap_input_strips_crlf_nul(self):
+        assert _sanitize_imap_input("INBOX") == "INBOX"
+        assert _sanitize_imap_input("INBOX\r\n") == "INBOX"
+        assert _sanitize_imap_input("folder\x00name") == "foldername"
+
+    def test_validate_imap_query_clean(self):
+        assert _validate_imap_query("ALL") is None
+        assert _validate_imap_query('FROM "user@example.com"') is None
+
+    def test_validate_imap_query_rejects_crlf(self):
+        result = _validate_imap_query("ALL\r\nSTORE 1 +FLAGS \\Deleted")
+        assert result is not None
+        assert "invalid characters" in result
+
+    def test_validate_imap_query_rejects_null(self):
+        result = _validate_imap_query("ALL\x00EXPUNGE")
+        assert result is not None
+        assert "invalid characters" in result
+
+
+# ---------------------------------------------------------------------------
+# Header injection prevention tests (send_email)
+# ---------------------------------------------------------------------------
+
+
+class TestHeaderInjectionPrevention:
+    @patch("initrunner.agent.tools.email_tools.smtplib.SMTP")
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_to_header_injection(self, _mock_imap, mock_smtp_cls):
+        """CRLF in 'to' field must not inject extra headers."""
+        mock_server = MagicMock()
+        mock_smtp_cls.return_value = mock_server
+
+        config = EmailToolConfig(
+            imap_host="imap.example.com",
+            smtp_host="smtp.example.com",
+            username="user@example.com",
+            password="pass",
+            read_only=False,
+        )
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["send_email"].function
+
+        fn(
+            to="victim@example.com\r\nBcc: evil@example.com",
+            subject="Test",
+            body="Hello",
+        )
+
+        sent_msg_str = mock_server.sendmail.call_args[0][2]
+        msg = email.message_from_string(sent_msg_str)
+        assert msg["Bcc"] is None
+        assert "\r" not in (msg["To"] or "")
+        assert "\n" not in (msg["To"] or "")
+
+    @patch("initrunner.agent.tools.email_tools.smtplib.SMTP")
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_subject_header_injection(self, _mock_imap, mock_smtp_cls):
+        """CRLF in 'subject' field must not inject extra headers."""
+        mock_server = MagicMock()
+        mock_smtp_cls.return_value = mock_server
+
+        config = EmailToolConfig(
+            imap_host="imap.example.com",
+            smtp_host="smtp.example.com",
+            username="user@example.com",
+            password="pass",
+            read_only=False,
+        )
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["send_email"].function
+
+        fn(
+            to="to@example.com",
+            subject="Test\r\nBcc: evil@example.com",
+            body="Hello",
+        )
+
+        sent_msg_str = mock_server.sendmail.call_args[0][2]
+        msg = email.message_from_string(sent_msg_str)
+        assert msg["Bcc"] is None
+        assert "\r" not in (msg["Subject"] or "")
+        assert "\n" not in (msg["Subject"] or "")
+
+    @patch("initrunner.agent.tools.email_tools.smtplib.SMTP")
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_cc_header_injection(self, _mock_imap, mock_smtp_cls):
+        """CRLF in 'cc' field must not inject extra headers."""
+        mock_server = MagicMock()
+        mock_smtp_cls.return_value = mock_server
+
+        config = EmailToolConfig(
+            imap_host="imap.example.com",
+            smtp_host="smtp.example.com",
+            username="user@example.com",
+            password="pass",
+            read_only=False,
+        )
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["send_email"].function
+
+        fn(
+            to="to@example.com",
+            subject="Test",
+            body="Hello",
+            cc="cc@example.com\r\nBcc: evil@example.com",
+        )
+
+        sent_msg_str = mock_server.sendmail.call_args[0][2]
+        msg = email.message_from_string(sent_msg_str)
+        assert msg["Bcc"] is None
+        assert "\r" not in (msg["Cc"] or "")
+        assert "\n" not in (msg["Cc"] or "")
+
+
+# ---------------------------------------------------------------------------
+# IMAP injection prevention tests
+# ---------------------------------------------------------------------------
+
+
+class TestImapInjectionPrevention:
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_search_rejects_crlf_query(self, mock_imap_cls):
+        """Query with CRLF must be rejected before reaching IMAP."""
+        config = EmailToolConfig(imap_host="imap.example.com", username="user", password="pass")
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["search_inbox"].function
+
+        result = fn(query="ALL\r\nSTORE 1 +FLAGS \\Deleted")
+        assert "invalid characters" in result
+        # IMAP connection should never be opened
+        mock_imap_cls.assert_not_called()
+
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_search_sanitizes_folder(self, mock_imap_cls):
+        """Folder with CRLF must be sanitized before IMAP select."""
+        mock_conn = MagicMock()
+        mock_imap_cls.return_value = mock_conn
+        mock_conn.login.return_value = ("OK", [])
+        mock_conn.select.return_value = ("OK", [b"0"])
+        mock_conn.search.return_value = ("OK", [b""])
+
+        config = EmailToolConfig(imap_host="imap.example.com", username="user", password="pass")
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["search_inbox"].function
+
+        fn(folder="INBOX\r\nEXPUNGE")
+        # Folder should be sanitized (no CRLF)
+        called_folder = mock_conn.select.call_args[0][0]
+        assert "\r" not in called_folder
+        assert "\n" not in called_folder
+
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_read_sanitizes_message_id(self, mock_imap_cls):
+        """Message-ID with CRLF must be sanitized before IMAP search."""
+        mock_conn = MagicMock()
+        mock_imap_cls.return_value = mock_conn
+        mock_conn.login.return_value = ("OK", [])
+        mock_conn.select.return_value = ("OK", [b"0"])
+        mock_conn.search.return_value = ("OK", [b""])
+
+        config = EmailToolConfig(imap_host="imap.example.com", username="user", password="pass")
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["read_email"].function
+
+        fn(message_id="<test@example.com>\r\nEXPUNGE")
+        # The search query should not contain CRLF
+        search_query = mock_conn.search.call_args[0][1]
+        assert "\r" not in search_query
+        assert "\n" not in search_query
+
+    @patch("initrunner.agent.tools.email_tools.imaplib.IMAP4_SSL")
+    def test_read_sanitizes_folder(self, mock_imap_cls):
+        """Folder with CRLF in read_email must be sanitized."""
+        mock_conn = MagicMock()
+        mock_imap_cls.return_value = mock_conn
+        mock_conn.login.return_value = ("OK", [])
+        mock_conn.select.return_value = ("OK", [b"0"])
+        mock_conn.search.return_value = ("OK", [b""])
+
+        config = EmailToolConfig(imap_host="imap.example.com", username="user", password="pass")
+        toolset = build_email_toolset(config, _make_ctx())
+        fn = toolset.tools["read_email"].function
+
+        fn(message_id="<test@example.com>", folder="Sent\r\nDELETE")
+        called_folder = mock_conn.select.call_args[0][0]
+        assert "\r" not in called_folder
+        assert "\n" not in called_folder

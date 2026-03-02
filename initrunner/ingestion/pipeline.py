@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import glob as globmod
 import hashlib
 import logging
@@ -19,6 +18,7 @@ from urllib.parse import urlparse
 
 from pydantic_ai.embeddings import Embedder
 
+from initrunner._async import run_sync
 from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.ingestion.chunker import Chunk, chunk_text
 from initrunner.ingestion.embeddings import compute_model_identity, create_embedder, embed_texts
@@ -46,23 +46,6 @@ def _get_ingest_lock(db_path: Path) -> threading.Lock:
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
-    """Run an async coroutine from sync context, reusing an existing loop if possible."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop is not None and loop.is_running():
-        # We're inside an async context (e.g. called via asyncio.to_thread from API/TUI).
-        # Create a new loop in a thread-safe way.
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
-    return asyncio.run(coro)
-
-
 def _embed_batch(
     embedder: Embedder, texts: list[str], batch_size: int = _EMBED_BATCH_SIZE
 ) -> list[list[float]]:
@@ -77,7 +60,7 @@ def _embed_batch(
             all_embeddings.extend(await embed_texts(embedder, batch))
         return all_embeddings
 
-    return _run_async(_embed_all())
+    return run_sync(_embed_all())
 
 
 class FileStatus(StrEnum):

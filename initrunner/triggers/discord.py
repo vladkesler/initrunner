@@ -164,10 +164,3 @@ class DiscordTrigger(TriggerBase):
                 await asyncio.gather(client.start(token), stop_task)
 
         asyncio.run(run_bot())
-
-    def stop(self) -> None:
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=10)
-            if self._thread.is_alive():
-                _logger.warning("Discord trigger thread still alive after stop")

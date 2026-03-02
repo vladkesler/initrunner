@@ -64,6 +64,215 @@ def _check_file_size(target: Path, max_file_size_mb: float) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Core functions (shared by toolset wrappers and MCP toolkit)
+# ---------------------------------------------------------------------------
+
+
+def _load_csv(
+    target: Path,
+    root: Path,
+    path_display: str,
+    delimiter: str,
+    max_rows: int,
+    max_file_size_mb: float,
+) -> tuple[list[dict[str, str]], list[str], bool] | str:
+    """Validate, read, and parse a CSV file.
+
+    Returns ``(rows, headers, truncated)`` on success, or an error string on failure.
+    """
+    err, resolved = validate_path_within(target, [root], allowed_ext={".csv"}, reject_symlinks=True)
+    if err:
+        return err
+
+    size_err = _check_file_size(resolved, max_file_size_mb)
+    if size_err:
+        return size_err
+
+    try:
+        text = resolved.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return f"Error: file not found: {path_display}"
+    except UnicodeDecodeError:
+        return "Error: file is not valid UTF-8"
+
+    try:
+        reader = csv.DictReader(text.splitlines(), delimiter=delimiter)
+        if reader.fieldnames is None:
+            return "Error: could not parse CSV: no headers found"
+        headers = list(reader.fieldnames)
+
+        rows: list[dict[str, str]] = []
+        truncated = False
+        for row in reader:
+            if len(rows) >= max_rows:
+                truncated = True
+                break
+            rows.append(dict(row))
+    except csv.Error as e:
+        return f"Error: could not parse CSV: {e}"
+
+    return rows, headers, truncated
+
+
+def _do_inspect_csv(
+    target: Path,
+    root: Path,
+    path_display: str,
+    max_rows: int,
+    delimiter: str,
+    max_file_size_mb: float,
+) -> str:
+    """Inspect a CSV file: validate, parse, infer types, return formatted output."""
+    loaded = _load_csv(target, root, path_display, delimiter, max_rows, max_file_size_mb)
+    if isinstance(loaded, str):
+        return loaded
+    rows, headers, truncated = loaded
+
+    col_values: dict[str, list[str]] = {h: [] for h in headers}
+    for row in rows:
+        for h in headers:
+            v = row.get(h, "")
+            if v and len(col_values[h]) < _SAMPLE_TYPE_ROWS:
+                col_values[h].append(v)
+
+    col_types = {h: _infer_type(col_values[h]) for h in headers}
+
+    lines: list[str] = [
+        f"**File:** {path_display}",
+        f"**Rows inspected:** {len(rows)}" + (" (truncated)" if truncated else ""),
+        f"**Columns:** {len(headers)}",
+        "",
+        "| Column | Type |",
+        "| --- | --- |",
+    ]
+    for h in headers:
+        lines.append(f"| {h} | {col_types[h]} |")
+
+    lines.append("")
+    lines.append("**First 5 rows:**")
+    lines.append("")
+    lines.append(_rows_to_md_table(headers, rows[:5]))
+
+    return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
+
+
+def _do_summarize_csv(
+    target: Path,
+    root: Path,
+    path_display: str,
+    max_rows: int,
+    delimiter: str,
+    max_file_size_mb: float,
+    column: str,
+) -> str:
+    """Summarize a CSV file or a single column with statistics."""
+    loaded = _load_csv(target, root, path_display, delimiter, max_rows, max_file_size_mb)
+    if isinstance(loaded, str):
+        return loaded
+    rows, headers, _ = loaded
+
+    def _col_summary(col_name: str) -> str:
+        non_empty = [row.get(col_name, "") for row in rows if row.get(col_name, "")]
+
+        nums: list[float] = []
+        for v in non_empty:
+            try:
+                nums.append(float(v))
+            except ValueError:
+                break
+        else:
+            if nums:
+                mn = min(nums)
+                mx = max(nums)
+                mean = statistics.mean(nums)
+                median = statistics.median(nums)
+                if len(nums) >= 2:
+                    stdev_str = f"{statistics.stdev(nums):.4g}"
+                else:
+                    stdev_str = "N/A (< 2 values)"
+                return (
+                    f"numeric | count_non_empty={len(non_empty)}, min={mn:.4g}, "
+                    f"max={mx:.4g}, mean={mean:.4g}, median={median:.4g}, stdev={stdev_str}"
+                )
+            return "numeric | (no values)"
+
+        counter = Counter(non_empty)
+        top10 = counter.most_common(10)
+        top_str = ", ".join(f"{v!r}:{c}" for v, c in top10)
+        return f"categorical | unique={len(counter)}, top values: {top_str}"
+
+    if column:
+        if column not in headers:
+            avail = ", ".join(headers)
+            return f"Error: column '{column}' not found. Available: {avail}"
+        output = f"**Column:** {column}\n**Summary:** {_col_summary(column)}\n**Rows:** {len(rows)}"
+    else:
+        lines: list[str] = [
+            f"**File:** {path_display}",
+            f"**Rows:** {len(rows)}",
+            "",
+            "| Column | Summary |",
+            "| --- | --- |",
+        ]
+        for h in headers:
+            lines.append(f"| {h} | {_col_summary(h)} |")
+        output = "\n".join(lines)
+
+    return truncate_output(output, _MAX_OUTPUT_BYTES)
+
+
+def _do_query_csv(
+    target: Path,
+    root: Path,
+    path_display: str,
+    max_rows: int,
+    delimiter: str,
+    max_file_size_mb: float,
+    filter_column: str,
+    filter_value: str,
+    columns: str,
+    limit: int,
+) -> str:
+    """Filter and return rows from a CSV file as a markdown table."""
+    loaded = _load_csv(target, root, path_display, delimiter, max_rows, max_file_size_mb)
+    if isinstance(loaded, str):
+        return loaded
+    all_rows, all_headers, _ = loaded
+
+    col_list = [c.strip() for c in columns.split(",") if c.strip()] if columns else all_headers
+
+    unknown = [c for c in col_list if c not in all_headers]
+    if filter_column and filter_column not in all_headers:
+        unknown.append(filter_column)
+    if unknown:
+        avail = ", ".join(all_headers)
+        return f"Error: unknown column(s): {', '.join(unknown)}. Available: {avail}"
+
+    effective_limit = min(limit, max_rows)
+    matched: list[dict[str, str]] = []
+
+    for row in all_rows:
+        if filter_column and filter_value:
+            if row.get(filter_column, "") != filter_value:
+                continue
+        if len(matched) < effective_limit:
+            matched.append({c: row.get(c, "") for c in col_list})
+
+    lines: list[str] = [
+        f"**File:** {path_display}",
+        f"**Rows inspected:** {len(all_rows)}, **Rows matched:** {len(matched)}",
+        "",
+        _rows_to_md_table(col_list, matched),
+    ]
+    return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
+
+
+# ---------------------------------------------------------------------------
+# Builder (thin wrappers delegating to core functions)
+# ---------------------------------------------------------------------------
+
+
 @register_tool("csv_analysis", CsvAnalysisToolConfig)
 def build_csv_analysis_toolset(
     config: CsvAnalysisToolConfig,
@@ -81,65 +290,9 @@ def build_csv_analysis_toolset(
         Args:
             path: Path to the CSV file, relative to the configured root directory.
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, config.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=config.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            headers = list(reader.fieldnames)
-
-            rows: list[dict[str, str]] = []
-            truncated = False
-            for row in reader:
-                if len(rows) >= config.max_rows:
-                    truncated = True
-                    break
-                rows.append(dict(row))
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        # Type inference: collect non-empty values per column
-        col_values: dict[str, list[str]] = {h: [] for h in headers}
-        for row in rows:
-            for h in headers:
-                v = row.get(h, "")
-                if v and len(col_values[h]) < _SAMPLE_TYPE_ROWS:
-                    col_values[h].append(v)
-
-        col_types = {h: _infer_type(col_values[h]) for h in headers}
-
-        lines: list[str] = [
-            f"**File:** {path}",
-            f"**Rows inspected:** {len(rows)}" + (" (truncated)" if truncated else ""),
-            f"**Columns:** {len(headers)}",
-            "",
-            "| Column | Type |",
-            "| --- | --- |",
-        ]
-        for h in headers:
-            lines.append(f"| {h} | {col_types[h]} |")
-
-        lines.append("")
-        lines.append("**First 5 rows:**")
-        lines.append("")
-        lines.append(_rows_to_md_table(headers, rows[:5]))
-
-        return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
+        return _do_inspect_csv(
+            root / path, root, path, config.max_rows, config.delimiter, config.max_file_size_mb
+        )
 
     @toolset.tool
     def summarize_csv(path: str, column: str = "") -> str:
@@ -153,89 +306,15 @@ def build_csv_analysis_toolset(
             path: Path to the CSV file, relative to the configured root directory.
             column: Column name to summarize. Leave empty to summarize all columns.
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, config.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=config.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            headers = list(reader.fieldnames)
-
-            rows: list[dict[str, str]] = []
-            for row in reader:
-                if len(rows) >= config.max_rows:
-                    break
-                rows.append(dict(row))
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        def _col_summary(col_name: str) -> str:
-            non_empty = [row.get(col_name, "") for row in rows if row.get(col_name, "")]
-
-            # Attempt numeric parsing
-            nums: list[float] = []
-            for v in non_empty:
-                try:
-                    nums.append(float(v))
-                except ValueError:
-                    break
-            else:
-                # Loop completed without break — all non-empty values are numeric
-                if nums:
-                    mn = min(nums)
-                    mx = max(nums)
-                    mean = statistics.mean(nums)
-                    median = statistics.median(nums)
-                    if len(nums) >= 2:
-                        stdev_str = f"{statistics.stdev(nums):.4g}"
-                    else:
-                        stdev_str = "N/A (< 2 values)"
-                    return (
-                        f"numeric | count_non_empty={len(non_empty)}, min={mn:.4g}, "
-                        f"max={mx:.4g}, mean={mean:.4g}, median={median:.4g}, stdev={stdev_str}"
-                    )
-                return "numeric | (no values)"
-
-            # Categorical
-            counter = Counter(non_empty)
-            top10 = counter.most_common(10)
-            top_str = ", ".join(f"{v!r}:{c}" for v, c in top10)
-            return f"categorical | unique={len(counter)}, top values: {top_str}"
-
-        if column:
-            if column not in headers:
-                avail = ", ".join(headers)
-                return f"Error: column '{column}' not found. Available: {avail}"
-            output = (
-                f"**Column:** {column}\n**Summary:** {_col_summary(column)}\n**Rows:** {len(rows)}"
-            )
-        else:
-            lines: list[str] = [
-                f"**File:** {path}",
-                f"**Rows:** {len(rows)}",
-                "",
-                "| Column | Summary |",
-                "| --- | --- |",
-            ]
-            for h in headers:
-                lines.append(f"| {h} | {_col_summary(h)} |")
-            output = "\n".join(lines)
-
-        return truncate_output(output, _MAX_OUTPUT_BYTES)
+        return _do_summarize_csv(
+            root / path,
+            root,
+            path,
+            config.max_rows,
+            config.delimiter,
+            config.max_file_size_mb,
+            column,
+        )
 
     @toolset.tool
     def query_csv(
@@ -254,64 +333,17 @@ def build_csv_analysis_toolset(
             columns: Comma-separated list of column names to include. Leave empty for all columns.
             limit: Maximum number of rows to return (default 50, capped at max_rows).
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, config.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=config.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            all_headers = list(reader.fieldnames)
-
-            # Determine output columns
-            col_list = (
-                [c.strip() for c in columns.split(",") if c.strip()] if columns else all_headers
-            )
-
-            # Validate all requested columns and filter_column
-            unknown = [c for c in col_list if c not in all_headers]
-            if filter_column and filter_column not in all_headers:
-                unknown.append(filter_column)
-            if unknown:
-                avail = ", ".join(all_headers)
-                return f"Error: unknown column(s): {', '.join(unknown)}. Available: {avail}"
-
-            effective_limit = min(limit, config.max_rows)
-            rows_read = 0
-            matched: list[dict[str, str]] = []
-
-            for row in reader:
-                if rows_read >= config.max_rows:
-                    break
-                rows_read += 1
-                if filter_column and filter_value:
-                    if row.get(filter_column, "") != filter_value:
-                        continue
-                if len(matched) < effective_limit:
-                    matched.append({c: row.get(c, "") for c in col_list})
-
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        lines: list[str] = [
-            f"**File:** {path}",
-            f"**Rows inspected:** {rows_read}, **Rows matched:** {len(matched)}",
-            "",
-            _rows_to_md_table(col_list, matched),
-        ]
-        return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
+        return _do_query_csv(
+            root / path,
+            root,
+            path,
+            config.max_rows,
+            config.delimiter,
+            config.max_file_size_mb,
+            filter_column,
+            filter_value,
+            columns,
+            limit,
+        )
 
     return toolset

@@ -74,6 +74,24 @@ class AgentSpec(BaseModel):
     observability: ObservabilityConfig | None = None
     tool_search: ToolSearchConfig = ToolSearchConfig()
 
+    @property
+    def features(self) -> list[str]:
+        """Return names of enabled optional features."""
+        out: list[str] = []
+        if self.tools:
+            out.append("tools")
+        if self.triggers:
+            out.append("triggers")
+        if self.ingest:
+            out.append("ingest")
+        if self.memory:
+            out.append("memory")
+        if self.sinks:
+            out.append("sinks")
+        if self.skills:
+            out.append("skills")
+        return out
+
     @field_validator("tools", mode="before")
     @classmethod
     def _parse_tools(cls, v: Any) -> list:

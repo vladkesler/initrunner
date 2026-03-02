@@ -8,8 +8,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner._paths import LazyPath
+
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
+
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class StoreBackend(StrEnum):
@@ -60,14 +64,11 @@ class Memory:
     consolidated_at: str | None = None
 
 
-class _LazyDir:
+class _LazyDir(LazyPath):
     """Lazy-evaluated default directory to avoid import-time filesystem access."""
 
     def __init__(self, getter_name: str) -> None:
         self._getter_name = getter_name
-
-    def __fspath__(self) -> str:
-        return str(self._resolve())
 
     def _resolve(self) -> Path:
         # Delegate to config functions directly; they use @lru_cache which
@@ -76,19 +77,6 @@ class _LazyDir:
 
         return getattr(config, self._getter_name)()
 
-    def __truediv__(self, other: str) -> Path:
-        return self._resolve() / other
-
-    def __str__(self) -> str:
-        return str(self._resolve())
-
-    def __repr__(self) -> str:
-        return f"_LazyDir({self._getter_name!r})"
-
-    def __getattr__(self, name: str):
-        # Delegate any attribute access to the resolved Path
-        return getattr(self._resolve(), name)
-
 
 DEFAULT_STORES_DIR: _LazyDir | Path = _LazyDir("get_stores_dir")
 DEFAULT_MEMORY_DIR: _LazyDir | Path = _LazyDir("get_memory_dir")
@@ -96,6 +84,30 @@ DEFAULT_MEMORY_DIR: _LazyDir | Path = _LazyDir("get_memory_dir")
 
 class EmbeddingModelChangedError(Exception):
     """Raised when the embedding model has changed and the store must be wiped."""
+
+
+def make_store_config(role: RoleDefinition) -> StoreConfig:
+    """Build a :class:`StoreConfig` from a role definition."""
+    ingest = role.spec.ingest
+    provider = role.spec.model.provider
+    name = role.metadata.name
+    if ingest is not None:
+        return StoreConfig(
+            db_path=resolve_store_path(ingest.store_path, name),
+            embed_provider=ingest.embeddings.provider or provider,
+            embed_model=ingest.embeddings.model,
+            store_backend=ingest.store_backend,
+            chunking_strategy=ingest.chunking.strategy,
+            chunk_size=ingest.chunking.chunk_size,
+            chunk_overlap=ingest.chunking.chunk_overlap,
+            embed_base_url=ingest.embeddings.base_url,
+            embed_api_key_env=ingest.embeddings.api_key_env,
+        )
+    return StoreConfig(
+        db_path=resolve_store_path(None, name),
+        embed_provider=provider,
+        embed_model="",
+    )
 
 
 def resolve_store_path(store_path: str | None, agent_name: str) -> Path:

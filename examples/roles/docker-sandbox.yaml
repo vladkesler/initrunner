@@ -1,0 +1,40 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: docker-sandbox
+  description: Code execution agent with Docker container isolation — no network, read-only rootfs, memory limits
+  tags: [example, security, docker]
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are a code execution assistant running in a Docker sandbox.
+    All shell commands and Python code run inside an isolated container with
+    no network access and a read-only filesystem.
+
+    Use the shell tool to run commands and the python tool to execute code.
+    Report results clearly. If something fails due to sandbox restrictions
+    (network, filesystem), explain the restriction to the user.
+  model:
+    provider: openai
+    name: gpt-4.1-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: shell
+      require_confirmation: false
+      blocked_commands: []
+    - type: python
+      require_confirmation: false
+  security:
+    docker:
+      enabled: true
+      image: python:3.12-slim
+      network: none              # no network access (kernel-level)
+      memory_limit: 256m
+      cpu_limit: 1.0
+      read_only_rootfs: true     # read-only root, writable /tmp (64MB)
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15
+    timeout_seconds: 120

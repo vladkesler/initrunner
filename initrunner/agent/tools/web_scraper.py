@@ -4,45 +4,17 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
-from urllib.parse import urlparse
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
 from initrunner._html import fetch_url_as_markdown
-from initrunner.agent._urls import SSRFBlocked
+from initrunner.agent._urls import SSRFBlocked, check_domain_filter
 from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 from initrunner.ingestion.chunker import chunk_text
 from initrunner.ingestion.embeddings import embed_single as _embed_single
-from initrunner.stores.base import StoreConfig
+from initrunner.stores.base import make_store_config
 from initrunner.stores.factory import create_document_store
-
-
-def _make_store_config_from_ctx(ctx: ToolBuildContext) -> StoreConfig:
-    """Build a StoreConfig from the role in context."""
-    from initrunner.stores.base import resolve_store_path
-
-    role = ctx.role
-    ingest = role.spec.ingest
-    provider = role.spec.model.provider
-    name = role.metadata.name
-    if ingest is not None:
-        return StoreConfig(
-            db_path=resolve_store_path(ingest.store_path, name),
-            embed_provider=ingest.embeddings.provider or provider,
-            embed_model=ingest.embeddings.model,
-            store_backend=ingest.store_backend,
-            chunking_strategy=ingest.chunking.strategy,
-            chunk_size=ingest.chunking.chunk_size,
-            chunk_overlap=ingest.chunking.chunk_overlap,
-            embed_base_url=ingest.embeddings.base_url,
-            embed_api_key_env=ingest.embeddings.api_key_env,
-        )
-    return StoreConfig(
-        db_path=resolve_store_path(None, name),
-        embed_provider=provider,
-        embed_model="",
-    )
 
 
 @register_tool("web_scraper", WebScraperToolConfig)
@@ -51,7 +23,7 @@ def build_web_scraper_toolset(
     ctx: ToolBuildContext,
 ) -> FunctionToolset:
     """Build a FunctionToolset that scrapes a page and stores it in the document store."""
-    store_config = _make_store_config_from_ctx(ctx)
+    store_config = make_store_config(ctx.role)
     sandbox = ctx.role.spec.security.tools
 
     if sandbox is not None:
@@ -70,18 +42,9 @@ def build_web_scraper_toolset(
         Args:
             url: The URL to scrape and store.
         """
-        try:
-            parsed = urlparse(url)
-            hostname = parsed.hostname or ""
-        except Exception:
-            return "Error: invalid URL"
-
-        if config.allowed_domains:
-            if hostname not in config.allowed_domains:
-                return f"Error: domain '{hostname}' is not in the allowed domains list"
-        elif config.blocked_domains:
-            if hostname in config.blocked_domains:
-                return f"Error: domain '{hostname}' is blocked"
+        error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
+        if error:
+            return error
 
         try:
             markdown = fetch_url_as_markdown(

@@ -135,6 +135,31 @@ class TestDoctorEmbeddingProviders:
         assert "No key needed" in result.output
 
 
+class TestDoctorDocker:
+    def test_docker_row_displayed(self, monkeypatch):
+        """Doctor should show a 'docker' row in the provider status table."""
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                with patch(
+                    "initrunner.agent.docker_sandbox.check_docker_available",
+                    return_value=False,
+                ):
+                    result = runner.invoke(app, ["doctor"])
+
+        assert result.exit_code == 0
+        assert "docker" in result.output.lower()
+
+
 class TestDoctorQuickstart:
     def test_quickstart_success(self, monkeypatch):
         """--quickstart with mocked successful run shows pass message."""

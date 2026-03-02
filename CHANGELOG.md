@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.13.0] - 2026-03-02
+
+### Added
+- **Docker container sandbox** (`security.docker`): opt-in kernel-level isolation for shell, Python, and script tool execution — network namespaces, cgroups, read-only rootfs, memory/CPU limits, bind mounts. Configured via `security.docker.enabled: true` in role YAML. Doctor command shows Docker availability status
+- **Shared streaming module** (`api/_streaming.py`): SSE streaming, upload staging, and attachment resolution utilities extracted from chat_ui and quick_chat routes
+- **MCP transport module** (`mcp/_transport.py`): unified MCP transport construction (stdio, SSE, streamable-http) with sandbox validation and env scrubbing
+- **Async utility** (`_async.py`): `run_sync()` helper for running async coroutines from sync code with event loop reuse and thread fallback
+- **Store factory helpers** (`stores/factory.py`): `managed_memory_store()` context manager for full memory store lifecycle (create → register → yield → unregister → close)
+- **Domain filtering** (`agent/_urls.py`): `check_domain_filter()` for URL domain allow/block list validation
+- **AgentSpec.features property** (`agent/schema/role.py`): lists enabled optional features (tools, triggers, ingest, memory, sinks, skills)
+- **Provider helpers** (`services/providers.py`): `is_ollama_running()`, `list_ollama_models()`, `resolve_provider_and_model()` for consolidated provider/model detection
+- Example role: `docker-sandbox.yaml`
+
+### Changed
+- **MCP toolkit refactored**: extracted tool implementations into shared helper functions; toolkit.py reduced from inlined logic to thin wrappers calling core functions in each tool module
+- **Email tools**: extracted core IMAP/SMTP logic into standalone functions (`_do_search_inbox`, `_do_read_email`, `_do_send_email`, `_do_list_folders`), added `ImapParams` dataclass, added header/IMAP injection security guards
+- **CSV analysis tools**: extracted `_load_csv`, `_do_inspect_csv`, `_do_summarize_csv`, `_do_query_csv` for MCP reuse
+- **Search tools**: consolidated error handling and result formatting into `_do_search`
+- **Audio tools**: extracted `_do_get_youtube_transcript` for MCP reuse
+- **API routes**: `chat_ui.py` and `quick_chat.py` deduplicated ~200 lines via shared `_streaming` module
+- **CLI commands**: migrated provider checks to `services.providers`, simplified memory lifecycle with `managed_memory_store()`
+- **Store config**: `make_store_config()` helper replaces inline `_make_store_config()` in registry
+- `check_tool_envs()` return type changed from `set` to `dict[str, list[str]]` for richer error messages
+
+### Documentation
+- New: `docs/security/docker-sandbox.md` — full Docker sandbox configuration reference
+- Updated: `docs/security/security.md` — added Docker sandbox section
+- Updated: `CLAUDE.md` — added Docker sandbox to documentation index
+
 ## [1.12.0] - 2026-03-02
 
 ### Added

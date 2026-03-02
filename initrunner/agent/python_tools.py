@@ -57,11 +57,36 @@ _PROXY_ENV_KEYS = (
 @register_tool("python", PythonToolConfig)
 def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing Python code in a subprocess."""
+    docker_config = ctx.role.spec.security.docker
+    role_dir = ctx.role_dir
+
     toolset = FunctionToolset()
 
     @toolset.tool
     def run_python(code: str) -> str:
         """Execute Python code and return the output."""
+        if docker_config.enabled:
+            # Preserve network_disabled shim when Docker network is not 'none'
+            if config.network_disabled and docker_config.network != "none":
+                code = _NETWORK_DISABLE_SHIM + code
+
+            from initrunner.agent.docker_sandbox import docker_run_python
+
+            try:
+                stdout, stderr, returncode = docker_run_python(
+                    code,
+                    docker_config,
+                    timeout=config.timeout_seconds,
+                    work_dir=config.working_dir,
+                    role_dir=role_dir,
+                )
+            except SubprocessTimeout as exc:
+                return str(exc)
+
+            return format_subprocess_output(
+                stdout, stderr, returncode=returncode, max_bytes=config.max_output_bytes
+            )
+
         work_dir = config.working_dir
         use_temp = work_dir is None
 

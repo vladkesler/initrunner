@@ -6,7 +6,7 @@ import inspect
 import shlex
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
@@ -17,6 +17,9 @@ from initrunner.agent._subprocess import (
 )
 from initrunner.agent.schema.tools import ScriptDefinition, ScriptToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
+
+if TYPE_CHECKING:
+    from initrunner.agent.schema.security import DockerSandboxConfig
 
 # Reuse the shell operator set from shell_tools for consistency.
 _SHELL_OPERATORS: frozenset[str] = frozenset(
@@ -67,6 +70,8 @@ def _make_script_fn(
     script: ScriptDefinition,
     config: ScriptToolConfig,
     work_dir: str | None,
+    docker_config: DockerSandboxConfig | None = None,
+    role_dir: Path | None = None,
 ) -> Any:
     """Build a callable with proper ``inspect.Signature`` for PydanticAI."""
     params: list[inspect.Parameter] = []
@@ -105,6 +110,8 @@ def _make_script_fn(
     _max_output = max_output
     _allowed_cmds = allowed_cmds
     _work_dir = work_dir
+    _docker_config = docker_config
+    _role_dir = role_dir
 
     def script_fn(**kwargs: Any) -> str:
         # Validate against allowed_commands if set
@@ -119,6 +126,28 @@ def _make_script_fn(
             env[key.upper()] = value
         for key, value in kwargs.items():
             env[key.upper()] = str(value)
+
+        if _docker_config is not None and _docker_config.enabled:
+            from initrunner.agent.docker_sandbox import docker_run_script
+
+            try:
+                stdout, stderr, returncode = docker_run_script(
+                    _body,
+                    _interpreter,
+                    _docker_config,
+                    timeout=_timeout,
+                    work_dir=_work_dir,
+                    env=env,
+                    role_dir=_role_dir,
+                )
+            except SubprocessTimeout:
+                raise
+            except FileNotFoundError:
+                return f"Error: interpreter '{_interpreter}' not found"
+
+            return format_subprocess_output(
+                stdout, stderr, returncode=returncode, max_bytes=_max_output
+            )
 
         cmd = [_interpreter]
 
@@ -156,6 +185,7 @@ def _make_script_fn(
 def build_script_toolset(config: ScriptToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset from a ScriptToolConfig."""
     role_dir = ctx.role_dir
+    docker_config = ctx.role.spec.security.docker
 
     # Resolve working directory: explicit > role_dir > cwd
     if config.working_dir:
@@ -167,7 +197,9 @@ def build_script_toolset(config: ScriptToolConfig, ctx: ToolBuildContext) -> Fun
 
     toolset = FunctionToolset()
     for script in config.scripts:
-        fn = _make_script_fn(script, config, work_dir)
+        fn = _make_script_fn(
+            script, config, work_dir, docker_config=docker_config, role_dir=role_dir
+        )
         toolset.tool(fn)
 
     return toolset

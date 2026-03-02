@@ -80,6 +80,8 @@ def validate_command(
 def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing commands (no shell)."""
     role_dir = ctx.role_dir
+    docker_config = ctx.role.spec.security.docker
+
     # Resolve working directory: explicit > role_dir > cwd
     if config.working_dir:
         work_dir = str(Path(config.working_dir).resolve())
@@ -104,11 +106,22 @@ def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> Funct
         tokens = result
 
         try:
-            stdout, stderr, returncode = run_subprocess_text(
-                tokens,
-                timeout=config.timeout_seconds,
-                cwd=work_dir,
-            )
+            if docker_config.enabled:
+                from initrunner.agent.docker_sandbox import docker_run_command
+
+                stdout, stderr, returncode = docker_run_command(
+                    tokens,
+                    docker_config,
+                    timeout=config.timeout_seconds,
+                    work_dir=work_dir,
+                    role_dir=role_dir,
+                )
+            else:
+                stdout, stderr, returncode = run_subprocess_text(
+                    tokens,
+                    timeout=config.timeout_seconds,
+                    cwd=work_dir,
+                )
         except SubprocessTimeout as exc:
             return str(exc)
         except FileNotFoundError:

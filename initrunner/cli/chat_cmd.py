@@ -69,14 +69,12 @@ def _check_profile_envs() -> set[str]:
     Returns tool names that should be skipped due to missing env vars.
     Prints a warning for each skipped tool.
     """
-    skip: set[str] = set()
-    for tool_name, env_vars in _TOOL_REQUIRED_ENVS.items():
-        missing = [v for v in env_vars if not os.environ.get(v)]
-        if missing:
-            env_list = ", ".join(missing)
-            console.print(f"[dim]Skipping tool '{tool_name}' — missing {env_list}[/dim]")
-            skip.add(tool_name)
-    return skip
+    from initrunner.services.providers import check_tool_envs
+
+    missing_map = check_tool_envs()
+    for tool_name, missing in missing_map.items():
+        console.print(f"[dim]Skipping tool '{tool_name}' — missing {', '.join(missing)}[/dim]")
+    return set(missing_map)
 
 
 def _merge_tools(profile_tools: list[dict], extras: list[dict]) -> list[dict]:
@@ -507,7 +505,7 @@ def _chat_bot_mode(
     from initrunner.services.providers import (
         _BOT_TOKEN_ENVS,
         build_ephemeral_role,
-        detect_provider_and_model,
+        resolve_provider_and_model,
     )
 
     # Verify bot token
@@ -527,21 +525,11 @@ def _chat_bot_mode(
     _verify_bot_sdk(platform)
 
     # Detect provider
-    detected = detect_provider_and_model()
-    if detected is None and provider is None:
-        console.print(
-            "[red]Error:[/red] No API key found. Run [bold]initrunner setup[/bold] "
-            "or set an API key environment variable."
-        )
-        raise typer.Exit(1)
-
-    prov = provider or detected.provider  # type: ignore[union-attr]
-    mod = model or detected.model  # type: ignore[union-attr]
-
-    if provider and not model:
-        from initrunner.templates import _default_model_name
-
-        mod = _default_model_name(provider)
+    try:
+        prov, mod = resolve_provider_and_model(provider, model)
+    except RuntimeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
     # Build trigger config
     trigger: dict = {"type": platform, "autonomous": True}
@@ -608,8 +596,9 @@ def _chat_bot_mode(
     role = build_ephemeral_role(prov, mod, **build_kwargs)
 
     from initrunner.agent.loader import build_agent
-    from initrunner.cli._helpers import create_audit_logger, resolve_memory_path
+    from initrunner.cli._helpers import create_audit_logger
     from initrunner.runner import run_daemon
+    from initrunner.stores.factory import managed_memory_store
 
     agent = build_agent(role)
     audit_logger = create_audit_logger(audit_db, no_audit)
@@ -618,31 +607,12 @@ def _chat_bot_mode(
     if ingest_config is not None:
         _run_ephemeral_ingest(role, prov)
 
-    # Set up memory store for daemon
-    memory_store = None
-    mem_path = None
-    if with_memory and role.spec.memory is not None:
-        from initrunner.stores.factory import (
-            create_memory_store,
-            register_memory_store,
-        )
-
-        mem_path = resolve_memory_path(role)
-        memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
-        register_memory_store(mem_path, memory_store)
-        agent._memory_store = memory_store  # type: ignore[attr-defined]
-
-    try:
-        run_daemon(agent, role, audit_logger=audit_logger, memory_store=memory_store)
-    finally:
-        if memory_store is not None:
-            from initrunner.stores.factory import unregister_memory_store
-
-            assert mem_path is not None
-            unregister_memory_store(mem_path)
-            memory_store.close()
-        if audit_logger is not None:
-            audit_logger.close()
+    with managed_memory_store(role, agent) as memory_store:
+        try:
+            run_daemon(agent, role, audit_logger=audit_logger, memory_store=memory_store)
+        finally:
+            if audit_logger is not None:
+                audit_logger.close()
 
 
 def _verify_bot_sdk(platform: str) -> None:

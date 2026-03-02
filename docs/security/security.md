@@ -272,6 +272,22 @@ security:
 
 MCP stdio subprocesses, Python tool subprocesses, and git tool subprocesses all receive a filtered copy of `os.environ` with sensitive variables removed. Any environment variable whose name starts with a prefix in `sensitive_env_prefixes` is excluded. This prevents API keys from leaking through git hooks, Python child processes, or MCP server environments.
 
+### `docker` -- Docker Container Sandbox
+
+Runs shell, Python, and script tool execution inside Docker containers for kernel-level isolation. Opt-in via `enabled: true`. See the dedicated [Docker Sandbox](docker-sandbox.md) documentation for full configuration reference, security defaults, and examples.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | `bool` | `false` | Enable Docker container isolation for tool execution. |
+| `image` | `str` | `"python:3.12-slim"` | Docker image to use. |
+| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Container network mode. |
+| `memory_limit` | `str` | `"256m"` | Memory limit in Docker format. |
+| `cpu_limit` | `float` | `1.0` | CPU limit (fractional cores). |
+| `read_only_rootfs` | `bool` | `true` | Read-only root filesystem. |
+| `bind_mounts` | `list[BindMount]` | `[]` | Additional bind mounts. |
+| `env_passthrough` | `list[str]` | `[]` | Env vars to pass through. |
+| `extra_args` | `list[str]` | `[]` | Extra `docker run` flags (dangerous flags blocked). |
+
 ### `audit` -- Audit Configuration
 
 Controls audit log retention and pruning.
@@ -406,6 +422,24 @@ security:
       - "token-\\w+"
     pii_redaction: true
 ```
+
+## CSRF Protection
+
+The web dashboard relies on `SameSite=strict` session cookies for CSRF protection. Combined with `X-Frame-Options: DENY` and CSP headers, this prevents cross-origin sites from forging requests on behalf of an authenticated user.
+
+**How it works:**
+
+- **`SameSite=strict` cookies**: The browser never sends session cookies on cross-origin requests (including top-level navigations from external sites). This means a malicious page on `evil.com` cannot issue authenticated requests to your InitRunner dashboard.
+- **`X-Frame-Options: DENY`**: Prevents the dashboard from being embedded in iframes, blocking clickjacking attacks.
+- **Content Security Policy (CSP)**: Restricts script sources and frame ancestors, providing defense-in-depth.
+
+**Limitations:**
+
+- `SameSite=strict` is supported by all modern browsers but not enforced by very old browsers (pre-2020). If you must support legacy browsers, consider adding explicit CSRF tokens.
+- Subdomains of the same registrable domain are considered same-site. If an attacker controls a subdomain (e.g. `compromised.example.com`), they could bypass `SameSite` protections for `dashboard.example.com`. Ensure all subdomains are trusted.
+- GET requests are not protected by `SameSite` alone (browsers send cookies on same-site navigations). The dashboard does not perform state-changing operations via GET.
+
+For deployments requiring stricter guarantees, a per-request CSRF token can be added as custom middleware.
 
 ## Webhook Rate Limiting
 

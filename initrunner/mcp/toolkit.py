@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import csv
 import logging
 import sqlite3
-import statistics
-from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -105,15 +102,13 @@ def _register_search(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
     cfg = ToolkitSearchConfig(**raw_config)
     api_key = resolve_env_vars(cfg.api_key)
 
-    from initrunner.agent.tools.search import _PROVIDERS, _format_results
+    from initrunner.agent.tools.search import _PROVIDERS, _do_search
 
     provider_fn = _PROVIDERS.get(cfg.provider)
     if provider_fn is None:
         raise ValueError(
             f"Unknown search provider: {cfg.provider!r}. Available: {', '.join(_PROVIDERS)}"
         )
-
-    from initrunner.agent._truncate import truncate_output
 
     @mcp.tool(description="Search the web for information using DuckDuckGo or other providers.")
     def web_search(query: str, num_results: int = 5) -> str:
@@ -123,22 +118,15 @@ def _register_search(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             query: The search query string.
             num_results: Maximum number of results to return (default 5).
         """
-        try:
-            results = provider_fn(
-                query=query,
-                max_results=min(num_results, cfg.max_results),
-                safe_search=cfg.safe_search,
-                api_key=api_key,
-                timeout=cfg.timeout_seconds,
-                news=False,
-            )
-            return truncate_output(_format_results(results), _MAX_OUTPUT_BYTES)
-        except ImportError as e:
-            return f"Error: {e}"
-        except TimeoutError:
-            return f"Error: search timed out after {cfg.timeout_seconds}s"
-        except Exception as e:
-            return f"Error: search failed: {e}"
+        return _do_search(
+            query,
+            num_results,
+            cfg.max_results,
+            cfg.safe_search,
+            api_key,
+            cfg.timeout_seconds,
+            provider_fn,
+        )
 
     @mcp.tool(description="Search for recent news articles.")
     def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
@@ -149,23 +137,17 @@ def _register_search(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             num_results: Maximum number of results to return (default 5).
             days_back: How many days back to search (default 7).
         """
-        try:
-            results = provider_fn(
-                query=query,
-                max_results=min(num_results, cfg.max_results),
-                safe_search=cfg.safe_search,
-                api_key=api_key,
-                timeout=cfg.timeout_seconds,
-                news=True,
-                days_back=days_back,
-            )
-            return truncate_output(_format_results(results), _MAX_OUTPUT_BYTES)
-        except ImportError as e:
-            return f"Error: {e}"
-        except TimeoutError:
-            return f"Error: search timed out after {cfg.timeout_seconds}s"
-        except Exception as e:
-            return f"Error: search failed: {e}"
+        return _do_search(
+            query,
+            num_results,
+            cfg.max_results,
+            cfg.safe_search,
+            api_key,
+            cfg.timeout_seconds,
+            provider_fn,
+            news=True,
+            days_back=days_back,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -207,12 +189,10 @@ def _register_csv_analysis(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
     cfg = ToolkitCsvAnalysisConfig(**raw_config)
     root = Path(cfg.root_path).resolve()
 
-    from initrunner.agent._paths import validate_path_within
-    from initrunner.agent._truncate import truncate_output
     from initrunner.agent.tools.csv_analysis import (
-        _check_file_size,
-        _infer_type,
-        _rows_to_md_table,
+        _do_inspect_csv,
+        _do_query_csv,
+        _do_summarize_csv,
     )
 
     @mcp.tool(
@@ -226,64 +206,9 @@ def _register_csv_analysis(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
         Args:
             path: Path to the CSV file, relative to the configured root directory.
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, cfg.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=cfg.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            headers = list(reader.fieldnames)
-
-            rows: list[dict[str, str]] = []
-            truncated = False
-            for row in reader:
-                if len(rows) >= cfg.max_rows:
-                    truncated = True
-                    break
-                rows.append(dict(row))
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        col_values: dict[str, list[str]] = {h: [] for h in headers}
-        for row in rows:
-            for h in headers:
-                v = row.get(h, "")
-                if v and len(col_values[h]) < 100:
-                    col_values[h].append(v)
-
-        col_types = {h: _infer_type(col_values[h]) for h in headers}
-
-        lines: list[str] = [
-            f"**File:** {path}",
-            f"**Rows inspected:** {len(rows)}" + (" (truncated)" if truncated else ""),
-            f"**Columns:** {len(headers)}",
-            "",
-            "| Column | Type |",
-            "| --- | --- |",
-        ]
-        for h in headers:
-            lines.append(f"| {h} | {col_types[h]} |")
-
-        lines.append("")
-        lines.append("**First 5 rows:**")
-        lines.append("")
-        lines.append(_rows_to_md_table(headers, rows[:5]))
-
-        return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
+        return _do_inspect_csv(
+            root / path, root, path, cfg.max_rows, cfg.delimiter, cfg.max_file_size_mb
+        )
 
     @mcp.tool(
         description=(
@@ -298,84 +223,9 @@ def _register_csv_analysis(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             path: Path to the CSV file, relative to the configured root directory.
             column: Column name to summarize. Leave empty to summarize all columns.
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, cfg.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=cfg.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            headers = list(reader.fieldnames)
-
-            rows: list[dict[str, str]] = []
-            for row in reader:
-                if len(rows) >= cfg.max_rows:
-                    break
-                rows.append(dict(row))
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        def _col_summary(col_name: str) -> str:
-            non_empty = [row.get(col_name, "") for row in rows if row.get(col_name, "")]
-            nums: list[float] = []
-            for v in non_empty:
-                try:
-                    nums.append(float(v))
-                except ValueError:
-                    break
-            else:
-                if nums:
-                    mn = min(nums)
-                    mx = max(nums)
-                    mean = statistics.mean(nums)
-                    median = statistics.median(nums)
-                    if len(nums) >= 2:
-                        stdev_str = f"{statistics.stdev(nums):.4g}"
-                    else:
-                        stdev_str = "N/A (< 2 values)"
-                    return (
-                        f"numeric | count_non_empty={len(non_empty)}, min={mn:.4g}, "
-                        f"max={mx:.4g}, mean={mean:.4g}, median={median:.4g}, stdev={stdev_str}"
-                    )
-                return "numeric | (no values)"
-            counter = Counter(non_empty)
-            top10 = counter.most_common(10)
-            top_str = ", ".join(f"{v!r}:{c}" for v, c in top10)
-            return f"categorical | unique={len(counter)}, top values: {top_str}"
-
-        if column:
-            if column not in headers:
-                avail = ", ".join(headers)
-                return f"Error: column '{column}' not found. Available: {avail}"
-            output = (
-                f"**Column:** {column}\n**Summary:** {_col_summary(column)}\n**Rows:** {len(rows)}"
-            )
-        else:
-            lines: list[str] = [
-                f"**File:** {path}",
-                f"**Rows:** {len(rows)}",
-                "",
-                "| Column | Summary |",
-                "| --- | --- |",
-            ]
-            for h in headers:
-                lines.append(f"| {h} | {_col_summary(h)} |")
-            output = "\n".join(lines)
-
-        return truncate_output(output, _MAX_OUTPUT_BYTES)
+        return _do_summarize_csv(
+            root / path, root, path, cfg.max_rows, cfg.delimiter, cfg.max_file_size_mb, column
+        )
 
     @mcp.tool(description="Filter and return rows from a CSV file as a markdown table.")
     def query_csv(
@@ -394,73 +244,18 @@ def _register_csv_analysis(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             columns: Comma-separated list of column names to include. Leave empty for all.
             limit: Maximum number of rows to return (default 50).
         """
-        raw = root / path
-        err, target = validate_path_within(raw, [root], allowed_ext={".csv"}, reject_symlinks=True)
-        if err:
-            return err
-
-        size_err = _check_file_size(target, cfg.max_file_size_mb)
-        if size_err:
-            return size_err
-
-        try:
-            text = target.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return f"Error: file not found: {path}"
-        except UnicodeDecodeError:
-            return "Error: file is not valid UTF-8"
-
-        try:
-            reader = csv.DictReader(text.splitlines(), delimiter=cfg.delimiter)
-            if reader.fieldnames is None:
-                return "Error: could not parse CSV: no headers found"
-            all_headers = list(reader.fieldnames)
-
-            col_list = (
-                [c.strip() for c in columns.split(",") if c.strip()] if columns else all_headers
-            )
-
-            unknown = [c for c in col_list if c not in all_headers]
-            if filter_column and filter_column not in all_headers:
-                unknown.append(filter_column)
-            if unknown:
-                avail = ", ".join(all_headers)
-                return f"Error: unknown column(s): {', '.join(unknown)}. Available: {avail}"
-
-            effective_limit = min(limit, cfg.max_rows)
-            rows_read = 0
-            matched: list[dict[str, str]] = []
-
-            for row in reader:
-                if rows_read >= cfg.max_rows:
-                    break
-                rows_read += 1
-                if filter_column and filter_value:
-                    if row.get(filter_column, "") != filter_value:
-                        continue
-                if len(matched) < effective_limit:
-                    matched.append({c: row.get(c, "") for c in col_list})
-        except csv.Error as e:
-            return f"Error: could not parse CSV: {e}"
-
-        lines: list[str] = [
-            f"**File:** {path}",
-            f"**Rows inspected:** {rows_read}, **Rows matched:** {len(matched)}",
-            "",
-            _rows_to_md_table(all_headers if not columns else col_list, matched),
-        ]
-        return truncate_output("\n".join(lines), _MAX_OUTPUT_BYTES)
-
-
-def _rows_to_md_table(headers: list[str], rows: list[dict[str, str]]) -> str:
-    """Format rows as a markdown table."""
-    if not rows:
-        return "(no rows)"
-    lines = ["| " + " | ".join(headers) + " |"]
-    lines.append("| " + " | ".join("---" for _ in headers) + " |")
-    for row in rows:
-        lines.append("| " + " | ".join(row.get(h, "") for h in headers) + " |")
-    return "\n".join(lines)
+        return _do_query_csv(
+            root / path,
+            root,
+            path,
+            cfg.max_rows,
+            cfg.delimiter,
+            cfg.max_file_size_mb,
+            filter_column,
+            filter_value,
+            columns,
+            limit,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -619,29 +414,26 @@ def _register_http(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
 
 
 def _register_email(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
-    import email as email_mod
-    import email.header
-    import email.mime.multipart
-    import email.mime.text
-    import imaplib
-    import re
-    import smtplib
-
     cfg = ToolkitEmailConfig(**raw_config)
     username = resolve_env_vars(cfg.username)
     password = resolve_env_vars(cfg.password)
 
-    from initrunner.agent._truncate import truncate_output
-    from initrunner.agent.tools.email_tools import _decode_header, _extract_body
+    from initrunner.agent.tools.email_tools import (
+        ImapParams,
+        _do_list_folders,
+        _do_read_email,
+        _do_search_inbox,
+        _do_send_email,
+    )
 
-    def _imap_connect() -> imaplib.IMAP4_SSL | imaplib.IMAP4:
-        if cfg.use_ssl:
-            conn = imaplib.IMAP4_SSL(cfg.imap_host, cfg.imap_port)
-        else:
-            conn = imaplib.IMAP4(cfg.imap_host, cfg.imap_port)
-        conn.sock.settimeout(cfg.timeout_seconds)
-        conn.login(username, password)
-        return conn
+    params = ImapParams(
+        host=cfg.imap_host,
+        port=cfg.imap_port,
+        username=username,
+        password=password,
+        use_ssl=cfg.use_ssl,
+        timeout_seconds=cfg.timeout_seconds,
+    )
 
     @mcp.tool(description="Search for emails using IMAP SEARCH syntax (RFC 3501).")
     def search_inbox(query: str = "ALL", folder: str = "", limit: int = 0) -> str:
@@ -652,56 +444,15 @@ def _register_email(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             folder: Mailbox folder to search. Defaults to configured default_folder.
             limit: Maximum number of results. 0 means use config default.
         """
-        conn = None
-        try:
-            conn = _imap_connect()
-            target_folder = folder or cfg.default_folder
-            conn.select(target_folder, readonly=True)
-
-            status, data = conn.search(None, query)
-            if status != "OK":
-                return f"IMAP error: search returned {status}"
-
-            msg_nums = data[0].split() if data[0] else []
-            msg_nums.reverse()
-
-            max_count = limit if limit > 0 else cfg.max_results
-            msg_nums = msg_nums[:max_count]
-
-            if not msg_nums:
-                return "No messages found."
-
-            results: list[str] = []
-            for num in msg_nums:
-                status, msg_data = conn.fetch(
-                    num, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])"
-                )
-                if status != "OK" or not msg_data or msg_data[0] is None:
-                    continue
-                raw = msg_data[0]
-                if isinstance(raw, tuple):
-                    header_bytes = raw[1]
-                else:
-                    continue
-                msg = email_mod.message_from_bytes(header_bytes)
-                mid = msg.get("Message-ID", "").strip()
-                frm = _decode_header(msg.get("From", ""))
-                subj = _decode_header(msg.get("Subject", ""))
-                date = msg.get("Date", "")
-                results.append(f"ID: {mid}\nFrom: {frm}\nSubject: {subj}\nDate: {date}")
-
-            output = "\n---\n".join(results)
-            return truncate_output(output, cfg.max_body_chars)
-        except imaplib.IMAP4.error as e:
-            return f"IMAP error: {e}"
-        except OSError as e:
-            return f"IMAP connection error: {e}"
-        finally:
-            if conn is not None:
-                try:
-                    conn.logout()
-                except Exception:
-                    pass
+        return _do_search_inbox(
+            params,
+            cfg.default_folder,
+            cfg.max_results,
+            cfg.max_body_chars,
+            query,
+            folder,
+            limit,
+        )
 
     @mcp.tool(description="Read the full content of an email by its Message-ID.")
     def read_email(message_id: str, folder: str = "") -> str:
@@ -711,92 +462,12 @@ def _register_email(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             message_id: The Message-ID header value (e.g. "<abc123@example.com>").
             folder: Mailbox folder to search in. Defaults to configured default_folder.
         """
-        conn = None
-        try:
-            conn = _imap_connect()
-            target_folder = folder or cfg.default_folder
-            conn.select(target_folder, readonly=False)
-
-            status, data = conn.search(None, f'HEADER Message-ID "{message_id}"')
-            if status != "OK" or not data[0]:
-                return f"Email not found: {message_id}"
-
-            msg_nums = data[0].split()
-            num = msg_nums[0]
-
-            status, msg_data = conn.fetch(num, "(RFC822)")
-            if status != "OK" or not msg_data or msg_data[0] is None:
-                return f"Failed to fetch email: {message_id}"
-
-            raw = msg_data[0]
-            if isinstance(raw, tuple):
-                raw_bytes = raw[1]
-            else:
-                return f"Failed to fetch email: {message_id}"
-
-            msg = email_mod.message_from_bytes(raw_bytes)
-
-            headers: list[str] = []
-            for hdr in ("Subject", "From", "To", "Cc", "Date"):
-                val = msg.get(hdr)
-                if val:
-                    headers.append(f"{hdr}: {_decode_header(val)}")
-
-            body = _extract_body(msg, cfg.max_body_chars)
-
-            output = "\n".join(headers) + "\n\n" + body
-            return truncate_output(output, cfg.max_body_chars)
-        except imaplib.IMAP4.error as e:
-            return f"IMAP error: {e}"
-        except OSError as e:
-            return f"IMAP connection error: {e}"
-        finally:
-            if conn is not None:
-                try:
-                    conn.logout()
-                except Exception:
-                    pass
+        return _do_read_email(params, cfg.default_folder, cfg.max_body_chars, message_id, folder)
 
     @mcp.tool(description="List all available mailbox folders.")
     def list_folders() -> str:
         """List all available mailbox folders."""
-        conn = None
-        try:
-            conn = _imap_connect()
-            status, data = conn.list()
-            if status != "OK":
-                return f"IMAP error: list returned {status}"
-
-            folders: list[str] = []
-            for item in data:
-                if item is None:
-                    continue
-                if isinstance(item, bytes):
-                    line = item.decode("utf-8", errors="replace")
-                else:
-                    line = str(item)
-                match = re.search(r'"([^"]*)"$', line)
-                if match:
-                    folder_name = match.group(1)
-                elif " " in line:
-                    folder_name = line.rsplit(" ", 1)[-1]
-                else:
-                    continue
-                if folder_name:
-                    folders.append(folder_name)
-
-            folders.sort()
-            return "\n".join(folders) if folders else "(no folders found)"
-        except imaplib.IMAP4.error as e:
-            return f"IMAP error: {e}"
-        except OSError as e:
-            return f"IMAP connection error: {e}"
-        finally:
-            if conn is not None:
-                try:
-                    conn.logout()
-                except Exception:
-                    pass
+        return _do_list_folders(params)
 
     if not cfg.read_only:
 
@@ -817,47 +488,18 @@ def _register_email(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
                 reply_to: Message-ID to reply to.
                 cc: CC recipients (comma-separated).
             """
-            server = None
-            try:
-                msg = email.mime.multipart.MIMEMultipart("alternative")
-                msg["From"] = username
-                msg["To"] = to
-                msg["Subject"] = subject
-                if cc:
-                    msg["Cc"] = cc
-                if reply_to:
-                    safe_reply_to = reply_to.replace("\r", "").replace("\n", "")
-                    msg["In-Reply-To"] = safe_reply_to
-                    msg["References"] = safe_reply_to
-
-                msg.attach(email.mime.text.MIMEText(body, "plain"))
-
-                recipients = [addr.strip() for addr in to.split(",")]
-                if cc:
-                    recipients.extend(addr.strip() for addr in cc.split(","))
-
-                if cfg.smtp_port == 465:
-                    server = smtplib.SMTP_SSL(
-                        cfg.smtp_host, cfg.smtp_port, timeout=cfg.timeout_seconds
-                    )
-                else:
-                    server = smtplib.SMTP(cfg.smtp_host, cfg.smtp_port, timeout=cfg.timeout_seconds)
-                    server.starttls()
-
-                server.login(username, password)
-                server.sendmail(username, recipients, msg.as_string())
-
-                return f"Email sent to {to}" + (f" (cc: {cc})" if cc else "")
-            except smtplib.SMTPException as e:
-                return f"SMTP error: {e}"
-            except OSError as e:
-                return f"SMTP connection error: {e}"
-            finally:
-                if server is not None:
-                    try:
-                        server.quit()
-                    except Exception:
-                        pass
+            return _do_send_email(
+                cfg.smtp_host,
+                cfg.smtp_port,
+                username,
+                password,
+                cfg.timeout_seconds,
+                to,
+                subject,
+                body,
+                reply_to,
+                cc,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -868,7 +510,7 @@ def _register_email(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
 def _register_audio(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
     cfg = ToolkitAudioConfig(**raw_config)
 
-    from initrunner.agent.tools.audio import _extract_video_id
+    from initrunner.agent.tools.audio import _do_get_youtube_transcript
 
     @mcp.tool(description="Fetch the transcript/captions for a YouTube video.")
     def get_youtube_transcript(url: str, language: str = "") -> str:
@@ -878,51 +520,13 @@ def _register_audio(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
             url: YouTube video URL.
             language: Language code (e.g. 'en', 'es'). Leave empty for configured default.
         """
-        try:
-            from youtube_transcript_api import (  # type: ignore[import-not-found]
-                YouTubeTranscriptApi,
-            )
-            from youtube_transcript_api._errors import (  # type: ignore[import-not-found]
-                NoTranscriptFound,
-                TranscriptsDisabled,
-            )
-        except ImportError:
-            return (
-                "Error: youtube-transcript-api is required. "
-                "Install with: pip install initrunner[audio]"
-            )
-
-        video_id = _extract_video_id(url)
-        if not video_id:
-            return f"Error: could not extract a YouTube video ID from URL: {url!r}"
-
-        langs = [language] if language else cfg.youtube_languages
-        try:
-            ytt = YouTubeTranscriptApi()
-            transcript_list = ytt.list(video_id)
-            try:
-                transcript = transcript_list.find_transcript(langs)
-            except NoTranscriptFound:
-                transcript = transcript_list.find_generated_transcript(langs)
-            entries = transcript.fetch()
-        except TranscriptsDisabled:
-            return "Error: transcripts are disabled for this video."
-        except NoTranscriptFound:
-            return f"Error: no transcript found for video {video_id!r} in languages {langs}."
-        except Exception as exc:
-            return f"Error fetching transcript: {exc}"
-
-        parts: list[str] = []
-        for entry in entries:
-            text = entry.text
-            if cfg.include_timestamps:
-                text = f"[{entry.start:.1f}s] {text}"
-            parts.append(text)
-
-        result = " ".join(parts)
-        if len(result) > cfg.max_transcript_chars:
-            result = result[: cfg.max_transcript_chars] + "\n[truncated]"
-        return result
+        return _do_get_youtube_transcript(
+            url,
+            cfg.youtube_languages,
+            cfg.include_timestamps,
+            cfg.max_transcript_chars,
+            language,
+        )
 
 
 # ---------------------------------------------------------------------------

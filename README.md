@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-2610+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.12.0-%2334D058" alt="v1.12.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2676+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.13.0-%2334D058" alt="v1.12.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.12.0** -- Intent-driven setup wizard: redesigned `initrunner setup` with 8 build intents, tool picker, and `chat.yaml` generation. Plus xAI and Bedrock provider support. See the [Changelog](CHANGELOG.md).
+> **v1.13.0** -- Docker container sandbox for tool execution, shared streaming and transport modules, tool architecture refactoring for MCP reuse, and security hardening. See the [Changelog](CHANGELOG.md).
 
 ## 30-Second Quickstart
 
@@ -459,6 +459,27 @@ docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
 ```
 
 Or use `docker compose up` with the included [`docker-compose.yml`](docker-compose.yml) (copy [`examples/.env.example`](examples/.env.example) to `.env` first). Example roles are seeded automatically on first boot. To use your own roles, uncomment the `./roles:/data/roles` volume mount in the compose file.
+
+### Docker Sandbox for Tool Execution
+
+Shell, Python, and script tools can run inside Docker containers for kernel-level isolation — network namespaces, cgroups, read-only rootfs, memory/CPU limits. Enable it in your role YAML:
+
+```yaml
+security:
+  docker:
+    enabled: true        # run tools in containers
+    image: python:3.12-slim
+    network: none        # no network access
+    memory_limit: 256m
+    cpu_limit: 1.0
+    read_only_rootfs: true
+    bind_mounts:
+      - source: ./data
+        target: /data
+        read_only: true
+```
+
+Run `initrunner doctor` to verify Docker is available. See [docs/security/docker-sandbox.md](docs/security/docker-sandbox.md) for the full configuration reference.
 
 ## Cloud Deploy
 

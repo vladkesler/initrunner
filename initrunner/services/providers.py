@@ -16,6 +16,38 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Ollama connectivity
+# ---------------------------------------------------------------------------
+
+OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
+_OLLAMA_TIMEOUT = 2
+
+
+def is_ollama_running(*, timeout: int = _OLLAMA_TIMEOUT) -> bool:
+    """Return True if Ollama is reachable."""
+    import urllib.request
+
+    try:
+        urllib.request.urlopen(OLLAMA_TAGS_URL, timeout=timeout)
+    except Exception:
+        return False
+    return True
+
+
+def list_ollama_models(*, timeout: int = _OLLAMA_TIMEOUT) -> list[str]:
+    """Return all available Ollama model names, or [] on failure."""
+    import json
+    import urllib.request
+
+    try:
+        resp = urllib.request.urlopen(OLLAMA_TAGS_URL, timeout=timeout)
+        data = json.loads(resp.read())
+        return [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+    except Exception:
+        return []
+
+
 # Explicit priority order — first match wins.
 # Do NOT rely on dict insertion order for correctness.
 _PROVIDER_PRIORITY: list[tuple[str, str]] = [
@@ -83,29 +115,13 @@ def _load_env() -> None:
 
 def _is_ollama_running() -> bool:
     """Return True if Ollama is reachable at localhost:11434."""
-    import urllib.request
-
-    try:
-        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
-    except Exception:
-        return False
-    return True
+    return is_ollama_running()
 
 
 def _get_first_ollama_model() -> str | None:
     """Return the name of the first available Ollama model, or None."""
-    import json
-    import urllib.request
-
-    try:
-        resp = urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
-        data = json.loads(resp.read())
-        models = data.get("models", [])
-        if models:
-            return models[0].get("name", "llama3.2")
-    except Exception:
-        pass
-    return None
+    models = list_ollama_models()
+    return models[0] if models else None
 
 
 def detect_provider_and_model() -> DetectedProvider | None:
@@ -141,14 +157,40 @@ def detect_bot_tokens() -> dict[str, str]:
     }
 
 
-def _check_tool_envs() -> set[str]:
-    """Return tool names that should be skipped due to missing env vars."""
-    skip: set[str] = set()
+def resolve_provider_and_model(
+    provider: str | None = None,
+    model: str | None = None,
+) -> tuple[str, str]:
+    """Detect provider/model, apply overrides. Raises RuntimeError if none found."""
+    detected = detect_provider_and_model()
+    if detected is None and provider is None:
+        raise RuntimeError(
+            "No API key found. Run `initrunner setup` or set an API key environment variable."
+        )
+
+    prov = provider or detected.provider  # type: ignore[union-attr]
+    mod = model or detected.model  # type: ignore[union-attr]
+
+    if provider and not model:
+        from initrunner.templates import _default_model_name
+
+        mod = _default_model_name(provider)
+
+    return prov, mod
+
+
+def check_tool_envs() -> dict[str, list[str]]:
+    """Return tool names with their missing env vars.
+
+    Returns a mapping of ``tool_name -> [missing_var, ...]`` for tools that
+    have at least one required env var unset.
+    """
+    missing_map: dict[str, list[str]] = {}
     for tool_name, env_vars in TOOL_REQUIRED_ENVS.items():
         missing = [v for v in env_vars if not os.environ.get(v)]
         if missing:
-            skip.add(tool_name)
-    return skip
+            missing_map[tool_name] = missing
+    return missing_map
 
 
 def build_quick_chat_role_sync(
@@ -172,22 +214,10 @@ def build_quick_chat_role_sync(
 
     _load_env()
 
-    detected = detect_provider_and_model()
-    if detected is None and provider is None:
-        raise RuntimeError(
-            "No API key found. Run `initrunner setup` or set an API key environment variable."
-        )
-
-    prov = provider or detected.provider  # type: ignore[union-attr]
-    mod = model or detected.model  # type: ignore[union-attr]
-
-    if provider and not model:
-        from initrunner.templates import _default_model_name
-
-        mod = _default_model_name(provider)
+    prov, mod = resolve_provider_and_model(provider, model)
 
     # Build tools: filter out those with missing env vars
-    skip = _check_tool_envs()
+    skip = set(check_tool_envs())
     if tool_defs is None:
         all_tools: list[dict] = [
             t for t in EPHEMERAL_TOOL_DEFAULTS.values() if t["type"] not in skip

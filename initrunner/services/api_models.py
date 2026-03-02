@@ -15,20 +15,7 @@ def role_to_summary(path: Path, role: RoleDefinition | None = None, error: str |
     from initrunner.api.models import RoleSummary
     from initrunner.api.state import role_path_to_id
 
-    features: list[str] = []
-    if role is not None:
-        if role.spec.tools:
-            features.append("tools")
-        if role.spec.triggers:
-            features.append("triggers")
-        if role.spec.ingest:
-            features.append("ingest")
-        if role.spec.memory:
-            features.append("memory")
-        if role.spec.sinks:
-            features.append("sinks")
-        if role.spec.skills:
-            features.append("skills")
+    features = role.spec.features if role is not None else []
 
     return RoleSummary(
         id=role_path_to_id(path),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic_ai.embeddings import Embedder
 
@@ -159,23 +159,12 @@ def embed_single(
     input_type: Literal["query", "document"] = "query",
 ) -> list[float]:
     """Create an embedder and embed a single text synchronously."""
-    import asyncio
+    from initrunner._async import run_sync
 
     embedder = create_embedder(provider, model, base_url=base_url, api_key_env=api_key_env)
     coro = embed_texts(embedder, [text], input_type=input_type)
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop is not None and loop.is_running():
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            vectors = cast(list[list[float]], pool.submit(asyncio.run, coro).result())
-            return vectors[0]
-    return asyncio.run(coro)[0]
+    vectors = run_sync(coro)
+    return vectors[0]
 
 
 async def embed_texts(

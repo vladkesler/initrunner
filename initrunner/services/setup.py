@@ -212,12 +212,9 @@ def provider_needs_embeddings_warning(provider: str, intent: str) -> bool:
 
 def check_ollama_models() -> list[str]:
     """Query Ollama for available models. Returns list of model names."""
-    try:
-        resp = urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3)
-        data = json.loads(resp.read())
-        return [m["name"] for m in data.get("models", [])]
-    except Exception:
-        return []
+    from initrunner.services.providers import list_ollama_models
+
+    return list_ollama_models(timeout=3)
 
 
 # ---------------------------------------------------------------------------

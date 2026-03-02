@@ -144,13 +144,13 @@ class TestMcpBuilderWiring:
 
     @patch("initrunner.mcp.server.FastMCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
-    def test_timeout_passed_to_stdio_transport(self, mock_transport_cls, mock_toolset_cls):
+    def test_timeout_not_passed_to_stdio_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
         config = McpToolConfig(transport="stdio", command="npx", timeout=30)
         build_mcp_toolset(config, _make_ctx())
         mock_transport_cls.assert_called_once()
         _, kwargs = mock_transport_cls.call_args
-        assert kwargs["timeout"] == 30
+        assert "timeout" not in kwargs  # StdioTransport does not support timeout
 
     @patch("initrunner.mcp.server.FastMCPToolset")
     @patch("fastmcp.client.transports.SSETransport")
@@ -187,7 +187,7 @@ class TestMcpBuilderWiring:
         config = McpToolConfig(transport="sse", url="http://localhost:3001/sse", timeout=60)
         build_mcp_toolset(config, _make_ctx())
         _, kwargs = mock_transport_cls.call_args
-        assert kwargs["timeout"] == 60
+        assert kwargs["sse_read_timeout"] == 60
 
     @patch.dict(os.environ, {"MCP_API_TOKEN": "secret123"}, clear=False)
     @patch("initrunner.mcp.server.FastMCPToolset")

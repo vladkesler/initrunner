@@ -223,6 +223,48 @@ def _format_results(results: list[dict[str, str]]) -> str:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Core functions (shared by toolset wrappers and MCP toolkit)
+# ---------------------------------------------------------------------------
+
+
+def _do_search(
+    query: str,
+    num_results: int,
+    max_results: int,
+    safe_search: bool,
+    api_key: str,
+    timeout_seconds: int,
+    provider_fn,
+    *,
+    news: bool = False,
+    days_back: int = 0,
+) -> str:
+    """Execute a web or news search with error handling and truncation."""
+    try:
+        results = provider_fn(
+            query=query,
+            max_results=min(num_results, max_results),
+            safe_search=safe_search,
+            api_key=api_key,
+            timeout=timeout_seconds,
+            news=news,
+            days_back=days_back,
+        )
+        return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
+    except ImportError as e:
+        return f"Error: {e}"
+    except TimeoutError:
+        return f"Error: search timed out after {timeout_seconds}s"
+    except Exception as e:
+        return f"Error: search failed: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Builder (thin wrappers delegating to core functions)
+# ---------------------------------------------------------------------------
+
+
 @register_tool("search", SearchToolConfig)
 def build_search_toolset(
     config: SearchToolConfig,
@@ -242,22 +284,15 @@ def build_search_toolset(
             query: The search query string.
             num_results: Maximum number of results to return (default 5).
         """
-        try:
-            results = provider_fn(
-                query=query,
-                max_results=min(num_results, config.max_results),
-                safe_search=config.safe_search,
-                api_key=api_key,
-                timeout=config.timeout_seconds,
-                news=False,
-            )
-            return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
-        except ImportError as e:
-            return f"Error: {e}"
-        except TimeoutError:
-            return f"Error: search timed out after {config.timeout_seconds}s"
-        except Exception as e:
-            return f"Error: search failed: {e}"
+        return _do_search(
+            query,
+            num_results,
+            config.max_results,
+            config.safe_search,
+            api_key,
+            config.timeout_seconds,
+            provider_fn,
+        )
 
     @toolset.tool
     def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
@@ -268,22 +303,16 @@ def build_search_toolset(
             num_results: Maximum number of results to return (default 5).
             days_back: How many days back to search (default 7).
         """
-        try:
-            results = provider_fn(
-                query=query,
-                max_results=min(num_results, config.max_results),
-                safe_search=config.safe_search,
-                api_key=api_key,
-                timeout=config.timeout_seconds,
-                news=True,
-                days_back=days_back,
-            )
-            return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
-        except ImportError as e:
-            return f"Error: {e}"
-        except TimeoutError:
-            return f"Error: search timed out after {config.timeout_seconds}s"
-        except Exception as e:
-            return f"Error: search failed: {e}"
+        return _do_search(
+            query,
+            num_results,
+            config.max_results,
+            config.safe_search,
+            api_key,
+            config.timeout_seconds,
+            provider_fn,
+            news=True,
+            days_back=days_back,
+        )
 
     return toolset

@@ -160,6 +160,22 @@ def _parse_memory_fields(f: dict) -> tuple[dict | None, MemoryType]:
     return meta, mem_type
 
 
+def _doc_to_memory(doc) -> Memory:
+    """Convert a single zvec document to a Memory instance."""
+    f = doc.fields
+    meta, mem_type = _parse_memory_fields(f)
+    consolidated = f.get("consolidated_at", "")
+    return Memory(
+        id=int(doc.id),
+        content=f.get("content", ""),
+        category=f.get("category", ""),
+        created_at=f.get("created_at", ""),
+        memory_type=mem_type,
+        metadata=meta,
+        consolidated_at=consolidated if consolidated else None,
+    )
+
+
 def _safe_id(key: str) -> str:
     """Convert an arbitrary string (e.g. file path) to a valid zvec doc ID."""
     return hashlib.sha256(key.encode()).hexdigest()
@@ -859,26 +875,7 @@ class ZvecMemoryStore(MemoryStoreBase):
     @staticmethod
     def _docs_to_memories(docs: list) -> list[tuple[Memory, float]]:
         """Convert zvec query result docs to (Memory, distance) tuples."""
-        out: list[tuple[Memory, float]] = []
-        for doc in docs:
-            f = doc.fields
-            meta, mem_type = _parse_memory_fields(f)
-            consolidated = f.get("consolidated_at", "")
-            out.append(
-                (
-                    Memory(
-                        id=int(doc.id),
-                        content=f.get("content", ""),
-                        category=f.get("category", ""),
-                        created_at=f.get("created_at", ""),
-                        memory_type=mem_type,
-                        metadata=meta,
-                        consolidated_at=consolidated if consolidated else None,
-                    ),
-                    1.0 - float(doc.score or 0),
-                )
-            )
-        return out
+        return [(_doc_to_memory(doc), 1.0 - float(doc.score or 0)) for doc in docs]
 
     def list_memories(
         self,
@@ -915,22 +912,7 @@ class ZvecMemoryStore(MemoryStoreBase):
 
             results = self._memories_col.query(**kwargs)
 
-            memories: list[Memory] = []
-            for doc in results:
-                f = doc.fields
-                meta, mem_type = _parse_memory_fields(f)
-                consolidated = f.get("consolidated_at", "")
-                memories.append(
-                    Memory(
-                        id=int(doc.id),
-                        content=f.get("content", ""),
-                        category=f.get("category", ""),
-                        created_at=f.get("created_at", ""),
-                        memory_type=mem_type,
-                        metadata=meta,
-                        consolidated_at=consolidated if consolidated else None,
-                    )
-                )
+            memories = [_doc_to_memory(doc) for doc in results]
 
             # Sort by created_at desc, take limit
             memories.sort(key=lambda m: m.created_at, reverse=True)
@@ -1015,22 +997,9 @@ class ZvecMemoryStore(MemoryStoreBase):
             # Filter out consolidated (non-empty consolidated_at)
             unconsolidated: list[Memory] = []
             for doc in results:
-                f = doc.fields
-                consolidated = f.get("consolidated_at", "")
-                if consolidated:
+                if doc.fields.get("consolidated_at", ""):
                     continue
-                meta, _ = _parse_memory_fields(f)
-                unconsolidated.append(
-                    Memory(
-                        id=int(doc.id),
-                        content=f.get("content", ""),
-                        category=f.get("category", ""),
-                        created_at=f.get("created_at", ""),
-                        memory_type=MemoryType.EPISODIC,
-                        metadata=meta,
-                        consolidated_at=None,
-                    )
-                )
+                unconsolidated.append(_doc_to_memory(doc))
 
             # Sort by created_at asc, take limit
             unconsolidated.sort(key=lambda m: m.created_at)

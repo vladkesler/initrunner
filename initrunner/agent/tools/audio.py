@@ -44,6 +44,70 @@ def _extract_video_id(url: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Core function (shared by toolset wrapper and MCP toolkit)
+# ---------------------------------------------------------------------------
+
+
+def _do_get_youtube_transcript(
+    url: str,
+    youtube_languages: list[str],
+    include_timestamps: bool,
+    max_transcript_chars: int,
+    language: str,
+) -> str:
+    """Fetch a YouTube transcript with import guard, fallback, and truncation."""
+    try:
+        from youtube_transcript_api import (  # type: ignore[import-not-found]
+            YouTubeTranscriptApi,
+        )
+        from youtube_transcript_api._errors import (  # type: ignore[import-not-found]
+            NoTranscriptFound,
+            TranscriptsDisabled,
+        )
+    except ImportError:
+        return (
+            "Error: youtube-transcript-api is required. Install with: pip install initrunner[audio]"
+        )
+
+    video_id = _extract_video_id(url)
+    if not video_id:
+        return f"Error: could not extract a YouTube video ID from URL: {url!r}"
+
+    langs = [language] if language else youtube_languages
+    try:
+        ytt = YouTubeTranscriptApi()
+        transcript_list = ytt.list(video_id)
+        try:
+            transcript = transcript_list.find_transcript(langs)
+        except NoTranscriptFound:
+            transcript = transcript_list.find_generated_transcript(langs)
+        entries = transcript.fetch()
+    except TranscriptsDisabled:
+        return "Error: transcripts are disabled for this video."
+    except NoTranscriptFound:
+        return f"Error: no transcript found for video {video_id!r} in languages {langs}."
+    except Exception as exc:
+        return f"Error fetching transcript: {exc}"
+
+    parts: list[str] = []
+    for entry in entries:
+        text = entry.text
+        if include_timestamps:
+            text = f"[{entry.start:.1f}s] {text}"
+        parts.append(text)
+
+    result = " ".join(parts)
+    if len(result) > max_transcript_chars:
+        result = result[:max_transcript_chars] + "\n[truncated]"
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Builder (thin wrappers delegating to core functions)
+# ---------------------------------------------------------------------------
+
+
 @register_tool("audio", AudioToolConfig)
 def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for audio operations."""
@@ -57,51 +121,13 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
         request a specific language code (e.g. 'en', 'es'). Leave empty to use
         the languages configured on this tool.
         """
-        try:
-            from youtube_transcript_api import (  # type: ignore[import-not-found]
-                YouTubeTranscriptApi,
-            )
-            from youtube_transcript_api._errors import (  # type: ignore[import-not-found]
-                NoTranscriptFound,
-                TranscriptsDisabled,
-            )
-        except ImportError:
-            return (
-                "Error: youtube-transcript-api is required. "
-                "Install with: pip install initrunner[audio]"
-            )
-
-        video_id = _extract_video_id(url)
-        if not video_id:
-            return f"Error: could not extract a YouTube video ID from URL: {url!r}"
-
-        langs = [language] if language else config.youtube_languages
-        try:
-            ytt = YouTubeTranscriptApi()
-            transcript_list = ytt.list(video_id)
-            try:
-                transcript = transcript_list.find_transcript(langs)
-            except NoTranscriptFound:
-                transcript = transcript_list.find_generated_transcript(langs)
-            entries = transcript.fetch()
-        except TranscriptsDisabled:
-            return "Error: transcripts are disabled for this video."
-        except NoTranscriptFound:
-            return f"Error: no transcript found for video {video_id!r} in languages {langs}."
-        except Exception as exc:
-            return f"Error fetching transcript: {exc}"
-
-        parts: list[str] = []
-        for entry in entries:
-            text = entry.text
-            if config.include_timestamps:
-                text = f"[{entry.start:.1f}s] {text}"
-            parts.append(text)
-
-        result = " ".join(parts)
-        if len(result) > config.max_transcript_chars:
-            result = result[: config.max_transcript_chars] + "\n[truncated]"
-        return result
+        return _do_get_youtube_transcript(
+            url,
+            config.youtube_languages,
+            config.include_timestamps,
+            config.max_transcript_chars,
+            language,
+        )
 
     @toolset.tool
     def transcribe_audio(file_path: str) -> str:

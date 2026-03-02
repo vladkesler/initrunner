@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from initrunner._ids import generate_id
 from initrunner.agent.executor import RunResult
@@ -98,9 +100,16 @@ def run_team(
     *,
     team_dir: Path,
     audit_logger: AuditLogger | None = None,
-    dry_run_model: str | None = None,
+    dry_run_model: Any = None,
+    on_persona_start: Callable[[str], None] | None = None,
 ) -> TeamResult:
-    """Execute all personas sequentially, passing output between them."""
+    """Execute all personas sequentially, passing output between them.
+
+    Args:
+        dry_run_model: A ``Model``, model name string, or ``None``.
+        on_persona_start: Optional callback invoked with the persona name
+            at the start of each persona's execution.
+    """
     from initrunner.agent.executor import execute_run
     from initrunner.agent.loader import _load_dotenv, build_agent
 
@@ -113,6 +122,9 @@ def run_team(
     wall_start = time.monotonic()
 
     for persona_name, description in team.spec.personas.items():
+        if on_persona_start is not None:
+            on_persona_start(persona_name)
+
         # Check cumulative token budget
         if team.spec.guardrails.team_token_budget is not None:
             if result.total_tokens >= team.spec.guardrails.team_token_budget:

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from initrunner._log import get_logger
-from initrunner._paths import ensure_private_dir, secure_database
+from initrunner._paths import LazyPath, ensure_private_dir, secure_database
 from initrunner.audit._redact import scrub_secrets
 
 if TYPE_CHECKING:
@@ -182,7 +182,7 @@ def _default_db_path() -> Path:
     return get_audit_db_path()
 
 
-class _LazyDbPath:
+class _LazyDbPath(LazyPath):
     """Lazy-evaluated default DB path to avoid import-time filesystem access."""
 
     _value: Path | None = None
@@ -191,22 +191,6 @@ class _LazyDbPath:
         if self._value is None:
             self._value = _default_db_path()
         return self._value
-
-    def __fspath__(self) -> str:
-        return str(self._resolve())
-
-    def __str__(self) -> str:
-        return str(self._resolve())
-
-    def __repr__(self) -> str:
-        return f"_LazyDbPath({self._resolve()!r})"
-
-    def __truediv__(self, other: str) -> Path:
-        return self._resolve() / other
-
-    def __getattr__(self, name: str):
-        # Delegate any attribute access (exists, parent, etc.) to the resolved Path
-        return getattr(self._resolve(), name)
 
 
 DEFAULT_DB_PATH: _LazyDbPath = _LazyDbPath()

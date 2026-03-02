@@ -57,6 +57,30 @@ def _is_private_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return any(check in net for net in _BLOCKED_NETWORKS)
 
 
+def check_domain_filter(
+    url: str,
+    allowed_domains: list[str],
+    blocked_domains: list[str],
+) -> str | None:
+    """Validate URL against domain allow/block lists.
+
+    Returns None if allowed, or an error string if blocked/invalid.
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+    except Exception:
+        return "Error: invalid URL"
+
+    if allowed_domains:
+        if hostname not in allowed_domains:
+            return f"Error: domain '{hostname}' is not in the allowed domains list"
+    elif blocked_domains:
+        if hostname in blocked_domains:
+            return f"Error: domain '{hostname}' is blocked"
+    return None
+
+
 def validate_url_ssrf(url: str, *, dns_timeout: float = _DNS_TIMEOUT) -> str | None:
     """Validate a URL against SSRF risks.
 

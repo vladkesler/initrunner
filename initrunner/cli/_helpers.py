@@ -133,11 +133,9 @@ def prompt_model_selection(
 
 def check_ollama_running() -> None:
     """Ping local Ollama and warn if it's not reachable."""
-    import urllib.request
+    from initrunner.services.providers import is_ollama_running
 
-    try:
-        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=2)
-    except Exception:
+    if not is_ollama_running():
         console.print(
             "[yellow]Warning:[/yellow] Ollama does not appear to be running. "
             "Make sure to run: [bold]ollama serve[/bold]"
@@ -204,6 +202,14 @@ def create_audit_logger(audit_db: Path | None, no_audit: bool) -> AuditLogger | 
     return _AuditLogger(audit_db or DEFAULT_DB_PATH)
 
 
+def _no_memory_role(role: RoleDefinition) -> RoleDefinition:
+    """Return a shallow copy of *role* with memory disabled.
+
+    Used to skip memory store creation when ``with_memory=False``.
+    """
+    return role.model_copy(update={"spec": role.spec.model_copy(update={"memory": None})})
+
+
 def resolve_memory_path(role: RoleDefinition) -> Path:
     from initrunner.stores.base import resolve_memory_path as _resolve
 
@@ -225,32 +231,17 @@ def ephemeral_context(
     Like command_context() but accepts pre-built RoleDefinition + Agent.
     Skips sinks and observability.
     """
+    from initrunner.stores.factory import managed_memory_store
+
     audit_logger = create_audit_logger(audit_db, no_audit)
 
-    memory_store = None
-    mem_path = None
-    if with_memory and role.spec.memory is not None:
-        from initrunner.stores.factory import (
-            create_memory_store,
-            register_memory_store,
-        )
-
-        mem_path = resolve_memory_path(role)
-        memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
-        register_memory_store(mem_path, memory_store)
-        agent._memory_store = memory_store  # type: ignore[attr-defined]
-
-    try:
-        yield role, agent, audit_logger, memory_store
-    finally:
-        if memory_store is not None:
-            from initrunner.stores.factory import unregister_memory_store
-
-            assert mem_path is not None
-            unregister_memory_store(mem_path)
-            memory_store.close()
-        if audit_logger is not None:
-            audit_logger.close()
+    mem_role = role if with_memory else _no_memory_role(role)
+    with managed_memory_store(mem_role, agent) as memory_store:
+        try:
+            yield role, agent, audit_logger, memory_store
+        finally:
+            if audit_logger is not None:
+                audit_logger.close()
 
 
 @contextmanager
@@ -267,6 +258,8 @@ def command_context(
 
     Yields (role, agent, audit_logger, memory_store, sink_dispatcher).
     """
+    from initrunner.stores.factory import managed_memory_store
+
     role, agent = load_and_build_or_exit(role_file, extra_skill_dirs=extra_skill_dirs)
 
     # Setup observability after load so TracerProvider is active before
@@ -278,39 +271,20 @@ def command_context(
         _otel_provider = setup_tracing(role.spec.observability, role.metadata.name)
     audit_logger = create_audit_logger(audit_db, no_audit)
 
-    memory_store = None
-    mem_path = None
-    if with_memory and role.spec.memory is not None:
-        from initrunner.stores.factory import (
-            create_memory_store,
-            register_memory_store,
-        )
+    mem_role = role if with_memory else _no_memory_role(role)
+    with managed_memory_store(mem_role, agent) as memory_store:
+        sink_dispatcher = None
+        if with_sinks and role.spec.sinks:
+            from initrunner.sinks.dispatcher import SinkDispatcher
 
-        mem_path = resolve_memory_path(role)
-        memory_store = create_memory_store(role.spec.memory.store_backend, mem_path)
-        register_memory_store(mem_path, memory_store)
-        # Expose the store on the agent so the procedural-memory system
-        # prompt callback can reuse it (avoids zvec double-lock).
-        agent._memory_store = memory_store  # type: ignore[attr-defined]
+            sink_dispatcher = SinkDispatcher(role.spec.sinks, role, role_dir=role_file.parent)
 
-    sink_dispatcher = None
-    if with_sinks and role.spec.sinks:
-        from initrunner.sinks.dispatcher import SinkDispatcher
+        try:
+            yield role, agent, audit_logger, memory_store, sink_dispatcher
+        finally:
+            if audit_logger is not None:
+                audit_logger.close()
+            if _otel_provider is not None:
+                from initrunner.observability import shutdown_tracing
 
-        sink_dispatcher = SinkDispatcher(role.spec.sinks, role, role_dir=role_file.parent)
-
-    try:
-        yield role, agent, audit_logger, memory_store, sink_dispatcher
-    finally:
-        if memory_store is not None:
-            from initrunner.stores.factory import unregister_memory_store
-
-            assert mem_path is not None
-            unregister_memory_store(mem_path)
-            memory_store.close()
-        if audit_logger is not None:
-            audit_logger.close()
-        if _otel_provider is not None:
-            from initrunner.observability import shutdown_tracing
-
-            shutdown_tracing()
+                shutdown_tracing()

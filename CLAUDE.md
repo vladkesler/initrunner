@@ -95,6 +95,7 @@ Detailed docs live in `docs/`. Key references:
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
 | Textual TUI | `docs/interfaces/tui.md` |
 | Testing guide | `docs/operations/testing.md` |
+| Docker sandbox | `docs/security/docker-sandbox.md` |
 | Auth & guardrails | `docs/security/auth.md`, `docs/configuration/guardrails.md` |
 | CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/pypi_publish.md` |
 | Role generation & wizards | `docs/agents/role_generation.md` |

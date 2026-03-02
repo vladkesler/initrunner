@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from initrunner.agent._subprocess import (
     DEFAULT_ENV_ALLOWLIST,
@@ -122,6 +122,80 @@ class ToolSandboxConfig(BaseModel):
     sandbox_violation_action: Literal["raise", "log"] = "raise"
 
 
+_DOCKER_BLOCKED_ARGS = frozenset(
+    {
+        "--privileged",
+        "--cap-add",
+        "--security-opt",
+        "--pid=host",
+        "--userns=host",
+        "--network=host",
+        "--ipc=host",
+    }
+)
+
+
+class BindMount(BaseModel):
+    source: str
+    target: str
+    read_only: bool = True
+
+    @field_validator("target")
+    @classmethod
+    def _absolute_target(cls, v: str) -> str:
+        if not v.startswith("/"):
+            raise ValueError(f"bind mount target must be absolute, got '{v}'")
+        return v
+
+
+class DockerSandboxConfig(BaseModel):
+    enabled: bool = False
+    image: str = "python:3.12-slim"
+    network: Literal["none", "bridge", "host"] = "none"
+    memory_limit: str = "256m"
+    cpu_limit: Annotated[float, Field(gt=0)] = 1.0
+    read_only_rootfs: bool = True
+    bind_mounts: list[BindMount] = Field(default_factory=list)
+    env_passthrough: list[str] = Field(default_factory=list)
+    extra_args: list[str] = Field(default_factory=list)
+
+    @field_validator("image")
+    @classmethod
+    def _non_empty_image(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Docker image must not be empty")
+        return v
+
+    @field_validator("memory_limit")
+    @classmethod
+    def _valid_memory_format(cls, v: str) -> str:
+        import re
+
+        if not re.match(r"^\d+[bkmgBKMG]?$", v):
+            raise ValueError(f"Invalid memory_limit '{v}' — use Docker format like '256m', '1g'")
+        return v
+
+    @field_validator("extra_args")
+    @classmethod
+    def _reject_dangerous_args(cls, v: list[str]) -> list[str]:
+        for arg in v:
+            normalized = arg.split("=")[0] if "=" in arg else arg
+            if arg in _DOCKER_BLOCKED_ARGS or normalized in _DOCKER_BLOCKED_ARGS:
+                raise ValueError(f"Docker extra_arg '{arg}' is blocked for security reasons")
+        return v
+
+    @model_validator(mode="after")
+    def _no_conflicting_work_mount(self) -> DockerSandboxConfig:
+        targets = [m.target for m in self.bind_mounts]
+        if "/work" in targets:
+            raise ValueError(
+                "bind_mount target '/work' conflicts with automatic working directory mount"
+            )
+        if len(targets) != len(set(targets)):
+            raise ValueError("duplicate bind_mount targets")
+        return self
+
+
 class AuditConfig(BaseModel):
     max_records: int = 100_000
     retention_days: int = 90
@@ -138,4 +212,5 @@ class SecurityPolicy(BaseModel):
     rate_limit: RateLimitConfig = RateLimitConfig()
     resources: ResourceLimits = ResourceLimits()
     tools: ToolSandboxConfig = ToolSandboxConfig()
+    docker: DockerSandboxConfig = DockerSandboxConfig()
     audit: AuditConfig = AuditConfig()

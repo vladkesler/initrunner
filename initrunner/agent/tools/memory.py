@@ -51,6 +51,16 @@ def build_memory_toolset(
             input_type=input_type,
         )
 
+    def _store_memory(
+        content: str, category: str, memory_type: MemoryType, max_count: int, label: str
+    ) -> str:
+        category = _sanitize_category(category)
+        embedding = _embed(content)
+        with create_memory_store(backend, db_path, dimensions=len(embedding)) as store:
+            mem_id = store.add_memory(content, category, embedding, memory_type=memory_type)
+            store.prune_memories(max_count, memory_type=memory_type)
+        return f"{label} (id={mem_id}, category={category})"
+
     toolset = FunctionToolset()
 
     if config.semantic.enabled:
@@ -58,14 +68,9 @@ def build_memory_toolset(
         @toolset.tool
         def remember(content: str, category: str = "general") -> str:
             """Store a piece of information in long-term memory for later recall."""
-            category = _sanitize_category(category)
-            embedding = _embed(content)
-            with create_memory_store(backend, db_path, dimensions=len(embedding)) as store:
-                mem_id = store.add_memory(
-                    content, category, embedding, memory_type=MemoryType.SEMANTIC
-                )
-                store.prune_memories(config.semantic.max_memories, memory_type=MemoryType.SEMANTIC)
-            return f"Remembered (id={mem_id}, category={category})"
+            return _store_memory(
+                content, category, MemoryType.SEMANTIC, config.semantic.max_memories, "Remembered"
+            )
 
     @toolset.tool
     def recall(
@@ -143,16 +148,13 @@ def build_memory_toolset(
             Use this to record insights about how to handle situations, best practices,
             or patterns that should be followed in future interactions.
             """
-            category = _sanitize_category(category)
-            embedding = _embed(content)
-            with create_memory_store(backend, db_path, dimensions=len(embedding)) as store:
-                mem_id = store.add_memory(
-                    content, category, embedding, memory_type=MemoryType.PROCEDURAL
-                )
-                store.prune_memories(
-                    config.procedural.max_procedures, memory_type=MemoryType.PROCEDURAL
-                )
-            return f"Learned procedure (id={mem_id}, category={category})"
+            return _store_memory(
+                content,
+                category,
+                MemoryType.PROCEDURAL,
+                config.procedural.max_procedures,
+                "Learned procedure",
+            )
 
     if config.episodic.enabled:
 
@@ -163,13 +165,12 @@ def build_memory_toolset(
             Use this to capture outcomes, decisions made, errors encountered,
             or other events worth remembering.
             """
-            category = _sanitize_category(category)
-            embedding = _embed(content)
-            with create_memory_store(backend, db_path, dimensions=len(embedding)) as store:
-                mem_id = store.add_memory(
-                    content, category, embedding, memory_type=MemoryType.EPISODIC
-                )
-                store.prune_memories(config.episodic.max_episodes, memory_type=MemoryType.EPISODIC)
-            return f"Recorded episode (id={mem_id}, category={category})"
+            return _store_memory(
+                content,
+                category,
+                MemoryType.EPISODIC,
+                config.episodic.max_episodes,
+                "Recorded episode",
+            )
 
     return toolset

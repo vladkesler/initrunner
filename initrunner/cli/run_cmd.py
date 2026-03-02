@@ -330,6 +330,7 @@ def _run_team(
 
     from initrunner.cli._helpers import create_audit_logger
     from initrunner.team.loader import TeamLoadError, load_team
+    from initrunner.team.runner import _persona_to_role, run_team
 
     try:
         team = load_team(team_file)
@@ -351,90 +352,14 @@ def _run_team(
     console.print()
 
     with console.status("[dim]Running team pipeline...[/dim]") as status:
-        import time
-
-        from initrunner._ids import generate_id
-        from initrunner.agent.executor import execute_run as _orig_execute_run
-        from initrunner.agent.loader import _load_dotenv, build_agent
-        from initrunner.team.runner import (
-            TeamResult,
-            _build_agent_prompt,
-            _persona_to_role,
+        result = run_team(
+            team,
+            prompt,
+            team_dir=team_file.parent,
+            audit_logger=audit_logger,
+            dry_run_model=dry_run_model,
+            on_persona_start=lambda name: status.update(f"[dim]Running persona: {name}...[/dim]"),
         )
-
-        team_run_id = generate_id()
-        result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
-        _load_dotenv(team_file.parent)
-
-        prior_outputs: list[tuple[str, str]] = []
-        wall_start = time.monotonic()
-
-        for persona_name, description in team.spec.personas.items():
-            status.update(f"[dim]Running persona: {persona_name}...[/dim]")
-
-            # Check cumulative token budget
-            if team.spec.guardrails.team_token_budget is not None:
-                if result.total_tokens >= team.spec.guardrails.team_token_budget:
-                    result.success = False
-                    result.error = (
-                        f"Team token budget exceeded: {result.total_tokens} >= "
-                        f"{team.spec.guardrails.team_token_budget}"
-                    )
-                    break
-
-            # Check team timeout
-            if team.spec.guardrails.team_timeout_seconds is not None:
-                elapsed_s = time.monotonic() - wall_start
-                if elapsed_s >= team.spec.guardrails.team_timeout_seconds:
-                    result.success = False
-                    result.error = (
-                        f"Team timeout exceeded: {elapsed_s:.0f}s >= "
-                        f"{team.spec.guardrails.team_timeout_seconds}s"
-                    )
-                    break
-
-            role = _persona_to_role(persona_name, description, team)
-            agent = build_agent(role, role_dir=team_file.parent)
-
-            agent_prompt = _build_agent_prompt(
-                prompt, persona_name, prior_outputs, team.spec.handoff_max_chars
-            )
-
-            trigger_metadata = {
-                "team_name": team.metadata.name,
-                "team_run_id": team_run_id,
-                "agent_name": persona_name,
-            }
-
-            run_result, _ = _orig_execute_run(
-                agent,
-                role,
-                agent_prompt,
-                audit_logger=audit_logger,
-                model_override=dry_run_model,
-                trigger_type="team",
-                trigger_metadata=trigger_metadata,
-            )
-
-            result.agent_results.append(run_result)
-            result.agent_names.append(persona_name)
-            result.total_tokens_in += run_result.tokens_in
-            result.total_tokens_out += run_result.tokens_out
-            result.total_tokens += run_result.total_tokens
-            result.total_tool_calls += run_result.tool_calls
-            result.total_duration_ms += run_result.duration_ms
-
-            if not run_result.success:
-                result.success = False
-                result.error = f"Persona '{persona_name}' failed: {run_result.error}"
-                break
-
-            prior_outputs.append((persona_name, run_result.output))
-
-        if result.agent_results:
-            last = result.agent_results[-1]
-            if last.success:
-                result.final_output = last.output
 
     _display_team_result(result)
 

@@ -47,7 +47,7 @@ class RolesScreen(FilterableScreen):
 
     @staticmethod
     def _empty_state_message() -> str:
-        from initrunner.cli.setup_cmd import needs_setup
+        from initrunner.services.setup import needs_setup
 
         if needs_setup():
             return (

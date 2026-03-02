@@ -16,7 +16,10 @@ from initrunner.stores.base import (
 )
 
 if TYPE_CHECKING:
+    from pydantic_ai import Agent
+
     from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.role import RoleDefinition
 
 # ---------------------------------------------------------------------------
 # Active memory-store registry
@@ -101,3 +104,28 @@ def open_memory_store(
         return
     with create_memory_store(memory_config.store_backend, mem_path, dimensions=dimensions) as store:
         yield store
+
+
+@contextmanager
+def managed_memory_store(
+    role: RoleDefinition,
+    agent: Agent | None = None,
+) -> Iterator[MemoryStoreBase | None]:
+    """Full lifecycle: resolve → create → register → yield → unregister → close.
+
+    Yields None if role has no memory config.
+    If agent is provided, sets agent._memory_store.
+    """
+    if role.spec.memory is None:
+        yield None
+        return
+    mem_path = resolve_memory_path(role.spec.memory.store_path, role.metadata.name)
+    store = create_memory_store(role.spec.memory.store_backend, mem_path)
+    register_memory_store(mem_path, store)
+    if agent is not None:
+        agent._memory_store = store  # type: ignore[attr-defined]
+    try:
+        yield store
+    finally:
+        unregister_memory_store(mem_path)
+        store.close()
