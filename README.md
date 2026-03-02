@@ -31,6 +31,11 @@ One YAML file is all it takes to go from idea to running agent - with document s
 
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+```
+
+Then run the setup wizard:
+
+```bash
 initrunner setup
 ```
 
