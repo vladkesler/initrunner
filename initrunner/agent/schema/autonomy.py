@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class CompactionConfig(BaseModel):
+    """Configuration for LLM-driven conversation history compaction."""
+
+    enabled: bool = False
+    threshold: int = Field(default=30, ge=1)
+    tail_messages: int = Field(default=6, ge=1)
+    model_override: str | None = None
+    summary_prefix: str = "[CONVERSATION HISTORY SUMMARY]\n"
 
 
 class AutonomyConfig(BaseModel):
@@ -20,3 +30,4 @@ class AutonomyConfig(BaseModel):
     max_scheduled_per_run: int = 3
     max_scheduled_total: int = 50
     max_schedule_delay_seconds: int = 86400  # 24h
+    compaction: CompactionConfig = CompactionConfig()

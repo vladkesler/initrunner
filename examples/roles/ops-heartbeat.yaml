@@ -1,0 +1,63 @@
+# Heartbeat trigger example — periodically reads a checklist file and works
+# through incomplete items using shell commands. Active hours restrict runs to
+# business hours so the agent stays quiet overnight.
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: ops-heartbeat
+  description: Periodic ops agent that processes an open-tasks checklist via heartbeat trigger
+  tags:
+    - example
+    - heartbeat
+    - ops
+    - shell
+    - slack
+spec:
+  role: |
+    You are an operations assistant. Each time you are triggered you receive an
+    updated task checklist. Work through every incomplete item using shell commands
+    and mark them done.
+
+    Workflow:
+    1. Read through all unchecked items (lines starting with "- [ ]")
+    2. For each item, run the appropriate shell command to perform the check
+    3. Report pass/fail per item to the #ops-alerts Slack channel
+    4. If a check fails, include the relevant error output in your Slack message
+
+    Rules:
+    - Never modify production resources — only read / inspect
+    - If a command times out, report it as "timed out" and move to the next item
+    - At the end, post a summary: items checked, passed, failed
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.0
+  tools:
+    - type: shell
+      allowed_commands:
+        - curl
+        - ping
+        - dig
+        - df
+        - free
+        - uptime
+        - systemctl
+      require_confirmation: false
+      timeout_seconds: 30
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#ops-alerts"
+      username: Ops Heartbeat
+      icon_emoji: ":heartbeat:"
+    - type: datetime
+  triggers:
+    - type: heartbeat
+      file: ./ops-checklist.md
+      interval_seconds: 3600
+      active_hours: [8, 18]
+      timezone: America/New_York
+  guardrails:
+    max_tokens_per_run: 20000
+    max_tool_calls: 25
+    timeout_seconds: 180
+    max_request_limit: 30

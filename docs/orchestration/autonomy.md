@@ -58,6 +58,11 @@ Controls loop behavior. All fields are optional — defaults apply if the `auton
 | `max_scheduled_per_run` | `int` | `3` | Maximum follow-up runs an agent can schedule in a single execution. Daemon mode only. |
 | `max_scheduled_total` | `int` | `50` | Maximum total pending scheduled tasks across the daemon lifetime. |
 | `max_schedule_delay_seconds` | `int` | `86400` | Maximum delay (in seconds) for a scheduled follow-up. Default is 24 hours. |
+| `compaction.enabled` | `bool` | `false` | Enable LLM-driven summarization of old messages before trimming. |
+| `compaction.threshold` | `int` | `30` | Minimum message count before compaction activates. |
+| `compaction.tail_messages` | `int` | `6` | Number of recent messages to keep verbatim (not summarized). |
+| `compaction.model_override` | `str \| null` | `null` | Model to use for summarization. Defaults to the role's model. |
+| `compaction.summary_prefix` | `str` | `"[CONVERSATION HISTORY SUMMARY]\n"` | Prefix prepended to the LLM summary. |
 
 ### `spec.guardrails` (autonomous fields)
 
@@ -131,7 +136,7 @@ schedule_followup_at(prompt: str, iso_datetime: str) -> str
 
 2. **Iterations 2+**: A continuation prompt is built from `autonomy.continuation_prompt` plus the current `ReflectionState` (the plan rendered as a checklist). This ensures the agent always sees its progress even if earlier messages were trimmed.
 
-3. **History trimming**: After each iteration, message history is trimmed to `max_history_messages` messages. The first message (original prompt) is always preserved to maintain task context.
+3. **History compaction and trimming**: After each iteration, if `compaction.enabled` is true and the history exceeds `compaction.threshold`, older messages are summarized by an LLM call and replaced with a single summary message. The most recent `compaction.tail_messages` messages are kept verbatim. After compaction, history is trimmed to `max_history_messages`. The first message (original prompt) is always preserved to maintain task context. Compaction follows the never-raises pattern — if the summarization LLM call fails, the original history is kept and trimming proceeds normally.
 
 4. **Budget check**: Before each iteration, cumulative token usage is compared against `autonomous_token_budget`. If exceeded, the loop stops with status `budget_exceeded`.
 
@@ -313,6 +318,21 @@ The run stopped with status `budget_exceeded`. Options:
 ### Scheduled tasks lost on restart
 
 Scheduled follow-ups (`schedule_followup` / `schedule_followup_at`) are in-memory only. If the daemon process restarts, all pending scheduled tasks are lost. For persistent scheduling, use cron triggers with appropriate schedules instead.
+
+### Agent loses context in long runs
+
+By default, old messages are silently dropped when history exceeds `max_history_messages`. Enable compaction to summarize old messages instead:
+
+```yaml
+spec:
+  autonomy:
+    compaction:
+      enabled: true
+      threshold: 30
+      tail_messages: 6
+```
+
+This uses an LLM call to produce a summary of the dropped messages, preserving key decisions, tool results, and open tasks. The summary is injected as a single message before the recent tail. You can use `model_override` to route summarization to a cheaper model.
 
 ### Agent makes no tool calls
 

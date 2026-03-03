@@ -179,8 +179,16 @@ def run_autonomous(
             result, iteration, max_iterations, cumulative_tokens, token_budget
         )
 
-        # Trim history
+        # Compact then trim history
         if message_history:
+            from initrunner.agent.history_compaction import maybe_compact_message_history
+
+            message_history = maybe_compact_message_history(
+                message_history,
+                autonomy_config,
+                role,
+                preserve_first=True,
+            )
             message_history = trim_message_history(
                 message_history,
                 autonomy_config.max_history_messages,

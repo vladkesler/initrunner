@@ -1,0 +1,73 @@
+# Hot-reload daemon example — edit this file while the daemon is running and
+# changes take effect automatically (no restart required).
+#
+# What reloads on change:
+#   - Role prompt text (spec.role)
+#   - Tool configuration (spec.tools)
+#   - Guardrails (spec.guardrails)
+#   - Trigger prompts and schedules (spec.triggers)
+#
+# What does NOT reload (requires a restart):
+#   - Model provider / name changes
+#   - Adding or removing trigger types
+#   - Daemon config itself (spec.daemon)
+#
+# Run with:
+#   initrunner daemon reloadable-assistant.yaml
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: reloadable-assistant
+  description: Slack-connected daemon with hot-reload — tweak the role, tools, or guardrails and see changes applied live
+  tags:
+    - example
+    - daemon
+    - hot-reload
+    - slack
+    - cron
+spec:
+  role: |
+    You are a team assistant running as a long-lived daemon. You respond to Slack
+    messages and run periodic summaries on a cron schedule.
+
+    Responsibilities:
+    1. Answer questions from the team in Slack
+    2. Every four hours, summarise recent activity and post to #team-updates
+    3. Use shell commands to gather system metrics when asked
+
+    Tone: concise, friendly, and professional. Prefer bullet points over prose.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.3
+    max_tokens: 4096
+  tools:
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#team-updates"
+      username: Team Assistant
+      icon_emoji: ":robot_face:"
+    - type: shell
+      allowed_commands:
+        - uptime
+        - df
+        - free
+        - date
+      require_confirmation: false
+      timeout_seconds: 15
+    - type: datetime
+  triggers:
+    - type: cron
+      schedule: "0 */4 * * *"
+      prompt: "Summarise recent activity and post a status update to Slack."
+      timezone: UTC
+  daemon:
+    hot_reload: true
+    reload_debounce_seconds: 2.0
+  guardrails:
+    max_tokens_per_run: 20000
+    max_tool_calls: 15
+    timeout_seconds: 120
+    max_request_limit: 20
+    daemon_token_budget: 500000
+    daemon_daily_token_budget: 200000

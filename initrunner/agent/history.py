@@ -6,8 +6,16 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import ModelMessage, ModelResponse
 
+from initrunner.agent.history_compaction import maybe_compact_message_history
+
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
+
+__all__ = [
+    "maybe_compact_message_history",
+    "session_limits",
+    "trim_message_history",
+]
 
 
 def trim_message_history(

@@ -57,6 +57,13 @@ class ToolSearchConfig(BaseModel):
     threshold: float = Field(default=0.0, ge=0.0)
 
 
+class DaemonConfig(BaseModel):
+    """Configuration for daemon mode behaviour."""
+
+    hot_reload: bool = True
+    reload_debounce_seconds: float = Field(default=1.0, ge=0.0, le=30.0)
+
+
 class AgentSpec(BaseModel):
     role: str
     model: ModelConfig
@@ -73,6 +80,7 @@ class AgentSpec(BaseModel):
     security: SecurityPolicy = SecurityPolicy()
     observability: ObservabilityConfig | None = None
     tool_search: ToolSearchConfig = ToolSearchConfig()
+    daemon: DaemonConfig = DaemonConfig()
 
     @property
     def features(self) -> list[str]:

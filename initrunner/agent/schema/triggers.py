@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -88,11 +89,47 @@ class DiscordTriggerConfig(BaseModel):
         return f"discord: {'; '.join(parts)}" if parts else "discord: all channels (mention/DM)"
 
 
+class HeartbeatTriggerConfig(BaseModel):
+    type: Literal["heartbeat"] = "heartbeat"
+    file: str
+    interval_seconds: int = Field(default=3600, gt=0)
+    prompt_prefix: str = (
+        "You are processing a periodic task checklist. "
+        "Review all items below and work through any that are not yet complete. "
+        "Use your tools as needed. Report what you did for each item."
+    )
+    active_hours: list[int] | None = None
+    timezone: str = "UTC"
+    autonomous: bool = False
+
+    @model_validator(mode="after")
+    def _validate_active_hours(self) -> HeartbeatTriggerConfig:
+        if self.active_hours is not None:
+            if len(self.active_hours) != 2:
+                raise ValueError("active_hours must be a list of exactly 2 integers [start, end]")
+            for h in self.active_hours:
+                if not (0 <= h <= 23):
+                    raise ValueError(f"active_hours values must be 0-23, got {h}")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_timezone(self) -> HeartbeatTriggerConfig:
+        try:
+            ZoneInfo(self.timezone)
+        except (KeyError, Exception) as exc:
+            raise ValueError(f"Invalid timezone: {self.timezone!r}") from exc
+        return self
+
+    def summary(self) -> str:
+        return f"heartbeat: {self.file} every {self.interval_seconds}s"
+
+
 TriggerConfig = Annotated[
     CronTriggerConfig
     | FileWatchTriggerConfig
     | WebhookTriggerConfig
     | TelegramTriggerConfig
-    | DiscordTriggerConfig,
+    | DiscordTriggerConfig
+    | HeartbeatTriggerConfig,
     Field(discriminator="type"),
 ]

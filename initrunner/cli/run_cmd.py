@@ -622,13 +622,14 @@ def daemon(
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
 
+    extra_skill_dirs = resolve_skill_dirs(skill_dir)
     with command_context(
         role_file,
         audit_db=audit_db,
         no_audit=no_audit,
         with_memory=True,
         with_sinks=True,
-        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        extra_skill_dirs=extra_skill_dirs,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         run_daemon(
             agent,
@@ -636,4 +637,6 @@ def daemon(
             audit_logger=audit_logger,
             sink_dispatcher=sink_dispatcher,
             memory_store=memory_store,
+            role_path=role_file.resolve(),
+            extra_skill_dirs=extra_skill_dirs,
         )

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
 from collections import OrderedDict
+from pathlib import Path
 
 from pydantic_ai import Agent
 
@@ -72,12 +74,17 @@ class DaemonRunner:
         audit_logger: AuditLogger | None = None,
         sink_dispatcher: SinkDispatcher | None = None,
         memory_store: MemoryStoreBase | None = None,
+        role_path: Path | None = None,
+        extra_skill_dirs: list[Path] | None = None,
     ) -> None:
         self._agent = agent
         self._role = role
+        self._agent_role_lock = threading.RLock()
         self._audit_logger = audit_logger
         self._sink_dispatcher = sink_dispatcher
         self._memory_store = memory_store
+        self._role_path = role_path
+        self._extra_skill_dirs = extra_skill_dirs
 
         self._stop = threading.Event()
         self._in_flight_count = 0
@@ -94,6 +101,8 @@ class DaemonRunner:
         self._scheduling_toolset = None
         self._autonomous_trigger_types: set[str] = set()
         self._conversations = _ConversationStore()
+        self._reloader = None
+        self._dispatcher = None
 
     def run(self) -> None:
         """Start the daemon: set up triggers, handle events, block until stopped."""
@@ -110,23 +119,30 @@ class DaemonRunner:
             if getattr(tc, "autonomous", False):
                 self._autonomous_trigger_types.add(tc.type)
 
-        dispatcher = TriggerDispatcher(self._role.spec.triggers, self._on_trigger)
+        self._dispatcher = TriggerDispatcher(self._role.spec.triggers, self._on_trigger)
 
         _display_daemon_header(
             self._role,
             self._role.spec.guardrails,
             self._autonomous_trigger_types,
-            dispatcher,
+            self._dispatcher,
         )
 
-        with dispatcher:
+        with self._dispatcher:
             from initrunner._signal import install_shutdown_handler
 
             install_shutdown_handler(self._stop, on_first_signal=self._on_first_signal)
+
+            # Start hot-reload watcher if configured
+            self._maybe_start_reloader()
+
             # Use a loop with timeout as a safety net: if the signal handler somehow
             # fails to set the stop event, we still get periodic wakeups to check.
             while not self._stop.wait(timeout=30):
                 pass
+
+        if self._reloader is not None:
+            self._reloader.stop()
 
         console.print("Daemon stopped.")
 
@@ -168,6 +184,11 @@ class DaemonRunner:
         from initrunner.agent.history import trim_message_history
         from initrunner.agent.schema.autonomy import AutonomyConfig
 
+        # Snapshot agent/role under lock so in-flight runs are unaffected by reload
+        with self._agent_role_lock:
+            agent = self._agent
+            role = self._role
+
         allowed, reason = self._tracker.check_before_run()
         if not allowed:
             console.print(f"\n[yellow]Budget exceeded — skipping trigger: {reason}[/yellow]")
@@ -183,7 +204,7 @@ class DaemonRunner:
         use_autonomous = (
             event.trigger_type in self._autonomous_trigger_types
             or event.trigger_type == "scheduled"
-        ) and self._role.spec.autonomy is not None
+        ) and role.spec.autonomy is not None
 
         if event.trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
             use_autonomous = False
@@ -192,15 +213,15 @@ class DaemonRunner:
         conv_key = event.conversation_key
         prior_history = self._conversations.get(conv_key) if conv_key else None
 
-        autonomy_config = self._role.spec.autonomy or AutonomyConfig()
+        autonomy_config = role.spec.autonomy or AutonomyConfig()
 
         with self._in_flight_cond:
             self._in_flight_count += 1
         try:
             if use_autonomous:
                 auto_result = run_autonomous(
-                    self._agent,
-                    self._role,
+                    agent,
+                    role,
                     event.prompt,
                     audit_logger=self._audit_logger,
                     sink_dispatcher=self._sink_dispatcher,
@@ -214,8 +235,17 @@ class DaemonRunner:
 
                 # Store updated conversation history
                 if conv_key and auto_result.final_messages:
-                    trimmed = trim_message_history(
+                    from initrunner.agent.history_compaction import (
+                        maybe_compact_message_history,
+                    )
+
+                    compacted = maybe_compact_message_history(
                         auto_result.final_messages,
+                        autonomy_config,
+                        role,
+                    )
+                    trimmed = trim_message_history(
+                        compacted,
                         autonomy_config.max_history_messages,
                     )
                     self._conversations.put(conv_key, trimmed)
@@ -241,8 +271,8 @@ class DaemonRunner:
                             )
             else:
                 result, new_messages = execute_run(
-                    self._agent,
-                    self._role,
+                    agent,
+                    role,
                     event.prompt,
                     audit_logger=self._audit_logger,
                     message_history=prior_history,
@@ -269,8 +299,17 @@ class DaemonRunner:
 
                 # Store updated conversation history
                 if conv_key and new_messages:
-                    trimmed = trim_message_history(
+                    from initrunner.agent.history_compaction import (
+                        maybe_compact_message_history,
+                    )
+
+                    compacted = maybe_compact_message_history(
                         new_messages,
+                        autonomy_config,
+                        role,
+                    )
+                    trimmed = trim_message_history(
+                        compacted,
                         autonomy_config.max_history_messages,
                     )
                     self._conversations.put(conv_key, trimmed)
@@ -326,6 +365,113 @@ class DaemonRunner:
         except Exception:
             _logger.warning("Error during signal handler cleanup", exc_info=True)
 
+    # ------------------------------------------------------------------
+    # Hot-reload support
+    # ------------------------------------------------------------------
+
+    def _maybe_start_reloader(self) -> None:
+        """Start the hot-reload watcher if conditions are met."""
+        if self._role_path is None:
+            return
+        if not self._role.spec.daemon.hot_reload:
+            return
+
+        from initrunner.runner.hot_reload import RoleReloader
+
+        debounce_ms = int(self._role.spec.daemon.reload_debounce_seconds * 1000)
+        watch_paths = self._resolve_watch_paths()
+
+        self._reloader = RoleReloader(
+            watch_paths,
+            self._apply_reload,
+            role_path=self._role_path,
+            debounce_ms=debounce_ms,
+        )
+        self._reloader.start()
+        console.print("[dim]  Hot-reload enabled (watching role + skills).[/dim]")
+
+    def _apply_reload(self, path: Path) -> None:
+        """Reload role and agent from disk. Fail-open: keeps old state on error."""
+        from initrunner.agent.loader import load_and_build
+
+        try:
+            new_role, new_agent = load_and_build(path, extra_skill_dirs=self._extra_skill_dirs)
+        except Exception:
+            _logger.warning("Hot-reload failed — keeping current config", exc_info=True)
+            return
+
+        old_triggers_key = _triggers_key(self._role.spec.triggers)
+        new_triggers_key = _triggers_key(new_role.spec.triggers)
+
+        with self._agent_role_lock:
+            self._role = new_role
+            self._agent = new_agent
+
+        # Recompute autonomous trigger types
+        new_auto_types: set[str] = set()
+        for tc in new_role.spec.triggers:
+            if getattr(tc, "autonomous", False):
+                new_auto_types.add(tc.type)
+        self._autonomous_trigger_types = new_auto_types
+
+        # Rebuild scheduling if autonomy config changed
+        self._setup_scheduling()
+
+        # Restart dispatcher if trigger config changed
+        if old_triggers_key != new_triggers_key:
+            self._restart_dispatcher(new_role)
+
+        # Update watched paths
+        if self._reloader is not None:
+            self._reloader.set_watched_paths(self._resolve_watch_paths())
+
+        console.print("[green]Hot-reload: config reloaded successfully.[/green]")
+
+    def _restart_dispatcher(self, new_role: RoleDefinition) -> None:
+        """Stop old trigger dispatcher and start a new one."""
+        from initrunner.triggers.dispatcher import TriggerDispatcher
+
+        if self._dispatcher is not None:
+            self._dispatcher.stop_all()
+
+        self._dispatcher = TriggerDispatcher(new_role.spec.triggers, self._on_trigger)
+        self._dispatcher.start_all()
+        console.print("[dim]  Triggers restarted after config change.[/dim]")
+
+    def _resolve_watch_paths(self) -> list[Path]:
+        """Resolve paths to watch: role file + skill files."""
+        paths: list[Path] = []
+        if self._role_path is not None:
+            paths.append(self._role_path)
+        paths.extend(_resolve_skill_paths(self._role, self._role_path))
+        return paths
+
+
+def _triggers_key(triggers: list) -> str:
+    """Produce a stable string key for change detection of trigger configs."""
+    try:
+        items = [tc.model_dump(mode="json") for tc in triggers]
+        return json.dumps(items, sort_keys=True)
+    except Exception:
+        return ""
+
+
+def _resolve_skill_paths(role: RoleDefinition, role_path: Path | None) -> list[Path]:
+    """Resolve SKILL.md file paths referenced by the role for watching."""
+    if not role.spec.skills or role_path is None:
+        return []
+    role_dir = role_path.parent
+    paths: list[Path] = []
+    for skill_ref in role.spec.skills:
+        candidate = role_dir / skill_ref
+        if candidate.exists():
+            paths.append(candidate)
+        # Also check if it's a directory containing SKILL.md
+        skill_md = role_dir / skill_ref / "SKILL.md"
+        if skill_md.exists():
+            paths.append(skill_md)
+    return paths
+
 
 def run_daemon(
     agent: Agent,
@@ -334,6 +480,8 @@ def run_daemon(
     audit_logger: AuditLogger | None = None,
     sink_dispatcher: SinkDispatcher | None = None,
     memory_store: MemoryStoreBase | None = None,
+    role_path: Path | None = None,
+    extra_skill_dirs: list[Path] | None = None,
 ) -> None:
     """Run in daemon mode: triggers fire → agent responds → result logged."""
     runner = DaemonRunner(
@@ -342,5 +490,7 @@ def run_daemon(
         audit_logger=audit_logger,
         sink_dispatcher=sink_dispatcher,
         memory_store=memory_store,
+        role_path=role_path,
+        extra_skill_dirs=extra_skill_dirs,
     )
     runner.run()

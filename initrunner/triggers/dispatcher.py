@@ -41,6 +41,7 @@ def _register_builtins() -> None:
         CronTriggerConfig,
         DiscordTriggerConfig,
         FileWatchTriggerConfig,
+        HeartbeatTriggerConfig,
         TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
@@ -74,6 +75,12 @@ def _register_builtins() -> None:
         from initrunner.triggers.discord import DiscordTrigger
 
         return DiscordTrigger(config, callback)
+
+    @register_trigger_builder(HeartbeatTriggerConfig)
+    def _build_heartbeat(config, callback):
+        from initrunner.triggers.heartbeat import HeartbeatTrigger
+
+        return HeartbeatTrigger(config, callback)
 
 
 _register_builtins()

@@ -82,7 +82,7 @@ Detailed docs live in `docs/`. Key references:
 | Memory system | `docs/core/memory.md` |
 | RAG quickstart | `docs/getting-started/rag-quickstart.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
-| Triggers (cron/file/webhook) | `docs/core/triggers.md` |
+| Triggers (cron/file/webhook/heartbeat) | `docs/core/triggers.md` |
 | Tool search meta-tool | `docs/core/tool-search.md` |
 | Discord bot quickstart | `docs/getting-started/discord.md` |
 | Telegram bot quickstart | `docs/getting-started/telegram.md` |

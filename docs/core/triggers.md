@@ -11,6 +11,7 @@ Triggers follow the same discriminated-union pattern as tools and sinks, keyed o
 | `cron` | Fire on a cron schedule |
 | `file_watch` | Fire when files change in watched directories |
 | `webhook` | Fire on incoming HTTP requests (localhost only) |
+| `heartbeat` | Read a markdown checklist on a fixed interval |
 | `telegram` | Respond to Telegram messages via long-polling (outbound only) |
 | `discord` | Respond to Discord DMs and @mentions via WebSocket (outbound only) |
 
@@ -189,6 +190,59 @@ curl -X POST http://127.0.0.1:9000/github \
   -d '{"action": "opened", "pull_request": {"title": "Fix bug"}}'
 ```
 
+## Heartbeat Trigger
+
+Fires on a fixed interval, reading a markdown checklist file and prompting the agent with any unchecked items. Useful for batching multiple periodic tasks into a single trigger instead of separate cron entries.
+
+```yaml
+triggers:
+  - type: heartbeat
+    file: ./tasks.md                    # required
+    interval_seconds: 3600              # default: 3600 (1 hour)
+    autonomous: true                    # default: false
+    active_hours: [9, 17]              # default: null (always active)
+    timezone: America/New_York         # default: UTC
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `file` | `str` | *(required)* | Path to the markdown checklist file. |
+| `interval_seconds` | `int` | `3600` | Seconds between heartbeat checks. Must be > 0. |
+| `prompt_prefix` | `str` | `"You are processing a periodic task checklist..."` | Text prepended to the checklist content in the prompt. |
+| `active_hours` | `list[int] \| null` | `null` | Two-element list `[start, end]` defining active hours (0-23). `null` means always active. |
+| `timezone` | `str` | `"UTC"` | Timezone for `active_hours` evaluation. Must be a valid IANA timezone (e.g. `America/New_York`). |
+
+### Active Hours
+
+When `active_hours` is set, the trigger only fires during the specified window:
+
+- **Normal window** (e.g. `[9, 17]`): fires when `start <= hour < end`
+- **Midnight-spanning** (e.g. `[22, 6]`): fires when `hour >= start` or `hour < end`
+- **Always active**: omit `active_hours` or set to `null`
+
+### Behavior
+
+- The first heartbeat fires after one full interval from daemon startup (not immediately).
+- On each heartbeat, the file is read (capped at 64KB with `[truncated]` marker).
+- Unchecked items (`- [ ]`) are counted. If there are zero open items, no event is fired.
+- The prompt is composed as: `prompt_prefix + "\n\n" + file_content`.
+- The trigger event includes `metadata: {"file": "...", "item_count": "...", "interval_seconds": "..."}`.
+
+### Example Checklist
+
+```markdown
+# Daily Tasks
+
+- [ ] Check deployment health
+- [x] Review overnight alerts
+- [ ] Update documentation
+- [ ] Run integration tests
+```
+
+No new dependencies — uses stdlib `zoneinfo` (Python 3.9+).
+
 ## Daemon Mode
 
 The `initrunner daemon` command starts all configured triggers and waits for events:
@@ -216,6 +270,32 @@ initrunner daemon role.yaml --no-audit
 5. **Other triggers** (cron, file watch, webhook) use the autonomous loop when `autonomous: true` is set. The result is displayed and dispatched to sinks after the run completes.
 6. The daemon continues until interrupted.
 
+### Hot-Reload
+
+By default, the daemon watches the role YAML and referenced skill files for changes. When a change is detected, the role and agent are reloaded without restarting the daemon.
+
+```yaml
+spec:
+  daemon:
+    hot_reload: true                    # default: true
+    reload_debounce_seconds: 1.0        # default: 1.0
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hot_reload` | `bool` | `true` | Enable file-watching for role YAML and skill files. |
+| `reload_debounce_seconds` | `float` | `1.0` | Debounce interval (0-30 seconds) for batching rapid writes. |
+
+**Fail-open policy**: if the reloaded YAML is invalid, the daemon keeps the last known-good config and logs a warning.
+
+**What is reloaded**: role YAML, skill files, model config, tools, triggers, autonomy config.
+
+**What is NOT reloaded** (requires daemon restart): memory store, audit logger, `.env` files, sink dispatcher configuration.
+
+**Thread safety**: in-flight trigger runs use a snapshot of the old agent/role. New runs after a reload use the updated config. Trigger dispatchers are restarted only if the trigger config actually changed.
+
+Hot-reload requires a `role_path` — it is automatically enabled when running `initrunner daemon role.yaml`. Ephemeral roles (e.g. from `initrunner chat`) do not support hot-reload.
+
 ### Signal Handling
 
 The daemon installs handlers for `SIGINT` (Ctrl+C) and `SIGTERM`:
@@ -231,7 +311,7 @@ Every trigger fires a `TriggerEvent` containing:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `trigger_type` | `str` | `"cron"`, `"file_watch"`, `"webhook"`, `"telegram"`, or `"discord"` |
+| `trigger_type` | `str` | `"cron"`, `"file_watch"`, `"webhook"`, `"heartbeat"`, `"telegram"`, or `"discord"` |
 | `prompt` | `str` | The prompt to send to the agent |
 | `timestamp` | `str` | ISO 8601 timestamp of when the event was created |
 | `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, user, etc.) |
