@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.14.0] - 2026-03-03
+
 ### Added
 - **Conversation history compaction** (`autonomy.compaction`): LLM-driven summarisation of older messages in long-running autonomous loops — keeps context manageable without silently dropping history. Configurable threshold, tail preservation, and optional cheap model override for summaries. Fail-open: compaction errors are logged, never crash the agent
 - **Heartbeat trigger** (`triggers.heartbeat`): fixed-interval periodic trigger that reads a markdown checklist file and prompts the agent only when unchecked items remain. Supports timezone-aware active hours, 64 KB file size cap, and autonomous mode
