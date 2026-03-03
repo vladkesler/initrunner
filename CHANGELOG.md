@@ -1,5 +1,21 @@
 # Changelog
 
+### Added
+- **Conversation history compaction** (`autonomy.compaction`): LLM-driven summarisation of older messages in long-running autonomous loops — keeps context manageable without silently dropping history. Configurable threshold, tail preservation, and optional cheap model override for summaries. Fail-open: compaction errors are logged, never crash the agent
+- **Heartbeat trigger** (`triggers.heartbeat`): fixed-interval periodic trigger that reads a markdown checklist file and prompts the agent only when unchecked items remain. Supports timezone-aware active hours, 64 KB file size cap, and autonomous mode
+- **Config hot-reload** (`daemon.hot_reload`): daemon mode watches role YAML and skill files for changes and reloads config without restart. Intelligent dispatcher restart (only when trigger config changes), thread-safe in-flight execution with snapshot semantics, fail-open on invalid config
+- Example roles: `long-running-analyst.yaml` (compaction), `ops-heartbeat.yaml` + `ops-checklist.md` (heartbeat trigger), `reloadable-assistant.yaml` (hot-reload daemon)
+
+### Changed
+- `DaemonRunner` accepts `role_path` and `extra_skill_dirs` parameters for hot-reload support
+- `AutonomyConfig` includes nested `CompactionConfig` with defaults (disabled, threshold=30, tail=6)
+- Trigger dispatcher registers `HeartbeatTriggerConfig` builder
+- CLI `daemon` command passes role path and skill dirs to runner
+
+### Documentation
+- Updated: `docs/core/triggers.md` — added heartbeat trigger section and hot-reload subsection
+- Updated: `docs/orchestration/autonomy.md` — added compaction config reference and troubleshooting
+
 ## [1.13.0] - 2026-03-02
 
 ### Added
