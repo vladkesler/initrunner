@@ -133,3 +133,17 @@ class SSRFSafeTransport(httpx.HTTPTransport):
         if error:
             raise SSRFBlocked(error)
         return super().handle_request(request)
+
+
+class AsyncSSRFSafeTransport(httpx.AsyncHTTPTransport):
+    """Async httpx transport that rejects requests to private/internal IPs."""
+
+    def __init__(self, *, dns_timeout: float = _DNS_TIMEOUT, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._dns_timeout = dns_timeout
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        error = validate_url_ssrf(str(request.url), dns_timeout=self._dns_timeout)
+        if error:
+            raise SSRFBlocked(error)
+        return await super().handle_async_request(request)

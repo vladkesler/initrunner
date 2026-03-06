@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import queue
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from pydantic_ai import Agent
 from rich.console import Console
 from rich.table import Table
 
+from initrunner._log import get_logger
 from initrunner.agent.executor import execute_run
 from initrunner.agent.loader import _load_dotenv, build_agent, load_and_build, load_role
 from initrunner.agent.schema.memory import MemoryConfig
@@ -23,6 +27,7 @@ from initrunner.triggers.base import TriggerEvent
 from initrunner.triggers.dispatcher import TriggerDispatcher
 
 console = Console()
+logger = get_logger("compose.orchestrator")
 
 
 def apply_shared_memory(role: RoleDefinition, store_path: str, max_memories: int = 1000) -> None:
@@ -42,6 +47,8 @@ def apply_shared_memory(role: RoleDefinition, store_path: str, max_memories: int
 class ComposeService:
     """Wraps a single service within a compose orchestration."""
 
+    _DEFAULT_SHUTDOWN_GRACE_SECONDS = 30
+
     def __init__(
         self,
         name: str,
@@ -51,6 +58,7 @@ class ComposeService:
         inbox: queue.Queue[DelegateEvent],
         *,
         audit_logger: AuditLogger | None = None,
+        shutdown_grace_seconds: float = _DEFAULT_SHUTDOWN_GRACE_SECONDS,
     ) -> None:
         self.name = name
         self.role = role
@@ -67,6 +75,13 @@ class ComposeService:
         self._execution_lock = threading.Lock()
         self._run_count = 0
         self._error_count = 0
+        self._shutdown_grace_seconds = shutdown_grace_seconds
+
+        # Async internals (set when scheduled on a shared loop)
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._executor: ThreadPoolExecutor | None = None
+        self._task: concurrent.futures.Future | None = None
+        self._async_inbox: asyncio.Queue[DelegateEvent] | None = None
 
     def add_sink(self, sink: SinkBase) -> None:
         self._sink_dispatcher.add_sink(sink)
@@ -76,6 +91,8 @@ class ComposeService:
 
     @property
     def is_alive(self) -> bool:
+        if self._task is not None:
+            return not self._task.done()
         return self._thread is not None and self._thread.is_alive()
 
     @property
@@ -151,15 +168,88 @@ class ComposeService:
             )
 
     def _on_trigger(self, event: TriggerEvent) -> None:
-        """Callback for trigger-driven execution."""
+        """Callback for trigger-driven execution.
+
+        When a shared async loop is available, bridges to the async inbox
+        so that ``_service_run_async`` dispatches the work.  Otherwise
+        calls ``_handle_prompt`` directly (original thread-per-service path).
+        """
         console.print(
             f"[dim][{self.name}] Trigger ({event.trigger_type}):[/dim] {event.prompt[:80]}"
         )
-        self._handle_prompt(
-            event.prompt,
-            trigger_type=event.trigger_type,
-            trigger_metadata=event.metadata or {},
-        )
+        if self._loop is not None and self._async_inbox is not None:
+            delegate = DelegateEvent(
+                source_service="trigger",
+                target_service=self.name,
+                prompt=event.prompt,
+                source_run_id="",
+                metadata=event.metadata or {},
+            )
+            asyncio.run_coroutine_threadsafe(self._async_inbox.put(delegate), self._loop)
+        else:
+            self._handle_prompt(
+                event.prompt,
+                trigger_type=event.trigger_type,
+                trigger_metadata=event.metadata or {},
+            )
+
+    # ------------------------------------------------------------------
+    # Async internals (used when scheduled on a shared orchestrator loop)
+    # ------------------------------------------------------------------
+
+    async def _inbox_bridge(self) -> None:
+        """Drain sync ``queue.Queue`` into internal ``asyncio.Queue``."""
+        loop = asyncio.get_running_loop()
+        while not self._stop_event.is_set():
+            try:
+                event = await loop.run_in_executor(None, lambda: self.inbox.get(timeout=0.5))
+                if self._async_inbox is not None:
+                    await self._async_inbox.put(event)
+            except queue.Empty:
+                continue
+
+    async def _service_run_async(self) -> None:
+        """Async service loop: start triggers, await async inbox, dispatch via executor."""
+        if self._trigger_dispatcher is not None:
+            self._trigger_dispatcher.start_all()
+
+        self._async_inbox = asyncio.Queue()
+        bridge_task = asyncio.create_task(self._inbox_bridge(), name=f"inbox-bridge-{self.name}")
+
+        try:
+            loop = asyncio.get_running_loop()
+            while not self._stop_event.is_set():
+                try:
+                    event = await asyncio.wait_for(self._async_inbox.get(), timeout=0.5)
+                except TimeoutError:
+                    continue
+
+                console.print(
+                    f"[dim][{self.name}] Delegate from {event.source_service}:[/dim] "
+                    f"{event.prompt[:80]}"
+                )
+
+                executor = self._executor
+                await loop.run_in_executor(
+                    executor,
+                    lambda e=event: self._handle_prompt(
+                        e.prompt,
+                        trigger_type="delegate",
+                        trigger_metadata=e.metadata,
+                    ),
+                )
+        finally:
+            bridge_task.cancel()
+            try:
+                await bridge_task
+            except asyncio.CancelledError:
+                pass
+            if self._trigger_dispatcher is not None:
+                self._trigger_dispatcher.stop_all()
+
+    # ------------------------------------------------------------------
+    # Legacy sync service loop (fallback when no shared loop is provided)
+    # ------------------------------------------------------------------
 
     def _service_run(self) -> None:
         """Main service loop: start triggers, poll inbox."""
@@ -186,21 +276,64 @@ class ComposeService:
             if self._trigger_dispatcher is not None:
                 self._trigger_dispatcher.stop_all()
 
-    def start(self) -> None:
+    # ------------------------------------------------------------------
+    # Public start/stop (sync façade)
+    # ------------------------------------------------------------------
+
+    def start(
+        self,
+        *,
+        loop: asyncio.AbstractEventLoop | None = None,
+        executor: ThreadPoolExecutor | None = None,
+    ) -> None:
+        """Start the service.
+
+        When *loop* is provided the service schedules its async task on
+        the shared event loop.  Otherwise it falls back to a dedicated
+        daemon thread (legacy path).
+        """
         self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._service_run, daemon=True, name=f"compose-{self.name}"
-        )
-        self._thread.start()
+        if loop is not None:
+            self._loop = loop
+            self._executor = executor
+            self._task = asyncio.run_coroutine_threadsafe(self._service_run_async(), loop)
+        else:
+            self._thread = threading.Thread(
+                target=self._service_run, daemon=True, name=f"compose-{self.name}"
+            )
+            self._thread.start()
 
     def stop(self) -> None:
+        """Stop the service, respecting the shutdown grace period for in-flight runs."""
         self._stop_event.set()
-        if self._thread is not None:
+        if self._task is not None:
+            # Wait for in-flight run to finish
+            locked = self._execution_lock.acquire(timeout=self._shutdown_grace_seconds)
+            if locked:
+                self._execution_lock.release()
+            else:
+                logger.warning(
+                    "Service '%s': in-flight run still active after %.0fs grace period, detaching",
+                    self.name,
+                    self._shutdown_grace_seconds,
+                )
+            self._task.cancel()
+            self._task = None
+            self._loop = None
+            self._executor = None
+            self._async_inbox = None
+        elif self._thread is not None:
             self._thread.join(timeout=5)
 
 
 class ComposeOrchestrator:
-    """Manages the lifecycle of all compose services."""
+    """Manages the lifecycle of all compose services.
+
+    Internally uses a shared asyncio event loop running in a daemon thread.
+    Services are scheduled as tasks on this loop, with agent runs dispatched
+    to a dedicated ``ThreadPoolExecutor``.  The public API (``start()``,
+    ``stop()``, ``__enter__``/``__exit__``) remains fully synchronous.
+    """
 
     def __init__(
         self,
@@ -208,6 +341,7 @@ class ComposeOrchestrator:
         base_dir: Path,
         *,
         audit_logger: AuditLogger | None = None,
+        max_agent_workers: int | None = None,
     ) -> None:
         self._compose = compose
         self._base_dir = base_dir
@@ -216,6 +350,12 @@ class ComposeOrchestrator:
         self._failed_services: dict[str, str] = {}
         self._delegate_sinks: list[DelegateSink] = []
         self._health_monitor = None
+
+        # Async runtime (created in start())
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._loop_thread: threading.Thread | None = None
+        self._executor: ThreadPoolExecutor | None = None
+        self._max_agent_workers = max_agent_workers
 
     @property
     def services(self) -> dict[str, ComposeService]:
@@ -328,10 +468,58 @@ class ComposeOrchestrator:
         }
         return topological_tiers(nodes, edges)
 
+    def _start_loop(self) -> None:
+        """Create and start the shared event loop in a daemon thread."""
+        n_services = len(self._services)
+        max_workers = self._max_agent_workers or min(32, n_services + 4)
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="compose-agent"
+        )
+        self._loop = asyncio.new_event_loop()
+
+        def _run_loop() -> None:
+            asyncio.set_event_loop(self._loop)
+            assert self._loop is not None
+            self._loop.run_forever()
+
+        self._loop_thread = threading.Thread(
+            target=_run_loop, daemon=True, name="compose-event-loop"
+        )
+        self._loop_thread.start()
+
+    def _stop_loop(self) -> None:
+        """Stop the shared event loop and executor."""
+        if self._loop is not None and self._loop.is_running():
+            # Cancel remaining tasks and stop the loop cleanly
+            async def _shutdown() -> None:
+                tasks = [
+                    t for t in asyncio.all_tasks(self._loop) if t is not asyncio.current_task()
+                ]
+                for t in tasks:
+                    t.cancel()
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                assert self._loop is not None
+                self._loop.stop()
+
+            asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)
+        if self._loop_thread is not None:
+            self._loop_thread.join(timeout=5)
+        if self._loop is not None:
+            self._loop.close()
+        if self._executor is not None:
+            self._executor.shutdown(wait=True, cancel_futures=False)
+        self._loop = None
+        self._loop_thread = None
+        self._executor = None
+
     def start(self) -> None:
         """Build, wire, and start all services in topological order."""
         self._build_services()
         self._wire_delegates()
+
+        # Create shared async runtime
+        self._start_loop()
 
         # Start health monitor if any service has a non-default restart policy
         has_restarts = any(
@@ -341,11 +529,11 @@ class ComposeOrchestrator:
             from initrunner.compose.health import HealthMonitor
 
             self._health_monitor = HealthMonitor(self._services)
-            self._health_monitor.start()
+            self._health_monitor.start(loop=self._loop)
 
         for tier in self._topological_order():
             for name in tier:
-                self._services[name].start()
+                self._services[name].start(loop=self._loop, executor=self._executor)
 
     def stop(self) -> None:
         """Stop all services in reverse topological order."""
@@ -355,6 +543,9 @@ class ComposeOrchestrator:
         for tier in reversed(self._topological_order()):
             for name in tier:
                 self._services[name].stop()
+
+        # Stop shared event loop and wait for in-flight executor tasks
+        self._stop_loop()
 
         # Flush remaining audit events from delegate sinks
         for sink in self._delegate_sinks:

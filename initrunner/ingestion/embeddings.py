@@ -176,3 +176,18 @@ async def embed_texts(
     """Embed a list of texts, returning float vectors."""
     result = await embedder.embed(texts, input_type=input_type)
     return [list(v) for v in result.embeddings]
+
+
+async def embed_single_async(
+    provider: str,
+    model: str,
+    text: str,
+    *,
+    base_url: str = "",
+    api_key_env: str = "",
+    input_type: Literal["query", "document"] = "query",
+) -> list[float]:
+    """Async variant of ``embed_single`` — directly awaits ``embed_texts``."""
+    embedder = create_embedder(provider, model, base_url=base_url, api_key_env=api_key_env)
+    vectors = await embed_texts(embedder, [text], input_type=input_type)
+    return vectors[0]

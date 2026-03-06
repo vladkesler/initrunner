@@ -61,6 +61,7 @@ Every builder receives a `ToolBuildContext` instance as its second argument:
 |-------|------|-------------|
 | `role` | `RoleDefinition` | The full parsed role definition |
 | `role_dir` | `Path \| None` | Directory containing the role YAML file |
+| `prefer_async` | `bool` | When `True`, the builder should register async tool closures (default `False`) |
 
 ### Auto-discovery
 
@@ -167,7 +168,7 @@ Rules for tool functions:
 1. **Return `str`** — tool results are always strings.
 2. **Use type annotations** — PydanticAI builds the parameter schema from annotations.
 3. **Write a docstring** — it becomes the tool description the LLM reads.
-4. **Keep it sync** — InitRunner uses sync execution. PydanticAI auto-wraps sync tools with `run_in_executor`.
+4. **Sync by default** — The CLI uses sync execution. PydanticAI auto-wraps sync tools with `run_in_executor`. For compose orchestration and API streaming, async tool closures are used automatically when available (see [Async Tool Builders](#async-tool-builders) for built-in tools).
 
 ```python
 def get_weather(city: str, units: str = "metric") -> str:
@@ -438,6 +439,62 @@ When a tool type is not found:
 ### Config Validation
 
 The config dict from the YAML is validated against the plugin's `config_class` using `model_validate()`. If required fields are missing or types are wrong, Pydantic raises a validation error at role load time.
+
+---
+
+## Async Tool Builders
+
+Built-in tools can register async closures for use in compose orchestration and API streaming, where an asyncio event loop is available. This avoids thread-pool overhead for I/O-bound operations and enables concurrency via `asyncio.gather`.
+
+### How It Works
+
+The `ToolBuildContext.prefer_async` flag is set to `True` when agents are built for compose services or the API layer. Tool builders check this flag and register either sync or async closures:
+
+```python
+@register_tool("my_http_tool", MyHttpToolConfig)
+def build_my_http_toolset(config: MyHttpToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
+    toolset = FunctionToolset()
+
+    if ctx.prefer_async:
+        import httpx
+
+        @toolset.tool
+        async def fetch_data(url: str) -> str:
+            """Fetch data from a URL."""
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url)
+                return resp.text
+    else:
+        import httpx
+
+        @toolset.tool
+        def fetch_data(url: str) -> str:
+            """Fetch data from a URL."""
+            with httpx.Client() as client:
+                resp = client.get(url)
+                return resp.text
+
+    return toolset
+```
+
+PydanticAI handles both sync and async closures transparently — sync tools are auto-wrapped with `run_in_executor` when called from an async context, and async tools work natively with `agent.run()`.
+
+### Built-in Async Tools
+
+The following built-in tools provide async variants when `prefer_async=True`:
+
+| Tool | Async Behavior |
+|------|---------------|
+| `http` | Uses `httpx.AsyncClient` with SSRF-safe transport |
+| `web_reader` | Async fetch via `fetch_url_as_markdown_async` |
+| `web_scraper` | Async fetch + concurrent embeddings via `asyncio.gather` |
+| `search` | Async HTTP for search APIs (blocking `ddgs` via `run_in_executor`) |
+
+Inherently blocking tools (`filesystem`, `script`, `shell`, `sql`, `git`) ignore `prefer_async` since their I/O is CPU-bound or uses blocking libraries.
+
+### Custom Tools
+
+Custom tools (loaded via `type: custom`) are always sync. PydanticAI automatically wraps them in `run_in_executor` when running in an async context, so no changes are needed.
 
 ---
 

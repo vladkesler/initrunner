@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import threading
 from typing import TYPE_CHECKING
 
@@ -14,7 +16,13 @@ logger = get_logger("compose.health")
 
 
 class HealthMonitor:
-    """Periodically checks service health and applies restart policies."""
+    """Periodically checks service health and applies restart policies.
+
+    Supports two modes:
+    - **Thread mode** (default): runs ``_run()`` in a daemon thread.
+    - **Task mode**: when ``start(loop=...)`` is called, schedules
+      ``_run_async()`` as an asyncio task on the given loop.
+    """
 
     def __init__(
         self,
@@ -25,6 +33,8 @@ class HealthMonitor:
         self._check_interval = check_interval
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._task: concurrent.futures.Future | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._lock = threading.Lock()
         self._restart_counts: dict[str, int] = {name: 0 for name in services}
 
@@ -67,22 +77,46 @@ class HealthMonitor:
             if self._stop_event.wait(timeout=policy.delay_seconds):
                 return  # Stop requested during delay
 
-            service.start()
+            service.start(loop=self._loop)
 
     def _run(self) -> None:
-        """Main monitor loop."""
+        """Main monitor loop (thread mode)."""
         while not self._stop_event.is_set():
             self._stop_event.wait(self._check_interval)
             if not self._stop_event.is_set():
                 self._check_and_restart()
 
-    def start(self) -> None:
+    async def _run_async(self) -> None:
+        """Main monitor loop (task mode)."""
+        loop = asyncio.get_running_loop()
+        while not self._stop_event.is_set():
+            # Use run_in_executor to wait on the threading.Event without blocking the loop
+            stopped = await loop.run_in_executor(None, self._stop_event.wait, self._check_interval)
+            if not stopped:
+                await loop.run_in_executor(None, self._check_and_restart)
+
+    def start(self, *, loop: asyncio.AbstractEventLoop | None = None) -> None:
+        """Start the health monitor.
+
+        If *loop* is provided, schedule as an asyncio task on that loop.
+        Otherwise start in a dedicated daemon thread.
+        """
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True, name="compose-health")
-        self._thread.start()
+        if loop is not None:
+            self._loop = loop
+            future = asyncio.run_coroutine_threadsafe(self._run_async(), loop)
+            # Wrap the concurrent.futures.Future into an asyncio.Task-like
+            self._task = future
+        else:
+            self._thread = threading.Thread(target=self._run, daemon=True, name="compose-health")
+            self._thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
+        if self._task is not None:
+            self._task.cancel()
+            self._task = None
+            self._loop = None
         if self._thread is not None:
             self._thread.join(timeout=5)
 

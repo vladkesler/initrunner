@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import json
 import logging
@@ -495,6 +496,251 @@ def execute_run_stream(
                 result.tokens_out = usage.output_tokens or 0
                 result.total_tokens = usage.total_tokens or 0
         except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
+            _handle_run_error(result, e, partial_output="".join(output_parts))
+
+        result.duration_ms = int((time.monotonic() - start) * 1000)
+
+        span.set_attribute("initrunner.tokens_total", result.total_tokens)
+        span.set_attribute("initrunner.duration_ms", result.duration_ms)
+        span.set_attribute("initrunner.success", result.success)
+
+    _audit_result(
+        result,
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        trigger_type=trigger_type,
+        trigger_metadata=trigger_metadata,
+    )
+
+    return result, new_messages
+
+
+# ---------------------------------------------------------------------------
+# Async retry helper
+# ---------------------------------------------------------------------------
+
+
+async def _retry_model_call_async(
+    fn: Callable[..., Any],
+    *,
+    on_retry: Callable[[], None] | None = None,
+) -> Any:
+    """Async variant of ``_retry_model_call`` — uses ``asyncio.sleep``."""
+    last_http_error: ModelHTTPError | None = None
+    for attempt in range(_RETRY_MAX_ATTEMPTS):
+        try:
+            return await fn()
+        except ModelHTTPError as e:
+            if e.status_code not in _RETRYABLE_STATUS_CODES:
+                raise
+            last_http_error = e
+            if on_retry is not None:
+                on_retry()
+            if attempt < _RETRY_MAX_ATTEMPTS - 1:
+                delay = _RETRY_BACKOFF_BASE * (2**attempt)
+                _logger.warning(
+                    "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
+                    e.status_code,
+                    attempt + 1,
+                    _RETRY_MAX_ATTEMPTS,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+    raise last_http_error  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Async non-streaming execution
+# ---------------------------------------------------------------------------
+
+
+async def execute_run_async(
+    agent: Agent,
+    role: RoleDefinition,
+    prompt: UserPrompt,
+    *,
+    audit_logger: AuditLogger | None = None,
+    message_history: list | None = None,
+    model_override: Model | str | None = None,
+    trigger_type: str | None = None,
+    trigger_metadata: dict[str, str] | None = None,
+    extra_toolsets: list | None = None,
+    skip_input_validation: bool = False,
+) -> tuple[RunResult, list]:
+    """Async variant of ``execute_run`` — uses ``agent.run()`` + ``asyncio.wait_for``."""
+    run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        message_history=message_history,
+        model_override=model_override,
+        trigger_type=trigger_type,
+        trigger_metadata=trigger_metadata,
+        extra_toolsets=extra_toolsets,
+        skip_input_validation=skip_input_validation,
+    )
+    if blocked is not None:
+        return blocked, []
+
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("initrunner")
+
+    result = RunResult(run_id=run_id)
+    new_messages: list = []
+    start = time.monotonic()
+
+    with tracer.start_as_current_span(
+        "initrunner.agent.run",
+        attributes={
+            "initrunner.run_id": run_id,
+            "initrunner.agent_name": role.metadata.name,
+            "initrunner.trigger_type": trigger_type or "",
+        },
+    ) as span:
+        try:
+            agent_result = await asyncio.wait_for(
+                _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
+                timeout=role.spec.guardrails.timeout_seconds,
+            )
+
+            raw_output = agent_result.output
+            if isinstance(raw_output, BaseModel):
+                result.output = raw_output.model_dump_json()
+            elif isinstance(raw_output, (dict, list)):
+                result.output = json.dumps(raw_output)
+            else:
+                result.output = str(raw_output)
+
+            _apply_output_validation(result, role)
+
+            usage = agent_result.usage()
+            result.tokens_in = usage.input_tokens or 0
+            result.tokens_out = usage.output_tokens or 0
+            result.total_tokens = usage.total_tokens or 0
+            result.tool_calls = usage.tool_calls or 0
+            new_messages = agent_result.all_messages()
+            result.tool_call_names = _extract_tool_call_names(new_messages)
+        except TimeoutError:
+            timeout = role.spec.guardrails.timeout_seconds
+            _handle_run_error(result, TimeoutError(f"Run timed out after {int(timeout)}s"))
+        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, OSError) as e:
+            _handle_run_error(result, e)
+
+        result.duration_ms = int((time.monotonic() - start) * 1000)
+
+        span.set_attribute("initrunner.tokens_total", result.total_tokens)
+        span.set_attribute("initrunner.duration_ms", result.duration_ms)
+        span.set_attribute("initrunner.success", result.success)
+
+    _audit_result(
+        result,
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        trigger_type=trigger_type,
+        trigger_metadata=trigger_metadata,
+    )
+
+    return result, new_messages
+
+
+# ---------------------------------------------------------------------------
+# Async streaming execution
+# ---------------------------------------------------------------------------
+
+
+async def execute_run_stream_async(
+    agent: Agent,
+    role: RoleDefinition,
+    prompt: UserPrompt,
+    *,
+    audit_logger: AuditLogger | None = None,
+    message_history: list | None = None,
+    model_override: Model | str | None = None,
+    on_token: Callable[[str], None] | None = None,
+    extra_toolsets: list | None = None,
+    trigger_type: str | None = None,
+    trigger_metadata: dict[str, str] | None = None,
+    skip_input_validation: bool = False,
+) -> tuple[RunResult, list]:
+    """Async variant of ``execute_run_stream`` — uses ``agent.run_stream()``."""
+    run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        message_history=message_history,
+        model_override=model_override,
+        trigger_type=trigger_type,
+        trigger_metadata=trigger_metadata,
+        extra_toolsets=extra_toolsets,
+        skip_input_validation=skip_input_validation,
+    )
+    if blocked is not None:
+        return blocked, []
+
+    if role.spec.output.type != "text":
+        raise ValueError(
+            "Streaming is not supported with structured output "
+            f"(output.type={role.spec.output.type!r}). "
+            "Use non-streaming execution instead."
+        )
+
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("initrunner")
+
+    result = RunResult(run_id=run_id)
+    new_messages: list = []
+    output_parts: list[str] = []
+    start = time.monotonic()
+
+    with tracer.start_as_current_span(
+        "initrunner.agent.run",
+        attributes={
+            "initrunner.run_id": run_id,
+            "initrunner.agent_name": role.metadata.name,
+            "initrunner.trigger_type": trigger_type or "",
+        },
+    ) as span:
+        try:
+
+            async def _do_stream():
+                async with agent.run_stream(
+                    prompt,
+                    **stream_kwargs,
+                ) as stream:
+                    async for chunk in stream.stream_text(delta=True):
+                        output_parts.append(chunk)
+                        if on_token is not None:
+                            on_token(chunk)
+
+                    nonlocal new_messages
+                    new_messages = stream.all_messages()
+                    return stream.usage()
+
+            usage = await asyncio.wait_for(
+                _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
+                timeout=role.spec.guardrails.timeout_seconds,
+            )
+            result.tool_call_names = _extract_tool_call_names(new_messages)
+
+            result.output = "".join(output_parts)
+            _apply_output_validation(result, role)
+
+            if usage is not None:
+                result.tokens_in = usage.input_tokens or 0
+                result.tokens_out = usage.output_tokens or 0
+                result.total_tokens = usage.total_tokens or 0
+        except TimeoutError:
+            timeout = role.spec.guardrails.timeout_seconds
+            _handle_run_error(
+                result,
+                TimeoutError(f"Run timed out after {int(timeout)}s"),
+                partial_output="".join(output_parts),
+            )
+        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, OSError) as e:
             _handle_run_error(result, e, partial_output="".join(output_parts))
 
         result.duration_ms = int((time.monotonic() - start) * 1000)

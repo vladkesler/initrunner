@@ -94,3 +94,45 @@ def execute_run_stream_sync(
         message_history=message_history,
         on_token=on_token,
     )
+
+
+async def execute_run_async(
+    agent: Agent,
+    role: RoleDefinition,
+    prompt: str | UserPrompt,
+    *,
+    audit_logger: AuditLogger | None = None,
+    message_history: list[ModelMessage] | None = None,
+) -> tuple[RunResult, list[ModelMessage]]:
+    """Execute a single agent run (async)."""
+    from initrunner.agent.executor import execute_run_async as _execute_run_async
+
+    return await _execute_run_async(
+        agent,
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        message_history=message_history,
+    )
+
+
+async def execute_run_stream_async(
+    agent: Agent,
+    role: RoleDefinition,
+    prompt: str | UserPrompt,
+    *,
+    audit_logger: AuditLogger | None = None,
+    message_history: list[ModelMessage] | None = None,
+    on_token: Callable[[str], None] | None = None,
+) -> tuple[RunResult, list[ModelMessage]]:
+    """Execute a streaming agent run (async)."""
+    from initrunner.agent.executor import execute_run_stream_async as _stream_async
+
+    return await _stream_async(
+        agent,
+        role,
+        prompt,
+        audit_logger=audit_logger,
+        message_history=message_history,
+        on_token=on_token,
+    )

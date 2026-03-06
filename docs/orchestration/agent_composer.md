@@ -1,6 +1,6 @@
 # Agent Composer — Multi-Agent Orchestration
 
-Agent Composer lets you define multiple agents as services in a single `compose.yaml` file, wire them together with delegate sinks, and run them all with one command. Each service runs in its own daemon thread with its own triggers, tools, and sinks, while delegate sinks route output from one service to another via in-memory queues.
+Agent Composer lets you define multiple agents as services in a single `compose.yaml` file, wire them together with delegate sinks, and run them all with one command. Each service runs as an asyncio task on a shared event loop, with agent executions dispatched to a thread pool. Delegate sinks route output from one service to another via in-memory queues.
 
 ## Quick Start
 
@@ -258,7 +258,7 @@ restart:
 
 ### Health Monitor
 
-When any service has a non-`none` restart policy, a health monitor thread starts automatically. It checks every 10 seconds whether each service thread is alive and applies the restart policy:
+When any service has a non-`none` restart policy, a health monitor starts automatically. In compose mode, it runs as an asyncio task on the shared event loop; in standalone mode, it runs as a thread. It checks every 10 seconds whether each service is alive and applies the restart policy:
 
 1. Skip services with `condition: none`.
 2. For `on-failure`, skip if `error_count == 0`.
@@ -296,6 +296,59 @@ Compose services are standard InitRunner roles. All role features carry over:
 - **Skills**: Skills referenced in the role definition are loaded and available.
 
 Services without a compose `sink:` behave identically to running the role with `initrunner daemon` — triggers fire, sinks dispatch, and memory persists as configured.
+
+## Runtime Architecture
+
+### Async Event Loop
+
+The compose orchestrator runs a shared asyncio event loop in a dedicated daemon thread. Each service runs as an asyncio task on this loop, while agent executions (LLM calls) are dispatched to a `ThreadPoolExecutor`. This design enables efficient orchestration (queue polling, health checks, signal handling) without blocking on I/O.
+
+```
+Main thread (sync CLI)
+  │
+  └── Daemon thread: asyncio event loop
+        ├── Task: service-a (_service_run_async)
+        ├── Task: service-b (_service_run_async)
+        ├── Task: health monitor
+        └── ThreadPoolExecutor (agent runs)
+```
+
+The sync façade is preserved — `ComposeOrchestrator.start()`, `stop()`, and `run_compose()` remain sync methods. The async loop is an internal implementation detail.
+
+### Async Tool Execution
+
+Compose services build agents with `prefer_async=True`, which gives I/O-bound tools (HTTP, web scraper, search) async closures. When the agent runs via PydanticAI's async `agent.run()`, these tools execute natively on the event loop without thread-pool overhead. Sync tools are auto-wrapped by PydanticAI.
+
+For async executor details, see `execute_run_async()` and `execute_run_stream_async()` in `agent/executor.py`.
+
+### Queue Bridge
+
+Delegate sinks use sync `queue.Queue` for compatibility. Each service runs an internal bridge coroutine that drains the sync queue into an `asyncio.Queue`:
+
+```
+DelegateSink.send()  →  queue.Queue.put()  →  _inbox_bridge()  →  asyncio.Queue  →  _service_run_async()
+     (sync)                (sync)              (async bridge)        (async)            (async)
+```
+
+This keeps `DelegateSink` fully sync while letting the service loop use `await` on the async side.
+
+### Shutdown Semantics
+
+Shutdown follows a structured sequence:
+
+1. First Ctrl+C (or SIGTERM) sets the stop event — services stop accepting new inbox events.
+2. Each service waits for any in-flight agent run to complete (grace period, default 30s).
+3. After the grace period, a warning is logged and the service detaches from the in-flight run.
+4. Service tasks are cancelled on the shared loop.
+5. The event loop thread joins.
+6. The `ThreadPoolExecutor` shuts down with `wait=True` to let in-flight runs complete naturally.
+7. Delegate sinks flush their audit threads.
+
+A second Ctrl+C force-exits immediately via `os._exit(1)`.
+
+### Executor Pool Sizing
+
+The thread pool for agent runs is configurable via `max_agent_workers` on `ComposeOrchestrator`. Default: `min(32, len(services) + 4)`. This pool is separate from the global `_TIMEOUT_POOL` used by standalone `execute_run()` calls.
 
 ## Shared Memory
 

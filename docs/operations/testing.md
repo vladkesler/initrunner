@@ -297,6 +297,18 @@ initrunner test role.yaml --suite tests.yaml -v
 
 Note that live tests are non-deterministic — LLM outputs vary between runs. Use broad assertions (`contains`, `not_contains`) rather than exact matches. The `expected_output` field is ignored when `--dry-run` is not set.
 
+## Async Tests
+
+Tests for the async runtime (compose event loop, async executor, async signal handlers) use `pytest-asyncio`:
+
+| Test File | Coverage |
+|-----------|----------|
+| `tests/test_compose_async_internals.py` | Queue bridge, shared event loop, shutdown grace period, trigger bridge, executor pool sizing |
+| `tests/test_executor_async.py` | `execute_run_async`, `execute_run_stream_async`, async retry logic, `prefer_async` tool building |
+| `tests/test_signal_async.py` | Async signal handler, double-Ctrl-C force exit |
+
+These tests use `@pytest.mark.asyncio` and mock PydanticAI's `agent.run()` / `agent.run_stream()` to avoid real LLM calls.
+
 ## Architecture
 
 The eval framework lives in `initrunner/eval/`:

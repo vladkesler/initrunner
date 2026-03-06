@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -261,6 +262,51 @@ def _do_search(
 
 
 # ---------------------------------------------------------------------------
+# Async search helper
+# ---------------------------------------------------------------------------
+
+
+async def _do_search_async(
+    query: str,
+    num_results: int,
+    max_results: int,
+    safe_search: bool,
+    api_key: str,
+    timeout_seconds: int,
+    provider_fn,
+    *,
+    news: bool = False,
+    days_back: int = 0,
+) -> str:
+    """Async variant of ``_do_search``.
+
+    Runs the provider function in ``run_in_executor`` since some providers
+    (duckduckgo) are inherently blocking.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: provider_fn(
+                query=query,
+                max_results=min(num_results, max_results),
+                safe_search=safe_search,
+                api_key=api_key,
+                timeout=timeout_seconds,
+                news=news,
+                days_back=days_back,
+            ),
+        )
+        return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
+    except ImportError as e:
+        return f"Error: {e}"
+    except TimeoutError:
+        return f"Error: search timed out after {timeout_seconds}s"
+    except Exception as e:
+        return f"Error: search failed: {e}"
+
+
+# ---------------------------------------------------------------------------
 # Builder (thin wrappers delegating to core functions)
 # ---------------------------------------------------------------------------
 
@@ -276,43 +322,86 @@ def build_search_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
-    def web_search(query: str, num_results: int = 5) -> str:
-        """Search the web for information.
+    if ctx.prefer_async:
 
-        Args:
-            query: The search query string.
-            num_results: Maximum number of results to return (default 5).
-        """
-        return _do_search(
-            query,
-            num_results,
-            config.max_results,
-            config.safe_search,
-            api_key,
-            config.timeout_seconds,
-            provider_fn,
-        )
+        @toolset.tool
+        async def web_search(query: str, num_results: int = 5) -> str:
+            """Search the web for information.
 
-    @toolset.tool
-    def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
-        """Search for recent news articles.
+            Args:
+                query: The search query string.
+                num_results: Maximum number of results to return (default 5).
+            """
+            return await _do_search_async(
+                query,
+                num_results,
+                config.max_results,
+                config.safe_search,
+                api_key,
+                config.timeout_seconds,
+                provider_fn,
+            )
 
-        Args:
-            query: The search query string.
-            num_results: Maximum number of results to return (default 5).
-            days_back: How many days back to search (default 7).
-        """
-        return _do_search(
-            query,
-            num_results,
-            config.max_results,
-            config.safe_search,
-            api_key,
-            config.timeout_seconds,
-            provider_fn,
-            news=True,
-            days_back=days_back,
-        )
+        @toolset.tool
+        async def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
+            """Search for recent news articles.
+
+            Args:
+                query: The search query string.
+                num_results: Maximum number of results to return (default 5).
+                days_back: How many days back to search (default 7).
+            """
+            return await _do_search_async(
+                query,
+                num_results,
+                config.max_results,
+                config.safe_search,
+                api_key,
+                config.timeout_seconds,
+                provider_fn,
+                news=True,
+                days_back=days_back,
+            )
+
+    else:
+
+        @toolset.tool
+        def web_search(query: str, num_results: int = 5) -> str:
+            """Search the web for information.
+
+            Args:
+                query: The search query string.
+                num_results: Maximum number of results to return (default 5).
+            """
+            return _do_search(
+                query,
+                num_results,
+                config.max_results,
+                config.safe_search,
+                api_key,
+                config.timeout_seconds,
+                provider_fn,
+            )
+
+        @toolset.tool
+        def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
+            """Search for recent news articles.
+
+            Args:
+                query: The search query string.
+                num_results: Maximum number of results to return (default 5).
+                days_back: How many days back to search (default 7).
+            """
+            return _do_search(
+                query,
+                num_results,
+                config.max_results,
+                config.safe_search,
+                api_key,
+                config.timeout_seconds,
+                provider_fn,
+                news=True,
+                days_back=days_back,
+            )
 
     return toolset

@@ -38,6 +38,7 @@ class ToolBuildContext:
 
     role: RoleDefinition
     role_dir: Path | None = None
+    prefer_async: bool = False
 
 
 # ---------------------------------------------------------------------------

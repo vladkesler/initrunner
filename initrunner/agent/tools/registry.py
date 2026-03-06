@@ -74,10 +74,12 @@ def build_toolsets(
     tools: list[ToolConfig],
     role: RoleDefinition,
     role_dir: Path | None = None,
+    *,
+    prefer_async: bool = False,
 ) -> list[AbstractToolset]:
     """Build a list of PydanticAI toolsets from tool configs + optional retrieval."""
     toolsets: list[AbstractToolset] = []
-    ctx = ToolBuildContext(role=role, role_dir=role_dir)
+    ctx = ToolBuildContext(role=role, role_dir=role_dir, prefer_async=prefer_async)
 
     install_audit_hooks(role)
 

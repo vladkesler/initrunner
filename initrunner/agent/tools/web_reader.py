@@ -14,25 +14,50 @@ def build_web_reader_toolset(config: WebReaderToolConfig, ctx: ToolBuildContext)
     """Build a FunctionToolset for fetching and reading web pages."""
     toolset = FunctionToolset()
 
-    @toolset.tool
-    def fetch_page(url: str) -> str:
-        """Fetch a web page and return its content as markdown."""
-        error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
-        if error:
-            return error
+    if ctx.prefer_async:
 
-        try:
-            from initrunner._html import fetch_url_as_markdown
+        @toolset.tool
+        async def fetch_page(url: str) -> str:
+            """Fetch a web page and return its content as markdown."""
+            error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
+            if error:
+                return error
 
-            return fetch_url_as_markdown(
-                url,
-                timeout=config.timeout_seconds,
-                user_agent=config.user_agent,
-                max_bytes=config.max_content_bytes,
-            )
-        except SSRFBlocked as e:
-            return str(e)
-        except Exception as e:
-            return f"Error fetching URL: {e}"
+            try:
+                from initrunner._html import fetch_url_as_markdown_async
+
+                return await fetch_url_as_markdown_async(
+                    url,
+                    timeout=config.timeout_seconds,
+                    user_agent=config.user_agent,
+                    max_bytes=config.max_content_bytes,
+                )
+            except SSRFBlocked as e:
+                return str(e)
+            except Exception as e:
+                return f"Error fetching URL: {e}"
+
+    else:
+
+        @toolset.tool
+        def fetch_page(url: str) -> str:
+            """Fetch a web page and return its content as markdown."""
+            error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
+            if error:
+                return error
+
+            try:
+                from initrunner._html import fetch_url_as_markdown
+
+                return fetch_url_as_markdown(
+                    url,
+                    timeout=config.timeout_seconds,
+                    user_agent=config.user_agent,
+                    max_bytes=config.max_content_bytes,
+                )
+            except SSRFBlocked as e:
+                return str(e)
+            except Exception as e:
+                return f"Error fetching URL: {e}"
 
     return toolset

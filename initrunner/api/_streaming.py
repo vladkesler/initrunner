@@ -187,21 +187,20 @@ def build_sse_stream(
     """
 
     async def event_stream():
-        from initrunner.services.execution import execute_run_stream_sync
+        from initrunner.services.execution import execute_run_stream_async
 
         token_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
-        loop = asyncio.get_running_loop()
 
         def on_token(chunk: str) -> None:
             try:
-                loop.call_soon_threadsafe(token_queue.put_nowait, chunk)
+                token_queue.put_nowait(chunk)
             except asyncio.QueueFull:
                 pass
 
         audit_logger = getattr(request.app.state, "audit_logger", None)
 
-        def run_stream():
-            return execute_run_stream_sync(
+        stream_task = asyncio.create_task(
+            execute_run_stream_async(
                 session.agent,
                 session.role,
                 user_prompt,
@@ -209,8 +208,7 @@ def build_sse_stream(
                 on_token=on_token,
                 audit_logger=audit_logger,
             )
-
-        stream_task = loop.run_in_executor(None, run_stream)
+        )
 
         timeout = session.role.spec.guardrails.timeout_seconds
         deadline = time.monotonic() + timeout

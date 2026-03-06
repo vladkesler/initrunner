@@ -157,6 +157,8 @@ def build_agent(
     role_dir: Path | None = None,
     output_type: type | None = None,
     extra_skill_dirs: list[Path] | None = None,
+    *,
+    prefer_async: bool = False,
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
     _validate_provider(role)
@@ -170,7 +172,7 @@ def build_agent(
 
     from initrunner.agent.tools import build_toolsets
 
-    toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
+    toolsets = build_toolsets(all_tools, role, role_dir=role_dir, prefer_async=prefer_async)
 
     # Tool search meta-tool — hides tools behind BM25 search to reduce context
     prepare_tools = None

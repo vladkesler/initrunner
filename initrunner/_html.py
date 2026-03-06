@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 from initrunner import __version__
 from initrunner.agent._truncate import truncate_output
-from initrunner.agent._urls import SSRFSafeTransport
+from initrunner.agent._urls import AsyncSSRFSafeTransport, SSRFSafeTransport
 
 _USER_AGENT = f"initrunner/{__version__}"
 
@@ -44,6 +44,46 @@ def fetch_url_as_markdown(
         tag.decompose()
 
     # Strip inline base64 data URIs
+    for tag in soup.find_all(src=True):
+        if tag["src"].startswith("data:"):  # type: ignore[union-attr]
+            tag.decompose()
+    for tag in soup.find_all(href=True):
+        if tag["href"].startswith("data:"):  # type: ignore[union-attr]
+            tag.decompose()
+
+    md = markdownify.markdownify(str(soup), strip=["img"])
+    return truncate_output(md, max_bytes)
+
+
+async def fetch_url_as_markdown_async(
+    url: str,
+    *,
+    timeout: int = 15,
+    user_agent: str = _USER_AGENT,
+    max_bytes: int = 512_000,
+) -> str:
+    """Async variant of ``fetch_url_as_markdown``.
+
+    Uses ``httpx.AsyncClient`` for non-blocking I/O.
+    """
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        headers={"User-Agent": user_agent},
+        follow_redirects=True,
+        transport=AsyncSSRFSafeTransport(),
+    ) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+
+    content_type = resp.headers.get("content-type", "")
+    if "html" not in content_type:
+        return truncate_output(resp.text, max_bytes)
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
     for tag in soup.find_all(src=True):
         if tag["src"].startswith("data:"):  # type: ignore[union-attr]
             tag.decompose()
