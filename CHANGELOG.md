@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.16.0] - 2026-03-06
+
+### Added
+- **Async compose orchestrator**: services run as asyncio tasks on a shared event loop instead of individual threads; agent executions dispatched to a configurable `ThreadPoolExecutor` (`max_agent_workers`). Sync façade (`run_compose()`, `start()`/`stop()`) preserved
+- **Async tool execution**: `execute_run_async()` and `execute_run_stream_async()` use PydanticAI's native `agent.run()` with `asyncio.wait_for` for timeouts — no thread-pool hop
+- **`prefer_async` tool build flag**: `ToolBuildContext.prefer_async` propagates through `build_agent → build_toolsets → tool builders`, letting I/O-bound tools register async closures
+- **Async tool variants**: `http`, `web_reader`, `web_scraper` (concurrent embeddings via `asyncio.gather`), and `search` tools provide native async closures when `prefer_async=True`
+- **Async signal handler**: `install_async_shutdown_handler()` in `_signal.py` with double-Ctrl-C force-exit pattern for asyncio event loops
+- **Queue bridge pattern**: sync `queue.Queue` → `asyncio.Queue` bridge inside `ComposeService` preserves `DelegateSink` sync contract while enabling async service loops
+- **Dual-mode health monitor**: `HealthMonitor` runs as asyncio task (compose) or thread (standalone)
+- **`AsyncSSRFSafeTransport`**: async SSRF protection for `httpx.AsyncClient`
+- **`fetch_url_as_markdown_async()`**: async HTML fetch and markdown conversion
+- **`embed_single_async()`**: async embedding for concurrent batch processing
+- **Native async API streaming**: `_streaming.py` uses `execute_run_stream_async()` directly — eliminates thread-pool hop for SSE streaming
+- New test files: `test_compose_async_internals.py`, `test_executor_async.py`, `test_signal_async.py`
+
+### Fixed
+- OCI registries on localhost now work over plain HTTP (previously required HTTPS)
+- Credential helpers warning test uses explicit logger name for reliable caplog capture
+
+### Changed
+- Compose services build agents with `prefer_async=True` for async tool closures
+- `HealthMonitor.start()` accepts optional `loop` parameter for task-mode scheduling
+- `ComposeService.start()` accepts optional `loop` and `executor` parameters
+
+### Documentation
+- Updated: `docs/orchestration/agent_composer.md` — new Runtime Architecture section (async event loop, queue bridge, shutdown semantics, executor pool sizing)
+- Updated: `docs/agents/tool_creation.md` — `prefer_async` in ToolBuildContext table, new Async Tool Builders section
+- Updated: `docs/operations/testing.md` — new Async Tests section with test file table
+- Updated: `CLAUDE.md` — "Sync CLI, async compose" key pattern
+
 ## [1.15.0] - 2026-03-06
 
 ### Added
