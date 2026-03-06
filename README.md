@@ -580,4 +580,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.15.0</sub></p>
+<p align="center"><sub>v1.16.0</sub></p>
