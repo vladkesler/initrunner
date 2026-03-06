@@ -51,3 +51,11 @@ def get_skills_dir() -> Path:
 
 def get_global_env_path() -> Path:
     return get_home_dir() / ".env"
+
+
+def get_oci_auth_path() -> Path:
+    return get_home_dir() / "oci-auth.json"
+
+
+def get_bundles_cache_dir() -> Path:
+    return get_home_dir() / "cache" / "bundles"

@@ -12,7 +12,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
@@ -85,6 +85,9 @@ class InstalledRole:
     ref: str
     local_path: Path
     installed_at: str
+    source_type: str = "github"
+    oci_ref: str = ""
+    oci_digest: str = ""
 
 
 @dataclass
@@ -158,15 +161,46 @@ def _resolve_from_index(name: str) -> ResolvedSource:
 # ---------------------------------------------------------------------------
 
 
+def _migrate_manifest_keys(data: dict) -> dict:
+    """Migrate old bare-name keys to qualified install IDs on read."""
+    roles = data.get("roles", {})
+    migrated: dict[str, dict] = {}
+    changed = False
+
+    for key, entry in roles.items():
+        if ":" in key:
+            # Already qualified
+            migrated[key] = entry
+            continue
+
+        # Legacy bare-name key — assign a qualified ID
+        source_type = entry.get("source_type", "github")
+        if source_type == "oci":
+            oci_ref = entry.get("oci_ref", "")
+            qualified = f"oci:{oci_ref}/{key}" if oci_ref else f"oci:unknown/{key}"
+        else:
+            repo = entry.get("repo", "unknown")
+            qualified = f"github:{repo}/{key}"
+
+        # Store the display name in the entry
+        entry.setdefault("display_name", key)
+        migrated[qualified] = entry
+        changed = True
+
+    if changed:
+        data["roles"] = migrated
+    return data
+
+
 def load_manifest() -> dict:
-    """Read registry.json, return empty dict if missing."""
+    """Read registry.json, return empty dict if missing. Migrates legacy keys."""
     if not MANIFEST_PATH.exists():
         return {"roles": {}}
     try:
         data = json.loads(MANIFEST_PATH.read_text())
         if "roles" not in data:
             data["roles"] = {}
-        return data
+        return _migrate_manifest_keys(data)
     except (json.JSONDecodeError, OSError):
         return {"roles": {}}
 
@@ -344,8 +378,101 @@ def _fetch_index() -> list[IndexEntry]:
 # ---------------------------------------------------------------------------
 
 
+def install_from_oci(oci_ref: str, *, force: bool = False, yes: bool = False) -> Path:
+    """Pull an OCI bundle and install it locally."""
+    from rich.console import Console
+
+    from initrunner.packaging.oci import OCIClient, OCIError, parse_oci_ref
+    from initrunner.services.packaging import pull_role
+
+    console = Console()
+    ref = parse_oci_ref(oci_ref)
+
+    console.print(f"Pulling from [cyan]oci://{ref.registry}/{ref.repository}:{ref.tag}[/cyan]...")
+
+    try:
+        target_dir = pull_role(oci_ref, force=force)
+    except RoleExistsError:
+        if not force:
+            raise
+        target_dir = pull_role(oci_ref, force=True)
+
+    # Read manifest.json from extracted bundle
+    manifest_json = target_dir / "manifest.json"
+    if manifest_json.exists():
+        import json as _json
+
+        bundle_meta = _json.loads(manifest_json.read_text())
+        role_name = bundle_meta.get("name", "unknown")
+        description = bundle_meta.get("description", "")
+        author = bundle_meta.get("author", "")
+    else:
+        role_name = "unknown"
+        description = ""
+        author = ""
+
+    if not yes:
+        console.print()
+        console.print(f"  [bold]Role:[/bold]        {role_name}")
+        console.print(f"  [bold]Description:[/bold] {description or '(none)'}")
+        console.print(f"  [bold]Author:[/bold]      {author or '(unknown)'}")
+        console.print(
+            f"  [bold]Source:[/bold]       oci://{ref.registry}/{ref.repository}:{ref.tag}"
+        )
+        console.print()
+
+        import typer
+
+        if not typer.confirm("Install this role?"):
+            # Cleanup on abort
+            shutil.rmtree(target_dir, ignore_errors=True)
+            raise typer.Abort()
+
+    # Get digest for tracking
+    try:
+        client = OCIClient(ref)
+        head_info = client.head()
+        oci_digest = head_info.get("digest", "")
+    except OCIError:
+        oci_digest = ""
+
+    # Update manifest with qualified key
+    qualified_key = f"oci:{ref.registry}/{ref.repository}/{role_name}"
+    manifest = load_manifest()
+
+    # Check for display name collision from different source
+    for key, entry in manifest["roles"].items():
+        entry_name = entry.get("display_name", key.rsplit("/", 1)[-1])
+        if entry_name == role_name and key != qualified_key and not force:
+            console.print(
+                f"[yellow]Warning:[/yellow] Role '{role_name}' is already installed "
+                f"from a different source ({key}). Use --force to overwrite."
+            )
+            shutil.rmtree(target_dir, ignore_errors=True)
+            raise RoleExistsError(f"Name collision: '{role_name}' already installed from {key}")
+
+    manifest["roles"][qualified_key] = {
+        "display_name": role_name,
+        "source_type": "oci",
+        "oci_ref": f"{ref.registry}/{ref.repository}",
+        "oci_digest": oci_digest,
+        "oci_tag": ref.tag,
+        "local_path": target_dir.name,
+        "installed_at": datetime.now(UTC).isoformat(),
+    }
+    save_manifest(manifest)
+
+    console.print(f"[green]Installed[/green] {role_name} → {target_dir}")
+    return target_dir
+
+
 def install_role(source: str, *, force: bool = False, yes: bool = False) -> Path:
     """Parse source -> download -> validate -> confirm -> save -> update manifest."""
+    from initrunner.packaging.oci import is_oci_reference
+
+    if is_oci_reference(source):
+        return install_from_oci(source, force=force, yes=yes)
+
     from rich.console import Console
 
     console = Console()
@@ -408,7 +535,10 @@ def install_role(source: str, *, force: bool = False, yes: bool = False) -> Path
     target.write_text(content)
 
     manifest = load_manifest()
-    manifest["roles"][role_name] = {
+    qualified_key = f"github:{resolved.full_repo}/{role_name}"
+    manifest["roles"][qualified_key] = {
+        "display_name": role_name,
+        "source_type": "github",
         "source_url": resolved.raw_url,
         "repo": resolved.full_repo,
         "path": resolved.path,
@@ -424,20 +554,39 @@ def install_role(source: str, *, force: bool = False, yes: bool = False) -> Path
     return target
 
 
+def _find_manifest_key(manifest: dict, name: str) -> str | None:
+    """Find a manifest key by qualified ID or display name."""
+    # Exact match first
+    if name in manifest["roles"]:
+        return name
+
+    # Search by display name
+    for key, entry in manifest["roles"].items():
+        display = entry.get("display_name", key.rsplit("/", 1)[-1])
+        if display == name:
+            return key
+
+    return None
+
+
 def uninstall_role(name: str) -> None:
-    """Remove YAML file + manifest entry."""
+    """Remove installed role file/directory + manifest entry."""
     manifest = load_manifest()
 
-    if name not in manifest["roles"]:
+    key = _find_manifest_key(manifest, name)
+    if key is None:
         raise RoleNotFoundError(f"Role '{name}' is not installed.")
 
-    entry = manifest["roles"][name]
+    entry = manifest["roles"][key]
     local_path = ROLES_DIR / entry["local_path"]
 
     if local_path.exists():
-        local_path.unlink()
+        if local_path.is_dir():
+            shutil.rmtree(local_path)
+        else:
+            local_path.unlink()
 
-    del manifest["roles"][name]
+    del manifest["roles"][key]
     save_manifest(manifest)
 
 
@@ -445,22 +594,37 @@ def list_installed() -> list[InstalledRole]:
     """Read manifest, return installed roles with metadata."""
     manifest = load_manifest()
     results = []
-    for name, entry in manifest["roles"].items():
+    for key, entry in manifest["roles"].items():
+        display_name = entry.get("display_name", key.rsplit("/", 1)[-1])
+        source_type = entry.get("source_type", "github")
         results.append(
             InstalledRole(
-                name=name,
-                source=entry.get("source_url", ""),
+                name=display_name,
+                source=entry.get("source_url", entry.get("oci_ref", "")),
                 repo=entry.get("repo", ""),
-                ref=entry.get("ref", "main"),
+                ref=entry.get("ref", entry.get("oci_tag", "")),
                 local_path=ROLES_DIR / entry["local_path"],
                 installed_at=entry.get("installed_at", ""),
+                source_type=source_type,
+                oci_ref=entry.get("oci_ref", ""),
+                oci_digest=entry.get("oci_digest", ""),
             )
         )
     return results
 
 
-def info_role(source: str) -> RoleInfo:
-    """Download and parse role without installing. Return summary."""
+def info_role(source: str) -> RoleInfo | dict[str, Any]:
+    """Download and parse role without installing. Return summary.
+
+    For OCI references, returns the bundle manifest metadata dict.
+    """
+    from initrunner.packaging.oci import is_oci_reference
+
+    if is_oci_reference(source):
+        from initrunner.services.packaging import inspect_oci_role
+
+        return inspect_oci_role(source)
+
     resolved = resolve_source(source)
     content = download_yaml(resolved.raw_url)
     role = _validate_yaml_content(content)
@@ -482,14 +646,101 @@ def search_index(query: str) -> list[IndexEntry]:
     return results
 
 
+def _update_oci_role(key: str, entry: dict, manifest: dict) -> UpdateResult:
+    """Update an OCI-installed role by checking for new digest."""
+    display_name = entry.get("display_name", key.rsplit("/", 1)[-1])
+    old_digest = entry.get("oci_digest", "")
+    oci_ref_str = entry.get("oci_ref", "")
+    oci_tag = entry.get("oci_tag", "latest")
+
+    if not oci_ref_str:
+        return UpdateResult(
+            name=display_name,
+            updated=False,
+            old_sha=old_digest,
+            new_sha="",
+            message="No OCI reference stored.",
+        )
+
+    from initrunner.packaging.oci import OCIClient, OCIError, OCIRef
+
+    # Parse stored ref
+    parts = oci_ref_str.split("/", 1)
+    if len(parts) < 2:
+        return UpdateResult(
+            name=display_name,
+            updated=False,
+            old_sha=old_digest,
+            new_sha="",
+            message=f"Invalid stored OCI ref: {oci_ref_str}",
+        )
+
+    ref = OCIRef(registry=parts[0], repository=parts[1], tag=oci_tag)
+
+    try:
+        client = OCIClient(ref)
+        head_info = client.head()
+        new_digest = head_info.get("digest", "")
+    except OCIError as e:
+        return UpdateResult(
+            name=display_name,
+            updated=False,
+            old_sha=old_digest,
+            new_sha="",
+            message=f"Error: {e}",
+        )
+
+    if new_digest == old_digest:
+        return UpdateResult(
+            name=display_name,
+            updated=False,
+            old_sha=old_digest,
+            new_sha=new_digest,
+            message="Already up to date.",
+        )
+
+    # Re-pull
+    full_ref = f"oci://{oci_ref_str}:{oci_tag}"
+    try:
+        from initrunner.services.packaging import pull_role
+
+        pull_role(full_ref, force=True)
+    except Exception as e:
+        return UpdateResult(
+            name=display_name,
+            updated=False,
+            old_sha=old_digest,
+            new_sha=new_digest,
+            message=f"Error: {e}",
+        )
+
+    entry["oci_digest"] = new_digest
+    entry["installed_at"] = datetime.now(UTC).isoformat()
+    save_manifest(manifest)
+
+    return UpdateResult(
+        name=display_name,
+        updated=True,
+        old_sha=old_digest,
+        new_sha=new_digest,
+        message="Updated.",
+    )
+
+
 def update_role(name: str) -> UpdateResult:
     """Compare remote SHA with stored SHA, re-download if changed."""
     manifest = load_manifest()
 
-    if name not in manifest["roles"]:
+    key = _find_manifest_key(manifest, name)
+    if key is None:
         raise RoleNotFoundError(f"Role '{name}' is not installed.")
 
-    entry = manifest["roles"][name]
+    entry = manifest["roles"][key]
+
+    # Handle OCI sources
+    if entry.get("source_type") == "oci":
+        return _update_oci_role(key, entry, manifest)
+
     old_sha = entry.get("commit_sha", "")
     repo = entry["repo"]
     ref = entry.get("ref", "main")

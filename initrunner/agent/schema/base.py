@@ -20,6 +20,12 @@ class Kind(StrEnum):
     AGENT = "Agent"
 
 
+class BundleConfig(BaseModel):
+    """Extra files to include in OCI bundles (glob patterns relative to role dir)."""
+
+    include: list[str] = []
+
+
 class Metadata(BaseModel):
     name: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")]
     description: str = ""
@@ -27,6 +33,7 @@ class Metadata(BaseModel):
     author: str = ""
     version: str = ""
     dependencies: list[str] = []
+    bundle: BundleConfig | None = None
 
 
 class ModelConfig(BaseModel):

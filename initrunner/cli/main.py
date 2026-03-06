@@ -136,6 +136,9 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     info,
     install,
     list_roles,
+    login,
+    publish,
+    pull,
     search,
     uninstall,
     update,
@@ -164,6 +167,9 @@ app.command()(search)
 app.command()(info)
 app.command("list")(list_roles)
 app.command()(update)
+app.command()(publish)
+app.command()(pull)
+app.command()(login)
 app.command()(doctor)
 
 

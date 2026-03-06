@@ -1,7 +1,8 @@
-"""Registry commands: install, uninstall, search, info, list, update."""
+"""Registry commands: install, uninstall, search, info, list, update, publish, pull, login."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -12,12 +13,15 @@ from initrunner.cli._helpers import console
 
 def install(
     source: Annotated[
-        str, typer.Argument(help="GitHub source (user/repo[:path][@ref]) or role name")
+        str,
+        typer.Argument(
+            help="GitHub source (user/repo[:path][@ref]), role name, or OCI ref (oci://...)"
+        ),
     ],
     force: Annotated[bool, typer.Option("--force", "-f", help="Overwrite existing")] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
 ) -> None:
-    """Install a role from GitHub or the community index."""
+    """Install a role from GitHub, the community index, or an OCI registry."""
     from initrunner.registry import (
         NetworkError,
         RegistryError,
@@ -82,6 +86,25 @@ def search(
     console.print(table)
 
 
+def _display_oci_info(d: dict) -> None:  # type: ignore[type-arg]
+    """Display OCI bundle manifest metadata."""
+    name = str(d.get("name", "unknown"))
+    table = Table(title=f"Role: {name}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Name", name)
+    table.add_row("Version", str(d.get("version", "")))
+    table.add_row("Description", str(d.get("description", "(none)")))
+    table.add_row("Author", str(d.get("author", "(unknown)")))
+    tags_val = d.get("tags")
+    tags_str = ", ".join(str(t) for t in tags_val) if isinstance(tags_val, list) else ""
+    table.add_row("Tags", tags_str)
+    table.add_row("InitRunner Version", str(d.get("initrunner_version", "")))
+    files_val = d.get("files")
+    table.add_row("Files", str(len(files_val)) if isinstance(files_val, list) else "0")
+    console.print(table)
+
+
 def info(
     source: Annotated[str, typer.Argument(help="Role source to inspect")],
 ) -> None:
@@ -93,6 +116,14 @@ def info(
     except (RoleNotFoundError, NetworkError, RegistryError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    # OCI info returns a dict (bundle manifest metadata)
+    if isinstance(role_info, dict):
+        _display_oci_info(role_info)
+        return
 
     table = Table(title=f"Role: {role_info.name}")
     table.add_column("Field", style="cyan")
@@ -124,12 +155,15 @@ def list_roles(
 
     table = Table(title="Installed Roles")
     table.add_column("Name", style="cyan")
+    table.add_column("Source", style="dim")
     table.add_column("Repo")
     table.add_column("Ref")
     table.add_column("Installed At")
 
     for role in roles:
-        table.add_row(role.name, role.repo, role.ref, role.installed_at[:19])
+        source_label = role.source_type.upper()
+        repo_label = role.repo or role.oci_ref
+        table.add_row(role.name, source_label, repo_label, role.ref, role.installed_at[:19])
 
     console.print(table)
 
@@ -166,3 +200,81 @@ def update(
         console.print(f"[green]Updated[/green] {name}: {result.message}")
     else:
         console.print(f"[dim]{name}:[/dim] {result.message}")
+
+
+def publish(
+    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml file")],
+    ref: Annotated[str, typer.Argument(help="OCI reference (oci://registry/repo)")],
+    tag: Annotated[str, typer.Option("--tag", "-t", help="Tag for the artifact")] = "latest",
+) -> None:
+    """Publish a role bundle to an OCI registry."""
+    from initrunner.packaging.oci import OCIError
+    from initrunner.services.packaging import publish_role
+
+    if not role_file.exists():
+        console.print(f"[red]Error:[/red] File not found: {role_file}")
+        raise typer.Exit(1)
+
+    try:
+        digest = publish_role(role_file, ref, tag=tag)
+        console.print(f"[green]Published[/green] → {ref}:{tag}")
+        console.print(f"  Digest: {digest}")
+    except OCIError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+
+def pull(
+    ref: Annotated[str, typer.Argument(help="OCI reference (oci://registry/repo:tag)")],
+    force: Annotated[bool, typer.Option("--force", "-f", help="Overwrite existing")] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")] = False,
+) -> None:
+    """Pull a role bundle from an OCI registry."""
+    from initrunner.registry import (
+        NetworkError,
+        RegistryError,
+        RoleExistsError,
+        install_role,
+    )
+
+    if not ref.startswith("oci://"):
+        ref = f"oci://{ref}"
+
+    try:
+        install_role(ref, force=force, yes=yes)
+    except RoleExistsError as e:
+        console.print(f"[yellow]Warning:[/yellow] {e}")
+        raise typer.Exit(1) from None
+    except (NetworkError, RegistryError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+
+def login(
+    registry: Annotated[str, typer.Argument(help="Registry hostname (e.g. ghcr.io)")],
+    username: Annotated[str | None, typer.Option("--username", "-u", help="Username")] = None,
+    password_stdin: Annotated[
+        bool, typer.Option("--password-stdin", help="Read password from stdin")
+    ] = False,
+) -> None:
+    """Log in to an OCI registry."""
+    import sys
+
+    from initrunner.packaging.auth import save_auth
+
+    if username is None:
+        username = typer.prompt("Username")
+
+    if password_stdin:
+        password = sys.stdin.readline().strip()
+    else:
+        password = typer.prompt("Password", hide_input=True)
+
+    save_auth(registry, username, password)
+    console.print(f"[green]Login succeeded[/green] for {registry}")

@@ -163,7 +163,17 @@ class TestManifest:
         monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
         monkeypatch.setattr("initrunner.registry.ROLES_DIR", tmp_path / "roles")
 
-        data = {"roles": {"test": {"source_url": "https://example.com", "ref": "main"}}}
+        data = {
+            "roles": {
+                "github:user/repo/test": {
+                    "source_url": "https://example.com",
+                    "ref": "main",
+                    "display_name": "test",
+                    "source_type": "github",
+                    "repo": "user/repo",
+                }
+            }
+        }
         save_manifest(data)
 
         loaded = load_manifest()
@@ -290,11 +300,13 @@ class TestInstallRole:
 
         # Check manifest
         manifest = json.loads((roles_dir / "registry.json").read_text())
-        assert "test-agent" in manifest["roles"]
-        entry = manifest["roles"]["test-agent"]
+        qualified_key = "github:user/repo/test-agent"
+        assert qualified_key in manifest["roles"]
+        entry = manifest["roles"][qualified_key]
         assert entry["repo"] == "user/repo"
         assert entry["commit_sha"] == "abc123"
         assert entry["sha256"] == hashlib.sha256(VALID_ROLE_YAML.encode()).hexdigest()
+        assert entry["display_name"] == "test-agent"
 
     def test_install_collision_without_force(self, tmp_path, monkeypatch):
         roles_dir = tmp_path / "roles"
@@ -358,7 +370,8 @@ class TestInstallRole:
 
         assert path.exists()
         manifest = json.loads((roles_dir / "registry.json").read_text())
-        assert manifest["roles"]["test-agent"]["commit_sha"] == ""
+        qualified_key = "github:user/repo/test-agent"
+        assert manifest["roles"][qualified_key]["commit_sha"] == ""
 
 
 # ---------------------------------------------------------------------------
