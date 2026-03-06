@@ -141,7 +141,7 @@ class TestDockerConfigAuth:
 
         import logging
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger="initrunner.packaging.auth"):
             result = load_docker_config_auth("ghcr.io")
 
         assert result is None
