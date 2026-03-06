@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-2793+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.14.0-%2334D058" alt="v1.14.0">
+  <img src="https://img.shields.io/badge/latest-v1.15.0-%2334D058" alt="v1.15.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.14.0** -- Conversation history compaction for long-running agents, heartbeat trigger for periodic checklists, config hot-reload in daemon mode, and new example roles. See the [Changelog](CHANGELOG.md).
+> **v1.15.0** -- OCI registry distribution for role bundles, qualified install IDs, and new publish/pull/login commands. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -38,6 +38,7 @@ One YAML file is all it takes to go from idea to running agent - with document s
 - [Quickstart](#quickstart)
 - [From Simple to Powerful](#from-simple-to-powerful)
 - [Community Roles](#community-roles)
+- [OCI Registry Distribution](#oci-registry-distribution)
 - [Docker](#docker)
 - [Cloud Deploy](#cloud-deploy)
 - [User Interfaces](#user-interfaces)
@@ -432,6 +433,19 @@ initrunner run ~/.initrunner/roles/code-reviewer.yaml -i # run an installed role
 
 Every install shows a security summary and asks for confirmation. See [docs/agents/registry.md](docs/agents/registry.md) for details.
 
+## OCI Registry Distribution
+
+Publish and install complete role bundles (with skills, schemas, and data files) to any OCI-compliant container registry:
+
+```bash
+initrunner login ghcr.io                                              # authenticate
+initrunner publish role.yaml oci://ghcr.io/org/my-agent --tag 1.0.0   # publish
+initrunner install oci://ghcr.io/org/my-agent:1.0.0                   # install
+initrunner info oci://ghcr.io/org/my-agent:1.0.0                      # inspect
+```
+
+Bundles include the role definition, resolved skills, schema files, and any explicitly included data files. OCI references use the `oci://` prefix and work alongside existing GitHub and community index installs. See [OCI Distribution docs](docs/core/oci-distribution.md) for authentication, bundle format, and full command reference.
+
 ## Docker
 
 Available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Docker Hub](https://hub.docker.com/r/vladkesler/initrunner). The image ships with all extras pre-installed.
@@ -534,6 +548,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
+| Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
@@ -565,4 +580,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.14.0</sub></p>
+<p align="center"><sub>v1.15.0</sub></p>

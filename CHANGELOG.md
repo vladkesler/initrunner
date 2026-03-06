@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.15.0] - 2026-03-06
+
+### Added
+- **OCI registry distribution**: publish and install complete role bundles to any OCI-compliant registry (Docker Hub, GHCR, ECR) via `initrunner publish`, `initrunner pull`, and `initrunner install oci://...`
+- **Role bundles**: deterministic `.tar.gz` archives containing role YAML, resolved skills, schema files, and explicit data files with SHA-256 integrity verification
+- **OCI authentication**: `initrunner login` command with credential resolution chain (env vars → oci-auth.json → Docker config base64 auth)
+- **Qualified install IDs**: manifest keys use `github:owner/repo/name` and `oci:registry/repo/name` to prevent name collisions across sources
+- **Bundle metadata field**: optional `metadata.bundle.include` for explicit extra file globs in role YAML
+- New CLI commands: `publish`, `pull`, `login`
+- New modules: `initrunner/packaging/` (bundle, auth, oci), `initrunner/services/packaging.py`
+
+### Changed
+- `initrunner list` shows Source Type column (GITHUB/OCI)
+- `initrunner info` supports OCI references (displays bundle manifest metadata)
+- `initrunner update` supports OCI sources (compares manifest digests)
+- `uninstall` handles directory-based OCI bundle installs
+- Manifest keys migrated from bare names to qualified IDs on read (backward compatible)
+
+### Documentation
+- New: `docs/core/oci-distribution.md` — full guide for OCI publishing, authentication, bundle format, and commands
+- Updated: README with OCI Registry Distribution section and documentation table entry
+
 ## [1.14.0] - 2026-03-03
 
 ### Added

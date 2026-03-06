@@ -84,6 +84,7 @@ Detailed docs live in `docs/`. Key references:
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook/heartbeat) | `docs/core/triggers.md` |
 | Tool search meta-tool | `docs/core/tool-search.md` |
+| OCI distribution & bundles | `docs/core/oci-distribution.md` |
 | Discord bot quickstart | `docs/getting-started/discord.md` |
 | Telegram bot quickstart | `docs/getting-started/telegram.md` |
 | Chat & quick start | `docs/getting-started/chat.md` |
