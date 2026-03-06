@@ -662,7 +662,7 @@ def _update_oci_role(key: str, entry: dict, manifest: dict) -> UpdateResult:
             message="No OCI reference stored.",
         )
 
-    from initrunner.packaging.oci import OCIClient, OCIError, OCIRef
+    from initrunner.packaging.oci import OCIClient, OCIError, OCIRef, _is_localhost
 
     # Parse stored ref
     parts = oci_ref_str.split("/", 1)
@@ -675,7 +675,12 @@ def _update_oci_role(key: str, entry: dict, manifest: dict) -> UpdateResult:
             message=f"Invalid stored OCI ref: {oci_ref_str}",
         )
 
-    ref = OCIRef(registry=parts[0], repository=parts[1], tag=oci_tag)
+    ref = OCIRef(
+        registry=parts[0],
+        repository=parts[1],
+        tag=oci_tag,
+        insecure=_is_localhost(parts[0]),
+    )
 
     try:
         client = OCIClient(ref)

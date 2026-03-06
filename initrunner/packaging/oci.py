@@ -31,10 +31,12 @@ class OCIRef:
     repository: str
     tag: str
     digest: str = ""
+    insecure: bool = False
 
     @property
     def base_url(self) -> str:
-        return f"https://{self.registry}"
+        scheme = "http" if self.insecure else "https"
+        return f"{scheme}://{self.registry}"
 
     @property
     def api_prefix(self) -> str:
@@ -44,6 +46,12 @@ class OCIRef:
 def is_oci_reference(source: str) -> bool:
     """Check if a source string is an OCI reference."""
     return source.startswith("oci://")
+
+
+def _is_localhost(registry: str) -> bool:
+    """Check if a registry hostname is localhost or 127.0.0.1."""
+    host = registry.split(":")[0]
+    return host in ("localhost", "127.0.0.1")
 
 
 def parse_oci_ref(source: str) -> OCIRef:
@@ -74,13 +82,17 @@ def parse_oci_ref(source: str) -> OCIRef:
         else:
             repo = repo_and_tag
 
-        return OCIRef(registry=registry_part, repository=repo, tag=tag, digest=digest)
+        result = OCIRef(registry=registry_part, repository=repo, tag=tag, digest=digest)
+        result.insecure = _is_localhost(registry_part)
+        return result
 
     parts = ref.split("/", 1)
     if len(parts) < 2:
         raise OCIError(f"Invalid OCI reference: '{source}' (missing repository)")
 
-    return OCIRef(registry=parts[0], repository=parts[1], tag=tag, digest=digest)
+    result = OCIRef(registry=parts[0], repository=parts[1], tag=tag, digest=digest)
+    result.insecure = _is_localhost(parts[0])
+    return result
 
 
 class OCIClient:
