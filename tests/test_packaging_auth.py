@@ -141,6 +141,12 @@ class TestDockerConfigAuth:
 
         import logging
 
+        # The "initrunner" parent logger has propagate=False (set by
+        # setup_logging), so caplog—which attaches to root—never sees child
+        # records.  Temporarily re-enable propagation for this test.
+        parent = logging.getLogger("initrunner")
+        monkeypatch.setattr(parent, "propagate", True)
+
         with caplog.at_level(logging.WARNING, logger="initrunner.packaging.auth"):
             result = load_docker_config_auth("ghcr.io")
 
