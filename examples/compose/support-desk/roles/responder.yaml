@@ -1,0 +1,24 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: responder
+  description: Drafts direct replies to straightforward support questions
+  tags:
+    - response
+    - reply
+    - answer
+    - chat
+    - help
+spec:
+  role: >
+    You are a support response agent. When you receive a triaged
+    support request that can be answered directly, draft a professional,
+    friendly reply. Keep responses concise and actionable. Include
+    relevant links or next steps when appropriate.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.5
+  guardrails:
+    max_tokens_per_run: 2000
+    timeout_seconds: 30

@@ -132,7 +132,7 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
 | **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt - DIY | Loaders > splitters > vectorstore chain |
 | **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
 | **Model switching** | Change `model.provider` in YAML | Rewrite client code | Swap LLM class + adjust prompts |
-| **Multi-agent** | `compose.yaml` with delegation | Custom orchestration layer | Agent executor + custom routing |
+| **Multi-agent** | `compose.yaml` with delegation + auto-routing | Custom orchestration layer | Agent executor + custom routing |
 
 ## What Can You Build?
 
@@ -140,7 +140,7 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
 - **A cron job that monitors competitors and sends daily digests** - cron trigger + web scraper + Slack sink
 - **A document Q&A agent for your team's knowledge base** - ingest PDFs and Markdown, serve as an API
 - **A code review bot triggered by new commits** - file-watch trigger + git tools + structured output
-- **A multi-agent pipeline: inbox watcher > triager > responder** - define in `compose.yaml`, run with one command
+- **A multi-agent pipeline with auto-routing: intake > researcher / responder / escalator** - sense routing picks the right target per message (`initrunner examples copy support-desk`)
 - **A personal assistant that remembers everything** - persistent memory across sessions, no setup
 
 ## Quickstart
@@ -268,7 +268,7 @@ See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegra
 
 ### 4. Compose agents
 
-Orchestrate multiple agents into a pipeline - one agent's output feeds into the next:
+Orchestrate multiple agents into a pipeline - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
 
 ```yaml
 apiVersion: initrunner/v1
@@ -279,10 +279,14 @@ spec:
     inbox-watcher:
       role: roles/inbox-watcher.yaml
       sink: { type: delegate, target: triager }
-    triager: { role: roles/triager.yaml }
+    triager:
+      role: roles/triager.yaml
+      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
+    researcher: { role: roles/researcher.yaml }
+    responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
+Run with `initrunner compose up pipeline.yaml`. The triager's output is auto-routed to the best-matching target using intent sensing - zero-cost keyword scoring with optional LLM tiebreak. Use `strategy: keyword` for zero API calls, or omit for fan-out to all targets. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
 ### 5. Team up agents
 

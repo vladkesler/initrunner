@@ -20,6 +20,7 @@ from initrunner.agent.schema.memory import MemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.compose.delegate_sink import DelegateEvent, DelegateSink
+from initrunner.compose.router_sink import RouterSink
 from initrunner.compose.schema import ComposeDefinition, ComposeServiceConfig
 from initrunner.sinks.base import SinkBase
 from initrunner.sinks.dispatcher import SinkDispatcher, build_sink
@@ -349,6 +350,7 @@ class ComposeOrchestrator:
         self._services: dict[str, ComposeService] = {}
         self._failed_services: dict[str, str] = {}
         self._delegate_sinks: list[DelegateSink] = []
+        self._router_sinks: list[RouterSink] = []
         self._health_monitor = None
 
         # Async runtime (created in start())
@@ -436,6 +438,8 @@ class ComposeOrchestrator:
                 config.sink.target if isinstance(config.sink.target, list) else [config.sink.target]
             )
 
+            # Build DelegateSink instances for all targets
+            sinks_by_target: dict[str, DelegateSink] = {}
             for target_name in targets:
                 if target_name not in self._services:
                     console.print(
@@ -453,8 +457,43 @@ class ComposeOrchestrator:
                     circuit_breaker_threshold=config.sink.circuit_breaker_threshold,
                     circuit_breaker_reset_seconds=config.sink.circuit_breaker_reset_seconds,
                 )
-                self._services[name].add_sink(delegate)
-                self._delegate_sinks.append(delegate)
+                sinks_by_target[target_name] = delegate
+
+            if not sinks_by_target:
+                continue
+
+            strategy = config.sink.strategy
+            if strategy != "all" and len(sinks_by_target) > 1:
+                # Build RoleCandidate objects from in-memory role definitions
+                from pathlib import Path as _Path
+
+                from initrunner.services.role_selector import RoleCandidate
+
+                target_candidates: list[RoleCandidate] = []
+                for target_name in sinks_by_target:
+                    role = self._services[target_name].role
+                    target_candidates.append(
+                        RoleCandidate(
+                            path=_Path(self._services[target_name].config.role),
+                            name=target_name,
+                            description=role.metadata.description,
+                            tags=list(role.metadata.tags),
+                        )
+                    )
+
+                router = RouterSink(
+                    delegate_sinks=sinks_by_target,
+                    target_candidates=target_candidates,
+                    strategy=strategy,
+                )
+                self._services[name].add_sink(router)
+                self._router_sinks.append(router)
+                # RouterSink.close() manages its delegate sinks
+            else:
+                # strategy: all — fan-out to every target (original behavior)
+                for delegate in sinks_by_target.values():
+                    self._services[name].add_sink(delegate)
+                    self._delegate_sinks.append(delegate)
 
     def _topological_order(self) -> list[list[str]]:
         """Return services in topological tiers based on depends_on."""
@@ -550,9 +589,15 @@ class ComposeOrchestrator:
         # Flush remaining audit events from delegate sinks
         for sink in self._delegate_sinks:
             sink.close()
+        # Close router sinks (which close their wrapped delegate sinks)
+        for router in self._router_sinks:
+            router.close()
 
     def delegate_health(self) -> list[dict]:
         """Return per-sink delegate routing health info."""
+        all_delegate_sinks = list(self._delegate_sinks)
+        for router in self._router_sinks:
+            all_delegate_sinks.extend(router._delegate_sinks.values())
         return [
             {
                 "source": sink.source_service,
@@ -562,7 +607,7 @@ class ComposeOrchestrator:
                 "circuit_state": sink.circuit_state,
                 "consecutive_failures": sink.consecutive_failures,
             }
-            for sink in self._delegate_sinks
+            for sink in all_delegate_sinks
         ]
 
     def __enter__(self) -> ComposeOrchestrator:

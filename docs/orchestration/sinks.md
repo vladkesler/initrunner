@@ -217,6 +217,8 @@ $ initrunner validate role.yaml
 
 The `delegate` sink type is used exclusively in [compose definitions](agent_composer.md) to route a service's output to other services via in-memory queues. It is not available in standalone role YAML files — it is configured via the `sink:` field on a compose service.
 
+When targeting multiple services, set `strategy: keyword` or `strategy: sense` to auto-route messages to the best-matching target instead of fan-out. This uses the same [Intent Sensing](../core/intent_sensing.md) logic as `--sense` in the CLI. See [Agent Composer — Routing Strategy](agent_composer.md#routing-strategy) for details.
+
 See [Agent Composer — Delegate Sink](agent_composer.md#delegate-sink) for configuration options, circuit breaker behavior, and examples.
 
 ## Run Modes

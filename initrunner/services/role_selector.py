@@ -211,66 +211,35 @@ def _llm_select(prompt: str, top_candidates: list[RoleCandidate]) -> RoleCandida
 # ---------------------------------------------------------------------------
 
 
-def select_role_sync(
+def select_candidate_sync(
     prompt: str,
+    candidates: list[RoleCandidate],
     *,
-    role_dir: Path | None = None,
     allow_llm: bool = True,
 ) -> SelectionResult:
-    """Select the best matching role for *prompt*.
+    """Score candidates against prompt using sense logic. No filesystem I/O.
 
     Args:
         prompt: The user's task description.
-        role_dir: Optional explicit directory to search (passed to discovery).
-        allow_llm: When False (e.g. ``--dry-run``), skips the LLM tiebreaker
-                   and uses Pass-1 top scorer as fallback instead.
+        candidates: Pre-built candidate list (from compose services, role files, etc.).
+        allow_llm: When False, skips the LLM tiebreaker and uses Pass-1 top
+                   scorer as fallback instead.
 
     Returns:
         :class:`SelectionResult` with the chosen candidate and diagnostics.
 
     Raises:
-        ValueError: If the prompt contains no meaningful keywords after filtering.
-        NoRolesFoundError: If no valid role files are found in the discovered dirs.
+        ValueError: If the prompt contains no meaningful keywords after filtering
+                    or candidates list is empty.
     """
-    from initrunner.services.discovery import discover_roles_sync, get_default_role_dirs
-
-    # Validate prompt before doing any I/O
     prompt_tokens = _tokenize(prompt)
     if not prompt_tokens:
         raise ValueError("Prompt contains no meaningful keywords after filtering.")
+    if not candidates:
+        raise ValueError("No candidates provided.")
 
-    dirs = get_default_role_dirs(role_dir)
-    discovered = discover_roles_sync(dirs)
-
-    valid = [d for d in discovered if d.error is None and d.role is not None]
-
-    if not valid:
-        searched = ", ".join(str(d) for d in dirs)
-        raise NoRolesFoundError(f"No valid role files found in: {searched}")
-
-    if len(valid) == 1:
-        d = valid[0]
-        assert d.role is not None
-        cand = RoleCandidate(
-            path=d.path,
-            name=d.role.metadata.name,
-            description=d.role.metadata.description,
-            tags=list(d.role.metadata.tags),
-        )
-        return SelectionResult(candidate=cand, method="only_one")
-
-    # Build candidates list
-    candidates: list[RoleCandidate] = []
-    for d in valid:
-        assert d.role is not None
-        candidates.append(
-            RoleCandidate(
-                path=d.path,
-                name=d.role.metadata.name,
-                description=d.role.metadata.description,
-                tags=list(d.role.metadata.tags),
-            )
-        )
+    if len(candidates) == 1:
+        return SelectionResult(candidate=candidates[0], method="only_one")
 
     scored = score_candidates(prompt, candidates)
     top_score = scored[0].score
@@ -314,3 +283,56 @@ def select_role_sync(
             top_score=top_score,
             gap=gap,
         )
+
+
+def select_role_sync(
+    prompt: str,
+    *,
+    role_dir: Path | None = None,
+    allow_llm: bool = True,
+) -> SelectionResult:
+    """Select the best matching role for *prompt*.
+
+    Args:
+        prompt: The user's task description.
+        role_dir: Optional explicit directory to search (passed to discovery).
+        allow_llm: When False (e.g. ``--dry-run``), skips the LLM tiebreaker
+                   and uses Pass-1 top scorer as fallback instead.
+
+    Returns:
+        :class:`SelectionResult` with the chosen candidate and diagnostics.
+
+    Raises:
+        ValueError: If the prompt contains no meaningful keywords after filtering.
+        NoRolesFoundError: If no valid role files are found in the discovered dirs.
+    """
+    from initrunner.services.discovery import discover_roles_sync, get_default_role_dirs
+
+    # Validate prompt before doing any I/O
+    prompt_tokens = _tokenize(prompt)
+    if not prompt_tokens:
+        raise ValueError("Prompt contains no meaningful keywords after filtering.")
+
+    dirs = get_default_role_dirs(role_dir)
+    discovered = discover_roles_sync(dirs)
+
+    valid = [d for d in discovered if d.error is None and d.role is not None]
+
+    if not valid:
+        searched = ", ".join(str(d) for d in dirs)
+        raise NoRolesFoundError(f"No valid role files found in: {searched}")
+
+    # Build candidates list
+    candidates: list[RoleCandidate] = []
+    for d in valid:
+        assert d.role is not None
+        candidates.append(
+            RoleCandidate(
+                path=d.path,
+                name=d.role.metadata.name,
+                description=d.role.metadata.description,
+                tags=list(d.role.metadata.tags),
+            )
+        )
+
+    return select_candidate_sync(prompt, candidates, allow_llm=allow_llm)

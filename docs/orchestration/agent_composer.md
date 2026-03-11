@@ -147,11 +147,82 @@ sink:
 |-------|------|---------|-------------|
 | `type` | `"delegate"` | *(required)* | Must be `delegate`. |
 | `target` | `str \| list[str]` | *(required)* | Target service name(s) to route output to. |
+| `strategy` | `"all" \| "keyword" \| "sense"` | `"all"` | Routing strategy for multi-target delegates. See [Routing Strategy](#routing-strategy). |
 | `keep_existing_sinks` | `bool` | `false` | When `true`, the service's role-level sinks (webhook, file, custom) are also activated alongside the delegate. When `false`, only the delegate sink is used. |
 | `queue_size` | `int` | `100` | Maximum number of events buffered in the target's inbox queue. |
 | `timeout_seconds` | `int` | `60` | How long to block when the target queue is full before dropping the message. |
 | `circuit_breaker_threshold` | `int \| null` | `null` | Number of consecutive delivery failures (drops + errors) before the circuit opens and rejects all messages. `null` disables the circuit breaker. |
 | `circuit_breaker_reset_seconds` | `int` | `60` | Seconds to wait in open state before allowing a single probe message through (half-open). If the probe succeeds, the circuit closes; if it fails, it re-opens. |
+
+### Routing Strategy
+
+When a delegate sink has multiple targets, the `strategy` field controls how messages are routed.
+
+| Strategy | Behavior | API calls |
+|----------|----------|-----------|
+| `all` | Fan-out — every target receives every message (default, backward compatible) | None |
+| `keyword` | [Intent Sensing](../core/intent_sensing.md) keyword scoring picks the best target | None |
+| `sense` | Keyword scoring first; LLM tiebreaker when ambiguous | 0 or 1 per message |
+
+The `keyword` and `sense` strategies use the same two-pass [Intent Sensing](../core/intent_sensing.md) logic used by `--sense` in the CLI. They score the agent's output text against each target service's `metadata.name`, `metadata.description`, and `metadata.tags` from its role definition.
+
+**Before (static fan-out):** every message goes to ALL targets:
+
+```yaml
+triager:
+  role: roles/triager.yaml
+  sink:
+    type: delegate
+    target: [researcher, responder, escalator]
+```
+
+**After (sense picks the right target):**
+
+```yaml
+triager:
+  role: roles/triager.yaml
+  sink:
+    type: delegate
+    strategy: sense              # ← one line added
+    target: [researcher, responder, escalator]
+```
+
+#### How routing works
+
+1. The upstream agent's output is scored against each target's role metadata (name, description, tags) using keyword matching.
+2. If the output doesn't produce a confident match, the original user prompt (preserved from the head of the delegation chain) is also scored.
+3. For `sense` strategy, if both attempts are inconclusive, an LLM tiebreaker call selects the best target.
+4. The message is forwarded to the selected target only (not fanned out).
+
+Routing diagnostics are injected into the payload's trigger metadata as `_compose_route_reason` for audit visibility.
+
+#### Optimizing roles for routing
+
+The same tips from [Intent Sensing — Optimizing Roles](../core/intent_sensing.md#optimizing-roles-for-sensing) apply. Each target service's role should have specific, non-overlapping tags and a clear description:
+
+```yaml
+# roles/researcher.yaml
+metadata:
+  name: researcher
+  description: Researches topics in depth and gathers supporting evidence
+  tags: [research, analysis, investigation, evidence]
+
+# roles/responder.yaml
+metadata:
+  name: responder
+  description: Responds directly to user queries with concise answers
+  tags: [response, chat, answer, reply]
+
+# roles/escalator.yaml
+metadata:
+  name: escalator
+  description: Escalates complex issues to human operators
+  tags: [escalation, support, human, complex]
+```
+
+#### Single target behavior
+
+When only one target is specified, `strategy` has no effect — the message always goes to that target regardless of the strategy setting.
 
 ### Backpressure Behavior
 
@@ -629,6 +700,7 @@ spec:
         - inbox-watcher
       sink:
         type: delegate
+        strategy: sense           # auto-route to the right target
         target:
           - researcher
           - responder
@@ -645,6 +717,8 @@ spec:
         max_retries: 3
         delay_seconds: 5
 ```
+
+With `strategy: sense`, the triager's output is analyzed and sent to either the researcher or the responder — not both. Use `strategy: all` (or omit) to fan out to every target.
 
 ### Role Files
 

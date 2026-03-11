@@ -73,6 +73,28 @@
     "tools": []
   },
   {
+    "name": "support-desk",
+    "category": "compose",
+    "description": "Support desk pipeline with intelligent auto-routing. An intake agent summarizes incoming requests, then sense routing automatically sends each request to the right handler -- researcher for technical issues, responder for quick answers, or escalator for urgent/complex cases.\n",
+    "tags": ["routing", "sense"],
+    "files": [
+      "support-desk/compose.yaml",
+      "support-desk/roles/escalator.yaml",
+      "support-desk/roles/intake.yaml",
+      "support-desk/roles/researcher.yaml",
+      "support-desk/roles/responder.yaml"
+    ],
+    "primary_file": "support-desk/compose.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: support-desk\n  description: >\n    Support desk pipeline with intelligent auto-routing. An intake agent\n    summarizes incoming requests, then sense routing automatically sends\n    each request to the right handler -- researcher for technical issues,\n    responder for quick answers, or escalator for urgent/complex cases.\n    No static fan-out: each message goes to exactly one target.\nspec:\n  services:\n    intake:\n      role: roles/intake.yaml\n      sink:\n        type: delegate\n        # strategy: sense uses keyword scoring + LLM tiebreak to pick the\n        # best target for each message. Use \"keyword\" for zero API calls,\n        # or \"all\" to fan out to every target (default).\n        strategy: sense\n        target:\n          - researcher\n          - responder\n          - escalator\n\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - intake\n\n    responder:\n      role: roles/responder.yaml\n      depends_on:\n        - intake\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    escalator:\n      role: roles/escalator.yaml\n      depends_on:\n        - intake\n",
+    "multi_file": true,
+    "difficulty": "intermediate",
+    "features": [
+      "compose",
+      "routing"
+    ],
+    "tools": []
+  },
+  {
     "name": "audio-assistant",
     "category": "role",
     "description": "Fetch YouTube transcripts and transcribe local audio files",

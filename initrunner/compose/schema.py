@@ -13,6 +13,7 @@ from initrunner.stores.base import StoreBackend
 class DelegateSinkConfig(BaseModel):
     type: Literal["delegate"] = "delegate"
     target: str | list[str]
+    strategy: Literal["all", "keyword", "sense"] = "all"
     keep_existing_sinks: bool = False
     queue_size: int = 100
     timeout_seconds: int = 60
@@ -21,7 +22,8 @@ class DelegateSinkConfig(BaseModel):
 
     def summary(self) -> str:
         targets = self.target if isinstance(self.target, list) else [self.target]
-        return f"delegate: {', '.join(targets)}"
+        strategy_suffix = f" [{self.strategy}]" if self.strategy != "all" else ""
+        return f"delegate: {', '.join(targets)}{strategy_suffix}"
 
 
 class HealthCheckConfig(BaseModel):

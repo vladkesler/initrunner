@@ -237,3 +237,18 @@ To avoid Pass 2 entirely, use `--dry-run` (skips LLM) or improve tag coverage so
 ### Prompt has no meaningful keywords
 
 If every word in the prompt is a stop word (e.g. "do it"), Intent Sensing raises an error before searching. Use a prompt with at least one content word.
+
+## Compose Integration
+
+Intent Sensing can also auto-route messages between services in a [compose pipeline](../orchestration/agent_composer.md). Set `strategy: keyword` or `strategy: sense` on a multi-target delegate sink:
+
+```yaml
+triager:
+  role: roles/triager.yaml
+  sink:
+    type: delegate
+    strategy: sense
+    target: [researcher, responder, escalator]
+```
+
+The same two-pass scoring (keyword + optional LLM tiebreak) runs on each message, using the target services' role metadata (name, description, tags) as candidates. See [Agent Composer — Routing Strategy](../orchestration/agent_composer.md#routing-strategy) for full details.

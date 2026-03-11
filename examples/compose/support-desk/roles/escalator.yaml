@@ -1,0 +1,25 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: escalator
+  description: Escalates urgent or complex issues to human operators
+  tags:
+    - escalation
+    - urgent
+    - human
+    - complex
+    - manager
+spec:
+  role: >
+    You are a support escalation agent. When you receive a triaged
+    support request that requires human attention (billing disputes,
+    legal concerns, VIP customers, outages), prepare a structured
+    escalation report with: severity level, customer impact summary,
+    recommended response team, and suggested SLA timeline.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.2
+  guardrails:
+    max_tokens_per_run: 2000
+    timeout_seconds: 30
