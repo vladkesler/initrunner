@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.17.0] - 2026-03-11
+
+### Added
+- **Compose auto-routing** — `strategy: keyword|sense` on delegate sinks routes messages to the best-matching target via intent scoring instead of static fan-out
+- **`RouterSink`** — wraps multiple `DelegateSink` instances, scores output against target metadata, forwards to winner
+- **`select_candidate_sync()`** — reusable intent-scoring core extracted from `role_selector` (no filesystem I/O)
+- **Dual-scoring fallback** — falls back to original user prompt when output text is inconclusive
+- **Support-desk example** — 4-service compose pipeline demonstrating `strategy: sense`
+- New test files: `test_compose_router_sink.py`, `test_role_selector.py`
+
+### Changed
+- `DelegateSinkConfig` accepts `strategy` field (`all`/`keyword`/`sense`, default `all`)
+- `select_role_sync()` refactored as thin wrapper over `select_candidate_sync()`
+- Orchestrator tracks `_router_sinks` separately to avoid double-close
+
+### Documentation
+- Updated: `docs/orchestration/agent_composer.md` — routing strategy section
+- Updated: `docs/orchestration/sinks.md` — strategy mention
+- Updated: `docs/core/intent_sensing.md` — compose integration section
+- Updated: `README.md` — auto-routing in feature comparison, compose section, examples
+
 ## [1.16.0] - 2026-03-06
 
 ### Added
