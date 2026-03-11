@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.18.0] - 2026-03-11
+
+### Changed
+- **BREAKING: Remove `MemoryConfig.max_memories`** — use `semantic.max_memories` instead; old YAML files get a clear migration error with instructions
+- `apply_shared_memory()` now patches `semantic.max_memories` instead of the removed top-level field
+- API `MemoryDetail` model no longer exposes `max_memories` (use `semantic_max`)
+
+### Added
+- **Shared CLI option aliases** — `AuditDbOption`, `NoAuditOption`, `SkillDirOption` in `initrunner/cli/_options.py` eliminate per-command duplication
+- **`INITRUNNER_AUDIT_DB` env var** — sets default audit database path (overridden by `--audit-db` flag)
+
+### Documentation
+- All memory config examples updated to use nested `semantic.max_memories`
+- CLI reference updated with `INITRUNNER_AUDIT_DB` env var
+- Removed deprecated backward-compatibility notes from memory docs
+
 ## [1.17.0] - 2026-03-11
 
 ### Added
