@@ -192,7 +192,8 @@ spec:
     name: llama3.2
   memory:
     max_sessions: 10
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
     embeddings:
       provider: ollama
       model: nomic-embed-text

@@ -16,7 +16,7 @@ from rich.table import Table
 from initrunner._log import get_logger
 from initrunner.agent.executor import execute_run
 from initrunner.agent.loader import _load_dotenv, build_agent, load_and_build, load_role
-from initrunner.agent.schema.memory import MemoryConfig
+from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.compose.delegate_sink import DelegateEvent, DelegateSink
@@ -35,14 +35,20 @@ def apply_shared_memory(role: RoleDefinition, store_path: str, max_memories: int
     """Patch a role's memory config to point at a shared store.
 
     If the role already has memory configured, override ``store_path`` and
-    ``max_memories``.  Otherwise inject a new ``MemoryConfig``.
+    ``semantic.max_memories``.  Otherwise inject a new ``MemoryConfig``.
     """
     if role.spec.memory is not None:
+        updated_semantic = role.spec.memory.semantic.model_copy(
+            update={"max_memories": max_memories}
+        )
         role.spec.memory = role.spec.memory.model_copy(
-            update={"store_path": store_path, "max_memories": max_memories}
+            update={"store_path": store_path, "semantic": updated_semantic}
         )
     else:
-        role.spec.memory = MemoryConfig(store_path=store_path, max_memories=max_memories)
+        role.spec.memory = MemoryConfig(
+            store_path=store_path,
+            semantic=SemanticMemoryConfig(max_memories=max_memories),
+        )
 
 
 class ComposeService:

@@ -268,7 +268,8 @@ spec:
         - .md
   memory:
     max_sessions: 10
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
     max_resume_messages: 20
   guardrails:
     max_tokens_per_run: 50000
@@ -411,7 +412,8 @@ spec:
       chunk_overlap: 50
   memory:
     max_sessions: 10
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
     max_resume_messages: 20
   guardrails:
     max_tokens_per_run: 50000
@@ -506,7 +508,8 @@ spec:
       chunk_overlap: 50
   memory:
     max_sessions: 10
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
     max_resume_messages: 20
   triggers:
     - type: cron
@@ -628,7 +631,8 @@ spec:
       chunk_overlap: 50
   memory:                           # Step 5: persistent memory
     max_sessions: 10
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
     max_resume_messages: 20
   triggers:                         # Step 7: scheduled execution
     - type: cron

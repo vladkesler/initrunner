@@ -35,7 +35,8 @@ spec:
       root_path: /data
     - type: audio
   memory:
-    max_memories: 500
+    semantic:
+      max_memories: 500
   guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 40

@@ -9,6 +9,7 @@ import typer
 from rich.table import Table
 
 from initrunner.cli._helpers import console
+from initrunner.cli._options import SkillDirOption
 
 app = typer.Typer(help="Manage reusable skills.")
 
@@ -68,9 +69,7 @@ def skill_validate(
 
 @app.command("list")
 def skill_list(
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra directory to scan")
-    ] = None,
+    skill_dir: SkillDirOption = None,
 ) -> None:
     """List available skills."""
     from initrunner.agent.skills import SkillLoadError, load_skill

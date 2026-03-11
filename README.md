@@ -222,7 +222,8 @@ spec:
     sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
   memory:
     store_path: ./memory.db
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
 ```
 
 ```bash

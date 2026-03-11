@@ -60,7 +60,6 @@ def role_to_detail(path: Path, role: RoleDefinition):
         memory = MemoryDetail(
             store_backend=role.spec.memory.store_backend.value,
             max_sessions=role.spec.memory.max_sessions,
-            max_memories=role.spec.memory.max_memories,
             max_resume_messages=role.spec.memory.max_resume_messages,
             episodic_enabled=role.spec.memory.episodic.enabled,
             episodic_max=role.spec.memory.episodic.max_episodes,

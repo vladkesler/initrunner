@@ -75,7 +75,7 @@ class TestFreshSetup:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -108,7 +108,7 @@ class TestFreshSetup:
                 "openai",
                 "--model",
                 "gpt-5-mini",
-                "--template",
+                "--intent",
                 "chatbot",
                 "--skip-test",
                 "--interfaces",
@@ -137,7 +137,7 @@ class TestRerunDetection:
                 "openai",
                 "--model",
                 "gpt-5-mini",
-                "--template",
+                "--intent",
                 "chatbot",
                 "--skip-test",
                 "--interfaces",
@@ -174,7 +174,7 @@ class TestProviderEnvVars:
                     provider,
                     "--model",
                     "test-model",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -209,7 +209,7 @@ class TestOllama:
                     "ollama",
                     "--model",
                     "llama3.2",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -243,7 +243,7 @@ class TestOllama:
                     "ollama",
                     "--model",
                     "llama3.2",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -274,7 +274,7 @@ class TestSkipTest:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -314,7 +314,7 @@ class TestSdkInstall:
                     "anthropic",
                     "--model",
                     "claude-sonnet-4-5-20250929",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -452,7 +452,7 @@ class TestRoleExists:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -482,7 +482,7 @@ class TestEnvFilePermissions:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -521,7 +521,7 @@ class TestTestRunFailure:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--interfaces",
                     "skip",
@@ -554,7 +554,7 @@ class TestPartialSetupRecovery:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -593,7 +593,7 @@ class TestWriteFailure:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -607,19 +607,17 @@ class TestWriteFailure:
         assert "export" in result.output
 
 
-class TestTemplatePickerChoices:
+class TestIntentPickerChoices:
     @pytest.mark.parametrize(
-        "template_choice,expected_content,extra_input",
+        "intent_choice,expected_content,extra_input",
         [
             ("chatbot", "You are a helpful assistant", ""),
-            ("rag", "knowledge assistant", "\n"),  # doc sources prompt
+            ("knowledge", "knowledge assistant", "\n"),  # doc sources prompt
             ("memory", "long-term memory", ""),
             ("daemon", "monitoring assistant", "\n\n"),  # trigger type + watch paths
         ],
     )
-    def test_template_picker_choices(
-        self, clean_env, template_choice, expected_content, extra_input
-    ):
+    def test_intent_picker_choices(self, clean_env, intent_choice, expected_content, extra_input):
         tmp_path = clean_env
         output = tmp_path / "role.yaml"
 
@@ -633,8 +631,8 @@ class TestTemplatePickerChoices:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
-                    template_choice,
+                    "--intent",
+                    intent_choice,
                     "--skip-test",
                     "--interfaces",
                     "skip",
@@ -674,7 +672,7 @@ class TestSecurityDisclaimer:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -703,7 +701,7 @@ class TestSecurityDisclaimer:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--interfaces",
@@ -735,8 +733,8 @@ class TestNextStepsIngestHint:
                 "openai",
                 "--model",
                 "gpt-5-mini",
-                "--template",
-                "rag",
+                "--intent",
+                "knowledge",
                 "--skip-test",
                 "--interfaces",
                 "skip",
@@ -763,7 +761,7 @@ class TestNextStepsIngestHint:
                 "openai",
                 "--model",
                 "gpt-5-mini",
-                "--template",
+                "--intent",
                 "chatbot",
                 "--skip-test",
                 "--interfaces",
@@ -794,8 +792,8 @@ class TestNextStepsIngestHint:
                     "ollama",
                     "--model",
                     "llama3.2",
-                    "--template",
-                    "rag",
+                    "--intent",
+                    "knowledge",
                     "--skip-test",
                     "--interfaces",
                     "skip",
@@ -819,7 +817,7 @@ class TestInterfaceInstall:
             "openai",
             "--model",
             "gpt-5-mini",
-            "--template",
+            "--intent",
             "chatbot",
             "--skip-test",
             "--output",
@@ -893,7 +891,7 @@ class TestInterfaceInstall:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--output",
@@ -921,7 +919,7 @@ class TestInterfaceInstall:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--output",
@@ -950,7 +948,7 @@ class TestInterfaceInstall:
                     "openai",
                     "--model",
                     "gpt-5-mini",
-                    "--template",
+                    "--intent",
                     "chatbot",
                     "--skip-test",
                     "--output",
@@ -1095,69 +1093,6 @@ class TestIntentSetup:
         assert output.exists()
         content = output.read_text()
         assert "telegram" in content.lower()
-
-
-class TestBackwardCompat:
-    def test_template_rag_still_works(self, clean_env, monkeypatch):
-        """--template rag should still work (mapped to knowledge intent)."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        result = runner.invoke(
-            app,
-            [
-                "setup",
-                "-y",
-                "--provider",
-                "openai",
-                "--model",
-                "gpt-5-mini",
-                "--template",
-                "rag",
-                "--skip-test",
-                "--interfaces",
-                "skip",
-                "--skip-chat-yaml",
-                "--output",
-                str(output),
-            ],
-            input="\n\n",  # accept default tools + default doc sources
-        )
-        assert result.exit_code == 0
-        assert "deprecated" in result.output.lower()
-        assert output.exists()
-        content = output.read_text()
-        assert "ingest" in content
-
-    def test_template_chatbot_still_works(self, clean_env, monkeypatch):
-        """--template chatbot should still work (mapped to chatbot intent)."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        result = runner.invoke(
-            app,
-            [
-                "setup",
-                "-y",
-                "--provider",
-                "openai",
-                "--model",
-                "gpt-5-mini",
-                "--template",
-                "chatbot",
-                "--skip-test",
-                "--interfaces",
-                "skip",
-                "--skip-chat-yaml",
-                "--output",
-                str(output),
-            ],
-            input="\n",  # accept default tools
-        )
-        assert result.exit_code == 0
-        assert output.exists()
 
 
 class TestSkipChatYaml:

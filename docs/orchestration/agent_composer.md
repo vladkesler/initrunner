@@ -454,8 +454,8 @@ Where `{compose-name}` comes from `metadata.name`.
 
 At startup, `apply_shared_memory()` patches each service's role definition:
 
-- **Roles with `memory:` configured**: the existing `store_path` and `max_memories` are overridden with the shared values. All other memory settings (embeddings, max_sessions, etc.) are preserved.
-- **Roles without `memory:`**: a `MemoryConfig` is injected with the shared path and max_memories, so `remember()`/`recall()`/`list_memories()` tools become available automatically.
+- **Roles with `memory:` configured**: the existing `store_path` and `semantic.max_memories` are overridden with the shared values. All other memory settings (embeddings, max_sessions, etc.) are preserved.
+- **Roles without `memory:`**: a `MemoryConfig` is injected with the shared path and `semantic.max_memories`, so `remember()`/`recall()`/`list_memories()` tools become available automatically.
 
 ### Embedding Consistency
 

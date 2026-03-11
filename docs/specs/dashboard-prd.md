@@ -154,7 +154,7 @@ class MemoryItem:
   - **Tools** card: list with type badges
   - **Triggers** card: list with type badges
   - **Ingest** card: sources, chunking config, store backend
-  - **Memory** card: store_backend, max_sessions, max_memories
+  - **Memory** card: store_backend, max_sessions, semantic.max_memories
 - Action buttons: Chat, Ingest, Daemon, Memory, Validate
 - YAML viewer toggle (syntax-highlighted)
 - Inline editing via form dialogs

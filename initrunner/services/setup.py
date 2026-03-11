@@ -76,15 +76,6 @@ BOT_TOKEN_ENVS: dict[str, str] = {
     "discord-bot": "DISCORD_BOT_TOKEN",
 }
 
-# Map legacy --template values to intents
-_TEMPLATE_TO_INTENT: dict[str, str] = {
-    "chatbot": "chatbot",
-    "basic": "chatbot",
-    "rag": "knowledge",
-    "memory": "memory",
-    "daemon": "daemon",
-}
-
 
 # ---------------------------------------------------------------------------
 # Data
@@ -379,8 +370,3 @@ def run_ingest_for_role(role_path: Path) -> bool:
     except Exception as exc:
         _logger.warning("Ingestion failed: %s", exc)
         return False
-
-
-def template_to_intent(template: str) -> str:
-    """Map a legacy --template value to an intent name."""
-    return _TEMPLATE_TO_INTENT.get(template, template)

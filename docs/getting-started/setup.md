@@ -34,7 +34,6 @@ initrunner setup --skip-test
 | `--provider` | `str` | *(interactive)* | Provider name. Skips the interactive selection prompt. |
 | `--name` | `str` | `my-agent` | Agent name used in the generated role YAML. |
 | `--intent` | `str` | *(interactive)* | What to build: `chatbot`, `knowledge`, `memory`, `telegram-bot`, `discord-bot`, `api-agent`, `daemon`, or `from-example`. |
-| `--template` | `str` | — | **Deprecated.** Maps to `--intent` internally (`rag` -> `knowledge`, others pass through). |
 | `--model` | `str` | *(interactive)* | Model name. Skips the interactive model selection prompt. |
 | `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
 | `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
@@ -183,19 +182,6 @@ initrunner setup --provider openai --intent chatbot --skip-test --skip-chat-yaml
 ```
 
 The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.
-
-## Backward Compatibility
-
-The `--template` flag is still accepted but deprecated. It maps to `--intent` internally:
-
-| `--template` | `--intent` |
-|---|---|
-| `chatbot` | `chatbot` |
-| `rag` | `knowledge` |
-| `memory` | `memory` |
-| `daemon` | `daemon` |
-
-A deprecation hint is printed when `--template` is used.
 
 ## Configuration Files
 

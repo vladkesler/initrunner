@@ -64,7 +64,6 @@ class IngestDetail(BaseModel):
 class MemoryDetail(BaseModel):
     store_backend: str
     max_sessions: int
-    max_memories: int
     max_resume_messages: int
     episodic_enabled: bool = True
     episodic_max: int = 500

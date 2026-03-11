@@ -28,7 +28,6 @@ from initrunner.services.setup import (
     provider_needs_embeddings_warning,
     run_connectivity_test,
     save_chat_yaml,
-    template_to_intent,
 )
 from initrunner.services.setup import (
     validate_api_key as _validate_api_key,
@@ -109,7 +108,6 @@ def run_setup(
     provider: str | None,
     name: str,
     intent: str | None = None,
-    template: str | None = None,
     skip_test: bool,
     output: Path,
     accept_risks: bool = False,
@@ -173,11 +171,6 @@ def run_setup(
     # ---------------------------------------------------------------
     # Step 2: Intent selection (replaces template picker)
     # ---------------------------------------------------------------
-    # Handle legacy --template flag
-    if template is not None and intent is None:
-        console.print("[dim]Hint: --template is deprecated, use --intent instead[/dim]")
-        intent = template_to_intent(template)
-
     if intent is None:
         console.print()
         console.print("[bold]What do you want to build?[/bold]")

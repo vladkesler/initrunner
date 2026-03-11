@@ -232,7 +232,7 @@ tools:
 
 ### Behavior
 
-At invocation time, `apply_shared_memory()` patches each sub-agent's role definition — overriding `store_path` and `max_memories` if the role already has `memory:` configured, or injecting a `MemoryConfig` if it doesn't. The sub-agent then has access to `remember()`, `recall()`, and `list_memories()` tools backed by the shared store.
+At invocation time, `apply_shared_memory()` patches each sub-agent's role definition — overriding `store_path` and `semantic.max_memories` if the role already has `memory:` configured, or injecting a `MemoryConfig` if it doesn't. The sub-agent then has access to `remember()`, `recall()`, and `list_memories()` tools backed by the shared store.
 
 Shared memory only applies to **inline** mode. MCP agents manage their own memory independently.
 

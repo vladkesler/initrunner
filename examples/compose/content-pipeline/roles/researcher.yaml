@@ -40,7 +40,8 @@ spec:
     - type: datetime
   memory:
     max_sessions: 10
-    max_memories: 500
+    semantic:
+      max_memories: 500
   guardrails:
     max_tokens_per_run: 8000
     max_tool_calls: 15

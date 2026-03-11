@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 
 from initrunner.cli._helpers import console
+from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
 
 app = typer.Typer(help="MCP server introspection, gateway, and toolkit.")
 
@@ -64,11 +65,9 @@ def mcp_serve(
     pass_through: Annotated[
         bool, typer.Option("--pass-through", help="Also expose agent MCP tools directly")
     ] = False,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
-    ] = None,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
+    skill_dir: SkillDirOption = None,
 ) -> None:
     """Expose InitRunner agents as an MCP server."""
     from initrunner.cli._helpers import create_audit_logger, resolve_skill_dirs

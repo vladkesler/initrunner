@@ -354,7 +354,12 @@ def memory_fields(role: RoleDefinition) -> list[FieldSpec]:
     assert mem is not None
     return [
         FieldSpec("Max Sessions", "max_sessions", str(mem.max_sessions), FieldKind.INT),
-        FieldSpec("Max Memories", "max_memories", str(mem.max_memories), FieldKind.INT),
+        FieldSpec(
+            "Semantic Max Memories",
+            "semantic.max_memories",
+            str(mem.semantic.max_memories),
+            FieldKind.INT,
+        ),
         FieldSpec(
             "Max Resume Messages",
             "max_resume_messages",

@@ -46,8 +46,9 @@ spec:
     - type: datetime
   memory:
     max_sessions: 10
-    max_memories: 1000
     max_resume_messages: 20
+    semantic:
+      max_memories: 1000
   guardrails:
     max_tokens_per_run: 30000
     max_tool_calls: 20

@@ -324,7 +324,7 @@ class TestInlineInvokerSharedMemory:
         assert result == "response"
         assert patched_memory is not None
         assert patched_memory.store_path == shared_path
-        assert patched_memory.max_memories == 500
+        assert patched_memory.semantic.max_memories == 500
 
     def test_no_shared_memory_leaves_role_unchanged(self, tmp_path):
         """Without shared_memory_path, standard load_and_build is used."""

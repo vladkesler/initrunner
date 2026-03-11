@@ -730,7 +730,7 @@ class TestSharedMemory:
 
         for role in roles.values():
             assert role.spec.memory is not None
-            assert role.spec.memory.max_memories == 500
+            assert role.spec.memory.semantic.max_memories == 500
 
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
@@ -744,7 +744,7 @@ class TestSharedMemory:
             role_data = _make_role_data()
             role_data["spec"]["memory"] = {
                 "store_path": "/original/path.db",
-                "max_memories": 2000,
+                "semantic": {"max_memories": 2000},
             }
             role = RoleDefinition.model_validate(role_data)
             roles[str(path)] = role
@@ -762,7 +762,7 @@ class TestSharedMemory:
         for role in roles.values():
             assert role.spec.memory is not None
             assert role.spec.memory.store_path == "/tmp/shared.db"
-            assert role.spec.memory.max_memories == 500
+            assert role.spec.memory.semantic.max_memories == 500
 
     @patch("initrunner.compose.orchestrator.load_and_build")
     def test_no_shared_memory_uses_load_and_build(self, mock_load):

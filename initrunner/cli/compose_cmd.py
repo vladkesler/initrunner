@@ -10,6 +10,7 @@ import typer
 from rich.table import Table
 
 from initrunner.cli._helpers import console, create_audit_logger
+from initrunner.cli._options import AuditDbOption, NoAuditOption
 
 app = typer.Typer(help="Multi-agent compose orchestration.")
 
@@ -60,8 +61,8 @@ def compose_validate(
 @app.command("up")
 def compose_up(
     compose_file: Annotated[Path, typer.Argument(help="Path to compose YAML")],
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
 ) -> None:
     """Start a compose orchestration (foreground)."""
     from initrunner.compose.loader import ComposeLoadError, load_compose
@@ -91,9 +92,7 @@ def compose_events(
     since: Annotated[str | None, typer.Option("--since", help="Start timestamp (ISO)")] = None,
     until: Annotated[str | None, typer.Option("--until", help="End timestamp (ISO)")] = None,
     limit: Annotated[int, typer.Option("--limit", help="Max events to show")] = 100,
-    audit_db: Annotated[
-        Path | None, typer.Option("--audit-db", help="Path to audit database")
-    ] = None,
+    audit_db: AuditDbOption = None,
 ) -> None:
     """Query delegate routing events from the audit trail."""
     from initrunner.audit.logger import DEFAULT_DB_PATH, AuditLogger

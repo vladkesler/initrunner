@@ -16,6 +16,7 @@ from initrunner.cli._helpers import (
     load_role_or_exit,
     resolve_skill_dirs,
 )
+from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
 
 if TYPE_CHECKING:
     from initrunner.agent.executor import AutonomousResult, RunResult
@@ -65,11 +66,9 @@ def run(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Simulate with TestModel (no API calls)")
     ] = False,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
-    ] = None,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
+    skill_dir: SkillDirOption = None,
     attach: Annotated[
         list[str] | None,
         typer.Option(
@@ -103,11 +102,8 @@ def run(
         bool,
         typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
     ] = False,
-    task: Annotated[str | None, typer.Option("--task", help="Task prompt (alias for -p)")] = None,
 ) -> None:
     """Run an agent with a role definition."""
-    # --task is an alias for --prompt
-    prompt = prompt or task
 
     # --- Intent Sensing resolution ---
     if role_file is not None and sense:
@@ -325,7 +321,7 @@ def _run_team(
 ) -> None:
     """Run a team YAML file."""
     if not prompt:
-        console.print("[red]Error:[/red] Team mode requires --prompt (-p) or --task.")
+        console.print("[red]Error:[/red] Team mode requires --prompt (-p).")
         raise typer.Exit(1)
 
     from initrunner.cli._helpers import create_audit_logger
@@ -613,11 +609,9 @@ def _status_color(status: object) -> str:
 
 def daemon(
     role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
-    ] = None,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
+    skill_dir: SkillDirOption = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon

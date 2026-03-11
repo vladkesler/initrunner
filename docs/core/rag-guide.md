@@ -37,7 +37,8 @@ spec:
     sources:
       - "./docs/**/*.md"
   memory:
-    max_memories: 500
+    semantic:
+      max_memories: 500
 ```
 
 ## End-to-End Walkthrough

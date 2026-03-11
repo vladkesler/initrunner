@@ -16,7 +16,6 @@ from initrunner.services.setup import (
     needs_setup,
     provider_needs_embeddings_warning,
     save_env_key,
-    template_to_intent,
 )
 
 _MOCK_LOAD_ENV = patch("initrunner.services.providers._load_env")
@@ -249,17 +248,3 @@ class TestIntentTemplateMap:
             assert template_key in TEMPLATES, (
                 f"Intent '{intent_key}' maps to template '{template_key}' which is not in TEMPLATES"
             )
-
-
-class TestTemplateToIntent:
-    def test_rag_maps_to_knowledge(self):
-        assert template_to_intent("rag") == "knowledge"
-
-    def test_chatbot_maps_to_chatbot(self):
-        assert template_to_intent("chatbot") == "chatbot"
-
-    def test_unknown_passes_through(self):
-        assert template_to_intent("unknown") == "unknown"
-
-    def test_basic_maps_to_chatbot(self):
-        assert template_to_intent("basic") == "chatbot"

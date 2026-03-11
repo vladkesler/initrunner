@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 from initrunner.cli._helpers import console
+from initrunner.cli._options import AuditDbOption, NoAuditOption
 
 # Import shared tool constants from service layer
 from initrunner.services.providers import (
@@ -132,10 +133,7 @@ def chat(
         str | None,
         typer.Option("--tool-profile", help="Tool profile: minimal, all, none"),
     ] = None,
-    audit_db: Annotated[
-        Path | None,
-        typer.Option(help="Path to audit database"),
-    ] = None,
+    audit_db: AuditDbOption = None,
     extra_tools: Annotated[
         list[str] | None,
         typer.Option("--tools", help="Extra tool types to enable (repeatable)"),
@@ -144,10 +142,7 @@ def chat(
         bool,
         typer.Option("--list-tools", help="List available extra tool types and exit"),
     ] = False,
-    no_audit: Annotated[
-        bool,
-        typer.Option(help="Disable audit logging"),
-    ] = False,
+    no_audit: NoAuditOption = False,
     memory: Annotated[
         bool | None,
         typer.Option("--memory/--no-memory", help="Enable/disable persistent memory"),

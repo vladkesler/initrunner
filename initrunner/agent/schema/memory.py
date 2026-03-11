@@ -36,7 +36,6 @@ class MemoryConfig(BaseModel):
     store_path: str | None = None  # default: ~/.initrunner/memory/{agent-name}.db
     store_backend: StoreBackend = StoreBackend.ZVEC
     max_sessions: int = 10
-    max_memories: int = 1000  # deprecated: use semantic.max_memories
     max_resume_messages: int = 20  # limit history loaded on --resume
     embeddings: EmbeddingConfig = EmbeddingConfig()
     episodic: EpisodicMemoryConfig = EpisodicMemoryConfig()
@@ -44,9 +43,15 @@ class MemoryConfig(BaseModel):
     procedural: ProceduralMemoryConfig = ProceduralMemoryConfig()
     consolidation: ConsolidationConfig = ConsolidationConfig()
 
-    @model_validator(mode="after")
-    def _sync_max_memories(self) -> MemoryConfig:
-        """Sync legacy max_memories → semantic.max_memories for backward compat."""
-        if self.max_memories != 1000 and self.semantic.max_memories == 1000:
-            self.semantic.max_memories = self.max_memories
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_max_memories(cls, data: dict) -> dict:
+        if isinstance(data, dict) and "max_memories" in data:
+            raise ValueError(
+                "MemoryConfig.max_memories has been removed. "
+                "Use semantic.max_memories instead:\n"
+                "  memory:\n"
+                "    semantic:\n"
+                "      max_memories: <value>"
+            )
+        return data

@@ -28,23 +28,22 @@ class TestMemoryConfig:
         mc = MemoryConfig()
         assert mc.store_path is None
         assert mc.max_sessions == 10
-        assert mc.max_memories == 1000
         assert mc.max_resume_messages == 20
+        assert mc.semantic.max_memories == 1000
         assert mc.embeddings == EmbeddingConfig()
 
     def test_custom_values(self):
-        mc = MemoryConfig(max_sessions=5, max_memories=500, max_resume_messages=10)
+        mc = MemoryConfig(max_sessions=5, max_resume_messages=10)
         assert mc.max_sessions == 5
-        assert mc.max_memories == 500
         assert mc.max_resume_messages == 10
 
     def test_memory_config_in_role(self):
         data = _minimal_role_data()
-        data["spec"]["memory"] = {"max_sessions": 5, "max_memories": 500}
+        data["spec"]["memory"] = {"max_sessions": 5, "semantic": {"max_memories": 500}}
         role = RoleDefinition.model_validate(data)
         assert role.spec.memory is not None
         assert role.spec.memory.max_sessions == 5
-        assert role.spec.memory.max_memories == 500
+        assert role.spec.memory.semantic.max_memories == 500
 
     def test_no_memory_by_default(self):
         role = RoleDefinition.model_validate(_minimal_role_data())
@@ -134,20 +133,22 @@ class TestConditionalToolRegistration:
         assert "remember" in names
 
 
-class TestMemoryConfigBackwardCompat:
-    def test_max_memories_syncs_to_semantic(self):
-        mc = MemoryConfig(max_memories=500)
-        assert mc.semantic.max_memories == 500
+class TestMemoryConfigMigrationError:
+    def test_legacy_max_memories_raises(self):
+        import pytest
 
-    def test_explicit_semantic_not_overridden(self):
-        mc = MemoryConfig(max_memories=500, semantic=SemanticMemoryConfig(max_memories=200))
-        # Explicit semantic wins — max_memories != 1000, but semantic was also set
-        assert mc.semantic.max_memories == 200
+        with pytest.raises(Exception, match="max_memories has been removed"):
+            MemoryConfig(max_memories=500)
 
-    def test_default_max_memories_no_sync(self):
+    def test_legacy_max_memories_with_semantic_raises(self):
+        import pytest
+
+        with pytest.raises(Exception, match="max_memories has been removed"):
+            MemoryConfig(max_memories=500, semantic=SemanticMemoryConfig(max_memories=200))
+
+    def test_semantic_max_memories_works(self):
         mc = MemoryConfig(semantic=SemanticMemoryConfig(max_memories=200))
         assert mc.semantic.max_memories == 200
-        assert mc.max_memories == 1000
 
     def test_nested_configs_in_role_yaml(self):
         data = {

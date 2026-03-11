@@ -9,13 +9,12 @@ import typer
 from rich.table import Table
 
 from initrunner.cli._helpers import check_ollama_running, console, resolve_skill_dirs
+from initrunner.cli._options import SkillDirOption
 
 
 def validate(
     role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
-    ] = None,
+    skill_dir: SkillDirOption = None,
 ) -> None:
     """Validate a role definition file."""
     from initrunner.cli._helpers import detect_yaml_kind
@@ -104,7 +103,7 @@ def validate(
         table.add_row(
             "Memory",
             f"max_sessions={role.spec.memory.max_sessions}, "
-            f"max_memories={role.spec.memory.max_memories}",
+            f"max_memories={role.spec.memory.semantic.max_memories}",
         )
     else:
         table.add_row("Memory", "(none)")
@@ -287,7 +286,6 @@ def setup(
             "api-agent, daemon, from-example"
         ),
     ] = None,
-    template: Annotated[str | None, typer.Option(help="[deprecated] Use --intent instead")] = None,
     model: Annotated[
         str | None,
         typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
@@ -314,7 +312,6 @@ def setup(
         provider=provider,
         name=name,
         intent=intent,
-        template=template,
         skip_test=skip_test,
         output=output,
         accept_risks=accept_risks,

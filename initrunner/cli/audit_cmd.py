@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from initrunner.cli._helpers import console
+from initrunner.cli._options import AuditDbOption
 
 app = typer.Typer(help="Inspect and export audit records.")
 
@@ -22,7 +23,7 @@ def audit_prune(
         int, typer.Option(help="Delete records older than this many days")
     ] = 90,
     max_records: Annotated[int, typer.Option(help="Maximum records to keep")] = 100_000,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
+    audit_db: AuditDbOption = None,
 ) -> None:
     """Prune old audit records."""
     from initrunner.audit.logger import DEFAULT_DB_PATH
@@ -53,7 +54,7 @@ def audit_export(
     since: Annotated[str | None, typer.Option(help="Filter: timestamp >= ISO string")] = None,
     until: Annotated[str | None, typer.Option(help="Filter: timestamp <= ISO string")] = None,
     limit: Annotated[int, typer.Option(help="Max records to return")] = 1000,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
+    audit_db: AuditDbOption = None,
 ) -> None:
     """Export audit records as JSON or CSV."""
     from initrunner.audit.logger import DEFAULT_DB_PATH

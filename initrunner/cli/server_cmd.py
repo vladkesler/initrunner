@@ -16,6 +16,7 @@ from initrunner.cli._helpers import (
     create_audit_logger,
     resolve_skill_dirs,
 )
+from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
 
 _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
@@ -28,11 +29,9 @@ def serve(
     host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
     api_key: Annotated[str | None, typer.Option(help="API key for authentication")] = None,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
-    skill_dir: Annotated[
-        Path | None, typer.Option("--skill-dir", help="Extra skill search directory")
-    ] = None,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
+    skill_dir: SkillDirOption = None,
     cors_origin: Annotated[
         list[str] | None,
         typer.Option("--cors-origin", help="Allowed CORS origin (repeatable)"),
@@ -82,8 +81,8 @@ def pipeline(
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Validate and display step graph without executing")
     ] = False,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
 ) -> None:
     """Run a pipeline of agents."""
     from initrunner.pipeline.loader import PipelineLoadError, load_pipeline
@@ -261,8 +260,8 @@ def ui(
     no_browser: Annotated[bool, typer.Option(help="Don't open browser automatically")] = False,
     api_key: Annotated[str | None, typer.Option(help="API key for dashboard auth")] = None,
     no_auth: Annotated[bool, typer.Option(help="Disable authentication (NOT recommended)")] = False,
-    audit_db: Annotated[Path | None, typer.Option(help="Path to audit database")] = None,
-    no_audit: Annotated[bool, typer.Option(help="Disable audit logging")] = False,
+    audit_db: AuditDbOption = None,
+    no_audit: NoAuditOption = False,
 ) -> None:
     """Launch the web dashboard."""
     try:

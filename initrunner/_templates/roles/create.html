@@ -243,8 +243,9 @@ function updateYamlPreview() {
     if (memory) {
         lines.push("  memory:");
         lines.push("    max_sessions: 10");
-        lines.push("    max_memories: 1000");
         lines.push("    max_resume_messages: 20");
+        lines.push("    semantic:");
+        lines.push("      max_memories: 1000");
     }
 
     if (ingest) {

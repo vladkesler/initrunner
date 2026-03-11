@@ -67,7 +67,7 @@ class TestBuildRoleYaml:
         result = build_role_yaml(name="test-agent", memory=True)
         raw = yaml.safe_load(result)
         assert raw["spec"]["memory"]["max_sessions"] == 10
-        assert raw["spec"]["memory"]["max_memories"] == 1000
+        assert raw["spec"]["memory"]["semantic"]["max_memories"] == 1000
 
     def test_without_memory(self):
         result = build_role_yaml(name="test-agent", memory=False)

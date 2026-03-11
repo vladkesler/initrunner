@@ -147,7 +147,6 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 |------|-------------|
 | `--provider TEXT` | Provider (skip interactive selection) |
 | `--name TEXT` | Agent name (default: `my-agent`) |
-| `--template TEXT` | Template: `chatbot`, `rag`, `memory`, `daemon` |
 | `--model TEXT` | Model name. Uses provider default if omitted. |
 | `--skip-test` | Skip connectivity test |
 | `--output PATH` | Role output path (default: `role.yaml`) |
@@ -216,3 +215,10 @@ See [MCP Gateway](../interfaces/mcp-gateway.md) for transport details, client co
 | `--role PATH` | Role file to test (loads its `.env` and uses it for `--quickstart`) |
 
 See [Doctor](../operations/doctor.md) for details.
+
+## Environment variables
+
+| Variable | Effect |
+|----------|--------|
+| `INITRUNNER_AUDIT_DB` | Default audit database path (overridden by `--audit-db`) |
+| `INITRUNNER_SKILL_DIR` | Extra skill search directory (CLI `--skill-dir` takes precedence, but env dir is also searched) |

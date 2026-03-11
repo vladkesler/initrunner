@@ -174,7 +174,8 @@ class RoleDetailScreen(RoleScreen):
         assert mem is not None
         lines = [f"[bold {COLOR_SECONDARY}]── Memory ──[/]"]
         lines.append(f"  Store         {mem.store_backend.value}")
-        lines.append(f"  Max Sessions  {mem.max_sessions:<14}Max Memories    {mem.max_memories}")
+        sem_max = mem.semantic.max_memories
+        lines.append(f"  Max Sessions  {mem.max_sessions:<14}Max Memories    {sem_max}")
         lines.append(f"  Resume Msgs   {mem.max_resume_messages}")
         return "\n".join(lines)
 
@@ -396,7 +397,12 @@ class RoleDetailScreen(RoleScreen):
         except ValueError as exc:
             self.notify(f"Invalid value: {exc}", severity="error", markup=False)
             return
-        save_yaml_field(self._role_path, "spec.memory", converted)
+        flat = {k: v for k, v in converted.items() if "." not in k}
+        if flat:
+            save_yaml_field(self._role_path, "spec.memory", flat)
+        for k, v in converted.items():
+            if "." in k:
+                save_yaml_field_scalar(self._role_path, f"spec.memory.{k}", v)
         self.run_worker(self._reload_role())
 
     def _on_list_item_saved(self, section: str, index: int, values: dict[str, str] | None) -> None:

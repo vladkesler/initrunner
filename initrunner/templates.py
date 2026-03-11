@@ -205,8 +205,9 @@ spec:
     max_tokens: 4096
   memory:
     max_sessions: 10
-    max_memories: 1000
     max_resume_messages: 20
+    semantic:
+      max_memories: 1000
   guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 20
@@ -593,8 +594,8 @@ def build_role_yaml(
     if memory:
         role["spec"]["memory"] = {
             "max_sessions": 10,
-            "max_memories": 1000,
             "max_resume_messages": 20,
+            "semantic": {"max_memories": 1000},
         }
 
     if ingest:

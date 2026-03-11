@@ -65,11 +65,10 @@ See [Chat & Quick Start](../getting-started/chat.md) for all chat options.
 
 ### Role-based config
 
-Minimal backward-compatible config still works — a bare `memory:` section with just `max_memories` enables semantic memory with defaults for all other types:
-
 ```yaml
   memory:
-    max_memories: 1000
+    semantic:
+      max_memories: 1000
 ```
 
 ```bash
@@ -119,7 +118,6 @@ Memory is configured in the `spec.memory` section:
 spec:
   memory:
     max_sessions: 10              # default: 10
-    max_memories: 1000            # deprecated — use semantic.max_memories
     max_resume_messages: 20       # default: 20
     store_backend: zvec           # default: "zvec"
     store_path: null              # default: ~/.initrunner/memory/<agent-name>.zvec
@@ -149,7 +147,6 @@ spec:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `max_sessions` | `int` | `10` | Maximum number of sessions to keep. Oldest sessions are pruned on REPL exit. |
-| `max_memories` | `int` | `1000` | **Deprecated.** Use `semantic.max_memories`. If set to a non-default value and `semantic.max_memories` is at default, the value is synced for backward compatibility. |
 | `max_resume_messages` | `int` | `20` | Maximum number of messages loaded when using `--resume`. |
 | `store_backend` | `str` | `"zvec"` | Memory store backend. Uses Zvec, an in-process vector database. |
 | `store_path` | `str \| null` | `null` | Custom path for the memory store directory. Default: `~/.initrunner/memory/<agent-name>.zvec`. |

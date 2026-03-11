@@ -92,7 +92,7 @@ class TestTeamRunCli:
         team_file.write_text(_TEAM_YAML)
 
         result = runner.invoke(
-            app, ["run", str(team_file), "--task", "review this", "--dry-run", "--no-audit"]
+            app, ["run", str(team_file), "-p", "review this", "--dry-run", "--no-audit"]
         )
         assert result.exit_code == 0
         assert "Team mode" in result.output
@@ -143,7 +143,7 @@ class TestTeamRunCli:
         team_file.write_text(_TEAM_YAML)
 
         result = runner.invoke(
-            app, ["run", str(team_file), "--task", "my task", "--dry-run", "--no-audit"]
+            app, ["run", str(team_file), "-p", "my task", "--dry-run", "--no-audit"]
         )
         assert result.exit_code == 0
 
@@ -162,7 +162,7 @@ class TestTeamRunCli:
         team_file = tmp_path / "team.yaml"
         team_file.write_text(_TEAM_YAML)
 
-        result = runner.invoke(app, ["run", str(team_file), "--task", "task", "--no-audit"])
+        result = runner.invoke(app, ["run", str(team_file), "-p", "task", "--no-audit"])
         assert result.exit_code == 1
 
 
