@@ -24,10 +24,11 @@ def validate(
         _validate_team(role_file)
         return
 
-    from initrunner.agent.loader import RoleLoadError, load_role
+    from initrunner.agent.loader import RoleLoadError
+    from initrunner.services.discovery import load_role_sync
 
     try:
-        role = load_role(role_file)
+        role = load_role_sync(role_file)
     except RoleLoadError as e:
         console.print(f"[red]Invalid:[/red] {e}")
         raise typer.Exit(1) from None

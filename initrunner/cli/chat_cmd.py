@@ -443,7 +443,8 @@ def _run_ephemeral_ingest(role, provider: str) -> None:
     """Run ingestion for ephemeral chat mode. Auto-forces on model change."""
     from initrunner.ingestion.pipeline import run_ingest
 
-    assert role.spec.ingest is not None
+    if role.spec.ingest is None:
+        raise RuntimeError("Role has no ingest configuration")
     resource_limits = role.spec.security.resources
 
     try:

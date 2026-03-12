@@ -27,7 +27,7 @@ def memory_clear(
     force: Annotated[bool, typer.Option("--force", help="Skip confirmation")] = False,
 ) -> None:
     """Clear memory store for an agent."""
-    from initrunner.agent.memory_ops import clear_memories
+    from initrunner.services.memory import clear_memories_sync
 
     role = load_role_or_exit(role_file)
 
@@ -65,7 +65,7 @@ def memory_clear(
             console.print("Aborted.")
             return
 
-    if not clear_memories(role, what=what, memory_type=mt_filter):
+    if not clear_memories_sync(role, what=what, memory_type=mt_filter):
         console.print("No memory store found.")
         return
 
@@ -80,7 +80,7 @@ def memory_export(
     ),
 ) -> None:
     """Export memories to JSON."""
-    from initrunner.agent.memory_ops import export_memories
+    from initrunner.services.memory import export_memories_sync
 
     role = load_role_or_exit(role_file)
 
@@ -88,7 +88,7 @@ def memory_export(
         console.print("[red]Error:[/red] No memory config in role definition.")
         raise typer.Exit(1)
 
-    data = export_memories(role)
+    data = export_memories_sync(role)
     if not data:
         console.print("No memory store found.")
         return
@@ -155,17 +155,10 @@ def memory_consolidate(
         console.print("[red]Error:[/red] No memory config in role definition.")
         raise typer.Exit(1)
 
-    from initrunner.stores.factory import open_memory_store
+    from initrunner.services.memory import consolidate_memories_sync
 
-    with open_memory_store(role.spec.memory, role.metadata.name) as store:
-        if store is None:
-            console.print("No memory store found.")
-            return
-
-        from initrunner.agent.memory_consolidation import maybe_consolidate
-
-        with console.status("Consolidating episodic memories...", spinner="dots"):
-            created = maybe_consolidate(store, role, force=True)
+    with console.status("Consolidating episodic memories...", spinner="dots"):
+        created = consolidate_memories_sync(role, force=True)
 
     if created > 0:
         console.print(f"[green]Created[/green] {created} semantic memories from episodic data.")

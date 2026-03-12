@@ -44,9 +44,11 @@ async def resolve_role_path(request: Request, role_id: str) -> Path:
 
 async def load_role_async(role_path: Path) -> RoleDefinition:
     """Load a role from *role_path* in a thread with BUILD_TIMEOUT."""
-    from initrunner.agent.loader import load_role
+    from initrunner.services.discovery import load_role_sync
 
-    return await asyncio.wait_for(asyncio.to_thread(load_role, role_path), timeout=BUILD_TIMEOUT)
+    return await asyncio.wait_for(
+        asyncio.to_thread(load_role_sync, role_path), timeout=BUILD_TIMEOUT
+    )
 
 
 async def load_role_with_memory(role_id: str, request: Request) -> tuple[RoleDefinition, Path]:

@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FuturesTimeout
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
@@ -45,6 +46,28 @@ def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
         raise TimeoutError(f"Run timed out after {int(timeout)}s") from None
 
 
+# ---------------------------------------------------------------------------
+# Retry helpers
+# ---------------------------------------------------------------------------
+
+
+def _should_retry(exc: ModelHTTPError, attempt: int) -> float | None:
+    """Return delay seconds if retryable and more attempts remain, else None."""
+    if exc.status_code not in _RETRYABLE_STATUS_CODES:
+        return None
+    if attempt >= _RETRY_MAX_ATTEMPTS - 1:
+        return None
+    delay = _RETRY_BACKOFF_BASE * (2**attempt)
+    _logger.warning(
+        "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
+        exc.status_code,
+        attempt + 1,
+        _RETRY_MAX_ATTEMPTS,
+        delay,
+    )
+    return delay
+
+
 def _retry_model_call(
     fn: Callable[[], _T],
     *,
@@ -54,29 +77,48 @@ def _retry_model_call(
 
     Retries up to ``_RETRY_MAX_ATTEMPTS`` times for status codes in
     ``_RETRYABLE_STATUS_CODES``, using exponential backoff.  Calls
-    *on_retry* (if provided) before each retry attempt.
+    *on_retry* (if provided) before each retry attempt — only when an
+    actual retry will follow.
     """
     last_http_error: ModelHTTPError | None = None
     for attempt in range(_RETRY_MAX_ATTEMPTS):
         try:
             return fn()
         except ModelHTTPError as e:
-            if e.status_code not in _RETRYABLE_STATUS_CODES:
+            delay = _should_retry(e, attempt)
+            if delay is None:
                 raise
             last_http_error = e
             if on_retry is not None:
                 on_retry()
-            if attempt < _RETRY_MAX_ATTEMPTS - 1:
-                delay = _RETRY_BACKOFF_BASE * (2**attempt)
-                _logger.warning(
-                    "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
-                    e.status_code,
-                    attempt + 1,
-                    _RETRY_MAX_ATTEMPTS,
-                    delay,
-                )
-                time.sleep(delay)
+            time.sleep(delay)
     raise last_http_error  # type: ignore[misc]
+
+
+async def _retry_model_call_async(
+    fn: Callable[..., Any],
+    *,
+    on_retry: Callable[[], None] | None = None,
+) -> Any:
+    """Async variant of ``_retry_model_call`` — uses ``asyncio.sleep``."""
+    last_http_error: ModelHTTPError | None = None
+    for attempt in range(_RETRY_MAX_ATTEMPTS):
+        try:
+            return await fn()
+        except ModelHTTPError as e:
+            delay = _should_retry(e, attempt)
+            if delay is None:
+                raise
+            last_http_error = e
+            if on_retry is not None:
+                on_retry()
+            await asyncio.sleep(delay)
+    raise last_http_error  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# Result dataclasses
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -178,13 +220,26 @@ def _validate_input_or_fail(
     return None
 
 
-def _handle_run_error(result: RunResult, exc: Exception, partial_output: str = "") -> None:
-    """Populate *result* fields for a caught run-time exception."""
+def _handle_run_error(
+    result: RunResult,
+    exc: Exception,
+    partial_output: str = "",
+    *,
+    timeout_seconds: float | None = None,
+) -> None:
+    """Populate *result* fields for a caught run-time exception.
+
+    When *timeout_seconds* is provided and *exc* is a ``TimeoutError``
+    with an empty message (as from ``asyncio.wait_for``), the error
+    string is formatted using the timeout value.
+    """
     result.success = False
     if isinstance(exc, ModelHTTPError):
         result.error = f"Model API error: {exc}"
     elif isinstance(exc, UsageLimitExceeded):
         result.error = f"Usage limit exceeded: {exc}"
+    elif isinstance(exc, TimeoutError) and not str(exc) and timeout_seconds is not None:
+        result.error = f"TimeoutError: Run timed out after {int(timeout_seconds)}s"
     else:
         result.error = f"{type(exc).__name__}: {exc}"
     if partial_output:
@@ -236,6 +291,75 @@ def _audit_result(
             trigger_metadata=trigger_metadata,
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Shared output processing (deduplicates sync/async paths)
+# ---------------------------------------------------------------------------
+
+
+def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
+    """Serialize agent output, validate, extract usage. Returns new_messages."""
+    raw_output = agent_result.output
+    if isinstance(raw_output, BaseModel):
+        result.output = raw_output.model_dump_json()
+    elif isinstance(raw_output, (dict, list)):
+        result.output = json.dumps(raw_output)
+    else:
+        result.output = str(raw_output)
+
+    _apply_output_validation(result, role)
+
+    usage = agent_result.usage()
+    result.tokens_in = usage.input_tokens or 0
+    result.tokens_out = usage.output_tokens or 0
+    result.total_tokens = usage.total_tokens or 0
+    result.tool_calls = usage.tool_calls or 0
+    new_messages = agent_result.all_messages()
+    result.tool_call_names = _extract_tool_call_names(new_messages)
+    return new_messages
+
+
+def _process_stream_output(
+    output_parts: list[str],
+    usage: Any,
+    new_messages: list,
+    result: RunResult,
+    role: RoleDefinition,
+) -> None:
+    """Finalize stream output: join parts, validate, extract usage."""
+    result.tool_call_names = _extract_tool_call_names(new_messages)
+    result.output = "".join(output_parts)
+    _apply_output_validation(result, role)
+
+    if usage is not None:
+        result.tokens_in = usage.input_tokens or 0
+        result.tokens_out = usage.output_tokens or 0
+        result.total_tokens = usage.total_tokens or 0
+
+
+def _record_span_metrics(span: Any, result: RunResult) -> None:
+    """Set standard OpenTelemetry span attributes from a RunResult."""
+    span.set_attribute("initrunner.tokens_total", result.total_tokens)
+    span.set_attribute("initrunner.duration_ms", result.duration_ms)
+    span.set_attribute("initrunner.success", result.success)
+
+
+@contextmanager
+def _create_run_span(run_id: str, role: RoleDefinition, trigger_type: str | None = None):
+    """Create an OpenTelemetry span with standard agent-run attributes."""
+    from opentelemetry import trace  # type: ignore[import-not-found]
+
+    tracer = trace.get_tracer("initrunner")
+    with tracer.start_as_current_span(
+        "initrunner.agent.run",
+        attributes={
+            "initrunner.run_id": run_id,
+            "initrunner.agent_name": role.metadata.name,
+            "initrunner.trigger_type": trigger_type or "",
+        },
+    ) as span:
+        yield span
 
 
 # ---------------------------------------------------------------------------
@@ -327,53 +451,22 @@ def execute_run(
     if blocked is not None:
         return blocked, []
 
-    from opentelemetry import trace
-
-    tracer = trace.get_tracer("initrunner")
-
     result = RunResult(run_id=run_id)
     new_messages: list = []
     start = time.monotonic()
 
-    with tracer.start_as_current_span(
-        "initrunner.agent.run",
-        attributes={
-            "initrunner.run_id": run_id,
-            "initrunner.agent_name": role.metadata.name,
-            "initrunner.trigger_type": trigger_type or "",
-        },
-    ) as span:
+    with _create_run_span(run_id, role, trigger_type) as span:
         try:
             agent_result = _run_with_timeout(
                 lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
                 timeout=role.spec.guardrails.timeout_seconds,
             )
-
-            raw_output = agent_result.output
-            if isinstance(raw_output, BaseModel):
-                result.output = raw_output.model_dump_json()
-            elif isinstance(raw_output, (dict, list)):
-                result.output = json.dumps(raw_output)
-            else:
-                result.output = str(raw_output)
-
-            _apply_output_validation(result, role)
-
-            usage = agent_result.usage()
-            result.tokens_in = usage.input_tokens or 0
-            result.tokens_out = usage.output_tokens or 0
-            result.total_tokens = usage.total_tokens or 0
-            result.tool_calls = usage.tool_calls or 0
-            new_messages = agent_result.all_messages()
-            result.tool_call_names = _extract_tool_call_names(new_messages)
+            new_messages = _process_agent_output(agent_result, result, role)
         except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
             _handle_run_error(result, e)
 
         result.duration_ms = int((time.monotonic() - start) * 1000)
-
-        span.set_attribute("initrunner.tokens_total", result.total_tokens)
-        span.set_attribute("initrunner.duration_ms", result.duration_ms)
-        span.set_attribute("initrunner.success", result.success)
+        _record_span_metrics(span, result)
 
     _audit_result(
         result,
@@ -419,11 +512,7 @@ def execute_run_stream(
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
 ) -> tuple[RunResult, list]:
-    """Execute a streaming agent run with guardrails, audit, and token callback.
-
-    Applies the same pre-run content validation, usage limits, post-run output
-    validation, and audit logging as ``execute_run``.
-    """
+    """Execute a streaming agent run with guardrails, audit, and token callback."""
     run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
         role,
         prompt,
@@ -445,10 +534,6 @@ def execute_run_stream(
             "Use non-streaming execution instead."
         )
 
-    from opentelemetry import trace
-
-    tracer = trace.get_tracer("initrunner")
-
     result = RunResult(run_id=run_id)
     new_messages: list = []
     output_parts: list[str] = []
@@ -456,14 +541,7 @@ def execute_run_stream(
 
     stream_state: dict = {"messages": [], "usage": None}
 
-    with tracer.start_as_current_span(
-        "initrunner.agent.run",
-        attributes={
-            "initrunner.run_id": run_id,
-            "initrunner.agent_name": role.metadata.name,
-            "initrunner.trigger_type": trigger_type or "",
-        },
-    ) as span:
+    with _create_run_span(run_id, role, trigger_type) as span:
         try:
 
             def _do_stream():
@@ -484,25 +562,12 @@ def execute_run_stream(
                 timeout=role.spec.guardrails.timeout_seconds,
             )
             new_messages = stream_state["messages"]
-            result.tool_call_names = _extract_tool_call_names(new_messages)
-            usage = stream_state["usage"]
-
-            result.output = "".join(output_parts)
-
-            _apply_output_validation(result, role)
-
-            if usage is not None:
-                result.tokens_in = usage.input_tokens or 0
-                result.tokens_out = usage.output_tokens or 0
-                result.total_tokens = usage.total_tokens or 0
+            _process_stream_output(output_parts, stream_state["usage"], new_messages, result, role)
         except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
             _handle_run_error(result, e, partial_output="".join(output_parts))
 
         result.duration_ms = int((time.monotonic() - start) * 1000)
-
-        span.set_attribute("initrunner.tokens_total", result.total_tokens)
-        span.set_attribute("initrunner.duration_ms", result.duration_ms)
-        span.set_attribute("initrunner.success", result.success)
+        _record_span_metrics(span, result)
 
     _audit_result(
         result,
@@ -514,40 +579,6 @@ def execute_run_stream(
     )
 
     return result, new_messages
-
-
-# ---------------------------------------------------------------------------
-# Async retry helper
-# ---------------------------------------------------------------------------
-
-
-async def _retry_model_call_async(
-    fn: Callable[..., Any],
-    *,
-    on_retry: Callable[[], None] | None = None,
-) -> Any:
-    """Async variant of ``_retry_model_call`` — uses ``asyncio.sleep``."""
-    last_http_error: ModelHTTPError | None = None
-    for attempt in range(_RETRY_MAX_ATTEMPTS):
-        try:
-            return await fn()
-        except ModelHTTPError as e:
-            if e.status_code not in _RETRYABLE_STATUS_CODES:
-                raise
-            last_http_error = e
-            if on_retry is not None:
-                on_retry()
-            if attempt < _RETRY_MAX_ATTEMPTS - 1:
-                delay = _RETRY_BACKOFF_BASE * (2**attempt)
-                _logger.warning(
-                    "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
-                    e.status_code,
-                    attempt + 1,
-                    _RETRY_MAX_ATTEMPTS,
-                    delay,
-                )
-                await asyncio.sleep(delay)
-    raise last_http_error  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -583,56 +614,29 @@ async def execute_run_async(
     if blocked is not None:
         return blocked, []
 
-    from opentelemetry import trace
-
-    tracer = trace.get_tracer("initrunner")
-
+    timeout = role.spec.guardrails.timeout_seconds
     result = RunResult(run_id=run_id)
     new_messages: list = []
     start = time.monotonic()
 
-    with tracer.start_as_current_span(
-        "initrunner.agent.run",
-        attributes={
-            "initrunner.run_id": run_id,
-            "initrunner.agent_name": role.metadata.name,
-            "initrunner.trigger_type": trigger_type or "",
-        },
-    ) as span:
+    with _create_run_span(run_id, role, trigger_type) as span:
         try:
             agent_result = await asyncio.wait_for(
                 _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
-                timeout=role.spec.guardrails.timeout_seconds,
+                timeout=timeout,
             )
-
-            raw_output = agent_result.output
-            if isinstance(raw_output, BaseModel):
-                result.output = raw_output.model_dump_json()
-            elif isinstance(raw_output, (dict, list)):
-                result.output = json.dumps(raw_output)
-            else:
-                result.output = str(raw_output)
-
-            _apply_output_validation(result, role)
-
-            usage = agent_result.usage()
-            result.tokens_in = usage.input_tokens or 0
-            result.tokens_out = usage.output_tokens or 0
-            result.total_tokens = usage.total_tokens or 0
-            result.tool_calls = usage.tool_calls or 0
-            new_messages = agent_result.all_messages()
-            result.tool_call_names = _extract_tool_call_names(new_messages)
-        except TimeoutError:
-            timeout = role.spec.guardrails.timeout_seconds
-            _handle_run_error(result, TimeoutError(f"Run timed out after {int(timeout)}s"))
-        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, OSError) as e:
-            _handle_run_error(result, e)
+            new_messages = _process_agent_output(agent_result, result, role)
+        except (
+            ModelHTTPError,
+            UsageLimitExceeded,
+            ConnectionError,
+            TimeoutError,
+            OSError,
+        ) as e:
+            _handle_run_error(result, e, timeout_seconds=timeout)
 
         result.duration_ms = int((time.monotonic() - start) * 1000)
-
-        span.set_attribute("initrunner.tokens_total", result.total_tokens)
-        span.set_attribute("initrunner.duration_ms", result.duration_ms)
-        span.set_attribute("initrunner.success", result.success)
+        _record_span_metrics(span, result)
 
     _audit_result(
         result,
@@ -687,23 +691,13 @@ async def execute_run_stream_async(
             "Use non-streaming execution instead."
         )
 
-    from opentelemetry import trace
-
-    tracer = trace.get_tracer("initrunner")
-
+    timeout = role.spec.guardrails.timeout_seconds
     result = RunResult(run_id=run_id)
     new_messages: list = []
     output_parts: list[str] = []
     start = time.monotonic()
 
-    with tracer.start_as_current_span(
-        "initrunner.agent.run",
-        attributes={
-            "initrunner.run_id": run_id,
-            "initrunner.agent_name": role.metadata.name,
-            "initrunner.trigger_type": trigger_type or "",
-        },
-    ) as span:
+    with _create_run_span(run_id, role, trigger_type) as span:
         try:
 
             async def _do_stream():
@@ -722,32 +716,22 @@ async def execute_run_stream_async(
 
             usage = await asyncio.wait_for(
                 _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
-                timeout=role.spec.guardrails.timeout_seconds,
+                timeout=timeout,
             )
-            result.tool_call_names = _extract_tool_call_names(new_messages)
-
-            result.output = "".join(output_parts)
-            _apply_output_validation(result, role)
-
-            if usage is not None:
-                result.tokens_in = usage.input_tokens or 0
-                result.tokens_out = usage.output_tokens or 0
-                result.total_tokens = usage.total_tokens or 0
-        except TimeoutError:
-            timeout = role.spec.guardrails.timeout_seconds
+            _process_stream_output(output_parts, usage, new_messages, result, role)
+        except (
+            ModelHTTPError,
+            UsageLimitExceeded,
+            ConnectionError,
+            TimeoutError,
+            OSError,
+        ) as e:
             _handle_run_error(
-                result,
-                TimeoutError(f"Run timed out after {int(timeout)}s"),
-                partial_output="".join(output_parts),
+                result, e, partial_output="".join(output_parts), timeout_seconds=timeout
             )
-        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, OSError) as e:
-            _handle_run_error(result, e, partial_output="".join(output_parts))
 
         result.duration_ms = int((time.monotonic() - start) * 1000)
-
-        span.set_attribute("initrunner.tokens_total", result.total_tokens)
-        span.set_attribute("initrunner.duration_ms", result.duration_ms)
-        span.set_attribute("initrunner.success", result.success)
+        _record_span_metrics(span, result)
 
     _audit_result(
         result,

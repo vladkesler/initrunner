@@ -175,7 +175,7 @@ class ServiceBridge:
         role: RoleDefinition,
         *,
         what: str = "all",
-    ) -> None:
+    ) -> bool:
         return await asyncio.to_thread(
             clear_memories_sync,
             role,

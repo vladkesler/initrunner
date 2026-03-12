@@ -22,10 +22,10 @@ async def ingest_page(request: Request, role_id: str):
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 
     # Get sources list
-    from initrunner.ingestion.pipeline import resolve_sources
+    from initrunner.services.operations import resolve_sources_sync
 
     files, urls = await asyncio.to_thread(
-        resolve_sources, role.spec.ingest.sources, base_dir=role_path.parent
+        resolve_sources_sync, role.spec.ingest.sources, base_dir=role_path.parent
     )
 
     sources = []

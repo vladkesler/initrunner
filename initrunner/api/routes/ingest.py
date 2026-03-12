@@ -26,10 +26,10 @@ async def list_sources(role_id: str, request: Request):
     if role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 
-    from initrunner.ingestion.pipeline import resolve_sources
+    from initrunner.services.operations import resolve_sources_sync
 
     files, urls = await asyncio.to_thread(
-        resolve_sources, role.spec.ingest.sources, base_dir=role_path.parent
+        resolve_sources_sync, role.spec.ingest.sources, base_dir=role_path.parent
     )
 
     sources = []
@@ -57,10 +57,10 @@ async def run_ingestion(
     if role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="No ingest config in this role")
 
-    from initrunner.ingestion.pipeline import resolve_sources
+    from initrunner.services.operations import resolve_sources_sync
 
     files, urls = await asyncio.to_thread(
-        resolve_sources, role.spec.ingest.sources, base_dir=role_path.parent
+        resolve_sources_sync, role.spec.ingest.sources, base_dir=role_path.parent
     )
     total = len(files) + len(urls)
 

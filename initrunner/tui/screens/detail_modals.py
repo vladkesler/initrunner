@@ -103,10 +103,12 @@ class FieldEditModal(ModalScreen[dict[str, str] | None]):
         for spec in self._fields:
             widget = self.query_one(f"#field-{spec.key.replace('.', '-')}")
             if spec.kind == FieldKind.BOOL:
-                assert isinstance(widget, Switch)
+                if not isinstance(widget, Switch):
+                    raise TypeError(f"Expected Switch widget for {spec.key}")
                 values[spec.key] = str(widget.value).lower()
             else:
-                assert isinstance(widget, Input)
+                if not isinstance(widget, Input):
+                    raise TypeError(f"Expected Input widget for {spec.key}")
                 values[spec.key] = widget.value.strip()
         # Validate types before dismissing
         try:

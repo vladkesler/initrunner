@@ -110,6 +110,13 @@ def get_default_role_dirs(explicit_dir: Path | None = None) -> list[Path]:
     return dirs
 
 
+def load_role_sync(path: Path) -> RoleDefinition:
+    """Load a single role file (sync). Raises RoleLoadError on failure."""
+    from initrunner.agent.loader import load_role
+
+    return load_role(path)
+
+
 def validate_role_sync(path: Path) -> DiscoveredRole:
     """Validate a single role file (sync)."""
     from initrunner.agent.loader import RoleLoadError, load_role

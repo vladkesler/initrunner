@@ -119,7 +119,8 @@ class DaemonScreen(RoleScreen):
 
             from initrunner.agent.executor import execute_run
 
-            assert self._agent is not None
+            if self._agent is None:
+                raise RuntimeError("Agent not initialized")
             result, _ = execute_run(
                 self._agent,
                 self._role,

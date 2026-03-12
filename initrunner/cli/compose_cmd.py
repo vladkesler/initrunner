@@ -20,10 +20,11 @@ def compose_validate(
     compose_file: Annotated[Path, typer.Argument(help="Path to compose YAML")],
 ) -> None:
     """Validate a compose definition file."""
-    from initrunner.compose.loader import ComposeLoadError, load_compose
+    from initrunner.compose.loader import ComposeLoadError
+    from initrunner.services.compose import load_compose_sync
 
     try:
-        compose = load_compose(compose_file)
+        compose = load_compose_sync(compose_file)
     except ComposeLoadError as e:
         console.print(f"[red]Invalid:[/red] {e}")
         raise typer.Exit(1) from None
@@ -65,11 +66,11 @@ def compose_up(
     no_audit: NoAuditOption = False,
 ) -> None:
     """Start a compose orchestration (foreground)."""
-    from initrunner.compose.loader import ComposeLoadError, load_compose
-    from initrunner.compose.orchestrator import run_compose
+    from initrunner.compose.loader import ComposeLoadError
+    from initrunner.services.compose import load_compose_sync, run_compose_sync
 
     try:
-        compose = load_compose(compose_file)
+        compose = load_compose_sync(compose_file)
     except ComposeLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -77,7 +78,7 @@ def compose_up(
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     try:
-        run_compose(compose, compose_file.parent, audit_logger=audit_logger)
+        run_compose_sync(compose, compose_file.parent, audit_logger=audit_logger)
     finally:
         if audit_logger is not None:
             audit_logger.close()
@@ -95,23 +96,24 @@ def compose_events(
     audit_db: AuditDbOption = None,
 ) -> None:
     """Query delegate routing events from the audit trail."""
-    from initrunner.audit.logger import DEFAULT_DB_PATH, AuditLogger
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.services.operations import query_delegate_events_sync
 
-    db_path = audit_db or DEFAULT_DB_PATH
+    db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found: {db_path}")
         raise typer.Exit(1)
 
-    with AuditLogger(db_path) as logger:
-        events = logger.query_delegate_events(
-            source_service=source,
-            target_service=target,
-            status=status,
-            source_run_id=run_id,
-            since=since,
-            until=until,
-            limit=limit,
-        )
+    events = query_delegate_events_sync(
+        source_service=source,
+        target_service=target,
+        status=status,
+        source_run_id=run_id,
+        since=since,
+        until=until,
+        limit=limit,
+        audit_db=db_path,
+    )
 
     if not events:
         console.print("[dim]No delegate events found.[/dim]")

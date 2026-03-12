@@ -2,7 +2,11 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from initrunner.agent.executor import (
+    _retry_model_call,
+    _should_retry,
     check_token_budget,
     execute_run,
     execute_run_stream,
@@ -40,6 +44,65 @@ def _make_mock_agent(output: str = "Hello!", tokens_in: int = 10, tokens_out: in
 
     agent.run_sync.return_value = result
     return agent
+
+
+class TestShouldRetry:
+    def test_retryable_code_with_attempts_remaining(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        exc = ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
+        delay = _should_retry(exc, 0)
+        assert delay is not None
+        assert delay > 0
+
+    def test_retryable_code_on_last_attempt(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        exc = ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
+        delay = _should_retry(exc, 2)  # attempt 2 is the last (0-indexed, 3 max)
+        assert delay is None
+
+    def test_non_retryable_code(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        exc = ModelHTTPError(status_code=400, model_name="test", body=b"bad request")
+        delay = _should_retry(exc, 0)
+        assert delay is None
+
+
+class TestRetryModelCall:
+    def test_on_retry_not_called_on_terminal_failure(self):
+        """on_retry must NOT be called when no further retry will follow."""
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        retries = []
+
+        def _fn():
+            raise ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
+
+        with pytest.raises(ModelHTTPError):
+            _retry_model_call(_fn, on_retry=lambda: retries.append(1))
+
+        # 3 attempts total, only 2 retries (before attempts 2 and 3)
+        # on_retry should NOT be called on the final (3rd) attempt
+        assert len(retries) == 2
+
+    def test_on_retry_called_before_each_retry(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        retries = []
+        call_count = 0
+
+        def _fn():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ModelHTTPError(status_code=500, model_name="test", body=b"error")
+            return "ok"
+
+        result = _retry_model_call(_fn, on_retry=lambda: retries.append(1))
+        assert result == "ok"
+        assert len(retries) == 1
 
 
 class TestExecuteRun:

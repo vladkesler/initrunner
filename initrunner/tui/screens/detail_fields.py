@@ -338,7 +338,8 @@ def sink_fields(sink: Any) -> list[FieldSpec]:
 
 def ingest_fields(role: RoleDefinition) -> list[FieldSpec]:
     ingest = role.spec.ingest
-    assert ingest is not None
+    if ingest is None:
+        raise RuntimeError("Role has no ingest configuration")
     ch = ingest.chunking
     return [
         FieldSpec("Sources", "sources", ", ".join(ingest.sources), FieldKind.CSV),
@@ -351,7 +352,8 @@ def ingest_fields(role: RoleDefinition) -> list[FieldSpec]:
 
 def memory_fields(role: RoleDefinition) -> list[FieldSpec]:
     mem = role.spec.memory
-    assert mem is not None
+    if mem is None:
+        raise RuntimeError("Role has no memory configuration")
     return [
         FieldSpec("Max Sessions", "max_sessions", str(mem.max_sessions), FieldKind.INT),
         FieldSpec(

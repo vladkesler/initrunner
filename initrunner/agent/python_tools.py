@@ -94,7 +94,8 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
             tmp_dir = tempfile.mkdtemp(prefix="initrunner_py_")
             work_dir = tmp_dir
         else:
-            assert work_dir is not None
+            if work_dir is None:
+                raise RuntimeError("work_dir must be set when use_temp is False")
             Path(work_dir).mkdir(parents=True, exist_ok=True)
 
         # Prepend network-blocking shim when network_disabled is set

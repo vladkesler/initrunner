@@ -435,7 +435,8 @@ def _embed_and_store_items(
     own_stack = stack is None
     if own_stack:
         stack = ExitStack()
-    assert stack is not None
+    if stack is None:
+        raise RuntimeError("ExitStack not initialized")
 
     try:
         for item in items:

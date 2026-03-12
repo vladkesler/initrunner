@@ -27,15 +27,16 @@ def audit_prune(
 ) -> None:
     """Prune old audit records."""
     from initrunner.audit.logger import DEFAULT_DB_PATH
-    from initrunner.audit.logger import AuditLogger as _AuditLogger
+    from initrunner.services.operations import audit_prune_sync
 
-    db_path = audit_db or DEFAULT_DB_PATH
+    db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
         raise typer.Exit(1)
 
-    with _AuditLogger(db_path) as logger:
-        deleted = logger.prune(retention_days=retention_days, max_records=max_records)
+    deleted = audit_prune_sync(
+        retention_days=retention_days, max_records=max_records, audit_db=db_path
+    )
 
     console.print(f"[green]Pruned[/green] {deleted} record(s).")
 
@@ -58,9 +59,9 @@ def audit_export(
 ) -> None:
     """Export audit records as JSON or CSV."""
     from initrunner.audit.logger import DEFAULT_DB_PATH
-    from initrunner.audit.logger import AuditLogger as _AuditLogger
+    from initrunner.services.operations import query_audit_sync
 
-    db_path = audit_db or DEFAULT_DB_PATH
+    db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
         raise typer.Exit(1)
@@ -69,15 +70,15 @@ def audit_export(
         console.print(f"[red]Error:[/red] Unknown format '{format}'. Use: json, csv")
         raise typer.Exit(1)
 
-    with _AuditLogger(db_path) as logger:
-        records = logger.query(
-            agent_name=agent,
-            run_id=run_id,
-            trigger_type=trigger_type,
-            since=since,
-            until=until,
-            limit=limit,
-        )
+    records = query_audit_sync(
+        agent_name=agent,
+        run_id=run_id,
+        trigger_type=trigger_type,
+        since=since,
+        until=until,
+        limit=limit,
+        audit_db=db_path,
+    )
 
     from initrunner.audit.logger import _RECORD_FIELDS, record_to_dict
 

@@ -227,7 +227,8 @@ class RunScreen(RoleScreen):
                     self.app.call_from_thread(streaming_msg.append_token, token)
                     self.app.call_from_thread(chat.scroll_end, False)
 
-                assert self._agent is not None
+                if self._agent is None:
+                    raise RuntimeError("Agent not initialized")
                 return ServiceBridge.run_agent_streamed(
                     self._agent,
                     self._role,
@@ -268,7 +269,8 @@ class RunScreen(RoleScreen):
         thinking = chat.add_thinking()
 
         try:
-            assert self._agent is not None
+            if self._agent is None:
+                raise RuntimeError("Agent not initialized")
             result, messages = await ServiceBridge.run_agent(
                 self._agent,
                 self._role,

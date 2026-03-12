@@ -18,22 +18,97 @@ if TYPE_CHECKING:
 def query_audit_sync(
     *,
     agent_name: str | None = None,
+    run_id: str | None = None,
+    trigger_type: str | None = None,
     since: str | None = None,
     until: str | None = None,
     limit: int = 100,
     audit_logger: AuditLogger | None = None,
+    audit_db: Path | None = None,
 ) -> list[AuditRecord]:
     """Query audit records (sync)."""
     if audit_logger is not None:
-        return audit_logger.query(agent_name=agent_name, since=since, until=until, limit=limit)
+        return audit_logger.query(
+            agent_name=agent_name,
+            run_id=run_id,
+            trigger_type=trigger_type,
+            since=since,
+            until=until,
+            limit=limit,
+        )
     from initrunner.audit.logger import DEFAULT_DB_PATH
     from initrunner.audit.logger import AuditLogger as _AuditLogger
 
-    db_path = DEFAULT_DB_PATH
+    db_path = audit_db or DEFAULT_DB_PATH
     if not db_path.exists():
         return []
     with _AuditLogger(db_path) as logger:
-        return logger.query(agent_name=agent_name, since=since, until=until, limit=limit)
+        return logger.query(
+            agent_name=agent_name,
+            run_id=run_id,
+            trigger_type=trigger_type,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+
+
+def audit_prune_sync(
+    *,
+    retention_days: int = 90,
+    max_records: int = 100_000,
+    audit_db: Path | None = None,
+) -> int:
+    """Prune old audit records (sync). Returns number of records deleted."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return 0
+    with _AuditLogger(db_path) as logger:
+        return logger.prune(retention_days=retention_days, max_records=max_records)
+
+
+def query_delegate_events_sync(
+    *,
+    source_service: str | None = None,
+    target_service: str | None = None,
+    status: str | None = None,
+    source_run_id: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    limit: int = 1000,
+    audit_db: Path | None = None,
+) -> list:
+    """Query delegate routing events from the audit trail (sync)."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return []
+    with _AuditLogger(db_path) as logger:
+        return logger.query_delegate_events(
+            source_service=source_service,
+            target_service=target_service,
+            status=status,
+            source_run_id=source_run_id,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+
+
+def resolve_sources_sync(
+    sources: list[str],
+    *,
+    base_dir: Path | None = None,
+) -> tuple[list[Path], list[str]]:
+    """Resolve ingest source patterns to files and URLs (sync)."""
+    from initrunner.ingestion.pipeline import resolve_sources
+
+    return resolve_sources(sources, base_dir=base_dir)
 
 
 def run_ingest_sync(

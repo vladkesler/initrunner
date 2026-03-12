@@ -255,7 +255,8 @@ class ToolSearchManager:
     ) -> list[ToolDefinition]:
         """PydanticAI ``prepare_tools`` callback — filter visible tools."""
         self._ensure_catalog(tool_defs)
-        assert self._catalog_names is not None
+        if self._catalog_names is None:
+            raise RuntimeError("Tool catalog not initialized")
 
         with self._lock:
             discovered = set(self._discovered)

@@ -524,7 +524,8 @@ class ComposeOrchestrator:
 
         def _run_loop() -> None:
             asyncio.set_event_loop(self._loop)
-            assert self._loop is not None
+            if self._loop is None:
+                raise RuntimeError("Event loop not initialized")
             self._loop.run_forever()
 
         self._loop_thread = threading.Thread(
@@ -544,7 +545,8 @@ class ComposeOrchestrator:
                     t.cancel()
                 if tasks:
                     await asyncio.gather(*tasks, return_exceptions=True)
-                assert self._loop is not None
+                if self._loop is None:
+                    raise RuntimeError("Event loop not initialized")
                 self._loop.stop()
 
             asyncio.run_coroutine_threadsafe(_shutdown(), self._loop)

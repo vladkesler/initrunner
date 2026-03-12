@@ -106,7 +106,8 @@ def openai_messages_to_pydantic(
     prior_non_system = [m for m in messages[:last_user_idx] if m.role != "system"]
 
     if is_multimodal:
-        assert isinstance(last_user_msg.content, list)
+        if not isinstance(last_user_msg.content, list):
+            raise ValueError("Expected multimodal content list")
         multimodal_parts = convert_content_parts(last_user_msg.content)
 
         # Prepend system text to the first text part if present

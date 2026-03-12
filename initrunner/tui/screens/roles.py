@@ -133,7 +133,8 @@ class RolesScreen(FilterableScreen):
         display_names = self._disambiguate_names(roles_info)
 
         for i, (_, _, dr) in enumerate(roles_info):
-            assert dr is not None
+            if dr is None:
+                raise RuntimeError("DiscoveredRole is None")
             name = display_names[i]
 
             if dr.role is not None:

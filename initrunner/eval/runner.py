@@ -189,7 +189,8 @@ def run_suite(
     When ``concurrency > 1``, requires ``agent_factory`` to build a fresh
     agent per worker thread.
     """
-    assert suite is not None
+    if suite is None:
+        raise ValueError("suite must not be None")
     result = SuiteResult(suite_name=suite.metadata.name)
 
     # Filter cases by tag
@@ -206,7 +207,8 @@ def run_suite(
             cases, agent_factory, dry_run=dry_run, concurrency=concurrency
         )
     else:
-        assert agent is not None and role is not None
+        if agent is None or role is None:
+            raise ValueError("agent and role must not be None for sequential execution")
         for case in cases:
             cr = _run_single_case(agent, role, case, dry_run=dry_run)
             result.case_results.append(cr)

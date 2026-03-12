@@ -84,6 +84,23 @@ class TestRetryModelCallAsync:
         assert result == "ok"
         assert len(retries) == 1
 
+    @pytest.mark.asyncio
+    async def test_on_retry_not_called_on_terminal_failure(self):
+        """on_retry must NOT be called when no further retry will follow."""
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        retries = []
+
+        async def _fn():
+            raise ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
+
+        with pytest.raises(ModelHTTPError):
+            await _retry_model_call_async(_fn, on_retry=lambda: retries.append(1))
+
+        # 3 attempts total, only 2 retries (before attempts 2 and 3)
+        # on_retry should NOT be called on the final (3rd) attempt
+        assert len(retries) == 2
+
 
 class TestExecuteRunAsync:
     @pytest.mark.asyncio

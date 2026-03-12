@@ -161,10 +161,11 @@ def detect_yaml_kind(path: Path) -> str:
 
 
 def load_role_or_exit(role_file: Path) -> RoleDefinition:
-    from initrunner.agent.loader import RoleLoadError, load_role
+    from initrunner.agent.loader import RoleLoadError
+    from initrunner.services.discovery import load_role_sync
 
     try:
-        return load_role(role_file)
+        return load_role_sync(role_file)
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

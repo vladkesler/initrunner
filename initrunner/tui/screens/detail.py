@@ -156,7 +156,8 @@ class RoleDetailScreen(RoleScreen):
 
     def _build_ingest_section(self) -> str:
         ingest = self._role.spec.ingest
-        assert ingest is not None
+        if ingest is None:
+            raise RuntimeError("Role has no ingest configuration")
         lines = [f"[bold {COLOR_SECONDARY}]── Ingest ──[/]"]
         sources = ", ".join(ingest.sources)
         if len(sources) > 60:
@@ -171,7 +172,8 @@ class RoleDetailScreen(RoleScreen):
 
     def _build_memory_section(self) -> str:
         mem = self._role.spec.memory
-        assert mem is not None
+        if mem is None:
+            raise RuntimeError("Role has no memory configuration")
         lines = [f"[bold {COLOR_SECONDARY}]── Memory ──[/]"]
         lines.append(f"  Store         {mem.store_backend.value}")
         sem_max = mem.semantic.max_memories

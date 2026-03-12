@@ -12,7 +12,6 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from initrunner._compat import _PROVIDER_EXTRAS, require_provider
-from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
 from initrunner.cli._helpers import check_ollama_running, console, install_extra
 from initrunner.config import get_global_env_path, get_home_dir
 from initrunner.services.setup import (
@@ -268,6 +267,8 @@ def run_setup(
     # ---------------------------------------------------------------
     # Step 5: API key / credentials entry + validation
     # ---------------------------------------------------------------
+    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+
     env_var = _PROVIDER_API_KEY_ENVS.get(provider)
     env_path = get_global_env_path()
 

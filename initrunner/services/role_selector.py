@@ -325,7 +325,8 @@ def select_role_sync(
     # Build candidates list
     candidates: list[RoleCandidate] = []
     for d in valid:
-        assert d.role is not None
+        if d.role is None:
+            raise ValueError(f"Role at {d.path} failed to load but was marked valid")
         candidates.append(
             RoleCandidate(
                 path=d.path,

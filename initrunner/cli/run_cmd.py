@@ -203,7 +203,8 @@ def run(
             console.print(f"[red]Attachment error:[/red] {e}")
             raise typer.Exit(1) from None
 
-    assert role_file is not None  # guaranteed by resolution block above
+    if role_file is None:
+        raise RuntimeError("role_file unresolved")
 
     resolved_model = resolve_model_override(model)
     with command_context(
@@ -219,7 +220,8 @@ def run(
         run_result = None  # RunResult or AutonomousResult
 
         if autonomous:
-            assert user_prompt is not None  # guarded above
+            if user_prompt is None:
+                raise RuntimeError("prompt unresolved")
             run_result = run_autonomous(
                 agent,
                 role,

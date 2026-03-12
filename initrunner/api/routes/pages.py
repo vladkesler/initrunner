@@ -92,10 +92,11 @@ async def role_detail(request: Request, role_id: str):
 
     path = await resolve_role_path(request, role_id)
 
-    from initrunner.agent.loader import RoleLoadError, load_role
+    from initrunner.agent.loader import RoleLoadError
+    from initrunner.services.discovery import load_role_sync
 
     try:
-        role = await asyncio.to_thread(load_role, path)
+        role = await asyncio.to_thread(load_role_sync, path)
     except RoleLoadError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 

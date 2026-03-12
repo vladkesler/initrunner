@@ -27,11 +27,16 @@ def list_memories_sync(
         return store.list_memories(category=category, limit=limit, memory_type=memory_type)
 
 
-def clear_memories_sync(role: RoleDefinition, *, what: str = "all") -> None:
-    """Clear memory store (sync). Delegates to shared domain function."""
+def clear_memories_sync(
+    role: RoleDefinition,
+    *,
+    what: str = "all",
+    memory_type: MemoryType | None = None,
+) -> bool:
+    """Clear memory store (sync). Returns True if a store was found."""
     from initrunner.agent.memory_ops import clear_memories
 
-    clear_memories(role, what=what)
+    return clear_memories(role, what=what, memory_type=memory_type)
 
 
 def export_memories_sync(role: RoleDefinition) -> list[dict]:
@@ -86,6 +91,17 @@ def delete_session_sync(role: RoleDefinition, session_id: str) -> bool:
     from initrunner.agent.memory_ops import delete_session
 
     return delete_session(role, session_id)
+
+
+def consolidate_memories_sync(role: RoleDefinition, *, force: bool = False) -> int:
+    """Run memory consolidation (sync). Returns number of semantic memories created."""
+    from initrunner.agent.memory_consolidation import maybe_consolidate
+    from initrunner.stores.factory import open_memory_store
+
+    with open_memory_store(role.spec.memory, role.metadata.name) as store:
+        if store is None:
+            return 0
+        return maybe_consolidate(store, role, force=force)
 
 
 def export_session_markdown_sync(role: RoleDefinition, messages: list[ModelMessage]) -> str:
