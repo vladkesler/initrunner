@@ -31,6 +31,7 @@ One YAML file is all it takes to go from idea to running agent - with document s
 
 - [Quickstart](#quickstart)
 - [Define an Agent in YAML](#define-agent-roles-in-yaml)
+- [User Interfaces](#user-interfaces)
 - [Why InitRunner](#why-initrunner)
 - [Features](#features)
 - [Distribution & Deployment](#distribution--deployment)
@@ -46,6 +47,15 @@ initrunner chat --ingest ./docs/   # chat with your docs, memory on by default
 ```
 
 Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md), [Setup](docs/getting-started/setup.md), and [Chat](docs/getting-started/chat.md) for details.
+
+**Or run with Docker** — no install needed:
+
+```bash
+docker run --rm -it -e OPENAI_API_KEY \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest chat
+```
+
+See the [Docker guide](docs/getting-started/docker.md) for RAG, Telegram, API server, and more examples.
 
 ## Define Agent Roles in YAML
 
@@ -80,6 +90,19 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
   <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
   <em>Quick Chat - ask a question, send the answer to Slack</em>
 </p>
+
+## User Interfaces
+
+| | Terminal UI (`tui`) | Web Dashboard (`ui`) |
+|---|---|---|
+| **Launch** | `initrunner tui` | `initrunner ui` |
+| **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
+| **Roles** | Create from template, edit via forms | Form builder with live preview, AI generate |
+| **Chat** | Streaming chat with token counts | SSE streaming with file attachments |
+| **Extras** | Audit log, memory, daemon event log | Audit detail panel, memory, trigger monitor |
+| **Style** | k9s-style keyboard-driven (Textual) | Server-rendered HTML (HTMX + DaisyUI) |
+
+See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashboard.md) · [API Server docs](docs/interfaces/server.md)
 
 ## Why InitRunner
 
@@ -217,40 +240,12 @@ initrunner install oci://ghcr.io/org/my-agent:1.0.0
 
 See [OCI Distribution](docs/core/oci-distribution.md).
 
-### Docker
-
-Available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Docker Hub](https://hub.docker.com/r/vladkesler/initrunner). The image ships with all extras pre-installed.
-
-```bash
-docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest chat
-
-docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data -v ./docs:/docs \
-    ghcr.io/vladkesler/initrunner:latest chat --ingest /docs
-```
-
-See [Docker guide](docs/getting-started/docker.md) for all examples (Telegram bot, API server, dashboard, compose, sandbox).
-
 ### Cloud deploy
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
 
 **Fly.io:** See [Cloud Deployment Guide](docs/getting-started/cloud-deploy.md#deploy-to-flyio).
-
-## User Interfaces
-
-| | Terminal UI (`tui`) | Web Dashboard (`ui`) |
-|---|---|---|
-| **Launch** | `initrunner tui` | `initrunner ui` |
-| **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
-| **Roles** | Create from template, edit via forms | Form builder with live preview, AI generate |
-| **Chat** | Streaming chat with token counts | SSE streaming with file attachments |
-| **Extras** | Audit log, memory, daemon event log | Audit detail panel, memory, trigger monitor |
-| **Style** | k9s-style keyboard-driven (Textual) | Server-rendered HTML (HTMX + DaisyUI) |
-
-See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashboard.md) · [API Server docs](docs/interfaces/server.md)
 
 ## Documentation
 
