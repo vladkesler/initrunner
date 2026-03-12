@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.1] - 2026-03-12
+
+### Fixed
+- **Streaming retry bug** — `on_retry` callback (which clears partial output) was called even on terminal failure (last retry attempt), silently discarding accumulated streaming output. Now only called when a retry will actually follow
+
+### Changed
+- **Executor sync/async deduplication** — extracted shared helpers (`_should_retry`, `_process_agent_output`, `_process_stream_output`, `_record_span_metrics`, `_create_run_span`), reducing `executor.py` from 761 to ~580 lines and eliminating duplicated logic between sync and async paths
+- **`zvec_store.py` split** — 1033-line god file split into `_zvec_common.py`, `zvec_document_store.py`, and `zvec_memory_store.py`; original file is now a backward-compatible re-export shim
+- **Services layer compliance** — CLI and API routes now import business logic through `services/` layer: new `services/compose.py`, extended `services/operations.py` and `services/discovery.py`, updated `cli/audit_cmd.py`, `cli/compose_cmd.py`, `cli/memory_cmd.py`, `cli/role_cmd.py`, and API route files
+- **Bare assertions replaced** — 42 bare `assert` statements across production code replaced with explicit `if`/`raise` for clear error messages (RuntimeError, ValueError, TypeError as appropriate)
+- **Lazy import fix** — moved `_PROVIDER_API_KEY_ENVS` import in `setup_cmd.py` from top-level into function body
+
 ## [1.20.0] - 2026-03-12
 
 ### Added
