@@ -60,17 +60,6 @@ def _build_autonomous_result(
     )
 
 
-def _capture_autonomous_episode(
-    memory_store: MemoryStoreBase,
-    role: RoleDefinition,
-    summary: str,
-) -> None:
-    """Persist the autonomous run summary as an episodic memory."""
-    from initrunner.agent.memory_capture import capture_episode
-
-    capture_episode(memory_store, role, summary, category="autonomous_run")
-
-
 def run_autonomous(
     agent: Agent,
     role: RoleDefinition,
@@ -88,7 +77,6 @@ def run_autonomous(
 ) -> AutonomousResult:
     """Execute an autonomous agentic loop until completion or budget exhaustion."""
     from initrunner._ids import generate_id
-    from initrunner.agent.history import trim_message_history
     from initrunner.agent.reflection import ReflectionState, format_reflection_state
     from initrunner.agent.tools.reflection import build_reflection_toolset
     from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES
@@ -181,18 +169,10 @@ def run_autonomous(
 
         # Compact then trim history
         if message_history:
-            from initrunner.agent.history_compaction import maybe_compact_message_history
+            from initrunner.agent.history import reduce_history
 
-            message_history = maybe_compact_message_history(
-                message_history,
-                autonomy_config,
-                role,
-                preserve_first=True,
-            )
-            message_history = trim_message_history(
-                message_history,
-                autonomy_config.max_history_messages,
-                preserve_first=True,
+            message_history = reduce_history(
+                message_history, autonomy_config, role, preserve_first=True
             )
 
         # Check if agent signalled completion
@@ -253,7 +233,9 @@ def run_autonomous(
 
     # Persist final summary as an episodic memory
     if memory_store is not None and role.spec.memory is not None and reflection_state.summary:
-        _capture_autonomous_episode(memory_store, role, reflection_state.summary)
+        from initrunner.agent.memory_capture import capture_episode
+
+        capture_episode(memory_store, role, reflection_state.summary, category="autonomous_run")
 
     # Consolidation at session exit
     if memory_store is not None and role.spec.memory is not None:

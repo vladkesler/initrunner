@@ -181,7 +181,6 @@ class DaemonRunner:
 
     def _on_trigger_inner(self, event: TriggerEvent) -> None:
         """Process a single trigger event."""
-        from initrunner.agent.history import trim_message_history
         from initrunner.agent.schema.autonomy import AutonomyConfig
 
         # Snapshot agent/role under lock so in-flight runs are unaffected by reload
@@ -235,20 +234,12 @@ class DaemonRunner:
 
                 # Store updated conversation history
                 if conv_key and auto_result.final_messages:
-                    from initrunner.agent.history_compaction import (
-                        maybe_compact_message_history,
-                    )
+                    from initrunner.agent.history import reduce_history
 
-                    compacted = maybe_compact_message_history(
-                        auto_result.final_messages,
-                        autonomy_config,
-                        role,
+                    self._conversations.put(
+                        conv_key,
+                        reduce_history(auto_result.final_messages, autonomy_config, role),
                     )
-                    trimmed = trim_message_history(
-                        compacted,
-                        autonomy_config.max_history_messages,
-                    )
-                    self._conversations.put(conv_key, trimmed)
 
                 # Reply to originating channel (messaging triggers)
                 if event.reply_fn is not None:
@@ -299,20 +290,12 @@ class DaemonRunner:
 
                 # Store updated conversation history
                 if conv_key and new_messages:
-                    from initrunner.agent.history_compaction import (
-                        maybe_compact_message_history,
-                    )
+                    from initrunner.agent.history import reduce_history
 
-                    compacted = maybe_compact_message_history(
-                        new_messages,
-                        autonomy_config,
-                        role,
+                    self._conversations.put(
+                        conv_key,
+                        reduce_history(new_messages, autonomy_config, role),
                     )
-                    trimmed = trim_message_history(
-                        compacted,
-                        autonomy_config.max_history_messages,
-                    )
-                    self._conversations.put(conv_key, trimmed)
 
             self._maybe_prune_sessions()
         finally:

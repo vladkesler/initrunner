@@ -9,10 +9,12 @@ from pydantic_ai.messages import ModelMessage, ModelResponse
 from initrunner.agent.history_compaction import maybe_compact_message_history
 
 if TYPE_CHECKING:
+    from initrunner.agent.schema.autonomy import AutonomyConfig
     from initrunner.agent.schema.role import RoleDefinition
 
 __all__ = [
     "maybe_compact_message_history",
+    "reduce_history",
     "session_limits",
     "trim_message_history",
 ]
@@ -44,6 +46,29 @@ def trim_message_history(
     while trimmed and isinstance(trimmed[0], ModelResponse):
         trimmed = trimmed[1:]
     return trimmed
+
+
+def reduce_history(
+    messages: list[ModelMessage],
+    autonomy_config: AutonomyConfig,
+    role: RoleDefinition,
+    *,
+    preserve_first: bool = False,
+) -> list[ModelMessage]:
+    """Compact then trim message history in one step.
+
+    Combines :func:`maybe_compact_message_history` and
+    :func:`trim_message_history` — the sequence that autonomous and daemon
+    runners both need after each iteration.
+    """
+    compacted = maybe_compact_message_history(
+        messages, autonomy_config, role, preserve_first=preserve_first
+    )
+    return trim_message_history(
+        compacted,
+        autonomy_config.max_history_messages,
+        preserve_first=preserve_first,
+    )
 
 
 def session_limits(role: RoleDefinition) -> tuple[int, int]:
