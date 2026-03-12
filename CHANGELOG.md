@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.19.0] - 2026-03-12
+
+### Changed
+- **BREAKING: Collapse report CLI flags** — `--export-report` + `--report-path` replaced by `--report PATH`; `--report-template` without `--report` now errors
+- **BREAKING: Simplify `memory clear` filters** — `--sessions-only`/`--memories-only` replaced by `--what` (sessions|memories|all); `--what sessions --type X` errors
+- **BREAKING: Rename `timeout` → `timeout_seconds`** on `McpToolConfig`, `ApiEndpoint`, `ToolkitWebReaderConfig`, `ToolkitHttpConfig` — aligns with all other tool configs
+- Extract `reduce_history()` helper in `agent/history.py` — deduplicates compact+trim sequence from autonomous and daemon runners
+- Inline `_capture_autonomous_episode()` — removed trivial 3-line wrapper in favour of direct `capture_episode()` call
+
+### Documentation
+- Report export docs updated with new `--report PATH` flag syntax
+- CLI reference updated for `--report` and `memory clear --what`
+
 ## [1.18.0] - 2026-03-11
 
 ### Changed
