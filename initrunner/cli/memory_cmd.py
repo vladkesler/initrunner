@@ -16,8 +16,10 @@ app = typer.Typer(help="Manage agent memory.")
 @app.command("clear")
 def memory_clear(
     role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
-    sessions_only: Annotated[bool, typer.Option(help="Only clear sessions")] = False,
-    memories_only: Annotated[bool, typer.Option(help="Only clear memories")] = False,
+    what: Annotated[
+        str,
+        typer.Option("--what", help="What to clear: sessions, memories, or all"),
+    ] = "all",
     memory_type: Annotated[
         str | None,
         typer.Option("--type", help="Clear only this memory type (episodic, semantic, procedural)"),
@@ -31,6 +33,14 @@ def memory_clear(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        raise typer.Exit(1)
+
+    if what not in ("sessions", "memories", "all"):
+        console.print("[red]Error:[/red] --what must be sessions, memories, or all.")
+        raise typer.Exit(1)
+
+    if what == "sessions" and memory_type is not None:
+        console.print("[red]Error:[/red] --type cannot be used with --what sessions.")
         raise typer.Exit(1)
 
     mt_filter = None
@@ -47,17 +57,15 @@ def memory_clear(
             raise typer.Exit(1) from None
 
     if not force:
-        what = "sessions" if sessions_only else ("memories" if memories_only else "all memory data")
+        label = what if what != "all" else "all memory data"
         if mt_filter:
-            what = f"{mt_filter} memories"
-        confirm = typer.confirm(f"Clear {what} for {role.metadata.name}?")
+            label = f"{mt_filter} memories"
+        confirm = typer.confirm(f"Clear {label} for {role.metadata.name}?")
         if not confirm:
             console.print("Aborted.")
             return
 
-    if not clear_memories(
-        role, sessions_only=sessions_only, memories_only=memories_only, memory_type=mt_filter
-    ):
+    if not clear_memories(role, what=what, memory_type=mt_filter):
         console.print("No memory store found.")
         return
 

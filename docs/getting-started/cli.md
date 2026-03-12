@@ -90,9 +90,8 @@ The `role.yaml` argument is optional when `--sense` is used.
 | `--no-audit` | Disable audit logging |
 | `--skill-dir PATH` | Extra skill search directory |
 | `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
-| `--export-report` | Export a markdown report after the run. See [Report Export](../core/reports.md). |
-| `--report-path PATH` | Report output path (default: `initrunner-report.md`). |
-| `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. |
+| `--report PATH` | Export a markdown report to PATH after the run. See [Report Export](../core/reports.md). |
+| `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
 | `--sense` | Sense the best role for the given prompt (replaces `role.yaml` argument). |
 | `--role-dir PATH` | Directory to search for roles when using `--sense`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |

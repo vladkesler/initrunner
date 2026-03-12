@@ -58,7 +58,7 @@ def _failed_run_result() -> RunResult:
 
 class TestExportReportCLI:
     def test_export_report_single_shot(self, tmp_path: Path):
-        """--export-report with --dry-run writes a report file."""
+        """--report PATH with --dry-run writes a report file."""
         report_file = tmp_path / "report.md"
 
         result_obj = _successful_run_result()
@@ -74,8 +74,7 @@ class TestExportReportCLI:
                         "-p",
                         "Hello",
                         "--dry-run",
-                        "--export-report",
-                        "--report-path",
+                        "--report",
                         str(report_file),
                     ],
                 )
@@ -101,8 +100,7 @@ class TestExportReportCLI:
                         "-p",
                         "Hello",
                         "--dry-run",
-                        "--export-report",
-                        "--report-path",
+                        "--report",
                         str(report_file),
                         "--report-template",
                         "pr-review",
@@ -114,8 +112,9 @@ class TestExportReportCLI:
         content = report_file.read_text()
         assert "# PR Review Report" in content
 
-    def test_export_report_invalid_template(self):
+    def test_export_report_invalid_template(self, tmp_path: Path):
         """Unknown --report-template errors before execution."""
+        report_file = tmp_path / "report.md"
         with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
             result = runner.invoke(
                 app,
@@ -124,7 +123,8 @@ class TestExportReportCLI:
                     "fake-role.yaml",
                     "-p",
                     "Hello",
-                    "--export-report",
+                    "--report",
+                    str(report_file),
                     "--report-template",
                     "nonexistent",
                 ],
@@ -132,6 +132,24 @@ class TestExportReportCLI:
 
         assert result.exit_code == 1
         assert "Unknown template" in result.output
+
+    def test_report_template_without_report_errors(self):
+        """--report-template without --report must error."""
+        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+            result = runner.invoke(
+                app,
+                [
+                    "run",
+                    "fake-role.yaml",
+                    "-p",
+                    "Hello",
+                    "--report-template",
+                    "pr-review",
+                ],
+            )
+
+        assert result.exit_code == 1
+        assert "--report-template requires --report" in result.output
 
     def test_export_report_failed_run(self, tmp_path: Path):
         """Report is still written when the run fails."""
@@ -149,8 +167,7 @@ class TestExportReportCLI:
                         "-p",
                         "Hello",
                         "--dry-run",
-                        "--export-report",
-                        "--report-path",
+                        "--report",
                         str(report_file),
                     ],
                 )

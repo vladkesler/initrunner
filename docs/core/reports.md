@@ -6,16 +6,13 @@ InitRunner can export a structured markdown report after any `run` command. Repo
 
 ```bash
 # Export a report after a run
-initrunner run role.yaml -p "Review this PR" --export-report
-
-# Custom output path
-initrunner run role.yaml -p "Review this PR" --export-report --report-path ./review.md
+initrunner run role.yaml -p "Review this PR" --report ./report.md
 
 # Use a purpose-built template
-initrunner run role.yaml -p "Review this PR" --export-report --report-template pr-review
+initrunner run role.yaml -p "Review this PR" --report ./review.md --report-template pr-review
 
 # Combine with --dry-run for testing
-initrunner run role.yaml -p "Hello" --dry-run --export-report
+initrunner run role.yaml -p "Hello" --dry-run --report ./report.md
 ```
 
 Reports are always written regardless of whether the run succeeds or fails. A failed run produces a report with the error details.
@@ -26,9 +23,8 @@ These flags are available on the `run` command:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--export-report` | `bool` | `false` | Export a markdown report after the run. |
-| `--report-path` | `Path` | `initrunner-report.md` | Output file path for the report. |
-| `--report-template` | `str` | `default` | Report template to use: `default`, `pr-review`, `changelog`, `ci-fix`. |
+| `--report PATH` | `Path` | — | Export a markdown report to PATH after the run. |
+| `--report-template` | `str` | `default` | Report template to use: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
 
 ## Templates
 
@@ -39,7 +35,7 @@ Four built-in templates are included. All receive the same data — they differ 
 Full report with header, prompt, output, metrics table, and iteration breakdown (if autonomous). Best for general-purpose use.
 
 ```bash
-initrunner run role.yaml -p "Summarize this" --export-report
+initrunner run role.yaml -p "Summarize this" --report ./report.md
 ```
 
 ### `pr-review`
@@ -48,7 +44,7 @@ Compact layout with a "PR Review Report" header. The agent output is presented a
 
 ```bash
 initrunner run role.yaml -p "Review the changes in this diff" \
-  --export-report --report-template pr-review
+  --report ./review.md --report-template pr-review
 ```
 
 ### `changelog`
@@ -57,7 +53,7 @@ initrunner run role.yaml -p "Review the changes in this diff" \
 
 ```bash
 initrunner run role.yaml -p "Generate a changelog from these commits" \
-  --export-report --report-template changelog
+  --report ./changelog.md --report-template changelog
 ```
 
 ### `ci-fix`
@@ -66,7 +62,7 @@ initrunner run role.yaml -p "Generate a changelog from these commits" \
 
 ```bash
 initrunner run role.yaml -p "Fix the failing CI tests" \
-  -a --export-report --report-template ci-fix
+  -a --report ./ci-analysis.md --report-template ci-fix
 ```
 
 ## Report Contents
@@ -104,9 +100,8 @@ For autonomous runs (`-a`), the `default` and `ci-fix` templates also include pe
 initrunner run code-reviewer.yaml \
   -p "Review the diff in review.patch" \
   -A review.patch \
-  --export-report \
-  --report-template pr-review \
-  --report-path ./pr-review-report.md
+  --report ./pr-review-report.md \
+  --report-template pr-review
 ```
 
 ### CI fix with autonomous mode
@@ -115,16 +110,15 @@ initrunner run code-reviewer.yaml \
 initrunner run ci-fixer.yaml \
   -p "The build is failing on test_auth. Fix it." \
   -a --max-iterations 5 \
-  --export-report \
-  --report-template ci-fix \
-  --report-path /tmp/ci-analysis.md
+  --report /tmp/ci-analysis.md \
+  --report-template ci-fix
 ```
 
 ### Dry-run report for testing
 
 ```bash
-initrunner run role.yaml -p "Hello" --dry-run --export-report
-cat initrunner-report.md
+initrunner run role.yaml -p "Hello" --dry-run --report ./report.md
+cat report.md
 ```
 
 ## Programmatic Usage

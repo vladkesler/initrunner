@@ -26,8 +26,7 @@ class TurnResult:
 def clear_memories(
     role: RoleDefinition,
     *,
-    sessions_only: bool = False,
-    memories_only: bool = False,
+    what: str = "all",
     memory_type: MemoryType | None = None,
 ) -> bool:
     """Clear memory store. Returns True if a store was found and cleared."""
@@ -36,9 +35,9 @@ def clear_memories(
     with open_memory_store(role.spec.memory, role.metadata.name) as store:
         if store is None:
             return False
-        if not memories_only:
+        if what in ("sessions", "all"):
             store.prune_sessions(role.metadata.name, keep_count=0)
-        if not sessions_only:
+        if what in ("memories", "all"):
             store.prune_memories(keep_count=0, memory_type=memory_type)
         return True
 

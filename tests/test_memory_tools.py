@@ -138,13 +138,13 @@ class TestMemoryConfigMigrationError:
         import pytest
 
         with pytest.raises(Exception, match="max_memories has been removed"):
-            MemoryConfig(max_memories=500)
+            MemoryConfig(max_memories=500)  # type: ignore[unknown-argument]
 
     def test_legacy_max_memories_with_semantic_raises(self):
         import pytest
 
         with pytest.raises(Exception, match="max_memories has been removed"):
-            MemoryConfig(max_memories=500, semantic=SemanticMemoryConfig(max_memories=200))
+            MemoryConfig(max_memories=500, semantic=SemanticMemoryConfig(max_memories=200))  # type: ignore[unknown-argument]
 
     def test_semantic_max_memories_works(self):
         mc = MemoryConfig(semantic=SemanticMemoryConfig(max_memories=200))

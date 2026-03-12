@@ -77,13 +77,10 @@ def run(
             help="Attach file or URL (repeatable, supports images/audio/video/docs)",
         ),
     ] = None,
-    export_report: Annotated[
-        bool, typer.Option("--export-report", help="Export markdown report after run")
-    ] = False,
-    report_path: Annotated[
-        Path,
-        typer.Option("--report-path", help="Report output path (default: ./initrunner-report.md)"),
-    ] = Path("initrunner-report.md"),
+    report: Annotated[
+        Path | None,
+        typer.Option("--report", help="Export markdown report to PATH after run"),
+    ] = None,
     report_template: Annotated[
         str,
         typer.Option(
@@ -150,8 +147,7 @@ def run(
             dry_run,
             audit_db,
             no_audit,
-            export_report,
-            report_path,
+            report,
             report_template,
         )
         return
@@ -164,7 +160,11 @@ def run(
         console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
         raise typer.Exit(1)
 
-    if export_report:
+    if report_template != "default" and report is None:
+        console.print("[red]Error:[/red] --report-template requires --report PATH.")
+        raise typer.Exit(1)
+
+    if report is not None:
         from initrunner.report import BUILT_IN_TEMPLATES
 
         if report_template not in BUILT_IN_TEMPLATES:
@@ -244,9 +244,9 @@ def run(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
             )
-            if export_report:
+            if report is not None:
                 _maybe_export_report(
-                    role, run_result, user_prompt, report_path, report_template, dry_run
+                    role, run_result, user_prompt, report, report_template, dry_run
                 )
             run_interactive(
                 agent,
@@ -270,10 +270,8 @@ def run(
             )
 
         # Export for non-interactive branches (after run completes)
-        if export_report and run_result is not None and not (user_prompt and interactive):
-            _maybe_export_report(
-                role, run_result, user_prompt, report_path, report_template, dry_run
-            )
+        if report is not None and run_result is not None and not (user_prompt and interactive):
+            _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
 
 
 def _display_team_result(team_result: object) -> None:
@@ -315,8 +313,7 @@ def _run_team(
     dry_run: bool,
     audit_db: Path | None,
     no_audit: bool,
-    export_report: bool,
-    report_path: Path,
+    report: Path | None,
     report_template: str,
 ) -> None:
     """Run a team YAML file."""
@@ -359,7 +356,7 @@ def _run_team(
 
     _display_team_result(result)
 
-    if export_report and result.agent_results:
+    if report is not None and result.agent_results:
         # Synthesize a RunResult for report export
         from initrunner.agent.executor import RunResult as _RunResult
 
@@ -384,7 +381,7 @@ def _run_team(
             synthetic_role,
             synthetic,
             prompt,
-            report_path,
+            report,
             report_template,
             dry_run,
         )

@@ -27,13 +27,11 @@ def list_memories_sync(
         return store.list_memories(category=category, limit=limit, memory_type=memory_type)
 
 
-def clear_memories_sync(
-    role: RoleDefinition, *, sessions_only: bool = False, memories_only: bool = False
-) -> None:
+def clear_memories_sync(role: RoleDefinition, *, what: str = "all") -> None:
     """Clear memory store (sync). Delegates to shared domain function."""
     from initrunner.agent.memory_ops import clear_memories
 
-    clear_memories(role, sessions_only=sessions_only, memories_only=memories_only)
+    clear_memories(role, what=what)
 
 
 def export_memories_sync(role: RoleDefinition) -> list[dict]:

@@ -174,14 +174,12 @@ class ServiceBridge:
     async def clear_memories(
         role: RoleDefinition,
         *,
-        sessions_only: bool = False,
-        memories_only: bool = False,
+        what: str = "all",
     ) -> None:
         return await asyncio.to_thread(
             clear_memories_sync,
             role,
-            sessions_only=sessions_only,
-            memories_only=memories_only,
+            what=what,
         )
 
     @staticmethod
