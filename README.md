@@ -48,7 +48,7 @@ initrunner chat --ingest ./docs/   # chat with your docs, memory on by default
 
 Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md), [Setup](docs/getting-started/setup.md), and [Chat](docs/getting-started/chat.md) for details.
 
-**Or run with Docker** — no install needed:
+**Or run with Docker**, no install needed:
 
 ```bash
 docker run --rm -it -e OPENAI_API_KEY \
