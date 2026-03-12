@@ -32,7 +32,7 @@ class ToolkitSearchConfig(BaseModel):
 
 
 class ToolkitWebReaderConfig(BaseModel):
-    timeout: int = 15
+    timeout_seconds: int = 15
     max_bytes: int = 512_000
 
 
@@ -56,7 +56,7 @@ class ToolkitHttpConfig(BaseModel):
     base_url: str
     allowed_methods: list[str] = Field(default_factory=lambda: ["GET"])
     headers: dict[str, str] = Field(default_factory=dict)
-    timeout: int = 30
+    timeout_seconds: int = 30
 
 
 class ToolkitEmailConfig(BaseModel):
@@ -173,7 +173,7 @@ def _register_web_reader(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
         from initrunner.agent._urls import SSRFBlocked
 
         try:
-            return fetch_url_as_markdown(url, timeout=cfg.timeout, max_bytes=cfg.max_bytes)
+            return fetch_url_as_markdown(url, timeout=cfg.timeout_seconds, max_bytes=cfg.max_bytes)
         except SSRFBlocked as e:
             return str(e)
         except Exception as e:
@@ -396,7 +396,7 @@ def _register_http(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
         try:
             with httpx.Client(
                 headers=cfg.headers,
-                timeout=cfg.timeout,
+                timeout=cfg.timeout_seconds,
                 transport=SSRFSafeTransport(),
             ) as client:
                 resp = client.request(method, url, content=body if body else None)

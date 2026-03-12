@@ -93,7 +93,7 @@ class TestApiToolConfigParsing:
                         ApiParameter(name="owner", type="string", required=True),
                         ApiParameter(name="repo", type="string", required=True),
                     ],
-                    timeout=60,
+                    timeout_seconds=60,
                 ),
             ],
         )

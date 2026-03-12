@@ -79,7 +79,7 @@ class McpToolConfig(ToolConfigBase):
     cwd: str | None = None
     tool_prefix: str | None = None
     max_retries: int = 1
-    timeout: int | None = None
+    timeout_seconds: int | None = None
 
     @model_validator(mode="after")
     def _validate_transport_fields(self) -> McpToolConfig:
@@ -169,7 +169,7 @@ class ApiEndpoint(BaseModel):
     body_template: dict[str, Any] | None = None
     query_params: dict[str, str] = {}
     response_extract: str | None = None  # "$.data.id" or None for full text
-    timeout: int = 30
+    timeout_seconds: int = 30
 
 
 class ApiToolConfig(ToolConfigBase):

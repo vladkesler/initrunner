@@ -126,7 +126,7 @@ class TestMcpConfigValidation:
         assert config.cwd is None
         assert config.tool_prefix is None
         assert config.max_retries == 1
-        assert config.timeout is None
+        assert config.timeout_seconds is None
 
 
 class TestMcpBuilderWiring:
@@ -146,7 +146,7 @@ class TestMcpBuilderWiring:
     @patch("fastmcp.client.transports.StdioTransport")
     def test_timeout_not_passed_to_stdio_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
-        config = McpToolConfig(transport="stdio", command="npx", timeout=30)
+        config = McpToolConfig(transport="stdio", command="npx", timeout_seconds=30)
         build_mcp_toolset(config, _make_ctx())
         mock_transport_cls.assert_called_once()
         _, kwargs = mock_transport_cls.call_args
@@ -184,7 +184,7 @@ class TestMcpBuilderWiring:
     @patch("fastmcp.client.transports.SSETransport")
     def test_timeout_passed_to_sse_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
-        config = McpToolConfig(transport="sse", url="http://localhost:3001/sse", timeout=60)
+        config = McpToolConfig(transport="sse", url="http://localhost:3001/sse", timeout_seconds=60)
         build_mcp_toolset(config, _make_ctx())
         _, kwargs = mock_transport_cls.call_args
         assert kwargs["sse_read_timeout"] == 60

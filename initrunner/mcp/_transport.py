@@ -75,8 +75,8 @@ def build_transport(
         sse_kwargs: dict = {"url": config.url}
         if resolved_headers:
             sse_kwargs["headers"] = resolved_headers
-        if config.timeout is not None:
-            sse_kwargs["sse_read_timeout"] = config.timeout
+        if config.timeout_seconds is not None:
+            sse_kwargs["sse_read_timeout"] = config.timeout_seconds
         return SSETransport(**sse_kwargs)
 
     elif config.transport == "streamable-http":
@@ -85,8 +85,8 @@ def build_transport(
         http_kwargs: dict = {"url": config.url}
         if resolved_headers:
             http_kwargs["headers"] = resolved_headers
-        if config.timeout is not None:
-            http_kwargs["sse_read_timeout"] = config.timeout
+        if config.timeout_seconds is not None:
+            http_kwargs["sse_read_timeout"] = config.timeout_seconds
         return StreamableHttpTransport(**http_kwargs)
 
     else:

@@ -62,7 +62,7 @@ class TestToolkitConfig:
 
     def test_web_reader_config_defaults(self):
         cfg = ToolkitWebReaderConfig()
-        assert cfg.timeout == 15
+        assert cfg.timeout_seconds == 15
         assert cfg.max_bytes == 512_000
 
     def test_csv_analysis_config_defaults(self):

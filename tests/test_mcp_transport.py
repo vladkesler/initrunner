@@ -74,8 +74,8 @@ def test_stdio_env_vars_resolved():
 
 
 def test_stdio_timeout_ignored():
-    """StdioTransport does not support timeout — config.timeout is silently ignored."""
-    config = McpToolConfig(transport="stdio", command="node", timeout=42)
+    """StdioTransport does not support timeout — config.timeout_seconds is silently ignored."""
+    config = McpToolConfig(transport="stdio", command="node", timeout_seconds=42)
     transport = build_transport(config)
     assert transport.command == "node"
 
@@ -134,7 +134,7 @@ def test_sse_with_headers():
 
 
 def test_sse_timeout():
-    config = McpToolConfig(transport="sse", url="http://localhost:8080/sse", timeout=30)
+    config = McpToolConfig(transport="sse", url="http://localhost:8080/sse", timeout_seconds=30)
     transport = build_transport(config)
     from datetime import timedelta
 

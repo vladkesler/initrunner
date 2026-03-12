@@ -110,7 +110,7 @@ def _make_endpoint_fn(
             "method": _endpoint.method,
             "url": url,
             "headers": {**_resolve_headers(_base_headers), **_resolve_headers(_endpoint.headers)},
-            "timeout": _endpoint.timeout,
+            "timeout": _endpoint.timeout_seconds,
         }
         if _endpoint.body_template is not None:
             request_kwargs["json"] = _format_template(_endpoint.body_template, kwargs)

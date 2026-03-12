@@ -81,7 +81,7 @@ spec:
             state: "{state}"
             description: "{description}"
             context: "{context}"
-          timeout: 15
+          timeout_seconds: 15
     - type: datetime
   guardrails:
     max_tokens_per_run: 15000
