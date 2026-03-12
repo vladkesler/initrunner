@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.20.0] - 2026-03-12
+
+### Added
+- **Model aliases** — define semantic names (`fast`, `smart`, `local`) in `~/.initrunner/models.yaml` and use them in role files, CLI flags, and `chat.yaml`
+- **`--model` CLI override** — override the role's model at runtime on `run`, `daemon`, `serve`, and `test` commands; backed by `INITRUNNER_MODEL` env var
+- **`chat --model` alias support** — ephemeral chat and role-file chat modes resolve aliases; `chat.yaml` `model` field accepts aliases
+- **`ModelConfig` inline provider:model syntax** — `name: openai:gpt-4o` auto-splits into provider + name when `provider` is omitted
+
+### Changed
+- `ModelConfig.provider` is now optional in role YAML when `name` contains a colon or resolves via alias (existing files with explicit `provider:` are unaffected)
+
+### Documentation
+- New: `docs/configuration/model-aliases.md` — full reference for aliases, `--model` override, precedence, and edge cases
+- Updated: `docs/configuration/providers.md` — model aliases section, updated model config reference table
+- Updated: `docs/getting-started/cli.md` — `--model` flag documented on `run`, `serve`, and `chat` option tables
+- Updated: `CLAUDE.md` — model aliases doc added to documentation index
+
 ## [1.19.0] - 2026-03-12
 
 ### Changed

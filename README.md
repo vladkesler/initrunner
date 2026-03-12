@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-2903+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.19.0-%2334D058" alt="v1.19.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-2989+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.20.0-%2334D058" alt="v1.20.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.19.0** -- Collapse report flags (`--report PATH`), simplify memory clear (`--what`), rename `timeout` → `timeout_seconds` on MCP/API configs, extract `reduce_history()` helper. See the [Changelog](CHANGELOG.md).
+> **v1.20.0** -- Model aliases (`~/.initrunner/models.yaml`), `--model` runtime override on all commands, inline `provider:model` syntax. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -131,7 +131,7 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
 | **Agent config** | One YAML file | Python classes + wiring | Python chains + config objects |
 | **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt - DIY | Loaders > splitters > vectorstore chain |
 | **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
-| **Model switching** | Change `model.provider` in YAML | Rewrite client code | Swap LLM class + adjust prompts |
+| **Model switching** | `--model` flag, aliases, or change YAML | Rewrite client code | Swap LLM class + adjust prompts |
 | **Multi-agent** | `compose.yaml` with delegation + auto-routing | Custom orchestration layer | Agent executor + custom routing |
 
 ## What Can You Build?
@@ -198,6 +198,7 @@ initrunner chat                        # zero-config chat with persistent memory
 initrunner chat --resume               # resume previous session + auto-recall memories
 initrunner chat --ingest ./docs/       # chat with your documents (instant RAG)
 initrunner chat --tool-profile all     # chat with all tools enabled
+initrunner chat --model smart          # use a model alias (defined in ~/.initrunner/models.yaml)
 initrunner chat --telegram             # one-command Telegram bot
 initrunner chat --telegram --allowed-user-ids 123456789  # restrict access
 initrunner run role.yaml -p "Hello!"   # one-shot prompt
@@ -585,4 +586,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.19.0</sub></p>
+<p align="center"><sub>v1.20.0</sub></p>
