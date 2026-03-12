@@ -57,5 +57,9 @@ def get_oci_auth_path() -> Path:
     return get_home_dir() / "oci-auth.json"
 
 
+def get_models_config_path() -> Path:
+    return get_home_dir() / "models.yaml"
+
+
 def get_bundles_cache_dir() -> Path:
     return get_home_dir() / "cache" / "bundles"

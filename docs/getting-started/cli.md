@@ -57,7 +57,7 @@ Running `initrunner` with no subcommand in a TTY starts chat automatically (or t
 | Flag | Description |
 |------|-------------|
 | `--provider TEXT` | Model provider (overrides auto-detection) |
-| `--model TEXT` | Model name (overrides auto-detection) |
+| `--model TEXT` | Model alias or provider:model (overrides auto-detection). Supports [aliases](../configuration/model-aliases.md). |
 | `-p, --prompt TEXT` | Send prompt then enter REPL |
 | `--telegram` | Launch as Telegram bot |
 | `--discord` | Launch as Discord bot |
@@ -95,6 +95,7 @@ The `role.yaml` argument is optional when `--sense` is used.
 | `--sense` | Sense the best role for the given prompt (replaces `role.yaml` argument). |
 | `--role-dir PATH` | Directory to search for roles when using `--sense`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
+| `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
 
 ### Intent Sensing examples
 
@@ -173,6 +174,7 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 | `--no-audit` | Disable audit logging |
 | `--cors-origin TEXT` | Allowed CORS origin (repeatable). Merged with `security.server.cors_origins` from role YAML. |
 | `--skill-dir PATH` | Extra skill search directory |
+| `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
 
 See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-turn conversations, and usage examples.
 

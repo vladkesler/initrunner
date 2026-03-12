@@ -258,9 +258,26 @@ def _load_dotenv(role_dir: Path) -> None:
 def load_and_build(
     path: Path,
     extra_skill_dirs: list[Path] | None = None,
+    model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
-    """Load a role YAML and build the corresponding agent."""
+    """Load a role YAML and build the corresponding agent.
+
+    When *model_override* is a ``provider:model`` string the role's model
+    config is replaced before the agent is built.
+    """
     _load_dotenv(path.parent)
     role = load_role(path)
+    if model_override:
+        from initrunner.model_aliases import parse_model_string
+
+        new_provider, new_name = parse_model_string(model_override)
+        old_model = role.spec.model
+        update: dict[str, Any] = {"provider": new_provider, "name": new_name}
+        if new_provider != old_model.provider:
+            update["base_url"] = None
+            update["api_key_env"] = None
+        new_model = old_model.model_copy(update=update)
+        new_spec = role.spec.model_copy(update={"model": new_model})
+        role = role.model_copy(update={"spec": new_spec})
     agent = build_agent(role, role_dir=path.parent, extra_skill_dirs=extra_skill_dirs)
     return role, agent

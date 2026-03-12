@@ -174,12 +174,26 @@ This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that expos
 
 > **Embedding endpoints:** `api_key_env` works for all embedding providers (standard and custom) via `ingest.embeddings.api_key_env` or `memory.embeddings.api_key_env`. When set, InitRunner validates the key at startup and fails fast with an actionable error if it's missing. See [Ingestion: Embedding Options](../core/ingestion.md#embedding-options) for details.
 
+## Model aliases & runtime override
+
+You can define semantic aliases (`fast`, `smart`, `local`) in `~/.initrunner/models.yaml` and override the model at runtime with `--model` or `INITRUNNER_MODEL`. See [Model Aliases](model-aliases.md) for full details.
+
+```bash
+# Override model at runtime
+initrunner run role.yaml -p "hello" --model fast
+
+# Use alias in role YAML (provider auto-resolved)
+spec:
+  model:
+    name: fast
+```
+
 ## Model config reference
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | string | `openai` | Provider name (`openai`, `anthropic`, `google`, `groq`, `mistral`, `cohere`, `bedrock`, `xai`, `ollama`) |
-| `name` | string | `gpt-5-mini` | Model identifier |
+| `provider` | string | *(empty)* | Provider name. Required unless `name` contains a colon or resolves via alias. Values: `openai`, `anthropic`, `google`, `groq`, `mistral`, `cohere`, `bedrock`, `xai`, `ollama` |
+| `name` | string | *(required)* | Model identifier, alias name, or `provider:model` string |
 | `base_url` | string | *null* | Custom endpoint URL (triggers OpenAI-compatible mode) |
 | `api_key_env` | string | *null* | Environment variable containing the API key |
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |

@@ -213,6 +213,19 @@ def chat(
         if memory is None:
             memory = True
 
+    # Resolve model aliases for ephemeral modes (no role_file).
+    # When --model or chat.yaml model is an alias (e.g. "fast"), resolve it
+    # and split into provider+model so resolve_provider_and_model() works.
+    if role_file is None and model is not None:
+        from initrunner.model_aliases import resolve_model_alias
+
+        resolved = resolve_model_alias(model)
+        if ":" in resolved:
+            alias_provider, alias_model = resolved.split(":", 1)
+            if provider is None:
+                provider = alias_provider
+            model = alias_model
+
     if tool_profile not in _TOOL_PROFILES:
         console.print(
             f"[red]Error:[/red] Unknown tool profile '{tool_profile}'. "
@@ -254,8 +267,15 @@ def chat(
     if role_file is not None:
         if extras:
             console.print("[dim]Info:[/dim] --tools ignored because role file defines tools.")
+        from initrunner.cli._helpers import resolve_model_override
+
         _chat_with_role_file(
-            role_file, prompt=prompt, audit_db=audit_db, no_audit=no_audit, resume=resume
+            role_file,
+            prompt=prompt,
+            audit_db=audit_db,
+            no_audit=no_audit,
+            resume=resume,
+            model_override=resolve_model_override(model),
         )
     elif bot_mode is not None:
         _chat_bot_mode(
@@ -301,6 +321,7 @@ def _chat_with_role_file(
     audit_db: Path | None,
     no_audit: bool,
     resume: bool = False,
+    model_override: str | None = None,
 ) -> None:
     """Mode A: chat with an existing role.yaml file."""
     from initrunner.cli._helpers import command_context
@@ -311,6 +332,7 @@ def _chat_with_role_file(
         audit_db=audit_db,
         no_audit=no_audit,
         with_memory=True,
+        model_override=model_override,
     ) as (role, agent, audit_logger, memory_store, _sink_dispatcher):
         message_history = None
         if prompt:

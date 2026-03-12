@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from initrunner import __version__
 
@@ -37,12 +37,49 @@ class Metadata(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    provider: str
+    provider: str = ""
     name: str
     base_url: str | None = None
     api_key_env: str | None = None
     temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.1
     max_tokens: Annotated[int, Field(ge=1, le=128000)] = 4096
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_alias_or_split(cls, data: dict) -> dict:  # type: ignore[type-arg]
+        if not isinstance(data, dict):
+            return data
+        provider = data.get("provider", "")
+        name = data.get("name", "")
+        if provider:
+            # Explicit provider — no alias resolution
+            return data
+        # No provider: resolve alias or split on colon
+        if ":" in name:
+            prov, model_name = name.split(":", 1)
+            data["provider"] = prov
+            data["name"] = model_name
+        else:
+            # Could be an alias — resolve lazily
+            from initrunner.model_aliases import resolve_model_alias
+
+            resolved = resolve_model_alias(name)
+            if ":" in resolved:
+                prov, model_name = resolved.split(":", 1)
+                data["provider"] = prov
+                data["name"] = model_name
+            # else: leave provider empty — after-validator will catch it
+        return data
+
+    @model_validator(mode="after")
+    def _check_provider_resolved(self) -> ModelConfig:
+        if not self.provider:
+            raise ValueError(
+                f"Could not resolve provider for model '{self.name}'. "
+                f"Either specify 'provider' explicitly, use 'provider:model' format, "
+                f"or add an alias to ~/.initrunner/models.yaml"
+            )
+        return self
 
     def to_model_string(self) -> str:
         return f"{self.provider}:{self.name}"

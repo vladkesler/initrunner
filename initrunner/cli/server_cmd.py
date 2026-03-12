@@ -14,9 +14,10 @@ from initrunner.cli._helpers import (
     command_context,
     console,
     create_audit_logger,
+    resolve_model_override,
     resolve_skill_dirs,
 )
-from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
+from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
 
 _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
@@ -36,15 +37,18 @@ def serve(
         list[str] | None,
         typer.Option("--cors-origin", help="Allowed CORS origin (repeatable)"),
     ] = None,
+    model: ModelOption = None,
 ) -> None:
     """Serve an agent as an OpenAI-compatible API."""
     from initrunner.server.app import run_server
 
+    resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
         audit_db=audit_db,
         no_audit=no_audit,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        model_override=resolved_model,
     ) as (
         role,
         agent,

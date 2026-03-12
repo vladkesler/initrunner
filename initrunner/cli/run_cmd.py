@@ -14,9 +14,10 @@ from initrunner.cli._helpers import (
     detect_yaml_kind,
     load_and_build_or_exit,
     load_role_or_exit,
+    resolve_model_override,
     resolve_skill_dirs,
 )
-from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
+from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
 
 if TYPE_CHECKING:
     from initrunner.agent.executor import AutonomousResult, RunResult
@@ -99,6 +100,7 @@ def run(
         bool,
         typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
     ] = False,
+    model: ModelOption = None,
 ) -> None:
     """Run an agent with a role definition."""
 
@@ -203,6 +205,7 @@ def run(
 
     assert role_file is not None  # guaranteed by resolution block above
 
+    resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
         audit_db=audit_db,
@@ -210,6 +213,7 @@ def run(
         with_memory=True,
         with_sinks=True,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         message_history = None
         run_result = None  # RunResult or AutonomousResult
@@ -453,10 +457,13 @@ def test(
     tag: Annotated[
         list[str] | None, typer.Option("--tag", help="Filter cases by tag (repeatable)")
     ] = None,
+    model: ModelOption = None,
 ) -> None:
     """Run a test suite against an agent role."""
     from initrunner.eval.runner import SuiteLoadError, load_suite
     from initrunner.services.eval import run_suite_sync, save_result
+
+    resolved_model = resolve_model_override(model)
 
     if dry_run:
         from pydantic_ai import Agent
@@ -465,7 +472,7 @@ def test(
         role = load_role_or_exit(role_file)
         agent = Agent(TestModel())
     else:
-        role, agent = load_and_build_or_exit(role_file)
+        role, agent = load_and_build_or_exit(role_file, model_override=resolved_model)
 
     try:
         test_suite = load_suite(suite)
@@ -609,10 +616,12 @@ def daemon(
     audit_db: AuditDbOption = None,
     no_audit: NoAuditOption = False,
     skill_dir: SkillDirOption = None,
+    model: ModelOption = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
 
+    resolved_model = resolve_model_override(model)
     extra_skill_dirs = resolve_skill_dirs(skill_dir)
     with command_context(
         role_file,
@@ -621,6 +630,7 @@ def daemon(
         with_memory=True,
         with_sinks=True,
         extra_skill_dirs=extra_skill_dirs,
+        model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         run_daemon(
             agent,

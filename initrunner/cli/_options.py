@@ -19,3 +19,11 @@ SkillDirOption = Annotated[
     Path | None,
     typer.Option("--skill-dir", help="Extra skill search directory"),
 ]
+ModelOption = Annotated[
+    str | None,
+    typer.Option(
+        "--model",
+        help="Model alias or provider:model (overrides role config)",
+        envvar="INITRUNNER_MODEL",
+    ),
+]

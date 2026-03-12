@@ -183,14 +183,61 @@ def resolve_skill_dirs(skill_dir: Path | None) -> list[Path] | None:
 def load_and_build_or_exit(
     role_file: Path,
     extra_skill_dirs: list[Path] | None = None,
+    model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     from initrunner.agent.loader import RoleLoadError, load_and_build
 
     try:
-        return load_and_build(role_file, extra_skill_dirs=extra_skill_dirs)
+        role, agent = load_and_build(
+            role_file,
+            extra_skill_dirs=extra_skill_dirs,
+            model_override=model_override,
+        )
+        return role, agent
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+
+def resolve_model_override(model_flag: str | None) -> str | None:
+    """Resolve a ``--model`` CLI flag value to ``provider:model``.
+
+    Returns ``None`` when *model_flag* is ``None``.  Resolves aliases and
+    validates the result contains a colon.  Exits with error on failure.
+    """
+    if model_flag is None:
+        return None
+
+    from initrunner.model_aliases import parse_model_string, resolve_model_alias
+
+    resolved = resolve_model_alias(model_flag)
+    try:
+        parse_model_string(resolved)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    return resolved
+
+
+def _apply_model_override(role: RoleDefinition, model_string: str) -> RoleDefinition:
+    """Return a copy of *role* with its model config replaced by *model_string*.
+
+    Preserves temperature and max_tokens.  Clears ``base_url`` and
+    ``api_key_env`` only when the provider changes.
+    """
+    from initrunner.model_aliases import parse_model_string
+
+    new_provider, new_name = parse_model_string(model_string)
+    old_model = role.spec.model
+
+    update: dict = {"provider": new_provider, "name": new_name}
+    if new_provider != old_model.provider:
+        update["base_url"] = None
+        update["api_key_env"] = None
+
+    new_model = old_model.model_copy(update=update)
+    new_spec = role.spec.model_copy(update={"model": new_model})
+    return role.model_copy(update={"spec": new_spec})
 
 
 def create_audit_logger(audit_db: Path | None, no_audit: bool) -> AuditLogger | None:
@@ -253,6 +300,7 @@ def command_context(
     with_memory: bool = False,
     with_sinks: bool = False,
     extra_skill_dirs: list[Path] | None = None,
+    model_override: str | None = None,
 ):
     """Context manager for agent setup and resource cleanup.
 
@@ -260,7 +308,9 @@ def command_context(
     """
     from initrunner.stores.factory import managed_memory_store
 
-    role, agent = load_and_build_or_exit(role_file, extra_skill_dirs=extra_skill_dirs)
+    role, agent = load_and_build_or_exit(
+        role_file, extra_skill_dirs=extra_skill_dirs, model_override=model_override
+    )
 
     # Setup observability after load so TracerProvider is active before
     # the first agent.run_sync() call (PydanticAI resolves it lazily).
