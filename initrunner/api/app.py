@@ -98,6 +98,14 @@ def create_dashboard_app(
         app.state.authz = None
         app.state.authz_config = None
 
+    # Resource attribute resolvers for Cerbos policy conditions
+    from initrunner.api.authz import agent_attrs_resolver
+    from initrunner.authz import AGENT, DAEMON, INGEST, MEMORY
+
+    app.state.resource_resolvers = {}
+    for _kind in (AGENT, DAEMON, INGEST, MEMORY):
+        app.state.resource_resolvers[_kind] = agent_attrs_resolver
+
     # Jinja2 templates
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
 

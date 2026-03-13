@@ -4,7 +4,7 @@
 # dashboard API and OpenAI-compatible server.
 #
 # Usage:
-#   docker run --rm -p 3593:3593 \
+#   docker run --rm -p 3592:3592 \
 #     -v ./examples/policies:/policies \
 #     ghcr.io/cerbos/cerbos:latest
 

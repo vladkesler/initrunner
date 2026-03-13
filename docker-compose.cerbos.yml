@@ -1,0 +1,49 @@
+# InitRunner + Cerbos authorization
+#
+# Usage:
+#   docker compose -f docker-compose.cerbos.yml up
+#
+# By default mounts the permissive policy set. To switch:
+#   - ./examples/policies/strict:/policies      # production
+#   - ./examples/policies/team:/policies         # multi-team orgs
+
+services:
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:latest
+    ports:
+      - "3593:3593"
+      - "3592:3592"
+    volumes:
+      - ./examples/policies/permissive:/policies
+    healthcheck:
+      test: ["CMD", "/cerbos", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  initrunner:
+    image: ghcr.io/vladkesler/initrunner:latest
+    ports:
+      - "8420:8420"
+      - "8000:8000"
+    volumes:
+      - initrunner-data:/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}
+      - INITRUNNER_CERBOS_ENABLED=true
+      - INITRUNNER_CERBOS_HOST=cerbos
+      - INITRUNNER_CERBOS_PORT=3592
+      - INITRUNNER_JWT_SECRET=${INITRUNNER_JWT_SECRET:-change-me-in-production}
+      - INITRUNNER_CERBOS_TOOL_CHECKS=true
+    depends_on:
+      cerbos:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["initrunner", "ui", "--role-dir", "/data/roles"]
+
+volumes:
+  initrunner-data:

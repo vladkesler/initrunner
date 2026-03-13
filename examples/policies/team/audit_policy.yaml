@@ -1,0 +1,10 @@
+# Team audit policy -- admin, auditor, and operator can read.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "audit"
+  rules:
+    - actions: ["read"]
+      roles: ["admin", "auditor", "operator"]
+      effect: EFFECT_ALLOW

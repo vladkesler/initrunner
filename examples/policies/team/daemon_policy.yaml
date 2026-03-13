@@ -1,0 +1,16 @@
+# Team daemon policy -- admin and team members can manage daemons.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "daemon"
+  importDerivedRoles:
+    - initrunner_roles
+  rules:
+    - actions: ["execute", "write"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    - actions: ["execute"]
+      derivedRoles: ["team_member"]
+      effect: EFFECT_ALLOW

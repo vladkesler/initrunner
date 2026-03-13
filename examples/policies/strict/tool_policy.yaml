@@ -1,0 +1,32 @@
+# Strict tool policy -- admin all tools, operator safe tools only.
+# Explicit DENY on shell, python, script for non-admin.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "tool"
+  rules:
+    # Admins can use all tools
+    - actions: ["execute"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    # Operators get safe tools only
+    - actions: ["execute"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.tool_type in
+            ["datetime", "search", "web_reader", "filesystem"]
+
+    # Explicit deny on dangerous tools for everyone except admin
+    - actions: ["execute"]
+      roles: ["operator", "viewer", "anonymous", "user"]
+      effect: EFFECT_DENY
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.tool_type in
+            ["shell", "python", "script"]

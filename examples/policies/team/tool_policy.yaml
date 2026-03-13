@@ -1,0 +1,28 @@
+# Team tool policy -- team members get operator-tier access.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "tool"
+  importDerivedRoles:
+    - initrunner_roles
+  rules:
+    # Admins can use all tools
+    - actions: ["execute"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    # Operators and team members can use all tools except shell and python
+    - actions: ["execute"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW
+      condition:
+        match:
+          expr: '!(request.resource.attr.tool_type in ["shell", "python"])'
+
+    - actions: ["execute"]
+      derivedRoles: ["team_member"]
+      effect: EFFECT_ALLOW
+      condition:
+        match:
+          expr: '!(request.resource.attr.tool_type in ["shell", "python"])'

@@ -80,13 +80,21 @@ async def list_roles(
     if resource_filter.deny_all:
         return RoleListResponse(roles=[])
     elif not resource_filter.allow_all:
-        roles = [r for r in roles if resource_filter.should_include({"name": r.name})]
+        roles = [
+            r
+            for r in roles
+            if resource_filter.should_include({"name": r.name, "author": r.author, "team": r.team})
+        ]
 
     return RoleListResponse(roles=roles)
 
 
 @router.get("/{role_id}", response_model=RoleDetail)
-async def get_role(role_id: str, request: Request):
+async def get_role(
+    role_id: str,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(AGENT, READ, resource_id_param="role_id")),
+):
     """Get full detail for a single role."""
     import asyncio
 

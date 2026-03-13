@@ -1,0 +1,23 @@
+# Strict derived roles for InitRunner.
+#
+# Used by strict policy set -- production, external-facing environments.
+
+apiVersion: api.cerbos.dev/v1
+derivedRoles:
+  name: initrunner_roles
+  definitions:
+    # An operator who authored this agent gets write+execute access
+    - name: agent_owner
+      parentRoles: ["operator"]
+      condition:
+        match:
+          expr: request.resource.attr.author == request.principal.id
+
+    # A team member shares read+execute on team agents
+    - name: team_member
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.team != "" &&
+            request.resource.attr.team == request.principal.attr.team

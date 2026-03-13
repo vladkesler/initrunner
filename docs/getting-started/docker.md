@@ -65,6 +65,8 @@ docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
 
 Use `docker compose up` with the included [`docker-compose.yml`](../../docker-compose.yml) (copy [`examples/.env.example`](../../examples/.env.example) to `.env` first). Example roles are seeded automatically on first boot. To use your own roles, uncomment the `./roles:/data/roles` volume mount in the compose file.
 
+For authorization with Cerbos policies, use `docker compose -f docker-compose.cerbos.yml up`. See [Cerbos Authorization](../security/cerbos.md#docker-compose) for details.
+
 ## Docker sandbox for tool execution
 
 Shell, Python, and script tools can run inside Docker containers for kernel-level isolation — network namespaces, cgroups, read-only rootfs, memory/CPU limits. Enable it in your role YAML:

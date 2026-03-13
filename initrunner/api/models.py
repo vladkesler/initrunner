@@ -16,6 +16,9 @@ class RoleSummary(BaseModel):
     features: list[str]
     valid: bool
     error: str | None = None
+    author: str = ""
+    tags: list[str] = []
+    team: str = ""
 
 
 class ToolSummary(BaseModel):

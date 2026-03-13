@@ -1,0 +1,14 @@
+# Strict ingest policy -- admin full access, operator read-only.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "ingest"
+  rules:
+    - actions: ["read", "execute"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    - actions: ["read"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW

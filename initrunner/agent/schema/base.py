@@ -31,6 +31,7 @@ class Metadata(BaseModel):
     description: str = ""
     tags: list[str] = []
     author: str = ""
+    team: str = ""
     version: str = ""
     dependencies: list[str] = []
     bundle: BundleConfig | None = None

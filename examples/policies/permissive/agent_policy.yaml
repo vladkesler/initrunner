@@ -1,0 +1,32 @@
+# Permissive agent policy -- development, internal/trusted environments.
+#
+# - Admin: full access
+# - Operator: read, write, execute
+# - Viewer/anonymous: read and execute
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "agent"
+  importDerivedRoles:
+    - initrunner_roles
+  rules:
+    # Admins have full access
+    - actions: ["read", "write", "execute"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    # Operators can read, write, and execute
+    - actions: ["read", "write", "execute"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW
+
+    # Viewers can read and execute
+    - actions: ["read", "execute"]
+      roles: ["viewer"]
+      effect: EFFECT_ALLOW
+
+    # Anonymous users can read and execute
+    - actions: ["read", "execute"]
+      roles: ["anonymous"]
+      effect: EFFECT_ALLOW

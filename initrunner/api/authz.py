@@ -78,11 +78,18 @@ def requires(
         if resource_id_param is not None:
             resource_id = request.path_params.get(resource_id_param, "*")
 
+        resource_attrs: dict[str, Any] | None = None
+        resolvers = getattr(request.app.state, "resource_resolvers", {})
+        resolver = resolvers.get(resource_kind)
+        if resolver is not None and resource_id != "*":
+            resource_attrs = await resolver(request, resource_id)
+
         allowed = await authz.check_async(
             principal,
             resource_kind,
             action,
             resource_id=resource_id,
+            resource_attrs=resource_attrs,
         )
         if not allowed:
             raise HTTPException(
@@ -236,3 +243,37 @@ def _evaluate_condition(node: dict[str, Any], attrs: dict[str, str]) -> bool:
     # Unknown operator -- fail-open with a warning
     _logger.warning("Unknown PlanResources condition operator: %s, allowing access", op)
     return True
+
+
+# ---------------------------------------------------------------------------
+# Resource attribute resolver for agent-based resources
+# ---------------------------------------------------------------------------
+
+
+async def agent_attrs_resolver(request: Request, resource_id: str) -> dict[str, Any]:
+    """Resolve agent metadata for Cerbos resource attributes.
+
+    Caches the loaded role on ``request.state`` so route handlers
+    can reuse it via ``getattr(request.state, '_role_cache', {}).get(resource_id)``.
+    """
+    cache: dict[str, Any] | None = getattr(request.state, "_role_cache", None)
+    if cache is not None and resource_id in cache:
+        role = cache[resource_id]
+    else:
+        try:
+            from initrunner.api._helpers import load_role_async, resolve_role_path
+
+            path = await resolve_role_path(request, resource_id)
+            role = await load_role_async(path)
+        except Exception:
+            return {}
+        if cache is None:
+            cache = {}
+            request.state._role_cache = cache
+        cache[resource_id] = role
+
+    return {
+        "author": role.metadata.author,
+        "team": role.metadata.team,
+        "tags": role.metadata.tags,
+    }

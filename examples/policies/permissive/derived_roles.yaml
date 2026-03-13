@@ -1,0 +1,21 @@
+# Permissive derived roles for InitRunner.
+#
+# Used by permissive policy set -- development, internal/trusted environments.
+
+apiVersion: api.cerbos.dev/v1
+derivedRoles:
+  name: initrunner_roles
+  definitions:
+    - name: agent_owner
+      parentRoles: ["operator"]
+      condition:
+        match:
+          expr: request.resource.attr.author == request.principal.id
+
+    - name: team_member
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.team != "" &&
+            request.resource.attr.team == request.principal.attr.team

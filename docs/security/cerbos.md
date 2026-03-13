@@ -29,7 +29,7 @@ This pulls in the `cerbos` Python SDK and `PyJWT`.
 mkdir -p policies
 
 # 2. Start Cerbos
-docker run --rm -p 3593:3593 -v ./policies:/policies ghcr.io/cerbos/cerbos:latest
+docker run --rm -p 3592:3592 -v ./policies:/policies ghcr.io/cerbos/cerbos:latest
 
 # 3. Enable authorization
 export INITRUNNER_CERBOS_ENABLED=true
@@ -52,8 +52,8 @@ All configuration is via environment variables. Authorization config is
 |----------|---------|-------------|
 | `INITRUNNER_CERBOS_ENABLED` | `false` | Set to `true`, `1`, or `yes` to enable. |
 | `INITRUNNER_CERBOS_HOST` | `127.0.0.1` | Cerbos PDP hostname or IP. |
-| `INITRUNNER_CERBOS_PORT` | `3593` | Cerbos gRPC port. |
-| `INITRUNNER_CERBOS_TLS` | `false` | Enable TLS for the gRPC connection. |
+| `INITRUNNER_CERBOS_PORT` | `3592` | Cerbos HTTP port. |
+| `INITRUNNER_CERBOS_TLS` | `false` | Enable TLS for the HTTP connection. |
 | `INITRUNNER_JWT_SECRET` | *(empty)* | Shared secret for HS256 JWT validation. |
 | `INITRUNNER_JWT_ALGORITHM` | `HS256` | JWT signing algorithm. |
 | `INITRUNNER_CERBOS_ANONYMOUS_ROLES` | `anonymous` | Comma-separated roles for API-key-only requests. |
@@ -229,6 +229,7 @@ that checks Cerbos before the handler executes:
 | Endpoint | Resource | Action |
 |----------|----------|--------|
 | `GET /api/roles` | `agent` | `read` |
+| `GET /api/roles/{role_id}` | `agent` | `read` |
 | `POST /api/roles` | `agent` | `write` |
 | `POST /api/roles/validate` | `agent` | `read` |
 | `POST /api/roles/generate` | `agent` | `write` |
@@ -352,7 +353,7 @@ This error appears at startup when the health check fails.
 
 1. Verify Cerbos is running: `docker ps | grep cerbos`
 2. Check the host/port: `curl http://localhost:3592/api/health`
-3. Ensure the gRPC port (default 3593) is exposed
+3. Ensure the HTTP port (default 3592) is exposed
 4. If using TLS, verify certificates match
 
 ### "Cerbos requires: pip install initrunner[authz]"
@@ -375,3 +376,23 @@ pip install initrunner[authz]
 - Check which roles the principal has (from the JWT `roles` claim)
 - Review your Cerbos policies to ensure the role has the required action
 - Use the Cerbos admin API or logs to debug policy evaluation
+
+## Docker Compose
+
+The repository includes a self-contained Docker Compose file that runs InitRunner alongside a Cerbos PDP:
+
+```bash
+docker compose -f docker-compose.cerbos.yml up
+```
+
+By default the compose file mounts the `examples/policies/permissive/` policy set. To switch to a different set, edit the Cerbos volume mount:
+
+```yaml
+# strict (production, external-facing)
+- ./examples/policies/strict:/policies
+
+# team (multi-team organizations)
+- ./examples/policies/team:/policies
+```
+
+See `examples/policies/README.md` for a description of each curated policy set.

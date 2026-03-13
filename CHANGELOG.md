@@ -1,5 +1,21 @@
 # Changelog
 
+### Added
+- **Curated Cerbos policy sets** -- three ready-to-use policy sets (`strict/`, `permissive/`, `team/`) in `examples/policies/`, each with 7 policy files covering agent, audit, daemon, ingest, memory, tool, and derived roles
+- **Docker Compose for Cerbos** -- `docker-compose.cerbos.yml` runs InitRunner + Cerbos PDP with healthcheck, configurable policy set mount
+- **Resource attribute resolver registry** -- `requires()` dependency automatically loads agent metadata (author, team, tags) as Cerbos resource attributes via registered resolvers on `app.state`
+- **`team` field on Metadata** -- `metadata.team` in role YAML enables team-based Cerbos policy conditions
+- **`GET /api/roles/{role_id}` authz guard** -- previously unguarded endpoint now checks Cerbos before returning role details
+
+### Fixed
+- **Cerbos SDK protobuf 6.x compatibility** -- switched from broken gRPC client to HTTP client (`cerbos.sdk.client`), resolving `TypeError` with protobuf >= 6.31
+- **PlanResources list filtering** -- `should_include()` now passes `author` and `team` attributes alongside `name`, enabling policy conditions on agent metadata
+- **Default Cerbos port** -- changed from 3593 (gRPC) to 3592 (HTTP) to match the HTTP client transport
+
+### Changed
+- `RoleSummary` API model now includes `author`, `tags`, and `team` fields
+- `role_to_summary()` populates new metadata fields from loaded role
+
 ## [1.22.0] - 2026-03-13
 
 ### Fixed

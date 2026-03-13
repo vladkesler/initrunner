@@ -1,0 +1,32 @@
+# Team-based derived roles for InitRunner.
+#
+# Adds team_admin on top of agent_owner and team_member.
+
+apiVersion: api.cerbos.dev/v1
+derivedRoles:
+  name: initrunner_roles
+  definitions:
+    # An operator who authored this agent gets write+execute access
+    - name: agent_owner
+      parentRoles: ["operator"]
+      condition:
+        match:
+          expr: request.resource.attr.author == request.principal.id
+
+    # A team member shares read+execute on team agents
+    - name: team_member
+      parentRoles: ["user", "operator"]
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.team != "" &&
+            request.resource.attr.team == request.principal.attr.team
+
+    # A team admin gets write on team agents
+    - name: team_admin
+      parentRoles: ["admin"]
+      condition:
+        match:
+          expr: >-
+            request.resource.attr.team != "" &&
+            request.resource.attr.team == request.principal.attr.team

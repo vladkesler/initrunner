@@ -26,6 +26,9 @@ def role_to_summary(path: Path, role: RoleDefinition | None = None, error: str |
         features=features,
         valid=role is not None,
         error=error,
+        author=role.metadata.author if role else "",
+        tags=role.metadata.tags if role else [],
+        team=role.metadata.team if role else "",
     )
 
 

@@ -1,0 +1,14 @@
+# Strict memory policy -- admin full access, no memory writes for operators.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "memory"
+  rules:
+    - actions: ["read", "write", "delete"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    - actions: ["read"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW

@@ -1,0 +1,18 @@
+# Permissive memory policy -- operator gets read/write, viewer gets read.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "memory"
+  rules:
+    - actions: ["read", "write", "delete"]
+      roles: ["admin"]
+      effect: EFFECT_ALLOW
+
+    - actions: ["read", "write"]
+      roles: ["operator"]
+      effect: EFFECT_ALLOW
+
+    - actions: ["read"]
+      roles: ["viewer"]
+      effect: EFFECT_ALLOW
