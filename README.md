@@ -34,6 +34,7 @@ One YAML file is all it takes to go from idea to running agent - with document s
 - [User Interfaces](#user-interfaces)
 - [Why InitRunner](#why-initrunner)
 - [Features](#features)
+- [Security & Authorization](#security--authorization)
 - [Distribution & Deployment](#distribution--deployment)
 - [Documentation](#documentation)
 - [Community](#community--contributing)
@@ -202,7 +203,7 @@ spec:
 
 Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
-### Security & authorization
+## Security & Authorization
 
 Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) policy-based authorization. JWT identity, per-route ABAC checks, **tool-level authorization**, PlanResources filtering, and full audit trail with principal tracking:
 
