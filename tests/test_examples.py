@@ -20,12 +20,19 @@ _SUITE_YAMLS = []
 
 for _p in _ALL_YAMLS:
     with open(_p) as _f:
-        _data = yaml.safe_load(_f)
-    if isinstance(_data, dict) and _data.get("kind") == "Compose":
+        try:
+            _data = yaml.safe_load(_f)
+        except yaml.YAMLError:
+            continue
+    if not isinstance(_data, dict):
+        continue
+    if _data.get("apiVersion", "").startswith("api.cerbos.dev/"):
+        continue
+    if _data.get("kind") == "Compose":
         _COMPOSE_YAMLS.append(_p)
-    elif isinstance(_data, dict) and _data.get("kind") == "Team":
+    elif _data.get("kind") == "Team":
         _TEAM_YAMLS.append(_p)
-    elif isinstance(_data, dict) and _data.get("kind") == "TestSuite":
+    elif _data.get("kind") == "TestSuite":
         _SUITE_YAMLS.append(_p)
     else:
         _ROLE_YAMLS.append(_p)
