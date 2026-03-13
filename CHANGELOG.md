@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.23.0] - 2026-03-14
+
 ### Added
 - **Curated Cerbos policy sets** -- three ready-to-use policy sets (`strict/`, `permissive/`, `team/`) in `examples/policies/`, each with 7 policy files covering agent, audit, daemon, ingest, memory, tool, and derived roles
 - **Docker Compose for Cerbos** -- `docker-compose.cerbos.yml` runs InitRunner + Cerbos PDP with healthcheck, configurable policy set mount
