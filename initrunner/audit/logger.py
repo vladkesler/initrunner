@@ -54,6 +54,7 @@ class AuditRecord:
     error: str | None = None
     trigger_type: str | None = None
     trigger_metadata: str | None = None
+    principal_id: str | None = None
 
     @classmethod
     def from_run(
@@ -65,6 +66,7 @@ class AuditRecord:
         output_override: str | None = None,
         trigger_type: str | None = None,
         trigger_metadata: dict[str, str] | None = None,
+        principal_id: str | None = None,
     ) -> AuditRecord:
         """Build an AuditRecord from a RunResult and role definition."""
         return cls(
@@ -84,6 +86,7 @@ class AuditRecord:
             error=result.error,
             trigger_type=trigger_type,
             trigger_metadata=json.dumps(trigger_metadata) if trigger_metadata else None,
+            principal_id=principal_id,
         )
 
 
@@ -120,8 +123,9 @@ _INSERT = """\
 INSERT INTO audit_log (
     run_id, agent_name, timestamp, user_prompt, model, provider,
     output, tokens_in, tokens_out, total_tokens, tool_calls,
-    duration_ms, success, error, trigger_type, trigger_metadata
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    duration_ms, success, error, trigger_type, trigger_metadata,
+    principal_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 _CREATE_SECURITY_EVENTS_TABLE = """\
@@ -142,8 +146,8 @@ _CREATE_SECURITY_INDEXES = [
 ]
 
 _INSERT_SECURITY_EVENT = """\
-INSERT INTO security_events (timestamp, event_type, agent_name, details, source_ip)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO security_events (timestamp, event_type, agent_name, details, source_ip, principal_id)
+VALUES (?, ?, ?, ?, ?, ?);
 """
 
 _CREATE_DELEGATE_EVENTS_TABLE = """\
@@ -208,6 +212,18 @@ def _migrate_add_trigger_columns(conn: sqlite3.Connection) -> None:
         pass  # Column already exists
 
 
+def _migrate_add_principal_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add principal_id column to existing DBs."""
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN principal_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE security_events ADD COLUMN principal_id TEXT")
+    except sqlite3.OperationalError:
+        pass
+
+
 def _build_where(
     filters: list[tuple[str, object]],
 ) -> tuple[str, list[object]]:
@@ -257,6 +273,7 @@ def _row_to_record(row: sqlite3.Row) -> AuditRecord:
         error=row["error"],
         trigger_type=row["trigger_type"],
         trigger_metadata=row["trigger_metadata"],
+        principal_id=row["principal_id"],
     )
 
 
@@ -277,6 +294,7 @@ _RECORD_FIELDS = [
     "error",
     "trigger_type",
     "trigger_metadata",
+    "principal_id",
 ]
 
 
@@ -323,6 +341,7 @@ class AuditLogger:
             self._conn.execute(_CREATE_SECURITY_EVENTS_TABLE)
             self._conn.execute(_CREATE_DELEGATE_EVENTS_TABLE)
             _migrate_add_trigger_columns(self._conn)
+            _migrate_add_principal_column(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -384,6 +403,7 @@ class AuditLogger:
                 error,
                 record.trigger_type,
                 record.trigger_metadata,
+                record.principal_id,
             ),
             error_label="audit record",
         )
@@ -412,6 +432,7 @@ class AuditLogger:
         agent_name: str | None = None,
         run_id: str | None = None,
         trigger_type: str | None = None,
+        principal_id: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 1000,
@@ -423,6 +444,7 @@ class AuditLogger:
                 ("agent_name = ?", agent_name),
                 ("run_id = ?", run_id),
                 ("trigger_type = ?", trigger_type),
+                ("principal_id = ?", principal_id),
                 ("timestamp >= ?", since),
                 ("timestamp <= ?", until),
             ],
@@ -436,6 +458,7 @@ class AuditLogger:
         agent_name: str,
         details: str,
         source_ip: str | None = None,
+        principal_id: str | None = None,
     ) -> None:
         """Log a security event. Never raises — prints to stderr on failure."""
         scrubbed_details = scrub_secrets(details)
@@ -447,6 +470,7 @@ class AuditLogger:
                 agent_name,
                 scrubbed_details,
                 source_ip,
+                principal_id,
             ),
             error_label="security event",
             auto_prune=False,

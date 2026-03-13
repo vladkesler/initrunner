@@ -21,6 +21,8 @@ class TriggerEvent:
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, str] = field(default_factory=dict)
     reply_fn: Callable[[str], None] | None = None
+    principal_id: str | None = None
+    principal_roles: list[str] = field(default_factory=list)
 
     @property
     def conversation_key(self) -> str | None:

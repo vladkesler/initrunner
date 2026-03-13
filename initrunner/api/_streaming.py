@@ -187,6 +187,7 @@ def build_sse_stream(
     """
 
     async def event_stream():
+        from initrunner.authz import ANONYMOUS, set_current_authz, set_current_principal
         from initrunner.services.execution import execute_run_stream_async
 
         token_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
@@ -198,6 +199,12 @@ def build_sse_stream(
                 pass
 
         audit_logger = getattr(request.app.state, "audit_logger", None)
+
+        # Propagate per-request identity into tool calls via ContextVars
+        principal = getattr(request.state, "principal", ANONYMOUS)
+        authz = getattr(request.app.state, "authz", None)
+        set_current_principal(principal)
+        set_current_authz(authz)
 
         stream_task = asyncio.create_task(
             execute_run_stream_async(

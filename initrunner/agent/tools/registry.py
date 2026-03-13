@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner.agent.permissions import CerbosToolset
 from initrunner.agent.schema.tools import ToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, get_builder
 from initrunner.stores.base import make_store_config
@@ -70,6 +71,14 @@ def resolve_func_names(tool_configs: list[dict]) -> list[str]:
     return func_names
 
 
+def _instance_key(tool_config: ToolConfig) -> str:
+    """Extract multi-instance identifier when available."""
+    # ApiToolConfig has a required `name` field
+    if hasattr(tool_config, "name") and isinstance(tool_config.name, str):  # type: ignore[union-attr]
+        return tool_config.name  # type: ignore[union-attr]
+    return ""
+
+
 def build_toolsets(
     tools: list[ToolConfig],
     role: RoleDefinition,
@@ -80,6 +89,7 @@ def build_toolsets(
     """Build a list of PydanticAI toolsets from tool configs + optional retrieval."""
     toolsets: list[AbstractToolset] = []
     ctx = ToolBuildContext(role=role, role_dir=role_dir, prefer_async=prefer_async)
+    agent_name = role.metadata.name
 
     install_audit_hooks(role)
 
@@ -92,6 +102,14 @@ def build_toolsets(
         builder = get_builder(tool.type)
         if builder:
             toolset = builder(tool, ctx)
+            # Inner layer: Cerbos identity-based check
+            toolset = CerbosToolset(
+                toolset,
+                tool.type,
+                agent_name,
+                instance_key=_instance_key(tool),
+            )
+            # Outer layer: fnmatch argument-level check (cheap, short-circuits)
             if tool.permissions is not None:
                 from initrunner.agent.permissions import PermissionToolset
 
@@ -102,20 +120,20 @@ def build_toolsets(
     if role.spec.ingest is not None:
         from initrunner.agent.tools.retrieval import build_retrieval_toolset
 
-        toolsets.append(
-            build_retrieval_toolset(make_store_config(role), sandbox=role.spec.security.tools)
-        )
+        ts = build_retrieval_toolset(make_store_config(role), sandbox=role.spec.security.tools)
+        ts = CerbosToolset(ts, "retrieval", agent_name)
+        toolsets.append(ts)
 
     if role.spec.memory is not None:
         from initrunner.agent.tools.memory import build_memory_toolset
 
-        toolsets.append(
-            build_memory_toolset(
-                role.spec.memory,
-                role.metadata.name,
-                role.spec.model.provider,
-                sandbox=role.spec.security.tools,
-            )
+        ts = build_memory_toolset(
+            role.spec.memory,
+            role.metadata.name,
+            role.spec.model.provider,
+            sandbox=role.spec.security.tools,
         )
+        ts = CerbosToolset(ts, "memory_store", agent_name)
+        toolsets.append(ts)
 
     return toolsets

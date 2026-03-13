@@ -88,6 +88,8 @@ def run_autonomous(
     token_budget = guardrails.autonomous_token_budget
 
     reflection_state = ReflectionState()
+    # NOTE: Reflection toolsets are exempt from Cerbos tool-level checks.
+    # They are internal control-flow tools, not user-facing.
     reflection_toolset = build_reflection_toolset(autonomy_config, reflection_state)
 
     all_extra = [reflection_toolset]

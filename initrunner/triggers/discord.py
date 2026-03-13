@@ -147,6 +147,10 @@ class DiscordTrigger(TriggerBase):
                     "user_id": str(message.author.id),
                 },
                 reply_fn=reply_fn,
+                principal_id=f"discord:{message.author.id}",
+                principal_roles=[r.name for r in message.author.roles]
+                if isinstance(message.author, discord.Member)
+                else [],
             )
             await asyncio.get_running_loop().run_in_executor(None, self._callback, event)
 

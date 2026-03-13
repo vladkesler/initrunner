@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import hmac
 from collections.abc import Callable, Set
+from typing import TYPE_CHECKING
 
 from starlette.requests import Request
 from starlette.responses import Response
+
+if TYPE_CHECKING:
+    from initrunner.authz import AuthzConfig
 
 # ---------------------------------------------------------------------------
 # Path predicates — control which routes a middleware applies to
@@ -81,6 +85,12 @@ ErrorResponseFn = Callable[[int, str], Response]
 AppliesFn = Callable[[Request], bool]
 
 
+def _looks_like_jwt(token: str) -> bool:
+    """Return True if *token* has the three-segment structure of a JWT."""
+    parts = token.split(".")
+    return len(parts) == 3 and all(len(p) > 0 for p in parts)
+
+
 def make_auth_dispatch(
     *,
     api_key: str,
@@ -92,6 +102,7 @@ def make_auth_dispatch(
     cookie_name: str = "initrunner_token",
     login_redirect: str | None = None,
     secure_cookies: bool = False,
+    authz_config: AuthzConfig | None = None,
 ):
     """Bearer token auth with timing-safe comparison.
 
@@ -99,6 +110,12 @@ def make_auth_dispatch(
     an additional auth source.  When *login_redirect* is set and the request
     accepts HTML, unauthenticated requests are redirected to the login page
     instead of returning a JSON 401.
+
+    When *authz_config* is provided and the Bearer token looks like a JWT
+    (three dot-separated segments), the token is validated as a JWT and a
+    :class:`~initrunner.authz.Principal` is attached to
+    ``request.state.principal``.  Plain API-key tokens fall through to the
+    existing HMAC comparison and receive an anonymous principal.
     """
 
     async def dispatch(request: Request, call_next) -> Response:
@@ -107,6 +124,36 @@ def make_auth_dispatch(
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
+
+            # --- JWT path (when authz is configured) ---
+            if (
+                token
+                and authz_config is not None
+                and authz_config.jwt_secret
+                and _looks_like_jwt(token)
+            ):
+                import jwt as _jwt  # type: ignore[import-not-found]
+
+                from initrunner.authz import Principal
+
+                try:
+                    payload = _jwt.decode(
+                        token,
+                        authz_config.jwt_secret,
+                        algorithms=[authz_config.jwt_algorithm],
+                    )
+                    request.state.principal = Principal(
+                        id=payload["sub"],
+                        roles=payload.get("roles", ["user"]),
+                        attrs=payload.get("attrs", {}),
+                    )
+                    return await call_next(request)
+                except _jwt.InvalidTokenError:
+                    return error_response(401, "Invalid JWT")
+                except KeyError:
+                    return error_response(401, "JWT missing required 'sub' claim")
+
+            # --- Plain API-key path (existing behaviour) ---
             if not token and allow_query_param:
                 token = request.query_params.get("api_key", "")
                 # If token came via query param, set cookie and redirect
@@ -122,6 +169,11 @@ def make_auth_dispatch(
                         samesite="strict",
                         secure=secure_cookies,
                     )
+                    # Attach anonymous principal when authz is enabled
+                    if authz_config is not None:
+                        from initrunner.authz import Principal
+
+                        resp.state = getattr(resp, "state", type("State", (), {})())  # type: ignore[assignment]
                     return resp
             if not token and allow_cookie:
                 token = request.cookies.get(cookie_name, "")
@@ -139,6 +191,16 @@ def make_auth_dispatch(
                             f"{login_redirect}?next={next_url}", status_code=302
                         )
                 return error_response(401, error_message)
+
+            # Authenticated via API key -- attach anonymous principal
+            if authz_config is not None:
+                from initrunner.authz import Principal
+
+                request.state.principal = Principal(
+                    id="anonymous",
+                    roles=list(authz_config.anonymous_roles),
+                )
+
         return await call_next(request)
 
     return dispatch

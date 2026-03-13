@@ -202,6 +202,19 @@ spec:
 
 Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
+### Security & authorization
+
+Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) policy-based authorization. JWT identity, per-route ABAC checks, **tool-level authorization**, PlanResources filtering, and full audit trail with principal tracking:
+
+```bash
+pip install initrunner[authz]
+export INITRUNNER_CERBOS_ENABLED=true INITRUNNER_JWT_SECRET=my-secret
+export INITRUNNER_CERBOS_TOOL_CHECKS=true  # per-tool identity checks
+initrunner ui   # routes + tool calls checked against Cerbos policies
+```
+
+Also includes content filtering, PEP 578 sandboxing, Docker isolation, token budgets, and rate limiting out of the box. See [Cerbos Authorization](docs/security/cerbos.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
+
 ### More capabilities
 
 | Feature | Command / config | Docs |
@@ -257,7 +270,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Operations | [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Security](docs/security/security.md) · [Cerbos Authorization](docs/security/cerbos.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
 

@@ -6,7 +6,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from initrunner._ids import generate_id
@@ -17,14 +17,20 @@ from initrunner.api._streaming import (
     resolve_attachments,
     stage_upload,
 )
+from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.state import sessions
+from initrunner.authz import AGENT, EXECUTE, READ, WRITE
 
 router = APIRouter(tags=["chat-ui"])
 _logger = logging.getLogger(__name__)
 
 
 @router.get("/roles/{role_id}/chat", response_class=HTMLResponse)
-async def chat_page(request: Request, role_id: str):
+async def chat_page(
+    request: Request,
+    role_id: str,
+    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE, resource_id_param="role_id")),
+):
     """Chat interface page."""
     role_path = await resolve_role_path(request, role_id)
     role = await load_role_async(role_path)
@@ -49,7 +55,11 @@ async def chat_page(request: Request, role_id: str):
 
 
 @router.post("/roles/{role_id}/chat/upload")
-async def chat_upload(request: Request, role_id: str):
+async def chat_upload(
+    request: Request,
+    role_id: str,
+    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE, resource_id_param="role_id")),
+):
     """Upload files for attachment staging. Returns JSON list of attachment IDs."""
     return await stage_upload(request)
 
@@ -62,6 +72,7 @@ async def chat_stream(
     session_id: str | None = Query(None),
     attachment_ids: str | None = Query(None),
     attachment_urls: str | None = Query(None),
+    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE, resource_id_param="role_id")),
 ):
     """SSE streaming chat endpoint.
 
@@ -135,7 +146,11 @@ async def chat_stream(
 
 
 @router.get("/roles/{role_id}/chat/sessions")
-async def list_chat_sessions(request: Request, role_id: str):
+async def list_chat_sessions(
+    request: Request,
+    role_id: str,
+    guard: AuthzGuard = Depends(requires(AGENT, READ, resource_id_param="role_id")),
+):
     """List stored sessions for a role."""
     role_path = await resolve_role_path(request, role_id)
 
@@ -160,7 +175,12 @@ async def list_chat_sessions(request: Request, role_id: str):
 
 
 @router.delete("/roles/{role_id}/chat/sessions/{session_id}")
-async def delete_chat_session(request: Request, role_id: str, session_id: str):
+async def delete_chat_session(
+    request: Request,
+    role_id: str,
+    session_id: str,
+    guard: AuthzGuard = Depends(requires(AGENT, WRITE, resource_id_param="role_id")),
+):
     """Delete a stored session."""
     role_path = await resolve_role_path(request, role_id)
 
@@ -174,7 +194,12 @@ async def delete_chat_session(request: Request, role_id: str, session_id: str):
 
 
 @router.get("/roles/{role_id}/chat/sessions/{session_id}/messages")
-async def get_session_messages(request: Request, role_id: str, session_id: str):
+async def get_session_messages(
+    request: Request,
+    role_id: str,
+    session_id: str,
+    guard: AuthzGuard = Depends(requires(AGENT, READ, resource_id_param="role_id")),
+):
     """Load messages for a specific session."""
     from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
 

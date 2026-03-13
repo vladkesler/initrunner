@@ -55,6 +55,7 @@ discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 tui = ["textual>=7.5.0"]
 dashboard = ["fastapi>=0.115.0", "uvicorn[standard]>=0.34.0", "jinja2>=3.1"]
+authz = ["cerbos>=0.15.1", "PyJWT>=2.12.1"]
 all = [
     "initrunner[ingest]",
     "initrunner[search]",
@@ -65,6 +66,7 @@ all = [
     "initrunner[channels]",
     "initrunner[tui]",
     "initrunner[dashboard]",
+    "initrunner[authz]",
 ]
 
 [project.scripts]
@@ -116,6 +118,7 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "initrunner/_yaml.py" = ["UP047"]  # TypeVar needed for Python 3.11 compat (PEP 695 is 3.12+)
 "initrunner/tui/**" = ["RUF012"]  # Textual uses mutable class attrs (BINDINGS, CSS_PATH)
+"initrunner/api/routes/**" = ["B008"]  # Depends(requires(...)) in FastAPI default args is idiomatic
 
 [tool.ruff.lint.isort]
 known-first-party = ["initrunner"]

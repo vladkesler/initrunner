@@ -56,6 +56,10 @@ def serve(
         _memory_store,
         _sink_dispatcher,
     ):
+        from initrunner.authz import load_authz_config
+
+        authz_config = load_authz_config()
+
         console.print(f"Serving [cyan]{role.metadata.name}[/cyan] at http://{host}:{port}")
         console.print(f"  Model ID: {role.metadata.name}")
         console.print(f"  Health:   http://{host}:{port}/health")
@@ -73,6 +77,7 @@ def serve(
             audit_logger=audit_logger,
             api_key=api_key,
             cors_origins=cors_origin,
+            authz_config=authz_config,
         )
 
 
@@ -306,6 +311,10 @@ def ui(
     else:
         console.print("[yellow]Authentication disabled.[/yellow]")
 
+    from initrunner.authz import load_authz_config
+
+    authz_config = load_authz_config()
+
     run_dashboard(
         host=host,
         port=port,
@@ -313,6 +322,7 @@ def ui(
         api_key=resolved_key,
         role_dirs=role_dirs,
         audit_logger=audit_logger,
+        authz_config=authz_config,
     )
 
 

@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from initrunner.api._helpers import resolve_role_path
+from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.models import (
     RoleCreateRequest,
     RoleDetail,
@@ -18,6 +19,7 @@ from initrunner.api.models import (
     ValidationResponse,
 )
 from initrunner.api.state import RoleRegistry, role_path_to_id
+from initrunner.authz import AGENT, READ, WRITE
 from initrunner.services.api_models import role_to_detail, role_to_summary
 
 router = APIRouter(prefix="/api/roles", tags=["roles"])
@@ -56,6 +58,7 @@ def _get_registry(request: Request) -> RoleRegistry:
 async def list_roles(
     request: Request,
     dirs: Annotated[str | None, Query(description="Comma-separated directories to scan")] = None,
+    guard: AuthzGuard = Depends(requires(AGENT, READ)),
 ):
     """Discover and list all role YAML files."""
     import asyncio
@@ -70,6 +73,15 @@ async def list_roles(
         discovered = await asyncio.to_thread(registry.discover)
 
     roles = [role_to_summary(d.path, d.role, d.error) for d in discovered]
+
+    from initrunner.api.authz import get_resource_filter
+
+    resource_filter = await get_resource_filter(request, AGENT, READ)
+    if resource_filter.deny_all:
+        return RoleListResponse(roles=[])
+    elif not resource_filter.allow_all:
+        roles = [r for r in roles if resource_filter.should_include({"name": r.name})]
+
     return RoleListResponse(roles=roles)
 
 
@@ -92,7 +104,11 @@ async def get_role(role_id: str, request: Request):
 
 
 @router.post("/validate", response_model=ValidationResponse)
-async def validate_role(req: ValidateRequest, request: Request):
+async def validate_role(
+    req: ValidateRequest,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(AGENT, READ)),
+):
     """Validate a role definition file."""
     import asyncio
 
@@ -118,7 +134,11 @@ async def validate_role(req: ValidateRequest, request: Request):
 
 
 @router.post("", status_code=201)
-async def create_role(req: RoleCreateRequest, request: Request):
+async def create_role(
+    req: RoleCreateRequest,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(AGENT, WRITE)),
+):
     """Create a new role by saving YAML content to disk."""
     import asyncio
     import re
@@ -173,7 +193,11 @@ async def create_role(req: RoleCreateRequest, request: Request):
 
 
 @router.post("/generate")
-async def generate_role_yaml(req: RoleGenerateRequest, request: Request):
+async def generate_role_yaml(
+    req: RoleGenerateRequest,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(AGENT, WRITE)),
+):
     """Generate role YAML from a natural language description using AI."""
     import asyncio
 
@@ -193,7 +217,12 @@ async def generate_role_yaml(req: RoleGenerateRequest, request: Request):
 
 
 @router.put("/{role_id}")
-async def update_role(role_id: str, req: RoleYamlUpdateRequest, request: Request):
+async def update_role(
+    role_id: str,
+    req: RoleYamlUpdateRequest,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(AGENT, WRITE, resource_id_param="role_id")),
+):
     """Update an existing role's YAML content."""
     import asyncio
 

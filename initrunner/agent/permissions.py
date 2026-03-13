@@ -104,3 +104,72 @@ class PermissionToolset(AbstractToolset[Any]):
 
     async def __aexit__(self, *args: Any) -> bool | None:
         return await self._inner.__aexit__(*args)
+
+
+class CerbosToolset(AbstractToolset[Any]):
+    """Checks Cerbos tool-level authorization per call.
+
+    Reads principal and authz from ContextVars (set per-request by the call
+    site). No-op when: authz is None (Cerbos disabled), principal is None
+    (CLI/trigger -- no HTTP identity), or tool_checks_enabled is False.
+    """
+
+    def __init__(
+        self,
+        inner: AbstractToolset[Any],
+        tool_type: str,
+        agent_name: str,
+        *,
+        instance_key: str = "",
+    ) -> None:
+        self._inner = inner
+        self._tool_type = tool_type
+        self._agent_name = agent_name
+        self._instance_key = instance_key
+
+    @property
+    def id(self) -> str | None:
+        return self._inner.id
+
+    async def get_tools(self, ctx: Any) -> dict[str, ToolsetTool[Any]]:
+        return await self._inner.get_tools(ctx)
+
+    async def call_tool(
+        self,
+        name: str,
+        tool_args: dict[str, Any],
+        ctx: Any,
+        tool: ToolsetTool[Any],
+    ) -> Any:
+        from initrunner.authz import EXECUTE, TOOL, get_current_authz, get_current_principal
+
+        authz = get_current_authz()
+        principal = get_current_principal()
+
+        if authz is not None and authz.tool_checks_enabled and principal is not None:
+            resource_attrs: dict[str, Any] = {
+                "tool_type": self._tool_type,
+                "agent": self._agent_name,
+                "callable": name,
+            }
+            if self._instance_key:
+                resource_attrs["instance"] = self._instance_key
+
+            allowed = await authz.check_async(
+                principal,
+                TOOL,
+                EXECUTE,
+                resource_id=name,
+                resource_attrs=resource_attrs,
+            )
+            if not allowed:
+                return f"Permission denied: {name} -- blocked by policy"
+
+        return await self._inner.call_tool(name, tool_args, ctx, tool)
+
+    async def __aenter__(self) -> CerbosToolset:
+        await self._inner.__aenter__()
+        return self
+
+    async def __aexit__(self, *args: Any) -> bool | None:
+        return await self._inner.__aexit__(*args)

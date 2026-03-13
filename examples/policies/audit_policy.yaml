@@ -1,0 +1,12 @@
+# Cerbos resource policy for InitRunner audit logs.
+#
+# Controls who can view audit records and security events.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: "audit"
+  rules:
+    - actions: ["read"]
+      roles: ["admin", "auditor"]
+      effect: EFFECT_ALLOW

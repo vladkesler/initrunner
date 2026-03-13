@@ -89,6 +89,7 @@ class TelegramTrigger(TriggerBase):
                     "user_id": str(user_id or ""),
                 },
                 reply_fn=reply_fn,
+                principal_id=f"telegram:{user_id}" if user_id else None,
             )
             await asyncio.get_running_loop().run_in_executor(None, self._callback, event)
 

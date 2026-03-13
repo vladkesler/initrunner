@@ -39,6 +39,7 @@ def execute_run_sync(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a single agent run (sync)."""
     from initrunner.agent.executor import execute_run
@@ -49,6 +50,7 @@ def execute_run_sync(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        principal_id=principal_id,
     )
 
 
@@ -60,6 +62,7 @@ def execute_autonomous_sync(
     audit_logger: AuditLogger | None = None,
     memory_store: MemoryStoreBase | None = None,
     max_iterations_override: int | None = None,
+    principal_id: str | None = None,
 ) -> AutonomousResult:
     """Execute an autonomous agentic loop (sync)."""
     from initrunner.runner import run_autonomous
@@ -82,6 +85,7 @@ def execute_run_stream_sync(
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
     on_token: Callable[[str], None] | None = None,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a streaming agent run (sync). Call from a worker thread."""
     from initrunner.agent.executor import execute_run_stream
@@ -93,6 +97,7 @@ def execute_run_stream_sync(
         audit_logger=audit_logger,
         message_history=message_history,
         on_token=on_token,
+        principal_id=principal_id,
     )
 
 
@@ -103,6 +108,7 @@ async def execute_run_async(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a single agent run (async)."""
     from initrunner.agent.executor import execute_run_async as _execute_run_async
@@ -113,6 +119,7 @@ async def execute_run_async(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        principal_id=principal_id,
     )
 
 
@@ -124,6 +131,7 @@ async def execute_run_stream_async(
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
     on_token: Callable[[str], None] | None = None,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a streaming agent run (async)."""
     from initrunner.agent.executor import execute_run_stream_async as _stream_async
@@ -135,4 +143,5 @@ async def execute_run_stream_async(
         audit_logger=audit_logger,
         message_history=message_history,
         on_token=on_token,
+        principal_id=principal_id,
     )

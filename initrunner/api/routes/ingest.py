@@ -6,12 +6,14 @@ import asyncio
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from initrunner._log import get_logger
 from initrunner.api._helpers import load_role_async, resolve_role_path
+from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.models import IngestSourceResponse, IngestSourcesResponse
+from initrunner.authz import EXECUTE, INGEST, READ
 
 logger = get_logger("api.ingest")
 
@@ -19,7 +21,11 @@ router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
 
 @router.get("/{role_id}/sources", response_model=IngestSourcesResponse)
-async def list_sources(role_id: str, request: Request):
+async def list_sources(
+    role_id: str,
+    request: Request,
+    guard: AuthzGuard = Depends(requires(INGEST, READ, resource_id_param="role_id")),
+):
     """List files that would be ingested for this role."""
     role_path = await resolve_role_path(request, role_id)
     role = await load_role_async(role_path)
@@ -50,6 +56,7 @@ async def run_ingestion(
     role_id: str,
     request: Request,
     force: bool = Query(False, description="Force re-ingestion of all files"),
+    guard: AuthzGuard = Depends(requires(INGEST, EXECUTE, resource_id_param="role_id")),
 ):
     """Run ingestion pipeline with SSE progress updates."""
     role_path = await resolve_role_path(request, role_id)

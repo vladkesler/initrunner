@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import atexit
+import contextvars
 import json
 import logging
 import time
@@ -38,10 +39,15 @@ _T = TypeVar("_T")
 
 
 def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
-    """Run *fn* in a thread pool with a hard timeout (seconds)."""
-    future = _TIMEOUT_POOL.submit(fn)
+    """Run *fn* in a thread pool with a hard timeout (seconds).
+
+    Uses ``copy_context()`` so that ContextVars (e.g. Cerbos principal/authz)
+    propagate to the pool thread where ``agent.run_sync()`` executes.
+    """
+    ctx = contextvars.copy_context()
+    future = _TIMEOUT_POOL.submit(ctx.run, fn)
     try:
-        return future.result(timeout=timeout)
+        return future.result(timeout=timeout)  # type: ignore[return-value]
     except _FuturesTimeout:
         raise TimeoutError(f"Run timed out after {int(timeout)}s") from None
 
@@ -196,6 +202,7 @@ def _validate_input_or_fail(
     model_override: Model | str | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
+    principal_id: str | None = None,
 ) -> RunResult | None:
     """Run pre-flight content validation. Returns a failed RunResult if blocked, else None."""
     from initrunner.agent.policies import redact_text, validate_input
@@ -214,6 +221,7 @@ def _validate_input_or_fail(
                     audit_prompt,
                     trigger_type=trigger_type,
                     trigger_metadata=trigger_metadata,
+                    principal_id=principal_id,
                 )
             )
         return result
@@ -268,6 +276,7 @@ def _audit_result(
     audit_logger: AuditLogger | None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
+    principal_id: str | None = None,
 ) -> None:
     """Log result to audit trail if a logger is provided."""
     if audit_logger is None:
@@ -289,6 +298,7 @@ def _audit_result(
             output_override=audit_output,
             trigger_type=trigger_type,
             trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
         )
     )
 
@@ -378,6 +388,7 @@ def _prepare_run(
     trigger_metadata: dict[str, str] | None = None,
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
+    principal_id: str | None = None,
 ) -> tuple[str, UsageLimits, dict[str, Any], RunResult | None]:
     """Shared pre-flight for execute_run / execute_run_stream.
 
@@ -396,6 +407,7 @@ def _prepare_run(
             model_override=model_override,
             trigger_type=trigger_type,
             trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
         )
 
     guardrails = role.spec.guardrails
@@ -435,6 +447,7 @@ def execute_run(
     trigger_metadata: dict[str, str] | None = None,
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a single agent run, returning the result and updated message history."""
     run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
@@ -447,6 +460,7 @@ def execute_run(
         trigger_metadata=trigger_metadata,
         extra_toolsets=extra_toolsets,
         skip_input_validation=skip_input_validation,
+        principal_id=principal_id,
     )
     if blocked is not None:
         return blocked, []
@@ -475,6 +489,7 @@ def execute_run(
         audit_logger=audit_logger,
         trigger_type=trigger_type,
         trigger_metadata=trigger_metadata,
+        principal_id=principal_id,
     )
 
     return result, new_messages
@@ -511,6 +526,7 @@ def execute_run_stream(
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a streaming agent run with guardrails, audit, and token callback."""
     run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
@@ -523,6 +539,7 @@ def execute_run_stream(
         trigger_metadata=trigger_metadata,
         extra_toolsets=extra_toolsets,
         skip_input_validation=skip_input_validation,
+        principal_id=principal_id,
     )
     if blocked is not None:
         return blocked, []
@@ -576,6 +593,7 @@ def execute_run_stream(
         audit_logger=audit_logger,
         trigger_type=trigger_type,
         trigger_metadata=trigger_metadata,
+        principal_id=principal_id,
     )
 
     return result, new_messages
@@ -598,6 +616,7 @@ async def execute_run_async(
     trigger_metadata: dict[str, str] | None = None,
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Async variant of ``execute_run`` — uses ``agent.run()`` + ``asyncio.wait_for``."""
     run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
@@ -610,6 +629,7 @@ async def execute_run_async(
         trigger_metadata=trigger_metadata,
         extra_toolsets=extra_toolsets,
         skip_input_validation=skip_input_validation,
+        principal_id=principal_id,
     )
     if blocked is not None:
         return blocked, []
@@ -645,6 +665,7 @@ async def execute_run_async(
         audit_logger=audit_logger,
         trigger_type=trigger_type,
         trigger_metadata=trigger_metadata,
+        principal_id=principal_id,
     )
 
     return result, new_messages
@@ -668,6 +689,7 @@ async def execute_run_stream_async(
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
+    principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Async variant of ``execute_run_stream`` — uses ``agent.run_stream()``."""
     run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
@@ -680,6 +702,7 @@ async def execute_run_stream_async(
         trigger_metadata=trigger_metadata,
         extra_toolsets=extra_toolsets,
         skip_input_validation=skip_input_validation,
+        principal_id=principal_id,
     )
     if blocked is not None:
         return blocked, []
@@ -740,6 +763,7 @@ async def execute_run_stream_async(
         audit_logger=audit_logger,
         trigger_type=trigger_type,
         trigger_metadata=trigger_metadata,
+        principal_id=principal_id,
     )
 
     return result, new_messages

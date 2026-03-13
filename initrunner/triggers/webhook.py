@@ -73,10 +73,12 @@ class WebhookTrigger(TriggerBase):
                 if not hmac.compare_digest(sig_header, expected):
                     return JSONResponse({"error": "invalid signature"}, status_code=403)
 
+            principal_id = request.headers.get("x-principal-id")
             event = TriggerEvent(
                 trigger_type="webhook",
                 prompt=body.decode("utf-8", errors="replace"),
                 metadata={"path": config.path},
+                principal_id=principal_id,
             )
             self._callback(event)
             return JSONResponse({"status": "ok"})

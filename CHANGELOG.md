@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.21.0] - 2026-03-13
+
+### Added
+- **Cerbos tool-level authorization** -- per-tool-call identity-based checks via Cerbos PDP, controlled by `INITRUNNER_CERBOS_TOOL_CHECKS=true`. `CerbosToolset` wrapper reads principal from ContextVars; no-op when disabled or no principal (CLI/trigger paths). Policies match on `tool_type`, `agent`, `callable`, and `instance` attributes
+- **Route-level Cerbos authorization** -- all dashboard and API endpoints protected by `requires()` dependency that checks Cerbos before handler execution. PlanResources-based list filtering for collection endpoints
+- **Audit trail principal tracking** -- every audit record includes `principal_id` from JWT identity, API-key anonymous principal, or trigger platform identity (e.g. `telegram:12345`). Queryable via `GET /api/audit?principal_id=...`
+- **Example Cerbos policies and role** -- `examples/policies/tool_policy.yaml` and `examples/roles/cerbos-tool-auth.yaml` demonstrating tiered tool access
+
+### Changed
+- `_run_with_timeout()` uses `contextvars.copy_context()` to propagate ContextVars through `ThreadPoolExecutor`
+- `build_toolsets()` wraps all toolsets with `CerbosToolset` (inner) and `PermissionToolset` (outer, when configured)
+- `TriggerEvent` carries `principal_id` and `principal_roles` from platform identity
+
+### Documentation
+- New: `docs/security/cerbos.md` -- full Cerbos reference (identity model, resource model, route matrix, tool-level auth, policy authoring)
+- Updated: README security section mentions tool-level authorization
+
 ## [1.20.1] - 2026-03-12
 
 ### Fixed

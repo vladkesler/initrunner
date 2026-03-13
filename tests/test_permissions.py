@@ -226,10 +226,11 @@ class TestToolPermissionsSchema:
 
 
 class TestBuildToolsetsPermissions:
-    def test_no_permissions_no_wrapping(self):
-        """When permissions is None, toolset is not wrapped."""
+    def test_no_permissions_cerbos_only_wrapping(self):
+        """When permissions is None, toolset is wrapped with CerbosToolset only."""
         from unittest.mock import MagicMock, patch
 
+        from initrunner.agent.permissions import CerbosToolset
         from initrunner.agent.schema.tools import ShellToolConfig
 
         tool = ShellToolConfig(working_dir=".")
@@ -259,8 +260,9 @@ class TestBuildToolsetsPermissions:
                 ),
             )
             toolsets = build_toolsets([tool], role)
-            # Should be the raw mock, not wrapped
-            assert toolsets[0] is mock_toolset
+            # Should be wrapped with CerbosToolset (no-op when disabled)
+            assert isinstance(toolsets[0], CerbosToolset)
+            assert toolsets[0]._inner is mock_toolset
 
     def test_permissions_wraps_toolset(self):
         """When permissions is set, toolset is wrapped with PermissionToolset."""

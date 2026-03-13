@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
+from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.models import AuditListResponse, AuditRecordResponse
+from initrunner.authz import AUDIT, READ
 from initrunner.services.operations import query_audit_sync
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -19,7 +21,9 @@ async def list_audit_records(
     agent_name: Annotated[str | None, Query()] = None,
     since: Annotated[str | None, Query(description="ISO timestamp")] = None,
     until: Annotated[str | None, Query(description="ISO timestamp")] = None,
+    principal_id: Annotated[str | None, Query(description="Filter by principal")] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    guard: AuthzGuard = Depends(requires(AUDIT, READ)),
 ):
     """Query audit trail records with optional filters."""
     audit_logger = getattr(request.app.state, "audit_logger", None)
@@ -28,6 +32,7 @@ async def list_audit_records(
         agent_name=agent_name,
         since=since,
         until=until,
+        principal_id=principal_id,
         limit=limit,
         audit_logger=audit_logger,
     )
@@ -49,6 +54,7 @@ async def list_audit_records(
                 duration_ms=r.duration_ms,
                 timestamp=r.timestamp,
                 trigger_type=r.trigger_type,
+                principal_id=r.principal_id,
             )
             for r in records
         ]

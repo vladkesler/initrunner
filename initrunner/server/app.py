@@ -9,6 +9,10 @@ import secrets
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from initrunner.authz import AuthzConfig
 
 import uvicorn
 from pydantic_ai import Agent
@@ -104,6 +108,7 @@ def create_app(
     api_key: str | None = None,
     conversation_ttl: float | None = None,
     cors_origins: list[str] | None = None,
+    authz_config: AuthzConfig | None = None,
 ) -> Starlette:
     """Build and return the Starlette ASGI application."""
     from initrunner.server.rate_limiter import TokenBucketRateLimiter
@@ -182,6 +187,7 @@ def create_app(
                 conv_id,
                 conversations,
                 audit_logger,
+                request=request,
             )
 
         return await _handle_non_stream(
@@ -193,6 +199,7 @@ def create_app(
             conv_id,
             conversations,
             audit_logger,
+            request=request,
         )
 
     # --- Non-streaming handler ---
@@ -206,11 +213,21 @@ def create_app(
         conv_id: str,
         conversations: ConversationStore,
         audit_logger: AuditLogger | None,
+        request: Request | None = None,
     ) -> JSONResponse:
         content_policy = role.spec.security.content
         validation = validate_input(extract_text_from_prompt(prompt), content_policy)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
+
+        # Propagate per-request identity into tool calls via ContextVars
+        if request is not None:
+            from initrunner.authz import set_current_authz, set_current_principal
+
+            principal = getattr(request.state, "principal", None)
+            authz_inst = getattr(request.app.state, "authz", None)
+            set_current_principal(principal)
+            set_current_authz(authz_inst)
 
         try:
             result, new_messages = await asyncio.to_thread(
@@ -261,6 +278,7 @@ def create_app(
         conv_id: str,
         conversations: ConversationStore,
         audit_logger: AuditLogger | None,
+        request: Request | None = None,
     ) -> JSONResponse | StreamingResponse:
         # Pre-flight input validation — reject before streaming starts so the
         # client gets a proper HTTP 400, not a 200 SSE stream with an error.
@@ -268,6 +286,15 @@ def create_app(
         validation = validate_input(extract_text_from_prompt(prompt), content_policy)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
+
+        # Propagate per-request identity into tool calls via ContextVars
+        if request is not None:
+            from initrunner.authz import set_current_authz, set_current_principal
+
+            principal = getattr(request.state, "principal", None)
+            authz_inst = getattr(request.app.state, "authz", None)
+            set_current_principal(principal)
+            set_current_authz(authz_inst)
 
         completion_id = _make_id()
         created = _now_ts()
@@ -470,6 +497,24 @@ def create_app(
 
     # Order matters: outermost middleware runs first
     # HTTPS check -> Body size -> Rate limit -> Auth
+    # Cerbos authorization (opt-in)
+    if authz_config is not None and authz_config.enabled:
+        from initrunner.authz import CerbosAuthz, require_cerbos
+
+        require_cerbos()
+        authz = CerbosAuthz(authz_config)
+        ok, msg = authz.health_check()
+        if not ok:
+            raise RuntimeError(f"Cerbos authorization is enabled but PDP is unreachable.\n{msg}")
+        app.state.authz = authz
+        app.state.authz_config = authz_config
+        _logger.info(
+            "Cerbos authorization enabled (PDP at %s:%d)", authz_config.host, authz_config.port
+        )
+    else:
+        app.state.authz = None
+        app.state.authz_config = None
+
     if api_key:
         app.add_middleware(
             BaseHTTPMiddleware,  # type: ignore[arg-type]
@@ -478,6 +523,7 @@ def create_app(
                 applies_to=v1_predicate,
                 error_response=openai_error_response,
                 error_message="invalid API key",
+                authz_config=app.state.authz_config,
             ),
         )
     app.add_middleware(
@@ -517,6 +563,7 @@ def run_server(
     api_key: str | None = None,
     conversation_ttl: float | None = None,
     cors_origins: list[str] | None = None,
+    authz_config: AuthzConfig | None = None,
 ) -> None:
     """Blocking entry point — starts uvicorn with the OpenAI-compatible app."""
     app = create_app(
@@ -526,5 +573,6 @@ def run_server(
         api_key=api_key,
         conversation_ttl=conversation_ttl,
         cors_origins=cors_origins,
+        authz_config=authz_config,
     )
     uvicorn.run(app, host=host, port=port, log_level="info")

@@ -137,6 +137,7 @@ class AuditRecordResponse(BaseModel):
     duration_ms: int
     timestamp: str
     trigger_type: str | None = None
+    principal_id: str | None = None
 
 
 class AuditListResponse(BaseModel):
