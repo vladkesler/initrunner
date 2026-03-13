@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.22.0] - 2026-03-13
+
+### Fixed
+- **Invalid YAML in example policy** -- quote CEL expression in `examples/policies/tool_policy.yaml` so leading `!` isn't interpreted as a YAML tag
+
 ## [1.21.0] - 2026-03-13
 
 ### Added

@@ -14,7 +14,7 @@ resourcePolicy:
       effect: EFFECT_ALLOW
       condition:
         match:
-          expr: !(request.resource.attr.tool_type in ["shell", "python"])
+          expr: '!(request.resource.attr.tool_type in ["shell", "python"])'
 
     # Anonymous users (API-key auth) get safe tools only
     - actions: ["execute"]
