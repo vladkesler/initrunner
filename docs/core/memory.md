@@ -6,7 +6,7 @@ InitRunner's memory system gives agents three capabilities: **short-term session
 - **Episodic memory** — what happened during tasks (e.g. "deployed v2.1 to staging, rollback needed")
 - **Procedural memory** — learned policies and patterns (e.g. "always run tests before deploying")
 
-All memory types are backed by a single store per agent using a configurable store backend (default: `zvec`, an in-process vector database). The store is dimension-agnostic — embedding dimensions are auto-detected on first use.
+All memory types are backed by a single store per agent using a configurable store backend (default: `lancedb`, an in-process vector database). The store is dimension-agnostic — embedding dimensions are auto-detected on first use.
 
 ## Quick Start
 
@@ -54,11 +54,11 @@ initrunner chat --resume
 initrunner chat --no-memory
 ```
 
-The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools. Memories are stored at `~/.initrunner/memory/ephemeral-chat.zvec`. Customize the agent name (and thus the memory path) via `~/.initrunner/chat.yaml`:
+The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools. Memories are stored at `~/.initrunner/memory/ephemeral-chat.lance`. Customize the agent name (and thus the memory path) via `~/.initrunner/chat.yaml`:
 
 ```yaml
 # ~/.initrunner/chat.yaml
-name: my-assistant   # stored at ~/.initrunner/memory/my-assistant.zvec
+name: my-assistant   # stored at ~/.initrunner/memory/my-assistant.lance
 ```
 
 See [Chat & Quick Start](../getting-started/chat.md) for all chat options.
@@ -119,8 +119,8 @@ spec:
   memory:
     max_sessions: 10              # default: 10
     max_resume_messages: 20       # default: 20
-    store_backend: zvec           # default: "zvec"
-    store_path: null              # default: ~/.initrunner/memory/<agent-name>.zvec
+    store_backend: lancedb        # default: "lancedb"
+    store_path: null              # default: ~/.initrunner/memory/<agent-name>.lance
     embeddings:
       provider: ""                # default: "" (derives from spec.model.provider)
       model: ""                   # default: "" (uses provider default)
@@ -148,8 +148,8 @@ spec:
 |-------|------|---------|-------------|
 | `max_sessions` | `int` | `10` | Maximum number of sessions to keep. Oldest sessions are pruned on REPL exit. |
 | `max_resume_messages` | `int` | `20` | Maximum number of messages loaded when using `--resume`. |
-| `store_backend` | `str` | `"zvec"` | Memory store backend. Uses Zvec, an in-process vector database. |
-| `store_path` | `str \| null` | `null` | Custom path for the memory store directory. Default: `~/.initrunner/memory/<agent-name>.zvec`. |
+| `store_backend` | `str` | `"lancedb"` | Memory store backend. Uses LanceDB, an in-process vector database. |
+| `store_path` | `str \| null` | `null` | Custom path for the memory store directory. Default: `~/.initrunner/memory/<agent-name>.lance`. |
 
 ### Embedding Options
 
@@ -365,7 +365,7 @@ This injection happens transparently — the agent sees these as part of its sys
 
 ## Store Schema
 
-The memory store directory contains three zvec collections:
+The memory store directory contains three LanceDB tables:
 
 ### `_meta`
 
@@ -496,7 +496,7 @@ This command always runs consolidation regardless of the `consolidation.interval
 ## Store Location
 
 ```
-~/.initrunner/memory/<agent-name>.zvec
+~/.initrunner/memory/<agent-name>.lance
 ```
 
 Override with `store_path` in the memory config. The directory is created automatically if it doesn't exist.
@@ -508,9 +508,9 @@ Multiple agents can share a single memory database, allowing one agent's `rememb
 - **Compose**: set `spec.shared_memory.enabled: true` in a compose definition to give all services a common store. See [Agent Composer: Shared Memory](../orchestration/agent_composer.md#shared-memory).
 - **Delegation**: set `shared_memory.store_path` on a delegate tool to share memory between inline sub-agents. See [Delegation: Shared Memory](../orchestration/delegation.md#shared-memory).
 
-Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same zvec store directory.
+Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same LanceDB store directory.
 
-Concurrent access from multiple service threads is safe — zvec handles contention via internal locking.
+Concurrent access from multiple service threads is safe -- LanceDB handles contention via internal locking.
 
 ## Dimension & Model Identity Tracking
 

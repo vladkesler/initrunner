@@ -6,7 +6,7 @@ Each step builds on the previous one and shows the **complete YAML** so you can 
 
 ## Prerequisites
 
-- **Python 3.11–3.12** installed
+- **Python 3.11+** installed
 - **InitRunner** installed — see [Installation](installation.md)
 - **An API key** configured — see [Setup](setup.md)
 
@@ -429,7 +429,7 @@ initrunner validate role.yaml
 initrunner ingest role.yaml
 ```
 
-The ingestion pipeline reads all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local Zvec vector database. This auto-registers a `search_documents(query)` tool for the agent.
+The ingestion pipeline reads all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local LanceDB vector database. This auto-registers a `search_documents(query)` tool for the agent.
 
 Now query your report history:
 

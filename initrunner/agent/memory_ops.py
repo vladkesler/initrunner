@@ -217,7 +217,7 @@ def build_memory_system_prompt(
     """Build a system prompt section from procedural memories. Never raises.
 
     If *store* is provided it is used directly (avoids re-opening and
-    hitting zvec collection locks).  Otherwise a temporary store is opened.
+    hitting LanceDB table locks).  Otherwise a temporary store is opened.
     """
     try:
         from initrunner.stores.base import MemoryType

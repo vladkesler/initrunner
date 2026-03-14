@@ -1,4 +1,4 @@
-ARG PYTHON_VERSION=3.12
+ARG PYTHON_VERSION=3.13
 
 # ---------------------------------------------------------------------------
 # Stage 1 — Builder: install uv, build wheel, install with extras

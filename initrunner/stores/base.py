@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class StoreBackend(StrEnum):
-    ZVEC = "zvec"
+    LANCEDB = "lancedb"
 
 
 class MemoryType(StrEnum):
@@ -33,7 +33,7 @@ class StoreConfig:
     db_path: Path
     embed_provider: str
     embed_model: str
-    store_backend: StoreBackend = StoreBackend.ZVEC
+    store_backend: StoreBackend = StoreBackend.LANCEDB
     chunking_strategy: str = "fixed"
     chunk_size: int = 512
     chunk_overlap: int = 50
@@ -112,12 +112,12 @@ def make_store_config(role: RoleDefinition) -> StoreConfig:
 
 def resolve_store_path(store_path: str | None, agent_name: str) -> Path:
     """Resolve the document store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_STORES_DIR / f"{agent_name}.zvec"
+    return Path(store_path) if store_path else DEFAULT_STORES_DIR / f"{agent_name}.lance"
 
 
 def resolve_memory_path(store_path: str | None, agent_name: str) -> Path:
     """Resolve the memory store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_MEMORY_DIR / f"{agent_name}.zvec"
+    return Path(store_path) if store_path else DEFAULT_MEMORY_DIR / f"{agent_name}.lance"
 
 
 class FileMetadataStore(abc.ABC):

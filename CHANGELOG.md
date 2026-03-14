@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.24.0] - 2026-03-14
+
+### Changed
+- **Replace zvec with LanceDB** -- vector store backend switched from zvec (C++ native extension) to LanceDB (pure-Python, columnar). Removes Python 3.13 restriction and CI SIGILL workaround
+- **Python 3.13 support** -- `requires-python` widened from `>=3.11,<3.13` to `>=3.11`; CI matrix now tests 3.11/3.12/3.13
+- **Docker images default to Python 3.13** -- `Dockerfile`, installer Dockerfiles updated
+- Legacy `store_backend: zvec` in role YAML is auto-migrated to `lancedb` with a deprecation warning
+
+### Removed
+- `zvec` dependency and all zvec store implementations (`_zvec_common.py`, `zvec_document_store.py`, `zvec_memory_store.py`, `zvec_store.py`)
+- `SKIP_ZVEC_TESTS` CI workaround
+
 ## [1.23.0] - 2026-03-14
 
 ### Added

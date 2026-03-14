@@ -59,7 +59,7 @@ tools:
     max_depth: 3       # default: 3
     timeout_seconds: 120  # default: 120
     shared_memory:     # optional, inline mode only
-      store_path: ./shared-memory.zvec
+      store_path: ./shared-memory.lance
       max_memories: 1000
 ```
 
@@ -219,7 +219,7 @@ tools:
         description: "Writes content"
     mode: inline
     shared_memory:
-      store_path: ./shared-memory.zvec
+      store_path: ./shared-memory.lance
       max_memories: 500
 ```
 
@@ -243,11 +243,11 @@ The parent agent is **not** automatically included in the shared store. If the p
 ```yaml
 spec:
   memory:
-    store_path: ./shared-memory.zvec
+    store_path: ./shared-memory.lance
   tools:
     - type: delegate
       shared_memory:
-        store_path: ./shared-memory.zvec
+        store_path: ./shared-memory.lance
 ```
 
 ### Embedding Consistency

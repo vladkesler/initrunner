@@ -609,7 +609,7 @@ def run_ingest(
         )
         if db_path.exists():
             from initrunner.stores.base import EmbeddingModelChangedError
-            from initrunner.stores.zvec_store import wipe_document_store
+            from initrunner.stores.lance_store import wipe_document_store
 
             with create_document_store(config.store_backend, db_path) as check_store:
                 stored_identity = check_store.read_store_meta("embedding_model")

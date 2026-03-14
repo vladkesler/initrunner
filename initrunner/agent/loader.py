@@ -216,7 +216,7 @@ def build_agent(
     # Register dynamic system prompt for procedural memory injection.
     # The closure reads ``_memory_store`` from the agent so the already-open
     # store is reused instead of opening a second handle (which would hit
-    # zvec collection locks).
+    # LanceDB table locks).
     if role.spec.memory is not None and role.spec.memory.procedural.enabled:
         from initrunner.agent.memory_ops import build_memory_system_prompt
 

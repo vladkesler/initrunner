@@ -6,7 +6,7 @@ import pytest
 
 from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, IngestConfig
 from initrunner.ingestion.pipeline import FileStatus, run_ingest
-from initrunner.stores.zvec_store import ZvecDocumentStore
+from initrunner.stores.lance_store import LanceDocumentStore
 
 
 def _make_config(sources=None):
@@ -25,7 +25,7 @@ async def _fake_embed(embedder, texts, **kwargs):
 @pytest.fixture()
 def ingest_env(tmp_path):
     """Set up a patched environment for incremental ingest tests."""
-    store_path = tmp_path / "store.zvec"
+    store_path = tmp_path / "store.lance"
     mock_embedder = MagicMock()
 
     patches = [
@@ -71,7 +71,7 @@ class TestIncrementalIngest:
         assert stats2.updated == 0
 
         # Chunk count should be unchanged
-        with ZvecDocumentStore(store_path, dimensions=4) as store:
+        with LanceDocumentStore(store_path, dimensions=4) as store:
             assert store.count() == stats1.total_chunks
 
     def test_modified_file_updated(self, ingest_env):
@@ -155,7 +155,7 @@ class TestIncrementalIngest:
         assert stats2.new == 0
 
         # Verify b.txt metadata and chunks are gone
-        with ZvecDocumentStore(store_path, dimensions=4) as store:
+        with LanceDocumentStore(store_path, dimensions=4) as store:
             assert store.get_file_metadata(str(tmp_path / "b.txt")) is None
             sources = store.list_sources()
             assert str(tmp_path / "b.txt") not in sources

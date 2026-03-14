@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=python:3.12-slim
+ARG BASE_IMAGE=python:3.13-slim
 FROM ${BASE_IMAGE}
 
 # Install curl (needed by installer) and python3 (for http server)

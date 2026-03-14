@@ -1,6 +1,6 @@
 # Document Ingestion
 
-InitRunner's ingestion pipeline extracts text from source files, splits it into chunks, generates embeddings, and stores vectors in a local Zvec vector database. Once ingested, an agent can search these documents at runtime via the auto-registered `search_documents` tool.
+InitRunner's ingestion pipeline extracts text from source files, splits it into chunks, generates embeddings, and stores vectors in a local LanceDB vector database. Once ingested, an agent can search these documents at runtime via the auto-registered `search_documents` tool.
 
 ## Quick Start
 
@@ -47,7 +47,7 @@ resolve sources (globs + URLs) → extract text → chunk → embed → store
 2. **Extract text** — Each file is passed through a format-specific extractor based on its extension.
 3. **Chunk text** — Extracted text is split into overlapping chunks using the configured strategy.
 4. **Embed** — Chunks are converted to vector embeddings using the configured embedding model.
-5. **Store** — Embeddings and text are stored in a local Zvec vector database.
+5. **Store** -- Embeddings and text are stored in a local LanceDB vector database.
 
 ## Configuration
 
@@ -70,8 +70,8 @@ spec:
       model: ""                 # default: "" (uses provider default)
       base_url: ""              # default: "" (custom endpoint URL)
       api_key_env: ""           # default: "" (env var holding API key)
-    store_backend: zvec         # default: "zvec"
-    store_path: null            # default: ~/.initrunner/stores/<agent-name>.zvec
+    store_backend: lancedb      # default: "lancedb"
+    store_path: null            # default: ~/.initrunner/stores/<agent-name>.lance
 ```
 
 ### Ingest Options
@@ -82,8 +82,8 @@ spec:
 | `watch` | `bool` | `false` | Reserved for future use. |
 | `chunking` | `ChunkingConfig` | See below | Chunking strategy and parameters. |
 | `embeddings` | `EmbeddingConfig` | See below | Embedding provider and model. |
-| `store_backend` | `str` | `"zvec"` | Vector store backend. Uses Zvec, an in-process vector database. |
-| `store_path` | `str \| null` | `null` | Custom path for the vector store directory. Default: `~/.initrunner/stores/<agent-name>.zvec`. |
+| `store_backend` | `str` | `"lancedb"` | Vector store backend. Uses LanceDB, an in-process vector database. |
+| `store_path` | `str \| null` | `null` | Custom path for the vector store directory. Default: `~/.initrunner/stores/<agent-name>.lance`. |
 
 ### Chunking Options
 
@@ -222,20 +222,20 @@ If no match is found, falls back to `openai:text-embedding-3-small`.
 
 ## Vector Store
 
-Documents are stored in a local Zvec vector database using a configurable backend (default: `zvec`). The store is dimension-agnostic — embedding dimensions are auto-detected from the model on first ingestion and persisted in the `_meta` collection.
+Documents are stored in a local LanceDB vector database using a configurable backend (default: `lancedb`). The store is dimension-agnostic -- embedding dimensions are auto-detected from the model on first ingestion and persisted in the `_meta` table.
 
 ### Backends
 
 | Backend | Config value | Description |
 |---------|-------------|-------------|
-| Zvec | `zvec` | Default. In-process vector database built on Alibaba's Proxima engine. Uses HNSW indexing with cosine similarity. |
+| LanceDB | `lancedb` | Default. In-process vector database with columnar storage. Uses HNSW indexing with cosine similarity. |
 
 Set `store_backend` in the ingest config to select a backend.
 
 ### Default Location
 
 ```
-~/.initrunner/stores/<agent-name>.zvec
+~/.initrunner/stores/<agent-name>.lance
 ```
 
 Override with `store_path` in the ingest config.
@@ -253,7 +253,7 @@ The store tracks both embedding dimensions and the embedding model identity:
 
 ### Collections
 
-The store directory contains three zvec collections:
+The store directory contains three LanceDB tables:
 
 **`_meta`** — Key-value metadata (e.g. dimensions, embedding model):
 
@@ -422,13 +422,13 @@ Embedding providers require credentials. InitRunner validates embedding keys at 
 
 You can override which env var is used for the embedding key by setting `embeddings.api_key_env` in your `ingest` or `memory` config.
 
-### `zvec` not available
+### `lancedb` not available
 
-The vector store backend requires the `zvec` package. Install it:
+The vector store backend requires the `lancedb` package. Install it:
 ```bash
-pip install zvec
+pip install lancedb
 # or with uv:
-uv pip install zvec
+uv pip install lancedb
 ```
 
 ## Scaffold a RAG Role

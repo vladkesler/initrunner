@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Literal
+import logging
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, BeforeValidator, model_validator
 
 from initrunner.stores.base import StoreBackend
+
+_logger = logging.getLogger(__name__)
+
+
+def _migrate_zvec_backend(v: object) -> object:
+    """Map legacy ``"zvec"`` backend to ``"lancedb"``."""
+    if isinstance(v, str) and v == "zvec":
+        _logger.warning("store_backend 'zvec' is deprecated, using 'lancedb' instead")
+        return "lancedb"
+    return v
+
+
+_MigratedBackend = Annotated[StoreBackend, BeforeValidator(_migrate_zvec_backend)]
 
 
 class ChunkingConfig(BaseModel):
@@ -36,5 +50,5 @@ class IngestConfig(BaseModel):
     watch: bool = False
     chunking: ChunkingConfig = ChunkingConfig()
     embeddings: EmbeddingConfig = EmbeddingConfig()
-    store_backend: StoreBackend = StoreBackend.ZVEC
+    store_backend: _MigratedBackend = StoreBackend.LANCEDB
     store_path: str | None = None  # default: ~/.initrunner/stores/{agent-name}.db

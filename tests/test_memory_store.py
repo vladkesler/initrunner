@@ -10,7 +10,7 @@ from pydantic_ai.messages import (
 
 from initrunner.stores._helpers import _filter_system_prompts
 from initrunner.stores.base import MemoryType
-from initrunner.stores.zvec_store import ZvecMemoryStore as MemoryStore
+from initrunner.stores.lance_store import LanceMemoryStore as MemoryStore
 
 
 def _make_request(content: str) -> ModelRequest:
@@ -27,12 +27,12 @@ def _make_system_request(system: str, user: str) -> ModelRequest:
 
 class TestCreateStore:
     def test_create_store(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4):
             assert store_path.exists()
 
     def test_context_manager(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("test", "general", [1.0, 0.0, 0.0, 0.0])
         assert store_path.exists()
@@ -40,7 +40,7 @@ class TestCreateStore:
 
 class TestSessionPersistence:
     def test_save_and_load_session(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         messages = [_make_request("hello"), _make_response("hi")]
         with MemoryStore(store_path, dimensions=4) as store:
             store.save_session("s1", "agent-a", messages)
@@ -51,7 +51,7 @@ class TestSessionPersistence:
         assert isinstance(loaded[1], ModelResponse)
 
     def test_save_session_filters_system_prompt(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         messages = [
             _make_system_request("You are helpful", "hello"),
             _make_response("hi"),
@@ -67,7 +67,7 @@ class TestSessionPersistence:
         assert isinstance(request.parts[0], UserPromptPart)
 
     def test_load_session_respects_max_messages(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         messages = []
         for i in range(10):
             messages.append(_make_request(f"q{i}"))
@@ -79,7 +79,7 @@ class TestSessionPersistence:
         assert len(loaded) == 4
 
     def test_load_session_starts_with_request(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         # Create a session where slicing would start with ModelResponse
         messages = [
             _make_request("q1"),
@@ -98,13 +98,13 @@ class TestSessionPersistence:
         assert isinstance(loaded[0], ModelRequest)
 
     def test_load_latest_session_empty(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             loaded = store.load_latest_session("nonexistent")
         assert loaded is None
 
     def test_prune_sessions(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             for i in range(5):
                 store.save_session(f"s{i}", "agent-a", [_make_request(f"q{i}")])
@@ -114,7 +114,7 @@ class TestSessionPersistence:
 
 class TestLongTermMemory:
     def test_add_and_count_memories(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("fact 1", "general", [1.0, 0.0, 0.0, 0.0])
             store.add_memory("fact 2", "notes", [0.0, 1.0, 0.0, 0.0])
@@ -122,13 +122,13 @@ class TestLongTermMemory:
 
     def test_search_memories_before_any_remember(self, tmp_path):
         """search_memories on a fresh store (no dimensions) returns [] instead of crashing."""
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path) as store:
             results = store.search_memories([1.0, 0.0, 0.0, 0.0], top_k=5)
         assert results == []
 
     def test_search_memories(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("cats are great", "animals", [1.0, 0.0, 0.0, 0.0])
             store.add_memory("dogs are loyal", "animals", [0.0, 1.0, 0.0, 0.0])
@@ -138,7 +138,7 @@ class TestLongTermMemory:
         assert results[0][0].content == "cats are great"
 
     def test_list_memories(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("fact 1", "general", [1.0, 0.0, 0.0, 0.0])
             store.add_memory("fact 2", "notes", [0.0, 1.0, 0.0, 0.0])
@@ -149,7 +149,7 @@ class TestLongTermMemory:
         assert len(notes_mems) == 2
 
     def test_prune_memories(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             for i in range(5):
                 store.add_memory(f"fact {i}", "general", [float(i == j) for j in range(4)])
@@ -193,7 +193,7 @@ class TestConcurrentAccess:
     def test_concurrent_add_and_search(self, tmp_path):
         import threading
 
-        store_path = tmp_path / "shared.zvec"
+        store_path = tmp_path / "shared.lance"
         dims = 4
         emb_a = [1.0, 0.0, 0.0, 0.0]
         emb_b = [0.0, 1.0, 0.0, 0.0]
@@ -223,7 +223,7 @@ class TestConcurrentAccess:
 
 class TestMemoryTypes:
     def test_add_and_count_by_type(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory(
                 "fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
@@ -240,7 +240,7 @@ class TestMemoryTypes:
             assert store.count_memories(memory_type=MemoryType.PROCEDURAL) == 1
 
     def test_list_by_type(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory(
                 "fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
@@ -259,7 +259,7 @@ class TestMemoryTypes:
             assert episodic[0].memory_type == MemoryType.EPISODIC
 
     def test_prune_by_type(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             for i in range(5):
                 store.add_memory(
@@ -279,7 +279,7 @@ class TestMemoryTypes:
             assert store.count_memories(memory_type=MemoryType.EPISODIC) == 2
 
     def test_search_with_type_filter(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory(
                 "semantic fact", "general", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.SEMANTIC
@@ -309,14 +309,14 @@ class TestMemoryTypes:
             assert types == {MemoryType.SEMANTIC, MemoryType.PROCEDURAL}
 
     def test_default_memory_type_is_semantic(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("plain memory", "general", [1.0, 0.0, 0.0, 0.0])
             mems = store.list_memories()
             assert mems[0].memory_type == MemoryType.SEMANTIC
 
     def test_metadata_storage(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             meta = {"tool_calls": 3, "duration_ms": 1200}
             store.add_memory(
@@ -330,7 +330,7 @@ class TestMemoryTypes:
             assert mems[0].metadata == meta
 
     def test_metadata_none(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             store.add_memory("fact", "general", [1.0, 0.0, 0.0, 0.0])
             mems = store.list_memories()
@@ -339,7 +339,7 @@ class TestMemoryTypes:
 
 class TestConsolidation:
     def test_mark_consolidated(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             id1 = store.add_memory(
                 "ep1", "run", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
@@ -355,7 +355,7 @@ class TestConsolidation:
                 assert m.consolidated_at == "2026-01-01T00:00:00+00:00"
 
     def test_get_unconsolidated_episodes(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             id1 = store.add_memory(
                 "ep1", "run", [1.0, 0.0, 0.0, 0.0], memory_type=MemoryType.EPISODIC
@@ -373,7 +373,7 @@ class TestConsolidation:
             assert unconsolidated[0].content == "ep2"
 
     def test_get_unconsolidated_episodes_respects_limit(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             for i in range(10):
                 store.add_memory(
@@ -387,7 +387,7 @@ class TestConsolidation:
             assert len(unconsolidated) == 3
 
     def test_mark_consolidated_empty_list(self, tmp_path):
-        store_path = tmp_path / "test.zvec"
+        store_path = tmp_path / "test.lance"
         with MemoryStore(store_path, dimensions=4) as store:
             # Should not error
             store.mark_consolidated([], "2026-01-01T00:00:00+00:00")

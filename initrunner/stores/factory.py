@@ -26,9 +26,9 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # When a long-lived owner (e.g. ``command_context``) opens a memory store it
 # registers it here.  Subsequent callers (tools, system-prompt callbacks) get
-# back the *same* instance via ``acquire()`` so that zvec collection locks are
-# not violated.  ``close()`` on borrowed references is a ref-counted no-op —
-# only the final owner actually releases the underlying collections.
+# back the *same* instance via ``acquire()`` so that LanceDB table locks are
+# not violated.  ``close()`` on borrowed references is a ref-counted no-op --
+# only the final owner actually releases the underlying tables.
 
 _active_memory_stores: dict[str, MemoryStoreBase] = {}
 _registry_lock = threading.Lock()
@@ -47,18 +47,18 @@ def unregister_memory_store(db_path: Path) -> None:
 
 
 def create_document_store(
-    backend: StoreBackend = StoreBackend.ZVEC,
+    backend: StoreBackend = StoreBackend.LANCEDB,
     db_path: Path = Path(),
     dimensions: int | None = None,
 ) -> DocumentStore:
     """Create a DocumentStore for the given backend."""
-    from initrunner.stores.zvec_store import ZvecDocumentStore
+    from initrunner.stores.lance_store import LanceDocumentStore
 
-    return ZvecDocumentStore(db_path, dimensions=dimensions)
+    return LanceDocumentStore(db_path, dimensions=dimensions)
 
 
 def create_memory_store(
-    backend: StoreBackend = StoreBackend.ZVEC,
+    backend: StoreBackend = StoreBackend.LANCEDB,
     db_path: Path = Path(),
     dimensions: int | None = None,
 ) -> MemoryStoreBase:
@@ -67,7 +67,7 @@ def create_memory_store(
     If a store for *db_path* is already registered (via
     :func:`register_memory_store`), it is returned with its reference count
     incremented so that the caller's ``close()`` won't release the underlying
-    collections.
+    tables.
     """
     key = str(db_path)
     with _registry_lock:
@@ -76,9 +76,9 @@ def create_memory_store(
             existing.acquire()  # type: ignore[attr-defined]
             return existing
 
-    from initrunner.stores.zvec_store import ZvecMemoryStore
+    from initrunner.stores.lance_store import LanceMemoryStore
 
-    return ZvecMemoryStore(db_path, dimensions=dimensions)
+    return LanceMemoryStore(db_path, dimensions=dimensions)
 
 
 @contextmanager

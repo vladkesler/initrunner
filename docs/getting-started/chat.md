@@ -269,7 +269,7 @@ Memory is enabled by default in ephemeral chat mode. The agent gets `remember()`
 ### How it works
 
 1. The agent's system prompt includes instructions to use `recall()` before answering and `remember()` when the user shares preferences or important facts.
-2. Memories are stored at `~/.initrunner/memory/<agent-name>.zvec` (default name: `ephemeral-chat`).
+2. Memories are stored at `~/.initrunner/memory/<agent-name>.lance` (default name: `ephemeral-chat`).
 3. On `--resume`, the previous session's message history is loaded **and** relevant long-term memories are automatically recalled and injected into the system prompt.
 
 ### Disable memory

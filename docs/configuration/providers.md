@@ -319,8 +319,8 @@ graph TD
     B --> C[Agent - PydanticAI]
     C --> D[Tools]
     C --> E[Triggers]
-    C --> F[Document Store - Zvec]
-    C --> G[Memory Store - Zvec]
+    C --> F[Document Store - LanceDB]
+    C --> G[Memory Store - LanceDB]
     C --> H[Audit Logger - SQLite]
 
     D --> D1[filesystem]

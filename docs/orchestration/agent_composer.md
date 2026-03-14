@@ -60,7 +60,7 @@ spec:
     enabled: false
     store_path: null
     max_memories: 1000
-    store_backend: zvec
+    store_backend: lancedb
 ```
 
 ### Top-Level Fields
@@ -74,9 +74,9 @@ spec:
 | `spec.services` | `dict[str, ServiceConfig]` | *(required)* | Map of service name to configuration. Must contain at least one service. |
 | `spec.shared_memory` | `SharedMemoryConfig` | disabled | Shared memory configuration across services. |
 | `spec.shared_memory.enabled` | `bool` | `false` | Enable shared memory across all services. |
-| `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.zvec`. |
+| `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.lance`. |
 | `spec.shared_memory.max_memories` | `int` | `1000` | Maximum number of memories in the shared store. |
-| `spec.shared_memory.store_backend` | `str` | `"zvec"` | Store backend. Uses Zvec, an in-process vector database. |
+| `spec.shared_memory.store_backend` | `str` | `"lancedb"` | Store backend. Uses LanceDB, an in-process vector database. |
 
 ## Service Configuration
 
@@ -431,7 +431,7 @@ When `spec.shared_memory.enabled` is `true`, all services in the compose orchest
 spec:
   shared_memory:
     enabled: true
-    store_path: ./shared-memory.zvec   # optional, default: ~/.initrunner/memory/{name}-shared.zvec
+    store_path: ./shared-memory.lance   # optional, default: ~/.initrunner/memory/{name}-shared.lance
     max_memories: 500                # optional, default: 1000
   services:
     researcher:
@@ -445,7 +445,7 @@ spec:
 When `store_path` is not set, the shared database is created at:
 
 ```
-~/.initrunner/memory/{compose-name}-shared.zvec
+~/.initrunner/memory/{compose-name}-shared.lance
 ```
 
 Where `{compose-name}` comes from `metadata.name`.
@@ -463,7 +463,7 @@ All services sharing a memory store must use compatible embedding models (same d
 
 ### Concurrency
 
-Zvec handles concurrent access from multiple service threads via internal locking. No additional configuration is needed.
+LanceDB handles concurrent access from multiple service threads via internal locking. No additional configuration is needed.
 
 ## CLI Commands
 
