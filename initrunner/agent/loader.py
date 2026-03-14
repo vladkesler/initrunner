@@ -90,16 +90,17 @@ def _resolve_skills_and_merge(
     role: RoleDefinition,
     role_dir: Path | None,
     extra_skill_dirs: list[Path] | None,
-) -> tuple[str, list]:
+) -> tuple[str, list, set[Path]]:
     """Resolve skills, log warnings, merge tools, and compose the system prompt.
 
-    Returns ``(system_prompt, all_tools)``.
+    Returns ``(system_prompt, all_tools, explicit_skill_paths)``.
     """
     system_prompt = role.spec.role
     all_tools = list(role.spec.tools)
+    explicit_paths: set[Path] = set()
 
     if not role.spec.skills:
-        return system_prompt, all_tools
+        return system_prompt, all_tools, explicit_paths
 
     from initrunner.agent.skills import (
         build_skill_system_prompt,
@@ -108,12 +109,13 @@ def _resolve_skills_and_merge(
     )
 
     resolved_skills = resolve_skills(role.spec.skills, role_dir, extra_skill_dirs)
+    explicit_paths = {rs.source_path for rs in resolved_skills}
 
     for rs in resolved_skills:
         for req in rs.requirement_statuses:
             if not req.met:
                 logger.warning(
-                    "Skill '%s': unmet %s — %s",
+                    "Skill '%s': unmet %s -- %s",
                     rs.definition.frontmatter.name,
                     req.kind,
                     req.detail,
@@ -124,7 +126,7 @@ def _resolve_skills_and_merge(
     if skill_prompt:
         system_prompt = f"{role.spec.role}\n\n{skill_prompt}"
 
-    return system_prompt, all_tools
+    return system_prompt, all_tools, explicit_paths
 
 
 def _create_agent(
@@ -162,7 +164,9 @@ def build_agent(
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
     _validate_provider(role)
-    system_prompt, all_tools = _resolve_skills_and_merge(role, role_dir, extra_skill_dirs)
+    system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
+        role, role_dir, extra_skill_dirs
+    )
 
     # Resolve output type: explicit param wins, then role config, then str default
     if output_type is None:
@@ -173,6 +177,25 @@ def build_agent(
     from initrunner.agent.tools import build_toolsets
 
     toolsets = build_toolsets(all_tools, role, role_dir=role_dir, prefer_async=prefer_async)
+
+    # Auto-discovered skills — progressive disclosure via activate_skill tool
+    auto_skill_activated: set[str] = set()
+    if role.spec.auto_skills.enabled:
+        from initrunner.agent.auto_skills import (
+            build_activate_skill_toolset,
+            build_catalog_prompt,
+            discover_skills,
+        )
+
+        discovered = discover_skills(
+            role_dir=role_dir,
+            extra_dirs=extra_skill_dirs,
+            max_skills=role.spec.auto_skills.max_skills,
+            exclude_paths=explicit_paths,
+        )
+        if discovered:
+            system_prompt = f"{system_prompt}\n\n{build_catalog_prompt(discovered)}"
+            toolsets.append(build_activate_skill_toolset(discovered, auto_skill_activated))
 
     # Tool search meta-tool — hides tools behind BM25 search to reduce context
     prepare_tools = None

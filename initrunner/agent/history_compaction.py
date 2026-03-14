@@ -120,8 +120,13 @@ def _serialize_messages_for_summary(messages: list[ModelMessage]) -> str:
                     content = str(part.content)
                     lines.append(f"User: {_truncate(content)}")
                 elif isinstance(part, ToolReturnPart):
-                    content = str(part.content)
-                    lines.append(f"Tool ({part.tool_name}): {_truncate(content)}")
+                    if part.tool_name == "activate_skill":
+                        lines.append(
+                            f"Tool ({part.tool_name}): [skill instructions preserved in context]"
+                        )
+                    else:
+                        content = str(part.content)
+                        lines.append(f"Tool ({part.tool_name}): {_truncate(content)}")
         elif isinstance(msg, ModelResponse):
             for part in msg.parts:
                 if isinstance(part, TextPart):

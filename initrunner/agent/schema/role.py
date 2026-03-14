@@ -48,6 +48,13 @@ def parse_tool_list(v: Any) -> list:
     return result
 
 
+class AutoSkillsConfig(BaseModel):
+    """Configuration for auto-discovered skills (agentskills.io progressive disclosure)."""
+
+    enabled: bool = True
+    max_skills: int = Field(default=50, ge=1, le=200)
+
+
 class ToolSearchConfig(BaseModel):
     """Configuration for the tool search meta-tool."""
 
@@ -79,6 +86,7 @@ class AgentSpec(BaseModel):
     resources: ResourceConfig = ResourceConfig()
     security: SecurityPolicy = SecurityPolicy()
     observability: ObservabilityConfig | None = None
+    auto_skills: AutoSkillsConfig = AutoSkillsConfig()
     tool_search: ToolSearchConfig = ToolSearchConfig()
     daemon: DaemonConfig = DaemonConfig()
 

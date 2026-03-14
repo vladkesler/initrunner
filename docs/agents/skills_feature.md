@@ -256,11 +256,88 @@ You have code tools available. Use read_file/list_directory to browse
 the codebase and run_python to execute Python snippets.
 ```
 
+## Auto-Discovered Skills (Progressive Disclosure)
+
+InitRunner supports automatic skill discovery following the [agentskills.io](https://agentskills.io) progressive disclosure model. Skills placed in well-known directories are automatically found and made available to agents without explicit `spec.skills` configuration.
+
+### How It Works
+
+Auto-discovery uses a three-tier model:
+
+| Tier | What | When | Cost |
+|------|------|------|------|
+| 1. Catalog | name + description | Agent build | ~50-100 tokens/skill |
+| 2. Instructions | Full SKILL.md body + resource index | Model calls `activate_skill` | <5000 tokens |
+| 3. Resources | Scripts, references | Model reads files as needed | Varies |
+
+The **model** decides when to activate a skill based on catalog descriptions. The catalog is injected into the system prompt as a lightweight list. When the model determines a task matches a skill's description, it calls the `activate_skill` tool to load the full instructions.
+
+### Discovery Paths
+
+Paths are resolved relative to `role_dir` (the role file's parent directory):
+
+| Priority | Path | Scope |
+|----------|------|-------|
+| 1 | `{role_dir}/skills/` | Role-local |
+| 2 | `{role_dir}/.agents/skills/` | Project-level (agentskills.io) |
+| 3 | `--skill-dir` / `INITRUNNER_SKILL_DIR` | Extra dirs |
+| 4 | `~/.agents/skills/` | User-level (agentskills.io) |
+| 5 | `~/.initrunner/skills/` | User-level (existing) |
+
+Higher-priority scopes override lower-priority scopes on name collision. A warning is logged when shadowing occurs.
+
+Only directory format (`{name}/SKILL.md`) is supported for auto-discovery. Flat `.md` files remain available for explicit `spec.skills` references only.
+
+### Configuration
+
+Auto-discovery is enabled by default. Configure it in your role YAML:
+
+```yaml
+spec:
+  auto_skills:
+    enabled: true    # default: true
+    max_skills: 50   # default: 50, max: 200
+```
+
+To disable auto-discovery:
+
+```yaml
+spec:
+  auto_skills:
+    enabled: false
+```
+
+### Scanning Rules
+
+- Directories like `.git/`, `node_modules/`, `__pycache__`, `.venv`, `dist` are skipped
+- Only 1 level deep inside each skills dir (only `{name}/SKILL.md`, no recursive nesting)
+- Total discovered skills capped at `max_skills` (default 50)
+- Skills without a `description` in frontmatter are skipped
+- Skills already referenced in `spec.skills` are excluded by resolved path to avoid duplication
+
+### Interaction with Explicit Skills
+
+Explicit skills (listed in `spec.skills`) are loaded eagerly with their full prompt and tools merged into the agent at build time. Auto-discovered skills are lazy -- only their name and description are injected initially.
+
+If a skill is both explicitly referenced and present in an auto-discovery directory, the auto-discovery system skips it (deduplication by resolved file path).
+
+### Trust Model
+
+Project-level skills (`{role_dir}/.agents/skills/`) are loaded with the same trust as the role file itself. InitRunner already executes the role's system prompt and tool configs from the same directory, so project-level skills do not expand the trust boundary.
+
+### Non-Reproducibility
+
+Auto-discovered skills are ambient capabilities by design. Two machines with different installed skills see different catalogs. This is consistent with the agentskills.io model (skills are like extensions/plugins).
+
+- **Bundles**: only include explicit `spec.skills`, not auto-discovered skills
+- **Daemon hot-reload**: only watches explicit skill refs; auto-skill directory changes require daemon restart
+
 ## Security
 
 - The role's `SecurityPolicy` applies to **all** tools, including those contributed by skills. Skills cannot weaken or bypass security policies.
-- Skills cannot nest — the `SkillFrontmatter` schema does not include a `skills` field, so a skill cannot reference other skills.
+- Skills cannot nest -- the `SkillFrontmatter` schema does not include a `skills` field, so a skill cannot reference other skills.
 - Tool sandbox restrictions (blocked modules, MCP command allowlists, sensitive env prefixes) apply uniformly regardless of whether a tool came from a skill or the role itself.
+- The `activate_skill` meta-tool is a privileged tool that bypasses Cerbos/permission wrapping. It only reads SKILL.md files from paths pre-discovered by the harness at build time (not user-controlled input). This is the same trust model as the `search_tools` meta-tool.
 
 See [Security](../security/security.md) for the full security policy reference.
 
@@ -279,21 +356,26 @@ If the path is a directory, InitRunner looks for `SKILL.md` inside it.
 
 Output includes: name, description, license, compatibility, metadata, tools (with summaries), requirement status (met/unmet), and a prompt preview (first 200 characters).
 
-### `skill list [--skill-dir DIR]`
+### `skill list [--skill-dir DIR] [--auto] [--all] [--role PATH]`
 
-List all available skills discovered across search locations.
+List available skills discovered across search locations.
 
 ```bash
-initrunner skill list
+initrunner skill list                           # explicit skills only
+initrunner skill list --auto                    # auto-discovered skills only
+initrunner skill list --all                     # both explicit and auto-discovered
+initrunner skill list --auto --role role.yaml   # auto-discover relative to role
 initrunner skill list --skill-dir ./my-skills
 ```
 
-Scans these directories (in order):
+**Explicit skills** scan these directories (in order):
 1. `./skills/` (current working directory)
 2. The `--skill-dir` argument (if provided)
 3. `~/.initrunner/skills/` (global)
 
-Output table includes: name, description, tools, and file path.
+**Auto-discovered skills** (`--auto` or `--all`) scan the discovery paths listed above, relative to the role file's directory (or current directory if `--role` is not provided).
+
+Output includes: name, description, scope/source, and path.
 
 ### `init --template skill --name <name>`
 
@@ -326,8 +408,23 @@ initrunner run role.yaml -i
 
 ## Examples
 
-See the example skills and role in the repository:
+See the example skills and roles in the repository:
 
-- `examples/skills/web-researcher/SKILL.md` — Directory-format skill with web tools
-- `examples/skills/code-tools.md` — Flat-format skill with filesystem and Python tools
-- `examples/roles/skill-demo.yaml` — Role that composes both skills
+**Explicit skills:**
+- `examples/skills/web-researcher/SKILL.md` -- Directory-format skill with web tools
+- `examples/skills/code-tools.md` -- Flat-format skill with filesystem and Python tools
+- `examples/roles/skill-demo.yaml` -- Role that composes both skills explicitly
+
+**Auto-discovered skills:**
+- `examples/roles/skills/summarizer/SKILL.md` -- Auto-discoverable skill (directory format)
+- `examples/roles/auto-skill-demo.yaml` -- Role that uses auto-discovery (skills in `./skills/` are found automatically)
+
+Try it:
+
+```bash
+# List auto-discovered skills for the demo role
+initrunner skill list --auto --role examples/roles/auto-skill-demo.yaml
+
+# Run the agent -- it will see the summarizer skill in its catalog
+initrunner run examples/roles/auto-skill-demo.yaml -i
+```

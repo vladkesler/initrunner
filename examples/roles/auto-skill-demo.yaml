@@ -1,0 +1,31 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: auto-skill-demo
+  description: Demonstrates auto-discovered skills with progressive disclosure
+  tags:
+    - demo
+    - skills
+    - auto-discovery
+spec:
+  role: |
+    You are a versatile assistant. When a task matches one of your available
+    skills, activate it to load detailed instructions before proceeding.
+  model:
+    provider: openai
+    name: gpt-4.1-mini
+    temperature: 0.2
+    max_tokens: 4096
+  # Auto-discovery is enabled by default. Skills placed in ./skills/ or
+  # ./.agents/skills/ next to this role file are automatically found.
+  # The model sees a lightweight catalog and activates skills on demand.
+  auto_skills:
+    enabled: true
+    max_skills: 50
+  tools:
+    - type: datetime
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 20
+    timeout_seconds: 300
+    max_request_limit: 50

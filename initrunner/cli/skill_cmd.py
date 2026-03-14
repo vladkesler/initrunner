@@ -70,63 +70,101 @@ def skill_validate(
 @app.command("list")
 def skill_list(
     skill_dir: SkillDirOption = None,
+    auto: Annotated[
+        bool,
+        typer.Option("--auto", help="Show only auto-discovered skills"),
+    ] = False,
+    show_all: Annotated[
+        bool,
+        typer.Option("--all", help="Show both explicit and auto-discovered skills"),
+    ] = False,
+    role: Annotated[
+        Path | None,
+        typer.Option("--role", help="Role file for auto-discovery context"),
+    ] = None,
 ) -> None:
     """List available skills."""
     from initrunner.agent.skills import SkillLoadError, load_skill
 
-    search_dirs: list[Path] = []
+    explicit_found: list[tuple[str, str, str, Path]] = []
+    auto_found: list[tuple[str, str, str, str]] = []
 
-    local_skills = Path("./skills")
-    if local_skills.is_dir():
-        search_dirs.append(local_skills)
+    # --- Explicit skills ---
+    if not auto:
+        search_dirs: list[Path] = []
 
-    if skill_dir is not None and skill_dir.is_dir():
-        search_dirs.append(skill_dir)
+        local_skills = Path("./skills")
+        if local_skills.is_dir():
+            search_dirs.append(local_skills)
 
-    from initrunner.config import get_skills_dir
+        if skill_dir is not None and skill_dir.is_dir():
+            search_dirs.append(skill_dir)
 
-    global_skills = get_skills_dir()
-    if global_skills.is_dir():
-        search_dirs.append(global_skills)
+        from initrunner.config import get_skills_dir
 
-    skills_found: list[tuple[str, str, str, Path]] = []
+        global_skills = get_skills_dir()
+        if global_skills.is_dir():
+            search_dirs.append(global_skills)
 
-    for d in search_dirs:
-        for skill_md in sorted(d.glob("*/SKILL.md")):
-            try:
-                sd = load_skill(skill_md)
-                tools = ", ".join(t.type for t in sd.frontmatter.tools) or "(none)"
-                skills_found.append(
-                    (sd.frontmatter.name, sd.frontmatter.description, tools, skill_md)
-                )
-            except SkillLoadError:
-                pass
+        for d in search_dirs:
+            for skill_md in sorted(d.glob("*/SKILL.md")):
+                try:
+                    sd = load_skill(skill_md)
+                    tools = ", ".join(t.type for t in sd.frontmatter.tools) or "(none)"
+                    explicit_found.append(
+                        (sd.frontmatter.name, sd.frontmatter.description, tools, skill_md)
+                    )
+                except SkillLoadError:
+                    pass
 
-        for md_file in sorted(d.glob("*.md")):
-            if md_file.name == "SKILL.md":
-                continue
-            try:
-                sd = load_skill(md_file)
-                tools = ", ".join(t.type for t in sd.frontmatter.tools) or "(none)"
-                skills_found.append(
-                    (sd.frontmatter.name, sd.frontmatter.description, tools, md_file)
-                )
-            except SkillLoadError:
-                pass
+            for md_file in sorted(d.glob("*.md")):
+                if md_file.name == "SKILL.md":
+                    continue
+                try:
+                    sd = load_skill(md_file)
+                    tools = ", ".join(t.type for t in sd.frontmatter.tools) or "(none)"
+                    explicit_found.append(
+                        (sd.frontmatter.name, sd.frontmatter.description, tools, md_file)
+                    )
+                except SkillLoadError:
+                    pass
 
-    if not skills_found:
+    # --- Auto-discovered skills ---
+    if auto or show_all:
+        from initrunner.agent.auto_skills import discover_skills
+
+        role_dir = role.parent if role else Path(".")
+        extra_dirs = [skill_dir] if skill_dir else None
+        discovered = discover_skills(role_dir=role_dir, extra_dirs=extra_dirs)
+        for ds in discovered:
+            auto_found.append((ds.name, ds.description, ds.scope, str(ds.path.parent)))
+
+    if not explicit_found and not auto_found:
         console.print(
             "No skills found. Use [bold]initrunner init --template skill[/bold] to create one."
         )
         return
 
-    table = Table(title="Available Skills")
-    table.add_column("Name", style="cyan")
-    table.add_column("Description")
-    table.add_column("Tools")
-    table.add_column("Path", style="dim")
+    if explicit_found and not auto:
+        table = Table(title="Explicit Skills")
+        table.add_column("Name", style="cyan")
+        table.add_column("Description")
+        table.add_column("Tools")
+        table.add_column("Path", style="dim")
 
-    for name, desc, tools, path in skills_found:
-        table.add_row(name, desc, tools, str(path))
+        for name, desc, tools, path in explicit_found:
+            table.add_row(name, desc, tools, str(path))
 
-    console.print(table)
+        console.print(table)
+
+    if auto_found:
+        table = Table(title="Auto-Discovered Skills")
+        table.add_column("Name", style="cyan")
+        table.add_column("Description")
+        table.add_column("Scope")
+        table.add_column("Source", style="dim")
+
+        for name, desc, scope, source in auto_found:
+            table.add_row(name, desc, scope, source)
+
+        console.print(table)
