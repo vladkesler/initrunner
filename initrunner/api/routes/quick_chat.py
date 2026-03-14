@@ -6,7 +6,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from initrunner._ids import generate_id
@@ -17,9 +17,7 @@ from initrunner.api._streaming import (
     resolve_attachments,
     stage_upload,
 )
-from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.state import role_path_to_id, sessions
-from initrunner.authz import AGENT, EXECUTE, READ
 
 router = APIRouter(tags=["quick-chat"])
 _logger = logging.getLogger(__name__)
@@ -34,7 +32,6 @@ def _templates(request: Request):
 @router.get("/chat", response_class=HTMLResponse)
 async def quick_chat_page(
     request: Request,
-    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE)),
 ):
     """Quick Chat page — auto-detect provider and start chatting."""
     from initrunner.services.providers import detect_provider_and_model
@@ -65,7 +62,6 @@ async def quick_chat_stream(
     request: Request,
     prompt: str,
     session_id: str | None = None,
-    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE)),
 ):
     """SSE streaming for ephemeral quick-chat agent."""
     sid = session_id or generate_id()
@@ -123,7 +119,6 @@ async def quick_chat_stream(
 @router.post("/chat/sense")
 async def quick_chat_sense(
     request: Request,
-    guard: AuthzGuard = Depends(requires(AGENT, READ)),
 ):
     """Accept prompt, return matched role JSON."""
     body = await request.json()
@@ -154,7 +149,6 @@ async def quick_chat_sense(
 @router.post("/chat/upload")
 async def quick_chat_upload(
     request: Request,
-    guard: AuthzGuard = Depends(requires(AGENT, EXECUTE)),
 ):
     """Upload files for quick-chat attachment staging."""
     return await stage_upload(request)

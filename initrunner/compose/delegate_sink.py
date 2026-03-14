@@ -14,6 +14,7 @@ from initrunner._log import get_logger
 from initrunner.sinks.base import SinkBase, SinkPayload
 
 if TYPE_CHECKING:
+    from initrunner.agent.schema.base import Metadata
     from initrunner.audit.logger import AuditLogger
 
 logger = get_logger("compose.delegate")
@@ -57,12 +58,16 @@ class DelegateSink(SinkBase):
         audit_logger: AuditLogger | None = None,
         circuit_breaker_threshold: int | None = None,
         circuit_breaker_reset_seconds: int = 60,
+        source_metadata: Metadata | None = None,
+        target_metadata: Metadata | None = None,
     ) -> None:
         self._source_service = source_service
         self._target_service = target_service
         self._target_queue = target_queue
         self._timeout_seconds = timeout_seconds
         self._audit_logger = audit_logger
+        self._source_metadata = source_metadata
+        self._target_metadata = target_metadata
         self._counter_lock = threading.Lock()
         self._dropped_count = 0
         self._filtered_count = 0
@@ -266,6 +271,30 @@ class DelegateSink(SinkBase):
                         payload_preview=payload.output[:200] if payload.output else "",
                     )
                 return
+
+            # Delegation policy check using role metadata (not service key)
+            if self._source_metadata is not None and self._target_metadata is not None:
+                from initrunner.agent.delegation import check_delegation_policy
+
+                target_name = self._target_metadata.name
+                if not check_delegation_policy(
+                    self._source_metadata, target_name, self._target_metadata
+                ):
+                    with self._counter_lock:
+                        self._dropped_count += 1
+                    logger.warning(
+                        "Delegation denied by policy: %s -> %s",
+                        self._source_metadata.name,
+                        target_name,
+                    )
+                    if self._audit_logger is not None:
+                        self._log_event(
+                            status="policy_denied",
+                            source_run_id=payload.run_id,
+                            reason="delegation_policy_denied",
+                            payload_preview=payload.output[:200] if payload.output else "",
+                        )
+                    return
 
             # Check circuit breaker before attempting delivery
             with self._counter_lock:

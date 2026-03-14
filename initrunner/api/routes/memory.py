@@ -5,13 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
 
 from initrunner.api._helpers import load_role_with_memory
-from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.models import MemoryItemResponse, MemoryListResponse
-from initrunner.authz import DELETE, MEMORY, READ
 
 router = APIRouter(prefix="/api/memories", tags=["memory"])
 
@@ -22,7 +20,6 @@ async def list_memories(
     request: Request,
     category: str | None = Query(None),
     limit: int = Query(100, ge=1, le=1000),
-    guard: AuthzGuard = Depends(requires(MEMORY, READ, resource_id_param="role_id")),
 ):
     """List memories for a role."""
     role = (await load_role_with_memory(role_id, request))[0]
@@ -48,7 +45,6 @@ async def list_memories(
 async def clear_memories(
     role_id: str,
     request: Request,
-    guard: AuthzGuard = Depends(requires(MEMORY, DELETE, resource_id_param="role_id")),
 ):
     """Clear all memories for a role."""
     role = (await load_role_with_memory(role_id, request))[0]
@@ -63,7 +59,6 @@ async def clear_memories(
 async def export_memories(
     role_id: str,
     request: Request,
-    guard: AuthzGuard = Depends(requires(MEMORY, READ, resource_id_param="role_id")),
 ):
     """Export memories as a downloadable JSON file."""
     role = (await load_role_with_memory(role_id, request))[0]

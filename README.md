@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3070+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.26.0-%2334D058" alt="v1.26.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3019+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.27.0-%2334D058" alt="v1.27.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.26.0** -- Auto-discovered skills with progressive disclosure, `activate_skill` meta-tool. See the [Changelog](CHANGELOG.md).
+> **v1.27.0** -- Agent-as-principal Cerbos policy engine for delegation and tool authorization. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -205,16 +205,16 @@ Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration
 
 ## Security & Authorization
 
-Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) policy-based authorization. JWT identity, per-route ABAC checks, **tool-level authorization**, PlanResources filtering, and full audit trail with principal tracking:
+Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, API, and pipeline:
 
 ```bash
 pip install initrunner[authz]
-export INITRUNNER_CERBOS_ENABLED=true INITRUNNER_JWT_SECRET=my-secret
-export INITRUNNER_CERBOS_TOOL_CHECKS=true  # per-tool identity checks
-initrunner ui   # routes + tool calls checked against Cerbos policies
+export INITRUNNER_CERBOS_ENABLED=true
+export INITRUNNER_CERBOS_AGENT_CHECKS=true  # per-agent identity checks
+initrunner run role.yaml   # tool calls + delegation checked against Cerbos policies
 ```
 
-Also includes content filtering, PEP 578 sandboxing, Docker isolation, token budgets, and rate limiting out of the box. See [Cerbos Authorization](docs/security/cerbos.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
+Also includes content filtering, PEP 578 sandboxing, Docker isolation, token budgets, and rate limiting out of the box. See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ### More capabilities
 
@@ -271,7 +271,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Operations | [Security](docs/security/security.md) · [Cerbos Authorization](docs/security/cerbos.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
 
@@ -298,4 +298,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.26.0</sub></p>
+<p align="center"><sub>v1.27.0</sub></p>

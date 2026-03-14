@@ -1647,7 +1647,6 @@ all = [
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-sdk" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"] },
-    { name = "pyjwt" },
     { name = "pymupdf4llm" },
     { name = "python-docx" },
     { name = "python-telegram-bot" },
@@ -1666,7 +1665,6 @@ audio = [
 ]
 authz = [
     { name = "cerbos" },
-    { name = "pyjwt" },
 ]
 channels = [
     { name = "discord-py" },
@@ -1766,8 +1764,6 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["groq"], marker = "extra == 'groq'", specifier = ">=1.56.0" },
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=1.56.0" },
-    { name = "pyjwt", marker = "extra == 'all'", specifier = ">=2.12.1" },
-    { name = "pyjwt", marker = "extra == 'authz'", specifier = ">=2.12.1" },
     { name = "pymupdf4llm", marker = "extra == 'all'", specifier = ">=0.2.9" },
     { name = "pymupdf4llm", marker = "extra == 'ingest'", specifier = ">=0.2.9" },
     { name = "python-docx", marker = "extra == 'all'", specifier = ">=1.2.0" },

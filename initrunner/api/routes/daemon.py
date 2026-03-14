@@ -7,11 +7,9 @@ import logging
 import threading
 from dataclasses import dataclass, field
 
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 from initrunner.api._helpers import BUILD_TIMEOUT, load_role_async, resolve_role_path
-from initrunner.api.authz import AuthzGuard, requires
-from initrunner.authz import DAEMON, EXECUTE, WRITE
 
 router = APIRouter(prefix="/api/daemon", tags=["daemon"])
 _logger = logging.getLogger(__name__)
@@ -35,7 +33,6 @@ _dispatcher_lock = threading.Lock()
 async def start_daemon(
     role_id: str,
     request: Request,
-    guard: AuthzGuard = Depends(requires(DAEMON, EXECUTE, resource_id_param="role_id")),
 ):
     """Start triggers for a role."""
     with _dispatcher_lock:
@@ -104,7 +101,6 @@ async def start_daemon(
 @router.post("/{role_id}/stop")
 async def stop_daemon(
     role_id: str,
-    guard: AuthzGuard = Depends(requires(DAEMON, WRITE, resource_id_param="role_id")),
 ):
     """Stop triggers for a role."""
     with _dispatcher_lock:

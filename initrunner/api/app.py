@@ -13,7 +13,6 @@ from initrunner import __version__
 
 if TYPE_CHECKING:
     from initrunner.audit.logger import AuditLogger
-    from initrunner.authz import AuthzConfig
 from initrunner.api.routes.audit import router as audit_router
 from initrunner.api.routes.auth_ui import router as auth_ui_router
 from initrunner.api.routes.chat_ui import router as chat_ui_router
@@ -43,7 +42,6 @@ def create_dashboard_app(
     role_dirs: list[Path] | None = None,
     audit_logger: AuditLogger | None = None,
     secure_cookies: bool = False,
-    authz_config: AuthzConfig | None = None,
 ) -> FastAPI:
     """Build the FastAPI application with all dashboard routes.
 
@@ -79,32 +77,6 @@ def create_dashboard_app(
     app.state.role_registry = RoleRegistry(app.state.role_dirs)
     app.state.audit_logger = audit_logger
     app.state.secure_cookies = secure_cookies
-
-    # Cerbos authorization (opt-in)
-    if authz_config is not None and authz_config.enabled:
-        from initrunner.authz import CerbosAuthz, require_cerbos
-
-        require_cerbos()
-        authz = CerbosAuthz(authz_config)
-        ok, msg = authz.health_check()
-        if not ok:
-            raise RuntimeError(f"Cerbos authorization is enabled but PDP is unreachable.\n{msg}")
-        app.state.authz = authz
-        app.state.authz_config = authz_config
-        _logger.info(
-            "Cerbos authorization enabled (PDP at %s:%d)", authz_config.host, authz_config.port
-        )
-    else:
-        app.state.authz = None
-        app.state.authz_config = None
-
-    # Resource attribute resolvers for Cerbos policy conditions
-    from initrunner.api.authz import agent_attrs_resolver
-    from initrunner.authz import AGENT, DAEMON, INGEST, MEMORY
-
-    app.state.resource_resolvers = {}
-    for _kind in (AGENT, DAEMON, INGEST, MEMORY):
-        app.state.resource_resolvers[_kind] = agent_attrs_resolver
 
     # Jinja2 templates
     env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
@@ -172,7 +144,6 @@ def create_dashboard_app(
                 allow_cookie=True,
                 login_redirect="/login",
                 secure_cookies=secure_cookies,
-                authz_config=app.state.authz_config,
             ),
         )
 
@@ -220,7 +191,6 @@ def run_dashboard(
     role_dirs: list[Path] | None = None,
     audit_logger: AuditLogger | None = None,
     secure_cookies: bool = False,
-    authz_config: AuthzConfig | None = None,
 ) -> None:
     """Start the dashboard server (blocking)."""
     import uvicorn
@@ -230,7 +200,6 @@ def run_dashboard(
         role_dirs=role_dirs,
         audit_logger=audit_logger,
         secure_cookies=secure_cookies,
-        authz_config=authz_config,
     )
 
     if open_browser:

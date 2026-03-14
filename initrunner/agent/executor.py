@@ -27,6 +27,64 @@ from initrunner.audit.logger import AuditLogger, AuditRecord
 
 _logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Agent principal scoping (Cerbos agent-as-principal)
+# ---------------------------------------------------------------------------
+
+_cached_authz: Any = None
+_authz_resolved = False
+
+
+def _ensure_authz() -> None:
+    """One-time: load config, construct CerbosAuthz, set ContextVar."""
+    global _cached_authz, _authz_resolved
+    if _authz_resolved:
+        return
+    _authz_resolved = True
+
+    from initrunner.authz import CerbosAuthz, load_authz_config, require_cerbos, set_current_authz
+
+    config = load_authz_config()
+    if config is None:
+        return
+
+    try:
+        require_cerbos()
+    except RuntimeError:
+        _logger.warning("Cerbos SDK not installed; agent policy checks disabled")
+        return
+
+    authz = CerbosAuthz(config)
+    ok, msg = authz.health_check()
+    if not ok:
+        _logger.warning("Cerbos PDP unreachable; agent policy checks disabled: %s", msg)
+        return
+
+    _cached_authz = authz
+    set_current_authz(authz)
+    _logger.info("Cerbos agent policy engine enabled (PDP at %s:%d)", config.host, config.port)
+
+
+def _enter_agent_context(role: RoleDefinition) -> contextvars.Token | None:
+    """Set the agent principal ContextVar for the current run."""
+    _ensure_authz()
+    if _cached_authz is None:
+        return None
+
+    from initrunner.authz import agent_principal_from_role, set_current_agent_principal
+
+    principal = agent_principal_from_role(role.metadata)
+    return set_current_agent_principal(principal)
+
+
+def _exit_agent_context(token: contextvars.Token | None) -> None:
+    """Reset the agent principal ContextVar."""
+    if token is not None:
+        from initrunner.authz import _current_agent_principal
+
+        _current_agent_principal.reset(token)
+
+
 _RETRY_MAX_ATTEMPTS = 3
 _RETRY_BACKOFF_BASE = 1.0  # seconds
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -450,49 +508,59 @@ def execute_run(
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a single agent run, returning the result and updated message history."""
-    run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
-    )
-    if blocked is not None:
-        return blocked, []
+    agent_token = _enter_agent_context(role)
+    try:
+        run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            extra_toolsets=extra_toolsets,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
+        )
+        if blocked is not None:
+            return blocked, []
 
-    result = RunResult(run_id=run_id)
-    new_messages: list = []
-    start = time.monotonic()
+        result = RunResult(run_id=run_id)
+        new_messages: list = []
+        start = time.monotonic()
 
-    with _create_run_span(run_id, role, trigger_type) as span:
-        try:
-            agent_result = _run_with_timeout(
-                lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
-                timeout=role.spec.guardrails.timeout_seconds,
-            )
-            new_messages = _process_agent_output(agent_result, result, role)
-        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
-            _handle_run_error(result, e)
+        with _create_run_span(run_id, role, trigger_type) as span:
+            try:
+                agent_result = _run_with_timeout(
+                    lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
+                    timeout=role.spec.guardrails.timeout_seconds,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+            ) as e:
+                _handle_run_error(result, e)
 
-        result.duration_ms = int((time.monotonic() - start) * 1000)
-        _record_span_metrics(span, result)
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
 
-    _audit_result(
-        result,
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        principal_id=principal_id,
-    )
+        _audit_result(
+            result,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
+        )
 
-    return result, new_messages
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
 
 
 def _extract_tool_call_names(messages: list) -> list[str]:
@@ -529,74 +597,86 @@ def execute_run_stream(
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a streaming agent run with guardrails, audit, and token callback."""
-    run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
-    )
-    if blocked is not None:
-        return blocked, []
+    agent_token = _enter_agent_context(role)
+    try:
+        run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            extra_toolsets=extra_toolsets,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
+        )
+        if blocked is not None:
+            return blocked, []
 
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
+        if role.spec.output.type != "text":
+            raise ValueError(
+                "Streaming is not supported with structured output "
+                f"(output.type={role.spec.output.type!r}). "
+                "Use non-streaming execution instead."
+            )
+
+        result = RunResult(run_id=run_id)
+        new_messages: list = []
+        output_parts: list[str] = []
+        start = time.monotonic()
+
+        stream_state: dict = {"messages": [], "usage": None}
+
+        with _create_run_span(run_id, role, trigger_type) as span:
+            try:
+
+                def _do_stream():
+                    stream = agent.run_stream_sync(
+                        prompt,
+                        **stream_kwargs,
+                    )
+                    for chunk in stream.stream_text(delta=True):
+                        output_parts.append(chunk)
+                        if on_token is not None:
+                            on_token(chunk)
+
+                    stream_state["messages"] = stream.all_messages()
+                    stream_state["usage"] = stream.usage()
+
+                _run_with_timeout(
+                    lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
+                    timeout=role.spec.guardrails.timeout_seconds,
+                )
+                new_messages = stream_state["messages"]
+                _process_stream_output(
+                    output_parts, stream_state["usage"], new_messages, result, role
+                )
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+            ) as e:
+                _handle_run_error(result, e, partial_output="".join(output_parts))
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
         )
 
-    result = RunResult(run_id=run_id)
-    new_messages: list = []
-    output_parts: list[str] = []
-    start = time.monotonic()
-
-    stream_state: dict = {"messages": [], "usage": None}
-
-    with _create_run_span(run_id, role, trigger_type) as span:
-        try:
-
-            def _do_stream():
-                stream = agent.run_stream_sync(
-                    prompt,
-                    **stream_kwargs,
-                )
-                for chunk in stream.stream_text(delta=True):
-                    output_parts.append(chunk)
-                    if on_token is not None:
-                        on_token(chunk)
-
-                stream_state["messages"] = stream.all_messages()
-                stream_state["usage"] = stream.usage()
-
-            _run_with_timeout(
-                lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
-                timeout=role.spec.guardrails.timeout_seconds,
-            )
-            new_messages = stream_state["messages"]
-            _process_stream_output(output_parts, stream_state["usage"], new_messages, result, role)
-        except (ModelHTTPError, UsageLimitExceeded, ConnectionError, TimeoutError, OSError) as e:
-            _handle_run_error(result, e, partial_output="".join(output_parts))
-
-        result.duration_ms = int((time.monotonic() - start) * 1000)
-        _record_span_metrics(span, result)
-
-    _audit_result(
-        result,
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        principal_id=principal_id,
-    )
-
-    return result, new_messages
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
 
 
 # ---------------------------------------------------------------------------
@@ -618,57 +698,61 @@ async def execute_run_async(
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Async variant of ``execute_run`` — uses ``agent.run()`` + ``asyncio.wait_for``."""
-    run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
-    )
-    if blocked is not None:
-        return blocked, []
+    """Async variant of ``execute_run`` -- uses ``agent.run()`` + ``asyncio.wait_for``."""
+    agent_token = _enter_agent_context(role)
+    try:
+        run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            extra_toolsets=extra_toolsets,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
+        )
+        if blocked is not None:
+            return blocked, []
 
-    timeout = role.spec.guardrails.timeout_seconds
-    result = RunResult(run_id=run_id)
-    new_messages: list = []
-    start = time.monotonic()
+        timeout = role.spec.guardrails.timeout_seconds
+        result = RunResult(run_id=run_id)
+        new_messages: list = []
+        start = time.monotonic()
 
-    with _create_run_span(run_id, role, trigger_type) as span:
-        try:
-            agent_result = await asyncio.wait_for(
-                _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
-                timeout=timeout,
-            )
-            new_messages = _process_agent_output(agent_result, result, role)
-        except (
-            ModelHTTPError,
-            UsageLimitExceeded,
-            ConnectionError,
-            TimeoutError,
-            OSError,
-        ) as e:
-            _handle_run_error(result, e, timeout_seconds=timeout)
+        with _create_run_span(run_id, role, trigger_type) as span:
+            try:
+                agent_result = await asyncio.wait_for(
+                    _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
+                    timeout=timeout,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+            ) as e:
+                _handle_run_error(result, e, timeout_seconds=timeout)
 
-        result.duration_ms = int((time.monotonic() - start) * 1000)
-        _record_span_metrics(span, result)
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
 
-    _audit_result(
-        result,
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        principal_id=principal_id,
-    )
+        _audit_result(
+            result,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
+        )
 
-    return result, new_messages
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
 
 
 # ---------------------------------------------------------------------------
@@ -691,79 +775,83 @@ async def execute_run_stream_async(
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Async variant of ``execute_run_stream`` — uses ``agent.run_stream()``."""
-    run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
-    )
-    if blocked is not None:
-        return blocked, []
+    """Async variant of ``execute_run_stream`` -- uses ``agent.run_stream()``."""
+    agent_token = _enter_agent_context(role)
+    try:
+        run_id, _usage_limits, stream_kwargs, blocked = _prepare_run(
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            extra_toolsets=extra_toolsets,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
+        )
+        if blocked is not None:
+            return blocked, []
 
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
+        if role.spec.output.type != "text":
+            raise ValueError(
+                "Streaming is not supported with structured output "
+                f"(output.type={role.spec.output.type!r}). "
+                "Use non-streaming execution instead."
+            )
+
+        timeout = role.spec.guardrails.timeout_seconds
+        result = RunResult(run_id=run_id)
+        new_messages: list = []
+        output_parts: list[str] = []
+        start = time.monotonic()
+
+        with _create_run_span(run_id, role, trigger_type) as span:
+            try:
+
+                async def _do_stream():
+                    async with agent.run_stream(
+                        prompt,
+                        **stream_kwargs,
+                    ) as stream:
+                        async for chunk in stream.stream_text(delta=True):
+                            output_parts.append(chunk)
+                            if on_token is not None:
+                                on_token(chunk)
+
+                        nonlocal new_messages
+                        new_messages = stream.all_messages()
+                        return stream.usage()
+
+                usage = await asyncio.wait_for(
+                    _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
+                    timeout=timeout,
+                )
+                _process_stream_output(output_parts, usage, new_messages, result, role)
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+            ) as e:
+                _handle_run_error(
+                    result, e, partial_output="".join(output_parts), timeout_seconds=timeout
+                )
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            principal_id=principal_id,
         )
 
-    timeout = role.spec.guardrails.timeout_seconds
-    result = RunResult(run_id=run_id)
-    new_messages: list = []
-    output_parts: list[str] = []
-    start = time.monotonic()
-
-    with _create_run_span(run_id, role, trigger_type) as span:
-        try:
-
-            async def _do_stream():
-                async with agent.run_stream(
-                    prompt,
-                    **stream_kwargs,
-                ) as stream:
-                    async for chunk in stream.stream_text(delta=True):
-                        output_parts.append(chunk)
-                        if on_token is not None:
-                            on_token(chunk)
-
-                    nonlocal new_messages
-                    new_messages = stream.all_messages()
-                    return stream.usage()
-
-            usage = await asyncio.wait_for(
-                _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
-                timeout=timeout,
-            )
-            _process_stream_output(output_parts, usage, new_messages, result, role)
-        except (
-            ModelHTTPError,
-            UsageLimitExceeded,
-            ConnectionError,
-            TimeoutError,
-            OSError,
-        ) as e:
-            _handle_run_error(
-                result, e, partial_output="".join(output_parts), timeout_seconds=timeout
-            )
-
-        result.duration_ms = int((time.monotonic() - start) * 1000)
-        _record_span_metrics(span, result)
-
-    _audit_result(
-        result,
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        principal_id=principal_id,
-    )
-
-    return result, new_messages
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)

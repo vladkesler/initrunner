@@ -107,11 +107,11 @@ class PermissionToolset(AbstractToolset[Any]):
 
 
 class CerbosToolset(AbstractToolset[Any]):
-    """Checks Cerbos tool-level authorization per call.
+    """Checks Cerbos tool-level authorization per call using agent principals.
 
-    Reads principal and authz from ContextVars (set per-request by the call
-    site). No-op when: authz is None (Cerbos disabled), principal is None
-    (CLI/trigger -- no HTTP identity), or tool_checks_enabled is False.
+    Reads the agent principal and authz from ContextVars (set per-run by
+    the executor).  No-op when: authz is None (Cerbos disabled), agent
+    principal is None, or ``agent_checks_enabled`` is False.
     """
 
     def __init__(
@@ -141,12 +141,12 @@ class CerbosToolset(AbstractToolset[Any]):
         ctx: Any,
         tool: ToolsetTool[Any],
     ) -> Any:
-        from initrunner.authz import EXECUTE, TOOL, get_current_authz, get_current_principal
+        from initrunner.authz import EXECUTE, TOOL, get_current_agent_principal, get_current_authz
 
         authz = get_current_authz()
-        principal = get_current_principal()
+        principal = get_current_agent_principal()
 
-        if authz is not None and authz.tool_checks_enabled and principal is not None:
+        if authz is not None and authz.agent_checks_enabled and principal is not None:
             resource_attrs: dict[str, Any] = {
                 "tool_type": self._tool_type,
                 "agent": self._agent_name,

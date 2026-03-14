@@ -56,7 +56,7 @@ discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 tui = ["textual>=7.5.0"]
 dashboard = ["fastapi>=0.115.0", "uvicorn[standard]>=0.34.0", "jinja2>=3.1"]
-authz = ["cerbos>=0.15.1", "PyJWT>=2.12.1"]
+authz = ["cerbos>=0.15.1"]
 all = [
     "initrunner[ingest]",
     "initrunner[search]",

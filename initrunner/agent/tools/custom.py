@@ -214,6 +214,7 @@ def build_delegate_toolset(
                 timeout=config.timeout_seconds,
                 shared_memory_path=sm_path,
                 shared_max_memories=sm.max_memories if sm else 1000,
+                source_metadata=ctx.role.metadata,
             )
         else:
             invoker = McpInvoker(
@@ -221,6 +222,7 @@ def build_delegate_toolset(
                 agent_name=agent_ref.name,
                 timeout=config.timeout_seconds,
                 headers_env=agent_ref.headers_env,
+                source_metadata=ctx.role.metadata,
             )
 
         # Capture invoker and description in closure

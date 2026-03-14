@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 
-from initrunner.api.authz import AuthzGuard, requires
 from initrunner.api.models import AuditListResponse, AuditRecordResponse
-from initrunner.authz import AUDIT, READ
 from initrunner.services.operations import query_audit_sync
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -23,7 +21,6 @@ async def list_audit_records(
     until: Annotated[str | None, Query(description="ISO timestamp")] = None,
     principal_id: Annotated[str | None, Query(description="Filter by principal")] = None,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
-    guard: AuthzGuard = Depends(requires(AUDIT, READ)),
 ):
     """Query audit trail records with optional filters."""
     audit_logger = getattr(request.app.state, "audit_logger", None)

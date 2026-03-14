@@ -126,12 +126,16 @@ def _execute_step(
     try:
         if step.mode == "mcp":
             from initrunner.agent.delegation import McpInvoker
+            from initrunner.agent.schema.base import Metadata
 
+            # Use step name as a lightweight identity for policy checks
+            step_metadata = Metadata(name=step.name, description="pipeline-step")
             invoker = McpInvoker(
                 base_url=step.url,  # type: ignore[arg-type]
                 agent_name=step.name,
                 timeout=step.timeout_seconds,
                 headers_env=step.headers_env,
+                source_metadata=step_metadata,
             )
             output = invoker.invoke(prompt)
         else:

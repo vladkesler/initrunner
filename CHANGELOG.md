@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.27.0] - 2026-03-14
+
+### Added
+- **Agent-as-principal Cerbos policy engine** -- agents get Cerbos identity from `role.metadata` (name, team, tags, author), enforced across CLI, compose, daemon, API, and pipeline
+- **`check_delegation_policy()`** -- Cerbos-based delegation authorization between agents (inline with full metadata, MCP remote with name-only)
+- **`DELEGATE` action constant** and `agent_checks_enabled` property on `CerbosAuthz`
+- **`agent_principal_from_role()`** factory constructs Cerbos principals from role metadata
+- **Per-run agent principal scoping** in executor via `_enter_agent_context()`/`_exit_agent_context()` with ContextVar token management
+- Agent policy examples: `examples/policies/agent/` with derived roles, delegation policy, and tool policy
+- Documentation: `docs/security/agent-policy.md`
+
+### Changed
+- `Principal.attrs` widened from `dict[str, str]` to `dict[str, Any]` (tags stored as native list)
+- `CerbosToolset` now uses agent principals (`get_current_agent_principal()`) instead of user principals
+- `DelegateSink` accepts `source_metadata`/`target_metadata` for policy checks using role metadata (not compose service keys)
+- `InlineInvoker` and `McpInvoker` accept optional `source_metadata` for delegation policy checks
+- `docker-compose.cerbos.yml` mounts agent policies, uses `INITRUNNER_CERBOS_AGENT_CHECKS`
+
+### Removed
+- User-management Cerbos code: `api/authz.py` (route guards, `AuthzGuard`, `ResourceFilter`, condition AST evaluator), JWT middleware, user principals, `ANONYMOUS` constant, `PlanResult`, `plan()`/`plan_async()` methods
+- `requires()` FastAPI dependency from all 7 route files
+- `authz_config` parameter from middleware, dashboard app, server app, CLI server command
+- PyJWT from `authz` extra dependency
+- User-role policy sets (`strict/`, `permissive/`, `team/`) and base-level user policy YAMLs
+- `examples/roles/cerbos-tool-auth.yaml`, `docs/security/cerbos.md`
+
 ## [1.26.0] - 2026-03-14
 
 ### Added

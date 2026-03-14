@@ -496,6 +496,7 @@ class ComposeOrchestrator:
                     )
                     continue
                 target_service = self._services[target_name]
+                source_role = self._services[name].role
                 delegate = DelegateSink(
                     source_service=name,
                     target_service=target_name,
@@ -504,6 +505,8 @@ class ComposeOrchestrator:
                     audit_logger=self._audit_logger,
                     circuit_breaker_threshold=config.sink.circuit_breaker_threshold,
                     circuit_breaker_reset_seconds=config.sink.circuit_breaker_reset_seconds,
+                    source_metadata=source_role.metadata,
+                    target_metadata=target_service.role.metadata,
                 )
                 sinks_by_target[target_name] = delegate
 

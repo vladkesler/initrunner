@@ -1,11 +1,9 @@
-# InitRunner + Cerbos authorization
+# InitRunner + Cerbos agent policy engine
 #
 # Usage:
 #   docker compose -f docker-compose.cerbos.yml up
 #
-# By default mounts the permissive policy set. To switch:
-#   - ./examples/policies/strict:/policies      # production
-#   - ./examples/policies/team:/policies         # multi-team orgs
+# Mounts the agent policy set for agent-as-principal delegation and tool checks.
 
 services:
   cerbos:
@@ -14,7 +12,7 @@ services:
       - "3593:3593"
       - "3592:3592"
     volumes:
-      - ./examples/policies/permissive:/policies
+      - ./examples/policies/agent:/policies
     healthcheck:
       test: ["CMD", "/cerbos", "healthcheck"]
       interval: 5s
@@ -37,8 +35,7 @@ services:
       - INITRUNNER_CERBOS_ENABLED=true
       - INITRUNNER_CERBOS_HOST=cerbos
       - INITRUNNER_CERBOS_PORT=3592
-      - INITRUNNER_JWT_SECRET=${INITRUNNER_JWT_SECRET:-change-me-in-production}
-      - INITRUNNER_CERBOS_TOOL_CHECKS=true
+      - INITRUNNER_CERBOS_AGENT_CHECKS=true
     depends_on:
       cerbos:
         condition: service_healthy
