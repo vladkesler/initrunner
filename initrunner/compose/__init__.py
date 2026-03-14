@@ -9,6 +9,7 @@ from initrunner.compose.schema import (
     DelegateSinkConfig,
     HealthCheckConfig,
     RestartPolicy,
+    SharedDocumentsConfig,
     SharedMemoryConfig,
 )
 from initrunner.compose.systemd import (
@@ -28,6 +29,7 @@ __all__ = [
     "DelegateSinkConfig",
     "HealthCheckConfig",
     "RestartPolicy",
+    "SharedDocumentsConfig",
     "SharedMemoryConfig",
     "SystemdError",
     "UnitInfo",

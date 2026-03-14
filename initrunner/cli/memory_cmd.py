@@ -144,6 +144,48 @@ def memory_list(
     console.print(f"\n[dim]{len(memories)} memories shown.[/dim]")
 
 
+@app.command("import")
+def memory_import(
+    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    input_file: Annotated[Path, typer.Argument(help="JSON file to import")],
+) -> None:
+    """Import memories from a JSON file (re-embeds content using the role's embedding config)."""
+    from initrunner.agent.loader import _load_dotenv
+    from initrunner.services.memory import import_memories_sync
+
+    role = load_role_or_exit(role_file)
+
+    if role.spec.memory is None:
+        console.print("[red]Error:[/red] No memory config in role definition.")
+        raise typer.Exit(1)
+
+    if not input_file.exists():
+        console.print(f"[red]Error:[/red] File not found: {input_file}")
+        raise typer.Exit(1)
+
+    try:
+        data = json.loads(input_file.read_text())
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Error:[/red] Invalid JSON: {exc}")
+        raise typer.Exit(1) from None
+
+    if not isinstance(data, list):
+        console.print("[red]Error:[/red] Expected a JSON array of memory objects.")
+        raise typer.Exit(1)
+
+    # Load .env from role directory so embedding API keys are available
+    _load_dotenv(role_file.parent)
+
+    try:
+        with console.status("Importing memories...", spinner="dots"):
+            count = import_memories_sync(role, data)
+    except ValueError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]Imported[/green] {count} memories into {role.metadata.name}.")
+
+
 @app.command("consolidate")
 def memory_consolidate(
     role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],

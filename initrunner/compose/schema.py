@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from initrunner.agent.schema.ingestion import _MigratedBackend
+from initrunner.agent.schema.ingestion import EmbeddingConfig, _MigratedBackend
 from initrunner.agent.schema.triggers import TriggerConfig
 from initrunner.stores.base import StoreBackend
 
@@ -46,6 +46,22 @@ class SharedMemoryConfig(BaseModel):
     max_memories: int = 1000
 
 
+class SharedDocumentsConfig(BaseModel):
+    enabled: bool = False
+    store_path: str | None = None
+    store_backend: _MigratedBackend = StoreBackend.LANCEDB
+    embeddings: EmbeddingConfig = EmbeddingConfig()
+
+    @model_validator(mode="after")
+    def _validate_embeddings_when_enabled(self) -> SharedDocumentsConfig:
+        if self.enabled:
+            if not self.embeddings.provider:
+                raise ValueError("shared_documents.embeddings.provider is required when enabled")
+            if not self.embeddings.model:
+                raise ValueError("shared_documents.embeddings.model is required when enabled")
+        return self
+
+
 class ComposeServiceConfig(BaseModel):
     role: str
     trigger: TriggerConfig | None = None
@@ -59,6 +75,7 @@ class ComposeServiceConfig(BaseModel):
 class ComposeSpec(BaseModel):
     services: dict[str, ComposeServiceConfig] = Field(min_length=1)
     shared_memory: SharedMemoryConfig = SharedMemoryConfig()
+    shared_documents: SharedDocumentsConfig = SharedDocumentsConfig()
 
     @model_validator(mode="after")
     def _validate_graph(self) -> ComposeSpec:

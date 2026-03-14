@@ -158,6 +158,26 @@ class TestLongTermMemory:
             assert store.count_memories() == 2
 
 
+class TestAddMemoryCreatedAt:
+    def test_add_memory_with_created_at(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        custom_ts = "2025-06-15T12:00:00+00:00"
+        with MemoryStore(store_path, dimensions=4) as store:
+            store.add_memory("imported fact", "general", [1.0, 0.0, 0.0, 0.0], created_at=custom_ts)
+            mems = store.list_memories()
+        assert len(mems) == 1
+        assert mems[0].created_at == custom_ts
+
+    def test_add_memory_default_created_at(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with MemoryStore(store_path, dimensions=4) as store:
+            store.add_memory("auto-ts fact", "general", [1.0, 0.0, 0.0, 0.0])
+            mems = store.list_memories()
+        assert len(mems) == 1
+        # Should be an ISO timestamp (contains 'T' separator)
+        assert "T" in mems[0].created_at
+
+
 class TestFilterSystemPrompts:
     def test_filters_system_prompt_parts(self):
         messages = [

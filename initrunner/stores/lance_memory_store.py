@@ -335,6 +335,7 @@ class LanceMemoryStore(MemoryStoreBase):
         *,
         memory_type: MemoryType = MemoryType.SEMANTIC,
         metadata: dict | None = None,
+        created_at: str | None = None,
     ) -> int:
         MemoryType(memory_type)  # validate
         with self._lock:
@@ -343,7 +344,7 @@ class LanceMemoryStore(MemoryStoreBase):
             self._ensure_vec_table(len(embedding))
 
             metadata_json = json.dumps(metadata) if metadata else ""
-            now = datetime.now(UTC).isoformat()
+            ts = created_at or datetime.now(UTC).isoformat()
             doc_id = self._alloc_memory_id()
 
             tbl = self._db.open_table("memories")
@@ -353,7 +354,7 @@ class LanceMemoryStore(MemoryStoreBase):
                         "id": doc_id,
                         "content": content,
                         "category": category,
-                        "created_at": now,
+                        "created_at": ts,
                         "memory_type": str(memory_type),
                         "metadata_json": metadata_json,
                         "consolidated_at": "",

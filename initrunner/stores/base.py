@@ -262,6 +262,7 @@ class MemoryStore(abc.ABC):
         *,
         memory_type: MemoryType = MemoryType.SEMANTIC,
         metadata: dict | None = None,
+        created_at: str | None = None,
     ) -> int: ...
 
     @abc.abstractmethod

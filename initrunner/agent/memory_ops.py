@@ -277,3 +277,82 @@ def finalize_turn(
             save_ok = False
 
     return TurnResult(messages=trimmed, save_ok=save_ok)
+
+
+def import_memories(
+    role: RoleDefinition,
+    data: list[dict[str, Any]],
+) -> int:
+    """Import memories from exported JSON data. Returns count imported.
+
+    Raises ValueError on malformed input or missing memory config.
+    """
+    from initrunner._async import run_sync
+    from initrunner.ingestion.embeddings import create_embedder, embed_texts
+    from initrunner.stores.base import MemoryType
+    from initrunner.stores.factory import open_memory_store
+
+    if role.spec.memory is None:
+        raise ValueError("Role has no memory config")
+
+    mem_cfg = role.spec.memory
+    embed_provider = mem_cfg.embeddings.provider or role.spec.model.provider or "openai"
+    embed_model = mem_cfg.embeddings.model
+    embedder = create_embedder(
+        embed_provider,
+        embed_model,
+        base_url=mem_cfg.embeddings.base_url,
+        api_key_env=mem_cfg.embeddings.api_key_env,
+    )
+
+    # Validate and collect entries -- fail fast on bad records
+    entries: list[tuple[str, str, MemoryType, str | None, dict | None]] = []
+    for i, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise ValueError(f"Record {i}: expected a dict, got {type(item).__name__}")
+
+        content = item.get("content", "")
+        if not content:
+            continue  # skip blank content
+
+        category = item.get("category", "general")
+        mt_raw = item.get("memory_type", "semantic")
+        try:
+            mt = MemoryType(mt_raw)
+        except ValueError:
+            raise ValueError(
+                f"Record {i}: unknown memory_type '{mt_raw}'. "
+                "Valid types: episodic, semantic, procedural"
+            ) from None
+
+        entries.append((content, category, mt, item.get("created_at"), item.get("metadata")))
+
+    if not entries:
+        return 0
+
+    # Batch embed (50 at a time), single embedder instance
+    all_embeddings: list[list[float]] = []
+    texts = [e[0] for e in entries]
+    batch_size = 50
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i : i + batch_size]
+        vectors = run_sync(embed_texts(embedder, batch, input_type="document"))
+        all_embeddings.extend(vectors)
+
+    # Store -- new IDs allocated by the store
+    with open_memory_store(mem_cfg, role.metadata.name, require_exists=False) as store:
+        if store is None:
+            raise ValueError("Could not open memory store")
+        for (content, category, mt, created_at, metadata), embedding in zip(
+            entries, all_embeddings, strict=True
+        ):
+            store.add_memory(
+                content,
+                category,
+                embedding,
+                memory_type=mt,
+                metadata=metadata,
+                created_at=created_at,
+            )
+
+    return len(entries)

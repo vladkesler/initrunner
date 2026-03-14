@@ -61,6 +61,13 @@ spec:
     store_path: null
     max_memories: 1000
     store_backend: lancedb
+  shared_documents:             # optional
+    enabled: false
+    store_path: null
+    store_backend: lancedb
+    embeddings:
+      provider: ""
+      model: ""
 ```
 
 ### Top-Level Fields
@@ -77,6 +84,12 @@ spec:
 | `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.lance`. |
 | `spec.shared_memory.max_memories` | `int` | `1000` | Maximum number of memories in the shared store. |
 | `spec.shared_memory.store_backend` | `str` | `"lancedb"` | Store backend. Uses LanceDB, an in-process vector database. |
+| `spec.shared_documents` | `SharedDocumentsConfig` | disabled | Shared document store configuration across services. See [Shared Documents](#shared-documents). |
+| `spec.shared_documents.enabled` | `bool` | `false` | Enable a shared document store across all services. |
+| `spec.shared_documents.store_path` | `str \| null` | `null` | Path to the shared document store. Default: `~/.initrunner/stores/{name}-shared.lance`. |
+| `spec.shared_documents.store_backend` | `str` | `"lancedb"` | Store backend. |
+| `spec.shared_documents.embeddings.provider` | `str` | *(required when enabled)* | Embedding provider. Must be set explicitly when `enabled: true`. |
+| `spec.shared_documents.embeddings.model` | `str` | *(required when enabled)* | Embedding model. Must be set explicitly when `enabled: true`. |
 
 ## Service Configuration
 
@@ -362,7 +375,8 @@ Compose services are standard InitRunner roles. All role features carry over:
 - **Triggers**: A service's role-level triggers (cron, file_watch, webhook) fire normally. The inbox-watcher example uses a cron trigger to poll for new emails.
 - **Sinks**: Role-level sinks activate when no compose `sink:` is set, or when `keep_existing_sinks: true`. See [Sinks](sinks.md).
 - **Tools**: All configured tools (built-in, custom, MCP) are available to the agent. See [Tools](../agents/tools.md).
-- **Memory**: Memory-enabled roles persist and recall memories as usual. Session pruning runs after each trigger execution, matching standalone daemon behavior. Use `spec.shared_memory` to give all services a common memory store — see [Shared Memory](#shared-memory) below. See [Memory](../core/memory.md).
+- **Memory**: Memory-enabled roles persist and recall memories as usual. Session pruning runs after each trigger execution, matching standalone daemon behavior. Use `spec.shared_memory` to give all services a common memory store — see [Shared Memory](#shared-memory). See [Memory](../core/memory.md).
+- **Documents**: Use `spec.shared_documents` to give all services a common document store with compose-owned embedding config — see [Shared Documents](#shared-documents). See [Ingestion](../core/ingestion.md).
 - **Guardrails**: Timeout, token limits, and tool call limits from the role definition apply to each execution.
 - **Skills**: Skills referenced in the role definition are loaded and available.
 
@@ -464,6 +478,59 @@ All services sharing a memory store must use compatible embedding models (same d
 ### Concurrency
 
 LanceDB handles concurrent access from multiple service threads via internal locking. No additional configuration is needed.
+
+## Shared Documents
+
+When `spec.shared_documents.enabled` is `true`, all services in the compose orchestration share a single document store. This lets you ingest documents once (e.g. via one service's `ingest` config) and have every service's `search_documents` tool query the same store.
+
+Unlike shared memory, shared documents requires **explicit embedding configuration** at the compose level. This prevents embedding model mismatches between roles querying the same store.
+
+### Configuration
+
+```yaml
+spec:
+  shared_documents:
+    enabled: true
+    store_path: ./shared-docs.lance   # optional, default: ~/.initrunner/stores/{name}-shared.lance
+    embeddings:
+      provider: openai                # required when enabled
+      model: text-embedding-3-small   # required when enabled
+  services:
+    researcher:
+      role: roles/researcher.yaml     # has ingest config with sources
+    writer:
+      role: roles/writer.yaml         # no ingest config needed
+```
+
+### Default Path
+
+When `store_path` is not set, the shared document store is created at:
+
+```
+~/.initrunner/stores/{compose-name}-shared.lance
+```
+
+Where `{compose-name}` comes from `metadata.name`.
+
+### How It Works
+
+At startup, `apply_shared_documents()` patches each service's role definition:
+
+- **Roles with `ingest:` configured**: the existing `store_path`, `store_backend`, and `embeddings` are overridden with the shared values. All other ingest settings (`sources`, `chunking`) are preserved.
+- **Roles without `ingest:`**: a minimal `IngestConfig` is injected with empty `sources` and the shared store settings. This registers the `search_documents` retrieval tool so the role can query the shared store without needing its own ingest config.
+
+Shared documents is a compose-time config patch only. It does not run ingestion automatically. Run `initrunner ingest` against the role that has `sources` configured to populate the shared store.
+
+### Embedding Consistency
+
+The compose definition **owns** the embedding configuration for the shared store. When `shared_documents.enabled` is `true`, both `embeddings.provider` and `embeddings.model` must be set explicitly. This is validated at parse time and prevents the situation where different roles derive different embedding models from their `spec.model.provider`.
+
+### Usage Pattern
+
+1. Configure one role (e.g. `researcher`) with `ingest.sources` pointing at your documents.
+2. Enable `shared_documents` with the same embedding model the researcher would use.
+3. Run `initrunner ingest roles/researcher.yaml` to populate the shared store.
+4. Start the compose. All services can now query the shared documents via `search_documents`.
 
 ## CLI Commands
 

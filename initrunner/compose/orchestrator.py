@@ -21,7 +21,7 @@ from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.compose.delegate_sink import DelegateEvent, DelegateSink
 from initrunner.compose.router_sink import RouterSink
-from initrunner.compose.schema import ComposeDefinition, ComposeServiceConfig
+from initrunner.compose.schema import ComposeDefinition, ComposeServiceConfig, SharedDocumentsConfig
 from initrunner.sinks.base import SinkBase
 from initrunner.sinks.dispatcher import SinkDispatcher, build_sink
 from initrunner.triggers.base import TriggerEvent
@@ -48,6 +48,35 @@ def apply_shared_memory(role: RoleDefinition, store_path: str, max_memories: int
         role.spec.memory = MemoryConfig(
             store_path=store_path,
             semantic=SemanticMemoryConfig(max_memories=max_memories),
+        )
+
+
+def apply_shared_documents(
+    role: RoleDefinition, cfg: SharedDocumentsConfig, store_path: str
+) -> None:
+    """Patch a role's ingest config to point at a shared document store.
+
+    Overrides ``store_path``, ``store_backend``, and ``embeddings`` so every
+    role in the compose uses identical embedding config for the shared store.
+    If the role has no ingest config, a minimal one is injected so the
+    retrieval tool is registered.
+    """
+    from initrunner.agent.schema.ingestion import IngestConfig
+
+    if role.spec.ingest is not None:
+        role.spec.ingest = role.spec.ingest.model_copy(
+            update={
+                "store_path": store_path,
+                "store_backend": cfg.store_backend,
+                "embeddings": cfg.embeddings,
+            }
+        )
+    else:
+        role.spec.ingest = IngestConfig(
+            sources=[],
+            store_path=store_path,
+            store_backend=cfg.store_backend,
+            embeddings=cfg.embeddings,
         )
 
 
@@ -372,22 +401,35 @@ class ComposeOrchestrator:
     def _build_services(self) -> None:
         """Load roles and create ComposeService instances."""
         shared_mem = self._compose.spec.shared_memory
-        shared_path: str | None = None
+        shared_doc = self._compose.spec.shared_documents
+        shared_mem_path: str | None = None
+        shared_doc_path: str | None = None
+
         if shared_mem.enabled:
             from initrunner.stores.base import DEFAULT_MEMORY_DIR
 
-            shared_path = shared_mem.store_path or str(
+            shared_mem_path = shared_mem.store_path or str(
                 DEFAULT_MEMORY_DIR / f"{self._compose.metadata.name}-shared.db"
+            )
+
+        if shared_doc.enabled:
+            from initrunner.stores.base import DEFAULT_STORES_DIR
+
+            shared_doc_path = shared_doc.store_path or str(
+                DEFAULT_STORES_DIR / f"{self._compose.metadata.name}-shared.lance"
             )
 
         for name, config in self._compose.spec.services.items():
             try:
                 role_path = self._base_dir / config.role
 
-                if shared_path:
+                if shared_mem_path or shared_doc_path:
                     _load_dotenv(role_path.parent)
                     role = load_role(role_path)
-                    apply_shared_memory(role, shared_path, shared_mem.max_memories)
+                    if shared_mem_path:
+                        apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
+                    if shared_doc_path:
+                        apply_shared_documents(role, shared_doc, shared_doc_path)
                     agent = build_agent(role, role_dir=role_path.parent)
                 else:
                     role, agent = load_and_build(role_path)

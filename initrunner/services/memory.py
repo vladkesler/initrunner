@@ -39,6 +39,13 @@ def clear_memories_sync(
     return clear_memories(role, what=what, memory_type=memory_type)
 
 
+def import_memories_sync(role: RoleDefinition, data: list[dict]) -> int:
+    """Import memories from exported data (sync). Returns count imported."""
+    from initrunner.agent.memory_ops import import_memories
+
+    return import_memories(role, data)
+
+
 def export_memories_sync(role: RoleDefinition) -> list[dict]:
     """Export memories as dicts (sync). Delegates to shared domain function."""
     from initrunner.agent.memory_ops import export_memories

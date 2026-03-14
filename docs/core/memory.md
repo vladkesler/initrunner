@@ -84,6 +84,7 @@ initrunner memory list role.yaml --type episodic
 initrunner memory clear role.yaml
 initrunner memory consolidate role.yaml
 initrunner memory export role.yaml -o memories.json
+initrunner memory import role.yaml memories.json
 ```
 
 ## Memory Types
@@ -459,6 +460,35 @@ The exported JSON is an array of objects:
     "metadata": {"trigger_type": "cron"}
   }
 ]
+```
+
+### `memory import`
+
+Import memories from a JSON file into an agent's memory store. Content is re-embedded using the role's embedding config, so you can transfer memories between agents that use different embedding models.
+
+```bash
+initrunner memory import role.yaml memories.json
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `role_file` | `Path` | *(required)* | Path to the role YAML file. |
+| `input_file` | `Path` | *(required)* | Path to the JSON file to import. |
+
+The input JSON must be an array of memory objects matching the [export format](#memory-export). Each object should have at least a `content` field. Optional fields: `category` (default: `"general"`), `memory_type` (default: `"semantic"`), `created_at` (preserved from export), and `metadata`.
+
+Entries with blank `content` are skipped. Unknown `memory_type` values cause a fast failure with the record index in the error message. The store allocates new IDs for imported memories (exported `id` values are not preserved).
+
+Embedding is done in batches of 50 using the role's `memory.embeddings` config. The role directory's `.env` file is loaded before embedding so API keys are available.
+
+#### Round-trip example
+
+```bash
+# Export from one agent
+initrunner memory export roles/agent-a.yaml -o /tmp/mem.json
+
+# Import into another agent
+initrunner memory import roles/agent-b.yaml /tmp/mem.json
 ```
 
 ### `memory list`

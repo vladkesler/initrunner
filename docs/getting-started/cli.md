@@ -28,6 +28,7 @@
 | `initrunner audit export` | Export audit records as JSON or CSV |
 | `initrunner memory clear <role.yaml>` | Clear agent memory store |
 | `initrunner memory export <role.yaml>` | Export memories to JSON |
+| `initrunner memory import <role.yaml> <file>` | Import memories from JSON |
 | `initrunner memory list <role.yaml>` | List stored memories |
 | `initrunner memory consolidate <role.yaml>` | Run memory consolidation manually |
 | `initrunner skill validate <path>` | Validate a skill definition |

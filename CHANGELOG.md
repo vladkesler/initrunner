@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.25.0] - 2026-03-14
+
+### Added
+- **Memory import** -- `initrunner memory import role.yaml data.json` seeds an agent's memory store from exported JSON. Re-embeds content using the role's embedding config, preserves original `created_at` timestamps, validates records and fails fast on malformed input. Batch embeds in groups of 50
+- **Shared document stores in compose** -- `spec.shared_documents` in compose YAML lets all services share a single document store with compose-owned embedding config. Prevents embedding model mismatches. Roles without ingest config get a minimal one injected so `search_documents` works
+
+### Changed
+- `MemoryStore.add_memory()` ABC and LanceDB implementation accept optional `created_at` parameter for timestamp preservation during import
+
 ## [1.24.0] - 2026-03-14
 
 ### Changed
