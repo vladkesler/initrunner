@@ -96,6 +96,7 @@ class TestInlineInvokerPolicyCheck:
     def test_policy_denied_returns_error(self, tmp_path):
         """InlineInvoker returns delegation error when policy denies."""
         from initrunner.agent.delegation import InlineInvoker
+        from initrunner.agent.schema.base import Metadata as _Meta
 
         # Create a minimal role file
         role_file = tmp_path / "target.yaml"
@@ -120,9 +121,20 @@ class TestInlineInvokerPolicyCheck:
             source_metadata=source,
         )
 
-        with patch(
-            "initrunner.agent.delegation.check_delegation_policy",
-            return_value=False,
+        # Mock load_and_build so it doesn't require a real API key
+        mock_role = MagicMock()
+        mock_role.metadata = _Meta(name="target-agent", description="test")
+        mock_agent = MagicMock()
+
+        with (
+            patch(
+                "initrunner.agent.delegation.check_delegation_policy",
+                return_value=False,
+            ),
+            patch(
+                "initrunner.agent.loader.load_and_build",
+                return_value=(mock_role, mock_agent),
+            ),
         ):
             result = invoker.invoke("test prompt")
 
