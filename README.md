@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3045+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.25.0-%2334D058" alt="v1.25.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3070+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.26.0-%2334D058" alt="v1.26.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.25.0** -- Memory import command, shared document stores in compose. See the [Changelog](CHANGELOG.md).
+> **v1.26.0** -- Auto-discovered skills with progressive disclosure, `activate_skill` meta-tool. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -220,7 +220,7 @@ Also includes content filtering, PEP 578 sandboxing, Docker isolation, token bud
 
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
-| **Skills** - reusable tool + prompt bundles | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **Skills** - reusable tool + prompt bundles, auto-discovered | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
 | **Team mode** - multi-persona on one task | `kind: Team` + `spec: { personas: {…} }` | [Team Mode](docs/orchestration/team_mode.md) |
 | **API server** - OpenAI-compatible endpoint | `initrunner serve agent.yaml --port 3000` | [Server](docs/interfaces/server.md) |
 | **Multimodal** - images, audio, video, docs | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
@@ -298,4 +298,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.25.0</sub></p>
+<p align="center"><sub>v1.26.0</sub></p>

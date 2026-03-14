@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.26.0] - 2026-03-14
+
+### Added
+- **Auto-discovered skills** -- skills in well-known directories (`./skills/`, `.agents/skills/`, `~/.agents/skills/`, `~/.initrunner/skills/`) are automatically found and exposed via a lightweight catalog. The model activates skills on demand using the `activate_skill` tool (agentskills.io three-tier progressive disclosure). Enabled by default; opt out with `auto_skills: { enabled: false }`
+- **`activate_skill` meta-tool** -- loads full SKILL.md instructions and lists resource files when the model decides a skill matches the current task. Session-level deduplication prevents re-injection
+- **`skill list --auto / --all`** -- CLI flags to show auto-discovered skills with scope and source info
+- **History compaction exemption** -- `activate_skill` tool returns are preserved during conversation compaction instead of being truncated
+- Example role `auto-skill-demo.yaml` and example auto-discoverable skill `summarizer`
+
 ## [1.25.0] - 2026-03-14
 
 ### Added
