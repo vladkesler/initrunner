@@ -1,40 +1,37 @@
 # Role Registry
 
-InitRunner's role registry lets you install, share, and discover community roles directly from GitHub. Roles are downloaded, validated, and saved to `~/.initrunner/roles/` where they integrate automatically with the CLI and TUI.
-
-No registry server is required — roles live on GitHub and a community index repo provides discovery. Everything is files and HTTP.
+InitRunner's role registry lets you install, share, and discover community roles from GitHub, OCI registries, and InitHub. Roles are downloaded, validated, and saved to `~/.initrunner/roles/` where they integrate automatically with the CLI and TUI.
 
 ## Quick Start
 
 ```bash
-# Install a role from GitHub
+# Install from InitHub
+initrunner install hub:owner/agent-pack
+initrunner install hub:owner/agent-pack@1.2.0
+
+# Install from GitHub
 initrunner install user/repo
-
-# Install a specific file from a repo
 initrunner install user/repo:roles/code-reviewer.yaml
-
-# Install pinned to a tag
 initrunner install user/repo@v1.2.0
+
+# Install from an OCI registry
+initrunner install oci://ghcr.io/user/my-role:latest
 
 # Install by name from the community index
 initrunner install code-reviewer
 
-# List installed roles
-initrunner list
-
-# Inspect a role before installing
+# Inspect a role (works with all source types)
+initrunner info hub:owner/agent-pack
 initrunner info user/repo:roles/summarizer.yaml
+initrunner info oci://ghcr.io/user/my-role:latest
 
-# Search the community index
+# Search InitHub
 initrunner search "code review"
 
-# Update a role
+# List / update / remove
+initrunner list
 initrunner update code-reviewer
-
-# Update all installed roles
 initrunner update --all
-
-# Remove an installed role
 initrunner uninstall code-reviewer
 ```
 
@@ -44,13 +41,16 @@ The `install` and `info` commands accept flexible source identifiers:
 
 | Format | Example | Description |
 |--------|---------|-------------|
+| `hub:owner/name` | `hub:alice/code-reviewer` | Installs from InitHub (latest version) |
+| `hub:owner/name@ver` | `hub:alice/code-reviewer@1.2.0` | Installs a specific version from InitHub |
+| `oci://reg/repo:tag` | `oci://ghcr.io/user/role:latest` | Pulls an OCI bundle |
 | `user/repo` | `jcdenton/ai-roles` | Downloads `role.yaml` from the repo root (main branch) |
 | `user/repo:path` | `jcdenton/ai-roles:roles/reviewer.yaml` | Downloads a specific file from the repo |
 | `user/repo@ref` | `jcdenton/ai-roles@v1.0` | Pins to a tag, branch, or commit SHA |
 | `user/repo:path@ref` | `jcdenton/ai-roles:roles/reviewer.yaml@v1.0` | Specific file at a pinned ref |
 | `bare-name` | `code-reviewer` | Looks up the name in the community index |
 
-Detection: if the identifier contains `/`, it's treated as a GitHub reference. Otherwise, it's looked up in the community index.
+Detection order: `hub:` prefix selects InitHub, `oci://` prefix selects OCI, `/` is treated as GitHub, and bare names are looked up in the community index.
 
 ## Install Flow
 
@@ -81,20 +81,23 @@ Two different authors can publish roles with the same `name`. The TUI and CLI di
 
 ### `install`
 
-Install a role from GitHub or the community index.
+Install a role from InitHub, GitHub, an OCI registry, or the community index.
 
 ```bash
+initrunner install hub:owner/name                     # from InitHub
+initrunner install hub:owner/name@1.0.0               # specific version
 initrunner install user/repo                          # from GitHub
 initrunner install user/repo:path/to/role.yaml        # specific file
 initrunner install user/repo@v1.0                     # pinned ref
 initrunner install code-reviewer                      # from community index
+initrunner install oci://ghcr.io/user/role:latest     # from OCI
 initrunner install user/repo --force                  # overwrite existing
 initrunner install user/repo --yes                    # skip confirmation
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `source` | `str` | *(required)* | GitHub source (`user/repo[:path][@ref]`) or community role name. |
+| `source` | `str` | *(required)* | Source identifier: `hub:owner/name[@ver]`, `oci://reg/repo:tag`, `user/repo[:path][@ref]`, or bare community name. |
 | `--force, -f` | `bool` | `false` | Overwrite if the role is already installed. |
 | `--yes, -y` | `bool` | `false` | Skip the confirmation prompt. |
 
@@ -126,7 +129,7 @@ Removes both the YAML file and the manifest entry.
 
 ### `search`
 
-Search the community role index.
+Search InitHub for agent packs.
 
 ```bash
 initrunner search "code review"
@@ -135,27 +138,29 @@ initrunner search python
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `query` | `str` | *(required)* | Search query. Matches against role name, description, and tags. |
+| `query` | `str` | *(required)* | Search query. Matches against package name, description, and tags. |
 
 Results are displayed in a table:
 
 ```
-        Community Roles
-┌────────────────┬────────┬─────────────────────────────────┬──────────────┐
-│ Name           │ Author │ Description                     │ Tags         │
-├────────────────┼────────┼─────────────────────────────────┼──────────────┤
-│ code-reviewer  │ jcd    │ Reviews code for best practices │ code, review │
-│ python-linter  │ comm   │ Lints Python files              │ code, python │
-└────────────────┴────────┴─────────────────────────────────┴──────────────┘
+                        InitHub Packages
+┌────────────────────┬─────────────────────────────────┬──────────────┐
+│ Package            │ Description                     │ Tags         │
+├────────────────────┼─────────────────────────────────┼──────────────┤
+│ alice/code-reviewer│ Reviews code for best practices │ code, review │
+│ bob/python-linter  │ Lints Python files              │ code, python │
+└────────────────────┴─────────────────────────────────┴──────────────┘
 ```
 
 ### `info`
 
-Inspect a role's metadata and tools without installing.
+Inspect a role's metadata and tools without installing. Works with all source types.
 
 ```bash
+initrunner info hub:owner/name
 initrunner info user/repo
 initrunner info user/repo:roles/reviewer.yaml
+initrunner info oci://ghcr.io/user/role:latest
 initrunner info code-reviewer
 ```
 
@@ -163,7 +168,7 @@ initrunner info code-reviewer
 |--------|------|---------|-------------|
 | `source` | `str` | *(required)* | Role source to inspect (same format as `install`). |
 
-Downloads and parses the role, then displays a summary table:
+Resolves the source and displays a summary table. Hub sources show package metadata (versions, downloads), OCI sources show bundle manifest info, and GitHub sources show role definition details:
 
 ```
         Role: code-reviewer

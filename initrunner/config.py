@@ -63,3 +63,7 @@ def get_models_config_path() -> Path:
 
 def get_bundles_cache_dir() -> Path:
     return get_home_dir() / "cache" / "bundles"
+
+
+def get_hub_auth_path() -> Path:
+    return get_home_dir() / "hub-auth.json"

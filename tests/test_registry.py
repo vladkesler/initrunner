@@ -16,7 +16,7 @@ from initrunner.registry import (
     _role_info_from_definition,
     _validate_yaml_content,
     check_dependencies,
-    install_role,
+    confirm_install,
     list_installed,
     load_manifest,
     resolve_source,
@@ -292,7 +292,7 @@ class TestInstallRole:
             patch("initrunner.registry.download_yaml", return_value=VALID_ROLE_YAML),
             patch("initrunner.registry.fetch_commit_sha", return_value="abc123"),
         ):
-            path = install_role("user/repo", yes=True)
+            path = confirm_install("user/repo")
 
         assert path.exists()
         assert path.name == "user__repo__test-agent.yaml"
@@ -317,7 +317,7 @@ class TestInstallRole:
 
         with patch("initrunner.registry.download_yaml", return_value=VALID_ROLE_YAML):
             with pytest.raises(RoleExistsError, match="already installed"):
-                install_role("user/repo", yes=True)
+                confirm_install("user/repo")
 
     def test_install_collision_with_force(self, tmp_path, monkeypatch):
         roles_dir = tmp_path / "roles"
@@ -330,7 +330,7 @@ class TestInstallRole:
             patch("initrunner.registry.download_yaml", return_value=VALID_ROLE_YAML),
             patch("initrunner.registry.fetch_commit_sha", return_value="abc123"),
         ):
-            path = install_role("user/repo", force=True, yes=True)
+            path = confirm_install("user/repo", force=True)
 
         assert path.read_text() == VALID_ROLE_YAML
 
@@ -341,7 +341,7 @@ class TestInstallRole:
 
         with patch("initrunner.registry.download_yaml", return_value="not: valid: role"):
             with pytest.raises(RegistryError):
-                install_role("user/repo", yes=True)
+                confirm_install("user/repo")
 
     def test_install_network_error(self, tmp_path, monkeypatch):
         roles_dir = tmp_path / "roles"
@@ -352,7 +352,7 @@ class TestInstallRole:
             side_effect=NetworkError("Connection failed"),
         ):
             with pytest.raises(NetworkError):
-                install_role("user/repo", yes=True)
+                confirm_install("user/repo")
 
     def test_install_sha_fetch_failure_still_installs(self, tmp_path, monkeypatch):
         roles_dir = tmp_path / "roles"
@@ -366,7 +366,7 @@ class TestInstallRole:
                 side_effect=NetworkError("rate limited"),
             ),
         ):
-            path = install_role("user/repo", yes=True)
+            path = confirm_install("user/repo")
 
         assert path.exists()
         manifest = json.loads((roles_dir / "registry.json").read_text())
@@ -790,18 +790,20 @@ class TestCLISearch:
         from typer.testing import CliRunner
 
         from initrunner.cli.main import app
+        from initrunner.hub import HubSearchResult
 
         runner = CliRunner()
-        entries = [
-            IndexEntry(
+        hub_results = [
+            HubSearchResult(
+                owner="test",
                 name="code-reviewer",
                 description="Reviews code",
-                author="test",
-                source="test/repo",
                 tags=["code"],
+                downloads=10,
+                latest_version="1.0.0",
             )
         ]
-        with patch("initrunner.registry._fetch_index", return_value=entries):
+        with patch("initrunner.hub.hub_search", return_value=hub_results):
             result = runner.invoke(app, ["search", "code"])
 
         assert result.exit_code == 0
@@ -813,11 +815,11 @@ class TestCLISearch:
         from initrunner.cli.main import app
 
         runner = CliRunner()
-        with patch("initrunner.registry._fetch_index", return_value=[]):
+        with patch("initrunner.hub.hub_search", return_value=[]):
             result = runner.invoke(app, ["search", "nonexistent"])
 
         assert result.exit_code == 0
-        assert "No roles found" in result.output
+        assert "No packages found" in result.output
 
 
 class TestCLIUpdate:

@@ -10,6 +10,7 @@ from initrunner.cli._helpers import console
 from initrunner.cli.audit_cmd import app as audit_app
 from initrunner.cli.compose_cmd import app as compose_app
 from initrunner.cli.examples_cmd import app as examples_app
+from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
 from initrunner.cli.skill_cmd import app as skill_app
@@ -24,6 +25,7 @@ app = typer.Typer(
 app.add_typer(audit_app, name="audit")
 app.add_typer(compose_app, name="compose")
 app.add_typer(examples_app, name="examples")
+app.add_typer(hub_app, name="hub")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(memory_app, name="memory")
 app.add_typer(skill_app, name="skill")
