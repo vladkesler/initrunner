@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.28.0] - 2026-03-17
+
+### Added
+- **`initrunner new` conversational builder** -- single command replaces `init`, `create`, and wizard. Supports 6 seed modes (blank, template, description, local file, example, hub), multi-turn LLM refinement with syntax-highlighted YAML preview, auto-repair on validation failure, and contextual next-step hints
+- **InitHub marketplace** -- `initrunner hub` sub-commands (login, logout, whoami, search, info, download, publish), `hub.py` API client with token management, hub-aware `install`/`info` in registry
+- **`initrunner skill new`** sub-command for skill scaffolding
+- `BuilderSession` service layer (`services/agent_builder.py`) -- UI-agnostic multi-turn builder
+- `build_tool_summary()` in `role_generator.py` -- tool reference from live registry
+- 68 new builder tests, 657+ new hub/registry tests
+
+### Changed
+- `generate_role()` is now a thin wrapper over `BuilderSession`
+- Zero-arg TTY: unconfigured shows setup hint panel; configured shows "Tip: use 'initrunner new'" before chat
+- `registry.py` enhanced with hub and OCI source resolution
+- `registry_cmd.py` enhanced with hub-aware install/info
+
+### Removed
+- `initrunner init` command
+- `initrunner create` command
+- `initrunner/cli/wizard.py`
+
+### Fixed
+- `hub.py`: `urllib.request.quote` -> `urllib.parse.quote`
+- `registry_cmd.py`: type narrowing for dict result
+- `test_hub.py`: `HTTPError` constructor type annotations
+- `test_executor_agent_principal.py`: null guard for `get_current_agent_principal()`
+
 ## [1.27.0] - 2026-03-14
 
 ### Added
