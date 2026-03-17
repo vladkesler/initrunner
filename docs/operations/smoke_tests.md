@@ -45,10 +45,10 @@ ValueError: Could not infer a valid transport from: MCPServerStdio(...)
 
 ```bash
 cd $(mktemp -d)
-initrunner init --template rag
+initrunner new --template rag
 initrunner validate role.yaml
 
-initrunner init --template memory
+initrunner new --template memory
 initrunner validate role.yaml
 ```
 

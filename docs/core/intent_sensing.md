@@ -221,7 +221,7 @@ The panel shows the method (`keyword match` or `LLM selection`), score, and gap.
 Intent Sensing searched all default directories and found nothing loadable. Fix options:
 
 - Point at a specific directory: `--role-dir ./my-roles/`
-- Create a role: `initrunner init --name my-agent`
+- Create a role: `initrunner new --blank`
 - Check that existing role files parse correctly: `initrunner validate role.yaml`
 
 ### LLM tiebreaker fails

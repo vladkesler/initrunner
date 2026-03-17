@@ -1,4 +1,4 @@
-"""Role commands: validate, init, setup."""
+"""Role commands: validate, setup."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from initrunner.cli._helpers import check_ollama_running, console, resolve_skill_dirs
+from initrunner.cli._helpers import console, resolve_skill_dirs
 from initrunner.cli._options import SkillDirOption
 
 
@@ -124,155 +124,6 @@ def validate(
 
     console.print(table)
     console.print("[green]Valid[/green]")
-
-
-def init(
-    name: Annotated[str, typer.Option(help="Agent name")] = "my-agent",
-    output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
-    template: Annotated[
-        str, typer.Option(help="Template: basic, rag, daemon, memory, ollama, tool, api, skill")
-    ] = "basic",
-    provider: Annotated[str, typer.Option(help="Model provider")] = "openai",
-    model: Annotated[
-        str | None,
-        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
-    ] = None,
-    interactive: Annotated[
-        bool, typer.Option("--interactive", "-i", help="Launch interactive wizard")
-    ] = False,
-) -> None:
-    """Scaffold a template role.yaml, tool module, or skill.
-
-    When called with --interactive (or -i), launches a guided wizard.
-    """
-    if interactive:
-        from initrunner.cli.wizard import run_wizard
-
-        run_wizard()
-        return
-
-    from initrunner.templates import TEMPLATES
-
-    builder = TEMPLATES.get(template)
-    if builder is None:
-        available = ", ".join(sorted(TEMPLATES.keys()))
-        console.print(f"[red]Error:[/red] Unknown template '{template}'. Use: {available}")
-        raise typer.Exit(1)
-
-    # Tool template writes a .py file
-    if template == "tool":
-        py_name = name.replace("-", "_")
-        out_path = Path(f"{py_name}.py")
-        if out_path.exists():
-            console.print(f"[red]Error:[/red] {out_path} already exists. Refusing to overwrite.")
-            raise typer.Exit(1)
-        content = builder(py_name, provider)
-        out_path.write_text(content)
-        console.print(f"[green]Created[/green] {out_path} (template=tool)")
-        console.print("\n[dim]Next steps:[/dim]")
-        console.print(f"  1. Edit {out_path} to add your tool functions")
-        console.print("  2. Reference in role.yaml:")
-        console.print("     tools:")
-        console.print("       - type: custom")
-        console.print(f"         module: {py_name}")
-        return
-
-    # Skill template writes a directory with SKILL.md
-    if template == "skill":
-        skill_dir_path = Path(name)
-        skill_file = skill_dir_path / "SKILL.md"
-        if skill_dir_path.exists():
-            console.print(
-                f"[red]Error:[/red] {skill_dir_path} already exists. Refusing to overwrite."
-            )
-            raise typer.Exit(1)
-        skill_dir_path.mkdir(parents=True)
-        content = builder(name, provider)
-        skill_file.write_text(content)
-        console.print(f"[green]Created[/green] {skill_file} (template=skill)")
-        console.print("\n[dim]Next steps:[/dim]")
-        console.print(f"  1. Edit {skill_file} to configure tools and prompt")
-        console.print("  2. Reference in role.yaml:")
-        console.print("     skills:")
-        console.print(f"       - {name}")
-        return
-
-    if output.exists():
-        console.print(
-            f"[red]Error:[/red] {output} already exists. Refusing to overwrite.",
-            soft_wrap=True,
-        )
-        raise typer.Exit(1)
-
-    if template in ("tool", "skill"):
-        content = builder(name, provider)
-    else:
-        content = builder(name, provider, model)
-    output.write_text(content)
-    console.print(f"[green]Created[/green] {output} (template={template})")
-
-    if provider not in ("openai", "ollama"):
-        console.print(f"[dim]Hint: install provider with: pip install initrunner[{provider}][/dim]")
-
-    if template == "ollama" or provider == "ollama":
-        check_ollama_running()
-
-
-def create(
-    description: Annotated[str, typer.Argument(help="Natural language description of the agent")],
-    provider: Annotated[str | None, typer.Option(help="Model provider for generation")] = None,
-    output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
-    name: Annotated[str | None, typer.Option(help="Agent name (auto-derived if omitted)")] = None,
-    model: Annotated[
-        str | None,
-        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
-    ] = None,
-    no_confirm: Annotated[bool, typer.Option("--no-confirm", help="Skip preview")] = False,
-) -> None:
-    """Generate a role.yaml from a natural language description using AI."""
-    from initrunner.services.roles import generate_role_sync
-
-    model_label = provider or "auto-detected"
-    console.print(f"[dim]Generating role.yaml using {model_label} provider...[/dim]")
-
-    try:
-        with console.status("Generating..."):
-            yaml_text = generate_role_sync(
-                description,
-                provider=provider,
-                model_name=model,
-                name_hint=name,
-            )
-    except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    # Preview
-    if not no_confirm:
-        console.print()
-        console.print("[bold]--- Generated role.yaml ---[/bold]")
-        console.print(yaml_text)
-        console.print("[bold]--- End ---[/bold]")
-        console.print()
-
-    if output.exists() and not no_confirm:
-        if not typer.confirm(f"{output} already exists. Overwrite?", default=False):
-            console.print("[dim]Cancelled.[/dim]")
-            raise typer.Exit()
-
-    # Validate before writing
-    from initrunner.services.roles import save_role_yaml_sync
-
-    try:
-        save_role_yaml_sync(output, yaml_text)
-        console.print(f"[green]Created[/green] {output}")
-    except (ValueError, Exception) as e:
-        # Write anyway but warn
-        output.write_text(yaml_text)
-        console.print(f"[yellow]Warning:[/yellow] Validation issue: {e}")
-        console.print(f"[green]Created[/green] {output} (may need manual fixes)")
-
-    console.print(f"[dim]Run: initrunner validate {output}[/dim]")
 
 
 def setup(

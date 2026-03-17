@@ -75,20 +75,20 @@ def main(
     from initrunner.cli.setup_cmd import needs_setup
 
     if needs_setup():
-        # TTY + no config: run setup wizard
-        from pathlib import Path
+        # TTY + no config: hint to run setup
+        from rich.panel import Panel
 
-        from initrunner.cli.setup_cmd import run_setup
-
-        run_setup(
-            provider=None,
-            name="my-agent",
-            intent=None,
-            skip_test=False,
-            output=Path("role.yaml"),
+        console.print(
+            Panel(
+                "No provider configured yet.\nRun [bold]initrunner setup[/bold] to get started.",
+                title="Setup Required",
+                border_style="yellow",
+            )
         )
+        raise typer.Exit(1)
     else:
         # TTY + configured: start ephemeral chat
+        console.print("[dim]Tip: use 'initrunner new' to create an agent[/dim]")
         from initrunner.cli.chat_cmd import (
             _EPHEMERAL_EXTRA_TOOL_DEFAULTS,
             _TOOL_PROFILES,
@@ -133,6 +133,7 @@ def main(
 
 from initrunner.cli.chat_cmd import chat  # noqa: E402
 from initrunner.cli.doctor_cmd import doctor  # noqa: E402
+from initrunner.cli.new_cmd import new  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
     info,
@@ -145,14 +146,13 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     uninstall,
     update,
 )
-from initrunner.cli.role_cmd import create, init, setup, validate  # noqa: E402
+from initrunner.cli.role_cmd import setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import daemon, ingest, run, test  # noqa: E402
 from initrunner.cli.server_cmd import pipeline, serve, tui, ui  # noqa: E402
 
 app.command()(chat)
 app.command()(validate)
-app.command()(init)
-app.command()(create)
+app.command()(new)
 app.command()(setup)
 app.command()(run)
 app.command()(test)

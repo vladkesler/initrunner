@@ -156,45 +156,48 @@ def build_schema_reference() -> str:
     return "\n\n".join(sections)
 
 
-_SYSTEM_PROMPT = """\
-You are an expert at creating InitRunner agent role YAML configuration files.
+def build_tool_summary() -> str:
+    """Generate a concise tool summary from the live tool registry."""
+    from initrunner.agent.tools._registry import get_tool_types
 
-Given a natural language description, produce a valid role.yaml file.
+    tool_types = get_tool_types()
+    lines = ["# Available tools (use in spec.tools list):"]
+    for type_name, config_cls in sorted(tool_types.items()):
+        desc_parts = []
+        for fname, finfo in config_cls.model_fields.items():
+            if fname in ("type", "permissions"):
+                continue
+            if finfo.default is not PydanticUndefined:
+                desc_parts.append(f"{fname}={finfo.default!r}")
+            else:
+                desc_parts.append(f"{fname}=(required)")
+        lines.append(f"- type: {type_name}  # {', '.join(desc_parts)}")
+    return "\n".join(lines)
 
-Rules:
-- Output ONLY valid YAML, no markdown fences, no explanation.
-- Use apiVersion: initrunner/v1 and kind: Agent.
-- metadata.name must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (lowercase, hyphens only).
-- Pick appropriate tools, triggers, and features based on the description.
-- Use sensible defaults for guardrails.
-- The spec.role field is the system prompt — write a good one that matches the description.
-- For tool configs, only include fields that differ from defaults.
-- Keep YAML clean and minimal.
-- Only include sections the agent actually needs. A simple chatbot needs no tools,
-  triggers, sinks, or ingest.
-- CRITICAL: The schema reference below uses dotted paths like "spec.model" for readability.
-  In the actual YAML, these MUST be nested under their parent key, NOT used as flat dotted keys.
-  Correct: spec: \\n  model: \\n    provider: openai
-  Wrong:   spec.model: \\n  provider: openai
 
-Example minimal role.yaml:
-```
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-  description: A helpful assistant.
-spec:
-  role: You are a helpful assistant.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  guardrails:
-    timeout_seconds: 30
-```
+def _strip_yaml_fences(text: str) -> str:
+    """Remove markdown code fences wrapping YAML content."""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines)
+    return text
 
-{schema_reference}
-"""
+
+def _validate_yaml(text: str) -> tuple[bool, str]:
+    """Validate YAML text against RoleDefinition. Returns (valid, error_msg)."""
+    from initrunner.agent.schema.role import RoleDefinition
+
+    try:
+        raw = yaml.safe_load(text)
+        RoleDefinition.model_validate(raw)
+        return True, ""
+    except Exception as e:
+        return False, str(e)
 
 
 def generate_role(
@@ -206,73 +209,15 @@ def generate_role(
 ) -> str:
     """Generate role YAML from a natural language description using an LLM.
 
-    Returns the generated YAML string. Validates via RoleDefinition
-    and retries once if invalid.
+    One-shot generation implemented via BuilderSession.
     """
-    from pydantic_ai import Agent
+    from initrunner.services.agent_builder import BuilderSession
 
-    from initrunner.agent.loader import _build_model
-    from initrunner.agent.schema.base import ModelConfig
-    from initrunner.agent.schema.role import RoleDefinition
-    from initrunner.templates import _default_model_name
-
-    if model_name is None:
-        model_name = _default_model_name(provider)
-
-    schema_ref = build_schema_reference()
-    system = _SYSTEM_PROMPT.format(schema_reference=schema_ref)
-
-    user_prompt = f"Create a role.yaml for: {description}"
-    if name_hint:
-        user_prompt += f"\nUse the name: {name_hint}"
-
-    # Build model config for the generator itself
-    gen_model_config = ModelConfig(provider=provider, name=model_name)
-    model = _build_model(gen_model_config)
-
-    agent: Agent[None, str] = Agent(model, system_prompt=system)
-
-    result = agent.run_sync(user_prompt)
-    yaml_text = result.output.strip()
-
-    # Strip markdown fences if present
-    if yaml_text.startswith("```"):
-        lines = yaml_text.split("\n")
-        # Remove first and last lines if they are fences
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        yaml_text = "\n".join(lines)
-
-    # Validate
-    def _try_validate(text: str) -> tuple[bool, str]:
-        try:
-            raw = yaml.safe_load(text)
-            RoleDefinition.model_validate(raw)
-            return True, ""
-        except Exception as e:
-            return False, str(e)
-
-    valid, error = _try_validate(yaml_text)
-    if not valid:
-        # Retry once with the error appended
-        _logger.info("Generated YAML invalid, retrying: %s", error)
-        retry_prompt = (
-            f"The YAML you generated had a validation error:\n{error}\n\n"
-            f"Fix the issue and output the corrected YAML only."
-        )
-        retry_result = agent.run_sync(
-            retry_prompt,
-            message_history=result.all_messages(),
-        )
-        yaml_text = retry_result.output.strip()
-        if yaml_text.startswith("```"):
-            lines = yaml_text.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            yaml_text = "\n".join(lines)
-
-    return yaml_text
+    session = BuilderSession()
+    turn = session.seed_description(
+        description,
+        provider=provider,
+        model_name=model_name,
+        name_hint=name_hint,
+    )
+    return turn.yaml_text

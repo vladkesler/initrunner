@@ -110,10 +110,14 @@ class TestEnterExitAgentContext:
 
         role = _make_role("inner-agent")
         token = _enter_agent_context(role)
-        assert get_current_agent_principal().id == "agent:inner-agent"
+        principal = get_current_agent_principal()
+        assert principal is not None
+        assert principal.id == "agent:inner-agent"
 
         _exit_agent_context(token)
-        assert get_current_agent_principal().id == "agent:outer"
+        principal = get_current_agent_principal()
+        assert principal is not None
+        assert principal.id == "agent:outer"
 
 
 class TestEnsureAuthzCaching:

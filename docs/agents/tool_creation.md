@@ -87,10 +87,10 @@ Custom tools load Python functions from a module and register them as agent tool
 ### Scaffolding
 
 ```bash
-initrunner init --template tool --name my_tools
+initrunner new --template tool
 ```
 
-This creates a `my_tools.py` file with example functions. Reference it in a role YAML:
+This creates a `role.py` file with example functions (named after `--output`, defaulting to `role`). Reference it in a role YAML:
 
 ```yaml
 tools:
@@ -206,7 +206,7 @@ API tools let you expose REST API endpoints as agent tools using pure YAML — n
 ### Scaffolding
 
 ```bash
-initrunner init --template api --name weather-agent
+initrunner new --template api --output weather-agent.yaml
 ```
 
 ### Full Example

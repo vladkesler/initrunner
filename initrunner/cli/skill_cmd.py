@@ -1,4 +1,4 @@
-"""Skill sub-commands: validate, list."""
+"""Skill sub-commands: new, validate, list."""
 
 from __future__ import annotations
 
@@ -12,6 +12,30 @@ from initrunner.cli._helpers import console
 from initrunner.cli._options import SkillDirOption
 
 app = typer.Typer(help="Manage reusable skills.")
+
+
+@app.command("new")
+def skill_new(
+    name: Annotated[str, typer.Argument(help="Skill name")] = "my-skill",
+    provider: Annotated[str, typer.Option(help="Model provider (for tool defaults)")] = "openai",
+) -> None:
+    """Scaffold a new skill directory with SKILL.md."""
+    from initrunner.templates import template_skill
+
+    skill_dir_path = Path(name)
+    skill_file = skill_dir_path / "SKILL.md"
+    if skill_dir_path.exists():
+        console.print(f"[red]Error:[/red] {skill_dir_path} already exists. Refusing to overwrite.")
+        raise typer.Exit(1)
+    skill_dir_path.mkdir(parents=True)
+    content = template_skill(name, provider)
+    skill_file.write_text(content)
+    console.print(f"[green]Created[/green] {skill_file}")
+    console.print("\n[dim]Next steps:[/dim]")
+    console.print(f"  1. Edit {skill_file} to configure tools and prompt")
+    console.print("  2. Reference in role.yaml:")
+    console.print("     skills:")
+    console.print(f"       - {name}")
 
 
 @app.command("validate")
@@ -140,9 +164,7 @@ def skill_list(
             auto_found.append((ds.name, ds.description, ds.scope, str(ds.path.parent)))
 
     if not explicit_found and not auto_found:
-        console.print(
-            "No skills found. Use [bold]initrunner init --template skill[/bold] to create one."
-        )
+        console.print("No skills found. Use [bold]initrunner skill new[/bold] to create one.")
         return
 
     if explicit_found and not auto:

@@ -606,14 +606,14 @@ class TestSkillCLI:
         assert result.exit_code == 0
         assert "web-researcher" in result.output
 
-    def test_init_template_skill(self, tmp_path: Path, monkeypatch):
+    def test_skill_new_command(self, tmp_path: Path, monkeypatch):
         from typer.testing import CliRunner
 
         from initrunner.cli.main import app
 
         monkeypatch.chdir(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(app, ["init", "--template", "skill", "--name", "web-tools"])
+        result = runner.invoke(app, ["skill", "new", "web-tools"])
         assert result.exit_code == 0
         assert "Created" in result.output
         assert (tmp_path / "web-tools" / "SKILL.md").exists()

@@ -94,7 +94,7 @@ spec:
 
 ## Model Selection
 
-`PROVIDER_MODELS` in `templates.py` maintains curated model lists for each provider. The interactive wizard (`initrunner init -i`) and setup command (`initrunner setup`) present these as a numbered menu. The `--model` flag on `init`, `setup`, and `create` bypasses the interactive prompt. Custom model names are always accepted — the curated list is a convenience, not a restriction.
+`PROVIDER_MODELS` in `templates.py` maintains curated model lists for each provider. The interactive wizard (`initrunner new`) and setup command (`initrunner setup`) present these as a numbered menu. The `--model` flag on `setup` bypasses the interactive prompt. Custom model names are always accepted -- the curated list is a convenience, not a restriction.
 
 | Provider | Model | Description |
 |----------|-------|-------------|

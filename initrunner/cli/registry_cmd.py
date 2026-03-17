@@ -11,11 +11,42 @@ from rich.table import Table
 from initrunner.cli._helpers import console
 
 
+def _display_install_preview(preview: object) -> None:
+    """Render an InstallPreview to the console."""
+    from initrunner.registry import InstallPreview
+
+    assert isinstance(preview, InstallPreview)
+
+    console.print()
+    if preview.source_type == "hub":
+        console.print(f"  [bold]Package:[/bold]     {preview.name}")
+        console.print(f"  [bold]Version:[/bold]     {preview.version}")
+        console.print(f"  [bold]Description:[/bold] {preview.description or '(none)'}")
+        console.print(f"  [bold]Author:[/bold]      {preview.author or '(unknown)'}")
+        console.print(f"  [bold]Downloads:[/bold]   {preview.downloads}")
+    elif preview.source_type == "oci":
+        console.print(f"  [bold]Role:[/bold]        {preview.name}")
+        console.print(f"  [bold]Description:[/bold] {preview.description or '(none)'}")
+        console.print(f"  [bold]Author:[/bold]      {preview.author or '(unknown)'}")
+        console.print(f"  [bold]Source:[/bold]       {preview.source_label}")
+    else:
+        # GitHub
+        console.print(f"  [bold]Role:[/bold]        {preview.name}")
+        console.print(f"  [bold]Description:[/bold] {preview.description or '(none)'}")
+        console.print(f"  [bold]Author:[/bold]      {preview.author or '(unknown)'}")
+        tools_str = ", ".join(preview.tools) if preview.tools else "none"
+        console.print(f"  [bold]Tools:[/bold]       {tools_str}")
+        console.print(f"  [bold]Model:[/bold]       {preview.model}")
+    for w in preview.warnings:
+        console.print(f"  [yellow]Warning:[/yellow] {w}")
+    console.print()
+
+
 def install(
     source: Annotated[
         str,
         typer.Argument(
-            help="GitHub source (user/repo[:path][@ref]), role name, or OCI ref (oci://...)"
+            help="Source: hub:owner/name[@ver], user/repo[:path][@ref], role name, or oci://..."
         ),
     ],
     force: Annotated[bool, typer.Option("--force", "-f", help="Overwrite existing")] = False,
@@ -23,21 +54,36 @@ def install(
 ) -> None:
     """Install a role from GitHub, the community index, or an OCI registry."""
     from initrunner.registry import (
-        NetworkError,
         RegistryError,
         RoleExistsError,
-        RoleNotFoundError,
-        install_role,
+        confirm_install,
+        preview_install,
     )
 
     try:
-        install_role(source, force=force, yes=yes)
+        preview = preview_install(source, force=force)
     except RoleExistsError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
         raise typer.Exit(1) from None
-    except (RoleNotFoundError, NetworkError, RegistryError) as e:
+    except RegistryError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+    if not yes:
+        _display_install_preview(preview)
+        if not typer.confirm("Install this role?"):
+            raise typer.Abort()
+
+    try:
+        path = confirm_install(source, force=force)
+    except RoleExistsError as e:
+        console.print(f"[yellow]Warning:[/yellow] {e}")
+        raise typer.Exit(1) from None
+    except RegistryError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]Installed[/green] {preview.name} -> {path}")
 
 
 def uninstall(
@@ -57,29 +103,27 @@ def uninstall(
 def search(
     query: Annotated[str, typer.Argument(help="Search query")],
 ) -> None:
-    """Search the community role index."""
-    from initrunner.registry import NetworkError, RegistryError, search_index
+    """Search InitHub for agent packs."""
+    from initrunner.registry import NetworkError, RegistryError, hub_search_index
 
     try:
-        results = search_index(query)
+        results = hub_search_index(query)
     except (NetworkError, RegistryError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
     if not results:
-        console.print(f"No roles found matching '{query}'.")
+        console.print(f"No packages found matching '{query}'.")
         return
 
-    table = Table(title="Community Roles")
-    table.add_column("Name", style="cyan")
-    table.add_column("Author")
+    table = Table(title="InitHub Packages")
+    table.add_column("Package", style="cyan")
     table.add_column("Description")
     table.add_column("Tags")
 
     for entry in results:
         table.add_row(
             entry.name,
-            entry.author,
             entry.description,
             ", ".join(entry.tags),
         )
@@ -105,24 +149,49 @@ def _display_oci_info(d: dict) -> None:  # type: ignore[type-arg]
     console.print(table)
 
 
+def _display_hub_info(d: dict) -> None:  # type: ignore[type-arg]
+    """Display InitHub package info table."""
+    name = str(d.get("name", "unknown"))
+    table = Table(title=f"Package: {name}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Name", name)
+    table.add_row("Description", str(d.get("description") or "(none)"))
+    table.add_row("Author", str(d.get("author") or "(unknown)"))
+    table.add_row("Latest Version", str(d.get("latest_version") or "(none)"))
+    table.add_row("Downloads", str(d.get("downloads", 0)))
+    tags = d.get("tags")
+    table.add_row("Tags", ", ".join(tags) if tags else "(none)")
+    versions = d.get("versions")
+    if versions is not None:
+        table.add_row("Versions", ", ".join(versions) if versions else "(none)")
+    repo_url = d.get("repository_url")
+    if repo_url:
+        table.add_row("Repository", repo_url)
+    console.print(table)
+
+
 def info(
     source: Annotated[str, typer.Argument(help="Role source to inspect")],
 ) -> None:
     """Inspect a role's metadata and tools without installing."""
-    from initrunner.registry import NetworkError, RegistryError, RoleNotFoundError, info_role
+    from initrunner.registry import RegistryError, info_role
 
     try:
         role_info = info_role(source)
-    except (RoleNotFoundError, NetworkError, RegistryError) as e:
+    except RegistryError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # OCI info returns a dict (bundle manifest metadata)
+    # Dict results: hub or OCI
     if isinstance(role_info, dict):
-        _display_oci_info(role_info)
+        if role_info.get("source_type") == "hub":  # type: ignore[arg-type]
+            _display_hub_info(role_info)
+        else:
+            _display_oci_info(role_info)
         return
 
     table = Table(title=f"Role: {role_info.name}")
@@ -234,26 +303,45 @@ def pull(
 ) -> None:
     """Pull a role bundle from an OCI registry."""
     from initrunner.registry import (
-        NetworkError,
         RegistryError,
         RoleExistsError,
-        install_role,
+        confirm_install,
+        preview_install,
     )
 
     if not ref.startswith("oci://"):
         ref = f"oci://{ref}"
 
     try:
-        install_role(ref, force=force, yes=yes)
+        preview = preview_install(ref, force=force)
     except RoleExistsError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
         raise typer.Exit(1) from None
-    except (NetworkError, RegistryError) as e:
+    except RegistryError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+    if not yes:
+        _display_install_preview(preview)
+        if not typer.confirm("Install this role?"):
+            raise typer.Abort()
+
+    try:
+        path = confirm_install(ref, force=force)
+    except RoleExistsError as e:
+        console.print(f"[yellow]Warning:[/yellow] {e}")
+        raise typer.Exit(1) from None
+    except RegistryError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except Exception as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]Installed[/green] {preview.name} -> {path}")
 
 
 def login(

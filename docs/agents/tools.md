@@ -280,7 +280,7 @@ Loads Python functions from a module and registers them as agent tools. Each fun
 ### Scaffolding
 
 ```bash
-initrunner init --template tool --name my_tools
+initrunner new --template tool
 ```
 
 ### Single Function
@@ -372,7 +372,7 @@ Defines REST API endpoints as agent tools using pure YAML — no Python required
 ### Scaffolding
 
 ```bash
-initrunner init --template api --name weather-agent
+initrunner new --template api --output weather-agent.yaml
 ```
 
 ### Example

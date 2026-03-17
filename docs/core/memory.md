@@ -555,7 +555,7 @@ See [Ingestion: Dimension & Model Identity Tracking](ingestion.md#dimension--mod
 ## Scaffold a Memory-Enabled Role
 
 ```bash
-initrunner init --name assistant --template memory
+initrunner new --template memory
 ```
 
 This generates a `role.yaml` with `memory` pre-configured and a system prompt that instructs the agent to use `remember()`, `recall()`, and `list_memories()`.

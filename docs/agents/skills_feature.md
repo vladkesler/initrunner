@@ -7,7 +7,7 @@ Skills are self-contained bundles of tools and system prompt instructions packag
 Create a skill:
 
 ```bash
-initrunner init --template skill --name web-researcher
+initrunner skill new web-researcher
 ```
 
 This creates `web-researcher/SKILL.md`:
@@ -377,12 +377,12 @@ initrunner skill list --skill-dir ./my-skills
 
 Output includes: name, description, scope/source, and path.
 
-### `init --template skill --name <name>`
+### `skill new <name>`
 
 Scaffold a new skill in directory format.
 
 ```bash
-initrunner init --template skill --name web-researcher
+initrunner skill new web-researcher
 ```
 
 Creates `web-researcher/SKILL.md` with template frontmatter and prompt. Refuses to overwrite an existing directory.

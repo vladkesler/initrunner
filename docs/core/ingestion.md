@@ -434,7 +434,7 @@ uv pip install lancedb
 ## Scaffold a RAG Role
 
 ```bash
-initrunner init --name kb-agent --template rag
+initrunner new --template rag
 ```
 
 This generates a role.yaml with `ingest` pre-configured for `./docs/**/*.md` and `./docs/**/*.txt`.

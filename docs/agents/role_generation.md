@@ -1,97 +1,145 @@
 # Role Generation
 
-InitRunner provides three ways to create `role.yaml` files: an interactive CLI wizard, an AI-powered generator, and the web dashboard. All three produce validated YAML that can be used immediately with `initrunner run`.
+InitRunner provides a single `initrunner new` command for creating `role.yaml` files. It supports multiple seed modes (templates, AI generation, examples, hub bundles, or local files) and an interactive refinement loop for iterating on the YAML before saving. The web dashboard offers a complementary GUI-based flow.
 
-## Interactive Wizard
-
-Launch the guided wizard with the `-i` flag:
+## Quick Start
 
 ```bash
-initrunner init -i
+# Generate from a description with interactive refinement
+initrunner new "A code review assistant that reads git diffs"
+
+# Start from a template, skip refinement
+initrunner new --template rag --no-refine
+
+# Blank template with a specific provider
+initrunner new --blank --provider anthropic
+
+# Load from a bundled example
+initrunner new --from hello-world
+
+# Fully interactive (no seed -- LLM asks what to build)
+initrunner new
 ```
 
-The wizard walks through each section of a role definition, building a complete `role.yaml` step by step.
-
-### Wizard Flow
-
-1. **Agent name** — lowercase with hyphens (e.g. `my-agent`)
-2. **Description** — optional free-text
-3. **Provider** — choose from `openai`, `anthropic`, `google`, `groq`, `mistral`, `cohere`, `ollama`
-4. **Model** — choose from a curated list of models for the selected provider, or type a custom model name
-5. **Base template** — pre-populates system prompt, tools, and features (see table below)
-6. **Tool selection** — pick tools by number or name, then configure each one
-7. **Memory** — enable/disable long-term memory
-8. **Ingestion** — enable/disable RAG with source glob and chunking config
-9. **Output file** — path to write (default: `role.yaml`)
-
-### Templates
-
-| Template | Description |
-|----------|-------------|
-| `basic` | Simple assistant |
-| `rag` | Answers from your documents |
-| `memory` | Remembers across sessions |
-| `daemon` | Runs on schedule / watches files |
-| `api` | Declarative REST API tools |
-| `blank` | Just the essentials, add everything yourself |
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `filesystem` | Read/write files |
-| `git` | Git operations |
-| `python` | Execute Python code |
-| `shell` | Run shell commands |
-| `http` | HTTP requests |
-| `web_reader` | Fetch web pages |
-| `sql` | Query SQLite databases |
-| `datetime` | Date/time utilities |
-| `mcp` | MCP server integration |
-| `slack` | Send Slack messages |
-
-Each selected tool prompts for its key configuration fields. For example, `filesystem` asks for `root_path` and `read_only`; `shell` asks for `require_confirmation` and `timeout_seconds`.
-
-The wizard validates the generated YAML against the `RoleDefinition` schema before writing and warns if there are issues.
-
-### Anthropic Embedding Warning
-
-When the wizard detects that `anthropic` is selected as the provider **and** memory or ingestion is enabled, it displays a warning:
-
-> **Warning:** Anthropic does not provide an embeddings API. RAG and memory features require `OPENAI_API_KEY` for embeddings.
-
-The warning also mentions that the embedding provider can be overridden via `spec.ingest.embeddings` or `spec.memory.embeddings` in the generated role file.
-
-## AI-Powered Generation
-
-Generate a complete `role.yaml` from a natural language description:
-
-```bash
-initrunner create "A code review assistant that reads git diffs and suggests improvements"
-```
-
-### CLI Flags
+## CLI Flags
 
 | Flag | Description |
 |------|-------------|
-| `--provider TEXT` | Model provider for generation (auto-detected if omitted) |
+| `DESCRIPTION` | Natural language description (generates via LLM) |
+| `--from SOURCE` | Local file path, bundled example name, or `hub:ref` |
+| `--template TEXT` | Start from a named template |
+| `--blank` | Start from minimal blank template |
+| `--provider TEXT` | Model provider (auto-detected if omitted) |
+| `--model TEXT` | Model name (uses provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
-| `--name TEXT` | Agent name (auto-derived from description if omitted) |
-| `--model TEXT` | Model name for the generated role (e.g. `gpt-4o`, `claude-sonnet-4-5-20250929`) |
-| `--no-confirm` | Skip the YAML preview and write immediately |
+| `--force` | Overwrite existing file without prompting |
+| `--no-refine` | Skip the interactive refinement loop |
 
-### How It Works
+Seed modes are mutually exclusive: specify at most one of `DESCRIPTION`, `--from`, `--template`, or `--blank`.
 
-1. Builds a dynamic schema reference by introspecting Pydantic models (`build_schema_reference()` in `role_generator.py`). This includes all tool types from the registry, trigger types, sink types, and every configurable field with defaults.
-2. Sends the description plus schema reference to the configured LLM.
-3. Validates the returned YAML against `RoleDefinition`.
-4. If validation fails, retries once by sending the error back to the LLM for correction.
+## Seed Modes
 
-### Provider Auto-Detection
+### Description (AI-powered)
 
-When `--provider` is omitted, `services.py` checks for available API keys in the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) and uses the first provider found. Falls back to `openai`.
+```bash
+initrunner new "A knowledge assistant that searches company docs"
+```
 
-## Dashboard — Create Role
+Sends the description plus a dynamic schema reference to the configured LLM. The schema reference is built by introspecting Pydantic models (`build_schema_reference()`) and the live tool registry (`build_tool_summary()`), so it always stays in sync with the code.
+
+If the generated YAML has validation errors, the builder automatically retries once by sending the errors back to the LLM.
+
+### Template
+
+```bash
+initrunner new --template rag
+```
+
+Available templates: `basic`, `rag`, `daemon`, `memory`, `ollama`, `api`, `telegram`, `discord`.
+
+### Blank
+
+```bash
+initrunner new --blank
+```
+
+Produces a minimal valid role YAML with sensible defaults.
+
+### From Source
+
+```bash
+initrunner new --from ./existing-role.yaml   # local file
+initrunner new --from hello-world            # bundled example
+initrunner new --from hub:owner/package      # hub bundle
+```
+
+Resolution order for `--from SOURCE`:
+1. Starts with `hub:` -- fetches from the hub (role YAML only)
+2. Exists as a filesystem path -- loads the local file
+3. Otherwise -- looks up as a bundled example name
+
+For multi-file example/hub bundles, only the primary role YAML is loaded into the builder. Omitted sidecar files (skills, configs, etc.) are listed as a warning. Use `initrunner examples copy <name>` to get all files.
+
+### No Seed (Interactive)
+
+```bash
+initrunner new
+```
+
+When no seed is specified, the LLM starts a conversation asking what kind of agent to build.
+
+## Refinement Loop
+
+After the initial seed, the builder shows a syntax-highlighted YAML panel with the agent name and validation status:
+
+```
++-- code-reviewer -------------------- VALID --+
+| apiVersion: initrunner/v1                     |
+| kind: Agent                                   |
+| ...                                           |
++-----------------------------------------------+
+
+Refine (empty to save, "quit" to discard):
+> add memory and change model to claude
+```
+
+- Type a refinement request to iterate on the YAML
+- Press Enter (empty input) or type `save` to write the file
+- Type `quit` or `q` to discard without saving
+- Use `--no-refine` to skip the loop entirely
+
+The refinement LLM has the full schema reference and tool registry, so it can add tools, triggers, memory, and other features by name.
+
+## Provider Auto-Detection
+
+When `--provider` is omitted, InitRunner checks for available API keys in the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) and uses the first provider found. Falls back to `openai`.
+
+## Post-Creation Output
+
+After saving, the builder shows contextual next-step hints based on the role's features:
+
+```
+Created role.yaml
+
+Next steps:
+  initrunner ingest role.yaml
+  initrunner run role.yaml -p 'hello'
+  initrunner validate role.yaml
+```
+
+## Scaffolding Tools and Skills
+
+Tool and skill scaffolds use dedicated sub-commands instead of `new`:
+
+```bash
+# Scaffold a custom tool module
+initrunner new --template tool
+
+# Scaffold a skill directory
+initrunner skill new my-skill
+```
+
+## Dashboard -- Create Role
 
 The web dashboard at `/roles/new` offers two tabs for role creation.
 
@@ -126,7 +174,7 @@ This calls `POST /api/roles/generate` to get the YAML, then `POST /api/roles` to
 
 `POST /api/roles` returns `409` if a role file with the same name already exists.
 
-## Dashboard — Edit Existing Roles
+## Dashboard -- Edit Existing Roles
 
 The role detail page (`/roles/{role_id}`) includes an editable YAML tab with **Save** and **Reset** buttons.
 
@@ -140,41 +188,37 @@ The role detail page (`/roles/{role_id}`) includes an editable YAML tab with **S
 
 ## Programmatic Usage
 
-All role creation logic lives in `services.py` for use by CLI, API, and TUI:
-
-| Function | Description |
-|----------|-------------|
-| `build_role_yaml_sync()` | Build YAML from structured parameters (name, provider, tools, etc.) |
-| `generate_role_sync()` | Generate YAML from a natural language description via LLM |
-| `save_role_yaml_sync()` | Validate YAML, create `.bak` backup if overwriting, and write to disk |
-
-Example:
+The builder service layer (`services/agent_builder.py`) is UI-agnostic and can be used by CLI, API, and TUI:
 
 ```python
-from initrunner.services import build_role_yaml_sync, save_role_yaml_sync
+from initrunner.services.agent_builder import BuilderSession
 from pathlib import Path
 
-yaml_text = build_role_yaml_sync(
-    name="my-agent",
-    provider="openai",
-    model_name="gpt-4o",
-    tools=[{"type": "filesystem", "root_path": ".", "read_only": True}],
-    memory=True,
-)
+session = BuilderSession()
 
-role = save_role_yaml_sync(Path("role.yaml"), yaml_text)
+# Seed from description
+turn = session.seed_description("a code review bot", "openai")
+
+# Refine
+turn = session.refine("add git and filesystem tools", "openai")
+
+# Save
+result = session.save(Path("role.yaml"))
+print(result.next_steps)
 ```
+
+Legacy one-shot generation is still available via `generate_role()` and `generate_role_sync()`, which now delegate to `BuilderSession` internally.
 
 ## Security
 
 - **Name validation**: `metadata.name` must match `^[a-z0-9][a-z0-9-]*[a-z0-9]$`
 - **Directory restrictions**: API writes are restricted to configured role directories; path traversal (`..`) is rejected
-- **Overwrite protection**: `POST /api/roles` returns `409` if the file exists; `PUT` and `save_role_yaml_sync()` create a `.bak` backup before overwriting
+- **Overwrite protection**: CLI prompts before overwriting; `POST /api/roles` returns `409` if the file exists; `save_role_yaml_sync()` creates a `.bak` backup before overwriting
 - **Validation before write**: YAML is parsed and validated against `RoleDefinition` before being written to disk
 
 ## See Also
 
-- [CLI Reference](../getting-started/cli.md) — full list of `init` and `create` flags
-- [Tool Creation](tool_creation.md) — writing custom tool modules
-- [Web Dashboard](../interfaces/dashboard.md) — dashboard setup and features
-- [Security Model](../security/security.md) — guardrails and access controls
+- [CLI Reference](../getting-started/cli.md) -- full list of `new` command flags
+- [Tool Creation](tool_creation.md) -- writing custom tool modules
+- [Web Dashboard](../interfaces/dashboard.md) -- dashboard setup and features
+- [Security Model](../security/security.md) -- guardrails and access controls

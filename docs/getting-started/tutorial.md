@@ -660,5 +660,5 @@ Now that you've built a complete agent, explore more of what InitRunner can do:
 - **Web dashboard**: Monitor agents in your browser with `initrunner ui` — see [Dashboard](../interfaces/dashboard.md)
 - **Terminal UI**: Full-featured TUI with `initrunner tui` — see [TUI](../interfaces/tui.md)
 - **API server**: Expose agents as OpenAI-compatible endpoints with `initrunner serve` — see [API Server](../interfaces/server.md)
-- **Role generation**: Scaffold new agents with `initrunner init` or generate them from descriptions with `initrunner create` — see [Role Generation](../agents/role_generation.md)
+- **Role generation**: Scaffold new agents with `initrunner new` or generate them from descriptions with `initrunner new "description"` — see [Role Generation](../agents/role_generation.md)
 - **CLI reference**: Full command reference — see [CLI](cli.md)

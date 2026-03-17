@@ -7,7 +7,7 @@
 | `initrunner chat [role.yaml]` | Start an ephemeral chat REPL or launch a bot |
 | `initrunner run <role.yaml>` | Run an agent (single-shot or interactive) |
 | `initrunner validate <role.yaml>` | Validate a role definition |
-| `initrunner init` | Scaffold a template role, tool module, or skill |
+| `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <role.yaml>` | Ingest documents into vector store |
 | `initrunner daemon <role.yaml>` | Run in trigger-driven daemon mode |
@@ -31,6 +31,7 @@
 | `initrunner memory import <role.yaml> <file>` | Import memories from JSON |
 | `initrunner memory list <role.yaml>` | List stored memories |
 | `initrunner memory consolidate <role.yaml>` | Run memory consolidation manually |
+| `initrunner skill new [name]` | Scaffold a new skill directory |
 | `initrunner skill validate <path>` | Validate a skill definition |
 | `initrunner skill list` | List available skills |
 | `initrunner compose up <compose.yaml>` | Run compose orchestration (foreground) |
@@ -53,7 +54,7 @@ Synopsis: `initrunner chat [role.yaml] [OPTIONS]`
 
 Start an ephemeral chat REPL, load a role for interactive use, or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide.
 
-Running `initrunner` with no subcommand in a TTY starts chat automatically (or the setup wizard if unconfigured).
+Running `initrunner` with no subcommand in a TTY starts chat automatically (or shows a setup hint if unconfigured). A tip about `initrunner new` is shown on each chat start.
 
 | Flag | Description |
 |------|-------------|
@@ -132,15 +133,44 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 |------|-------------|
 | `--force` | Force re-ingestion of all files. Also wipes the store when the embedding model has changed. |
 
-## Init options
+## New options
+
+Synopsis: `initrunner new [DESCRIPTION] [OPTIONS]`
+
+Create a new agent role via conversational builder. Seed modes are mutually exclusive.
 
 | Flag | Description |
 |------|-------------|
-| `--name TEXT` | Agent name (default: `my-agent`) |
-| `--template TEXT` | Template: `basic`, `rag`, `daemon`, `memory`, `ollama`, `tool`, `api`, `skill` (default: `basic`) |
-| `--provider TEXT` | Model provider (default: `openai`) |
-| `--model TEXT` | Model name (e.g. `gpt-4o`, `claude-sonnet-4-5-20250929`). Uses provider default if omitted. |
+| `DESCRIPTION` | Natural language description (generates via LLM) |
+| `--from SOURCE` | Source: local file path, bundled example name, or `hub:ref` |
+| `--template TEXT` | Start from a named template (`basic`, `rag`, `daemon`, `memory`, `ollama`, `api`, `telegram`, `discord`) |
+| `--blank` | Start from a minimal blank template |
+| `--provider TEXT` | Model provider (auto-detected if omitted) |
+| `--model TEXT` | Model name (uses provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
+| `--force` | Overwrite existing file without prompting |
+| `--no-refine` | Skip the interactive refinement loop |
+
+Without any seed, starts an interactive conversation where the LLM asks what to build.
+
+### Examples
+
+```bash
+# Generate from description with interactive refinement
+initrunner new "a code review bot that reads git diffs"
+
+# Start from a template, skip refinement
+initrunner new --template rag --no-refine
+
+# Load from an example
+initrunner new --from hello-world
+
+# Blank template with specific provider
+initrunner new --blank --provider anthropic
+
+# Fully interactive (no seed)
+initrunner new
+```
 
 ## Setup options
 
@@ -153,16 +183,6 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 | `--output PATH` | Role output path (default: `role.yaml`) |
 | `-y, --accept-risks` | Accept security disclaimer without prompting |
 | `--interfaces TEXT` | Install interfaces: `tui`, `dashboard`, `both`, `skip` |
-
-## Create options
-
-| Flag | Description |
-|------|-------------|
-| `--provider TEXT` | Model provider for generation (auto-detected if omitted) |
-| `--output PATH` | Output file path (default: `role.yaml`) |
-| `--name TEXT` | Agent name (auto-derived if omitted) |
-| `--model TEXT` | Model name for the generated role |
-| `--no-confirm` | Skip the YAML preview |
 
 ## Serve options
 
