@@ -288,7 +288,7 @@ Local dev:                           k8s / distributed:
                                      +----------------------+
 ```
 
-- Each agent runs as `initrunner serve <role.yaml>` in its own Deployment + Service
+- Each agent runs as `initrunner serve <path>` in its own Deployment + Service
 - The coordinator runs with `mode: mcp` targeting agent service URLs
 - Audit stays local per pod (SQLite per process)
 - No k8s-specific code — users bring their own manifests

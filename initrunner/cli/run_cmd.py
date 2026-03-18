@@ -50,7 +50,9 @@ def _maybe_export_report(
 def run(
     role_file: Annotated[
         Path | None,
-        typer.Argument(help="Path to role.yaml. Omit with --sense to select automatically."),
+        typer.Argument(
+            help="Agent directory or role YAML file. Omit with --sense to select automatically."
+        ),
     ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
     interactive: Annotated[
@@ -442,7 +444,7 @@ def _display_suite_result(suite_result: object, verbose: bool = False) -> None:
 
 
 def test(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     suite: Annotated[Path, typer.Option("-s", "--suite", help="Path to test suite YAML")],
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Simulate with TestModel (no API calls)")
@@ -509,14 +511,16 @@ def test(
 
 
 def ingest(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     force: Annotated[bool, typer.Option("--force", help="Force re-ingestion of all files")] = False,
 ) -> None:
     """Ingest documents defined in the role's ingest config."""
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
+    from initrunner.cli._helpers import resolve_role_path
     from initrunner.ingestion.pipeline import FileStatus, resolve_sources, run_ingest
 
+    role_file = resolve_role_path(role_file)
     role = load_role_or_exit(role_file)
 
     from initrunner.agent.loader import _load_dotenv
@@ -614,7 +618,7 @@ def _status_color(status: object) -> str:
 
 
 def daemon(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     audit_db: AuditDbOption = None,
     no_audit: NoAuditOption = False,
     skill_dir: SkillDirOption = None,

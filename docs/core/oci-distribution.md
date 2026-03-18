@@ -8,8 +8,9 @@ InitRunner supports publishing and installing role bundles via any OCI-compliant
 # Log in to a registry
 initrunner login ghcr.io
 
-# Publish a role
-initrunner publish role.yaml oci://ghcr.io/org/my-agent --tag 1.0.0
+# Publish a role (from current directory, or specify a path)
+initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0
+initrunner publish ./my-agent/ oci://ghcr.io/org/my-agent --tag 1.0.0
 
 # Install from a registry
 initrunner install oci://ghcr.io/org/my-agent:1.0.0
@@ -120,7 +121,7 @@ For OCI sources, `update` performs a HEAD request to check if the manifest diges
 
 | Command | Description |
 |---------|-------------|
-| `initrunner publish <role.yaml> <oci-ref> [--tag TAG]` | Bundle and push a role to an OCI registry |
+| `initrunner publish [PATH] <oci-ref> [--tag TAG]` | Bundle and push a role to an OCI registry (PATH defaults to `.`) |
 | `initrunner pull <oci-ref> [--force] [--yes]` | Pull and install a role from an OCI registry |
 | `initrunner install oci://... [--force] [--yes]` | Install from OCI (same as pull) |
 | `initrunner login <registry>` | Store credentials for a registry |

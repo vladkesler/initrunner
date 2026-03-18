@@ -107,7 +107,7 @@ def _print_list_tools() -> None:
 def chat(
     role_file: Annotated[
         Path | None,
-        typer.Argument(help="Path to role.yaml (omit for auto-detect mode)"),
+        typer.Argument(help="Agent directory or role YAML file (omit for auto-detect mode)"),
     ] = None,
     provider: Annotated[
         str | None,

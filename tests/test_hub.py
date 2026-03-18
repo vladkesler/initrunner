@@ -10,6 +10,7 @@ import pytest
 
 from initrunner.hub import (
     HubAuthError,
+    HubDeviceCodeExpired,
     HubError,
     HubPackageInfo,
     _hub_request,
@@ -19,7 +20,9 @@ from initrunner.hub import (
     is_hub_reference,
     load_hub_token,
     parse_hub_reference,
+    poll_device_code,
     remove_hub_token,
+    request_device_code,
     save_hub_token,
 )
 
@@ -407,3 +410,109 @@ class TestHubPublish:
         assert b'name="readme"' not in body
         assert b'name="repository_url"' not in body
         assert b'name="categories"' not in body
+
+
+# ---------------------------------------------------------------------------
+# request_device_code
+# ---------------------------------------------------------------------------
+
+
+class TestRequestDeviceCode:
+    def _mock_response(self, data: dict) -> MagicMock:
+        body = json.dumps(data).encode()
+        resp = MagicMock()
+        resp.read.return_value = body
+        resp.__enter__ = MagicMock(return_value=resp)
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    def test_success(self):
+        response_data = {
+            "device_code": "dc-abc",
+            "user_code": "ABCD-1234",
+            "verification_url": "https://hub.initrunner.ai/cli-auth?code=ABCD-1234",
+            "interval_seconds": 5,
+            "expires_at": "2026-03-18T12:00:00+00:00",
+        }
+        resp = self._mock_response(response_data)
+        with patch("initrunner.hub.urllib.request.urlopen", return_value=resp):
+            result = request_device_code()
+        assert result == response_data
+
+    def test_network_error(self):
+        import urllib.error
+
+        error = urllib.error.URLError("Connection refused")
+        with patch("initrunner.hub.urllib.request.urlopen", side_effect=error):
+            with pytest.raises(HubError, match="Could not reach InitHub"):
+                request_device_code()
+
+
+# ---------------------------------------------------------------------------
+# poll_device_code
+# ---------------------------------------------------------------------------
+
+
+class TestPollDeviceCode:
+    def _mock_response(self, data: dict) -> MagicMock:
+        body = json.dumps(data).encode()
+        resp = MagicMock()
+        resp.read.return_value = body
+        resp.__enter__ = MagicMock(return_value=resp)
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
+
+    def test_pending(self):
+        resp = self._mock_response({"status": "pending"})
+        with patch("initrunner.hub.urllib.request.urlopen", return_value=resp):
+            result = poll_device_code("dc-abc")
+        assert result == {"status": "pending"}
+
+    def test_complete(self):
+        response_data = {"status": "complete", "token": "tok-xyz", "username": "alice"}
+        resp = self._mock_response(response_data)
+        with patch("initrunner.hub.urllib.request.urlopen", return_value=resp):
+            result = poll_device_code("dc-abc")
+        assert result == response_data
+
+    def test_expired_raises_device_code_expired(self):
+        import urllib.error
+
+        error = urllib.error.HTTPError(
+            "http://example.com",
+            400,
+            "Bad Request",
+            {},  # type: ignore[arg-type]
+            BytesIO(json.dumps({"detail": "Device code expired"}).encode()),
+        )
+        with patch("initrunner.hub.urllib.request.urlopen", side_effect=error):
+            with pytest.raises(HubDeviceCodeExpired, match="expired"):
+                poll_device_code("dc-abc")
+
+    def test_invalid_raises_hub_error(self):
+        import urllib.error
+
+        error = urllib.error.HTTPError(
+            "http://example.com",
+            400,
+            "Bad Request",
+            {},  # type: ignore[arg-type]
+            BytesIO(json.dumps({"detail": "Invalid device code"}).encode()),
+        )
+        with patch("initrunner.hub.urllib.request.urlopen", side_effect=error):
+            with pytest.raises(HubError, match="Invalid device code"):
+                poll_device_code("dc-abc")
+
+    def test_consumed_raises_hub_error(self):
+        import urllib.error
+
+        error = urllib.error.HTTPError(
+            "http://example.com",
+            400,
+            "Bad Request",
+            {},  # type: ignore[arg-type]
+            BytesIO(json.dumps({"detail": "Device code already consumed"}).encode()),
+        )
+        with patch("initrunner.hub.urllib.request.urlopen", side_effect=error):
+            with pytest.raises(HubError, match="already consumed"):
+                poll_device_code("dc-abc")

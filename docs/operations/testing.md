@@ -158,7 +158,7 @@ Remember that YAML requires escaping backslashes in double-quoted strings (`"\\d
 ### `initrunner test`
 
 ```
-initrunner test <role.yaml> --suite <suite.yaml> [--dry-run] [-v]
+initrunner test <PATH> --suite <suite.yaml> [--dry-run] [-v]
 ```
 
 | Option | Short | Required | Description |
@@ -208,7 +208,7 @@ With `--verbose`, an additional **Details** column shows each assertion result:
 ### `initrunner run --dry-run`
 
 ```
-initrunner run <role.yaml> -p "prompt" --dry-run
+initrunner run <PATH> -p "prompt" --dry-run
 ```
 
 Runs the agent with a `TestModel` that always returns `"[dry-run] Simulated response."`. All other flags (`-i`, `--resume`, `--no-audit`, etc.) work as usual.

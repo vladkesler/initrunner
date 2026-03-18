@@ -77,6 +77,19 @@ Installed roles use flat namespaced filenames to prevent collisions between diff
 
 Two different authors can publish roles with the same `name`. The TUI and CLI display the human-friendly name and disambiguate when collisions exist (e.g. `code-reviewer (jcdenton)` vs `code-reviewer (adamjensen)`).
 
+## Authentication
+
+Publishing to InitHub requires authentication. Two login methods are available:
+
+```bash
+initrunner hub login                    # browser-based device code flow (default)
+initrunner hub login --token <TOKEN>    # for CI/headless environments
+```
+
+The default `hub login` generates a one-time device code, opens your browser to approve it, and stores the resulting token locally. Use `--token` to pass an API token directly in CI pipelines or headless servers.
+
+Publishing requires a token with `publish` scope. Tokens created via the device code flow are granted `publish,read` scopes by default.
+
 ## CLI Commands
 
 ### `install`

@@ -28,6 +28,11 @@ def _mock_command_context(role=None, agent=None):
     return _ctx
 
 
+def _passthrough_resolve(path):
+    """Identity resolve — used to skip path resolution in tests with fake paths."""
+    return path
+
+
 def _successful_run_result() -> RunResult:
     return RunResult(
         run_id="test-001",
@@ -63,7 +68,10 @@ class TestExportReportCLI:
 
         result_obj = _successful_run_result()
 
-        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+        with (
+            patch("initrunner.cli._helpers.resolve_role_path", _passthrough_resolve),
+            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+        ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
                 result = runner.invoke(
@@ -89,7 +97,10 @@ class TestExportReportCLI:
         report_file = tmp_path / "review.md"
         result_obj = _successful_run_result()
 
-        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+        with (
+            patch("initrunner.cli._helpers.resolve_role_path", _passthrough_resolve),
+            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+        ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
                 result = runner.invoke(
@@ -115,7 +126,10 @@ class TestExportReportCLI:
     def test_export_report_invalid_template(self, tmp_path: Path):
         """Unknown --report-template errors before execution."""
         report_file = tmp_path / "report.md"
-        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+        with (
+            patch("initrunner.cli._helpers.resolve_role_path", _passthrough_resolve),
+            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+        ):
             result = runner.invoke(
                 app,
                 [
@@ -135,7 +149,10 @@ class TestExportReportCLI:
 
     def test_report_template_without_report_errors(self):
         """--report-template without --report must error."""
-        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+        with (
+            patch("initrunner.cli._helpers.resolve_role_path", _passthrough_resolve),
+            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+        ):
             result = runner.invoke(
                 app,
                 [
@@ -156,7 +173,10 @@ class TestExportReportCLI:
         report_file = tmp_path / "report.md"
         result_obj = _failed_run_result()
 
-        with patch("initrunner.cli.run_cmd.command_context", _mock_command_context()):
+        with (
+            patch("initrunner.cli._helpers.resolve_role_path", _passthrough_resolve),
+            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+        ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
                 result = runner.invoke(

@@ -26,7 +26,7 @@ _DEFAULT_UI_HOST = "0.0.0.0" if _DOCKER else "127.0.0.1"
 
 
 def serve(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
     api_key: Annotated[str | None, typer.Option(help="API key for authentication")] = None,

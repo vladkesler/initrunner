@@ -7,7 +7,7 @@ from unittest.mock import patch
 import typer
 from typer.testing import CliRunner
 
-from initrunner.hub import HubError, HubPackageInfo, HubSearchResult
+from initrunner.hub import HubDeviceCodeExpired, HubError, HubPackageInfo, HubSearchResult
 
 # Build a minimal app that includes the hub sub-app for testing
 app = typer.Typer()
@@ -25,18 +25,119 @@ runner = CliRunner()
 
 
 class TestHubLogin:
-    def test_login_saves_token(self):
+    def test_login_token_flag_saves_token(self):
         with patch("initrunner.hub.save_hub_token") as mock_save:
-            result = runner.invoke(app, ["hub", "login"], input="my-secret-token\n")
+            result = runner.invoke(app, ["hub", "login", "--token", "my-secret-token"])
         assert result.exit_code == 0
         assert "Token saved" in result.output
         mock_save.assert_called_once_with("my-secret-token")
 
-    def test_login_strips_whitespace(self):
+    def test_login_token_flag_strips_whitespace(self):
         with patch("initrunner.hub.save_hub_token") as mock_save:
-            result = runner.invoke(app, ["hub", "login"], input="  token-with-spaces  \n")
+            result = runner.invoke(app, ["hub", "login", "--token", "  token-with-spaces  "])
         assert result.exit_code == 0
         mock_save.assert_called_once_with("token-with-spaces")
+
+
+# ---------------------------------------------------------------------------
+# hub login (device code flow)
+# ---------------------------------------------------------------------------
+
+_DEVICE_CODE_RESPONSE = {
+    "device_code": "dc-test-123",
+    "user_code": "ABCD-1234",
+    "verification_url": "https://hub.initrunner.ai/cli-auth?code=ABCD-1234",
+    "interval_seconds": 1,
+    "expires_at": "2099-12-31T23:59:59+00:00",
+}
+
+
+class TestHubLoginDeviceCode:
+    def test_immediate_complete(self):
+        complete = {"status": "complete", "token": "tok-abc", "username": "alice"}
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch("initrunner.hub.poll_device_code", return_value=complete),
+            patch("initrunner.hub.save_hub_token") as mock_save,
+            patch("time.sleep"),
+            patch("webbrowser.open"),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 0
+        assert "alice" in result.output
+        mock_save.assert_called_once_with("tok-abc")
+
+    def test_pending_then_complete(self):
+        pending = {"status": "pending"}
+        complete = {"status": "complete", "token": "tok-xyz", "username": "bob"}
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch("initrunner.hub.poll_device_code", side_effect=[pending, pending, complete]),
+            patch("initrunner.hub.save_hub_token") as mock_save,
+            patch("time.sleep"),
+            patch("webbrowser.open"),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 0
+        assert "bob" in result.output
+        mock_save.assert_called_once_with("tok-xyz")
+
+    def test_request_failure(self):
+        with (
+            patch("initrunner.hub.request_device_code", side_effect=HubError("Network error")),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 1
+        assert "Network error" in result.output
+
+    def test_expired(self):
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch("initrunner.hub.poll_device_code", side_effect=HubDeviceCodeExpired("expired")),
+            patch("time.sleep"),
+            patch("webbrowser.open"),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 1
+        assert "expired" in result.output.lower()
+
+    def test_invalid_consumed(self):
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch(
+                "initrunner.hub.poll_device_code",
+                side_effect=HubError("Device code error: Invalid device code"),
+            ),
+            patch("time.sleep"),
+            patch("webbrowser.open"),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 1
+        assert "Invalid device code" in result.output
+
+    def test_browser_open_fails_url_still_printed(self):
+        complete = {"status": "complete", "token": "tok-abc", "username": "alice"}
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch("initrunner.hub.poll_device_code", return_value=complete),
+            patch("initrunner.hub.save_hub_token"),
+            patch("time.sleep"),
+            patch("webbrowser.open", side_effect=OSError("no browser")),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 0
+        assert "cli-auth" in result.output
+
+    def test_keyboard_interrupt(self):
+        with (
+            patch("initrunner.hub.request_device_code", return_value=_DEVICE_CODE_RESPONSE),
+            patch("initrunner.hub.poll_device_code", side_effect=KeyboardInterrupt),
+            patch("time.sleep"),
+            patch("webbrowser.open"),
+        ):
+            result = runner.invoke(app, ["hub", "login"])
+        assert result.exit_code == 0
+        assert "cancelled" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +321,7 @@ class TestHubPublish:
         with patch("initrunner.hub.load_hub_token", return_value="token"):
             result = runner.invoke(app, ["hub", "publish", str(tmp_path / "nonexistent.yaml")])
         assert result.exit_code == 1
-        assert "File not found" in result.output
+        assert "not found" in result.output.lower()
 
     def test_publish_bundle_error(self, tmp_path):
         role_file = tmp_path / "role.yaml"

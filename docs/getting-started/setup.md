@@ -215,7 +215,7 @@ This file is loaded by `initrunner chat` to pre-configure the ephemeral chat ses
 
 ### Generated Role
 
-The generated `role.yaml` (or custom `--output` path) is a standard InitRunner role definition. See `initrunner validate <role.yaml>` to check it, or edit it directly to add tools, triggers, or ingestion config.
+The generated `role.yaml` (or custom `--output` path) is a standard InitRunner role definition. See `initrunner validate <path>` to check it, or edit it directly to add tools, triggers, or ingestion config.
 
 ## Troubleshooting
 

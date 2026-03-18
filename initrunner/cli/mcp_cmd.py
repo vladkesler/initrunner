@@ -16,7 +16,7 @@ app = typer.Typer(help="MCP server introspection, gateway, and toolkit.")
 
 @app.command("list-tools")
 def list_tools(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     index: Annotated[
         int | None,
         typer.Option("--index", "-i", help="Target a specific MCP tool entry (0-based)"),
@@ -25,7 +25,10 @@ def list_tools(
     """List tools available from MCP servers configured in a role."""
     from rich.table import Table
 
+    from initrunner.cli._helpers import resolve_role_path
     from initrunner.services.operations import list_mcp_tools_sync
+
+    role_file = resolve_role_path(role_file)
 
     try:
         results = list_mcp_tools_sync(role_file, index=index)
@@ -54,7 +57,8 @@ _VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
 @app.command("serve")
 def mcp_serve(
     role_files: Annotated[
-        list[Path], typer.Argument(help="Role YAML files to expose as MCP tools")
+        list[Path],
+        typer.Argument(help="Agent directories or role YAML files to expose as MCP tools"),
     ],
     transport: Annotated[
         str, typer.Option("--transport", "-t", help="Transport: stdio, sse, streamable-http")
@@ -70,7 +74,7 @@ def mcp_serve(
     skill_dir: SkillDirOption = None,
 ) -> None:
     """Expose InitRunner agents as an MCP server."""
-    from initrunner.cli._helpers import create_audit_logger, resolve_skill_dirs
+    from initrunner.cli._helpers import create_audit_logger, resolve_role_paths, resolve_skill_dirs
     from initrunner.mcp.gateway import build_mcp_gateway, run_mcp_gateway
 
     # All output goes to stderr to keep stdout clean for stdio transport
@@ -82,11 +86,8 @@ def mcp_serve(
         err_console.print(f"Expected one of: {', '.join(sorted(_VALID_TRANSPORTS))}")
         raise typer.Exit(1)
 
-    # Validate role files exist
-    for rf in role_files:
-        if not rf.exists():
-            err_console.print(f"[red]Error:[/red] Role file not found: {rf}")
-            raise typer.Exit(1)
+    # Resolve directories to role files
+    role_files = resolve_role_paths(role_files)
 
     audit_logger = create_audit_logger(audit_db, no_audit)
     extra_skill_dirs = resolve_skill_dirs(skill_dir)

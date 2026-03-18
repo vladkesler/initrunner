@@ -13,14 +13,99 @@ app = typer.Typer(name="hub", help="InitHub marketplace commands.")
 
 
 @app.command()
-def login() -> None:
-    """Log in to InitHub with an API token."""
-    from initrunner.hub import save_hub_token
+def login(
+    token: Annotated[
+        str | None, typer.Option("--token", help="API token (for CI/headless)")
+    ] = None,
+) -> None:
+    """Log in to InitHub. Opens browser for authorization by default."""
+    import time
+    import webbrowser
+    from datetime import UTC, datetime
 
-    console.print("Create a token at [cyan]https://hub.initrunner.ai/settings[/cyan]")
-    token = typer.prompt("Paste your InitHub API token", hide_input=True)
-    save_hub_token(token.strip())
-    console.print("[green]Token saved.[/green]")
+    from initrunner.hub import (
+        HubDeviceCodeExpired,
+        HubError,
+        poll_device_code,
+        request_device_code,
+        save_hub_token,
+    )
+
+    if token is not None:
+        save_hub_token(token.strip())
+        console.print("[green]Token saved.[/green]")
+        return
+
+    # Device code flow
+    try:
+        dc = request_device_code()
+    except HubError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    user_code = dc["user_code"]
+    device_code = dc["device_code"]
+    verification_url = dc["verification_url"]
+    interval = dc.get("interval_seconds", 5)
+    expires_at_str = dc["expires_at"]
+
+    console.print()
+    console.print(f"  Your code: [bold cyan]{user_code}[/bold cyan]")
+    console.print()
+    console.print(f"  Open: [cyan]{verification_url}[/cyan]")
+    console.print()
+
+    try:
+        webbrowser.open(verification_url)
+    except Exception:
+        pass
+
+    consecutive_errors = 0
+
+    try:
+        with console.status("Waiting for browser authorization..."):
+            while True:
+                time.sleep(interval)
+
+                # Local expiry check
+                try:
+                    expires_at = datetime.fromisoformat(expires_at_str)
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=UTC)
+                    if datetime.now(UTC) >= expires_at:
+                        console.print("[red]Device code expired.[/red] Please try again.")
+                        raise typer.Exit(1)
+                except (ValueError, TypeError):
+                    pass
+
+                try:
+                    result = poll_device_code(device_code)
+                    consecutive_errors = 0
+                except HubDeviceCodeExpired:
+                    console.print("[red]Device code expired.[/red] Please try again.")
+                    raise typer.Exit(1) from None
+                except HubError as e:
+                    if "invalid" in str(e).lower() or "consumed" in str(e).lower():
+                        console.print(f"[red]Error:[/red] {e}")
+                        raise typer.Exit(1) from None
+                    # Transient network error
+                    consecutive_errors += 1
+                    if consecutive_errors >= 3:
+                        console.print("[red]Too many network errors. Please try again.[/red]")
+                        raise typer.Exit(1) from None
+                    continue
+
+                if result["status"] == "pending":
+                    continue
+
+                if result["status"] == "complete":
+                    save_hub_token(result["token"])
+                    username = result["username"]
+                    console.print(f"[green]Logged in as[/green] [cyan]{username}[/cyan]")
+                    return
+    except KeyboardInterrupt:
+        console.print("\nLogin cancelled.")
+        raise typer.Exit(0) from None
 
 
 @app.command()
@@ -57,22 +142,23 @@ def whoami() -> None:
 
 @app.command()
 def publish(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml file")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")] = Path(
+        "."
+    ),
     readme: Annotated[Path | None, typer.Option("--readme", help="README file")] = None,
     repo_url: Annotated[str | None, typer.Option("--repo-url", help="Repository URL")] = None,
     category: Annotated[list[str] | None, typer.Option("--category", "-c", help="Category")] = None,
 ) -> None:
     """Publish a role to InitHub."""
+    from initrunner.cli._helpers import resolve_role_path
     from initrunner.hub import HubError, hub_publish, load_hub_token
     from initrunner.packaging.bundle import create_bundle
+
+    role_file = resolve_role_path(role_file)
 
     token = load_hub_token()
     if not token:
         console.print("Not logged in. Run [bold]initrunner hub login[/bold] first.")
-        raise typer.Exit(1)
-
-    if not role_file.exists():
-        console.print(f"[red]Error:[/red] File not found: {role_file}")
         raise typer.Exit(1)
 
     # Create bundle

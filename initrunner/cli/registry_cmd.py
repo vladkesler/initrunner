@@ -272,17 +272,22 @@ def update(
 
 
 def publish(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml file")],
-    ref: Annotated[str, typer.Argument(help="OCI reference (oci://registry/repo)")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")] = Path(
+        "."
+    ),
+    ref: Annotated[str, typer.Argument(help="OCI reference (oci://registry/repo)")] = "",
     tag: Annotated[str, typer.Option("--tag", "-t", help="Tag for the artifact")] = "latest",
 ) -> None:
     """Publish a role bundle to an OCI registry."""
+    from initrunner.cli._helpers import resolve_role_path
     from initrunner.packaging.oci import OCIError
     from initrunner.services.packaging import publish_role
 
-    if not role_file.exists():
-        console.print(f"[red]Error:[/red] File not found: {role_file}")
+    if not ref:
+        console.print("[red]Error:[/red] OCI reference argument is required.")
         raise typer.Exit(1)
+
+    role_file = resolve_role_path(role_file)
 
     try:
         digest = publish_role(role_file, ref, tag=tag)

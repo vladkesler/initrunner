@@ -187,7 +187,7 @@ The output schema:
 ## CLI Reference
 
 ```bash
-initrunner test <role.yaml> -s <suite.yaml> [OPTIONS]
+initrunner test <PATH> -s <suite.yaml> [OPTIONS]
 ```
 
 | Flag | Description |

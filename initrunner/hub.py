@@ -48,6 +48,10 @@ class HubAuthError(HubError):
     """Authentication failed."""
 
 
+class HubDeviceCodeExpired(HubError):
+    """Device code has expired."""
+
+
 def save_hub_token(token: str) -> None:
     """Save InitHub API token to disk."""
     from initrunner._paths import ensure_private_dir
@@ -251,6 +255,52 @@ def hub_publish(
         data=body,
         content_type=f"multipart/form-data; boundary={boundary}",
     )
+
+
+def request_device_code() -> dict:
+    """Request a new device code for CLI login.
+
+    Returns dict with device_code, user_code, verification_url, interval_seconds, expires_at.
+    """
+    url = f"{INITHUB_API_URL}/auth/device-code"
+    req = urllib.request.Request(url, method="POST", data=b"")
+    req.add_header("User-Agent", "initrunner-hub-client")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.URLError as e:
+        raise HubError("Could not reach InitHub. Check your connection.") from e
+
+
+def poll_device_code(device_code: str) -> dict:
+    """Poll device code status.
+
+    Returns dict with status ("pending" or "complete") and on complete: token, username.
+    Raises HubDeviceCodeExpired for expired codes, HubError for invalid/consumed.
+    """
+    url = f"{INITHUB_API_URL}/auth/device-code/poll"
+    body = json.dumps({"device_code": device_code}).encode()
+    req = urllib.request.Request(url, method="POST", data=body)
+    req.add_header("User-Agent", "initrunner-hub-client")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        resp_body = e.read().decode("utf-8", errors="replace")
+        detail = ""
+        try:
+            detail = json.loads(resp_body).get("detail", "")
+        except (json.JSONDecodeError, AttributeError):
+            detail = resp_body
+        if "expired" in detail.lower():
+            raise HubDeviceCodeExpired("Device code has expired. Please try again.") from e
+        raise HubError(f"Device code error: {detail}") from e
+    except urllib.error.URLError as e:
+        raise HubError("Could not reach InitHub. Check your connection.") from e
 
 
 # Hub reference parsing

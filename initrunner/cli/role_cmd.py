@@ -13,7 +13,7 @@ from initrunner.cli._options import SkillDirOption
 
 
 def validate(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     skill_dir: SkillDirOption = None,
 ) -> None:
     """Validate a role definition file."""

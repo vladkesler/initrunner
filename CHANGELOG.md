@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.29.0] - 2026-03-18
+
+### Added
+- **`hub login` device code flow** -- `initrunner hub login` opens the browser for one-time device code authorization; `--token` flag for CI/headless environments. Replaces manual token paste.
+- **CLI path resolution** -- all commands that accept a role file now also accept a directory. Resolves `<dir>/role.yaml` or scans for a single `apiVersion: initrunner/v1` YAML file. Enables `initrunner run .` and `initrunner hub publish` from an agent directory.
+- **`hub publish` from directory** -- defaults to current directory; accepts directory or file path
+- `resolve_role_path()` and `resolve_role_paths()` helpers in `cli/_helpers.py`
+- 27 new tests for path resolution, device code flow, and hub CLI commands
+
+### Changed
+- All CLI help text updated from "Path to role.yaml" to "Agent directory or role YAML file"
+- `hub publish` argument changed from required file to optional path (default `.`)
+- CLI reference docs updated: `<role.yaml>` -> `<PATH>`, new hub command and path resolution sections
+- Registry docs enhanced with authentication section (device code flow, `--token`)
+
 ## [1.28.0] - 2026-03-17
 
 ### Added

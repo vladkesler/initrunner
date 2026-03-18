@@ -20,6 +20,71 @@ if TYPE_CHECKING:
 
 console = Console()
 
+_INITRUNNER_API_VERSIONS = {"initrunner/v1"}
+_INITRUNNER_KINDS = {"Agent", "Team"}
+
+
+def resolve_role_path(path: Path) -> Path:
+    """Resolve a directory to its role YAML file.
+
+    When *path* is a file, return it unchanged.  When it is a directory:
+    1. If ``<dir>/role.yaml`` exists, use it.
+    2. Otherwise scan top-level ``*.yaml`` / ``*.yml`` for files whose
+       ``apiVersion`` is in ``initrunner/v1`` and ``kind`` is Agent or Team.
+    3. Exactly one match → use it.
+    4. Zero → exit with error.
+    5. Multiple → exit with error listing the names.
+    """
+    if path.is_file():
+        return path
+
+    if not path.is_dir():
+        console.print(f"[red]Error:[/red] Path not found: {path}")
+        raise typer.Exit(1)
+
+    # 1. Convention: role.yaml
+    default = path / "role.yaml"
+    if default.is_file():
+        return default
+
+    # 2. Scan top-level YAML files
+    import yaml
+
+    candidates: list[Path] = []
+    for ext in ("*.yaml", "*.yml"):
+        for f in path.glob(ext):
+            if not f.is_file():
+                continue
+            try:
+                with open(f) as fh:
+                    data = yaml.safe_load(fh)
+                if (
+                    isinstance(data, dict)
+                    and data.get("apiVersion") in _INITRUNNER_API_VERSIONS
+                    and data.get("kind") in _INITRUNNER_KINDS
+                ):
+                    candidates.append(f)
+            except Exception:
+                continue
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if len(candidates) == 0:
+        console.print(f"[red]Error:[/red] No role YAML found in {path}")
+        raise typer.Exit(1)
+
+    names = ", ".join(sorted(c.name for c in candidates))
+    console.print(
+        f"[red]Error:[/red] Multiple role YAML files found in {path}: {names}; pass one explicitly"
+    )
+    raise typer.Exit(1)
+
+
+def resolve_role_paths(paths: list[Path]) -> list[Path]:
+    """Resolve a list of paths, applying :func:`resolve_role_path` to each."""
+    return [resolve_role_path(p) for p in paths]
+
 
 def display_sense_result(result: SelectionResult) -> None:
     """Render the intent-sensed role in a Rich panel."""
@@ -161,6 +226,7 @@ def detect_yaml_kind(path: Path) -> str:
 
 
 def load_role_or_exit(role_file: Path) -> RoleDefinition:
+    role_file = resolve_role_path(role_file)
     from initrunner.agent.loader import RoleLoadError
     from initrunner.services.discovery import load_role_sync
 
@@ -186,6 +252,7 @@ def load_and_build_or_exit(
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
+    role_file = resolve_role_path(role_file)
     from initrunner.agent.loader import RoleLoadError, load_and_build
 
     try:
@@ -307,6 +374,7 @@ def command_context(
 
     Yields (role, agent, audit_logger, memory_store, sink_dispatcher).
     """
+    role_file = resolve_role_path(role_file)
     from initrunner.stores.factory import managed_memory_store
 
     role, agent = load_and_build_or_exit(

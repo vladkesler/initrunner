@@ -16,13 +16,20 @@ def doctor(
     quickstart: Annotated[
         bool, typer.Option("--quickstart", help="Run a smoke prompt to verify end-to-end")
     ] = False,
-    role_file: Annotated[Path | None, typer.Option("--role", help="Role file to test")] = None,
+    role_file: Annotated[
+        Path | None, typer.Option("--role", help="Agent directory or role YAML file to test")
+    ] = None,
 ) -> None:
     """Check provider configuration, API keys, and connectivity."""
     import os
 
     from initrunner._compat import require_provider
     from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
+
+    if role_file is not None:
+        from initrunner.cli._helpers import resolve_role_path
+
+        role_file = resolve_role_path(role_file)
 
     # Load .env so that .env-only setups are detected
     if role_file is not None:

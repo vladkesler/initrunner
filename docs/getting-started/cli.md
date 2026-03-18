@@ -1,18 +1,28 @@
 # CLI Reference
 
+## Path resolution
+
+All commands that accept a role path also accept a **directory**. When given a directory, the CLI resolves it to a role YAML file:
+
+1. If `<dir>/role.yaml` exists, use it.
+2. Otherwise scan top-level `*.yaml`/`*.yml` for files with `apiVersion: initrunner/v1` and `kind: Agent` or `Team`.
+3. Exactly one match is used; zero or multiple matches produce an error.
+
+This means `initrunner run .` and `initrunner hub publish` (defaults to `.`) work from inside an agent directory.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `initrunner chat [role.yaml]` | Start an ephemeral chat REPL or launch a bot |
-| `initrunner run <role.yaml>` | Run an agent (single-shot or interactive) |
-| `initrunner validate <role.yaml>` | Validate a role definition |
+| `initrunner chat [PATH]` | Start an ephemeral chat REPL or launch a bot |
+| `initrunner run <PATH>` | Run an agent (single-shot or interactive) |
+| `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
-| `initrunner ingest <role.yaml>` | Ingest documents into vector store |
-| `initrunner daemon <role.yaml>` | Run in trigger-driven daemon mode |
-| `initrunner serve <role.yaml>` | Serve agent as an OpenAI-compatible API |
-| `initrunner test <role.yaml> -s <suite>` | Run a test suite against an agent |
+| `initrunner ingest <PATH>` | Ingest documents into vector store |
+| `initrunner daemon <PATH>` | Run in trigger-driven daemon mode |
+| `initrunner serve <PATH>` | Serve agent as an OpenAI-compatible API |
+| `initrunner test <PATH> -s <suite>` | Run a test suite against an agent |
 | `initrunner pipeline <pipeline.yaml>` | Run a pipeline of agents |
 | `initrunner tui` | Launch TUI dashboard |
 | `initrunner ui` | Launch web dashboard (requires `[dashboard]` extra) |
@@ -26,11 +36,11 @@
 | `initrunner plugins` | List discovered tool plugins |
 | `initrunner audit prune` | Prune old audit records |
 | `initrunner audit export` | Export audit records as JSON or CSV |
-| `initrunner memory clear <role.yaml>` | Clear agent memory store |
-| `initrunner memory export <role.yaml>` | Export memories to JSON |
-| `initrunner memory import <role.yaml> <file>` | Import memories from JSON |
-| `initrunner memory list <role.yaml>` | List stored memories |
-| `initrunner memory consolidate <role.yaml>` | Run memory consolidation manually |
+| `initrunner memory clear <PATH>` | Clear agent memory store |
+| `initrunner memory export <PATH>` | Export memories to JSON |
+| `initrunner memory import <PATH> <file>` | Import memories from JSON |
+| `initrunner memory list <PATH>` | List stored memories |
+| `initrunner memory consolidate <PATH>` | Run memory consolidation manually |
 | `initrunner skill new [name]` | Scaffold a new skill directory |
 | `initrunner skill validate <path>` | Validate a skill definition |
 | `initrunner skill list` | List available skills |
@@ -44,13 +54,21 @@
 | `initrunner compose status <name>` | Show systemd service status |
 | `initrunner compose logs <name>` | Show journald logs |
 | `initrunner compose events` | Query delegate routing events |
-| `initrunner mcp list-tools <role.yaml>` | List tools from MCP servers in a role |
-| `initrunner mcp serve <role.yaml>...` | Expose agents as an MCP server |
+| `initrunner mcp list-tools <PATH>` | List tools from MCP servers in a role |
+| `initrunner mcp serve <PATH>...` | Expose agents as an MCP server |
+| `initrunner hub login` | Authenticate with InitHub (browser-based device code flow) |
+| `initrunner hub logout` | Remove stored InitHub credentials |
+| `initrunner hub whoami` | Show current InitHub user |
+| `initrunner hub search <QUERY>` | Search InitHub for agent packs |
+| `initrunner hub publish [PATH]` | Publish an agent pack to InitHub |
+| `initrunner hub info <PACKAGE>` | Show InitHub package details |
 | `initrunner --version` | Print version |
+
+> **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`) or a directory containing one. See [Path resolution](#path-resolution).
 
 ## Chat options
 
-Synopsis: `initrunner chat [role.yaml] [OPTIONS]`
+Synopsis: `initrunner chat [PATH] [OPTIONS]`
 
 Start an ephemeral chat REPL, load a role for interactive use, or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide.
 
@@ -76,9 +94,9 @@ Running `initrunner` with no subcommand in a TTY starts chat automatically (or s
 
 ## Run options
 
-Synopsis: `initrunner run [role.yaml] [OPTIONS]`
+Synopsis: `initrunner run [PATH] [OPTIONS]`
 
-The `role.yaml` argument is optional when `--sense` is used.
+The path argument is optional when `--sense` is used.
 
 | Flag | Description |
 |------|-------------|
@@ -94,7 +112,7 @@ The `role.yaml` argument is optional when `--sense` is used.
 | `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
 | `--report PATH` | Export a markdown report to PATH after the run. See [Report Export](../core/reports.md). |
 | `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
-| `--sense` | Sense the best role for the given prompt (replaces `role.yaml` argument). |
+| `--sense` | Sense the best role for the given prompt (replaces the path argument). |
 | `--role-dir PATH` | Directory to search for roles when using `--sense`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
 | `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
@@ -201,7 +219,7 @@ See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-
 
 ## MCP serve options
 
-Synopsis: `initrunner mcp serve ROLE_FILES... [OPTIONS]`
+Synopsis: `initrunner mcp serve PATHS... [OPTIONS]`
 
 | Flag | Description |
 |------|-------------|
@@ -234,9 +252,67 @@ See [MCP Gateway](../interfaces/mcp-gateway.md) for transport details, client co
 | Flag | Description |
 |------|-------------|
 | `--quickstart` | Run a smoke prompt to verify end-to-end connectivity |
-| `--role PATH` | Role file to test (loads its `.env` and uses it for `--quickstart`) |
+| `--role PATH` | Agent directory or role file to test (loads its `.env` and uses it for `--quickstart`) |
 
 See [Doctor](../operations/doctor.md) for details.
+
+## Hub options
+
+Synopsis: `initrunner hub <command> [OPTIONS]`
+
+Manage agent packs on [InitHub](https://hub.initrunner.ai).
+
+### `hub login`
+
+```bash
+initrunner hub login              # opens browser for device code authorization
+initrunner hub login --token TEXT  # pass a token directly (CI/headless environments)
+```
+
+| Flag | Description |
+|------|-------------|
+| `--token TEXT` | API token with `publish` scope. Skips browser-based device code flow. Use in CI or headless environments. |
+
+Without `--token`, the CLI generates a one-time device code, opens the browser to approve it, and polls until authorization completes. The resulting token is stored locally for future commands.
+
+### `hub publish`
+
+```bash
+initrunner hub publish                                # publish from current directory
+initrunner hub publish ./my-agent/                    # publish from a path
+initrunner hub publish role.yaml --readme README.md   # attach a README
+```
+
+| Flag | Description |
+|------|-------------|
+| `PATH` | Role file or directory to publish (default: `.`) |
+| `--readme PATH` | README file to include with the package |
+| `--repo-url TEXT` | Repository URL for the package listing |
+| `--category TEXT` | Category slug (repeatable) |
+
+Requires authentication (`hub login`) with a token that has `publish` scope.
+
+### `hub search`
+
+```bash
+initrunner hub search "code review"
+initrunner hub search python --tag automation
+```
+
+| Flag | Description |
+|------|-------------|
+| `QUERY` | Search query (matches name, description, tags) |
+| `--tag TEXT` | Filter by tag (repeatable) |
+
+### `hub info`
+
+```bash
+initrunner hub info owner/package-name
+```
+
+| Flag | Description |
+|------|-------------|
+| `PACKAGE` | Package identifier (`owner/name`) |
 
 ## Environment variables
 

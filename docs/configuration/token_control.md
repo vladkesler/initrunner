@@ -105,7 +105,7 @@ guardrails:
 
 ## Session Token Budget
 
-The `session_token_budget` tracks cumulative token usage across all turns in an interactive REPL session (`initrunner run <role.yaml> -i`). This is useful for capping how much a single interactive session can spend.
+The `session_token_budget` tracks cumulative token usage across all turns in an interactive REPL session (`initrunner run <path> -i`). This is useful for capping how much a single interactive session can spend.
 
 ```yaml
 guardrails:
@@ -132,7 +132,7 @@ In the TUI run screen, the session budget is displayed in the status bar with co
 
 ## Daemon Token Budgets
 
-Daemon mode (`initrunner daemon <role.yaml>`) supports two independent budget controls that work together. Both are tracked in-memory by a thread-safe `DaemonTokenTracker`.
+Daemon mode (`initrunner daemon <path>`) supports two independent budget controls that work together. Both are tracked in-memory by a thread-safe `DaemonTokenTracker`.
 
 ### Lifetime Budget (`daemon_token_budget`)
 

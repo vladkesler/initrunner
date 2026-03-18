@@ -15,7 +15,7 @@ app = typer.Typer(help="Manage agent memory.")
 
 @app.command("clear")
 def memory_clear(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     what: Annotated[
         str,
         typer.Option("--what", help="What to clear: sessions, memories, or all"),
@@ -74,7 +74,7 @@ def memory_clear(
 
 @app.command("export")
 def memory_export(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     output: Annotated[Path, typer.Option("-o", "--output", help="Output JSON file")] = Path(
         "memories.json"
     ),
@@ -99,7 +99,7 @@ def memory_export(
 
 @app.command("list")
 def memory_list(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     memory_type: Annotated[
         str | None,
         typer.Option("--type", help="Filter by memory type (episodic, semantic, procedural)"),
@@ -146,13 +146,15 @@ def memory_list(
 
 @app.command("import")
 def memory_import(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     input_file: Annotated[Path, typer.Argument(help="JSON file to import")],
 ) -> None:
     """Import memories from a JSON file (re-embeds content using the role's embedding config)."""
     from initrunner.agent.loader import _load_dotenv
+    from initrunner.cli._helpers import resolve_role_path
     from initrunner.services.memory import import_memories_sync
 
+    role_file = resolve_role_path(role_file)
     role = load_role_or_exit(role_file)
 
     if role.spec.memory is None:
@@ -188,7 +190,7 @@ def memory_import(
 
 @app.command("consolidate")
 def memory_consolidate(
-    role_file: Annotated[Path, typer.Argument(help="Path to role.yaml")],
+    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
 ) -> None:
     """Manually run memory consolidation (extract semantic facts from episodes)."""
     role = load_role_or_exit(role_file)

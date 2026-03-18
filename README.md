@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3095+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.28.0-%2334D058" alt="v1.28.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3123+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.29.0-%2334D058" alt="v1.29.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -18,14 +18,14 @@
 </p>
 
 <p align="center">
-  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
+  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
 **Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 40+ tools, policy-based authorization. Any model.**
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.28.0** -- `initrunner new` conversational agent builder and InitHub marketplace. See the [Changelog](CHANGELOG.md).
+> **v1.29.0** -- Hub device code auth, CLI path resolution (`initrunner run .`), and directory-based publishing. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -244,12 +244,27 @@ initrunner install user/repo:roles/agent.yaml@v1.0       # install from any GitH
 
 See [Registry](docs/agents/registry.md).
 
+> ### InitHub -- Discover and share AI agent packs for InitRunner
+>
+> Browse the marketplace or publish your own at [hub.initrunner.ai](https://hub.initrunner.ai).
+
+```bash
+initrunner hub login                    # browser-based device code auth (opens browser)
+initrunner hub login --token <TOKEN>    # CI/headless
+initrunner hub publish                  # publish from current agent directory
+initrunner hub search "code review"
+initrunner install hub:owner/package-name
+```
+
+See [Publishing Guide](https://hub.initrunner.ai/docs/publish).
+
 ### OCI registry
 
 Publish and install complete role bundles to any OCI-compliant container registry:
 
 ```bash
-initrunner publish role.yaml oci://ghcr.io/org/my-agent --tag 1.0.0
+initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0       # from current dir
+initrunner publish ./my-agent/ oci://ghcr.io/org/my-agent --tag 1.0.0  # or pass a path
 initrunner install oci://ghcr.io/org/my-agent:1.0.0
 ```
 
@@ -299,4 +314,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.28.0</sub></p>
+<p align="center"><sub>v1.29.0</sub></p>

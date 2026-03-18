@@ -141,11 +141,11 @@ Bot mode builds an ephemeral role in memory with:
 
 ## CLI Options
 
-Synopsis: `initrunner chat [role.yaml] [OPTIONS]`
+Synopsis: `initrunner chat [PATH] [OPTIONS]`
 
 | Flag | Description |
 |------|-------------|
-| `role_file` | Path to `role.yaml` (positional, optional). Omit for auto-detect mode. |
+| `PATH` | Agent directory or role YAML file (positional, optional). Omit for auto-detect mode. |
 | `--provider TEXT` | Model provider — overrides auto-detection. |
 | `--model TEXT` | Model name — overrides auto-detection. |
 | `-p, --prompt TEXT` | Send a prompt then enter REPL (or launch bot with this context). |
