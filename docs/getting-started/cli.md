@@ -8,7 +8,7 @@ All commands that accept a role path also accept a **directory**. When given a d
 2. Otherwise scan top-level `*.yaml`/`*.yml` for files with `apiVersion: initrunner/v1` and `kind: Agent` or `Team`.
 3. Exactly one match is used; zero or multiple matches produce an error.
 
-This means `initrunner run .` and `initrunner hub publish` (defaults to `.`) work from inside an agent directory.
+This means `initrunner run .` and `initrunner publish` (defaults to `.`) work from inside an agent directory.
 
 ## Commands
 
@@ -26,9 +26,9 @@ This means `initrunner run .` and `initrunner hub publish` (defaults to `.`) wor
 | `initrunner pipeline <pipeline.yaml>` | Run a pipeline of agents |
 | `initrunner tui` | Launch TUI dashboard |
 | `initrunner ui` | Launch web dashboard (requires `[dashboard]` extra) |
-| `initrunner install <source>` | Install a role from GitHub or community index |
+| `initrunner install <source>` | Install a role from InitHub or OCI registry |
 | `initrunner uninstall <name>` | Remove an installed role |
-| `initrunner search <query>` | Search the community role index |
+| `initrunner search <query>` | Search InitHub for agent packs |
 | `initrunner info <source>` | Inspect a role's metadata without installing |
 | `initrunner list` | List installed roles |
 | `initrunner update [name]` | Update installed role(s) to latest version |
@@ -56,12 +56,16 @@ This means `initrunner run .` and `initrunner hub publish` (defaults to `.`) wor
 | `initrunner compose events` | Query delegate routing events |
 | `initrunner mcp list-tools <PATH>` | List tools from MCP servers in a role |
 | `initrunner mcp serve <PATH>...` | Expose agents as an MCP server |
-| `initrunner hub login` | Authenticate with InitHub (browser-based device code flow) |
-| `initrunner hub logout` | Remove stored InitHub credentials |
-| `initrunner hub whoami` | Show current InitHub user |
-| `initrunner hub search <QUERY>` | Search InitHub for agent packs |
-| `initrunner hub publish [PATH]` | Publish an agent pack to InitHub |
-| `initrunner hub info <PACKAGE>` | Show InitHub package details |
+| `initrunner login` | Log in to InitHub (browser auth) or OCI registry |
+| `initrunner logout` | Remove stored InitHub credentials |
+| `initrunner whoami` | Show current InitHub user |
+| `initrunner publish [PATH]` | Publish to InitHub (default) or OCI registry |
+| `initrunner hub login` | (deprecated) Authenticate with InitHub |
+| `initrunner hub logout` | (deprecated) Remove stored InitHub credentials |
+| `initrunner hub whoami` | (deprecated) Show current InitHub user |
+| `initrunner hub search <QUERY>` | (deprecated) Search InitHub for agent packs |
+| `initrunner hub publish [PATH]` | (deprecated) Publish an agent pack to InitHub |
+| `initrunner hub info <PACKAGE>` | (deprecated) Show InitHub package details |
 | `initrunner --version` | Print version |
 
 > **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`) or a directory containing one. See [Path resolution](#path-resolution).

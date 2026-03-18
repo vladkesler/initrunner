@@ -2,36 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import re
 import shutil
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from initrunner.agent.schema.role import RoleDefinition
+from typing import Any
 
 from initrunner._paths import ensure_private_dir
 from initrunner.config import get_roles_dir
 
 ROLES_DIR = get_roles_dir()
 MANIFEST_PATH = ROLES_DIR / "registry.json"
-INDEX_URL = "https://raw.githubusercontent.com/vladkesler/community-roles/main/index.yaml"
-
-# Only allow downloads from GitHub raw content
-_ALLOWED_HOST = "raw.githubusercontent.com"
-
-_SOURCE_RE = re.compile(
-    r"^(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+)"
-    r"(?::(?P<path>[^@]+))?"
-    r"(?:@(?P<ref>.+))?$"
-)
 
 
 class RegistryError(Exception):
@@ -56,28 +38,6 @@ class NetworkError(RegistryError):
 
 
 @dataclass
-class ResolvedSource:
-    owner: str
-    repo: str
-    path: str
-    ref: str
-    raw_url: str
-
-    @property
-    def full_repo(self) -> str:
-        return f"{self.owner}/{self.repo}"
-
-
-@dataclass
-class IndexEntry:
-    name: str
-    description: str
-    author: str
-    source: str
-    tags: list[str] = field(default_factory=list)
-
-
-@dataclass
 class InstalledRole:
     name: str
     source: str
@@ -85,22 +45,10 @@ class InstalledRole:
     ref: str
     local_path: Path
     installed_at: str
-    source_type: str = "github"
+    source_type: str = "hub"
     oci_ref: str = ""
     oci_digest: str = ""
-
-
-@dataclass
-class RoleInfo:
-    name: str
-    description: str
-    author: str
-    tools: list[str]
-    model: str
-    provider: str
-    has_triggers: bool
-    has_ingestion: bool
-    has_memory: bool
+    hub_version: str = ""
 
 
 @dataclass
@@ -121,55 +69,11 @@ class InstallPreview:
     author: str
     version: str
     source_label: str
-    source_type: str  # "github", "oci", "hub"
+    source_type: str  # "oci" or "hub"
     downloads: int = 0
     tools: list[str] = field(default_factory=list)
     model: str = ""
     warnings: list[str] = field(default_factory=list)
-
-
-# ---------------------------------------------------------------------------
-# Source identifier parsing
-# ---------------------------------------------------------------------------
-
-
-def resolve_source(identifier: str) -> ResolvedSource:
-    """Resolve a source identifier to a structured format.
-
-    Formats:
-        user/repo                     → role.yaml in root, ref=main
-        user/repo:path/to/role.yaml   → specific file, ref=main
-        user/repo@v1.0                → role.yaml in root, pinned ref
-        user/repo:path/role.yaml@v1.0 → specific file, pinned ref
-        bare-name                     → lookup in community index
-    """
-    if "/" not in identifier:
-        # Bare name — resolve via community index
-        return _resolve_from_index(identifier)
-
-    m = _SOURCE_RE.match(identifier)
-    if m is None:
-        raise RegistryError(f"Invalid source format: '{identifier}'")
-
-    owner = m.group("owner")
-    repo = m.group("repo")
-    path = m.group("path") or "role.yaml"
-    ref = m.group("ref") or "main"
-
-    raw_url = f"https://{_ALLOWED_HOST}/{owner}/{repo}/{ref}/{path}"
-    return ResolvedSource(owner=owner, repo=repo, path=path, ref=ref, raw_url=raw_url)
-
-
-def _resolve_from_index(name: str) -> ResolvedSource:
-    """Look up a bare role name in the community index."""
-    entries = _fetch_index()
-    for entry in entries:
-        if entry.name == name:
-            return resolve_source(entry.source)
-    raise RoleNotFoundError(
-        f"Role '{name}' not found in community index. "
-        "Install directly with: initrunner install user/repo"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -230,183 +134,32 @@ def save_manifest(data: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
-# GitHub download + SHA fetch
-# ---------------------------------------------------------------------------
-
-
-def _build_request(url: str) -> urllib.request.Request:
-    """Build a urllib Request with optional GitHub token."""
-    req = urllib.request.Request(url)
-    req.add_header("User-Agent", "initrunner-registry")
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        req.add_header("Authorization", f"token {token}")
-    return req
-
-
-def download_yaml(url: str) -> str:
-    """Download raw YAML content from GitHub."""
-    try:
-        req = _build_request(url)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return resp.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            raise RoleNotFoundError(
-                f"Role not found at {url}. Check the path and try again."
-            ) from e
-        if e.code == 403:
-            raise NetworkError(
-                "GitHub API rate limit reached. Set GITHUB_TOKEN env var for higher limits."
-            ) from e
-        raise NetworkError(f"HTTP {e.code} downloading {url}") from e
-    except urllib.error.URLError as e:
-        raise NetworkError("Could not reach GitHub. Check your connection.") from e
-
-
-def fetch_commit_sha(repo: str, ref: str) -> str:
-    """Get current commit SHA for a ref via GitHub API."""
-    url = f"https://api.github.com/repos/{repo}/commits/{ref}"
-    try:
-        req = _build_request(url)
-        req.add_header("Accept", "application/vnd.github.v3+json")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["sha"]
-    except urllib.error.HTTPError as e:
-        if e.code == 403:
-            raise NetworkError(
-                "GitHub API rate limit reached. Try again later, or set GITHUB_TOKEN."
-            ) from e
-        raise NetworkError(f"Could not fetch commit SHA for {repo}@{ref}: HTTP {e.code}") from e
-    except (urllib.error.URLError, KeyError, json.JSONDecodeError) as e:
-        raise NetworkError(f"Could not fetch commit SHA for {repo}@{ref}") from e
-
-
-# ---------------------------------------------------------------------------
-# Validation helpers
-# ---------------------------------------------------------------------------
-
-
-def _validate_yaml_content(content: str) -> RoleDefinition:
-    """Validate YAML content as an InitRunner role. Returns RoleDefinition."""
-    import yaml
-    from pydantic import ValidationError
-
-    from initrunner.agent.schema.role import RoleDefinition
-
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError as e:
-        raise RegistryError(f"Downloaded file is not valid YAML: {e}") from e
-
-    if not isinstance(data, dict):
-        raise RegistryError(
-            "Downloaded file is not a valid InitRunner role (expected YAML mapping)"
-        )
-
-    try:
-        return RoleDefinition.model_validate(data)
-    except ValidationError as e:
-        raise RegistryError(f"Downloaded file is not a valid InitRunner role: {e}") from e
-
-
-def check_dependencies(role: RoleDefinition) -> list[str]:
-    """Check if role dependencies are satisfied. Returns warning strings."""
-    import sys
-
-    warnings: list[str] = []
-    metadata = role.metadata
-
-    for dep in metadata.dependencies:
-        if dep.startswith("python"):
-            # Simple version check: python>=3.11
-            match = re.match(r"python>=(\d+\.\d+)", dep)
-            if match:
-                required = tuple(int(x) for x in match.group(1).split("."))
-                current = sys.version_info[:2]
-                if current < required:
-                    warnings.append(
-                        f"Requires Python >={match.group(1)}, you have {current[0]}.{current[1]}"
-                    )
-        else:
-            if not shutil.which(dep):
-                warnings.append(f"Dependency '{dep}' not found on PATH")
-
-    return warnings
-
-
-def _role_info_from_definition(role: RoleDefinition) -> RoleInfo:
-    """Extract displayable info from a RoleDefinition."""
-    return RoleInfo(
-        name=role.metadata.name,
-        description=role.metadata.description,
-        author=role.metadata.author,
-        tools=[t.type for t in role.spec.tools],
-        model=role.spec.model.name,
-        provider=role.spec.model.provider,
-        has_triggers=bool(role.spec.triggers),
-        has_ingestion=role.spec.ingest is not None,
-        has_memory=role.spec.memory is not None,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Community index
-# ---------------------------------------------------------------------------
-
-
-def _fetch_index() -> list[IndexEntry]:
-    """Fetch and parse the community role index."""
-    import yaml
-
-    try:
-        content = download_yaml(INDEX_URL)
-    except NetworkError:
-        raise NetworkError(
-            "Community index unavailable. Install directly: initrunner install user/repo"
-        ) from None
-
-    try:
-        data = yaml.safe_load(content)
-    except Exception as e:
-        raise RegistryError(f"Invalid community index: {e}") from e
-
-    if not isinstance(data, dict) or "roles" not in data:
-        raise RegistryError("Invalid community index format")
-
-    entries = []
-    for item in data["roles"]:
-        entries.append(
-            IndexEntry(
-                name=item["name"],
-                description=item.get("description", ""),
-                author=item.get("author", ""),
-                source=item["source"],
-                tags=item.get("tags", []),
-            )
-        )
-    return entries
-
-
-# ---------------------------------------------------------------------------
 # Core operations
 # ---------------------------------------------------------------------------
 
 
 def preview_install(source: str, *, force: bool = False) -> InstallPreview:
     """Resolve source, fetch metadata, and return a preview. No file writes, no UI."""
-    from initrunner.hub import is_hub_reference
-
-    if is_hub_reference(source):
-        return _preview_hub(source, force=force)
-
     from initrunner.packaging.oci import is_oci_reference
 
     if is_oci_reference(source):
         return _preview_oci(source, force=force)
 
-    return _preview_github(source, force=force)
+    # Bare name (no slash) -> error with search hint
+    if "/" not in source:
+        raise RegistryError(
+            f"Unknown source '{source}'. Search InitHub: initrunner search {source}"
+        )
+
+    # Deprecated GitHub :path syntax
+    if ":" in source and not source.startswith("hub:"):
+        raise RegistryError(
+            "GitHub ':path' syntax is no longer supported. "
+            "Install from InitHub instead: initrunner install owner/name"
+        )
+
+    # Everything else: owner/name[@ver] or hub:owner/name[@ver] -> InitHub
+    return _preview_hub(source, force=force)
 
 
 def _preview_oci(oci_ref: str, *, force: bool = False) -> InstallPreview:
@@ -450,14 +203,20 @@ def _preview_oci(oci_ref: str, *, force: bool = False) -> InstallPreview:
 
 def _preview_hub(source: str, *, force: bool = False) -> InstallPreview:
     """Resolve hub reference metadata into an InstallPreview."""
-    from initrunner.hub import hub_resolve, parse_hub_reference
+    from initrunner.hub import hub_resolve, parse_hub_source
 
-    owner, name, version = parse_hub_reference(source)
+    owner, name, version = parse_hub_source(source)
     info = hub_resolve(owner, name, version)
 
     resolved_version = version or info.latest_version
     if not resolved_version:
         raise RoleNotFoundError(f"No versions published for {owner}/{name}")
+
+    if version and info.versions and version not in info.versions:
+        raise RoleNotFoundError(
+            f"Version '{version}' not found for {owner}/{name}. "
+            f"Available: {', '.join(info.versions)}"
+        )
 
     # Check for existing install
     safe_name = f"hub__{owner}__{name}"
@@ -478,48 +237,25 @@ def _preview_hub(source: str, *, force: bool = False) -> InstallPreview:
     )
 
 
-def _preview_github(source: str, *, force: bool = False) -> InstallPreview:
-    """Resolve GitHub reference metadata into an InstallPreview."""
-    resolved = resolve_source(source)
-    content = download_yaml(resolved.raw_url)
-    role = _validate_yaml_content(content)
-
-    role_name = role.metadata.name
-    safe_name = f"{resolved.owner}__{resolved.repo}__{role_name}.yaml"
-    target = ROLES_DIR / safe_name
-
-    if target.exists() and not force:
-        raise RoleExistsError(f"Role '{role_name}' is already installed. Use --force to overwrite.")
-
-    warnings = check_dependencies(role)
-    info = _role_info_from_definition(role)
-
-    return InstallPreview(
-        name=info.name,
-        description=info.description,
-        author=info.author,
-        version=resolved.ref,
-        source_label=f"{resolved.full_repo}",
-        source_type="github",
-        tools=info.tools,
-        model=f"{info.provider}/{info.model}",
-        warnings=warnings,
-    )
-
-
 def confirm_install(source: str, *, force: bool = False) -> Path:
     """Actually install a role from any source. No UI output. Returns installed path."""
-    from initrunner.hub import is_hub_reference
-
-    if is_hub_reference(source):
-        return _install_hub(source, force=force)
-
     from initrunner.packaging.oci import is_oci_reference
 
     if is_oci_reference(source):
         return _install_oci(source, force=force)
 
-    return _install_github(source, force=force)
+    if "/" not in source:
+        raise RegistryError(
+            f"Unknown source '{source}'. Search InitHub: initrunner search {source}"
+        )
+
+    if ":" in source and not source.startswith("hub:"):
+        raise RegistryError(
+            "GitHub ':path' syntax is no longer supported. "
+            "Install from InitHub instead: initrunner install owner/name"
+        )
+
+    return _install_hub(source, force=force)
 
 
 def _install_oci(oci_ref: str, *, force: bool = False) -> Path:
@@ -582,10 +318,10 @@ def _install_hub(source: str, *, force: bool = False) -> Path:
     """Install a role from InitHub. No UI output."""
     import tempfile
 
-    from initrunner.hub import hub_download, hub_resolve, parse_hub_reference
+    from initrunner.hub import hub_download, hub_resolve, parse_hub_source
     from initrunner.packaging.bundle import extract_bundle
 
-    owner, name, version = parse_hub_reference(source)
+    owner, name, version = parse_hub_source(source)
     info = hub_resolve(owner, name, version)
 
     resolved_version = version or info.latest_version
@@ -627,45 +363,6 @@ def _install_hub(source: str, *, force: bool = False) -> Path:
     }
     save_manifest(manifest_data)
     return target_dir
-
-
-def _install_github(source: str, *, force: bool = False) -> Path:
-    """Install a role from GitHub. No UI output."""
-    resolved = resolve_source(source)
-    content = download_yaml(resolved.raw_url)
-    role = _validate_yaml_content(content)
-
-    role_name = role.metadata.name
-    safe_name = f"{resolved.owner}__{resolved.repo}__{role_name}.yaml"
-    target = ROLES_DIR / safe_name
-
-    if target.exists() and not force:
-        raise RoleExistsError(f"Role '{role_name}' is already installed. Use --force to overwrite.")
-
-    try:
-        commit_sha = fetch_commit_sha(resolved.full_repo, resolved.ref)
-    except NetworkError:
-        commit_sha = ""
-
-    ensure_private_dir(ROLES_DIR)
-    target.write_text(content)
-
-    manifest = load_manifest()
-    qualified_key = f"github:{resolved.full_repo}/{role_name}"
-    manifest["roles"][qualified_key] = {
-        "display_name": role_name,
-        "source_type": "github",
-        "source_url": resolved.raw_url,
-        "repo": resolved.full_repo,
-        "path": resolved.path,
-        "ref": resolved.ref,
-        "commit_sha": commit_sha,
-        "local_path": safe_name,
-        "installed_at": datetime.now(UTC).isoformat(),
-        "sha256": hashlib.sha256(content.encode()).hexdigest(),
-    }
-    save_manifest(manifest)
-    return target
 
 
 def install_role(source: str, *, force: bool = False, quiet: bool = False) -> Path:
@@ -719,48 +416,34 @@ def list_installed() -> list[InstalledRole]:
     for key, entry in manifest["roles"].items():
         display_name = entry.get("display_name", key.rsplit("/", 1)[-1])
         source_type = entry.get("source_type", "github")
+        repo = entry.get("repo", "")
+        ref = entry.get("ref", entry.get("oci_tag", ""))
+        if source_type == "hub":
+            repo = f"{entry.get('hub_owner', '')}/{entry.get('hub_name', '')}"
+            ref = entry.get("hub_version", "")
         results.append(
             InstalledRole(
                 name=display_name,
                 source=entry.get("source_url", entry.get("oci_ref", "")),
-                repo=entry.get("repo", ""),
-                ref=entry.get("ref", entry.get("oci_tag", "")),
+                repo=repo,
+                ref=ref,
                 local_path=ROLES_DIR / entry["local_path"],
                 installed_at=entry.get("installed_at", ""),
                 source_type=source_type,
                 oci_ref=entry.get("oci_ref", ""),
                 oci_digest=entry.get("oci_digest", ""),
+                hub_version=entry.get("hub_version", ""),
             )
         )
     return results
 
 
-def info_role(source: str) -> RoleInfo | dict[str, Any]:
-    """Download and parse role without installing. Return summary.
+def info_role(source: str) -> dict[str, Any]:
+    """Inspect a role without installing. Returns metadata dict.
 
-    For hub references, returns a dict with ``source_type: "hub"`` and package metadata.
+    For hub references, returns package metadata from InitHub.
     For OCI references, returns the bundle manifest metadata dict.
-    For GitHub references, returns a ``RoleInfo`` dataclass.
     """
-    from initrunner.hub import is_hub_reference
-
-    if is_hub_reference(source):
-        from initrunner.hub import hub_resolve, parse_hub_reference
-
-        owner, name, _ = parse_hub_reference(source)
-        pkg = hub_resolve(owner, name)
-        return {
-            "name": f"{pkg.owner}/{pkg.name}",
-            "description": pkg.description,
-            "author": pkg.author,
-            "latest_version": pkg.latest_version,
-            "downloads": pkg.downloads,
-            "tags": pkg.tags,
-            "versions": pkg.versions,
-            "repository_url": pkg.repository_url,
-            "source_type": "hub",
-        }
-
     from initrunner.packaging.oci import is_oci_reference
 
     if is_oci_reference(source):
@@ -768,25 +451,32 @@ def info_role(source: str) -> RoleInfo | dict[str, Any]:
 
         return inspect_oci_role(source)
 
-    resolved = resolve_source(source)
-    content = download_yaml(resolved.raw_url)
-    role = _validate_yaml_content(content)
-    return _role_info_from_definition(role)
+    if "/" not in source:
+        raise RegistryError(
+            f"Unknown source '{source}'. Search InitHub: initrunner search {source}"
+        )
 
+    if ":" in source and not source.startswith("hub:"):
+        raise RegistryError(
+            "GitHub ':path' syntax is no longer supported. "
+            "Use InitHub instead: initrunner info owner/name"
+        )
 
-def search_index(query: str) -> list[IndexEntry]:
-    """Fetch community index, filter by name/description/tags."""
-    entries = _fetch_index()
-    query_lower = query.lower()
-    results = []
-    for entry in entries:
-        if (
-            query_lower in entry.name.lower()
-            or query_lower in entry.description.lower()
-            or any(query_lower in tag.lower() for tag in entry.tags)
-        ):
-            results.append(entry)
-    return results
+    from initrunner.hub import hub_resolve, parse_hub_source
+
+    owner, name, _ = parse_hub_source(source)
+    pkg = hub_resolve(owner, name)
+    return {
+        "name": f"{pkg.owner}/{pkg.name}",
+        "description": pkg.description,
+        "author": pkg.author,
+        "latest_version": pkg.latest_version,
+        "downloads": pkg.downloads,
+        "tags": pkg.tags,
+        "versions": pkg.versions,
+        "repository_url": pkg.repository_url,
+        "source_type": "hub",
+    }
 
 
 def _update_oci_role(key: str, entry: dict, manifest: dict) -> UpdateResult:
@@ -953,59 +643,15 @@ def update_role(name: str) -> UpdateResult:
     if entry.get("source_type") == "hub":
         return _update_hub_role(key, entry, manifest)
 
-    old_sha = entry.get("commit_sha", "")
-    repo = entry["repo"]
-    ref = entry.get("ref", "main")
-
-    # Warn if pinned to a tag
-    if ref and not ref.startswith("v") and ref != "main" and len(ref) < 40:
-        pass  # could be a branch
-    elif ref and ref.startswith("v"):
-        return UpdateResult(
-            name=name,
-            updated=False,
-            old_sha=old_sha,
-            new_sha=old_sha,
-            message=f"Pinned to tag '{ref}' — tags are immutable. "
-            "Reinstall with a different ref to update.",
-        )
-
-    try:
-        new_sha = fetch_commit_sha(repo, ref)
-    except NetworkError as e:
-        return UpdateResult(
-            name=name, updated=False, old_sha=old_sha, new_sha="", message=f"Error: {e}"
-        )
-
-    if new_sha == old_sha:
-        return UpdateResult(
-            name=name,
-            updated=False,
-            old_sha=old_sha,
-            new_sha=new_sha,
-            message="Already up to date.",
-        )
-
-    # Re-download
-    source_url = entry["source_url"]
-    try:
-        content = download_yaml(source_url)
-        _validate_yaml_content(content)
-    except (NetworkError, RegistryError) as e:
-        return UpdateResult(
-            name=name, updated=False, old_sha=old_sha, new_sha=new_sha, message=f"Error: {e}"
-        )
-
-    local_path = ROLES_DIR / entry["local_path"]
-    local_path.write_text(content)
-
-    entry["commit_sha"] = new_sha
-    entry["sha256"] = hashlib.sha256(content.encode()).hexdigest()
-    entry["installed_at"] = datetime.now(UTC).isoformat()
-    save_manifest(manifest)
-
+    # Legacy GitHub source -- no longer supported
+    display_name = entry.get("display_name", key.rsplit("/", 1)[-1])
     return UpdateResult(
-        name=name, updated=True, old_sha=old_sha, new_sha=new_sha, message="Updated."
+        name=display_name,
+        updated=False,
+        old_sha="",
+        new_sha="",
+        message="Installed from GitHub (no longer supported). "
+        "Reinstall from InitHub: initrunner install owner/name",
     )
 
 
@@ -1016,21 +662,3 @@ def update_all() -> list[UpdateResult]:
     for name in list(manifest["roles"]):
         results.append(update_role(name))
     return results
-
-
-def hub_search_index(query: str) -> list[IndexEntry]:
-    """Search InitHub for packages, return as IndexEntry for compatibility."""
-    from initrunner.hub import hub_search
-
-    results = hub_search(query)
-
-    return [
-        IndexEntry(
-            name=f"{r.owner}/{r.name}",
-            description=r.description,
-            author=r.owner,
-            source=f"hub:{r.owner}/{r.name}",
-            tags=r.tags,
-        )
-        for r in results
-    ]

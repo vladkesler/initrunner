@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.30.0] - 2026-03-18
+
+### Breaking Changes
+- **Removed community roles (GitHub index)**: bare-name installation (`initrunner install code-reviewer`) now shows an error with a search hint instead of looking up the community index
+- **Removed GitHub source syntax**: `user/repo[:path][@ref]` format that downloaded from `raw.githubusercontent.com` is no longer supported. Use `owner/name[@ver]` to install from InitHub instead
+- `initrunner hub` subcommands are deprecated (still functional with warnings). Use top-level equivalents: `initrunner login`, `initrunner logout`, `initrunner whoami`, `initrunner publish`, `initrunner search`
+
+### Added
+- **`owner/name[@ver]` installs from InitHub** by default (no `hub:` prefix required)
+- **`initrunner login`** top-level command with smart dispatch: no args = InitHub (device code flow), hostname arg = OCI registry
+- **`initrunner logout`** and **`initrunner whoami`** promoted to top-level commands
+- **`initrunner publish`** smart dispatch: no OCI ref = InitHub, with OCI ref = OCI registry. Adds `--readme`, `--repo-url`, `--category` options for InitHub
+- **`initrunner search`** now shows version, downloads, and tags columns. Added `--tag` filter option
+- `parse_hub_source()` in `hub.py` accepts both `owner/name[@ver]` and `hub:owner/name[@ver]`
+- Early version validation in `preview_install()`: fails before download if requested `@version` does not exist
+- Hub list display shows owner/name and version for installed hub packages
+- Legacy GitHub manifest entries handled gracefully on `update` (returns "no longer supported" message)
+
+### Removed
+- `resolve_source()`, `_resolve_from_index()`, `search_index()`, `hub_search_index()` from `registry.py`
+- `_validate_yaml_content()`, `check_dependencies()`, `_role_info_from_definition()` from `registry.py`
+- `download_yaml()`, `fetch_commit_sha()`, `_build_request()`, `_fetch_index()` from `registry.py`
+- `ResolvedSource`, `IndexEntry`, `RoleInfo` dataclasses from `registry.py`
+- `INDEX_URL`, `_ALLOWED_HOST`, `_SOURCE_RE` constants from `registry.py`
+- GitHub install, preview, and update code paths
+
 ## [1.29.0] - 2026-03-18
 
 ### Added

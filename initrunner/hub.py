@@ -115,7 +115,7 @@ def _hub_request(
         body = e.read().decode("utf-8", errors="replace")
         if e.code == 401:
             raise HubAuthError(
-                "Authentication failed. Run 'initrunner hub login' to set your token."
+                "Authentication failed. Run 'initrunner login' to authenticate."
             ) from e
         if e.code == 404:
             raise HubError(f"Not found: {path}") from e
@@ -322,4 +322,22 @@ def parse_hub_reference(source: str) -> tuple[str, str, str | None]:
     m = re.match(_HUB_RE_STR, source)
     if not m:
         raise ValueError(f"Invalid hub reference: {source}")
+    return m.group("owner"), m.group("name"), m.group("version")
+
+
+# Flexible source parsing (accepts both owner/name[@ver] and hub:owner/name[@ver])
+
+_SOURCE_RE_STR = (
+    r"^(?:hub:)?(?P<owner>[a-zA-Z0-9_.-]+)/(?P<name>[a-zA-Z0-9_.-]+)"
+    r"(?:@(?P<version>.+))?$"
+)
+
+
+def parse_hub_source(source: str) -> tuple[str, str, str | None]:
+    """Parse owner/name[@ver] or hub:owner/name[@ver]."""
+    import re
+
+    m = re.match(_SOURCE_RE_STR, source)
+    if not m:
+        raise ValueError(f"Invalid source: {source}")
     return m.group("owner"), m.group("name"), m.group("version")

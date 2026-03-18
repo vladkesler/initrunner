@@ -20,6 +20,7 @@ from initrunner.hub import (
     is_hub_reference,
     load_hub_token,
     parse_hub_reference,
+    parse_hub_source,
     poll_device_code,
     remove_hub_token,
     request_device_code,
@@ -90,6 +91,58 @@ class TestParseHubReference:
     def test_invalid_no_slash_raises(self):
         with pytest.raises(ValueError, match="Invalid hub reference"):
             parse_hub_reference("hub:justname")
+
+
+class TestParseHubSource:
+    """Tests for the flexible source parser (accepts both owner/name and hub:owner/name)."""
+
+    def test_simple_owner_name(self):
+        owner, name, version = parse_hub_source("owner/name")
+        assert owner == "owner"
+        assert name == "name"
+        assert version is None
+
+    def test_owner_name_with_version(self):
+        owner, name, version = parse_hub_source("owner/name@2.1.0")
+        assert owner == "owner"
+        assert name == "name"
+        assert version == "2.1.0"
+
+    def test_hub_prefix(self):
+        owner, name, version = parse_hub_source("hub:owner/name")
+        assert owner == "owner"
+        assert name == "name"
+        assert version is None
+
+    def test_hub_prefix_with_version(self):
+        owner, name, version = parse_hub_source("hub:owner/name@1.0.0")
+        assert owner == "owner"
+        assert name == "name"
+        assert version == "1.0.0"
+
+    def test_dots_and_hyphens(self):
+        owner, name, version = parse_hub_source("my-org.io/my-agent.pack@latest")
+        assert owner == "my-org.io"
+        assert name == "my-agent.pack"
+        assert version == "latest"
+
+    def test_underscores(self):
+        owner, name, version = parse_hub_source("my_org/my_agent")
+        assert owner == "my_org"
+        assert name == "my_agent"
+        assert version is None
+
+    def test_invalid_bare_name_raises(self):
+        with pytest.raises(ValueError, match="Invalid source"):
+            parse_hub_source("justname")
+
+    def test_invalid_empty_raises(self):
+        with pytest.raises(ValueError, match="Invalid source"):
+            parse_hub_source("")
+
+    def test_oci_prefix_raises(self):
+        with pytest.raises(ValueError, match="Invalid source"):
+            parse_hub_source("oci://registry/repo")
 
 
 # ---------------------------------------------------------------------------

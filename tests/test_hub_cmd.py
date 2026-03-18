@@ -270,7 +270,7 @@ class TestHubInfo:
     def test_info_no_slash(self):
         result = runner.invoke(app, ["hub", "info", "justname"])
         assert result.exit_code == 1
-        assert "owner/name" in result.output
+        assert "Unknown source" in result.output
 
     def test_info_error(self):
         with patch("initrunner.hub.hub_resolve", side_effect=HubError("Not found")):
@@ -359,3 +359,25 @@ class TestHubPublish:
             result = runner.invoke(app, ["hub", "publish", str(role_file)])
         assert result.exit_code == 1
         assert "Upload failed" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Deprecation warnings
+# ---------------------------------------------------------------------------
+
+
+class TestDeprecationWarnings:
+    def test_hub_login_shows_deprecation(self):
+        with patch("initrunner.hub.save_hub_token"):
+            result = runner.invoke(app, ["hub", "login", "--token", "test"])
+        assert "Deprecated" in result.output
+
+    def test_hub_logout_shows_deprecation(self):
+        with patch("initrunner.hub.remove_hub_token"):
+            result = runner.invoke(app, ["hub", "logout"])
+        assert "Deprecated" in result.output
+
+    def test_hub_search_shows_deprecation(self):
+        with patch("initrunner.hub.hub_search", return_value=[]):
+            result = runner.invoke(app, ["hub", "search", "test"])
+        assert "Deprecated" in result.output

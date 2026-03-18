@@ -140,11 +140,13 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     install,
     list_roles,
     login,
+    logout,
     publish,
     pull,
     search,
     uninstall,
     update,
+    whoami,
 )
 from initrunner.cli.role_cmd import setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import daemon, ingest, run, test  # noqa: E402
@@ -172,6 +174,8 @@ app.command()(update)
 app.command()(publish)
 app.command()(pull)
 app.command()(login)
+app.command()(logout)
+app.command()(whoami)
 app.command()(doctor)
 
 
