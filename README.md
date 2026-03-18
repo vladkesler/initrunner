@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-3123+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.29.0-%2334D058" alt="v1.29.0">
+  <img src="https://img.shields.io/badge/latest-v1.30.0-%2334D058" alt="v1.30.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.29.0** -- Hub device code auth, CLI path resolution (`initrunner run .`), and directory-based publishing. See the [Changelog](CHANGELOG.md).
+> **v1.30.0** -- InitHub is now the default registry; community roles and GitHub source syntax removed. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -234,26 +234,20 @@ See [Tutorial](docs/getting-started/tutorial.md) for a guided walkthrough.
 
 ## Distribution & Deployment
 
-### Community roles
+### InitHub
 
 ```bash
-initrunner search "code review"                          # browse the community index
-initrunner install code-reviewer                         # download, validate, confirm
-initrunner install user/repo:roles/agent.yaml@v1.0       # install from any GitHub repo
+initrunner search "code review"                          # browse InitHub
+initrunner install alice/code-reviewer                   # install from InitHub
+initrunner install alice/code-reviewer@1.2.0             # pin a version
 ```
 
 See [Registry](docs/agents/registry.md).
 
-> ### InitHub -- Discover and share AI agent packs for InitRunner
->
-> Browse the marketplace or publish your own at [hub.initrunner.ai](https://hub.initrunner.ai).
-
 ```bash
-initrunner hub login                    # browser-based device code auth (opens browser)
-initrunner hub login --token <TOKEN>    # CI/headless
-initrunner hub publish                  # publish from current agent directory
-initrunner hub search "code review"
-initrunner install hub:owner/package-name
+initrunner login                        # browser-based device code auth
+initrunner login --token <TOKEN>        # CI/headless
+initrunner publish                      # publish from current agent directory
 ```
 
 See [Publishing Guide](https://hub.initrunner.ai/docs/publish).
@@ -314,4 +308,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.29.0</sub></p>
+<p align="center"><sub>v1.30.0</sub></p>
