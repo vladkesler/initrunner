@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-3123+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.31.0-%2334D058" alt="v1.31.0">
+  <img src="https://img.shields.io/badge/latest-v1.32.0-%2334D058" alt="v1.32.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.31.0** -- Helpdesk example agent, bundle extraction path fix, LanceDB warning fix. See the [Changelog](CHANGELOG.md).
+> **v1.32.0** -- Kube-advisor example, InitHub publish readme fix, compact example READMEs. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -308,4 +308,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.31.0</sub></p>
+<p align="center"><sub>v1.32.0</sub></p>

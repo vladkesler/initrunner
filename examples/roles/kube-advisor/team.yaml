@@ -1,0 +1,297 @@
+# Kubernetes Troubleshooting Team
+#
+# Multi-persona troubleshooting pipeline: triage -> diagnostician -> advisor.
+# Each persona specializes in a different phase of incident response.
+#
+# Usage:
+#   initrunner run team.yaml --task "Pods are pending in staging"
+
+apiVersion: initrunner/v1
+kind: Team
+metadata:
+  name: kube-advisor-team
+  description: Multi-persona Kubernetes troubleshooting pipeline
+  tags: [kubernetes, devops, troubleshooting, team, sre, example]
+spec:
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.1
+  personas:
+    triage: |
+      You are a Kubernetes triage agent. Your job is to gather initial
+      cluster state and identify the problem layer.
+
+      Workflow:
+      1. Confirm cluster access with kubectl cluster-info
+      2. Run cluster_health for a cluster-wide overview
+      3. Scope to the affected namespace with recent_events
+      4. Identify affected resources with targeted kubectl commands
+      5. Categorize the issue layer: pod, service/network, node/scheduling,
+         storage, config, or rollout
+
+      Output a structured triage summary with:
+      - Cluster context and namespace
+      - Affected resources (names, statuses)
+      - Observed symptoms (events, error messages)
+      - Relevant events (sorted by time)
+      - Initial hypothesis and affected layer
+
+      Be thorough in data gathering but concise in your summary.
+      Include raw kubectl output snippets as evidence.
+    diagnostician: |
+      You are a Kubernetes diagnostician. You receive a triage summary
+      and perform deep investigation to identify the root cause.
+
+      Workflow:
+      1. Review the triage summary and identify the affected layer
+      2. Run the appropriate diagnostic script:
+         - Pod issues: pod_diagnostics
+         - Network issues: network_check
+         - Resource issues: resource_pressure
+         - Storage issues: storage_check
+      3. Read troubleshooting_workflow.md for the matching decision tree
+      4. Read common_issues.md for the matching symptom
+      5. Use think to reason through the evidence chain
+
+      Output:
+      - Root cause (specific and actionable)
+      - Evidence chain (events, logs, config that prove the cause)
+      - Confidence level (high/medium/low with reasoning)
+      - Additional investigation needed (if confidence is low)
+
+      Do not propose fixes -- that is the advisor's job. Focus on
+      accurate diagnosis with clear evidence.
+    advisor: |
+      You are a Kubernetes remediation advisor. You receive a diagnosis
+      and provide actionable fix instructions.
+
+      Rules:
+      - Include exact kubectl commands for each remediation step
+      - For destructive operations, explain the blast radius and provide
+        a rollback plan
+      - Rank fix options by risk (safest first)
+      - Include verification commands after each fix step
+      - Note any prerequisites (permissions, cluster state)
+
+      Output:
+      1. Numbered remediation steps with exact commands
+      2. Expected outcome after each step
+      3. Verification commands to confirm the fix
+      4. Rollback plan if the fix does not work
+      5. Preventive recommendations to avoid recurrence
+
+      Safety: Always prefer non-destructive fixes over destructive ones.
+      When a destructive action is necessary, include the current state
+      snapshot command before the mutation.
+  tools:
+    - type: shell
+      allowed_commands: [kubectl, helm]
+      require_confirmation: false
+      timeout_seconds: 30
+      max_output_bytes: 102400
+    - type: think
+    - type: datetime
+    - type: filesystem
+      root_path: ./references
+      read_only: true
+      allowed_extensions: [.md]
+    - type: python
+      timeout_seconds: 15
+      require_confirmation: false
+      network_disabled: true
+    - type: script
+      interpreter: /bin/bash
+      timeout_seconds: 45
+      max_output_bytes: 102400
+      scripts:
+        - name: cluster_health
+          description: Cluster-wide health snapshot including nodes, system pods, capacity, and recent warnings
+          body: |
+            echo "=== Node Status ==="
+            kubectl get nodes -o wide 2>&1
+
+            echo ""
+            echo "=== Node Conditions ==="
+            kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.conditions[*]}{.type}={.status} {end}{"\n"}{end}' 2>&1
+
+            echo ""
+            echo "=== System Pods ==="
+            kubectl get pods -n kube-system -o wide 2>&1
+
+            echo ""
+            echo "=== Cluster Resource Usage ==="
+            kubectl top nodes 2>&1 || echo "(metrics-server not available)"
+
+            echo ""
+            echo "=== Recent Warning Events (cluster-wide) ==="
+            kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -30
+
+        - name: pod_diagnostics
+          description: Deep diagnostic for a specific pod including describe, events, logs, and previous crash logs
+          parameters:
+            - name: pod_name
+              description: Name of the pod to diagnose
+              required: true
+            - name: namespace
+              description: Namespace of the pod
+              default: default
+          body: |
+            NS="${NAMESPACE:-default}"
+
+            echo "=== Pod Description ==="
+            kubectl describe pod "$POD_NAME" -n "$NS" 2>&1
+
+            echo ""
+            echo "=== Pod Events ==="
+            kubectl get events -n "$NS" --field-selector involvedObject.name="$POD_NAME" --sort-by=.lastTimestamp 2>&1
+
+            echo ""
+            echo "=== Container Logs (last 100 lines) ==="
+            kubectl logs "$POD_NAME" -n "$NS" --tail=100 --all-containers 2>&1
+
+            echo ""
+            echo "=== Previous Container Logs ==="
+            kubectl logs "$POD_NAME" -n "$NS" --previous --all-containers --tail=50 2>&1 || echo "(no previous logs)"
+
+            echo ""
+            echo "=== Pod YAML (status section) ==="
+            kubectl get pod "$POD_NAME" -n "$NS" -o jsonpath='{.status}' 2>&1 | python3 -m json.tool 2>/dev/null || kubectl get pod "$POD_NAME" -n "$NS" -o jsonpath='{.status}' 2>&1
+
+        - name: network_check
+          description: Network diagnostic for services, endpoints, DNS, ingress, and network policies
+          parameters:
+            - name: namespace
+              description: Namespace to check
+              default: default
+            - name: service_name
+              description: Specific service to inspect (optional)
+          body: |
+            NS="${NAMESPACE:-default}"
+
+            echo "=== Services ==="
+            kubectl get svc -n "$NS" -o wide 2>&1
+
+            if [ -n "$SERVICE_NAME" ]; then
+              echo ""
+              echo "=== Service Detail: $SERVICE_NAME ==="
+              kubectl describe svc "$SERVICE_NAME" -n "$NS" 2>&1
+
+              echo ""
+              echo "=== Endpoints: $SERVICE_NAME ==="
+              kubectl get endpoints "$SERVICE_NAME" -n "$NS" -o yaml 2>&1
+            fi
+
+            echo ""
+            echo "=== Ingress ==="
+            kubectl get ingress -n "$NS" 2>&1 || echo "(no ingress resources)"
+
+            echo ""
+            echo "=== Network Policies ==="
+            kubectl get networkpolicies -n "$NS" 2>&1 || echo "(no network policies)"
+
+            echo ""
+            echo "=== CoreDNS Status ==="
+            kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide 2>&1
+
+        - name: resource_pressure
+          description: Resource usage analysis including node capacity, quotas, and top consumers
+          parameters:
+            - name: namespace
+              description: Namespace to check
+              default: default
+          body: |
+            NS="${NAMESPACE:-default}"
+
+            echo "=== Node Resource Usage ==="
+            kubectl top nodes 2>&1 || echo "(metrics-server not available)"
+
+            echo ""
+            echo "=== Node Allocatable vs Capacity ==="
+            kubectl get nodes -o jsonpath='{range .items[*]}Node: {.metadata.name}{"\n"}  CPU: {.status.allocatable.cpu} / {.status.capacity.cpu}{"\n"}  Mem: {.status.allocatable.memory} / {.status.capacity.memory}{"\n"}{end}' 2>&1
+
+            echo ""
+            echo "=== Resource Quotas ($NS) ==="
+            kubectl get resourcequotas -n "$NS" 2>&1 || echo "(no quotas)"
+            kubectl describe resourcequotas -n "$NS" 2>&1 || true
+
+            echo ""
+            echo "=== Limit Ranges ($NS) ==="
+            kubectl get limitranges -n "$NS" 2>&1 || echo "(no limit ranges)"
+
+            echo ""
+            echo "=== Top Pods by CPU ($NS) ==="
+            kubectl top pods -n "$NS" --sort-by=cpu 2>&1 | head -20 || echo "(metrics-server not available)"
+
+            echo ""
+            echo "=== Top Pods by Memory ($NS) ==="
+            kubectl top pods -n "$NS" --sort-by=memory 2>&1 | head -20 || echo "(metrics-server not available)"
+
+        - name: storage_check
+          description: Storage diagnostic including StorageClasses, PV/PVC status, and CSI drivers
+          parameters:
+            - name: namespace
+              description: Namespace to check
+              default: default
+          body: |
+            NS="${NAMESPACE:-default}"
+
+            echo "=== Storage Classes ==="
+            kubectl get sc 2>&1
+
+            echo ""
+            echo "=== Persistent Volumes ==="
+            kubectl get pv 2>&1 || echo "(no PVs)"
+
+            echo ""
+            echo "=== Persistent Volume Claims ($NS) ==="
+            kubectl get pvc -n "$NS" 2>&1 || echo "(no PVCs)"
+
+            echo ""
+            echo "=== Unbound PVCs ($NS) ==="
+            kubectl get pvc -n "$NS" --field-selector status.phase!=Bound 2>&1 || echo "(all PVCs bound)"
+
+            echo ""
+            echo "=== PVC Details ($NS) ==="
+            for pvc in $(kubectl get pvc -n "$NS" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+              echo "--- $pvc ---"
+              kubectl describe pvc "$pvc" -n "$NS" 2>&1 | grep -E "Status|Volume|StorageClass|Capacity|Events" | head -10
+              echo ""
+            done
+
+            echo ""
+            echo "=== CSI Drivers ==="
+            kubectl get csidrivers 2>&1 || echo "(no CSI drivers)"
+
+        - name: recent_events
+          description: Filtered event listing with optional type filter and reason summary
+          parameters:
+            - name: namespace
+              description: Namespace to check (use _all for all namespaces)
+              default: default
+            - name: event_type
+              description: Event type filter (Normal or Warning)
+              default: Warning
+          body: |
+            NS="${NAMESPACE:-default}"
+            TYPE="${EVENT_TYPE:-Warning}"
+
+            if [ "$NS" = "_all" ]; then
+              NS_FLAG="-A"
+            else
+              NS_FLAG="-n $NS"
+            fi
+
+            echo "=== Recent $TYPE Events ==="
+            kubectl get events $NS_FLAG --field-selector type="$TYPE" --sort-by=.lastTimestamp 2>&1 | tail -40
+
+            echo ""
+            echo "=== Event Reason Summary ==="
+            kubectl get events $NS_FLAG --field-selector type="$TYPE" -o jsonpath='{range .items[*]}{.reason}{"\n"}{end}' 2>&1 | sort | uniq -c | sort -rn | head -20
+  handoff_max_chars: 8000
+  guardrails:
+    max_tokens_per_run: 40000
+    max_tool_calls: 25
+    timeout_seconds: 300
+    team_token_budget: 120000
+    team_timeout_seconds: 600

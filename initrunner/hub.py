@@ -221,35 +221,25 @@ def hub_publish(
     parts.append(bundle_data)
     parts.append(b"\r\n")
 
-    # Optional text fields
-    if readme:
-        parts.append(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="readme"\r\n\r\n'
-            f"{readme}\r\n".encode()
-        )
-
-    if repository_url:
-        parts.append(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="repository_url"\r\n\r\n'
-            f"{repository_url}\r\n".encode()
-        )
-
-    if categories:
-        cats_json = json.dumps(categories)
-        parts.append(
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="categories"\r\n\r\n'
-            f"{cats_json}\r\n".encode()
-        )
-
     parts.append(f"--{boundary}--\r\n".encode())
 
     body = b"".join(parts)
 
+    # The InitHub API expects readme, repository_url, and categories as
+    # query parameters, not multipart form fields.
+    query_params: dict[str, str] = {}
+    if readme:
+        query_params["readme"] = readme
+    if repository_url:
+        query_params["repository_url"] = repository_url
+    if categories:
+        query_params["categories"] = json.dumps(categories)
+
+    query_string = urllib.parse.urlencode(query_params) if query_params else ""
+    path = f"/packages?{query_string}" if query_string else "/packages"
+
     return _hub_request(
-        "/packages",
+        path,
         method="POST",
         token=token,
         data=body,

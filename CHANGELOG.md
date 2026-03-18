@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.32.0] - 2026-03-19
+
+### Added
+- **Kube-advisor example agent** (`examples/roles/kube-advisor/`) -- Kubernetes troubleshooting agent with team mode, reusable kubernetes skill, diagnostic scripts, and curated reference guides
+- **InitRunner support example** (`examples/roles/initrunner-support/`) -- support agent with RAG over InitRunner documentation and long-term memory
+
+### Fixed
+- **InitHub publish README not displaying** -- `hub_publish()` sent readme, repository_url, and categories as multipart form fields; the InitHub API expects them as query parameters. READMEs now appear on package detail pages
+
+### Changed
+- Compact, user-friendly READMEs for helpdesk, initrunner-support, and kube-advisor examples
+- Updated metadata descriptions for helpdesk and initrunner-support to be action-oriented
+
 ## [1.31.0] - 2026-03-18
 
 ### Added

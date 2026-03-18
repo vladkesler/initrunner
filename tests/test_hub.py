@@ -442,12 +442,15 @@ class TestHubPublish:
         assert call_kwargs.kwargs["token"] == "test-token"
         assert "multipart/form-data" in call_kwargs.kwargs["content_type"]
 
-        # Verify the body contains expected parts
+        # Verify the body contains the bundle data
         body = call_kwargs.kwargs["data"]
         assert b"fake-bundle-content" in body
-        assert b"# My Pack" in body
-        assert b"https://github.com/alice/my-pack" in body
-        assert b'["code", "review"]' in body
+
+        # readme, repository_url, and categories are sent as query params
+        path = call_kwargs.args[0]
+        assert "readme=" in path
+        assert "repository_url=" in path
+        assert "categories=" in path
 
     def test_publish_minimal(self, tmp_path):
         bundle_file = tmp_path / "test-bundle.tar.gz"
@@ -458,11 +461,11 @@ class TestHubPublish:
             result = hub_publish(str(bundle_file), "token")
 
         assert result == api_response
-        body = mock_req.call_args.kwargs["data"]
-        # Should not contain readme or repository_url fields
-        assert b'name="readme"' not in body
-        assert b'name="repository_url"' not in body
-        assert b'name="categories"' not in body
+        # Minimal publish should not have query params for optional fields
+        path = mock_req.call_args.args[0]
+        assert "readme=" not in path
+        assert "repository_url=" not in path
+        assert "categories=" not in path
 
 
 # ---------------------------------------------------------------------------

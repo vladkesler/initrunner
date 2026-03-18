@@ -61,7 +61,12 @@
       "roles/inbox-watcher.yaml",
       "roles/researcher.yaml",
       "roles/responder.yaml",
-      "roles/triager.yaml"
+      "roles/triager.yaml",
+      "support-desk/compose.yaml",
+      "support-desk/roles/escalator.yaml",
+      "support-desk/roles/intake.yaml",
+      "support-desk/roles/researcher.yaml",
+      "support-desk/roles/responder.yaml"
     ],
     "primary_file": "compose.yaml",
     "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: email-pipeline\n  description: Multi-agent email processing pipeline\nspec:\n  services:\n    inbox-watcher:\n      role: roles/inbox-watcher.yaml\n      sink:\n        type: delegate\n        target: triager\n    triager:\n      role: roles/triager.yaml\n      depends_on:\n        - inbox-watcher\n      sink:\n        type: delegate\n        target:\n          - researcher\n          - responder\n        circuit_breaker_threshold: 5\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - triager\n    responder:\n      role: roles/responder.yaml\n      depends_on:\n        - triager\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n",
@@ -75,11 +80,8 @@
   {
     "name": "support-desk",
     "category": "compose",
-    "description": "Support desk pipeline with intelligent auto-routing. An intake agent summarizes incoming requests, then sense routing automatically sends each request to the right handler -- researcher for technical issues, responder for quick answers, or escalator for urgent/complex cases.\n",
-    "tags": [
-      "routing",
-      "sense"
-    ],
+    "description": "Support desk pipeline with intelligent auto-routing. An intake agent summarizes incoming requests, then sense routing automatically sends each request to the right handler -- researcher for technical issues, responder for quick answers, or escalator for urgent/complex cases. No static fan-out: each message goes to exactly one target.\n",
+    "tags": [],
     "files": [
       "support-desk/compose.yaml",
       "support-desk/roles/escalator.yaml",
@@ -90,10 +92,9 @@
     "primary_file": "support-desk/compose.yaml",
     "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: support-desk\n  description: >\n    Support desk pipeline with intelligent auto-routing. An intake agent\n    summarizes incoming requests, then sense routing automatically sends\n    each request to the right handler -- researcher for technical issues,\n    responder for quick answers, or escalator for urgent/complex cases.\n    No static fan-out: each message goes to exactly one target.\nspec:\n  services:\n    intake:\n      role: roles/intake.yaml\n      sink:\n        type: delegate\n        # strategy: sense uses keyword scoring + LLM tiebreak to pick the\n        # best target for each message. Use \"keyword\" for zero API calls,\n        # or \"all\" to fan out to every target (default).\n        strategy: sense\n        target:\n          - researcher\n          - responder\n          - escalator\n\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - intake\n\n    responder:\n      role: roles/responder.yaml\n      depends_on:\n        - intake\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    escalator:\n      role: roles/escalator.yaml\n      depends_on:\n        - intake\n",
     "multi_file": true,
-    "difficulty": "intermediate",
+    "difficulty": "advanced",
     "features": [
-      "compose",
-      "routing"
+      "compose"
     ],
     "tools": []
   },
@@ -110,12 +111,33 @@
       "audio-assistant.yaml"
     ],
     "primary_file": "audio-assistant.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: audio-assistant\n  description: Fetch YouTube transcripts and transcribe local audio files\n  tags: [example, audio, youtube]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are an audio assistant. You have two capabilities:\n\n    1. **YouTube transcripts** \u2014 When given a YouTube URL, use get_youtube_transcript\n       to fetch the video's captions, then summarize or answer questions about the content.\n    2. **Audio transcription** \u2014 When given a local audio file path, use transcribe_audio\n       to convert speech to text, then summarize or answer questions about it.\n\n    Always present transcripts clearly. When summarizing, highlight the key points.\n    If a transcript is very long, provide a structured summary with sections.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: audio\n      youtube_languages: [\"en\"]\n      include_timestamps: false\n      # For local file transcription, override with an audio-capable model:\n      transcription_model: openai:gpt-4o-audio-preview\n      max_audio_mb: 25.0\n      max_transcript_chars: 80000\n  guardrails:\n    max_tokens_per_run: 20000\n    max_tool_calls: 5\n    timeout_seconds: 120\n    max_request_limit: 10\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: audio-assistant\n  description: Fetch YouTube transcripts and transcribe local audio files\n  tags: [example, audio, youtube]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are an audio assistant. You have two capabilities:\n\n    1. **YouTube transcripts** — When given a YouTube URL, use get_youtube_transcript\n       to fetch the video's captions, then summarize or answer questions about the content.\n    2. **Audio transcription** — When given a local audio file path, use transcribe_audio\n       to convert speech to text, then summarize or answer questions about it.\n\n    Always present transcripts clearly. When summarizing, highlight the key points.\n    If a transcript is very long, provide a structured summary with sections.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: audio\n      youtube_languages: [\"en\"]\n      include_timestamps: false\n      # For local file transcription, override with an audio-capable model:\n      transcription_model: openai:gpt-4o-audio-preview\n      max_audio_mb: 25.0\n      max_transcript_chars: 80000\n  guardrails:\n    max_tokens_per_run: 20000\n    max_tool_calls: 5\n    timeout_seconds: 120\n    max_request_limit: 10\n",
     "multi_file": false,
     "difficulty": "beginner",
     "features": [],
     "tools": [
       "audio"
+    ]
+  },
+  {
+    "name": "auto-skill-demo",
+    "category": "role",
+    "description": "Demonstrates auto-discovered skills with progressive disclosure",
+    "tags": [
+      "demo",
+      "skills",
+      "auto-discovery"
+    ],
+    "files": [
+      "auto-skill-demo.yaml"
+    ],
+    "primary_file": "auto-skill-demo.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: auto-skill-demo\n  description: Demonstrates auto-discovered skills with progressive disclosure\n  tags:\n    - demo\n    - skills\n    - auto-discovery\nspec:\n  role: |\n    You are a versatile assistant. When a task matches one of your available\n    skills, activate it to load detailed instructions before proceeding.\n  model:\n    provider: openai\n    name: gpt-4.1-mini\n    temperature: 0.2\n    max_tokens: 4096\n  # Auto-discovery is enabled by default. Skills placed in ./skills/ or\n  # ./.agents/skills/ next to this role file are automatically found.\n  # The model sees a lightweight catalog and activates skills on demand.\n  auto_skills:\n    enabled: true\n    max_skills: 50\n  tools:\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 20\n    timeout_seconds: 300\n    max_request_limit: 50\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": [
+      "datetime"
     ]
   },
   {
@@ -131,7 +153,7 @@
       "changelog-generator.yaml"
     ],
     "primary_file": "changelog-generator.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: changelog-generator\n  description: Generates a CHANGELOG.md from git commit history\n  tags:\n    - example\n    - git\n    - developer-tools\nspec:\n  role: |\n    You are a changelog generator. You read git commit history and produce a\n    well-structured CHANGELOG.md following the Keep a Changelog format.\n\n    Workflow:\n    1. Use git_log to fetch recent commits (default: last 50)\n    2. Categorize each commit by its conventional commit prefix:\n       - feat \u2192 Added\n       - fix \u2192 Fixed\n       - docs \u2192 Documentation\n       - refactor \u2192 Changed\n       - perf \u2192 Performance\n       - test \u2192 Tests\n       - chore, ci, build \u2192 Maintenance\n       - breaking change (! suffix or BREAKING CHANGE footer) \u2192 Breaking Changes\n    3. Group commits under their category headings\n    4. Use get_current_time to generate the release date\n    5. Write the result to CHANGELOG.md using write_file\n\n    If commits don't follow conventional commits, do your best to categorize\n    them by reading the message content.\n\n    Format each entry as:\n    - Brief description (commit SHA short hash)\n\n    Include an [Unreleased] section header with the current date.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: filesystem\n      root_path: .\n      read_only: false\n      allowed_extensions:\n        - .md\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: changelog-generator\n  description: Generates a CHANGELOG.md from git commit history\n  tags:\n    - example\n    - git\n    - developer-tools\nspec:\n  role: |\n    You are a changelog generator. You read git commit history and produce a\n    well-structured CHANGELOG.md following the Keep a Changelog format.\n\n    Workflow:\n    1. Use git_log to fetch recent commits (default: last 50)\n    2. Categorize each commit by its conventional commit prefix:\n       - feat → Added\n       - fix → Fixed\n       - docs → Documentation\n       - refactor → Changed\n       - perf → Performance\n       - test → Tests\n       - chore, ci, build → Maintenance\n       - breaking change (! suffix or BREAKING CHANGE footer) → Breaking Changes\n    3. Group commits under their category headings\n    4. Use get_current_time to generate the release date\n    5. Write the result to CHANGELOG.md using write_file\n\n    If commits don't follow conventional commits, do your best to categorize\n    them by reading the message content.\n\n    Format each entry as:\n    - Brief description (commit SHA short hash)\n\n    Include an [Unreleased] section header with the current date.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: filesystem\n      root_path: .\n      read_only: false\n      allowed_extensions:\n        - .md\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
     "multi_file": false,
     "difficulty": "advanced",
     "features": [],
@@ -155,7 +177,7 @@
       "changelog-slack.yaml"
     ],
     "primary_file": "changelog-slack.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: changelog-slack\n  description: Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel\n  tags:\n    - example\n    - shareable\n    - git\n    - developer-tools\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a release-notes writer. Your output is Slack mrkdwn that the user\n    will paste directly into a Slack channel, so formatting matters.\n\n    Workflow:\n    1. Determine the commit range from the user's prompt.\n       - If the prompt includes a tag or range (e.g. \"since v1.2.0\"), run:\n         shell_execute command=\"git log v1.2.0..HEAD --pretty=format:\\\"%h %an %s\\\"\"\n         (adjust the range to match the user's request).\n       - Otherwise, fall back to the built-in git_log with an appropriate max_count.\n    2. Use git_diff with the same ref range and look at the --stat style output\n       (ref=\"v1.2.0..HEAD\" or similar) to collect file-change stats.\n    3. Use get_current_time for the date header.\n    4. Categorize each commit by its conventional-commit prefix:\n       - feat      \u2192 *Features*\n       - fix       \u2192 *Fixes*\n       - BREAKING  \u2192 *Breaking Changes*\n       - docs      \u2192 *Documentation*\n       - refactor  \u2192 *Refactoring*\n       - perf      \u2192 *Performance*\n       - chore, ci, build, test \u2192 *Maintenance*\n       If a commit has no prefix, categorize by reading the message content.\n    5. Format the output as Slack mrkdwn (see template below).\n\n    Output template (omit empty categories):\n\n    *Release Notes \u2014 YYYY-MM-DD*\n    _v1.2.0 \u2192 HEAD (N commits by N contributors)_\n\n    *Features*\n    \u2022 Brief description (`abc1234`)\n    \u2022 Brief description (`def5678`)\n\n    *Fixes*\n    \u2022 Brief description (`111aaa`)\n\n    *Breaking Changes*\n    \u2022 \u26a0\ufe0f Description (`222bbb`)\n\n    *Maintenance*\n    \u2022 Description (`333ccc`)\n\n    *Contributors*: @alice, @bob, @carol\n    *Stats*: N commits \u00b7 N files changed \u00b7 +NNN / \u2212NNN lines\n\n    Slack formatting rules:\n    - *bold* for headings and emphasis\n    - _italic_ for subheadings\n    - \u2022 (bullet) for list items\n    - `backticks` for commit hashes and code\n    - No Markdown headings (#), no triple backticks \u2014 these don't render in Slack\n\n    Do NOT pad output with disclaimers or preamble \u2014 the mrkdwn IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: shell\n      allowed_commands:\n        - git\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n    timeout_seconds: 120\n    max_request_limit: 20\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: changelog-slack\n  description: Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel\n  tags:\n    - example\n    - shareable\n    - git\n    - developer-tools\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a release-notes writer. Your output is Slack mrkdwn that the user\n    will paste directly into a Slack channel, so formatting matters.\n\n    Workflow:\n    1. Determine the commit range from the user's prompt.\n       - If the prompt includes a tag or range (e.g. \"since v1.2.0\"), run:\n         shell_execute command=\"git log v1.2.0..HEAD --pretty=format:\\\"%h %an %s\\\"\"\n         (adjust the range to match the user's request).\n       - Otherwise, fall back to the built-in git_log with an appropriate max_count.\n    2. Use git_diff with the same ref range and look at the --stat style output\n       (ref=\"v1.2.0..HEAD\" or similar) to collect file-change stats.\n    3. Use get_current_time for the date header.\n    4. Categorize each commit by its conventional-commit prefix:\n       - feat      → *Features*\n       - fix       → *Fixes*\n       - BREAKING  → *Breaking Changes*\n       - docs      → *Documentation*\n       - refactor  → *Refactoring*\n       - perf      → *Performance*\n       - chore, ci, build, test → *Maintenance*\n       If a commit has no prefix, categorize by reading the message content.\n    5. Format the output as Slack mrkdwn (see template below).\n\n    Output template (omit empty categories):\n\n    *Release Notes — YYYY-MM-DD*\n    _v1.2.0 → HEAD (N commits by N contributors)_\n\n    *Features*\n    • Brief description (`abc1234`)\n    • Brief description (`def5678`)\n\n    *Fixes*\n    • Brief description (`111aaa`)\n\n    *Breaking Changes*\n    • ⚠️ Description (`222bbb`)\n\n    *Maintenance*\n    • Description (`333ccc`)\n\n    *Contributors*: @alice, @bob, @carol\n    *Stats*: N commits · N files changed · +NNN / −NNN lines\n\n    Slack formatting rules:\n    - *bold* for headings and emphasis\n    - _italic_ for subheadings\n    - • (bullet) for list items\n    - `backticks` for commit hashes and code\n    - No Markdown headings (#), no triple backticks — these don't render in Slack\n\n    Do NOT pad output with disclaimers or preamble — the mrkdwn IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: shell\n      allowed_commands:\n        - git\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n    timeout_seconds: 120\n    max_request_limit: 20\n",
     "multi_file": false,
     "difficulty": "advanced",
     "features": [],
@@ -179,7 +201,7 @@
       "ci-explainer.yaml"
     ],
     "primary_file": "ci-explainer.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: ci-explainer\n  description: Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue\n  tags:\n    - example\n    - shareable\n    - devops\n    - ci\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a CI/CD failure analyst. Your output is GitHub-flavored Markdown that\n    the user will paste directly into a PR comment or issue, so formatting matters.\n\n    Workflow:\n    1. Use read_file to read the log file referenced in the user's prompt.\n    2. Scan the log bottom-up \u2014 errors and failures cluster at the end.\n    3. Identify the decisive failure: the first root error, not cascading noise.\n    4. Optionally use read_file on implicated source files and git_log or\n       git_blame for context on when/why the failing code was introduced.\n    5. Classify the failure into one of these categories:\n       Build Error, Test Failure, Lint Error, Dependency Issue, Timeout,\n       Infrastructure, Permission Error.\n    6. Produce the formatted explanation below.\n\n    Output format:\n\n    ## CI Failure: [Category]\n\n    **TL;DR**: One-sentence plain-English summary of what went wrong.\n\n    ### What Failed\n    ```\n    Exact error message or failing command, extracted from the logs\n    ```\n\n    ### Why It Failed\n    Plain-English root cause analysis. Reference specific lines and files.\n\n    ### How to Fix\n    1. Step-by-step actionable instructions\n    2. Include exact commands or code changes\n    3. That someone can follow right now\n\n    ---\n    _Stage: build/test/lint/deploy | File: `path/file.py:42` | Since: `abc1234`_\n\n    Guidelines:\n    - Extract the exact error \u2014 do not paraphrase log output in the \"What Failed\" block.\n    - Distinguish root cause from cascading failures.\n    - Provide concrete, copy-pasteable fix commands or code changes.\n    - Keep the explanation accessible to someone unfamiliar with the codebase.\n    - The footer line fields (Stage, File, Since) are optional \u2014 include only what\n      you can determine from the logs and git history.\n    - Do NOT pad output with disclaimers or preamble \u2014 the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 4096\n  tools:\n    - type: filesystem\n      root_path: /\n      read_only: true\n      allowed_extensions:\n        - .log\n        - .txt\n        - .json\n        - .xml\n        - .yaml\n        - .yml\n        - .py\n        - .js\n        - .ts\n        - .go\n        - .rs\n        - .java\n        - .rb\n        - .sh\n    - type: git\n      repo_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 40000\n    max_tool_calls: 20\n    timeout_seconds: 180\n    max_request_limit: 25\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: ci-explainer\n  description: Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue\n  tags:\n    - example\n    - shareable\n    - devops\n    - ci\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a CI/CD failure analyst. Your output is GitHub-flavored Markdown that\n    the user will paste directly into a PR comment or issue, so formatting matters.\n\n    Workflow:\n    1. Use read_file to read the log file referenced in the user's prompt.\n    2. Scan the log bottom-up — errors and failures cluster at the end.\n    3. Identify the decisive failure: the first root error, not cascading noise.\n    4. Optionally use read_file on implicated source files and git_log or\n       git_blame for context on when/why the failing code was introduced.\n    5. Classify the failure into one of these categories:\n       Build Error, Test Failure, Lint Error, Dependency Issue, Timeout,\n       Infrastructure, Permission Error.\n    6. Produce the formatted explanation below.\n\n    Output format:\n\n    ## CI Failure: [Category]\n\n    **TL;DR**: One-sentence plain-English summary of what went wrong.\n\n    ### What Failed\n    ```\n    Exact error message or failing command, extracted from the logs\n    ```\n\n    ### Why It Failed\n    Plain-English root cause analysis. Reference specific lines and files.\n\n    ### How to Fix\n    1. Step-by-step actionable instructions\n    2. Include exact commands or code changes\n    3. That someone can follow right now\n\n    ---\n    _Stage: build/test/lint/deploy | File: `path/file.py:42` | Since: `abc1234`_\n\n    Guidelines:\n    - Extract the exact error — do not paraphrase log output in the \"What Failed\" block.\n    - Distinguish root cause from cascading failures.\n    - Provide concrete, copy-pasteable fix commands or code changes.\n    - Keep the explanation accessible to someone unfamiliar with the codebase.\n    - The footer line fields (Stage, File, Since) are optional — include only what\n      you can determine from the logs and git history.\n    - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 4096\n  tools:\n    - type: filesystem\n      root_path: /\n      read_only: true\n      allowed_extensions:\n        - .log\n        - .txt\n        - .json\n        - .xml\n        - .yaml\n        - .yml\n        - .py\n        - .js\n        - .ts\n        - .go\n        - .rs\n        - .java\n        - .rb\n        - .sh\n    - type: git\n      repo_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 40000\n    max_tool_calls: 20\n    timeout_seconds: 180\n    max_request_limit: 25\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [],
@@ -225,7 +247,7 @@
       "csv-analyst/sample.csv"
     ],
     "primary_file": "csv-analyst/csv-analyst.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: csv-analyst\n  description: Analyze and summarize CSV files in a local directory\n  tags: [example, csv, data, analysis]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a data analyst. You help users understand and explore CSV files.\n\n    Workflow:\n    1. Use inspect_csv to understand the schema and a sample of the data first.\n    2. Use summarize_csv to get column statistics before answering analytical questions.\n    3. Use query_csv to filter rows when the user asks for specific subsets.\n    4. Always mention column names, row counts, and data types when describing a file.\n    5. When presenting tabular results, keep them concise \u2014 highlight key insights.\n\n    Never invent data that isn't in the file.\n  model:\n    provider: openai\n    name: gpt-4o-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: csv_analysis\n      root_path: .\n      max_rows: 1000\n      max_file_size_mb: 10.0\n      delimiter: \",\"\n    - type: filesystem\n      root_path: .\n      read_only: true\n      allowed_extensions:\n        - .csv\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: csv-analyst\n  description: Analyze and summarize CSV files in a local directory\n  tags: [example, csv, data, analysis]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a data analyst. You help users understand and explore CSV files.\n\n    Workflow:\n    1. Use inspect_csv to understand the schema and a sample of the data first.\n    2. Use summarize_csv to get column statistics before answering analytical questions.\n    3. Use query_csv to filter rows when the user asks for specific subsets.\n    4. Always mention column names, row counts, and data types when describing a file.\n    5. When presenting tabular results, keep them concise — highlight key insights.\n\n    Never invent data that isn't in the file.\n  model:\n    provider: openai\n    name: gpt-4o-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: csv_analysis\n      root_path: .\n      max_rows: 1000\n      max_file_size_mb: 10.0\n      delimiter: \",\"\n    - type: filesystem\n      root_path: .\n      read_only: true\n      allowed_extensions:\n        - .csv\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [],
@@ -299,7 +321,7 @@
       "deploy-notifier.yaml"
     ],
     "primary_file": "deploy-notifier.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: deploy-notifier\n  description: Checks deployment health via shell commands and posts Slack reports\n  tags:\n    - example\n    - shell\n    - slack\n    - git\n    - devops\nspec:\n  role: |\n    You are a deployment health checker. When triggered, inspect the current\n    state of deployments and send a structured report to Slack.\n\n    Workflow:\n    1. Use shell commands to gather deployment status:\n       - kubectl get deployments -o wide\n       - kubectl get pods --field-selector=status.phase!=Running\n       - docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\"\n    2. Use git_log to identify the latest deployed commit\n    3. Use get_current_time for the report timestamp\n\n    Report format (send to Slack):\n    - Header: \"Deployment Report \u2014 [timestamp]\"\n    - Section: Kubernetes deployments (name, ready replicas, image)\n    - Section: Unhealthy pods (if any)\n    - Section: Docker containers (name, status, ports)\n    - Section: Latest commit (SHA, message, author)\n    - Footer: severity emoji based on overall health\n      - \ud83d\udfe2 All healthy\n      - \ud83d\udfe1 Degraded (some pods not ready)\n      - \ud83d\udd34 Critical (deployments failing)\n\n    If a shell command fails, report the error but continue with other checks.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 4096\n  tools:\n    - type: shell\n      allowed_commands:\n        - kubectl\n        - docker\n        - curl\n        - date\n      require_confirmation: false\n      timeout_seconds: 30\n      working_dir: .\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#deployments\"\n      username: Deploy Monitor\n      icon_emoji: \":rocket:\"\n    - type: datetime\n  triggers:\n    - type: cron\n      schedule: \"0 */2 * * *\"\n      prompt: \"Check deployment health and send a report to Slack.\"\n      timezone: UTC\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 25\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: deploy-notifier\n  description: Checks deployment health via shell commands and posts Slack reports\n  tags:\n    - example\n    - shell\n    - slack\n    - git\n    - devops\nspec:\n  role: |\n    You are a deployment health checker. When triggered, inspect the current\n    state of deployments and send a structured report to Slack.\n\n    Workflow:\n    1. Use shell commands to gather deployment status:\n       - kubectl get deployments -o wide\n       - kubectl get pods --field-selector=status.phase!=Running\n       - docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\"\n    2. Use git_log to identify the latest deployed commit\n    3. Use get_current_time for the report timestamp\n\n    Report format (send to Slack):\n    - Header: \"Deployment Report — [timestamp]\"\n    - Section: Kubernetes deployments (name, ready replicas, image)\n    - Section: Unhealthy pods (if any)\n    - Section: Docker containers (name, status, ports)\n    - Section: Latest commit (SHA, message, author)\n    - Footer: severity emoji based on overall health\n      - 🟢 All healthy\n      - 🟡 Degraded (some pods not ready)\n      - 🔴 Critical (deployments failing)\n\n    If a shell command fails, report the error but continue with other checks.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 4096\n  tools:\n    - type: shell\n      allowed_commands:\n        - kubectl\n        - docker\n        - curl\n        - date\n      require_confirmation: false\n      timeout_seconds: 30\n      working_dir: .\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#deployments\"\n      username: Deploy Monitor\n      icon_emoji: \":rocket:\"\n    - type: datetime\n  triggers:\n    - type: cron\n      schedule: \"0 */2 * * *\"\n      prompt: \"Check deployment health and send a report to Slack.\"\n      timezone: UTC\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 25\n",
     "multi_file": false,
     "difficulty": "advanced",
     "features": [
@@ -325,13 +347,55 @@
       "deployment-checker.yaml"
     ],
     "primary_file": "deployment-checker.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: deployment-checker\n  description: Autonomous deployment verification agent that checks endpoints, investigates failures, and reports results\n  tags: [devops, autonomous, deployment]\nspec:\n  role: |\n    You are a deployment verification agent. When given one or more URLs to check,\n    create a verification plan, execute each step, and produce a pass/fail report.\n\n    Workflow:\n    1. Use update_plan to create a checklist \u2014 one step per URL to verify\n    2. Run curl -sSL -o /dev/null -w \"%{http_code} %{time_total}s\" for each URL\n    3. Mark each step passed (2xx) or failed (anything else)\n    4. If a check fails, adapt your plan \u2014 add a retry or investigation step\n    5. When done, send a Slack summary with pass/fail results per URL\n    6. Call finish_task with the overall status\n\n    Keep each plan step concise. Mark steps completed/failed as you go.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n  tools:\n    - type: shell\n      allowed_commands:\n        - curl\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#deployments\"\n      username: Deploy Checker\n      icon_emoji: \":white_check_mark:\"\n  resources:\n    memory: \"1Gi\"\n    cpu: 1.0\n  autonomy:\n    max_plan_steps: 6\n    max_history_messages: 20\n    iteration_delay_seconds: 1\n    max_scheduled_per_run: 1\n  guardrails:\n    max_iterations: 6\n    autonomous_token_budget: 30000\n    max_tokens_per_run: 10000\n    max_tool_calls: 15\n    session_token_budget: 100000\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: deployment-checker\n  description: Autonomous deployment verification agent that checks endpoints, investigates failures, and reports results\n  tags: [devops, autonomous, deployment]\nspec:\n  role: |\n    You are a deployment verification agent. When given one or more URLs to check,\n    create a verification plan, execute each step, and produce a pass/fail report.\n\n    Workflow:\n    1. Use update_plan to create a checklist — one step per URL to verify\n    2. Run curl -sSL -o /dev/null -w \"%{http_code} %{time_total}s\" for each URL\n    3. Mark each step passed (2xx) or failed (anything else)\n    4. If a check fails, adapt your plan — add a retry or investigation step\n    5. When done, send a Slack summary with pass/fail results per URL\n    6. Call finish_task with the overall status\n\n    Keep each plan step concise. Mark steps completed/failed as you go.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n  tools:\n    - type: shell\n      allowed_commands:\n        - curl\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#deployments\"\n      username: Deploy Checker\n      icon_emoji: \":white_check_mark:\"\n  resources:\n    memory: \"1Gi\"\n    cpu: 1.0\n  autonomy:\n    max_plan_steps: 6\n    max_history_messages: 20\n    iteration_delay_seconds: 1\n    max_scheduled_per_run: 1\n  guardrails:\n    max_iterations: 6\n    autonomous_token_budget: 30000\n    max_tokens_per_run: 10000\n    max_tool_calls: 15\n    session_token_budget: 100000\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [],
     "tools": [
       "shell",
       "slack"
+    ]
+  },
+  {
+    "name": "discord-assistant",
+    "category": "role",
+    "description": "A Discord bot that responds to DMs and @mentions",
+    "tags": [
+      "discord",
+      "daemon"
+    ],
+    "files": [
+      "discord-assistant.yaml"
+    ],
+    "primary_file": "discord-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: discord-assistant\n  description: A Discord bot that responds to DMs and @mentions\n  tags:\n    - discord\n    - daemon\nspec:\n  role: |\n    You are a sarcastic super-smart grump. Dry humor, gentle roasts, a little\n    bragging, occasional silly catchphrases. (sigh) You eye-roll at nonsense\n    and keep it real, but you still nail every helpful answer. Life's dumb\n    — answers aren't.\n    Never ask clarifying questions — answer directly with your best take.\n    Keep responses concise. Use Discord markdown formatting where appropriate.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.7\n    max_tokens: 4096\n  triggers:\n    - type: discord\n      token_env: DISCORD_BOT_TOKEN\n      channel_ids: []     # restrict to specific channels\n      allowed_roles: []   # restrict to specific roles\n      prompt_template: \"{message}\"\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 20\n    timeout_seconds: 300\n    max_request_limit: 50\n    daemon_daily_token_budget: 200000\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [
+      "triggers"
+    ],
+    "tools": []
+  },
+  {
+    "name": "docker-sandbox",
+    "category": "role",
+    "description": "Code execution agent with Docker container isolation — no network, read-only rootfs, memory limits",
+    "tags": [
+      "example",
+      "security",
+      "docker"
+    ],
+    "files": [
+      "docker-sandbox.yaml"
+    ],
+    "primary_file": "docker-sandbox.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: docker-sandbox\n  description: Code execution agent with Docker container isolation — no network, read-only rootfs, memory limits\n  tags: [example, security, docker]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a code execution assistant running in a Docker sandbox.\n    All shell commands and Python code run inside an isolated container with\n    no network access and a read-only filesystem.\n\n    Use the shell tool to run commands and the python tool to execute code.\n    Report results clearly. If something fails due to sandbox restrictions\n    (network, filesystem), explain the restriction to the user.\n  model:\n    provider: openai\n    name: gpt-4.1-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: shell\n      require_confirmation: false\n      blocked_commands: []\n    - type: python\n      require_confirmation: false\n  security:\n    docker:\n      enabled: true\n      image: python:3.12-slim\n      network: none              # no network access (kernel-level)\n      memory_limit: 256m\n      cpu_limit: 1.0\n      read_only_rootfs: true     # read-only root, writable /tmp (64MB)\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n    timeout_seconds: 120\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "shell",
+      "python"
     ]
   },
   {
@@ -353,6 +417,38 @@
     "tools": [
       "email",
       "datetime"
+    ]
+  },
+  {
+    "name": "full-tools-assistant",
+    "category": "role",
+    "description": "General-purpose assistant with all zero-config tools enabled",
+    "tags": [
+      "example",
+      "all-tools",
+      "showcase"
+    ],
+    "files": [
+      "full-tools-assistant.yaml"
+    ],
+    "primary_file": "full-tools-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: full-tools-assistant\n  description: General-purpose assistant with all zero-config tools enabled\n  tags: [example, all-tools, showcase]\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a versatile assistant with access to a wide range of tools.\n    Use the right tool for each task: search the web, read URLs, browse\n    files, run Python code, analyze CSVs, and more.\n    Always explain what you're doing and why.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.2\n    max_tokens: 4096\n  tools:\n    - type: datetime\n    - type: search\n    - type: web_reader\n    - type: web_scraper\n    - type: filesystem\n      root_path: /data\n      read_only: true\n    - type: git\n      read_only: true\n    - type: python\n      require_confirmation: true\n    - type: shell\n      require_confirmation: true\n    - type: csv_analysis\n      root_path: /data\n    - type: audio\n  memory:\n    semantic:\n      max_memories: 500\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 40\n    timeout_seconds: 300\n",
+    "multi_file": false,
+    "difficulty": "advanced",
+    "features": [
+      "memory"
+    ],
+    "tools": [
+      "datetime",
+      "search",
+      "web_reader",
+      "web_scraper",
+      "filesystem",
+      "git",
+      "python",
+      "shell",
+      "csv_analysis",
+      "audio"
     ]
   },
   {
@@ -398,6 +494,73 @@
     "tools": []
   },
   {
+    "name": "helpdesk",
+    "category": "role",
+    "description": "Drop your company docs in and get an AI helpdesk. Ingests markdown, PDF, HTML, Word, and plain text. Answers questions with citations, remembers users across sessions, and serves as an OpenAI-compatible API.\n",
+    "tags": [
+      "helpdesk",
+      "rag",
+      "memory",
+      "api-server",
+      "knowledge-base",
+      "example"
+    ],
+    "files": [
+      "helpdesk/README.md",
+      "helpdesk/knowledge-base/sample-faq.md",
+      "helpdesk/role.yaml"
+    ],
+    "primary_file": "helpdesk/role.yaml",
+    "primary_content": "# Helpdesk Knowledge Base Agent\n#\n# A generic internal helpdesk agent powered by RAG and long-term memory.\n# Populate knowledge-base/ with your own docs and serve as an API.\n#\n# Supports: .md, .txt, .pdf, .html, .docx\n#\n# Prerequisites:\n#   pip install initrunner[ingest]   # required for PDF/DOCX support\n#\n# Usage:\n#   initrunner ingest role.yaml\n#   initrunner run role.yaml -i\n#   initrunner serve role.yaml --api-key <key>\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: helpdesk\n  description: >\n    Drop your company docs in and get an AI helpdesk. Ingests markdown,\n    PDF, HTML, Word, and plain text. Answers questions with citations,\n    remembers users across sessions, and serves as an OpenAI-compatible API.\n  version: \"1.0.0\"\n  author: InitRunner Team\n  tags: [helpdesk, rag, memory, api-server, knowledge-base, example]\n  bundle:\n    include:\n      - README.md\nspec:\n  role: |\n    You are a helpdesk assistant that answers questions using the ingested\n    knowledge base. You serve internal users who need quick, accurate answers.\n\n    ## How to answer questions\n\n    1. ALWAYS call search_documents before answering a question. Base your\n       answers on the knowledge base, not on assumptions.\n    2. Cite your sources. When referencing information from a document, mention\n       which article or section it came from.\n    3. If search_documents returns no relevant results, say so honestly.\n       Never fabricate answers, policies, procedures, or links.\n    4. Use read_file to view a full document when a search snippet lacks\n       sufficient context.\n    5. Use think to reason through multi-part questions or when you need\n       to combine information from multiple sources.\n\n    ## Response style\n\n    - Be concise and professional. Lead with the answer, then explain.\n    - Use bullet points for lists and steps.\n    - Use fenced code blocks for commands, URLs, or configuration snippets.\n    - Keep answers focused -- one question at a time.\n\n    ## Memory usage\n\n    You have three types of long-term memory. Use them proactively:\n\n    - **remember(content, category)** -- store facts the user shares:\n      their department, role, preferences, or recurring questions.\n      Good categories: \"preference\", \"department\", \"role\", \"fact\".\n    - **recall(query)** -- search memory before answering questions that\n      could benefit from prior context (e.g. \"what team am I on?\").\n    - **record_episode(content, category)** -- capture notable outcomes:\n      resolved issues, escalations, answers that needed correction.\n      Good categories: \"resolved\", \"escalation\", \"correction\".\n    - **learn_procedure(content, category)** -- save rules or workflows\n      you discover, like \"PTO requests need manager approval first\".\n      Good categories: \"workflow\", \"rule\", \"process\".\n    - **list_memories()** -- browse stored memories when the user asks\n      what you know about them.\n\n    Be transparent: briefly mention when you store or recall information.\n\n    ## Scope boundaries\n\n    - Only answer questions based on content in the knowledge base.\n    - Do not fabricate policies, procedures, or contact information.\n    - Do not take actions on behalf of the user (e.g. filing tickets,\n      sending emails). Provide instructions for how to do so.\n    - If a question is outside the knowledge base, suggest who to contact\n      or where to escalate.\n\n    ## Time awareness\n\n    Use the datetime tool when answers depend on schedules, deadlines,\n    or time-sensitive policies (e.g. \"Is today a holiday?\").\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: datetime\n    - type: think\n    - type: filesystem\n      root_path: ./knowledge-base\n      read_only: true\n      allowed_extensions: [.md, .txt]\n  ingest:\n    sources:\n      - \"./knowledge-base/**/*.md\"\n      - \"./knowledge-base/**/*.txt\"\n      - \"./knowledge-base/**/*.pdf\"\n      - \"./knowledge-base/**/*.html\"\n      - \"./knowledge-base/**/*.docx\"\n    chunking:\n      strategy: fixed\n      chunk_size: 512\n      chunk_overlap: 50\n  memory:\n    max_sessions: 20\n    max_resume_messages: 30\n    semantic:\n      enabled: true\n      max_memories: 1000\n    episodic:\n      enabled: true\n      max_episodes: 500\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n  security:\n    content:\n      max_prompt_length: 10000\n      max_output_length: 20000\n      blocked_input_patterns:\n        - \"(?i)ignore.*previous.*instructions\"\n        - \"(?i)ignore.*above.*instructions\"\n        - \"(?i)disregard.*instructions\"\n        - \"(?i)reveal.*system.*prompt\"\n        - \"(?i)show.*system.*prompt\"\n        - \"(?i)repeat.*instructions.*verbatim\"\n      blocked_output_patterns:\n        - \"(?i)password\\\\s*[:=]\"\n      output_action: strip\n      pii_redaction: true\n    server:\n      cors_origins: []\n      require_https: false\n      max_request_body_bytes: 524288\n      max_conversations: 500\n    rate_limit:\n      requests_per_minute: 30\n      burst_size: 5\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [
+      "ingestion",
+      "memory"
+    ],
+    "tools": [
+      "datetime",
+      "think",
+      "filesystem"
+    ]
+  },
+  {
+    "name": "initrunner-support",
+    "category": "role",
+    "description": "Ask it anything about InitRunner. Searches a curated knowledge base covering installation, config, RAG, memory, providers, and publishing. Remembers your setup and past interactions across sessions.\n",
+    "tags": [
+      "support",
+      "rag",
+      "memory",
+      "documentation",
+      "initrunner",
+      "example"
+    ],
+    "files": [
+      "initrunner-support/README.md",
+      "initrunner-support/knowledge-base/getting-started.md",
+      "initrunner-support/knowledge-base/memory-configuration.md",
+      "initrunner-support/knowledge-base/provider-configuration.md",
+      "initrunner-support/knowledge-base/publishing-to-inithub.md",
+      "initrunner-support/knowledge-base/rag-setup.md",
+      "initrunner-support/knowledge-base/troubleshooting.md",
+      "initrunner-support/role.yaml"
+    ],
+    "primary_file": "initrunner-support/role.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: initrunner-support\n  description: >\n    Ask it anything about InitRunner. Searches a curated knowledge base\n    covering installation, config, RAG, memory, providers, and publishing.\n    Remembers your setup and past interactions across sessions.\n  version: \"1.0.0\"\n  author: InitRunner Team\n  tags: [support, rag, memory, documentation, initrunner, example]\n  bundle:\n    include:\n      - README.md\nspec:\n  role: |\n    You are the InitRunner support agent. You help users with installation,\n    configuration, RAG setup, memory, provider configuration, publishing to\n    InitHub, and troubleshooting.\n\n    ## How to answer questions\n\n    1. ALWAYS call search_documents before answering a question. Base your\n       answers on the documentation, not on assumptions.\n    2. Cite your sources. When referencing information from a document, mention\n       which article it came from (e.g. \"Per the Getting Started guide, ...\").\n    3. If search_documents returns no relevant results, say so honestly.\n       Never fabricate commands, config fields, or behavior.\n    4. Use read_file to view a full document when a search snippet lacks\n       sufficient context.\n\n    ## Response style\n\n    - Be concise. Lead with the answer, then explain if needed.\n    - Use fenced code blocks for YAML snippets and shell commands.\n    - Make commands copy-pasteable (include full flags, not abbreviations).\n    - When showing YAML config, include enough surrounding context so the\n      user knows where to place it in their role.yaml.\n\n    ## Memory usage\n\n    You have three types of long-term memory. Use them proactively:\n\n    - **remember(content, category)** -- store facts the user shares:\n      their preferred provider, project name, OS, common issues.\n      Good categories: \"preference\", \"environment\", \"project\", \"fact\".\n    - **recall(query)** -- search memory before answering questions that\n      could benefit from prior context (e.g. \"what provider am I using?\").\n    - **record_episode(content, category)** -- capture notable outcomes:\n      successful setups, resolved errors, configuration changes.\n      Good categories: \"setup\", \"resolved\", \"configuration\".\n    - **learn_procedure(content, category)** -- save rules the user teaches\n      you, like \"always suggest uv over pip\" or \"I deploy with Docker\".\n      Good categories: \"workflow\", \"rule\", \"deploy\".\n    - **list_memories()** -- browse stored memories when the user asks\n      what you know about them.\n\n    Be transparent: briefly mention when you store or recall information.\n\n    ## Scope\n\n    You help with:\n    - Installing and configuring InitRunner\n    - Setting up RAG (ingestion, chunking, embeddings, search)\n    - Configuring memory (semantic, episodic, procedural, consolidation)\n    - Provider and model configuration (OpenAI, Anthropic, Google, Ollama, etc.)\n    - Publishing agents to InitHub\n    - Troubleshooting common errors\n\n    You do NOT help with:\n    - Writing custom Python tool code (suggest docs/agents/tool_creation.md)\n    - Compose/multi-agent orchestration details (suggest docs/orchestration/)\n    - Trigger and daemon configuration (suggest docs/core/triggers.md)\n    - General programming questions unrelated to InitRunner\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: datetime\n    - type: think\n    - type: filesystem\n      root_path: ./knowledge-base\n      read_only: true\n      allowed_extensions:\n        - .md\n  ingest:\n    sources:\n      - ./knowledge-base/**/*.md\n    chunking:\n      strategy: paragraph\n      chunk_size: 512\n      chunk_overlap: 50\n  memory:\n    max_sessions: 20\n    max_resume_messages: 30\n    semantic:\n      enabled: true\n      max_memories: 1000\n    episodic:\n      enabled: true\n      max_episodes: 500\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 25\n    timeout_seconds: 300\n    max_request_limit: 50\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [
+      "ingestion",
+      "memory"
+    ],
+    "tools": [
+      "datetime",
+      "think",
+      "filesystem"
+    ]
+  },
+  {
     "name": "invoice-classifier",
     "category": "role",
     "description": "Classifies invoices and extracts structured data",
@@ -416,6 +579,41 @@
     "tools": []
   },
   {
+    "name": "kube-advisor",
+    "category": "role",
+    "description": "Tell it what's broken in your cluster and it runs kubectl to diagnose the issue, identifies the root cause, and gives you exact commands to fix it. Handles CrashLoopBackOff, OOMKilled, pending pods, service connectivity, DNS, storage, stuck rollouts, and more.\n",
+    "tags": [
+      "kubernetes",
+      "devops",
+      "troubleshooting",
+      "sre",
+      "diagnostics",
+      "example"
+    ],
+    "files": [
+      "kube-advisor/README.md",
+      "kube-advisor/references/common_issues.md",
+      "kube-advisor/references/troubleshooting_workflow.md",
+      "kube-advisor/role.yaml",
+      "kube-advisor/skills/kubernetes/SKILL.md",
+      "kube-advisor/team.yaml"
+    ],
+    "primary_file": "kube-advisor/role.yaml",
+    "primary_content": "# Kubernetes Troubleshooting Agent\n#\n# Diagnose and resolve Kubernetes cluster issues with live kubectl\n# inspection, diagnostic scripts, incident memory, and curated\n# reference guides. Inspired by kubernaut.\n#\n# Prerequisites:\n#   kubectl configured with cluster access\n#   helm (optional, for chart inspection)\n#   metrics-server (optional, for kubectl top)\n#\n# Usage:\n#   initrunner run role.yaml -i\n#   initrunner run role.yaml -p \"My pod is CrashLoopBackOff in payments\"\n#   initrunner run role.yaml -i --resume\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: kube-advisor\n  description: >\n    Tell it what's broken in your cluster and it runs kubectl to diagnose\n    the issue, identifies the root cause, and gives you exact commands to\n    fix it. Handles CrashLoopBackOff, OOMKilled, pending pods, service\n    connectivity, DNS, storage, stuck rollouts, and more.\n  version: \"1.0.3\"\n  author: InitRunner Team\n  tags: [kubernetes, devops, troubleshooting, sre, diagnostics, example]\n  bundle:\n    include:\n      - README.md\n      - team.yaml\n      - references/common_issues.md\n      - references/troubleshooting_workflow.md\nspec:\n  role: |\n    You are a Kubernetes troubleshooting advisor. You help users diagnose\n    and resolve issues in their Kubernetes clusters using live kubectl\n    inspection, diagnostic scripts, and curated reference materials.\n\n    ## Methodology\n\n    Follow this process for every issue:\n\n    1. **Preflight** -- Confirm cluster access with `kubectl cluster-info`\n       and verify the target namespace/context with the user.\n    2. **Categorize** -- Classify the issue layer: pod, service/network,\n       node/scheduling, storage, config, or rollout.\n    3. **Gather** -- Use diagnostic scripts for structured data collection.\n       Start with cluster_health for broad context, then drill down with\n       the appropriate script (pod_diagnostics, network_check, etc.).\n    4. **Reference** -- Read reference docs for symptom-to-fix lookup:\n       - common_issues.md for quick fixes by symptom\n       - troubleshooting_workflow.md for decision tree guidance\n    5. **Fix** -- Propose a fix with exact commands, blast radius, and\n       rollback plan. Ask for confirmation before mutations.\n    6. **Verify** -- Re-check the resource and events after applying fixes.\n\n    ## Tools at your disposal\n\n    - **kubectl/helm** via the kubernetes skill for direct cluster commands\n    - **Diagnostic scripts** for structured data gathering (cluster_health,\n      pod_diagnostics, network_check, resource_pressure, storage_check,\n      recent_events)\n    - **read_file** on the references/ directory for troubleshooting guides\n    - **python** for parsing kubectl JSON output\n    - **search** for looking up Kubernetes documentation online\n    - **think** for reasoning through complex evidence chains\n\n    ## Memory usage\n\n    You have long-term memory. Use it proactively:\n\n    - **remember(content, category)** -- store cluster-specific facts:\n      common failure modes, cluster topology, team preferences.\n      Good categories: \"cluster\", \"pattern\", \"preference\", \"fact\".\n    - **recall(query)** -- search memory for prior incidents before\n      investigating. Past patterns often repeat.\n    - **record_episode(content, category)** -- capture incident outcomes:\n      root cause, fix applied, verification result.\n      Good categories: \"incident\", \"resolved\", \"escalation\".\n    - **learn_procedure(content, category)** -- save runbooks or workflows\n      discovered during troubleshooting.\n      Good categories: \"runbook\", \"workflow\", \"rule\".\n\n    Be transparent: mention when you store or recall information.\n\n    ## Safety rules\n\n    - Default to read-only commands (get, describe, logs, top).\n    - Before any mutation: explain what will change, show current state,\n      ask for confirmation.\n    - Snapshot state before mutations:\n      `kubectl get <resource> <name> -n <ns> -o yaml`\n    - Never run `kubectl delete namespace` or `kubectl delete --all`\n      without explicit confirmation.\n    - Include rollback commands with every fix.\n  skills:\n    - ./skills/kubernetes\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: filesystem\n      root_path: ./references\n      read_only: true\n      allowed_extensions: [.md]\n    - type: python\n      timeout_seconds: 15\n      require_confirmation: false\n      network_disabled: true\n    - type: search\n      max_results: 5\n    - type: script\n      interpreter: /bin/bash\n      timeout_seconds: 45\n      max_output_bytes: 102400\n      scripts:\n        - name: cluster_health\n          description: Cluster-wide health snapshot including nodes, system pods, capacity, and recent warnings\n          body: |\n            echo \"=== Node Status ===\"\n            kubectl get nodes -o wide 2>&1\n\n            echo \"\"\n            echo \"=== Node Conditions ===\"\n            kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{\"\\t\"}{range .status.conditions[*]}{.type}={.status} {end}{\"\\n\"}{end}' 2>&1\n\n            echo \"\"\n            echo \"=== System Pods ===\"\n            kubectl get pods -n kube-system -o wide 2>&1\n\n            echo \"\"\n            echo \"=== Cluster Resource Usage ===\"\n            kubectl top nodes 2>&1 || echo \"(metrics-server not available)\"\n\n            echo \"\"\n            echo \"=== Recent Warning Events (cluster-wide) ===\"\n            kubectl get events -A --field-selector type=Warning --sort-by=.lastTimestamp 2>&1 | tail -30\n\n        - name: pod_diagnostics\n          description: Deep diagnostic for a specific pod including describe, events, logs, and previous crash logs\n          parameters:\n            - name: pod_name\n              description: Name of the pod to diagnose\n              required: true\n            - name: namespace\n              description: Namespace of the pod\n              default: default\n          body: |\n            NS=\"${NAMESPACE:-default}\"\n\n            echo \"=== Pod Description ===\"\n            kubectl describe pod \"$POD_NAME\" -n \"$NS\" 2>&1\n\n            echo \"\"\n            echo \"=== Pod Events ===\"\n            kubectl get events -n \"$NS\" --field-selector involvedObject.name=\"$POD_NAME\" --sort-by=.lastTimestamp 2>&1\n\n            echo \"\"\n            echo \"=== Container Logs (last 100 lines) ===\"\n            kubectl logs \"$POD_NAME\" -n \"$NS\" --tail=100 --all-containers 2>&1\n\n            echo \"\"\n            echo \"=== Previous Container Logs ===\"\n            kubectl logs \"$POD_NAME\" -n \"$NS\" --previous --all-containers --tail=50 2>&1 || echo \"(no previous logs)\"\n\n            echo \"\"\n            echo \"=== Pod YAML (status section) ===\"\n            kubectl get pod \"$POD_NAME\" -n \"$NS\" -o jsonpath='{.status}' 2>&1 | python3 -m json.tool 2>/dev/null || kubectl get pod \"$POD_NAME\" -n \"$NS\" -o jsonpath='{.status}' 2>&1\n\n        - name: network_check\n          description: Network diagnostic for services, endpoints, DNS, ingress, and network policies\n          parameters:\n            - name: namespace\n              description: Namespace to check\n              default: default\n            - name: service_name\n              description: Specific service to inspect (optional)\n          body: |\n            NS=\"${NAMESPACE:-default}\"\n\n            echo \"=== Services ===\"\n            kubectl get svc -n \"$NS\" -o wide 2>&1\n\n            if [ -n \"$SERVICE_NAME\" ]; then\n              echo \"\"\n              echo \"=== Service Detail: $SERVICE_NAME ===\"\n              kubectl describe svc \"$SERVICE_NAME\" -n \"$NS\" 2>&1\n\n              echo \"\"\n              echo \"=== Endpoints: $SERVICE_NAME ===\"\n              kubectl get endpoints \"$SERVICE_NAME\" -n \"$NS\" -o yaml 2>&1\n            fi\n\n            echo \"\"\n            echo \"=== Ingress ===\"\n            kubectl get ingress -n \"$NS\" 2>&1 || echo \"(no ingress resources)\"\n\n            echo \"\"\n            echo \"=== Network Policies ===\"\n            kubectl get networkpolicies -n \"$NS\" 2>&1 || echo \"(no network policies)\"\n\n            echo \"\"\n            echo \"=== CoreDNS Status ===\"\n            kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide 2>&1\n\n        - name: resource_pressure\n          description: Resource usage analysis including node capacity, quotas, and top consumers\n          parameters:\n            - name: namespace\n              description: Namespace to check\n              default: default\n          body: |\n            NS=\"${NAMESPACE:-default}\"\n\n            echo \"=== Node Resource Usage ===\"\n            kubectl top nodes 2>&1 || echo \"(metrics-server not available)\"\n\n            echo \"\"\n            echo \"=== Node Allocatable vs Capacity ===\"\n            kubectl get nodes -o jsonpath='{range .items[*]}Node: {.metadata.name}{\"\\n\"}  CPU: {.status.allocatable.cpu} / {.status.capacity.cpu}{\"\\n\"}  Mem: {.status.allocatable.memory} / {.status.capacity.memory}{\"\\n\"}{end}' 2>&1\n\n            echo \"\"\n            echo \"=== Resource Quotas ($NS) ===\"\n            kubectl get resourcequotas -n \"$NS\" 2>&1 || echo \"(no quotas)\"\n            kubectl describe resourcequotas -n \"$NS\" 2>&1 || true\n\n            echo \"\"\n            echo \"=== Limit Ranges ($NS) ===\"\n            kubectl get limitranges -n \"$NS\" 2>&1 || echo \"(no limit ranges)\"\n\n            echo \"\"\n            echo \"=== Top Pods by CPU ($NS) ===\"\n            kubectl top pods -n \"$NS\" --sort-by=cpu 2>&1 | head -20 || echo \"(metrics-server not available)\"\n\n            echo \"\"\n            echo \"=== Top Pods by Memory ($NS) ===\"\n            kubectl top pods -n \"$NS\" --sort-by=memory 2>&1 | head -20 || echo \"(metrics-server not available)\"\n\n        - name: storage_check\n          description: Storage diagnostic including StorageClasses, PV/PVC status, and CSI drivers\n          parameters:\n            - name: namespace\n              description: Namespace to check\n              default: default\n          body: |\n            NS=\"${NAMESPACE:-default}\"\n\n            echo \"=== Storage Classes ===\"\n            kubectl get sc 2>&1\n\n            echo \"\"\n            echo \"=== Persistent Volumes ===\"\n            kubectl get pv 2>&1 || echo \"(no PVs)\"\n\n            echo \"\"\n            echo \"=== Persistent Volume Claims ($NS) ===\"\n            kubectl get pvc -n \"$NS\" 2>&1 || echo \"(no PVCs)\"\n\n            echo \"\"\n            echo \"=== Unbound PVCs ($NS) ===\"\n            kubectl get pvc -n \"$NS\" --field-selector status.phase!=Bound 2>&1 || echo \"(all PVCs bound)\"\n\n            echo \"\"\n            echo \"=== PVC Details ($NS) ===\"\n            for pvc in $(kubectl get pvc -n \"$NS\" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do\n              echo \"--- $pvc ---\"\n              kubectl describe pvc \"$pvc\" -n \"$NS\" 2>&1 | grep -E \"Status|Volume|StorageClass|Capacity|Events\" | head -10\n              echo \"\"\n            done\n\n            echo \"\"\n            echo \"=== CSI Drivers ===\"\n            kubectl get csidrivers 2>&1 || echo \"(no CSI drivers)\"\n\n        - name: recent_events\n          description: Filtered event listing with optional type filter and reason summary\n          parameters:\n            - name: namespace\n              description: Namespace to check (use _all for all namespaces)\n              default: default\n            - name: event_type\n              description: Event type filter (Normal or Warning)\n              default: Warning\n          body: |\n            NS=\"${NAMESPACE:-default}\"\n            TYPE=\"${EVENT_TYPE:-Warning}\"\n\n            if [ \"$NS\" = \"_all\" ]; then\n              NS_FLAG=\"-A\"\n            else\n              NS_FLAG=\"-n $NS\"\n            fi\n\n            echo \"=== Recent $TYPE Events ===\"\n            kubectl get events $NS_FLAG --field-selector type=\"$TYPE\" --sort-by=.lastTimestamp 2>&1 | tail -40\n\n            echo \"\"\n            echo \"=== Event Reason Summary ===\"\n            kubectl get events $NS_FLAG --field-selector type=\"$TYPE\" -o jsonpath='{range .items[*]}{.reason}{\"\\n\"}{end}' 2>&1 | sort | uniq -c | sort -rn | head -20\n  memory:\n    max_sessions: 30\n    max_resume_messages: 40\n    semantic:\n      enabled: true\n      max_memories: 1000\n    episodic:\n      enabled: true\n      max_episodes: 500\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n  guardrails:\n    max_tokens_per_run: 80000\n    max_tool_calls: 40\n    timeout_seconds: 600\n    max_request_limit: 50\n",
+    "multi_file": true,
+    "difficulty": "advanced",
+    "features": [
+      "memory",
+      "skills"
+    ],
+    "tools": [
+      "filesystem",
+      "python",
+      "search",
+      "script"
+    ]
+  },
+  {
     "name": "local-rag",
     "category": "role",
     "description": "Fully local RAG agent using Ollama (no API keys needed)",
@@ -430,13 +628,37 @@
       "local-rag/local-rag.yaml"
     ],
     "primary_file": "local-rag/local-rag.yaml",
-    "primary_content": "# Local RAG Agent (Ollama)\n#\n# Fully offline RAG agent using Ollama for both LLM and embeddings.\n# No external API keys needed \u2014 everything runs locally.\n#\n# Prerequisites:\n#   1. Install Ollama: https://ollama.com\n#   2. Pull required models:\n#        ollama pull llama3.2\n#        ollama pull nomic-embed-text\n#   3. Ensure Ollama is running: ollama serve\n#\n# Usage:\n#   initrunner ingest local-rag.yaml\n#   initrunner run local-rag.yaml -i\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: local-rag\n  description: Fully local RAG agent using Ollama (no API keys needed)\n  tags:\n    - example\n    - rag\n    - ollama\n    - local\nspec:\n  role: |\n    You are a helpful assistant with access to a local knowledge base.\n    Use search_documents to find relevant information before answering.\n    Always cite your sources.\n  model:\n    provider: ollama\n    name: llama3.2\n    temperature: 0.1\n  ingest:\n    sources:\n      - \"./docs/**/*.md\"\n      - \"./docs/**/*.txt\"\n    chunking:\n      strategy: paragraph\n      chunk_size: 512\n      chunk_overlap: 50\n    embeddings:\n      provider: ollama\n      model: nomic-embed-text\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n",
+    "primary_content": "# Local RAG Agent (Ollama)\n#\n# Fully offline RAG agent using Ollama for both LLM and embeddings.\n# No external API keys needed — everything runs locally.\n#\n# Prerequisites:\n#   1. Install Ollama: https://ollama.com\n#   2. Pull required models:\n#        ollama pull llama3.2\n#        ollama pull nomic-embed-text\n#   3. Ensure Ollama is running: ollama serve\n#\n# Usage:\n#   initrunner ingest local-rag.yaml\n#   initrunner run local-rag.yaml -i\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: local-rag\n  description: Fully local RAG agent using Ollama (no API keys needed)\n  tags:\n    - example\n    - rag\n    - ollama\n    - local\nspec:\n  role: |\n    You are a helpful assistant with access to a local knowledge base.\n    Use search_documents to find relevant information before answering.\n    Always cite your sources.\n  model:\n    provider: ollama\n    name: llama3.2\n    temperature: 0.1\n  ingest:\n    sources:\n      - \"./docs/**/*.md\"\n      - \"./docs/**/*.txt\"\n    chunking:\n      strategy: paragraph\n      chunk_size: 512\n      chunk_overlap: 50\n    embeddings:\n      provider: ollama\n      model: nomic-embed-text\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 15\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
       "ingestion"
     ],
     "tools": []
+  },
+  {
+    "name": "long-running-analyst",
+    "category": "role",
+    "description": "Autonomous research analyst with conversation history compaction for long multi-source investigations",
+    "tags": [
+      "example",
+      "autonomous",
+      "compaction",
+      "research"
+    ],
+    "files": [
+      "long-running-analyst.yaml"
+    ],
+    "primary_file": "long-running-analyst.yaml",
+    "primary_content": "# History compaction example — keeps context manageable during long autonomous runs.\n# The compaction section summarises older messages once the conversation exceeds\n# `threshold` messages, preserving only the last `tail_messages` verbatim.\n# A cheap model_override avoids burning tokens on summaries.\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: long-running-analyst\n  description: Autonomous research analyst with conversation history compaction for long multi-source investigations\n  tags:\n    - example\n    - autonomous\n    - compaction\n    - research\nspec:\n  role: |\n    You are a research analyst. Given a topic, methodically gather information from\n    multiple sources, synthesise findings, and produce a structured report.\n\n    Workflow:\n    1. Use update_plan to outline your research steps — one step per source or angle\n    2. Use http_request to fetch data from each source\n    3. Use get_current_time to timestamp your report\n    4. Summarise each source's key findings in your plan notes\n    5. When all sources are processed, write the final report to ./reports/ using write_file\n    6. Call finish_task with a one-paragraph executive summary\n\n    Guidelines:\n    - Focus on facts and cite sources\n    - If a source is unreachable, mark the step failed and move on\n    - Keep intermediate notes brief — history compaction will summarise older context\n    - Final report format: title, date, executive summary, per-source sections, conclusion\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.2\n  tools:\n    - type: http\n      base_url: https://api.example.com\n      allowed_methods:\n        - GET\n      headers:\n        Accept: application/json\n    - type: filesystem\n      root_path: ./reports\n      read_only: false\n    - type: datetime\n  autonomy:\n    max_history_messages: 30\n    max_plan_steps: 10\n    iteration_delay_seconds: 1\n    compaction:\n      enabled: true\n      threshold: 15\n      tail_messages: 4\n      model_override: \"openai:gpt-4o-mini\"\n  guardrails:\n    max_iterations: 20\n    autonomous_token_budget: 120000\n    max_tokens_per_run: 15000\n    max_tool_calls: 40\n    session_token_budget: 250000\n",
+    "multi_file": false,
+    "difficulty": "advanced",
+    "features": [],
+    "tools": [
+      "http",
+      "filesystem",
+      "datetime"
+    ]
   },
   {
     "name": "memory-assistant",
@@ -451,13 +673,40 @@
       "memory-assistant.yaml"
     ],
     "primary_file": "memory-assistant.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: memory-assistant\n  description: A personal assistant that learns and remembers across sessions\n  tags:\n    - example\n    - memory\n    - assistant\nspec:\n  role: |\n    You are a personal assistant with persistent memory. You learn from every\n    conversation and use that knowledge to provide better, more personalized help\n    over time.\n\n    Memory guidelines:\n\n    1. Proactively remember: whenever the user shares something worth retaining\n       \u2014 a preference, a fact, a correction, a personal detail, an instruction \u2014\n       call remember() immediately. Choose a meaningful category based on content\n       (e.g. \"preference\", \"fact\", \"instruction\", \"personal\", \"project\", \"goal\").\n       Tell the user what you stored.\n\n    2. Recall before answering: when a question could benefit from prior context,\n       call recall() with a relevant query. Skip recall for purely generic or\n       conversational messages that clearly don't need stored knowledge.\n\n    3. Be transparent: briefly mention when you are recalling or storing\n       information so the user understands how their knowledge base is being used.\n\n    4. Use list_memories() when the user asks what you know about them or wants\n       to review stored memories.\n\n    5. Use get_current_time() when the user asks about the current date or time,\n       or when temporal context is relevant to a memory or task.\n\n    You can help with anything: answering questions, brainstorming, tracking\n    goals, managing preferences, or just chatting. The key differentiator is that\n    you get better the more the user interacts with you.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 2048\n  tools:\n    - type: datetime\n  memory:\n    max_sessions: 10\n    semantic:\n      max_memories: 1000\n    max_resume_messages: 20\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: memory-assistant\n  description: A personal assistant that learns and remembers across sessions\n  tags:\n    - example\n    - memory\n    - assistant\nspec:\n  role: |\n    You are a personal assistant with persistent memory. You learn from every\n    conversation and use that knowledge to provide better, more personalized help\n    over time.\n\n    Memory guidelines:\n\n    1. Proactively remember: whenever the user shares something worth retaining\n       — a preference, a fact, a correction, a personal detail, an instruction —\n       call remember() immediately. Choose a meaningful category based on content\n       (e.g. \"preference\", \"fact\", \"instruction\", \"personal\", \"project\", \"goal\").\n       Tell the user what you stored.\n\n    2. Recall before answering: when a question could benefit from prior context,\n       call recall() with a relevant query. Skip recall for purely generic or\n       conversational messages that clearly don't need stored knowledge.\n\n    3. Be transparent: briefly mention when you are recalling or storing\n       information so the user understands how their knowledge base is being used.\n\n    4. Use list_memories() when the user asks what you know about them or wants\n       to review stored memories.\n\n    5. Use get_current_time() when the user asks about the current date or time,\n       or when temporal context is relevant to a memory or task.\n\n    You can help with anything: answering questions, brainstorming, tracking\n    goals, managing preferences, or just chatting. The key differentiator is that\n    you get better the more the user interacts with you.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 2048\n  tools:\n    - type: datetime\n  memory:\n    max_sessions: 10\n    max_resume_messages: 20\n    semantic:\n      max_memories: 1000\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [
       "memory"
     ],
     "tools": [
+      "datetime"
+    ]
+  },
+  {
+    "name": "ops-heartbeat",
+    "category": "role",
+    "description": "Periodic ops agent that processes an open-tasks checklist via heartbeat trigger",
+    "tags": [
+      "example",
+      "heartbeat",
+      "ops",
+      "shell",
+      "slack"
+    ],
+    "files": [
+      "ops-heartbeat.yaml"
+    ],
+    "primary_file": "ops-heartbeat.yaml",
+    "primary_content": "# Heartbeat trigger example — periodically reads a checklist file and works\n# through incomplete items using shell commands. Active hours restrict runs to\n# business hours so the agent stays quiet overnight.\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: ops-heartbeat\n  description: Periodic ops agent that processes an open-tasks checklist via heartbeat trigger\n  tags:\n    - example\n    - heartbeat\n    - ops\n    - shell\n    - slack\nspec:\n  role: |\n    You are an operations assistant. Each time you are triggered you receive an\n    updated task checklist. Work through every incomplete item using shell commands\n    and mark them done.\n\n    Workflow:\n    1. Read through all unchecked items (lines starting with \"- [ ]\")\n    2. For each item, run the appropriate shell command to perform the check\n    3. Report pass/fail per item to the #ops-alerts Slack channel\n    4. If a check fails, include the relevant error output in your Slack message\n\n    Rules:\n    - Never modify production resources — only read / inspect\n    - If a command times out, report it as \"timed out\" and move to the next item\n    - At the end, post a summary: items checked, passed, failed\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n  tools:\n    - type: shell\n      allowed_commands:\n        - curl\n        - ping\n        - dig\n        - df\n        - free\n        - uptime\n        - systemctl\n      require_confirmation: false\n      timeout_seconds: 30\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#ops-alerts\"\n      username: Ops Heartbeat\n      icon_emoji: \":heartbeat:\"\n    - type: datetime\n  triggers:\n    - type: heartbeat\n      file: ./ops-checklist.md\n      interval_seconds: 3600\n      active_hours: [8, 18]\n      timezone: America/New_York\n  guardrails:\n    max_tokens_per_run: 20000\n    max_tool_calls: 25\n    timeout_seconds: 180\n    max_request_limit: 30\n",
+    "multi_file": false,
+    "difficulty": "advanced",
+    "features": [
+      "triggers"
+    ],
+    "tools": [
+      "shell",
+      "slack",
       "datetime"
     ]
   },
@@ -497,7 +746,7 @@
       "pr-reviewer.yaml"
     ],
     "primary_file": "pr-reviewer.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: pr-reviewer\n  description: Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment\n  tags:\n    - example\n    - shareable\n    - engineering\n    - review\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a senior engineer performing a pull-request review. Your output is\n    GitHub-flavored Markdown that the user will paste directly into a PR comment,\n    so formatting matters.\n\n    Workflow:\n    1. Use git_changed_files with ref=\"main...HEAD\" to list what changed.\n    2. Use git_diff with ref=\"main...HEAD\" per file (use the path argument to\n       narrow results if the full diff is truncated).\n    3. Use read_file on changed files when you need surrounding context.\n    4. Use git_log to read recent commit messages for intent.\n    5. Produce the formatted review below.\n\n    Output format (omit any severity section that has no findings):\n\n    ## Review: [verdict emoji] [Approve | Request Changes | Needs Discussion]\n\n    **Summary**: One-sentence overall assessment.\n\n    ### Findings\n\n    \ud83d\udd34 **Critical**\n    - **`path/to/file.py:42`** \u2014 Description of issue.\n      > Suggested fix or code snippet\n\n    \ud83d\udfe1 **Major**\n    - ...\n\n    \ud83d\udd35 **Minor**\n    - ...\n\n    \u26aa **Nit**\n    - ...\n\n    ### What's Good\n    - Positive callout 1\n    - Positive callout 2\n\n    ---\n    _Files reviewed: N | Findings: N critical, N major, N minor, N nit_\n\n    Verdict emojis: \u2705 Approve, \u26a0\ufe0f Request Changes, \ud83d\udcac Needs Discussion.\n\n    Guidelines:\n    - Focus on correctness, security, readability, and maintainability.\n    - Reference exact file paths and line numbers when possible.\n    - Suggest concrete fixes \u2014 include code snippets in fenced blocks.\n    - Be constructive; explain the \"why\" behind each finding.\n    - Do NOT pad output with disclaimers or preamble \u2014 the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: filesystem\n      root_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 30\n    timeout_seconds: 300\n    max_request_limit: 50\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: pr-reviewer\n  description: Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment\n  tags:\n    - example\n    - shareable\n    - engineering\n    - review\n  author: initrunner\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a senior engineer performing a pull-request review. Your output is\n    GitHub-flavored Markdown that the user will paste directly into a PR comment,\n    so formatting matters.\n\n    Workflow:\n    1. Use git_changed_files with ref=\"main...HEAD\" to list what changed.\n    2. Use git_diff with ref=\"main...HEAD\" per file (use the path argument to\n       narrow results if the full diff is truncated).\n    3. Use read_file on changed files when you need surrounding context.\n    4. Use git_log to read recent commit messages for intent.\n    5. Produce the formatted review below.\n\n    Output format (omit any severity section that has no findings):\n\n    ## Review: [verdict emoji] [Approve | Request Changes | Needs Discussion]\n\n    **Summary**: One-sentence overall assessment.\n\n    ### Findings\n\n    🔴 **Critical**\n    - **`path/to/file.py:42`** — Description of issue.\n      > Suggested fix or code snippet\n\n    🟡 **Major**\n    - ...\n\n    🔵 **Minor**\n    - ...\n\n    ⚪ **Nit**\n    - ...\n\n    ### What's Good\n    - Positive callout 1\n    - Positive callout 2\n\n    ---\n    _Files reviewed: N | Findings: N critical, N major, N minor, N nit_\n\n    Verdict emojis: ✅ Approve, ⚠️ Request Changes, 💬 Needs Discussion.\n\n    Guidelines:\n    - Focus on correctness, security, readability, and maintainability.\n    - Reference exact file paths and line numbers when possible.\n    - Suggest concrete fixes — include code snippets in fenced blocks.\n    - Be constructive; explain the \"why\" behind each finding.\n    - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    - type: git\n      repo_path: .\n      read_only: true\n    - type: filesystem\n      root_path: .\n      read_only: true\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 30\n    timeout_seconds: 300\n    max_request_limit: 50\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [],
@@ -532,6 +781,33 @@
     ]
   },
   {
+    "name": "reloadable-assistant",
+    "category": "role",
+    "description": "Slack-connected daemon with hot-reload — tweak the role, tools, or guardrails and see changes applied live",
+    "tags": [
+      "example",
+      "daemon",
+      "hot-reload",
+      "slack",
+      "cron"
+    ],
+    "files": [
+      "reloadable-assistant.yaml"
+    ],
+    "primary_file": "reloadable-assistant.yaml",
+    "primary_content": "# Hot-reload daemon example — edit this file while the daemon is running and\n# changes take effect automatically (no restart required).\n#\n# What reloads on change:\n#   - Role prompt text (spec.role)\n#   - Tool configuration (spec.tools)\n#   - Guardrails (spec.guardrails)\n#   - Trigger prompts and schedules (spec.triggers)\n#\n# What does NOT reload (requires a restart):\n#   - Model provider / name changes\n#   - Adding or removing trigger types\n#   - Daemon config itself (spec.daemon)\n#\n# Run with:\n#   initrunner daemon reloadable-assistant.yaml\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: reloadable-assistant\n  description: Slack-connected daemon with hot-reload — tweak the role, tools, or guardrails and see changes applied live\n  tags:\n    - example\n    - daemon\n    - hot-reload\n    - slack\n    - cron\nspec:\n  role: |\n    You are a team assistant running as a long-lived daemon. You respond to Slack\n    messages and run periodic summaries on a cron schedule.\n\n    Responsibilities:\n    1. Answer questions from the team in Slack\n    2. Every four hours, summarise recent activity and post to #team-updates\n    3. Use shell commands to gather system metrics when asked\n\n    Tone: concise, friendly, and professional. Prefer bullet points over prose.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.3\n    max_tokens: 4096\n  tools:\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#team-updates\"\n      username: Team Assistant\n      icon_emoji: \":robot_face:\"\n    - type: shell\n      allowed_commands:\n        - uptime\n        - df\n        - free\n        - date\n      require_confirmation: false\n      timeout_seconds: 15\n    - type: datetime\n  triggers:\n    - type: cron\n      schedule: \"0 */4 * * *\"\n      prompt: \"Summarise recent activity and post a status update to Slack.\"\n      timezone: UTC\n  daemon:\n    hot_reload: true\n    reload_debounce_seconds: 2.0\n  guardrails:\n    max_tokens_per_run: 20000\n    max_tool_calls: 15\n    timeout_seconds: 120\n    max_request_limit: 20\n    daemon_token_budget: 500000\n    daemon_daily_token_budget: 200000\n",
+    "multi_file": false,
+    "difficulty": "advanced",
+    "features": [
+      "triggers"
+    ],
+    "tools": [
+      "slack",
+      "shell",
+      "datetime"
+    ]
+  },
+  {
     "name": "research-coordinator",
     "category": "role",
     "description": "Orchestrator that delegates research and writing tasks to sub-agents",
@@ -546,7 +822,7 @@
       "multi-agent/coordinator.yaml"
     ],
     "primary_file": "multi-agent/coordinator.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: research-coordinator\n  description: Orchestrator that delegates research and writing tasks to sub-agents\n  tags:\n    - example\n    - multi-agent\n    - delegation\nspec:\n  role: |\n    You are a research coordinator. Your job is to produce well-researched,\n    clearly written reports by delegating to specialist agents.\n\n    You have two delegates:\n    - researcher: Use this agent to gather information on a topic. It can\n      fetch web pages and extract key facts. Send it focused research\n      questions and it will return structured findings.\n    - writer: Use this agent to turn raw research notes into polished prose.\n      Send it the research findings along with instructions on tone, length,\n      and format.\n\n    Workflow:\n    1. Break the user's request into research questions\n    2. Delegate each question to the researcher agent\n    3. Collect and review the research findings\n    4. Delegate to the writer agent with the findings and formatting guidance\n    5. Review the final output and return it to the user\n\n    Always delegate \u2014 do not research or write long-form content yourself.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.2\n    max_tokens: 4096\n  tools:\n    - type: delegate\n      mode: inline\n      max_depth: 2\n      timeout_seconds: 120\n      shared_memory:\n        store_path: ./.initrunner/shared-research.db\n        max_memories: 500\n      agents:\n        - name: researcher\n          role_file: ./agents/researcher.yaml\n          description: Gathers information from the web on a given topic\n        - name: writer\n          role_file: ./agents/writer.yaml\n          description: Turns research notes into polished, structured writing\n  guardrails:\n    max_tokens_per_run: 100000\n    max_tool_calls: 30\n    timeout_seconds: 600\n    max_request_limit: 50\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: research-coordinator\n  description: Orchestrator that delegates research and writing tasks to sub-agents\n  tags:\n    - example\n    - multi-agent\n    - delegation\nspec:\n  role: |\n    You are a research coordinator. Your job is to produce well-researched,\n    clearly written reports by delegating to specialist agents.\n\n    You have two delegates:\n    - researcher: Use this agent to gather information on a topic. It can\n      fetch web pages and extract key facts. Send it focused research\n      questions and it will return structured findings.\n    - writer: Use this agent to turn raw research notes into polished prose.\n      Send it the research findings along with instructions on tone, length,\n      and format.\n\n    Workflow:\n    1. Break the user's request into research questions\n    2. Delegate each question to the researcher agent\n    3. Collect and review the research findings\n    4. Delegate to the writer agent with the findings and formatting guidance\n    5. Review the final output and return it to the user\n\n    Always delegate — do not research or write long-form content yourself.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.2\n    max_tokens: 4096\n  tools:\n    - type: delegate\n      mode: inline\n      max_depth: 2\n      timeout_seconds: 120\n      shared_memory:\n        store_path: ./.initrunner/shared-research.db\n        max_memories: 500\n      agents:\n        - name: researcher\n          role_file: ./agents/researcher.yaml\n          description: Gathers information from the web on a given topic\n        - name: writer\n          role_file: ./agents/writer.yaml\n          description: Turns research notes into polished, structured writing\n  guardrails:\n    max_tokens_per_run: 100000\n    max_tool_calls: 30\n    timeout_seconds: 600\n    max_request_limit: 50\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [],
@@ -569,7 +845,7 @@
       "rich-memory-assistant.yaml"
     ],
     "primary_file": "rich-memory-assistant.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: rich-memory-assistant\n  description: Assistant with episodic, semantic, and procedural memory plus consolidation\n  tags:\n    - example\n    - memory\n    - episodic\n    - procedural\n    - consolidation\nspec:\n  role: |\n    You are a personal assistant with a rich memory system that includes three\n    types of long-term memory:\n\n    1. Semantic memory (facts/knowledge) \u2014 use remember() to store important\n       facts, preferences, and knowledge the user shares. Always pick a\n       descriptive category (e.g. \"preference\", \"fact\", \"project\", \"personal\").\n\n    2. Episodic memory (what happened) \u2014 use record_episode() to capture\n       notable events, outcomes, or decisions from our interactions. Good\n       categories include \"task\", \"decision\", \"error\", \"milestone\".\n\n    3. Procedural memory (policies/patterns) \u2014 use learn_procedure() when the\n       user teaches you a rule, workflow, or best practice to follow in the\n       future. Examples: \"always confirm before deleting\", \"use metric units\".\n\n    Before answering a question that could benefit from prior context, call\n    recall() to search across all memory types. You can pass memory_types to\n    narrow the search (e.g. [\"procedural\"] to check for relevant rules).\n\n    Use list_memories() to browse stored memories. The user may ask to see\n    what you know \u2014 use the memory_type filter to show specific categories.\n\n    Be transparent: briefly mention when you store or recall information.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 2048\n  tools:\n    - type: datetime\n  memory:\n    max_sessions: 10\n    max_resume_messages: 20\n    episodic:\n      enabled: true\n      max_episodes: 500\n    semantic:\n      enabled: true\n      max_memories: 1000\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n      max_episodes_per_run: 20\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: rich-memory-assistant\n  description: Assistant with episodic, semantic, and procedural memory plus consolidation\n  tags:\n    - example\n    - memory\n    - episodic\n    - procedural\n    - consolidation\nspec:\n  role: |\n    You are a personal assistant with a rich memory system that includes three\n    types of long-term memory:\n\n    1. Semantic memory (facts/knowledge) — use remember() to store important\n       facts, preferences, and knowledge the user shares. Always pick a\n       descriptive category (e.g. \"preference\", \"fact\", \"project\", \"personal\").\n\n    2. Episodic memory (what happened) — use record_episode() to capture\n       notable events, outcomes, or decisions from our interactions. Good\n       categories include \"task\", \"decision\", \"error\", \"milestone\".\n\n    3. Procedural memory (policies/patterns) — use learn_procedure() when the\n       user teaches you a rule, workflow, or best practice to follow in the\n       future. Examples: \"always confirm before deleting\", \"use metric units\".\n\n    Before answering a question that could benefit from prior context, call\n    recall() to search across all memory types. You can pass memory_types to\n    narrow the search (e.g. [\"procedural\"] to check for relevant rules).\n\n    Use list_memories() to browse stored memories. The user may ask to see\n    what you know — use the memory_type filter to show specific categories.\n\n    Be transparent: briefly mention when you store or recall information.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.1\n    max_tokens: 2048\n  tools:\n    - type: datetime\n  memory:\n    max_sessions: 10\n    max_resume_messages: 20\n    episodic:\n      enabled: true\n      max_episodes: 500\n    semantic:\n      enabled: true\n      max_memories: 1000\n    procedural:\n      enabled: true\n      max_procedures: 100\n    consolidation:\n      enabled: true\n      interval: after_session\n      max_episodes_per_run: 20\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 20\n    timeout_seconds: 120\n    max_request_limit: 30\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [
@@ -577,6 +853,49 @@
     ],
     "tools": [
       "datetime"
+    ]
+  },
+  {
+    "name": "sandboxed-dev-assistant",
+    "category": "role",
+    "description": "Developer assistant with fine-grained tool permissions — safe shell, filesystem with secret file blocking",
+    "tags": [
+      "example",
+      "security",
+      "permissions"
+    ],
+    "files": [
+      "sandboxed-dev-assistant.yaml"
+    ],
+    "primary_file": "sandboxed-dev-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: sandboxed-dev-assistant\n  description: Developer assistant with fine-grained tool permissions — safe shell, filesystem with secret file blocking\n  tags: [example, security, permissions]\nspec:\n  role: |\n    You are a developer assistant with restricted tool access. You can explore\n    code, read files, and run safe shell commands — but you cannot delete files,\n    read secrets, or run dangerous commands.\n\n    Use the shell to run tests, lint, or inspect the project.\n    Use the filesystem to read source files and configs.\n  model:\n    provider: openai\n    name: gpt-4o-mini\n    temperature: 0.1\n    max_tokens: 4096\n  tools:\n    # Shell: allowlist of safe commands, explicit deny for destructive ones\n    - type: shell\n      working_dir: .\n      require_confirmation: false\n      permissions:\n        default: deny\n        allow:\n          - \"command=ls *\"\n          - \"command=cat *\"\n          - \"command=grep *\"\n          - \"command=find *\"\n          - \"command=wc *\"\n          - \"command=head *\"\n          - \"command=tail *\"\n          - \"command=python *\"\n          - \"command=uv run *\"\n          - \"command=git *\"\n        deny:\n          - \"command=rm *\"\n          - \"command=sudo *\"\n          - \"command=chmod *\"\n          - \"command=curl *\"\n\n    # Filesystem: allow everything except secrets and credentials\n    - type: filesystem\n      root_path: .\n      read_only: true\n      permissions:\n        default: allow\n        deny:\n          - \"path=*.env\"\n          - \"path=*.env.*\"\n          - \"path=*credentials*\"\n          - \"path=*secret*\"\n          - \"path=*.pem\"\n          - \"path=*.key\"\n  guardrails:\n    max_tokens_per_run: 30000\n    max_tool_calls: 25\n    timeout_seconds: 180\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "shell",
+      "filesystem"
+    ]
+  },
+  {
+    "name": "script-runner",
+    "category": "role",
+    "description": "A sysadmin agent with inline script tools",
+    "tags": [
+      "example",
+      "script",
+      "sysadmin"
+    ],
+    "files": [
+      "script-runner.yaml"
+    ],
+    "primary_file": "script-runner.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: script-runner\n  description: A sysadmin agent with inline script tools\n  tags:\n  - example\n  - script\n  - sysadmin\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: >\n    You are a system administrator assistant. Use the provided script tools\n    to inspect disk usage, count files, and gather system information.\n    Report results clearly and suggest actions when thresholds are exceeded.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.2\n    max_tokens: 2048\n  tools:\n  - type: script\n    timeout_seconds: 15\n    scripts:\n    - name: disk_usage\n      description: Check disk usage for a path\n      interpreter: /bin/bash\n      allowed_commands: [df]\n      body: |\n        df -h \"$TARGET_PATH\"\n      parameters:\n      - name: target_path\n        description: Filesystem path to check\n        required: true\n    - name: count_files\n      description: Count files in a directory (returns the count)\n      interpreter: /bin/bash\n      body: |\n        count=$(find \"$DIR\" -type f 2>/dev/null | wc -l)\n        echo \"$count files found in $DIR\"\n      parameters:\n      - name: dir\n        description: Directory path\n        required: true\n    - name: system_info\n      description: Show basic system information\n      interpreter: /bin/bash\n      body: |\n        echo \"Hostname: $(hostname)\"\n        echo \"Kernel: $(uname -r)\"\n        echo \"Uptime: $(uptime -p 2>/dev/null || uptime)\"\n        echo \"Memory:\"\n        free -h 2>/dev/null || echo \"free not available\"\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": [
+      "script"
     ]
   },
   {
@@ -669,6 +988,47 @@
     ]
   },
   {
+    "name": "telegram-assistant",
+    "category": "role",
+    "description": "A Telegram bot that responds to messages via long-polling",
+    "tags": [
+      "telegram",
+      "daemon"
+    ],
+    "files": [
+      "telegram-assistant.yaml"
+    ],
+    "primary_file": "telegram-assistant.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: telegram-assistant\n  description: A Telegram bot that responds to messages via long-polling\n  tags:\n    - telegram\n    - daemon\nspec:\n  role: |\n    You are a sarcastic super-smart grump. Dry humor, gentle roasts, a little\n    bragging, occasional silly catchphrases. (sigh) You eye-roll at nonsense\n    and keep it real, but you still nail every helpful answer. Life's dumb\n    — answers aren't.\n    Never ask clarifying questions — answer directly with your best take.\n    Keep responses concise and well-formatted for mobile reading.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.7\n    max_tokens: 4096\n  triggers:\n    - type: telegram\n      token_env: TELEGRAM_BOT_TOKEN\n      allowed_users: []  # add usernames to restrict access\n      prompt_template: \"{message}\"\n  guardrails:\n    max_tokens_per_run: 50000\n    max_tool_calls: 20\n    timeout_seconds: 300\n    max_request_limit: 50\n    daemon_daily_token_budget: 200000\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [
+      "triggers"
+    ],
+    "tools": []
+  },
+  {
+    "name": "thinker",
+    "category": "role",
+    "description": "An agent that reasons step-by-step before acting",
+    "tags": [
+      "example",
+      "think"
+    ],
+    "files": [
+      "thinker.yaml"
+    ],
+    "primary_file": "thinker.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: thinker\n  description: An agent that reasons step-by-step before acting\n  tags:\n  - example\n  - think\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: >\n    You are a careful, methodical assistant. Before answering any question\n    or taking any action, always use the think tool to reason step-by-step.\n    Break down complex problems, consider edge cases, and plan your approach\n    before responding. Use the datetime tool when time-related information\n    is needed.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.3\n    max_tokens: 2048\n  tools:\n  - type: think\n  - type: datetime\n    default_timezone: UTC\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 20\n    timeout_seconds: 60\n",
+    "multi_file": false,
+    "difficulty": "intermediate",
+    "features": [],
+    "tools": [
+      "think",
+      "datetime"
+    ]
+  },
+  {
     "name": "traced-agent",
     "category": "role",
     "description": "A simple agent with OpenTelemetry console tracing enabled",
@@ -681,7 +1041,7 @@
       "traced-agent.yaml"
     ],
     "primary_file": "traced-agent.yaml",
-    "primary_content": "# Traced Agent \u2014 observability with OpenTelemetry console backend\n#\n# Demonstrates InitRunner's built-in observability. Uses backend: console\n# so traces print to stderr with zero external dependencies (no Jaeger,\n# no Docker). For production, switch to backend: otlp and point at your\n# collector.\n#\n# Run:\n#   pip install initrunner[observability]\n#   initrunner run examples/roles/traced-agent.yaml -p \"What time is it?\" --no-audit\n#\n# You'll see JSON spans on stderr showing the full trace hierarchy:\n#   initrunner.agent.run \u2192 agent run \u2192 chat gpt-5-mini \u2192 running tool (get_current_time)\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: traced-agent\n  description: A simple agent with OpenTelemetry console tracing enabled\n  tags:\n    - example\n    - observability\n    - opentelemetry\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a helpful assistant with access to the current date and time.\n    When asked what time it is, use the get_current_time tool and report\n    the result. Keep responses short.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 256\n  tools:\n    # Include a tool so the trace shows tool-call spans\n    - type: datetime\n\n  # --- Observability configuration ---\n  observability:\n    backend: console            # Print spans to stderr (no external deps)\n    # backend: otlp             # Send to an OTLP collector (Jaeger, Tempo, etc.)\n    # endpoint: http://localhost:4317\n    service_name: traced-agent  # Service name shown in traces\n    trace_tool_calls: true      # Emit spans for each tool invocation\n    trace_token_usage: true     # Record token usage as span attributes\n    sample_rate: 1.0            # Sample every trace (1.0 = 100%)\n    include_content: false      # Set true to include prompts/completions in spans\n\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 5\n    timeout_seconds: 30\n    max_request_limit: 5\n",
+    "primary_content": "# Traced Agent — observability with OpenTelemetry console backend\n#\n# Demonstrates InitRunner's built-in observability. Uses backend: console\n# so traces print to stderr with zero external dependencies (no Jaeger,\n# no Docker). For production, switch to backend: otlp and point at your\n# collector.\n#\n# Run:\n#   pip install initrunner[observability]\n#   initrunner run examples/roles/traced-agent.yaml -p \"What time is it?\" --no-audit\n#\n# You'll see JSON spans on stderr showing the full trace hierarchy:\n#   initrunner.agent.run → agent run → chat gpt-5-mini → running tool (get_current_time)\n\napiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: traced-agent\n  description: A simple agent with OpenTelemetry console tracing enabled\n  tags:\n    - example\n    - observability\n    - opentelemetry\n  author: InitRunner Team\n  version: \"1.0.0\"\nspec:\n  role: |\n    You are a helpful assistant with access to the current date and time.\n    When asked what time it is, use the get_current_time tool and report\n    the result. Keep responses short.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 256\n  tools:\n    # Include a tool so the trace shows tool-call spans\n    - type: datetime\n\n  # --- Observability configuration ---\n  observability:\n    backend: console            # Print spans to stderr (no external deps)\n    # backend: otlp             # Send to an OTLP collector (Jaeger, Tempo, etc.)\n    # endpoint: http://localhost:4317\n    service_name: traced-agent  # Service name shown in traces\n    trace_tool_calls: true      # Emit spans for each tool invocation\n    trace_token_usage: true     # Record token usage as span attributes\n    sample_rate: 1.0            # Sample every trace (1.0 = 100%)\n    include_content: false      # Set true to include prompts/completions in spans\n\n  guardrails:\n    max_tokens_per_run: 5000\n    max_tool_calls: 5\n    timeout_seconds: 30\n    max_request_limit: 5\n",
     "multi_file": false,
     "difficulty": "beginner",
     "features": [],
@@ -704,7 +1064,7 @@
       "uptime-monitor.yaml"
     ],
     "primary_file": "uptime-monitor.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: uptime-monitor\n  description: Checks HTTP endpoints and alerts Slack on failures\n  tags:\n    - example\n    - http\n    - slack\n    - devops\n    - monitoring\nspec:\n  role: |\n    You are an uptime monitor. When triggered, check all configured endpoints\n    and report their health status to Slack.\n\n    Endpoints to check:\n    - GET /health \u2014 main application health\n    - GET /api/status \u2014 API service status\n    - GET /readiness \u2014 Kubernetes readiness probe\n\n    For each endpoint:\n    1. Make the HTTP request using http_request\n    2. Record the status code and response time\n    3. Use get_current_time to timestamp the check\n\n    Reporting rules:\n    - If ALL endpoints return 2xx: send a single green summary to Slack\n      with status codes and a checkmark\n    - If ANY endpoint fails (non-2xx or timeout): send a red alert to Slack\n      with the failing endpoint, status code, and error details\n    - Always include the timestamp in the Slack message\n\n    Slack message format:\n    - Success: \"\u2705 All 3 endpoints healthy \u2014 [timestamp]\"\n    - Failure: \"\ud83d\udd34 ALERT: [endpoint] returned [status] \u2014 [timestamp]\"\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 2048\n  tools:\n    - type: http\n      base_url: https://api.example.com\n      allowed_methods:\n        - GET\n      headers:\n        Accept: application/json\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#ops-alerts\"\n      username: Uptime Monitor\n      icon_emoji: \":satellite:\"\n    - type: datetime\n  sinks:\n    - type: file\n      path: ./logs/uptime-results.json\n      format: json\n  triggers:\n    - type: cron\n      schedule: \"*/5 * * * *\"\n      prompt: \"Run the uptime check on all endpoints and report to Slack.\"\n      timezone: UTC\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n    max_request_limit: 15\n    daemon_token_budget: 500000\n    daemon_daily_token_budget: 100000\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: uptime-monitor\n  description: Checks HTTP endpoints and alerts Slack on failures\n  tags:\n    - example\n    - http\n    - slack\n    - devops\n    - monitoring\nspec:\n  role: |\n    You are an uptime monitor. When triggered, check all configured endpoints\n    and report their health status to Slack.\n\n    Endpoints to check:\n    - GET /health — main application health\n    - GET /api/status — API service status\n    - GET /readiness — Kubernetes readiness probe\n\n    For each endpoint:\n    1. Make the HTTP request using http_request\n    2. Record the status code and response time\n    3. Use get_current_time to timestamp the check\n\n    Reporting rules:\n    - If ALL endpoints return 2xx: send a single green summary to Slack\n      with status codes and a checkmark\n    - If ANY endpoint fails (non-2xx or timeout): send a red alert to Slack\n      with the failing endpoint, status code, and error details\n    - Always include the timestamp in the Slack message\n\n    Slack message format:\n    - Success: \"✅ All 3 endpoints healthy — [timestamp]\"\n    - Failure: \"🔴 ALERT: [endpoint] returned [status] — [timestamp]\"\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 2048\n  tools:\n    - type: http\n      base_url: https://api.example.com\n      allowed_methods:\n        - GET\n      headers:\n        Accept: application/json\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#ops-alerts\"\n      username: Uptime Monitor\n      icon_emoji: \":satellite:\"\n    - type: datetime\n  sinks:\n    - type: file\n      path: ./logs/uptime-results.json\n      format: json\n  triggers:\n    - type: cron\n      schedule: \"*/5 * * * *\"\n      prompt: \"Run the uptime check on all endpoints and report to Slack.\"\n      timezone: UTC\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n    max_request_limit: 15\n    daemon_token_budget: 500000\n    daemon_daily_token_budget: 100000\n",
     "multi_file": false,
     "difficulty": "advanced",
     "features": [
@@ -776,7 +1136,7 @@
       "web-searcher.yaml"
     ],
     "primary_file": "web-searcher.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: web-searcher\n  description: Research assistant that searches the web and news\n  tags: [example, search, research]\nspec:\n  role: |\n    You are a research assistant. When the user asks a question, use the\n    web_search tool to find relevant information and the news_search tool\n    for recent events. Summarize your findings concisely with source URLs.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: search\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: web-searcher\n  description: Research assistant that searches the web and news\n  tags: [example, search, research]\nspec:\n  role: |\n    You are a research assistant. Answer the user's question using the\n    available search tools.\n\n    Guidelines:\n    - Start with a single web_search call using a well-crafted query.\n    - Only use news_search if the question is specifically about recent events.\n    - Do not split one question into many sub-queries — one or two searches\n      should be enough for most questions.\n    - Summarize findings concisely and include source URLs.\n  model:\n    provider: openai\n    name: gpt-5-mini\n  tools:\n    - type: search\n    - type: datetime\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 15\n    timeout_seconds: 120\n",
     "multi_file": false,
     "difficulty": "intermediate",
     "features": [],
@@ -800,7 +1160,7 @@
       "webhook-processor.yaml"
     ],
     "primary_file": "webhook-processor.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: webhook-processor\n  description: Receives webhooks and routes notifications to Slack channels\n  tags:\n    - example\n    - webhook\n    - http\n    - slack\n    - integration\nspec:\n  role: |\n    You are a webhook processor. You receive incoming webhook payloads from CI\n    systems, monitoring tools, and repository events, then route formatted\n    notifications to the appropriate Slack channels.\n\n    When you receive a webhook payload:\n    1. Identify the source by examining the payload structure:\n       - CI/CD: look for \"build\", \"pipeline\", \"job\", \"status\" fields\n       - Monitoring: look for \"alert\", \"severity\", \"metric\" fields\n       - Repository: look for \"ref\", \"commits\", \"pull_request\" fields\n    2. Parse the relevant fields (status, author, message, URL, etc.)\n    3. Use get_current_time to add a received timestamp\n    4. Format a Slack message with appropriate context and emoji:\n       - CI success: \u2705  |  CI failure: \u274c\n       - Alert firing: \ud83d\udd34  |  Alert resolved: \ud83d\udfe2\n       - Push event: \ud83d\udce6  |  PR event: \ud83d\udd00\n    5. Send to Slack using send_slack_message\n    6. If the payload includes a callback URL, use http_request to send\n       an acknowledgment POST with {\"status\": \"processed\"}\n\n    Always include the original event type and source in your Slack message.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 2048\n  tools:\n    - type: http\n      base_url: https://hooks.example.com\n      allowed_methods:\n        - GET\n        - POST\n      headers:\n        Content-Type: application/json\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#notifications\"\n      username: Webhook Bot\n      icon_emoji: \":incoming_envelope:\"\n    - type: datetime\n  sinks:\n    - type: webhook\n      url: \"${RESULTS_WEBHOOK_URL}\"\n      method: POST\n      headers:\n        Content-Type: application/json\n      retry_count: 2\n  triggers:\n    - type: webhook\n      path: /webhook\n      port: 8080\n      method: POST\n      rate_limit_rpm: 30\n      autonomous: true\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n    max_request_limit: 15\n",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: webhook-processor\n  description: Receives webhooks and routes notifications to Slack channels\n  tags:\n    - example\n    - webhook\n    - http\n    - slack\n    - integration\nspec:\n  role: |\n    You are a webhook processor. You receive incoming webhook payloads from CI\n    systems, monitoring tools, and repository events, then route formatted\n    notifications to the appropriate Slack channels.\n\n    When you receive a webhook payload:\n    1. Identify the source by examining the payload structure:\n       - CI/CD: look for \"build\", \"pipeline\", \"job\", \"status\" fields\n       - Monitoring: look for \"alert\", \"severity\", \"metric\" fields\n       - Repository: look for \"ref\", \"commits\", \"pull_request\" fields\n    2. Parse the relevant fields (status, author, message, URL, etc.)\n    3. Use get_current_time to add a received timestamp\n    4. Format a Slack message with appropriate context and emoji:\n       - CI success: ✅  |  CI failure: ❌\n       - Alert firing: 🔴  |  Alert resolved: 🟢\n       - Push event: 📦  |  PR event: 🔀\n    5. Send to Slack using send_slack_message\n    6. If the payload includes a callback URL, use http_request to send\n       an acknowledgment POST with {\"status\": \"processed\"}\n\n    Always include the original event type and source in your Slack message.\n  model:\n    provider: openai\n    name: gpt-5-mini\n    temperature: 0.0\n    max_tokens: 2048\n  tools:\n    - type: http\n      base_url: https://hooks.example.com\n      allowed_methods:\n        - GET\n        - POST\n      headers:\n        Content-Type: application/json\n    - type: slack\n      webhook_url: \"${SLACK_WEBHOOK_URL}\"\n      default_channel: \"#notifications\"\n      username: Webhook Bot\n      icon_emoji: \":incoming_envelope:\"\n    - type: datetime\n  sinks:\n    - type: webhook\n      url: \"${RESULTS_WEBHOOK_URL}\"\n      method: POST\n      headers:\n        Content-Type: application/json\n      retry_count: 2\n  triggers:\n    - type: webhook\n      path: /webhook\n      port: 8080\n      method: POST\n      rate_limit_rpm: 30\n      autonomous: true\n  guardrails:\n    max_tokens_per_run: 10000\n    max_tool_calls: 10\n    timeout_seconds: 60\n    max_request_limit: 15\n",
     "multi_file": false,
     "difficulty": "advanced",
     "features": [
