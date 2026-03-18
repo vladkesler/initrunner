@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.31.0] - 2026-03-18
+
+### Added
+- **Helpdesk example agent** (`examples/roles/helpdesk/`) -- generic knowledge base helpdesk with multi-format ingestion, memory, security hardening, and API server support
+
+### Fixed
+- **Bundle extraction path resolution** -- installed roles now resolve relative paths correctly (`data/` prefix stripped during extraction so `./knowledge-base/` matches the original layout)
+- **LanceDB deprecation warning** -- include `_distance` in vector search projection to suppress `lance::dataset::scanner` warning
+
 ## [1.30.0] - 2026-03-18
 
 ### Breaking Changes

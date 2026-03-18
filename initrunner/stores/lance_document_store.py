@@ -180,7 +180,7 @@ class LanceDocumentStore(DocumentStore):
             if filter_expr is not None:
                 q = q.where(filter_expr, prefilter=True)
 
-            results = q.select(["id", "text", "source"]).to_list()
+            results = q.select(["id", "text", "source", "_distance"]).to_list()
 
             search_results: list[SearchResult] = []
             for row in results:

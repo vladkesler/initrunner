@@ -246,6 +246,14 @@ def extract_bundle(archive_path: Path, target_dir: Path) -> BundleManifest:
         # Safety filter: only extract expected files
         allowed = {"manifest.json"} | {bf.path for bf in manifest.files}
         members = [m for m in tar.getmembers() if m.name in allowed]
+
+        # Strip the "data/" prefix so extracted paths match the original
+        # development layout (e.g. data/knowledge-base/foo.md -> knowledge-base/foo.md).
+        # This keeps role.yaml relative paths working after install.
+        for m in members:
+            if m.name.startswith("data/"):
+                m.name = m.name[5:]  # len("data/") == 5
+
         tar.extractall(target_dir, members=members)
 
     return manifest
