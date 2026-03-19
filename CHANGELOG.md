@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.33.1] - 2026-03-19
+
+### Fixed
+- Version bump for PyPI re-release (v1.33.0 tag pointed to post-release README commit; PyPI rejects duplicate versions)
+
 ## [1.33.0] - 2026-03-19
 
 ### Added
