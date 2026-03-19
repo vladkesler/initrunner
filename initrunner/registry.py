@@ -38,6 +38,14 @@ class NetworkError(RegistryError):
 
 
 @dataclass
+class InstallResult:
+    """Result of a successful install."""
+
+    path: Path
+    display_name: str
+
+
+@dataclass
 class InstalledRole:
     name: str
     source: str
@@ -237,8 +245,8 @@ def _preview_hub(source: str, *, force: bool = False) -> InstallPreview:
     )
 
 
-def confirm_install(source: str, *, force: bool = False) -> Path:
-    """Actually install a role from any source. No UI output. Returns installed path."""
+def confirm_install(source: str, *, force: bool = False) -> InstallResult:
+    """Actually install a role from any source. No UI output. Returns InstallResult."""
     from initrunner.packaging.oci import is_oci_reference
 
     if is_oci_reference(source):
@@ -258,7 +266,7 @@ def confirm_install(source: str, *, force: bool = False) -> Path:
     return _install_hub(source, force=force)
 
 
-def _install_oci(oci_ref: str, *, force: bool = False) -> Path:
+def _install_oci(oci_ref: str, *, force: bool = False) -> InstallResult:
     """Pull an OCI bundle and install it locally."""
     from initrunner.packaging.oci import OCIClient, OCIError, parse_oci_ref
     from initrunner.services.packaging import pull_role
@@ -311,10 +319,10 @@ def _install_oci(oci_ref: str, *, force: bool = False) -> Path:
         "installed_at": datetime.now(UTC).isoformat(),
     }
     save_manifest(manifest)
-    return target_dir
+    return InstallResult(path=target_dir, display_name=role_name)
 
 
-def _install_hub(source: str, *, force: bool = False) -> Path:
+def _install_hub(source: str, *, force: bool = False) -> InstallResult:
     """Install a role from InitHub. No UI output."""
     import tempfile
 
@@ -362,15 +370,58 @@ def _install_hub(source: str, *, force: bool = False) -> Path:
         "installed_at": datetime.now(UTC).isoformat(),
     }
     save_manifest(manifest_data)
-    return target_dir
+    return InstallResult(path=target_dir, display_name=manifest.name)
 
 
-def install_role(source: str, *, force: bool = False, quiet: bool = False) -> Path:
+def install_role(source: str, *, force: bool = False, quiet: bool = False) -> InstallResult:
     """Convenience: preview + install in one shot. No UI prompts.
 
     Use ``preview_install`` + ``confirm_install`` for interactive flows.
     """
     return confirm_install(source, force=force)
+
+
+def resolve_installed_path(name: str) -> Path | None:
+    """Resolve an installed role name to its directory.
+
+    Raises RegistryError on ambiguous display name match.
+    Returns None if no match found.
+    """
+    manifest = load_manifest()
+    roles = manifest["roles"]
+
+    # 1. Exact qualified key (e.g. "hub:alice/code-reviewer")
+    if name in roles:
+        p = ROLES_DIR / roles[name]["local_path"]
+        if p.is_dir():
+            return p
+
+    # 2. owner/name -> hub:owner/name
+    if "/" in name:
+        hub_key = f"hub:{name}"
+        if hub_key in roles:
+            p = ROLES_DIR / roles[hub_key]["local_path"]
+            if p.is_dir():
+                return p
+
+    # 3. Display name (must be unambiguous)
+    matches = []
+    for key, entry in roles.items():
+        display = entry.get("display_name", key.rsplit("/", 1)[-1])
+        if display == name:
+            p = ROLES_DIR / entry["local_path"]
+            if p.is_dir():
+                matches.append((key, p))
+
+    if len(matches) == 1:
+        return matches[0][1]
+    if len(matches) > 1:
+        sources = ", ".join(k for k, _ in matches)
+        raise RegistryError(
+            f"Ambiguous role name '{name}' -- installed from: {sources}. "
+            f"Use the qualified name instead."
+        )
+    return None
 
 
 def _find_manifest_key(manifest: dict, name: str) -> str | None:

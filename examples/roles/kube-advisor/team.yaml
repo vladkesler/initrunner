@@ -17,6 +17,9 @@ spec:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
+  shared_memory:
+    enabled: true
+    max_memories: 500
   personas:
     triage: |
       You are a Kubernetes triage agent. Your job is to gather initial

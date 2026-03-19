@@ -277,6 +277,171 @@ class TestRun:
         assert result.exit_code == 0
 
 
+class TestRunStreaming:
+    """Tests for the --no-stream flag and TTY streaming gate."""
+
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_tty_text_output_uses_streaming(
+        self, mock_load, mock_run_single, mock_run_stream, tmp_path
+    ):
+        """TTY + text output role should use run_single_stream."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        mock_load.return_value = (role, MagicMock())
+        mock_run_stream.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_run_stream.assert_called_once()
+        mock_run_single.assert_not_called()
+
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_non_tty_uses_buffered(self, mock_load, mock_run_single, mock_run_stream, tmp_path):
+        """Non-TTY should use run_single (buffered)."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        mock_load.return_value = (role, MagicMock())
+        mock_run_single.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = False
+            result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_run_single.assert_called_once()
+        mock_run_stream.assert_not_called()
+
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_no_stream_forces_buffered(self, mock_load, mock_run_single, mock_run_stream, tmp_path):
+        """--no-stream on TTY should use run_single (buffered)."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        mock_load.return_value = (role, MagicMock())
+        mock_run_single.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(
+                app, ["run", str(role_file), "-p", "hello", "--no-stream", "--no-audit"]
+            )
+
+        assert result.exit_code == 0
+        mock_run_single.assert_called_once()
+        mock_run_stream.assert_not_called()
+
+    @patch("initrunner.runner.run_interactive")
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_initial_prompt_interactive_passes_stream(
+        self, mock_load, mock_run_stream, mock_interactive, tmp_path
+    ):
+        """-p 'hi' -i should pass stream=True to run_interactive on TTY."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        mock_load.return_value = (role, MagicMock())
+        mock_run_stream.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(app, ["run", str(role_file), "-p", "hi", "-i", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_interactive.assert_called_once()
+        call_kwargs = mock_interactive.call_args.kwargs
+        assert call_kwargs["stream"] is True
+
+    @patch("initrunner.runner.run_autonomous")
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_autonomous_does_not_stream(
+        self, mock_load, mock_run_single, mock_run_stream, mock_autonomous, tmp_path
+    ):
+        """-a -p 'hi' should not use streaming."""
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        mock_load.return_value = (role, MagicMock())
+
+        auto_result = MagicMock()
+        auto_result.success = True
+        auto_result.total_tokens = 100
+        mock_autonomous.return_value = auto_result
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(app, ["run", str(role_file), "-a", "-p", "hi", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_autonomous.assert_called_once()
+        mock_run_stream.assert_not_called()
+        mock_run_single.assert_not_called()
+
+
 class TestIngest:
     def test_missing_role_file(self):
         result = runner.invoke(app, ["ingest", "/nonexistent/role.yaml"])
@@ -678,3 +843,115 @@ class TestDaemon:
     def test_missing_role_file(self):
         result = runner.invoke(app, ["daemon", "/nonexistent/role.yaml"])
         assert result.exit_code == 1
+
+
+class TestResolveRolePathInstalled:
+    """resolve_role_path falls through to installed role lookup."""
+
+    def test_local_file_takes_precedence(self, tmp_path):
+        """A local file path is returned without hitting the registry."""
+        from initrunner.cli._helpers import resolve_role_path
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+        assert resolve_role_path(role_file) == role_file
+
+    def test_local_dir_takes_precedence(self, tmp_path):
+        """A local directory with role.yaml is returned without hitting the registry."""
+        from initrunner.cli._helpers import resolve_role_path
+
+        (tmp_path / "role.yaml").write_text("dummy")
+        assert resolve_role_path(tmp_path) == tmp_path / "role.yaml"
+
+    def test_falls_through_to_installed(self, tmp_path, monkeypatch):
+        """A non-existent path resolves via the registry."""
+        import json
+        from pathlib import Path
+
+        from initrunner.cli._helpers import resolve_role_path
+
+        roles_dir = tmp_path / "roles"
+        roles_dir.mkdir(parents=True)
+        role_dir = roles_dir / "hub__alice__code-reviewer"
+        role_dir.mkdir()
+        (role_dir / "role.yaml").write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: code-reviewer
+            spec:
+              role: You review code.
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+
+        manifest_path = roles_dir / "registry.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "roles": {
+                        "hub:alice/code-reviewer": {
+                            "display_name": "code-reviewer",
+                            "source_type": "hub",
+                            "local_path": "hub__alice__code-reviewer",
+                        }
+                    }
+                }
+            )
+        )
+
+        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+
+        resolved = resolve_role_path(Path("code-reviewer"))
+        assert resolved == role_dir / "role.yaml"
+
+    def test_run_command_with_installed_name(self, tmp_path, monkeypatch):
+        """'initrunner run code-reviewer -p hello' resolves via registry."""
+        import json
+
+        roles_dir = tmp_path / "roles"
+        roles_dir.mkdir(parents=True)
+        role_dir = roles_dir / "hub__alice__code-reviewer"
+        role_dir.mkdir()
+        (role_dir / "role.yaml").write_text("dummy")
+
+        manifest_path = roles_dir / "registry.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "roles": {
+                        "hub:alice/code-reviewer": {
+                            "display_name": "code-reviewer",
+                            "source_type": "hub",
+                            "local_path": "hub__alice__code-reviewer",
+                        }
+                    }
+                }
+            )
+        )
+
+        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+
+        from initrunner.agent.executor import RunResult
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        agent = MagicMock()
+
+        with (
+            patch("initrunner.agent.loader.load_and_build", return_value=(role, agent)),
+            patch(
+                "initrunner.runner.run_single",
+                return_value=(RunResult(run_id="t", output="ok", success=True), []),
+            ),
+        ):
+            result = runner.invoke(app, ["run", "code-reviewer", "-p", "hello", "--no-audit"])
+
+        assert result.exit_code == 0

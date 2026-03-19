@@ -13,12 +13,15 @@ from initrunner.cli._options import SkillDirOption
 
 
 def validate(
-    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
+    role_file: Annotated[
+        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
+    ],
     skill_dir: SkillDirOption = None,
 ) -> None:
     """Validate a role definition file."""
-    from initrunner.cli._helpers import detect_yaml_kind
+    from initrunner.cli._helpers import detect_yaml_kind, resolve_role_path
 
+    role_file = resolve_role_path(role_file)
     kind = detect_yaml_kind(role_file)
     if kind == "Team":
         _validate_team(role_file)
@@ -194,12 +197,46 @@ def _validate_team(team_file: Path) -> None:
     table.add_row("Tags", ", ".join(team.metadata.tags) if team.metadata.tags else "(none)")
     table.add_row("Model", team.spec.model.to_model_string())
     table.add_row("Personas", str(len(team.spec.personas)))
-    table.add_row("Persona Names", ", ".join(team.spec.personas.keys()))
+    # Build persona display with inline overrides
+    persona_parts = []
+    for pname, pcfg in team.spec.personas.items():
+        extras = []
+        if pcfg.model:
+            extras.append(f"model={pcfg.model.to_model_string()}")
+        if pcfg.tools:
+            extras.append(f"{len(pcfg.tools)} tools ({pcfg.tools_mode})")
+        if pcfg.environment:
+            extras.append(f"{len(pcfg.environment)} env vars")
+        if extras:
+            persona_parts.append(f"{pname} [{', '.join(extras)}]")
+        else:
+            persona_parts.append(pname)
+    table.add_row("Persona Names", ", ".join(persona_parts))
+    table.add_row("Strategy", team.spec.strategy)
 
     if team.spec.tools:
         table.add_row("Tools", "\n".join(t.summary() for t in team.spec.tools))
     else:
         table.add_row("Tools", "0")
+
+    # Shared memory / documents
+    if team.spec.shared_memory.enabled:
+        max_mem = team.spec.shared_memory.max_memories
+        table.add_row("Shared Memory", f"enabled (max={max_mem})")
+    else:
+        table.add_row("Shared Memory", "(disabled)")
+
+    if team.spec.shared_documents.enabled:
+        n_src = len(team.spec.shared_documents.sources)
+        table.add_row("Shared Documents", f"enabled ({n_src} sources)")
+    else:
+        table.add_row("Shared Documents", "(disabled)")
+
+    # Observability
+    if team.spec.observability:
+        table.add_row("Observability", team.spec.observability.backend)
+    else:
+        table.add_row("Observability", "(none)")
 
     table.add_row("Timeout/persona", f"{team.spec.guardrails.timeout_seconds}s")
     table.add_row("Max Tokens/persona", str(team.spec.guardrails.max_tokens_per_run))

@@ -11,7 +11,7 @@ from initrunner.agent.prompt import UserPrompt, build_multimodal_prompt
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import _display_budget_warning, _display_save_warning, console
-from initrunner.runner.single import run_single
+from initrunner.runner.single import run_single, run_single_stream
 from initrunner.sinks.dispatcher import SinkDispatcher
 from initrunner.stores.base import MemoryStoreBase
 
@@ -26,6 +26,7 @@ def run_interactive(
     resume: bool = False,
     sink_dispatcher: SinkDispatcher | None = None,
     model_override: Model | str | None = None,
+    stream: bool = False,
 ) -> None:
     """Run an interactive REPL with multi-turn conversation history."""
     agent_name = role.metadata.name
@@ -128,7 +129,8 @@ def run_interactive(
         else:
             user_prompt = raw_input
 
-        result, message_history = run_single(
+        _run_fn = run_single_stream if stream else run_single
+        result, message_history = _run_fn(
             agent,
             role,
             user_prompt,

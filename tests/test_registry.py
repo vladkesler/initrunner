@@ -7,12 +7,14 @@ from unittest.mock import patch
 import pytest
 
 from initrunner.registry import (
+    InstallResult,
     RegistryError,
     RoleExistsError,
     RoleNotFoundError,
     confirm_install,
     list_installed,
     load_manifest,
+    resolve_installed_path,
     save_manifest,
     uninstall_role,
     update_all,
@@ -126,9 +128,11 @@ class TestInstallRole:
             patch("initrunner.hub.hub_download", return_value=b"fake-bundle"),
             patch("initrunner.packaging.bundle.extract_bundle", side_effect=fake_extract),
         ):
-            path = confirm_install("user/test-agent")
+            result = confirm_install("user/test-agent")
 
-        assert path == target_dir
+        assert isinstance(result, InstallResult)
+        assert result.path == target_dir
+        assert result.display_name == "test-agent"
         manifest = json.loads((roles_dir / "registry.json").read_text())
         assert "hub:user/test-agent" in manifest["roles"]
         entry = manifest["roles"]["hub:user/test-agent"]
@@ -159,9 +163,9 @@ class TestInstallRole:
             patch("initrunner.hub.hub_download", return_value=b"fake-bundle"),
             patch("initrunner.packaging.bundle.extract_bundle", side_effect=fake_extract),
         ):
-            path = confirm_install("hub:user/test-agent")
+            result = confirm_install("hub:user/test-agent")
 
-        assert path == target_dir
+        assert result.path == target_dir
 
     def test_bare_name_raises_helpful_error(self, tmp_path, monkeypatch):
         """Bare name like 'code-reviewer' raises error with search hint."""
@@ -700,6 +704,193 @@ class TestCLISearch:
 
         assert result.exit_code == 0
         assert "No packages found" in result.output
+
+
+class TestResolveInstalledPath:
+    """Tests for resolve_installed_path()."""
+
+    def _setup_manifest(self, tmp_path, monkeypatch, roles_data, create_dirs=None):
+        roles_dir = tmp_path / "roles"
+        roles_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = roles_dir / "registry.json"
+        manifest_path.write_text(json.dumps({"roles": roles_data}))
+        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+        for d in create_dirs or []:
+            (roles_dir / d).mkdir(parents=True, exist_ok=True)
+        return roles_dir
+
+    def test_exact_qualified_key(self, tmp_path, monkeypatch):
+        roles_dir = self._setup_manifest(
+            tmp_path,
+            monkeypatch,
+            {
+                "hub:alice/code-reviewer": {
+                    "display_name": "code-reviewer",
+                    "source_type": "hub",
+                    "local_path": "hub__alice__code-reviewer",
+                }
+            },
+            create_dirs=["hub__alice__code-reviewer"],
+        )
+
+        result = resolve_installed_path("hub:alice/code-reviewer")
+        assert result == roles_dir / "hub__alice__code-reviewer"
+
+    def test_owner_name_auto_prefix(self, tmp_path, monkeypatch):
+        roles_dir = self._setup_manifest(
+            tmp_path,
+            monkeypatch,
+            {
+                "hub:alice/code-reviewer": {
+                    "display_name": "code-reviewer",
+                    "source_type": "hub",
+                    "local_path": "hub__alice__code-reviewer",
+                }
+            },
+            create_dirs=["hub__alice__code-reviewer"],
+        )
+
+        result = resolve_installed_path("alice/code-reviewer")
+        assert result == roles_dir / "hub__alice__code-reviewer"
+
+    def test_display_name_single_match(self, tmp_path, monkeypatch):
+        roles_dir = self._setup_manifest(
+            tmp_path,
+            monkeypatch,
+            {
+                "hub:alice/code-reviewer": {
+                    "display_name": "code-reviewer",
+                    "source_type": "hub",
+                    "local_path": "hub__alice__code-reviewer",
+                }
+            },
+            create_dirs=["hub__alice__code-reviewer"],
+        )
+
+        result = resolve_installed_path("code-reviewer")
+        assert result == roles_dir / "hub__alice__code-reviewer"
+
+    def test_ambiguous_display_name_raises(self, tmp_path, monkeypatch):
+        self._setup_manifest(
+            tmp_path,
+            monkeypatch,
+            {
+                "hub:alice/scanner": {
+                    "display_name": "scanner",
+                    "source_type": "hub",
+                    "local_path": "hub__alice__scanner",
+                },
+                "oci:registry.io/repo/scanner": {
+                    "display_name": "scanner",
+                    "source_type": "oci",
+                    "local_path": "oci__scanner",
+                },
+            },
+            create_dirs=["hub__alice__scanner", "oci__scanner"],
+        )
+
+        with pytest.raises(RegistryError, match="Ambiguous"):
+            resolve_installed_path("scanner")
+
+    def test_missing_on_disk_returns_none(self, tmp_path, monkeypatch):
+        self._setup_manifest(
+            tmp_path,
+            monkeypatch,
+            {
+                "hub:alice/gone": {
+                    "display_name": "gone",
+                    "source_type": "hub",
+                    "local_path": "hub__alice__gone",
+                }
+            },
+        )
+        # Directory not created on disk
+        result = resolve_installed_path("gone")
+        assert result is None
+
+    def test_no_match_returns_none(self, tmp_path, monkeypatch):
+        self._setup_manifest(tmp_path, monkeypatch, {})
+        result = resolve_installed_path("nonexistent")
+        assert result is None
+
+
+class TestCLIInstallHint:
+    """Tests for install command post-install hint and list Run column."""
+
+    def test_install_shows_run_hint(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from initrunner.cli.main import app
+
+        runner = CliRunner()
+        roles_dir = tmp_path / "roles"
+        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", roles_dir / "registry.json")
+
+        from unittest.mock import MagicMock
+
+        from initrunner.hub import HubPackageInfo
+
+        info = HubPackageInfo(
+            owner="user",
+            name="test-agent",
+            description="Test",
+            latest_version="1.0.0",
+            versions=["1.0.0"],
+        )
+
+        def fake_extract(archive, dest):
+            dest.mkdir(parents=True, exist_ok=True)
+            m = MagicMock()
+            m.name = "test-agent"
+            return m
+
+        with (
+            patch("initrunner.hub.parse_hub_source", return_value=("user", "test-agent", None)),
+            patch("initrunner.hub.hub_resolve", return_value=info),
+            patch("initrunner.hub.hub_download", return_value=b"fake-bundle"),
+            patch("initrunner.packaging.bundle.extract_bundle", side_effect=fake_extract),
+        ):
+            result = runner.invoke(app, ["install", "user/test-agent", "--yes"])
+
+        assert result.exit_code == 0
+        assert "Run:" in result.output
+        assert "initrunner run test-agent" in result.output
+
+    def test_list_shows_run_column(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+
+        from initrunner.cli.main import app
+
+        runner = CliRunner()
+        roles_dir = tmp_path / "roles"
+        roles_dir.mkdir()
+        manifest_path = roles_dir / "registry.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "roles": {
+                        "hub:alice/my-agent": {
+                            "display_name": "my-agent",
+                            "source_type": "hub",
+                            "hub_owner": "alice",
+                            "hub_name": "my-agent",
+                            "hub_version": "1.0.0",
+                            "local_path": "hub__alice__my-agent",
+                            "installed_at": "2026-03-18T12:00:00",
+                        }
+                    }
+                }
+            )
+        )
+
+        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+
+        result = runner.invoke(app, ["list"])
+        assert result.exit_code == 0
+        assert "initrunner run my-agent" in result.output
 
 
 class TestCLIUpdate:

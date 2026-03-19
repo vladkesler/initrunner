@@ -2,13 +2,16 @@
 
 ## Path resolution
 
-All commands that accept a role path also accept a **directory**. When given a directory, the CLI resolves it to a role YAML file:
+All commands that accept a role path also accept a **directory** or an **installed role name**. Resolution order:
 
-1. If `<dir>/role.yaml` exists, use it.
-2. Otherwise scan top-level `*.yaml`/`*.yml` for files with `apiVersion: initrunner/v1` and `kind: Agent` or `Team`.
-3. Exactly one match is used; zero or multiple matches produce an error.
+1. If the path is a file, use it.
+2. If the path is a directory:
+   a. If `<dir>/role.yaml` exists, use it.
+   b. Otherwise scan top-level `*.yaml`/`*.yml` for files with `apiVersion: initrunner/v1`.
+   c. Exactly one match is used; zero or multiple matches produce an error.
+3. Otherwise, look up the name in the installed role registry (exact key, owner/name, or display name).
 
-This means `initrunner run .` and `initrunner publish` (defaults to `.`) work from inside an agent directory.
+This means `initrunner run .` works from inside an agent directory, and `initrunner run code-reviewer` works after `initrunner install alice/code-reviewer`.
 
 ## Commands
 
@@ -30,7 +33,7 @@ This means `initrunner run .` and `initrunner publish` (defaults to `.`) work fr
 | `initrunner uninstall <name>` | Remove an installed role |
 | `initrunner search <query>` | Search InitHub for agent packs |
 | `initrunner info <source>` | Inspect a role's metadata without installing |
-| `initrunner list` | List installed roles |
+| `initrunner list` | List installed roles (with run commands) |
 | `initrunner update [name]` | Update installed role(s) to latest version |
 | `initrunner doctor` | Check provider configuration, API keys, and connectivity |
 | `initrunner plugins` | List discovered tool plugins |
@@ -118,6 +121,7 @@ The path argument is optional when `--sense` is used.
 | `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
 | `--sense` | Sense the best role for the given prompt (replaces the path argument). |
 | `--role-dir PATH` | Directory to search for roles when using `--sense`. |
+| `--no-stream` | Disable streaming output (show result in panel). By default, output streams live on interactive terminals. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
 | `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
 

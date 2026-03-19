@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -15,6 +16,7 @@ from initrunner.cli._helpers import (
     load_and_build_or_exit,
     load_role_or_exit,
     resolve_model_override,
+    resolve_role_path,
     resolve_skill_dirs,
 )
 from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
@@ -51,7 +53,7 @@ def run(
     role_file: Annotated[
         Path | None,
         typer.Argument(
-            help="Agent directory or role YAML file. Omit with --sense to select automatically."
+            help="Agent directory, role YAML, or installed role name. Omit with --sense."
         ),
     ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
@@ -91,6 +93,9 @@ def run(
             help="Report template: default, pr-review, changelog, ci-fix",
         ),
     ] = "default",
+    no_stream: Annotated[
+        bool, typer.Option("--no-stream", help="Disable streaming output (show result in panel)")
+    ] = False,
     sense: Annotated[
         bool, typer.Option("--sense", help="Sense the best role for the given prompt")
     ] = False,
@@ -111,15 +116,13 @@ def run(
         console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
         raise typer.Exit(1)
     if role_file is None and not sense:
-        console.print("[red]Error:[/red] Provide a role file path or use --sense.")
+        console.print("[red]Error:[/red] Provide a role file, installed role name, or use --sense.")
         raise typer.Exit(1)
     if sense and not prompt:
         console.print("[red]Error:[/red] --sense requires --prompt (-p).")
         raise typer.Exit(1)
 
     if sense:
-        import sys
-
         from initrunner.cli._helpers import display_sense_result
         from initrunner.services.role_selector import NoRolesFoundError, select_role_sync
 
@@ -142,6 +145,10 @@ def run(
                 raise typer.Exit()
         role_file = selection.candidate.path
     # --- End Intent Sensing ---
+
+    # --- Early resolution for installed role names ---
+    if role_file is not None and not sense:
+        role_file = resolve_role_path(role_file)
 
     # --- Team mode dispatch ---
     if role_file is not None and detect_yaml_kind(role_file) == "Team":
@@ -178,13 +185,11 @@ def run(
             )
             raise typer.Exit(1)
 
-    import sys
-
     if attach and not prompt and not interactive and sys.stdin.isatty():
         console.print("[red]Error:[/red] use --prompt with --attach or pipe stdin.")
         raise typer.Exit(1)
 
-    from initrunner.runner import run_autonomous, run_interactive, run_single
+    from initrunner.runner import run_autonomous, run_interactive, run_single, run_single_stream
 
     model_override = None
     if dry_run:
@@ -221,6 +226,14 @@ def run(
         message_history = None
         run_result = None  # RunResult or AutonomousResult
 
+        use_stream = (
+            sys.stdout.isatty()
+            and not no_stream
+            and not autonomous
+            and role.spec.output.type == "text"
+        )
+        _run_single = run_single_stream if use_stream else run_single
+
         if autonomous:
             if user_prompt is None:
                 raise RuntimeError("prompt unresolved")
@@ -235,7 +248,7 @@ def run(
                 max_iterations_override=max_iterations,
             )
         elif user_prompt and not interactive:
-            run_result, _ = run_single(
+            run_result, _ = _run_single(
                 agent,
                 role,
                 user_prompt,
@@ -244,7 +257,7 @@ def run(
                 model_override=model_override,
             )
         elif user_prompt and interactive:
-            run_result, message_history = run_single(
+            run_result, message_history = _run_single(
                 agent,
                 role,
                 user_prompt,
@@ -265,6 +278,7 @@ def run(
                 resume=False,
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
+                stream=use_stream,
             )
         else:
             run_interactive(
@@ -275,6 +289,7 @@ def run(
                 resume=resume,
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
+                stream=use_stream,
             )
 
         # Export for non-interactive branches (after run completes)
@@ -331,7 +346,7 @@ def _run_team(
 
     from initrunner.cli._helpers import create_audit_logger
     from initrunner.team.loader import TeamLoadError, load_team
-    from initrunner.team.runner import _persona_to_role, run_team
+    from initrunner.team.runner import _team_report_role, run_team_dispatch
 
     try:
         team = load_team(team_file)
@@ -349,11 +364,23 @@ def _run_team(
 
     persona_names = list(team.spec.personas.keys())
     console.print(f"[bold]Team mode[/bold] -- team: [cyan]{team.metadata.name}[/cyan]")
+    console.print(f"  Strategy: {team.spec.strategy}")
     console.print(f"  Personas: {', '.join(persona_names)}")
+    if team.spec.shared_memory.enabled:
+        console.print("  Shared memory: enabled")
+    if team.spec.shared_documents.enabled:
+        n_sources = len(team.spec.shared_documents.sources)
+        console.print(f"  Shared documents: enabled ({n_sources} sources)")
     console.print()
 
-    with console.status("[dim]Running team pipeline...[/dim]") as status:
-        result = run_team(
+    strategy = team.spec.strategy
+    status_text = (
+        "[dim]Running team pipeline (parallel)...[/dim]"
+        if strategy == "parallel"
+        else "[dim]Running team pipeline...[/dim]"
+    )
+    with console.status(status_text) as status:
+        result = run_team_dispatch(
             team,
             prompt,
             team_dir=team_file.parent,
@@ -380,11 +407,7 @@ def _run_team(
             error=result.error,
         )
         # Build a synthetic role for the report
-        synthetic_role = _persona_to_role(
-            team.metadata.name,
-            team.metadata.description or "Team run",
-            team,
-        )
+        synthetic_role = _team_report_role(team)
         _maybe_export_report(
             synthetic_role,
             synthetic,
@@ -444,7 +467,9 @@ def _display_suite_result(suite_result: object, verbose: bool = False) -> None:
 
 
 def test(
-    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
+    role_file: Annotated[
+        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
+    ],
     suite: Annotated[Path, typer.Option("-s", "--suite", help="Path to test suite YAML")],
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Simulate with TestModel (no API calls)")
@@ -464,6 +489,8 @@ def test(
     model: ModelOption = None,
 ) -> None:
     """Run a test suite against an agent role."""
+    role_file = resolve_role_path(role_file)
+
     from initrunner.eval.runner import SuiteLoadError, load_suite
     from initrunner.services.eval import run_suite_sync, save_result
 
@@ -511,7 +538,9 @@ def test(
 
 
 def ingest(
-    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
+    role_file: Annotated[
+        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
+    ],
     force: Annotated[bool, typer.Option("--force", help="Force re-ingestion of all files")] = False,
 ) -> None:
     """Ingest documents defined in the role's ingest config."""
@@ -618,13 +647,17 @@ def _status_color(status: object) -> str:
 
 
 def daemon(
-    role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
+    role_file: Annotated[
+        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
+    ],
     audit_db: AuditDbOption = None,
     no_audit: NoAuditOption = False,
     skill_dir: SkillDirOption = None,
     model: ModelOption = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
+    role_file = resolve_role_path(role_file)
+
     from initrunner.runner import run_daemon
 
     resolved_model = resolve_model_override(model)

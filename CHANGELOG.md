@@ -1,5 +1,20 @@
 # Changelog
 
+### Added
+- **Team mode v2** -- parallel execution strategy (`strategy: parallel`), per-persona model/tools/environment overrides, shared memory across personas, shared documents (RAG) with pre-run ingestion, and OpenTelemetry observability support
+- **Installed role name resolution** -- `initrunner run code-reviewer` resolves installed roles by display name, `owner/name`, or qualified key (`hub:owner/name`). All commands accepting a role path gain this: `run`, `validate`, `test`, `ingest`, `daemon`, `serve`, `chat`
+- **Install "Run:" hint** -- `initrunner install` and `initrunner pull` now print `Run: initrunner run <name> -p "your prompt"` after successful install
+- **Streaming single-shot output** -- `initrunner run` streams tokens live on interactive terminals. Use `--no-stream` to disable
+- **Stale-docs-bloodhound example** (`examples/roles/stale-docs-bloodhound/`) -- daemon agent that monitors a repo for stale documentation using git blame analysis and reference cross-checking
+- New `InstallResult` dataclass in `registry.py` returns both `path` and `display_name` from install operations
+- New `resolve_installed_path()` function with ambiguity detection (raises clear error when display name matches multiple sources)
+
+### Changed
+- `initrunner list` now shows a "Run" column with the execution command instead of "Installed At" timestamp
+- `confirm_install()`, `install_role()` return `InstallResult` instead of bare `Path`
+- Help text for all role-accepting commands updated to mention installed role names
+- Kube-advisor team example updated with per-persona tool overrides
+
 ## [1.32.0] - 2026-03-19
 
 ### Added

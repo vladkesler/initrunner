@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import threading
 import time
 from collections import OrderedDict
@@ -11,12 +12,17 @@ from pathlib import Path
 
 from pydantic_ai import Agent
 
-from initrunner.agent.executor import RunResult, execute_run
+from initrunner.agent.executor import RunResult, execute_run, execute_run_stream
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.autonomous import run_autonomous
 from initrunner.runner.budget import DaemonTokenTracker
-from initrunner.runner.display import _display_daemon_header, _display_result, console
+from initrunner.runner.display import (
+    _display_daemon_header,
+    _display_result,
+    _display_stream_stats,
+    console,
+)
 from initrunner.sinks.dispatcher import SinkDispatcher
 from initrunner.stores.base import MemoryStoreBase
 from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES, TriggerEvent
@@ -263,17 +269,42 @@ class DaemonRunner:
                                 exc_info=True,
                             )
             else:
-                result, new_messages = execute_run(
-                    agent,
-                    role,
-                    event.prompt,
-                    audit_logger=self._audit_logger,
-                    message_history=prior_history,
-                    trigger_type=event.trigger_type,
-                    trigger_metadata=event.metadata or {},
-                    extra_toolsets=extra_ts if extra_ts else None,
-                    principal_id=event.principal_id,
-                )
+                use_stream = sys.stdout.isatty() and role.spec.output.type == "text"
+
+                if use_stream:
+                    out = console.file
+
+                    def on_token(chunk: str) -> None:
+                        out.write(chunk)
+                        out.flush()
+
+                    result, new_messages = execute_run_stream(
+                        agent,
+                        role,
+                        event.prompt,
+                        audit_logger=self._audit_logger,
+                        message_history=prior_history,
+                        trigger_type=event.trigger_type,
+                        trigger_metadata=event.metadata or {},
+                        extra_toolsets=extra_ts if extra_ts else None,
+                        principal_id=event.principal_id,
+                        on_token=on_token,
+                    )
+                    out.write("\n")
+                    out.flush()
+                else:
+                    result, new_messages = execute_run(
+                        agent,
+                        role,
+                        event.prompt,
+                        audit_logger=self._audit_logger,
+                        message_history=prior_history,
+                        trigger_type=event.trigger_type,
+                        trigger_metadata=event.metadata or {},
+                        extra_toolsets=extra_ts if extra_ts else None,
+                        principal_id=event.principal_id,
+                    )
+
                 self._tracker.record_usage(result.total_tokens)
 
                 # Reply first, post-process after
@@ -287,7 +318,10 @@ class DaemonRunner:
                             exc_info=True,
                         )
 
-                _display_result(result)
+                if use_stream and result.success:
+                    _display_stream_stats(result)
+                else:
+                    _display_result(result)
                 self._dispatch_sink(result, event)
                 self._capture_episode(result, event)
 

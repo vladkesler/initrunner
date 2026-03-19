@@ -25,7 +25,7 @@ _INITRUNNER_KINDS = {"Agent", "Team"}
 
 
 def resolve_role_path(path: Path) -> Path:
-    """Resolve a directory to its role YAML file.
+    """Resolve a directory, file, or installed role name to its role YAML file.
 
     When *path* is a file, return it unchanged.  When it is a directory:
     1. If ``<dir>/role.yaml`` exists, use it.
@@ -34,50 +34,65 @@ def resolve_role_path(path: Path) -> Path:
     3. Exactly one match → use it.
     4. Zero → exit with error.
     5. Multiple → exit with error listing the names.
+
+    When *path* is neither a file nor a directory, try to resolve it as an
+    installed role name via the registry.
     """
     if path.is_file():
         return path
 
-    if not path.is_dir():
-        console.print(f"[red]Error:[/red] Path not found: {path}")
+    if path.is_dir():
+        # 1. Convention: role.yaml
+        default = path / "role.yaml"
+        if default.is_file():
+            return default
+
+        # 2. Scan top-level YAML files
+        import yaml
+
+        candidates: list[Path] = []
+        for ext in ("*.yaml", "*.yml"):
+            for f in path.glob(ext):
+                if not f.is_file():
+                    continue
+                try:
+                    with open(f) as fh:
+                        data = yaml.safe_load(fh)
+                    if (
+                        isinstance(data, dict)
+                        and data.get("apiVersion") in _INITRUNNER_API_VERSIONS
+                        and data.get("kind") in _INITRUNNER_KINDS
+                    ):
+                        candidates.append(f)
+                except Exception:
+                    continue
+
+        if len(candidates) == 1:
+            return candidates[0]
+
+        if len(candidates) == 0:
+            console.print(f"[red]Error:[/red] No role YAML found in {path}")
+            raise typer.Exit(1)
+
+        names = ", ".join(sorted(c.name for c in candidates))
+        console.print(
+            f"[red]Error:[/red] Multiple role YAML files in {path}: {names}; pass one explicitly"
+        )
         raise typer.Exit(1)
 
-    # 1. Convention: role.yaml
-    default = path / "role.yaml"
-    if default.is_file():
-        return default
+    # Not a file or directory: try installed role lookup
+    from initrunner.registry import RegistryError, resolve_installed_path
 
-    # 2. Scan top-level YAML files
-    import yaml
+    try:
+        resolved = resolve_installed_path(str(path))
+    except RegistryError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
 
-    candidates: list[Path] = []
-    for ext in ("*.yaml", "*.yml"):
-        for f in path.glob(ext):
-            if not f.is_file():
-                continue
-            try:
-                with open(f) as fh:
-                    data = yaml.safe_load(fh)
-                if (
-                    isinstance(data, dict)
-                    and data.get("apiVersion") in _INITRUNNER_API_VERSIONS
-                    and data.get("kind") in _INITRUNNER_KINDS
-                ):
-                    candidates.append(f)
-            except Exception:
-                continue
+    if resolved is not None:
+        return resolve_role_path(resolved)
 
-    if len(candidates) == 1:
-        return candidates[0]
-
-    if len(candidates) == 0:
-        console.print(f"[red]Error:[/red] No role YAML found in {path}")
-        raise typer.Exit(1)
-
-    names = ", ".join(sorted(c.name for c in candidates))
-    console.print(
-        f"[red]Error:[/red] Multiple role YAML files found in {path}: {names}; pass one explicitly"
-    )
+    console.print(f"[red]Error:[/red] Path not found: {path}")
     raise typer.Exit(1)
 
 

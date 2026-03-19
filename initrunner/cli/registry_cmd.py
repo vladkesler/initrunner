@@ -66,7 +66,7 @@ def install(
             raise typer.Abort()
 
     try:
-        path = confirm_install(source, force=force)
+        result = confirm_install(source, force=force)
     except RoleExistsError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
         raise typer.Exit(1) from None
@@ -74,7 +74,8 @@ def install(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    console.print(f"[green]Installed[/green] {preview.name} -> {path}")
+    console.print(f"[green]Installed[/green] {preview.name} -> {result.path}")
+    console.print(f'  Run: [bold]initrunner run {result.display_name} -p "your prompt"[/bold]')
 
 
 def uninstall(
@@ -205,13 +206,15 @@ def list_roles(
     table.add_column("Source", style="dim")
     table.add_column("Repo")
     table.add_column("Version")
-    table.add_column("Installed At")
+    table.add_column("Run", style="green")
 
     for role in roles:
         source_label = role.source_type.upper()
         repo_label = role.repo or role.oci_ref
         version_label = role.hub_version or role.ref
-        table.add_row(role.name, source_label, repo_label, version_label, role.installed_at[:19])
+        table.add_row(
+            role.name, source_label, repo_label, version_label, f"initrunner run {role.name}"
+        )
 
     console.print(table)
 
@@ -363,7 +366,7 @@ def pull(
             raise typer.Abort()
 
     try:
-        path = confirm_install(ref, force=force)
+        result = confirm_install(ref, force=force)
     except RoleExistsError as e:
         console.print(f"[yellow]Warning:[/yellow] {e}")
         raise typer.Exit(1) from None
@@ -374,7 +377,8 @@ def pull(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    console.print(f"[green]Installed[/green] {preview.name} -> {path}")
+    console.print(f"[green]Installed[/green] {preview.name} -> {result.path}")
+    console.print(f'  Run: [bold]initrunner run {result.display_name} -p "your prompt"[/bold]')
 
 
 def login(

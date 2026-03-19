@@ -123,6 +123,12 @@ def _display_autonomous_summary(
     )
 
 
+def _display_stream_stats(result: RunResult) -> None:
+    """Print a compact stats line after streamed output."""
+    stats = f"{result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms"
+    console.print(f"\n[dim]--- tokens: {stats} ---[/dim]")
+
+
 def _display_daemon_header(
     role: RoleDefinition,
     guardrails: object,

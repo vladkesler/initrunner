@@ -8,7 +8,7 @@ from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
-from initrunner.runner import DaemonTokenTracker, run_autonomous, run_single
+from initrunner.runner import DaemonTokenTracker, run_autonomous, run_single, run_single_stream
 
 
 def _make_role(
@@ -136,6 +136,153 @@ class TestRunSingle:
         sink = MagicMock()
         run_single(agent, role, "Hi", sink_dispatcher=sink)
         sink.dispatch.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# run_single_stream
+# ---------------------------------------------------------------------------
+
+
+def _make_role_with_output(output_type: str = "text", **kwargs) -> RoleDefinition:
+    """Create a role with a specific output type."""
+    from initrunner.agent.schema.output import OutputConfig
+
+    role = _make_role(**kwargs)
+    role.spec.output = OutputConfig(type=output_type)  # type: ignore[arg-type]
+    return role
+
+
+class TestRunSingleStream:
+    @patch("initrunner.agent.executor.execute_run_stream")
+    def test_calls_streaming_executor(self, mock_stream):
+        """run_single_stream should call execute_run_stream with an on_token callback."""
+        mock_stream.return_value = (
+            RunResult(run_id="s1", output="hello", tokens_in=10, tokens_out=5, total_tokens=15),
+            [],
+        )
+        role = _make_role_with_output("text")
+        agent = MagicMock()
+
+        run_single_stream(agent, role, "Hi")
+
+        mock_stream.assert_called_once()
+        call_kwargs = mock_stream.call_args.kwargs
+        assert call_kwargs["on_token"] is not None
+        assert callable(call_kwargs["on_token"])
+
+    @patch("initrunner.runner.single.console")
+    @patch("initrunner.agent.executor.execute_run_stream")
+    def test_writes_tokens_incrementally(self, mock_stream, mock_console):
+        """Tokens should be written to console.file as they arrive."""
+        import io
+
+        fake_file = io.StringIO()
+        mock_console.file = fake_file
+
+        chunks = ["Hel", "lo ", "world"]
+
+        def _side_effect(agent, role, prompt, **kwargs):
+            on_token = kwargs["on_token"]
+            for chunk in chunks:
+                on_token(chunk)
+            return (
+                RunResult(
+                    run_id="s1",
+                    output="Hello world",
+                    tokens_in=10,
+                    tokens_out=5,
+                    total_tokens=15,
+                ),
+                [],
+            )
+
+        mock_stream.side_effect = _side_effect
+        role = _make_role_with_output("text")
+        agent = MagicMock()
+
+        run_single_stream(agent, role, "Hi")
+
+        written = fake_file.getvalue()
+        assert "Hello world" in written
+
+    @patch("initrunner.runner.display.console")
+    @patch("initrunner.runner.single.console")
+    @patch("initrunner.agent.executor.execute_run_stream")
+    def test_shows_stats(self, mock_stream, mock_single_console, mock_display_console):
+        """Successful stream should print compact stats line."""
+        import io
+
+        mock_single_console.file = io.StringIO()
+        mock_stream.return_value = (
+            RunResult(
+                run_id="s1",
+                output="ok",
+                tokens_in=100,
+                tokens_out=50,
+                total_tokens=150,
+                duration_ms=1234,
+            ),
+            [],
+        )
+        role = _make_role_with_output("text")
+        agent = MagicMock()
+
+        run_single_stream(agent, role, "Hi")
+
+        mock_display_console.print.assert_called()
+        stats_call = mock_display_console.print.call_args[0][0]
+        assert "100" in stats_call
+        assert "50" in stats_call
+        assert "1234" in stats_call
+
+    @patch("initrunner.agent.executor.execute_run_stream")
+    def test_error_shows_panel(self, mock_stream):
+        """Error result should display the error panel, not stats."""
+        mock_stream.return_value = (
+            RunResult(run_id="s1", output="", success=False, error="Model exploded"),
+            [],
+        )
+        role = _make_role_with_output("text")
+        agent = MagicMock()
+
+        result, _ = run_single_stream(agent, role, "Hi")
+
+        assert result.success is False
+        assert result.error == "Model exploded"
+
+    @patch("initrunner.agent.executor.execute_run_stream")
+    def test_dispatches_sink(self, mock_stream):
+        """Sink dispatch should still occur in streaming mode."""
+        mock_stream.return_value = (
+            RunResult(run_id="s1", output="hello", tokens_in=10, tokens_out=5, total_tokens=15),
+            [],
+        )
+        role = _make_role_with_output("text")
+        agent = MagicMock()
+        sink = MagicMock()
+
+        run_single_stream(agent, role, "Hi", sink_dispatcher=sink)
+
+        sink.dispatch.assert_called_once()
+
+    @patch("initrunner.runner.single.run_single")
+    def test_structured_output_falls_back(self, mock_run_single):
+        """Non-text output type should fall back to run_single."""
+        mock_run_single.return_value = (
+            RunResult(run_id="s1", output='{"key": "val"}', tokens_in=10, tokens_out=5),
+            [],
+        )
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = _make_role()
+        role.spec.output = OutputConfig(
+            type="json_schema", schema={"type": "object", "properties": {"key": {"type": "string"}}}
+        )
+        agent = MagicMock()
+
+        run_single_stream(agent, role, "Hi")
+
+        mock_run_single.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
