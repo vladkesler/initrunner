@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.33.0] - 2026-03-19
+
 ### Added
 - **Team mode v2** -- parallel execution strategy (`strategy: parallel`), per-persona model/tools/environment overrides, shared memory across personas, shared documents (RAG) with pre-run ingestion, and OpenTelemetry observability support
 - **Installed role name resolution** -- `initrunner run code-reviewer` resolves installed roles by display name, `owner/name`, or qualified key (`hub:owner/name`). All commands accepting a role path gain this: `run`, `validate`, `test`, `ingest`, `daemon`, `serve`, `chat`
