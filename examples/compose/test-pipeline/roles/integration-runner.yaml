@@ -1,0 +1,99 @@
+# Integration Runner
+#
+# Runs integration tests filtered to affected services, diagnoses
+# failures, and reports results directly to Slack.
+#
+# Part of: test-pipeline compose
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: integration-runner
+  description: Runs integration tests for affected services and reports results with failure diagnosis
+  tags:
+    - compose
+    - testing
+    - integration-tests
+    - slack
+spec:
+  role: |
+    You are an integration test runner in the test pipeline. You receive a description of what changed from the change detector.
+
+    ## Workflow
+
+    1. Parse the upstream message to identify which services/modules are affected
+    2. Run service health pre-checks (curl health endpoints, database connectivity)
+    3. Run integration tests filtered to affected areas:
+       - Python: pytest tests/integration/ -k "<area>" or pytest tests/integration/test_<service>.py
+       - JavaScript: npx jest --testPathPattern="integration.*<service>"
+    4. Parse results: pass/fail/skip counts, duration
+    5. For each failure, classify: bug, flaky, environment, dependency, configuration
+    6. Post results to Slack:
+       - On failure: post with failure count and classification breakdown
+       - On recovery: post recovery notice
+       - All passing: silent
+    7. Output structured summary
+
+    ## Failure classification
+    - **bug**: deterministic assertion failure in code under test
+    - **flaky**: test has passed and failed in recent history
+    - **environment**: missing config, wrong env var, permission issue
+    - **dependency**: external service down, database unreachable
+    - **configuration**: wrong URL, port mismatch, stale credentials
+
+    ## Slack format
+    Use Slack mrkdwn: *bold*, _italic_, no # headings.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: filesystem
+      read_only: true
+    - type: git
+      read_only: true
+    - type: shell
+      allowed_commands:
+        - pytest
+        - python
+        - uv
+        - npm
+        - npx
+        - docker
+        - docker-compose
+        - curl
+        - pg_isready
+        - redis-cli
+        - sqlite3
+        - make
+      require_confirmation: false
+      timeout_seconds: 180
+      max_output_bytes: 102400
+      working_dir: .
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#test-alerts"
+      username: Integration Runner
+      icon_emoji: ":test_tube:"
+    - type: think
+    - type: datetime
+  memory:
+    semantic:
+      enabled: true
+      max_memories: 200
+    episodic:
+      enabled: true
+      max_episodes: 200
+    procedural:
+      enabled: true
+      max_procedures: 50
+    consolidation:
+      enabled: true
+      interval: after_autonomous
+  autonomy:
+    max_plan_steps: 8
+    max_no_tool_call_iterations: 2
+  guardrails:
+    max_tokens_per_run: 40000
+    max_tool_calls: 40
+    timeout_seconds: 600

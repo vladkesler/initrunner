@@ -1,0 +1,56 @@
+# Test Pipeline
+#
+# Multi-agent test pipeline. A file watcher detects changes, analyzes
+# git diff, and delegates to unit and integration test runners. Each
+# runner posts its own Slack summary directly.
+#
+# Prerequisites:
+#   Test framework (pytest, jest, etc.)
+#   Slack incoming webhook URL
+#
+# Usage:
+#   initrunner compose up examples/compose/test-pipeline/compose.yaml
+apiVersion: initrunner/v1
+kind: Compose
+metadata:
+  name: test-pipeline
+  description: >
+    Multi-agent test pipeline. A file watcher detects repository changes,
+    analyzes git diff to determine affected modules, and delegates to unit
+    and integration test runners. Each runner posts its own results directly
+    to Slack.
+spec:
+  shared_memory:
+    enabled: true
+    store_path: ./.initrunner/test-pipeline-shared.db
+    max_memories: 1000
+  services:
+    change-detector:
+      role: roles/change-detector.yaml
+      sink:
+        type: delegate
+        target:
+          - unit-runner
+          - integration-runner
+      health_check:
+        interval_seconds: 60
+        timeout_seconds: 15
+        retries: 5
+
+    unit-runner:
+      role: roles/unit-runner.yaml
+      depends_on:
+        - change-detector
+      restart:
+        condition: on-failure
+        max_retries: 3
+        delay_seconds: 5
+
+    integration-runner:
+      role: roles/integration-runner.yaml
+      depends_on:
+        - change-detector
+      restart:
+        condition: on-failure
+        max_retries: 2
+        delay_seconds: 10

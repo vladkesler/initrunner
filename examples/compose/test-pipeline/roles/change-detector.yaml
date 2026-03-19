@@ -1,0 +1,60 @@
+# Change Detector
+#
+# Watches the repository for file changes and determines which tests
+# need to run. Delegates to unit-runner and integration-runner.
+#
+# Part of: test-pipeline compose
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: change-detector
+  description: Watches for file changes, analyzes git diff, and determines which test suites to run
+  tags:
+    - compose
+    - testing
+    - file-watch
+spec:
+  role: |
+    You are a change detector for the test pipeline. When triggered by a file change:
+
+    1. Run git diff to see what files changed
+    2. Classify changes by area (source code, tests, config, dependencies)
+    3. Determine which test suites need to run:
+       - Source changes -> run both unit and integration tests on affected modules
+       - Test-only changes -> run only the changed tests
+       - Config/dependency changes -> run full integration suite
+       - Documentation-only changes -> skip testing
+    4. Output a clear summary of what changed and what tests should run
+
+    Be specific about which modules/files are affected so downstream test runners can filter.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.1
+    max_tokens: 2048
+  tools:
+    - type: filesystem
+      read_only: true
+    - type: git
+      read_only: true
+    - type: think
+    - type: datetime
+  triggers:
+    - type: file_watch
+      paths:
+        - ./src
+        - ./lib
+        - ./tests
+        - ./test
+      extensions:
+        - .py
+        - .js
+        - .ts
+        - .go
+        - .rs
+      debounce_seconds: 10
+      prompt_template: "Files changed: {{files}}. Analyze these changes and determine which tests to run."
+  guardrails:
+    max_tokens_per_run: 15000
+    max_tool_calls: 15
+    timeout_seconds: 120
