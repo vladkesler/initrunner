@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.33.2] - 2026-03-19
+
+### Added
+- **New example roles**: `api-monitor`, `email-agent`, `integration-tester`, `security-scanner`, `slack-digest`, `unit-tester` (each with `role.yaml`, `README.md`, and optional `skills/`)
+- **Upgraded to directory format**: `discord-assistant`, `telegram-assistant` (were single `.yaml` files, now directories with READMEs)
+- **New compose example**: `examples/compose/test-pipeline/` -- multi-agent test pipeline with change-detector, unit-runner, and integration-runner
+- **New team config**: `examples/teams/test-review.yaml`
+- **Updated examples catalog** (`initrunner/_examples_catalog.json`)
+
 ## [1.33.1] - 2026-03-19
 
 ### Fixed
