@@ -71,6 +71,16 @@ def _fail_result(run_id: str = "r1", error: str = "API error"):
     return RunResult(run_id=run_id, success=False, error=error), []
 
 
+def _parallel_side_effect(results_by_name: dict[str, tuple]):
+    """Thread-safe side_effect that returns results by persona name."""
+
+    def _inner(*args, **kwargs):
+        name = kwargs.get("trigger_metadata", {}).get("agent_name")
+        return results_by_name[name]
+
+    return _inner
+
+
 class TestTruncateHandoff:
     def test_short_text_unchanged(self):
         assert _truncate_handoff("hello", 100) == "hello"
@@ -692,10 +702,12 @@ class TestRunTeamParallel:
     def test_all_personas_run(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "alpha out"),
-            _ok_result("r2", "bravo out"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "alpha out"),
+                "bravo": _ok_result("r2", "bravo out"),
+            }
+        )
 
         result = run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -709,10 +721,12 @@ class TestRunTeamParallel:
     def test_no_prior_outputs_in_prompt(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "out1"),
-            _ok_result("r2", "out2"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "out1"),
+                "bravo": _ok_result("r2", "out2"),
+            }
+        )
 
         run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -733,11 +747,13 @@ class TestRunTeamParallel:
             strategy="parallel",
         )
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "alpha out"),
-            _ok_result("r2", "bravo out"),
-            _ok_result("r3", "charlie out"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "alpha out"),
+                "bravo": _ok_result("r2", "bravo out"),
+                "charlie": _ok_result("r3", "charlie out"),
+            }
+        )
 
         result = run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -757,11 +773,13 @@ class TestRunTeamParallel:
             strategy="parallel",
         )
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "alpha out"),
-            _fail_result("r2", "bravo error"),
-            _ok_result("r3", "charlie out"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "alpha out"),
+                "bravo": _fail_result("r2", "bravo error"),
+                "charlie": _ok_result("r3", "charlie out"),
+            }
+        )
 
         result = run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -777,10 +795,12 @@ class TestRunTeamParallel:
     def test_token_budget_checked_after(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(team_token_budget=100, strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "out1", total_tokens=80),
-            _ok_result("r2", "out2", total_tokens=80),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "out1", total_tokens=80),
+                "bravo": _ok_result("r2", "out2", total_tokens=80),
+            }
+        )
 
         result = run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -795,10 +815,12 @@ class TestRunTeamParallel:
     def test_final_output_format(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "alpha analysis"),
-            _ok_result("r2", "bravo analysis"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "alpha analysis"),
+                "bravo": _ok_result("r2", "bravo analysis"),
+            }
+        )
 
         result = run_team_parallel(team, "task", team_dir=tmp_path)
 
@@ -829,10 +851,12 @@ class TestRunTeamDispatch:
     def test_parallel_dispatch(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "out1"),
-            _ok_result("r2", "out2"),
-        ]
+        mock_exec.side_effect = _parallel_side_effect(
+            {
+                "alpha": _ok_result("r1", "out1"),
+                "bravo": _ok_result("r2", "out2"),
+            }
+        )
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is True
