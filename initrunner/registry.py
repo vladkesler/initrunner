@@ -33,6 +33,61 @@ class NetworkError(RegistryError):
 
 
 # ---------------------------------------------------------------------------
+# Provider override helpers
+# ---------------------------------------------------------------------------
+
+
+def get_role_overrides(name: str) -> dict:
+    """Return the ``overrides`` dict for an installed role, or ``{}``."""
+    manifest = load_manifest()
+    key = _find_manifest_key(manifest, name)
+    if key is None:
+        return {}
+    return dict(manifest["roles"][key].get("overrides", {}))
+
+
+def set_role_overrides(name: str, overrides: dict) -> None:
+    """Store provider/model overrides for an installed role.
+
+    Pass an empty dict to clear overrides.
+    """
+    manifest = load_manifest()
+    key = _find_manifest_key(manifest, name)
+    if key is None:
+        raise RoleNotFoundError(f"Role '{name}' is not installed.")
+    if overrides:
+        manifest["roles"][key]["overrides"] = overrides
+    else:
+        manifest["roles"][key].pop("overrides", None)
+    save_manifest(manifest)
+
+
+def clear_role_overrides(name: str) -> None:
+    """Remove provider/model overrides for an installed role."""
+    set_role_overrides(name, {})
+
+
+def get_overrides_for_path(role_path: Path) -> dict:
+    """Return provider overrides for a role loaded by filesystem path, or ``{}``.
+
+    Matches the path against installed roles by comparing the ``local_path``
+    directory component.
+    """
+    manifest = load_manifest()
+    try:
+        role_dir = role_path.parent if role_path.is_file() else role_path
+        rel = role_dir.relative_to(ROLES_DIR)
+        top_dir = rel.parts[0] if rel.parts else ""
+    except (ValueError, IndexError):
+        return {}
+
+    for _key, entry in manifest["roles"].items():
+        if entry.get("local_path") == top_dir:
+            return dict(entry.get("overrides", {}))
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
 
@@ -309,7 +364,12 @@ def _install_oci(oci_ref: str, *, force: bool = False) -> InstallResult:
             shutil.rmtree(target_dir, ignore_errors=True)
             raise RoleExistsError(f"Name collision: '{role_name}' already installed from {key}")
 
-    manifest["roles"][qualified_key] = {
+    # Preserve user's provider overrides across reinstall/update
+    existing_overrides = {}
+    if qualified_key in manifest["roles"]:
+        existing_overrides = manifest["roles"][qualified_key].get("overrides", {})
+
+    new_entry: dict = {
         "display_name": role_name,
         "source_type": "oci",
         "oci_ref": f"{ref.registry}/{ref.repository}",
@@ -318,6 +378,10 @@ def _install_oci(oci_ref: str, *, force: bool = False) -> InstallResult:
         "local_path": target_dir.name,
         "installed_at": datetime.now(UTC).isoformat(),
     }
+    if existing_overrides:
+        new_entry["overrides"] = existing_overrides
+
+    manifest["roles"][qualified_key] = new_entry
     save_manifest(manifest)
     return InstallResult(path=target_dir, display_name=role_name)
 
@@ -360,7 +424,13 @@ def _install_hub(source: str, *, force: bool = False) -> InstallResult:
 
     qualified_key = f"hub:{owner}/{name}"
     manifest_data = load_manifest()
-    manifest_data["roles"][qualified_key] = {
+
+    # Preserve user's provider overrides across reinstall/update
+    existing_overrides = {}
+    if qualified_key in manifest_data["roles"]:
+        existing_overrides = manifest_data["roles"][qualified_key].get("overrides", {})
+
+    new_entry: dict = {
         "display_name": manifest.name,
         "source_type": "hub",
         "hub_owner": owner,
@@ -369,6 +439,10 @@ def _install_hub(source: str, *, force: bool = False) -> InstallResult:
         "local_path": safe_name,
         "installed_at": datetime.now(UTC).isoformat(),
     }
+    if existing_overrides:
+        new_entry["overrides"] = existing_overrides
+
+    manifest_data["roles"][qualified_key] = new_entry
     save_manifest(manifest_data)
     return InstallResult(path=target_dir, display_name=manifest.name)
 

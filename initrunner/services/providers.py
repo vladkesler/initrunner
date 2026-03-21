@@ -179,6 +179,127 @@ def resolve_provider_and_model(
     return prov, mod
 
 
+def list_available_providers() -> list[DetectedProvider]:
+    """Return all providers the user has API keys for, in priority order."""
+    from initrunner.templates import _default_model_name
+
+    _load_env()
+
+    result: list[DetectedProvider] = []
+    for provider, env_var in _PROVIDER_PRIORITY:
+        if os.environ.get(env_var):
+            result.append(DetectedProvider(provider=provider, model=_default_model_name(provider)))
+
+    if _is_ollama_running():
+        model = _get_first_ollama_model() or "llama3.2"
+        result.append(DetectedProvider(provider="ollama", model=model))
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Provider compatibility checking for installed roles
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProviderCompatibility:
+    """Result of checking whether a role's provider matches user configuration."""
+
+    role_provider: str
+    role_model: str
+    user_has_key: bool
+    available_providers: list[DetectedProvider]
+    needs_embeddings: bool
+    effective_embedding_provider: str
+    has_embedding_key: bool
+
+
+def _effective_embedding_provider(role: object) -> tuple[str, str]:
+    """Resolve the effective embedding provider and its required env var.
+
+    Inspects ``ingest.embeddings`` and ``memory.embeddings`` overrides,
+    falling back to the default mapping in ``ingestion/embeddings.py``.
+
+    Returns ``(provider_name, env_var_name)``.
+    """
+    from initrunner.ingestion.embeddings import (
+        _DEFAULT_MODELS,
+        _default_embedding_key_env,
+    )
+
+    spec = getattr(role, "spec", None)
+    if spec is None:
+        return "", ""
+
+    # Check ingest.embeddings first, then memory.embeddings
+    for config_attr in ("ingest", "memory"):
+        section = getattr(spec, config_attr, None)
+        if section is None:
+            continue
+        emb = getattr(section, "embeddings", None)
+        if emb is None:
+            continue
+        if getattr(emb, "provider", ""):
+            prov = emb.provider
+            env = getattr(emb, "api_key_env", "") or _default_embedding_key_env(prov)
+            return prov, env
+
+    # No explicit override -- use default based on LLM provider
+    llm_prov = spec.model.provider if hasattr(spec, "model") else ""
+    default_emb = _DEFAULT_MODELS.get(llm_prov, "openai:text-embedding-3-small")
+    emb_prov = default_emb.split(":")[0] if ":" in default_emb else "openai"
+    return emb_prov, _default_embedding_key_env(emb_prov)
+
+
+def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
+    """Check whether the user has the provider/embedding keys a role needs.
+
+    Loads the role YAML and inspects ``spec.model``, ``spec.ingest.embeddings``,
+    and ``spec.memory.embeddings``.
+    """
+    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, load_role
+
+    _load_env()
+    role = load_role(role_path)
+
+    role_provider = role.spec.model.provider
+    role_model = role.spec.model.name
+
+    # Check if user has the required LLM key
+    env_var = role.spec.model.api_key_env or _PROVIDER_API_KEY_ENVS.get(role_provider, "")
+    user_has_key = bool(os.environ.get(env_var)) if env_var else True
+    # Ollama needs no key
+    if role_provider == "ollama":
+        user_has_key = _is_ollama_running()
+
+    available = list_available_providers()
+
+    # Check embeddings
+    has_ingest = getattr(role.spec, "ingest", None) is not None
+    has_memory = getattr(role.spec, "memory", None) is not None
+    needs_embeddings = has_ingest or has_memory
+
+    emb_provider = ""
+    has_embedding_key = True
+    if needs_embeddings:
+        emb_provider, emb_env = _effective_embedding_provider(role)
+        if emb_provider == "ollama":
+            has_embedding_key = _is_ollama_running()
+        elif emb_env:
+            has_embedding_key = bool(os.environ.get(emb_env))
+
+    return ProviderCompatibility(
+        role_provider=role_provider,
+        role_model=role_model,
+        user_has_key=user_has_key,
+        available_providers=available,
+        needs_embeddings=needs_embeddings,
+        effective_embedding_provider=emb_provider,
+        has_embedding_key=has_embedding_key,
+    )
+
+
 def check_tool_envs() -> dict[str, list[str]]:
     """Return tool names with their missing env vars.
 

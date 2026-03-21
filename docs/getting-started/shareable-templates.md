@@ -256,7 +256,17 @@ changelog "Changelog since v1.0.0"
 ci-explain "Explain /tmp/build.log"
 ```
 
-**Customize the model** — these templates work with any provider. Override the model block in your own copy:
+**Customize the model** — these templates work with any provider. The easiest way to switch:
+
+```bash
+# Switch a local role to a different provider
+initrunner configure role.yaml --provider groq
+
+# Or override at runtime without changing the file
+initrunner run role.yaml -p "hello" --model ollama:llama3.2
+```
+
+You can also edit the model block directly in YAML:
 
 ```yaml
 model:
@@ -266,4 +276,4 @@ model:
   max_tokens: 4096
 ```
 
-See [Provider Configuration](../configuration/providers.md) for all supported providers.
+For installed roles from InitHub, provider overrides are stored in the registry and survive updates. See [Provider Configuration](../configuration/providers.md) for all supported providers and the `configure` command.

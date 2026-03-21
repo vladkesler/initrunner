@@ -283,6 +283,18 @@ def _load_dotenv(role_dir: Path) -> None:
         load_dotenv(global_env, override=False)
 
 
+def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> RoleDefinition:
+    """Return a copy of *role* with its model config replaced."""
+    old_model = role.spec.model
+    update: dict[str, Any] = {"provider": provider, "name": name}
+    if provider != old_model.provider:
+        update["base_url"] = None
+        update["api_key_env"] = None
+    new_model = old_model.model_copy(update=update)
+    new_spec = role.spec.model_copy(update={"model": new_model})
+    return role.model_copy(update={"spec": new_spec})
+
+
 def load_and_build(
     path: Path,
     extra_skill_dirs: list[Path] | None = None,
@@ -291,7 +303,9 @@ def load_and_build(
     """Load a role YAML and build the corresponding agent.
 
     When *model_override* is a ``provider:model`` string the role's model
-    config is replaced before the agent is built.
+    config is replaced before the agent is built.  Otherwise, if the role
+    was installed via the registry and the user set a provider override,
+    that override is applied automatically.
     """
     _load_dotenv(path.parent)
     role = load_role(path)
@@ -299,13 +313,36 @@ def load_and_build(
         from initrunner.model_aliases import parse_model_string
 
         new_provider, new_name = parse_model_string(model_override)
-        old_model = role.spec.model
-        update: dict[str, Any] = {"provider": new_provider, "name": new_name}
-        if new_provider != old_model.provider:
-            update["base_url"] = None
-            update["api_key_env"] = None
-        new_model = old_model.model_copy(update=update)
-        new_spec = role.spec.model_copy(update={"model": new_model})
-        role = role.model_copy(update={"spec": new_spec})
+        role = _apply_model_override(role, new_provider, new_name)
+    else:
+        # Apply registry overrides for installed roles (if any)
+        role = _apply_registry_overrides(role, path)
     agent = build_agent(role, role_dir=path.parent, extra_skill_dirs=extra_skill_dirs)
     return role, agent
+
+
+def _apply_registry_overrides(role: RoleDefinition, path: Path) -> RoleDefinition:
+    """Apply provider/model overrides from the registry manifest, if present."""
+    try:
+        from initrunner.registry import get_overrides_for_path
+
+        overrides = get_overrides_for_path(path)
+    except Exception:
+        return role
+
+    if not overrides:
+        return role
+
+    provider = overrides.get("provider", "")
+    model = overrides.get("model", "")
+    if not provider or not model:
+        return role
+
+    logger.info(
+        "Applying registry override: %s/%s (original: %s/%s)",
+        provider,
+        model,
+        role.spec.model.provider,
+        role.spec.model.name,
+    )
+    return _apply_model_override(role, provider, model)

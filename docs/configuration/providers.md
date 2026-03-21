@@ -174,6 +174,52 @@ This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that expos
 
 > **Embedding endpoints:** `api_key_env` works for all embedding providers (standard and custom) via `ingest.embeddings.api_key_env` or `memory.embeddings.api_key_env`. When set, InitRunner validates the key at startup and fails fast with an actionable error if it's missing. See [Ingestion: Embedding Options](../core/ingestion.md#embedding-options) for details.
 
+## Switching providers
+
+### `initrunner configure`
+
+Switch the provider/model for any role without editing YAML:
+
+```bash
+# Non-interactive: specify provider (model auto-selected)
+initrunner configure role.yaml --provider groq
+
+# Non-interactive: specify both provider and model
+initrunner configure my-agent --provider ollama --model deepseek-coder-v2
+
+# Interactive: shows available providers and model picker
+initrunner configure role.yaml
+
+# Reset an installed role back to its original provider
+initrunner configure my-agent --reset
+```
+
+For installed roles (from InitHub or OCI), the override is stored in the registry manifest and survives updates. For local YAML files, the file is edited directly.
+
+### Post-install provider adaptation
+
+When you install a role from InitHub, InitRunner checks if you have the required API key. If not, it offers to adapt the role to a provider you have configured:
+
+```
+$ initrunner install acme/support-bot
+
+Installed acme/support-bot -> ~/.initrunner/roles/hub__acme__support-bot/
+
++-- Provider Check ----------------------------------------+
+|  Role uses:  mistral / mistral-large-latest               |
+|  MISTRAL_API_KEY: Missing                                  |
+|                                                            |
+|  1. Adapt to openai (gpt-5-mini)                           |
+|  2. Adapt to ollama (llama3.2)                             |
+|  3. Keep as-is (set MISTRAL_API_KEY later)                 |
++-----------------------------------------------------------+
+Adapt? [1-3] (1):
+```
+
+The override is stored in the registry and applied at runtime. The installed YAML stays pristine, so updates from the author don't conflict with your local provider choice.
+
+Use `--yes` for non-interactive mode (auto-adapts to your top available provider).
+
 ## Model aliases & runtime override
 
 You can define semantic aliases (`fast`, `smart`, `local`) in `~/.initrunner/models.yaml` and override the model at runtime with `--model` or `INITRUNNER_MODEL`. See [Model Aliases](model-aliases.md) for full details.

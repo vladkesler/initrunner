@@ -1,4 +1,4 @@
-"""Role commands: validate, setup."""
+"""Role commands: validate, setup, configure."""
 
 from __future__ import annotations
 
@@ -174,6 +174,168 @@ def setup(
         model=model,
         skip_chat_yaml=skip_chat_yaml,
     )
+
+
+def configure(
+    role: Annotated[
+        Path,
+        typer.Argument(help="Role YAML file, directory, or installed role name"),
+    ],
+    provider: Annotated[
+        str | None,
+        typer.Option(help="Target provider (e.g. openai, anthropic, groq, ollama)"),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(help="Target model name"),
+    ] = None,
+    reset: Annotated[
+        bool,
+        typer.Option("--reset", help="Remove provider override, revert to original"),
+    ] = False,
+) -> None:
+    """Switch the LLM provider/model for a role."""
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+
+    from initrunner.agent.loader import RoleLoadError, load_role
+    from initrunner.cli._helpers import prompt_model_selection, resolve_role_path
+    from initrunner.registry import (
+        clear_role_overrides,
+        get_overrides_for_path,
+        resolve_installed_path,
+        set_role_overrides,
+    )
+    from initrunner.services.providers import list_available_providers
+
+    # Resolve the path
+    role_path = resolve_role_path(role)
+
+    try:
+        role_def = load_role(role_path)
+    except RoleLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    # Determine if this is an installed role (registry-backed) or local file
+    installed_path = None
+    try:
+        installed_path = resolve_installed_path(str(role))
+    except Exception:
+        pass
+    is_installed = installed_path is not None
+
+    current_overrides = get_overrides_for_path(role_path) if is_installed else {}
+    effective_provider = current_overrides.get("provider", role_def.spec.model.provider)
+    effective_model = current_overrides.get("model", role_def.spec.model.name)
+    original_provider = role_def.spec.model.provider
+    original_model = role_def.spec.model.name
+
+    # Handle --reset
+    if reset:
+        if not is_installed:
+            console.print("[yellow]Warning:[/yellow] --reset only applies to installed roles.")
+            raise typer.Exit(1)
+        clear_role_overrides(str(role))
+        console.print(
+            f"Removed provider override. Using original: "
+            f"[cyan]{original_provider} / {original_model}[/cyan]"
+        )
+        return
+
+    # Show current config
+    features = []
+    if role_def.spec.tools:
+        features.append("tools")
+    if role_def.spec.ingest:
+        features.append("ingest (RAG)")
+    if role_def.spec.memory:
+        features.append("memory")
+    if role_def.spec.triggers:
+        features.append("triggers")
+
+    lines = [
+        f"  Name:      [bold]{role_def.metadata.name}[/bold]",
+        f"  Provider:  [cyan]{effective_provider}[/cyan]"
+        + ("  (override)" if current_overrides else ""),
+        f"  Model:     {effective_model}",
+    ]
+    if current_overrides:
+        lines.append(f"  Original:  {original_provider} / {original_model}")
+    if features:
+        lines.append(f"  Features:  {', '.join(features)}")
+
+    console.print(Panel("\n".join(lines), title="Current Configuration", border_style="cyan"))
+
+    # Non-interactive mode
+    if provider is not None:
+        if model is None:
+            from initrunner.templates import _default_model_name
+
+            model = _default_model_name(provider)
+
+        if is_installed:
+            set_role_overrides(str(role), {"provider": provider, "model": model})
+        else:
+            _update_role_yaml(role_path, provider, model)
+
+        console.print(f"Updated {role_def.metadata.name}: [cyan]{provider} / {model}[/cyan]")
+        return
+
+    # Interactive mode -- show available providers
+    available = list_available_providers()
+    if not available:
+        console.print(
+            "[yellow]No providers configured.[/yellow] Run [bold]initrunner setup[/bold] first."
+        )
+        raise typer.Exit(1)
+
+    console.print("\nAvailable providers:")
+    for i, dp in enumerate(available, 1):
+        current_tag = "    (current)" if dp.provider == effective_provider else ""
+        console.print(f"  {i}. {dp.provider:10s} [{dp.model}]{current_tag}")
+
+    raw = Prompt.ask(
+        f"\nSwitch provider [1-{len(available)}, Enter to keep]",
+        default="",
+    )
+
+    if not raw.strip():
+        console.print("  No change.")
+        return
+
+    idx = int(raw) - 1 if raw.strip().isdigit() else -1
+    if not (0 <= idx < len(available)):
+        console.print(f"[red]Invalid choice:[/red] '{raw}'")
+        raise typer.Exit(1)
+
+    chosen_provider = available[idx].provider
+    chosen_model = prompt_model_selection(chosen_provider)
+
+    if is_installed:
+        set_role_overrides(str(role), {"provider": chosen_provider, "model": chosen_model})
+    else:
+        _update_role_yaml(role_path, chosen_provider, chosen_model)
+
+    console.print(
+        f"Updated {role_def.metadata.name}: [cyan]{chosen_provider} / {chosen_model}[/cyan]"
+    )
+
+
+def _update_role_yaml(role_path: Path, provider: str, model: str) -> None:
+    """Rewrite the model block in a local role YAML file."""
+    import yaml
+
+    data = yaml.safe_load(role_path.read_text())
+    if "spec" in data and "model" in data["spec"]:
+        old_provider = data["spec"]["model"].get("provider", "")
+        data["spec"]["model"]["provider"] = provider
+        data["spec"]["model"]["name"] = model
+        # Only clear provider-specific fields when the provider actually changes
+        if provider != old_provider:
+            data["spec"]["model"].pop("base_url", None)
+            data["spec"]["model"].pop("api_key_env", None)
+    role_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
 
 def _validate_team(team_file: Path) -> None:

@@ -142,7 +142,7 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     update,
     whoami,
 )
-from initrunner.cli.role_cmd import setup, validate  # noqa: E402
+from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import ingest, run, test  # noqa: E402
 from initrunner.cli.server_cmd import tui, ui  # noqa: E402
 
@@ -158,6 +158,7 @@ app.command(rich_help_panel="Run & Test")(run)
 app.command(rich_help_panel="Run & Test")(test)
 app.command(rich_help_panel="Run & Test")(ingest)
 app.command(rich_help_panel="Run & Test")(validate)
+app.command(rich_help_panel="Run & Test")(configure)
 
 # --- Interfaces ---
 app.command(rich_help_panel="Interfaces")(ui)

@@ -35,6 +35,103 @@ def _display_install_preview(preview: object) -> None:
     console.print()
 
 
+def _post_install_provider_check(result: object, *, yes: bool = False) -> None:
+    """Check provider compatibility after install; offer adaptation if mismatch."""
+    from rich.panel import Panel
+    from rich.prompt import Prompt
+
+    from initrunner.cli._helpers import resolve_role_path
+    from initrunner.registry import InstallResult, set_role_overrides
+    from initrunner.services.providers import check_role_provider_compatibility
+
+    assert isinstance(result, InstallResult)
+
+    try:
+        role_path = resolve_role_path(result.path)
+    except (SystemExit, Exception):
+        return  # Can't resolve role YAML -- skip check silently
+
+    try:
+        compat = check_role_provider_compatibility(role_path)
+    except Exception:
+        return  # Load/parse error -- user will see it at run time
+
+    if compat.user_has_key:
+        # Provider matches -- show status and move on
+        console.print(
+            f"  Provider: {compat.role_provider} / {compat.role_model} [green][Key set][/green]"
+        )
+    elif not compat.available_providers:
+        console.print(
+            "[yellow]Warning:[/yellow] No provider configured. "
+            "Run [bold]initrunner setup[/bold] first."
+        )
+    else:
+        # Mismatch -- build adaptation options
+        from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+
+        env_var = _PROVIDER_API_KEY_ENVS.get(compat.role_provider, compat.role_provider.upper())
+        lines = [
+            f"  Role uses:  [bold]{compat.role_provider} / {compat.role_model}[/bold]",
+            f"  {env_var}: [red]Missing[/red]",
+            "",
+        ]
+        for i, dp in enumerate(compat.available_providers, 1):
+            lines.append(f"  {i}. Adapt to [cyan]{dp.provider}[/cyan] ({dp.model})")
+        keep_idx = len(compat.available_providers) + 1
+        lines.append(f"  {keep_idx}. Keep as-is (set {env_var} later)")
+
+        console.print(Panel("\n".join(lines), title="Provider Check", border_style="yellow"))
+
+        if yes:
+            # Non-interactive: auto-adapt to top available provider
+            chosen = compat.available_providers[0]
+            set_role_overrides(
+                result.display_name,
+                {
+                    "provider": chosen.provider,
+                    "model": chosen.model,
+                },
+            )
+            console.print(
+                f"  Auto-adapted to [cyan]{chosen.provider} / {chosen.model}[/cyan] "
+                f"(override stored in registry)"
+            )
+        else:
+            raw = Prompt.ask(
+                f"Adapt? [1-{keep_idx}]",
+                default="1",
+            )
+            idx = int(raw) - 1 if raw.strip().isdigit() else -1
+            if 0 <= idx < len(compat.available_providers):
+                chosen = compat.available_providers[idx]
+                set_role_overrides(
+                    result.display_name,
+                    {
+                        "provider": chosen.provider,
+                        "model": chosen.model,
+                    },
+                )
+                console.print(
+                    f"  Adapted to [cyan]{chosen.provider} / {chosen.model}[/cyan] "
+                    f"(override stored in registry)"
+                )
+            else:
+                console.print("  Keeping original provider.")
+
+    # Embedding warning
+    if compat.needs_embeddings and not compat.has_embedding_key:
+        from initrunner.ingestion.embeddings import _default_embedding_key_env
+
+        emb_env = _default_embedding_key_env(compat.effective_embedding_provider)
+        console.print(
+            f"\n  [yellow]Note:[/yellow] This role uses RAG/memory. "
+            f"Effective embedding provider is [bold]{compat.effective_embedding_provider}[/bold]."
+            f"\n  Set [bold]{emb_env}[/bold] for embeddings. "
+            f"Run: [bold]initrunner doctor[/bold]"
+        )
+
+
 def install(
     source: Annotated[
         str,
@@ -75,6 +172,10 @@ def install(
         raise typer.Exit(1) from None
 
     console.print(f"[green]Installed[/green] {preview.name} -> {result.path}")
+
+    # --- Post-install provider compatibility check ---
+    _post_install_provider_check(result, yes=yes)
+
     console.print(f'  Run: [bold]initrunner run {result.display_name} -p "your prompt"[/bold]')
 
 
