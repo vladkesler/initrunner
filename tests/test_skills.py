@@ -290,7 +290,7 @@ class TestLoadSkill:
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.DEBUG):
+            with caplog.at_level(logging.DEBUG, logger="initrunner"):
                 sd = load_skill(path)
             assert sd.frontmatter.tools == []
             assert "no tool configs" in caplog.text
@@ -491,7 +491,7 @@ class TestMergeSkillTools:
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.DEBUG):
+            with caplog.at_level(logging.DEBUG, logger="initrunner"):
                 merged = merge_skill_tools([skill], role_tools)
 
             assert len(merged) == 1
@@ -508,7 +508,7 @@ class TestMergeSkillTools:
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.DEBUG):
+            with caplog.at_level(logging.DEBUG, logger="initrunner"):
                 merged = merge_skill_tools([skill_a, skill_b], [])
 
             assert len(merged) == 1
