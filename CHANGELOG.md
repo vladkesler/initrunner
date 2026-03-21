@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.34.0] - 2026-03-21
+
+### Changed
+- **Unified `run` command**: `run` now auto-detects YAML kind (Agent, Team, Compose, Pipeline) and dispatches accordingly. One command replaces `daemon`, `serve`, and `pipeline`
+- `run` gains `--daemon`, `--serve`, `--bot`, `--var`, `--host`, `--port`, `--api-key`, `--cors-origin`, `--allowed-users`, `--allowed-user-ids` flags with grouped help panels
+- `chat` is now ephemeral-only (no role-file argument); use `run <role>` for role-backed execution
+- Trigger hint shown when entering REPL for roles with configured triggers
+
+### Added
+- `runner/bot.py`: dedicated bot runner that starts Telegram/Discord event loops directly without going through DaemonRunner
+- `runner/_conversations.py`: extracted `ConversationStore` for shared use between daemon and bot runners
+- `resolve_run_target()` in CLI helpers for unified target resolution with kind detection
+- 21 new tests for dispatch, kind/mode validation, mutual exclusivity, and old command removal
+
+### Removed
+- `initrunner daemon` top-level command (use `initrunner run <role> --daemon`)
+- `initrunner serve` top-level command (use `initrunner run <role> --serve`)
+- `initrunner pipeline` top-level command (use `initrunner run <file>` with Pipeline YAML)
+- `initrunner chat <role>` mode (use `initrunner run <role>`)
+
 ## [1.33.2] - 2026-03-19
 
 ### Added
