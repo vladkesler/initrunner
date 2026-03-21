@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.37.0] - 2026-03-21
+
+### Added
+- **`initrunner configure` command** -- switch the LLM provider/model for any role without editing YAML. Interactive mode shows available providers and model picker; non-interactive via `--provider`/`--model` flags. `--reset` reverts to original
+- **Post-install provider adaptation** -- after `initrunner install`, detects if the user lacks the role's required API key and offers one-step adaptation to a configured provider. Lists all available providers. Non-interactive (`--yes`) auto-adapts
+- **Registry override layer** -- provider overrides stored in `registry.json` alongside installed role metadata. Overrides survive hub updates, reinstalls, and `--force` re-installs. Installed YAML stays pristine
+- **Provider compatibility checking** -- `check_role_provider_compatibility()` inspects LLM provider key, effective embedding provider (respects `ingest.embeddings` and `memory.embeddings` overrides, falls back to defaults from `ingestion/embeddings.py`)
+- `list_available_providers()` returns all providers the user has API keys for, not just the first match
+- 28 new tests across `test_registry_overrides.py`, `test_providers_compat.py`, `test_configure_cmd.py`
+
+### Changed
+- PydanticAI minimum version bumped to 1.70.0
+- `_update_role_yaml` preserves `base_url` and `api_key_env` when the provider stays the same (fixes OpenRouter model switching)
+- Loader applies registry overrides before building agent (`--model` CLI override takes higher priority)
+
 ## [1.36.0] - 2026-03-21
 
 ### Added

@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3531+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.36.0-%2334D058" alt="v1.36.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3485+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.37.0-%2334D058" alt="v1.37.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.36.0** - New built-in tools: calculator (AST-based), image generation (DALL-E 3 / Stability AI), PDF extraction, browser MCP server. 4 new example roles. See the [Changelog](CHANGELOG.md).
+> **v1.37.0** - `initrunner configure` command to switch providers without editing YAML. Post-install provider adaptation detects mismatched API keys and offers one-step switching. PydanticAI 1.70.0+. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -229,6 +229,7 @@ Also includes content filtering, PEP 578 sandboxing, Docker isolation, token bud
 | **Evals** - test agent output quality | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
 | **MCP gateway** - expose agents as MCP tools | `initrunner mcp serve agent.yaml` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | **MCP toolkit** - tools without an agent | `initrunner mcp toolkit` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
+| **Configure** - switch provider/model on any role | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
 
 See [Tutorial](docs/getting-started/tutorial.md) for a guided walkthrough.
 
@@ -308,4 +309,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.36.0</sub></p>
+<p align="center"><sub>v1.37.0</sub></p>
