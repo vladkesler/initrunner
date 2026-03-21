@@ -532,6 +532,26 @@ WIZARD_TEMPLATES: dict[str, str] = {
     "blank": "Just the essentials, add everything yourself",
 }
 
+# Listable role templates (excludes blank, tool, skill)
+LISTABLE_TEMPLATES: dict[str, str] = {
+    "basic": "Simple assistant",
+    "rag": "Answers from your documents",
+    "daemon": "Runs on schedule / watches files",
+    "memory": "Remembers across sessions",
+    "ollama": "Local Ollama model",
+    "api": "Declarative REST API tools",
+    "telegram": "Telegram bot agent",
+    "discord": "Discord bot agent",
+}
+
+
+# Compose scaffold patterns
+COMPOSE_PATTERNS: dict[str, str] = {
+    "pipeline": "Linear A -> B -> C chain",
+    "fan-out": "One dispatcher fans out to multiple workers",
+    "route": "Intake routes to specialists via intent sensing",
+}
+
 
 def build_role_yaml(
     *,
@@ -541,6 +561,7 @@ def build_role_yaml(
     model_name: str | None = None,
     system_prompt: str = "You are a helpful assistant.",
     tools: list[dict[str, Any]] | None = None,
+    tags: list[str] | None = None,
     memory: bool = False,
     ingest: dict[str, Any] | None = None,
     triggers: list[dict[str, Any]] | None = None,
@@ -563,7 +584,7 @@ def build_role_yaml(
         "metadata": {
             "name": name,
             "description": description,
-            "tags": [],
+            "tags": tags if tags is not None else [],
         },
         "spec": {
             "role": system_prompt,

@@ -89,6 +89,8 @@ class TestExportReportCLI:
                         "--dry-run",
                         "--report",
                         str(report_file),
+                        "--format",
+                        "rich",
                     ],
                 )
 
@@ -120,6 +122,8 @@ class TestExportReportCLI:
                         str(report_file),
                         "--report-template",
                         "pr-review",
+                        "--format",
+                        "rich",
                     ],
                 )
 
@@ -194,6 +198,8 @@ class TestExportReportCLI:
                         "--dry-run",
                         "--report",
                         str(report_file),
+                        "--format",
+                        "rich",
                     ],
                 )
 

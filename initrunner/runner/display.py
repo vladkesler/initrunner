@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import json as _json
+import sys
+from collections.abc import Callable
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
 from initrunner.agent.executor import AutonomousResult, RunResult, TokenBudgetStatus
 from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.tool_events import ToolEvent
 
 console = Console()
 
@@ -150,3 +155,63 @@ def _display_daemon_header(
             f"  Autonomous triggers: [cyan]{', '.join(sorted(autonomous_trigger_types))}[/cyan]"
         )
     console.print(f"  {dispatcher.count} trigger(s) active. Press Ctrl+C to stop.\n")  # type: ignore[union-attr]
+
+
+def _format_tool_event(event: ToolEvent) -> str:
+    """Format a ToolEvent as a compact Rich-markup status line."""
+    if event.status == "ok":
+        return (
+            f"[dim]  tool [bold]{event.tool_name}[/bold]: "
+            f"[green]ok[/green] ({event.duration_ms}ms)[/dim]"
+        )
+    summary = f" - {event.error_summary}" if event.error_summary else ""
+    return (
+        f"[dim]  tool [bold]{event.tool_name}[/bold]: "
+        f"[red]error[/red]{summary} ({event.duration_ms}ms)[/dim]"
+    )
+
+
+def _make_tool_event_printer() -> Callable[[ToolEvent], None]:
+    """Return a callback that prints tool events to the console.
+
+    Uses ``console.print()`` which Rich renders above any active
+    ``Status``/``Live`` display.
+    """
+
+    def _on_event(event: ToolEvent) -> None:
+        console.print(_format_tool_event(event))
+
+    return _on_event
+
+
+def _display_result_plain(result: RunResult) -> None:
+    """Write plain-text output to stdout, stats/errors to stderr."""
+    if result.success:
+        sys.stdout.write(result.output)
+        if result.output and not result.output.endswith("\n"):
+            sys.stdout.write("\n")
+        sys.stdout.flush()
+        stats = f"tokens: {result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms"
+        sys.stderr.write(f"--- {stats} ---\n")
+        sys.stderr.flush()
+    else:
+        sys.stderr.write(f"Error: {result.error}\n")
+        sys.stderr.flush()
+
+
+def _display_result_json(result: RunResult) -> None:
+    """Write a curated JSON envelope to stdout."""
+    payload = {
+        "run_id": result.run_id,
+        "output": result.output,
+        "error": result.error,
+        "success": result.success,
+        "tokens_in": result.tokens_in,
+        "tokens_out": result.tokens_out,
+        "total_tokens": result.total_tokens,
+        "tool_calls": result.tool_calls,
+        "tool_call_names": result.tool_call_names,
+        "duration_ms": result.duration_ms,
+    }
+    sys.stdout.write(_json.dumps(payload) + "\n")
+    sys.stdout.flush()

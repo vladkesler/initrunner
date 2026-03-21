@@ -21,14 +21,8 @@ app = typer.Typer(
     no_args_is_help=False,
 )
 
-# Sub-app registrations
-app.add_typer(audit_app, name="audit")
-app.add_typer(compose_app, name="compose")
-app.add_typer(examples_app, name="examples")
-app.add_typer(hub_app, name="hub")
-app.add_typer(mcp_app, name="mcp")
-app.add_typer(memory_app, name="memory")
-app.add_typer(skill_app, name="skill")
+# Sub-app and command registrations are below the callback (after lazy imports).
+# See "Command registrations" block.
 
 
 # ---------------------------------------------------------------------------
@@ -152,28 +146,46 @@ from initrunner.cli.role_cmd import setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import ingest, run, test  # noqa: E402
 from initrunner.cli.server_cmd import tui, ui  # noqa: E402
 
-app.command()(chat)
-app.command()(validate)
-app.command()(new)
-app.command()(setup)
-app.command()(run)
-app.command()(test)
-app.command()(ingest)
-app.command()(ui)
-app.command()(tui)
-app.command()(plugins)
-app.command()(install)
-app.command()(uninstall)
-app.command()(search)
-app.command()(info)
-app.command("list")(list_roles)
-app.command()(update)
-app.command()(publish)
-app.command()(pull)
-app.command()(login)
-app.command()(logout)
-app.command()(whoami)
-app.command()(doctor)
+# --- Getting Started ---
+app.command(rich_help_panel="Getting Started")(chat)
+app.command(rich_help_panel="Getting Started")(new)
+app.command(rich_help_panel="Getting Started")(setup)
+app.command(rich_help_panel="Getting Started")(doctor)
+app.add_typer(examples_app, name="examples", rich_help_panel="Getting Started")
+
+# --- Run & Test ---
+app.command(rich_help_panel="Run & Test")(run)
+app.command(rich_help_panel="Run & Test")(test)
+app.command(rich_help_panel="Run & Test")(ingest)
+app.command(rich_help_panel="Run & Test")(validate)
+
+# --- Interfaces ---
+app.command(rich_help_panel="Interfaces")(ui)
+app.command(rich_help_panel="Interfaces")(tui)
+app.add_typer(compose_app, name="compose", rich_help_panel="Interfaces")
+app.add_typer(mcp_app, name="mcp", rich_help_panel="Interfaces")
+
+# --- Package Registry ---
+app.command(rich_help_panel="Package Registry")(install)
+app.command(rich_help_panel="Package Registry")(uninstall)
+app.command("list", rich_help_panel="Package Registry")(list_roles)
+app.command(rich_help_panel="Package Registry")(update)
+app.command(rich_help_panel="Package Registry")(search)
+app.command(rich_help_panel="Package Registry")(info)
+app.command(rich_help_panel="Package Registry")(publish)
+app.command(rich_help_panel="Package Registry")(pull)
+app.command(rich_help_panel="Package Registry")(login)
+app.command(rich_help_panel="Package Registry")(logout)
+app.command(rich_help_panel="Package Registry")(whoami)
+
+# --- Agent Internals ---
+app.command(rich_help_panel="Agent Internals")(plugins)
+app.add_typer(skill_app, name="skill", rich_help_panel="Agent Internals")
+app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
+app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")
+
+# --- Deprecated (hidden from help) ---
+app.add_typer(hub_app, name="hub", hidden=True)
 
 
 def app_entry() -> None:

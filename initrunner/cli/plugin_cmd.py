@@ -18,8 +18,10 @@ def plugins() -> None:
     all_plugins = registry.list_plugins()
 
     if not all_plugins:
-        console.print("No tool plugins installed.")
-        console.print("[dim]Install plugins with: pip install initrunner-<plugin-name>[/dim]")
+        console.print("No tool plugins installed.\n")
+        console.print("Plugins are pip-installable packages that add new tool types to InitRunner.")
+        console.print("See the tool creation guide: docs/agents/tool_creation.md\n")
+        console.print("[dim]Install pattern: pip install initrunner-<plugin-name>[/dim]")
         return
 
     table = Table(title="Tool Plugins")

@@ -22,6 +22,9 @@ def new(
     ] = None,
     template: Annotated[str | None, typer.Option("--template", help="Template name")] = None,
     blank: Annotated[bool, typer.Option("--blank", help="Start from blank template")] = False,
+    list_templates: Annotated[
+        bool, typer.Option("--list-templates", help="Show available templates and exit")
+    ] = False,
     provider: Annotated[str | None, typer.Option(help="Model provider")] = None,
     model: Annotated[str | None, typer.Option(help="Model name")] = None,
     output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
@@ -38,6 +41,21 @@ def new(
 
     Without any seed, starts an interactive conversation.
     """
+    # --- List templates (pure informational, exit early) ---
+    if list_templates:
+        from rich.table import Table
+
+        from initrunner.templates import LISTABLE_TEMPLATES
+
+        table = Table(title="Available Templates")
+        table.add_column("Name", style="cyan")
+        table.add_column("Description")
+        for name, desc in sorted(LISTABLE_TEMPLATES.items()):
+            table.add_row(name, desc)
+        console.print(table)
+        console.print("\n[dim]Usage: initrunner new --template <name>[/dim]")
+        raise typer.Exit(0)
+
     from initrunner.agent.loader import _load_dotenv
     from initrunner.services.agent_builder import BuilderSession
     from initrunner.services.roles import _detect_provider

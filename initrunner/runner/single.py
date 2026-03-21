@@ -24,15 +24,22 @@ def run_single(
     model_override: Model | str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a single prompt and display the result."""
-    with console.status("Thinking...", spinner="dots"):
-        result, messages = execute_run(
-            agent,
-            role,
-            prompt,
-            audit_logger=audit_logger,
-            message_history=message_history,
-            model_override=model_override,
-        )
+    from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
+    from initrunner.runner.display import _make_tool_event_printer
+
+    token = set_tool_event_callback(_make_tool_event_printer())
+    try:
+        with console.status("Thinking...", spinner="dots"):
+            result, messages = execute_run(
+                agent,
+                role,
+                prompt,
+                audit_logger=audit_logger,
+                message_history=message_history,
+                model_override=model_override,
+            )
+    finally:
+        reset_tool_event_callback(token)
     _display_result(result)
     if sink_dispatcher is not None:
         sink_dispatcher.dispatch(result, extract_text_from_prompt(prompt))
@@ -63,6 +70,10 @@ def run_single_stream(
         )
 
     from initrunner.agent.executor import execute_run_stream
+    from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
+    from initrunner.runner.display import _make_tool_event_printer
+
+    cb_token = set_tool_event_callback(_make_tool_event_printer())
 
     out = console.file
     status = console.status("Thinking...", spinner="dots")
@@ -88,6 +99,7 @@ def run_single_stream(
             on_token=on_token,
         )
     finally:
+        reset_tool_event_callback(cb_token)
         if first_token:
             status.stop()
 

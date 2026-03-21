@@ -160,11 +160,11 @@ def chat(
         typer.Option("--allowed-user-ids", help="Restrict bot to these user IDs (repeatable)"),
     ] = None,
 ) -> None:
-    """Zero-config ephemeral chat and bot launcher.
+    """Quick chat without a role file.
 
     Auto-detects your API provider and starts a REPL with persistent memory.
     Use --telegram or --discord to launch an ephemeral bot.
-    For role-backed execution, use 'initrunner run <role>' instead.
+    For role-backed interactive chat, use: initrunner run <role> -i
     """
     if list_tools:
         _print_list_tools()
@@ -344,6 +344,9 @@ def _chat_auto_detect(
     agent = build_agent(role)
 
     console.print(f"[dim]Using {prov}:{mod}[/dim]")
+    console.print(
+        "[dim]Tip: for custom tools and guardrails, create a role with 'initrunner new'[/dim]"
+    )
 
     # Run ingestion if configured
     if ingest_config is not None:

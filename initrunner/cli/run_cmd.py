@@ -23,9 +23,14 @@ from initrunner.cli._helpers import (
 from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
 
 if TYPE_CHECKING:
+    from pydantic_ai import Agent
+    from pydantic_ai.models import Model
+
     from initrunner.agent.executor import AutonomousResult, RunResult
     from initrunner.agent.prompt import UserPrompt
     from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.audit.logger import AuditLogger
+    from initrunner.sinks.dispatcher import SinkDispatcher
 
 
 def _maybe_export_report(
@@ -94,8 +99,12 @@ def run(
             help="Report template: default, pr-review, changelog, ci-fix",
         ),
     ] = "default",
+    output_format: Annotated[
+        str,
+        typer.Option("-f", "--format", help="Output format: auto, json, text, rich"),
+    ] = "auto",
     no_stream: Annotated[
-        bool, typer.Option("--no-stream", help="Disable streaming output (show result in panel)")
+        bool, typer.Option("--no-stream", hidden=True, help="Deprecated: use --format rich")
     ] = False,
     sense: Annotated[
         bool, typer.Option("--sense", help="Sense the best role for the given prompt")
@@ -157,7 +166,11 @@ def run(
         ),
     ] = None,
 ) -> None:
-    """Run an agent, team, compose, or pipeline target."""
+    """Run an agent, team, compose, or pipeline from a YAML file.
+
+    Use -i for interactive REPL, -a for autonomous mode.
+    For quick chat without a role file, use 'initrunner chat'.
+    """
 
     # --- Mutual exclusivity for mode flags ---
     mode_flags = sum([daemon_mode, serve_mode, autonomous, bool(bot)])
@@ -171,13 +184,35 @@ def run(
         console.print(f"[red]Error:[/red] --bot must be 'telegram' or 'discord', got '{bot}'.")
         raise typer.Exit(1)
 
+    # --- Output format validation ---
+    if output_format not in ("auto", "json", "text", "rich"):
+        console.print(
+            f"[red]Error:[/red] Unknown format '{output_format}'. Use: auto, json, text, rich"
+        )
+        raise typer.Exit(1)
+
+    if no_stream:
+        typer.echo("Warning: --no-stream is deprecated; use --format rich", err=True)
+        if output_format == "auto":
+            output_format = "rich"
+
+    if output_format in ("json", "text") and interactive:
+        console.print("[red]Error:[/red] --format json|text is not supported with -i.")
+        raise typer.Exit(1)
+
+    if output_format in ("json", "text") and autonomous:
+        console.print("[red]Error:[/red] --format json|text is not supported with -a.")
+        raise typer.Exit(1)
+
     # --- Intent Sensing resolution ---
     if role_file is not None and sense:
         console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
         raise typer.Exit(1)
     if role_file is None and not sense:
         console.print(
-            "[red]Error:[/red] Provide a target file, installed role name, or use --sense."
+            "[red]Error:[/red] Provide a role file, installed role name, or use --sense.\n"
+            "[dim]Hint: for quick ephemeral chat, use 'initrunner chat'.\n"
+            "      To create a new agent, use 'initrunner new'.[/dim]"
         )
         raise typer.Exit(1)
     if sense and not prompt:
@@ -372,12 +407,25 @@ def run(
         message_history = None
         run_result = None  # RunResult or AutonomousResult
 
-        use_stream = (
-            sys.stdout.isatty()
-            and not no_stream
-            and not autonomous
-            and role.spec.output.type == "text"
-        )
+        # --- Resolve effective output mode ---
+        if output_format in ("json", "text"):
+            effective = output_format
+        elif output_format == "rich":
+            effective = "rich"
+        else:  # auto
+            if not sys.stdout.isatty():
+                effective = "text"
+            elif autonomous:
+                effective = "rich"
+            elif role.spec.output.type != "text":
+                effective = "rich"
+            else:
+                effective = "stream"
+
+        if no_stream and effective == "stream":
+            effective = "rich"
+
+        use_stream = effective == "stream"
         _run_single = run_single_stream if use_stream else run_single
 
         if autonomous:
@@ -394,14 +442,25 @@ def run(
                 max_iterations_override=max_iterations,
             )
         elif user_prompt and not interactive:
-            run_result, _ = _run_single(
-                agent,
-                role,
-                user_prompt,
-                audit_logger=audit_logger,
-                sink_dispatcher=sink_dispatcher,
-                model_override=model_override,
-            )
+            if effective in ("text", "json"):
+                run_result, _ = _run_formatted(
+                    effective,
+                    agent,
+                    role,
+                    user_prompt,
+                    audit_logger=audit_logger,
+                    sink_dispatcher=sink_dispatcher,
+                    model_override=model_override,
+                )
+            else:
+                run_result, _ = _run_single(
+                    agent,
+                    role,
+                    user_prompt,
+                    audit_logger=audit_logger,
+                    sink_dispatcher=sink_dispatcher,
+                    model_override=model_override,
+                )
         elif user_prompt and interactive:
             run_result, message_history = _run_single(
                 agent,
@@ -441,6 +500,53 @@ def run(
         # Export for non-interactive branches (after run completes)
         if report is not None and run_result is not None and not (user_prompt and interactive):
             _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+
+
+# ---------------------------------------------------------------------------
+# Formatted output helper (text / json)
+# ---------------------------------------------------------------------------
+
+
+def _run_formatted(
+    effective: str,
+    agent: Agent,
+    role: RoleDefinition,
+    prompt: UserPrompt,
+    *,
+    audit_logger: AuditLogger | None = None,
+    sink_dispatcher: SinkDispatcher | None = None,
+    model_override: Model | str | None = None,
+) -> tuple:
+    """Execute a single prompt and display in plain-text or JSON format.
+
+    Bypasses ``run_single`` to avoid Rich panel output.  Spinner goes to
+    stderr so stdout remains clean for piping.
+    """
+    from rich.console import Console as _Console
+
+    from initrunner.agent.executor import execute_run
+    from initrunner.agent.prompt import extract_text_from_prompt
+    from initrunner.runner.display import _display_result_json, _display_result_plain
+
+    stderr_console = _Console(stderr=True)
+    with stderr_console.status("Thinking...", spinner="dots"):
+        result, messages = execute_run(
+            agent,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            model_override=model_override,
+        )
+
+    if effective == "json":
+        _display_result_json(result)
+    else:
+        _display_result_plain(result)
+
+    if sink_dispatcher is not None:
+        sink_dispatcher.dispatch(result, extract_text_from_prompt(prompt))
+
+    return result, messages
 
 
 # ---------------------------------------------------------------------------

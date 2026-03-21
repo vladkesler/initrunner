@@ -210,6 +210,35 @@ class TestNewOverwrite:
 
 
 # ---------------------------------------------------------------------------
+# --list-templates
+# ---------------------------------------------------------------------------
+
+_ROLE_TEMPLATES = {"basic", "rag", "daemon", "memory", "ollama", "api", "telegram", "discord"}
+
+
+class TestListTemplates:
+    def test_list_templates_exits_zero(self):
+        result = runner.invoke(app, ["new", "--list-templates"])
+        assert result.exit_code == 0
+
+    def test_list_templates_shows_all_role_templates(self):
+        result = runner.invoke(app, ["new", "--list-templates"])
+        for name in _ROLE_TEMPLATES:
+            assert name in result.output
+
+    def test_list_templates_excludes_non_role(self):
+        result = runner.invoke(app, ["new", "--list-templates"])
+        # blank is a separate flag; tool/skill are scaffolds
+        assert "blank" not in result.output.lower().split()
+        assert "tool" not in result.output.lower().split()
+        assert "skill" not in result.output.lower().split()
+
+    def test_list_templates_in_help(self):
+        result = runner.invoke(app, ["new", "--help"])
+        assert "--list-templates" in result.output
+
+
+# ---------------------------------------------------------------------------
 # Command surface: init and create are gone, new is registered
 # ---------------------------------------------------------------------------
 
@@ -245,7 +274,7 @@ class TestZeroArg:
         """Non-TTY (piped) should show help text."""
         result = runner.invoke(app, [])
         assert result.exit_code == 0
-        assert "Commands" in result.output
+        assert "Usage:" in result.output
 
     def test_new_command_in_help(self):
         """The 'new' command should appear in help output."""

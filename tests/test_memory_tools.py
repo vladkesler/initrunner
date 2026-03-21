@@ -67,11 +67,12 @@ class TestBuildMemoryToolset:
         data["spec"]["memory"] = {"max_sessions": 5}
         role = RoleDefinition.model_validate(data)
         toolsets = build_toolsets(role.spec.tools, role)
-        # Memory toolset should be included (last one), wrapped in CerbosToolset
+        # Memory toolset should be included, wrapped in ObservableToolset -> CerbosToolset
         assert len(toolsets) == 1
         mem_toolset = toolsets[0]
-        # Unwrap CerbosToolset to access inner toolset
-        inner = getattr(mem_toolset, "_inner", mem_toolset)
+        # Unwrap ObservableToolset then CerbosToolset to access inner toolset
+        cerbos = getattr(mem_toolset, "_inner", mem_toolset)
+        inner = getattr(cerbos, "_inner", cerbos)
         assert hasattr(inner, "tools")
         names = list(inner.tools.keys())  # type: ignore[attr-defined]
         assert "remember" in names

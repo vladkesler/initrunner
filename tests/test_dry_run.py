@@ -78,7 +78,8 @@ class TestRunDryRun:
         role_file.write_text(_ROLE_YAML)
 
         result = runner.invoke(
-            app, ["run", str(role_file), "-p", "hello", "--dry-run", "--no-audit"]
+            app,
+            ["run", str(role_file), "-p", "hello", "--dry-run", "--no-audit", "--format", "rich"],
         )
         assert result.exit_code == 0
         mock_run_single.assert_called_once()
@@ -105,7 +106,9 @@ class TestRunDryRun:
         role_file = tmp_path / "role.yaml"
         role_file.write_text(_ROLE_YAML)
 
-        result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+        result = runner.invoke(
+            app, ["run", str(role_file), "-p", "hello", "--no-audit", "--format", "rich"]
+        )
         assert result.exit_code == 0
         call_kwargs = mock_run_single.call_args
         model_override = call_kwargs.kwargs.get("model_override")

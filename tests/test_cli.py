@@ -107,7 +107,10 @@ class TestRun:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")  # won't be read due to mock
 
-        result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+        # Use --format rich to force buffered panel path (CliRunner is non-TTY)
+        result = runner.invoke(
+            app, ["run", str(role_file), "-p", "hello", "--format", "rich", "--no-audit"]
+        )
         assert result.exit_code == 0
         mock_run_single.assert_called_once()
 
@@ -161,7 +164,10 @@ class TestRun:
             [],
         )
 
-        result = runner.invoke(app, ["run", "--sense", "-p", "test task", "--no-audit"])
+        # Use --format rich to force buffered panel path (CliRunner is non-TTY)
+        result = runner.invoke(
+            app, ["run", "--sense", "-p", "test task", "--format", "rich", "--no-audit"]
+        )
         assert result.exit_code == 0
         mock_select.assert_called_once_with("test task", role_dir=None, allow_llm=True)
         mock_run_single.assert_called_once()
@@ -215,9 +221,10 @@ class TestRun:
             def isatty(self):
                 return True
 
+        # Use --format rich to force buffered panel path (CliRunner is non-TTY)
         result = runner.invoke(
             app,
-            ["run", "--sense", "--confirm-role", "-p", "task", "--no-audit"],
+            ["run", "--sense", "--confirm-role", "-p", "task", "--format", "rich", "--no-audit"],
             input=_FakeTTY(b"y\n"),
         )
         assert result.exit_code == 0
@@ -312,11 +319,11 @@ class TestRunStreaming:
         mock_run_stream.assert_called_once()
         mock_run_single.assert_not_called()
 
+    @patch("initrunner.cli.run_cmd._run_formatted")
     @patch("initrunner.runner.run_single_stream")
-    @patch("initrunner.runner.run_single")
     @patch("initrunner.agent.loader.load_and_build")
-    def test_non_tty_uses_buffered(self, mock_load, mock_run_single, mock_run_stream, tmp_path):
-        """Non-TTY should use run_single (buffered)."""
+    def test_non_tty_uses_plain_text(self, mock_load, mock_run_stream, mock_formatted, tmp_path):
+        """Non-TTY should use _run_formatted with effective='text'."""
         from initrunner.agent.executor import RunResult
         from initrunner.agent.schema.output import OutputConfig
 
@@ -326,7 +333,7 @@ class TestRunStreaming:
         role.spec.observability = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
-        mock_run_single.return_value = (
+        mock_formatted.return_value = (
             RunResult(run_id="test", output="hello", success=True),
             [],
         )
@@ -339,7 +346,8 @@ class TestRunStreaming:
             result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
 
         assert result.exit_code == 0
-        mock_run_single.assert_called_once()
+        mock_formatted.assert_called_once()
+        assert mock_formatted.call_args[0][0] == "text"
         mock_run_stream.assert_not_called()
 
     @patch("initrunner.runner.run_single_stream")
@@ -440,6 +448,327 @@ class TestRunStreaming:
         mock_autonomous.assert_called_once()
         mock_run_stream.assert_not_called()
         mock_run_single.assert_not_called()
+
+
+class TestRunOutputFormat:
+    """Tests for --format flag and plain/json output modes."""
+
+    def _mock_role(self):
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        return role
+
+    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_format_json_calls_run_formatted(self, mock_load, mock_formatted, tmp_path):
+        """--format json should use _run_formatted with effective='json'."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+        mock_load.return_value = (role, MagicMock())
+        mock_formatted.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app, ["run", str(role_file), "-p", "hello", "--format", "json", "--no-audit"]
+        )
+
+        assert result.exit_code == 0
+        mock_formatted.assert_called_once()
+        assert mock_formatted.call_args[0][0] == "json"
+
+    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_format_text_calls_run_formatted(self, mock_load, mock_formatted, tmp_path):
+        """--format text should use _run_formatted with effective='text'."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+        mock_load.return_value = (role, MagicMock())
+        mock_formatted.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app, ["run", str(role_file), "-p", "hello", "--format", "text", "--no-audit"]
+        )
+
+        assert result.exit_code == 0
+        mock_formatted.assert_called_once()
+        assert mock_formatted.call_args[0][0] == "text"
+
+    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_format_auto_non_tty_uses_text(
+        self, mock_load, mock_run_stream, mock_formatted, tmp_path
+    ):
+        """auto format + non-TTY should use _run_formatted with effective='text'."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+        mock_load.return_value = (role, MagicMock())
+        mock_formatted.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = False
+            result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_formatted.assert_called_once()
+        assert mock_formatted.call_args[0][0] == "text"
+        mock_run_stream.assert_not_called()
+
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_format_auto_tty_still_streams(
+        self, mock_load, mock_run_single, mock_run_stream, tmp_path
+    ):
+        """auto format + TTY should still use run_single_stream."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+        mock_load.return_value = (role, MagicMock())
+        mock_run_stream.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+
+        assert result.exit_code == 0
+        mock_run_stream.assert_called_once()
+        mock_run_single.assert_not_called()
+
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.runner.run_single_stream")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_format_rich_uses_buffered(self, mock_load, mock_run_stream, mock_run_single, tmp_path):
+        """--format rich should use run_single (buffered panel)."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+        mock_load.return_value = (role, MagicMock())
+        mock_run_single.return_value = (
+            RunResult(run_id="test", output="hello", success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(
+                app, ["run", str(role_file), "-p", "hello", "--format", "rich", "--no-audit"]
+            )
+
+        assert result.exit_code == 0
+        mock_run_single.assert_called_once()
+        mock_run_stream.assert_not_called()
+
+    def test_format_json_with_interactive_errors(self, tmp_path):
+        """--format json with -i should be rejected."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app,
+            ["run", str(role_file), "-p", "hello", "--format", "json", "-i", "--no-audit"],
+        )
+        assert result.exit_code == 1
+        assert "not supported with -i" in result.output
+
+    def test_format_text_with_autonomous_errors(self, tmp_path):
+        """--format text with -a should be rejected."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app,
+            ["run", str(role_file), "-p", "hello", "--format", "text", "-a", "--no-audit"],
+        )
+        assert result.exit_code == 1
+        assert "not supported with -a" in result.output
+
+    def test_format_invalid_errors(self, tmp_path):
+        """Unknown format value should be rejected."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app,
+            ["run", str(role_file), "-p", "hello", "--format", "xml", "--no-audit"],
+        )
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+    def test_no_stream_deprecation_warning(self, tmp_path):
+        """--no-stream should emit a deprecation warning."""
+        from initrunner.agent.executor import RunResult
+
+        role = self._mock_role()
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        with (
+            patch("initrunner.agent.loader.load_and_build", return_value=(role, MagicMock())),
+            patch(
+                "initrunner.runner.run_single",
+                return_value=(RunResult(run_id="t", output="ok", success=True), []),
+            ),
+            patch("initrunner.cli.run_cmd.sys") as mock_sys,
+        ):
+            mock_sys.stdout.isatty.return_value = True
+            result = runner.invoke(
+                app, ["run", str(role_file), "-p", "hello", "--no-stream", "--no-audit"]
+            )
+
+        assert result.exit_code == 0
+        # Deprecation warning goes to stderr (captured by typer.echo(err=True))
+        # CliRunner merges stdout+stderr in output by default
+        assert "deprecated" in result.output.lower()
+
+
+class TestDisplayResultPlain:
+    """Tests for _display_result_plain output format."""
+
+    def test_success_writes_output_to_stdout(self, capsys):
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_plain
+
+        result = RunResult(
+            run_id="r1",
+            output="The answer is 42.",
+            success=True,
+            tokens_in=10,
+            tokens_out=5,
+            duration_ms=120,
+        )
+        _display_result_plain(result)
+
+        captured = capsys.readouterr()
+        assert captured.out == "The answer is 42.\n"
+        assert "tokens: 10in/5out | 120ms" in captured.err
+
+    def test_error_writes_to_stderr_only(self, capsys):
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_plain
+
+        result = RunResult(run_id="r1", output="", success=False, error="Model error")
+        _display_result_plain(result)
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Error: Model error" in captured.err
+
+    def test_no_extra_newline_when_output_ends_with_newline(self, capsys):
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_plain
+
+        result = RunResult(run_id="r1", output="hello\n", success=True)
+        _display_result_plain(result)
+
+        captured = capsys.readouterr()
+        assert captured.out == "hello\n"  # no double newline
+
+
+class TestDisplayResultJson:
+    """Tests for _display_result_json output format."""
+
+    def test_success_produces_valid_json(self, capsys):
+        import json
+
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_json
+
+        result = RunResult(
+            run_id="r1",
+            output="hello",
+            success=True,
+            tokens_in=10,
+            tokens_out=5,
+            total_tokens=15,
+            tool_calls=2,
+            duration_ms=100,
+            tool_call_names=["web_search", "filesystem"],
+        )
+        _display_result_json(result)
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["run_id"] == "r1"
+        assert data["output"] == "hello"
+        assert data["success"] is True
+        assert data["error"] is None
+        assert data["tokens_in"] == 10
+        assert data["tokens_out"] == 5
+        assert data["total_tokens"] == 15
+        assert data["tool_calls"] == 2
+        assert data["tool_call_names"] == ["web_search", "filesystem"]
+        assert data["duration_ms"] == 100
+        assert captured.err == ""
+
+    def test_error_includes_error_field(self, capsys):
+        import json
+
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_json
+
+        result = RunResult(
+            run_id="r1",
+            output="",
+            success=False,
+            error="Model timeout",
+        )
+        _display_result_json(result)
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["success"] is False
+        assert data["error"] == "Model timeout"
+
+    def test_no_final_messages_in_output(self, capsys):
+        """JSON envelope must not include final_messages (non-serializable)."""
+        import json
+
+        from initrunner.agent.executor import RunResult
+        from initrunner.runner.display import _display_result_json
+
+        result = RunResult(run_id="r1", output="ok", success=True)
+        _display_result_json(result)
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert "final_messages" not in data
+        assert "messages" not in data
 
 
 class TestIngest:
@@ -952,6 +1281,49 @@ class TestResolveRolePathInstalled:
                 return_value=(RunResult(run_id="t", output="ok", success=True), []),
             ),
         ):
-            result = runner.invoke(app, ["run", "code-reviewer", "-p", "hello", "--no-audit"])
+            # Use --format rich to force buffered panel path (CliRunner is non-TTY)
+            result = runner.invoke(
+                app, ["run", "code-reviewer", "-p", "hello", "--format", "rich", "--no-audit"]
+            )
 
+        assert result.exit_code == 0
+
+
+class TestHelpPanels:
+    """Verify --help groups commands into rich_help_panel sections."""
+
+    def test_all_panels_present(self):
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        for panel in (
+            "Getting Started",
+            "Run & Test",
+            "Interfaces",
+            "Package Registry",
+            "Agent Internals",
+        ):
+            assert panel in result.output, f"Panel '{panel}' missing from help output"
+
+    def test_no_default_commands_panel(self):
+        """All commands are assigned to a panel -- no leftover 'Commands' group."""
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        # Typer renders a "Commands" header when ungrouped commands exist.
+        # With every command assigned to a panel, it should not appear.
+        lines = result.output.splitlines()
+        assert not any(
+            line.strip() == "Commands" or line.strip() == "Commands:" for line in lines
+        ), "Default 'Commands' panel should not appear when all commands are grouped"
+
+    def test_hub_hidden_from_help(self):
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        # hub should not appear as a listed command in any panel
+        lines = result.output.splitlines()
+        hub_lines = [ln for ln in lines if ln.strip().startswith("hub ")]
+        assert len(hub_lines) == 0, "Deprecated 'hub' should be hidden from --help"
+
+    def test_hub_still_works(self):
+        """hidden=True hides from help but the sub-app remains invocable."""
+        result = runner.invoke(app, ["hub", "--help"])
         assert result.exit_code == 0

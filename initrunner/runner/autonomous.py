@@ -104,6 +104,11 @@ def run_autonomous(
     error_msg: str | None = None
     loop_start = time.monotonic()
 
+    from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
+    from initrunner.runner.display import _make_tool_event_printer
+
+    cb_token = set_tool_event_callback(_make_tool_event_printer())
+
     _display_autonomous_header(role, max_iterations, token_budget)
 
     autonomous_timeout = guardrails.autonomous_timeout_seconds
@@ -215,6 +220,8 @@ def run_autonomous(
             time.sleep(autonomy_config.iteration_delay_seconds)
     else:
         final_status = "max_iterations"
+
+    reset_tool_event_callback(cb_token)
 
     total_duration = int((time.monotonic() - loop_start) * 1000)
 

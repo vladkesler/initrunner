@@ -194,8 +194,11 @@ def build_agent(
             exclude_paths=explicit_paths,
         )
         if discovered:
+            from initrunner.agent.tool_events import wrap_observable
+
             system_prompt = f"{system_prompt}\n\n{build_catalog_prompt(discovered)}"
-            toolsets.append(build_activate_skill_toolset(discovered, auto_skill_activated))
+            ts = build_activate_skill_toolset(discovered, auto_skill_activated)
+            toolsets.append(wrap_observable(ts))
 
     # Tool search meta-tool — hides tools behind BM25 search to reduce context
     prepare_tools = None
@@ -211,7 +214,9 @@ def build_agent(
             max_results=ts_config.max_results,
             threshold=ts_config.threshold,
         )
-        toolsets.append(build_tool_search_toolset(manager))
+        from initrunner.agent.tool_events import wrap_observable
+
+        toolsets.append(wrap_observable(build_tool_search_toolset(manager)))
         prepare_tools = manager.prepare_tools_callback
         system_prompt += (
             "\n\nIMPORTANT: You have many tools available beyond what you currently see. "

@@ -38,6 +38,18 @@ Start the orchestration (foreground, Ctrl+C to stop):
 initrunner compose up compose.yaml
 ```
 
+## Scaffold with `compose new`
+
+Instead of writing YAML by hand, scaffold a project directory:
+
+```bash
+initrunner compose new my-pipeline                            # 3-service linear pipeline
+initrunner compose new desk --pattern route --shared-memory   # support-desk with intent routing
+initrunner compose new spread --pattern fan-out --services 5  # 1 dispatcher + 4 workers
+```
+
+This creates a directory with `compose.yaml` and `roles/*.yaml` files, all pre-validated. Run `initrunner compose new --list-patterns` to see available patterns.
+
 ## Compose Definition
 
 The top-level structure follows the same `apiVersion`/`kind`/`metadata`/`spec` pattern as role definitions.

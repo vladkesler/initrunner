@@ -227,11 +227,12 @@ class TestToolPermissionsSchema:
 
 class TestBuildToolsetsPermissions:
     def test_no_permissions_cerbos_only_wrapping(self):
-        """When permissions is None, toolset is wrapped with CerbosToolset only."""
+        """Toolset is wrapped CerbosToolset -> ObservableToolset."""
         from unittest.mock import MagicMock, patch
 
         from initrunner.agent.permissions import CerbosToolset
         from initrunner.agent.schema.tools import ShellToolConfig
+        from initrunner.agent.tool_events import ObservableToolset
 
         tool = ShellToolConfig(working_dir=".")
         assert tool.permissions is None
@@ -260,16 +261,18 @@ class TestBuildToolsetsPermissions:
                 ),
             )
             toolsets = build_toolsets([tool], role)
-            # Should be wrapped with CerbosToolset (no-op when disabled)
-            assert isinstance(toolsets[0], CerbosToolset)
-            assert toolsets[0]._inner is mock_toolset
+            # Outermost wrapper is ObservableToolset, inner is CerbosToolset
+            assert isinstance(toolsets[0], ObservableToolset)
+            assert isinstance(toolsets[0]._inner, CerbosToolset)
+            assert toolsets[0]._inner._inner is mock_toolset
 
     def test_permissions_wraps_toolset(self):
-        """When permissions is set, toolset is wrapped with PermissionToolset."""
+        """Toolset is wrapped PermissionToolset -> ObservableToolset."""
         from unittest.mock import MagicMock, patch
 
         from initrunner.agent.permissions import PermissionToolset
         from initrunner.agent.schema.tools import ShellToolConfig
+        from initrunner.agent.tool_events import ObservableToolset
 
         tool = ShellToolConfig(
             working_dir=".",
@@ -300,4 +303,6 @@ class TestBuildToolsetsPermissions:
                 ),
             )
             toolsets = build_toolsets([tool], role)
-            assert isinstance(toolsets[0], PermissionToolset)
+            # Outermost is ObservableToolset, inner is PermissionToolset
+            assert isinstance(toolsets[0], ObservableToolset)
+            assert isinstance(toolsets[0]._inner, PermissionToolset)

@@ -44,6 +44,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner skill new [name]` | Scaffold a new skill directory |
 | `initrunner skill validate <path>` | Validate a skill definition |
 | `initrunner skill list` | List available skills |
+| `initrunner compose new <name>` | Scaffold a new compose project directory |
 | `initrunner compose up <compose.yaml>` | Run compose orchestration (foreground) |
 | `initrunner compose validate <compose.yaml>` | Validate a compose definition |
 | `initrunner compose install <compose.yaml>` | Install systemd user unit |
@@ -128,7 +129,8 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
 | `--sense` | Sense the best role for the given prompt (replaces the path argument). |
 | `--role-dir PATH` | Directory to search for roles when using `--sense`. |
-| `--no-stream` | Disable streaming output (show result in panel). By default, output streams live on interactive terminals. |
+| `-f, --format TEXT` | Output format: `auto` (default), `json`, `text`, `rich`. See [Output Formats](#output-formats). |
+| `--no-stream` | **Deprecated.** Use `--format rich`. Hidden from `--help`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
 | `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
 
@@ -160,6 +162,37 @@ Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in
 
 Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then continues interactively.
 
+## Output Formats
+
+The `--format` flag controls how `initrunner run` presents output. The default (`auto`) adapts based on whether stdout is a terminal:
+
+| Format | Behavior |
+|--------|----------|
+| `auto` | **TTY:** stream tokens live. **Non-TTY (piped):** plain text to stdout, stats to stderr. |
+| `json` | JSON envelope to stdout with `output`, `success`, `error`, token counts, and timing. |
+| `text` | Plain text to stdout (agent output only), stats to stderr. |
+| `rich` | Buffered Rich panel with Markdown rendering (the old `--no-stream` behavior). |
+
+In `auto` (streaming), `rich`, and autonomous modes, tool call completions are shown as dimmed status lines so you can distinguish tool issues from model issues:
+
+```
+  tool search_web: ok (1523ms)
+  tool search_web: error - Error: search timed out after 15s (15023ms)
+```
+
+`--format json` and `--format text` are only supported for single-shot runs (`-p` without `-i` or `-a`).
+
+```bash
+# Pipe agent output to jq
+initrunner run role.yaml -p "list 3 facts" --format json | jq .output
+
+# Clean output for scripts
+initrunner run role.yaml -p "summarize this" --format text > summary.txt
+
+# Force Rich panel on a TTY
+initrunner run role.yaml -p "hello" --format rich
+```
+
 ## Ingest options
 
 | Flag | Description |
@@ -176,7 +209,8 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 |------|-------------|
 | `DESCRIPTION` | Natural language description (generates via LLM) |
 | `--from SOURCE` | Source: local file path, bundled example name, or `hub:ref` |
-| `--template TEXT` | Start from a named template (`basic`, `rag`, `daemon`, `memory`, `ollama`, `api`, `telegram`, `discord`) |
+| `--template TEXT` | Start from a named template (use `--list-templates` to see options) |
+| `--list-templates` | Show available templates and exit |
 | `--blank` | Start from a minimal blank template |
 | `--provider TEXT` | Model provider (auto-detected if omitted) |
 | `--model TEXT` | Model name (uses provider default if omitted) |
@@ -239,6 +273,27 @@ Synopsis: `initrunner mcp serve PATHS... [OPTIONS]`
 | `--skill-dir PATH` | Extra skill search directory |
 
 See [MCP Gateway](../interfaces/mcp-gateway.md) for transport details, client configuration, pass-through mode, and usage examples.
+
+## Compose new options
+
+Scaffold a compose project directory with `compose.yaml` and stub role files.
+
+```bash
+initrunner compose new my-pipeline                          # default: 3-service pipeline
+initrunner compose new desk --pattern route --shared-memory # support-desk style routing
+initrunner compose new spread --pattern fan-out --services 5
+```
+
+| Flag | Description |
+|------|-------------|
+| `--pattern TEXT` | Compose pattern: `pipeline` (default), `fan-out`, `route` |
+| `--services INT` | Number of services (default: `3`). Pipeline min 2, fan-out min 3, route is fixed |
+| `--shared-memory` | Enable shared memory store across all services |
+| `--provider TEXT` | Model provider for generated roles (auto-detected if omitted) |
+| `--model TEXT` | Model name for generated roles |
+| `--output PATH` | Parent directory for the project (default: `.`) |
+| `--force`, `-f` | Overwrite existing directory |
+| `--list-patterns` | Show available patterns and exit |
 
 ## Compose events options
 

@@ -15,6 +15,70 @@ from initrunner.cli._options import AuditDbOption, NoAuditOption
 app = typer.Typer(help="Multi-agent compose orchestration.")
 
 
+@app.command("new")
+def compose_new(
+    name: Annotated[str, typer.Argument(help="Project name (becomes directory name)")],
+    pattern: Annotated[str, typer.Option("--pattern", help="Compose pattern")] = "pipeline",
+    services: Annotated[int, typer.Option("--services", help="Number of services")] = 3,
+    shared_memory: Annotated[
+        bool, typer.Option("--shared-memory", help="Enable shared memory store")
+    ] = False,
+    provider: Annotated[str | None, typer.Option(help="Model provider")] = None,
+    model: Annotated[str | None, typer.Option(help="Model name")] = None,
+    output: Annotated[Path, typer.Option(help="Parent directory for the project")] = Path("."),
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="Overwrite existing directory")
+    ] = False,
+    list_patterns: Annotated[
+        bool, typer.Option("--list-patterns", help="Show available patterns and exit")
+    ] = False,
+) -> None:
+    """Scaffold a new compose project directory."""
+    from initrunner.templates import COMPOSE_PATTERNS
+
+    if list_patterns:
+        table = Table(title="Compose Patterns")
+        table.add_column("Name", style="cyan")
+        table.add_column("Description")
+        for pname, desc in COMPOSE_PATTERNS.items():
+            table.add_row(pname, desc)
+        console.print(table)
+        raise typer.Exit(0)
+
+    from initrunner.agent.loader import _load_dotenv
+    from initrunner.services.compose import scaffold_compose_project
+    from initrunner.services.roles import _detect_provider
+
+    _load_dotenv(Path.cwd())
+
+    resolved_provider = provider or _detect_provider()
+
+    try:
+        result = scaffold_compose_project(
+            name,
+            pattern=pattern,
+            services=services,
+            shared_memory=shared_memory,
+            provider=resolved_provider,
+            model_name=model,
+            output_dir=output,
+            force=force,
+        )
+    except (ValueError, FileExistsError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]Created[/green] {result.project_dir}/")
+    console.print(f"  {result.compose_path.name}")
+    for rp in result.role_paths:
+        console.print(f"  roles/{rp.name}")
+
+    console.print("\n[dim]Next steps:[/dim]")
+    console.print(f"  cd {result.project_dir}")
+    console.print("  initrunner compose validate compose.yaml")
+    console.print("  initrunner compose up compose.yaml")
+
+
 @app.command("validate")
 def compose_validate(
     compose_file: Annotated[Path, typer.Argument(help="Path to compose YAML")],

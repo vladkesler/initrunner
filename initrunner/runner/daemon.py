@@ -231,41 +231,51 @@ class DaemonRunner:
                                 exc_info=True,
                             )
             else:
+                from initrunner.agent.tool_events import (
+                    reset_tool_event_callback,
+                    set_tool_event_callback,
+                )
+                from initrunner.runner.display import _make_tool_event_printer
+
+                cb_token = set_tool_event_callback(_make_tool_event_printer())
                 use_stream = sys.stdout.isatty() and role.spec.output.type == "text"
 
-                if use_stream:
-                    out = console.file
+                try:
+                    if use_stream:
+                        out = console.file
 
-                    def on_token(chunk: str) -> None:
-                        out.write(chunk)
+                        def on_token(chunk: str) -> None:
+                            out.write(chunk)
+                            out.flush()
+
+                        result, new_messages = execute_run_stream(
+                            agent,
+                            role,
+                            event.prompt,
+                            audit_logger=self._audit_logger,
+                            message_history=prior_history,
+                            trigger_type=event.trigger_type,
+                            trigger_metadata=event.metadata or {},
+                            extra_toolsets=extra_ts if extra_ts else None,
+                            principal_id=event.principal_id,
+                            on_token=on_token,
+                        )
+                        out.write("\n")
                         out.flush()
-
-                    result, new_messages = execute_run_stream(
-                        agent,
-                        role,
-                        event.prompt,
-                        audit_logger=self._audit_logger,
-                        message_history=prior_history,
-                        trigger_type=event.trigger_type,
-                        trigger_metadata=event.metadata or {},
-                        extra_toolsets=extra_ts if extra_ts else None,
-                        principal_id=event.principal_id,
-                        on_token=on_token,
-                    )
-                    out.write("\n")
-                    out.flush()
-                else:
-                    result, new_messages = execute_run(
-                        agent,
-                        role,
-                        event.prompt,
-                        audit_logger=self._audit_logger,
-                        message_history=prior_history,
-                        trigger_type=event.trigger_type,
-                        trigger_metadata=event.metadata or {},
-                        extra_toolsets=extra_ts if extra_ts else None,
-                        principal_id=event.principal_id,
-                    )
+                    else:
+                        result, new_messages = execute_run(
+                            agent,
+                            role,
+                            event.prompt,
+                            audit_logger=self._audit_logger,
+                            message_history=prior_history,
+                            trigger_type=event.trigger_type,
+                            trigger_metadata=event.metadata or {},
+                            extra_toolsets=extra_ts if extra_ts else None,
+                            principal_id=event.principal_id,
+                        )
+                finally:
+                    reset_tool_event_callback(cb_token)
 
                 self._tracker.record_usage(result.total_tokens)
 

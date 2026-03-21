@@ -87,6 +87,8 @@ def build_toolsets(
     prefer_async: bool = False,
 ) -> list[AbstractToolset]:
     """Build a list of PydanticAI toolsets from tool configs + optional retrieval."""
+    from initrunner.agent.tool_events import wrap_observable
+
     toolsets: list[AbstractToolset] = []
     ctx = ToolBuildContext(role=role, role_dir=role_dir, prefer_async=prefer_async)
     agent_name = role.metadata.name
@@ -109,12 +111,13 @@ def build_toolsets(
                 agent_name,
                 instance_key=_instance_key(tool),
             )
-            # Outer layer: fnmatch argument-level check (cheap, short-circuits)
+            # Middle layer: fnmatch argument-level check (cheap, short-circuits)
             if tool.permissions is not None:
                 from initrunner.agent.permissions import PermissionToolset
 
                 toolset = PermissionToolset(toolset, tool.permissions, tool.type)
-            toolsets.append(toolset)
+            # Outer layer: observable status events
+            toolsets.append(wrap_observable(toolset))
 
     # Auto-tools (retrieval, memory) — not user-configured, wired from role spec
     if role.spec.ingest is not None:
@@ -122,7 +125,7 @@ def build_toolsets(
 
         ts = build_retrieval_toolset(make_store_config(role), sandbox=role.spec.security.tools)
         ts = CerbosToolset(ts, "retrieval", agent_name)
-        toolsets.append(ts)
+        toolsets.append(wrap_observable(ts))
 
     if role.spec.memory is not None:
         from initrunner.agent.tools.memory import build_memory_toolset
@@ -134,6 +137,6 @@ def build_toolsets(
             sandbox=role.spec.security.tools,
         )
         ts = CerbosToolset(ts, "memory_store", agent_name)
-        toolsets.append(ts)
+        toolsets.append(wrap_observable(ts))
 
     return toolsets
