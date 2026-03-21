@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.35.0] - 2026-03-21
+
+### Added
+- **Tool event observability** -- `ObservableToolset` wraps all toolsets with ContextVar-based callbacks that emit `ToolEvent` (tool name, status, error summary, duration). Zero overhead when no callback is set. Error detection identifies common failure patterns (HTTP errors, SSRF blocks, timeouts, non-zero exits). Live tool status displayed during single-shot, autonomous, and daemon runs
+- **Compose project scaffolding** -- `initrunner compose new <name>` generates a complete multi-agent project with role files and `compose.yaml`. Three patterns: `pipeline` (linear chain, configurable service count), `fan-out` (dispatcher + parallel workers), `route` (intake with sense-based routing to researcher/responder/escalator). Options: `--pattern`, `--services`, `--shared-memory`, `--provider`, `--model`
+- **Output format control** -- `--format` flag on `run` with four modes: `auto` (stream on TTY, plain text when piped), `json` (structured envelope with token counts and timing), `text` (stdout-only, stats to stderr), `rich` (buffered Markdown panel). Replaces `--no-stream` (now deprecated and hidden)
+- `--list-templates` flag on `initrunner new` shows available role templates (basic, rag, daemon, memory, ollama, api, telegram, discord)
+- `--list-patterns` flag on `initrunner compose new` shows available composition patterns
+- 40+ new tests: tool events, compose scaffolding (pipeline/fan-out/route), plugin listing, output format dispatch
+
+### Changed
+- All toolsets wrapped with `ObservableToolset` as outermost layer (after permission checks)
+- `chat` command help updated to reference `run <role> -i` for role-backed chat
+- Test assertions updated to account for `ObservableToolset` wrapper layer
+
 ## [1.34.0] - 2026-03-21
 
 ### Changed
