@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import textwrap
 from unittest.mock import MagicMock
 
@@ -235,7 +236,8 @@ class TestListTemplates:
 
     def test_list_templates_in_help(self):
         result = runner.invoke(app, ["new", "--help"])
-        assert "--list-templates" in result.output
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--list-templates" in plain
 
 
 # ---------------------------------------------------------------------------
