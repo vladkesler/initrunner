@@ -8,6 +8,7 @@
 - **Output format control** -- `--format` flag on `run` with four modes: `auto` (stream on TTY, plain text when piped), `json` (structured envelope with token counts and timing), `text` (stdout-only, stats to stderr), `rich` (buffered Markdown panel). Replaces `--no-stream` (now deprecated and hidden)
 - `--list-templates` flag on `initrunner new` shows available role templates (basic, rag, daemon, memory, ollama, api, telegram, discord)
 - `--list-patterns` flag on `initrunner compose new` shows available composition patterns
+- Improved `--help` across CLI: `plugins` command shows docs link and install pattern, `chat` shows tip about `initrunner new` for custom tools
 - 40+ new tests: tool events, compose scaffolding (pipeline/fan-out/route), plugin listing, output format dispatch
 
 ### Changed
