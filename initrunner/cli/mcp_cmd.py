@@ -207,3 +207,69 @@ def mcp_toolkit(
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+
+
+@app.command("browser")
+def mcp_browser(
+    transport: Annotated[
+        str, typer.Option("--transport", "-t", help="Transport: stdio, sse, streamable-http")
+    ] = "stdio",
+    host: Annotated[str, typer.Option(help="Host to bind to (sse/http)")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on (sse/http)")] = 8080,
+    session_name: Annotated[
+        str | None, typer.Option("--session-name", help="Browser session name for persistence")
+    ] = None,
+    allowed_domains: Annotated[
+        str | None,
+        typer.Option("--allowed-domains", help="Comma-separated allowed domains"),
+    ] = None,
+    screenshot_dir: Annotated[
+        str | None, typer.Option("--screenshot-dir", help="Directory to save screenshots")
+    ] = None,
+    headed: Annotated[bool, typer.Option("--headed", help="Run browser in headed mode")] = False,
+    agent_browser_path: Annotated[
+        str | None,
+        typer.Option("--agent-browser-path", help="Path to agent-browser binary"),
+    ] = None,
+) -> None:
+    """Expose agent-browser as an MCP server for AI agent browser automation."""
+    from initrunner.mcp.browser import BrowserMCPConfig, build_browser_mcp
+    from initrunner.mcp.gateway import run_mcp_gateway
+
+    err_console = Console(stderr=True)
+
+    if transport not in _VALID_TRANSPORTS:
+        err_console.print(f"[red]Error:[/red] Unknown transport: {transport!r}")
+        err_console.print(f"Expected one of: {', '.join(sorted(_VALID_TRANSPORTS))}")
+        raise typer.Exit(1)
+
+    cfg = BrowserMCPConfig(headless=not headed)
+    if session_name is not None:
+        cfg.session_name = session_name
+    if allowed_domains is not None:
+        cfg.allowed_domains = [d.strip() for d in allowed_domains.split(",") if d.strip()]
+    if screenshot_dir is not None:
+        cfg.screenshot_dir = screenshot_dir
+    if agent_browser_path is not None:
+        cfg.agent_browser_path = agent_browser_path
+
+    try:
+        mcp = build_browser_mcp(cfg)
+    except Exception as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    err_console.print(f"[bold]MCP Browser:[/bold] {cfg.server_name}")
+    err_console.print(f"  Transport: {transport}")
+    if cfg.session_name:
+        err_console.print(f"  Session: {cfg.session_name}")
+    if cfg.allowed_domains:
+        err_console.print(f"  Allowed domains: {', '.join(cfg.allowed_domains)}")
+    if transport != "stdio":
+        err_console.print(f"  Endpoint: {host}:{port}")
+
+    try:
+        run_mcp_gateway(mcp, transport=transport, host=host, port=port)
+    except Exception as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None

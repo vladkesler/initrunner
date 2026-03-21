@@ -27,6 +27,10 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `csv_analysis` | Inspect, summarize, and query CSV files within a sandboxed directory |
 | `think` | Internal reasoning scratchpad — agent thinks step-by-step without user-visible output |
 | `script` | Inline shell scripts defined in YAML as named, parameterized tools |
+| `calculator` | Safe mathematical expression evaluator (AST-based, no eval) |
+| `pdf_extract` | Extract text and metadata from PDF files inline |
+| `image_gen` | Generate images via OpenAI DALL-E or Stability AI |
+| `mcp` (browser) | Browser automation via agent-browser MCP server |
 | *(plugin)* | Any other type is resolved via the [plugin registry](tool_creation.md#plugin-registry) |
 
 ## Quick Example
@@ -1222,6 +1226,227 @@ tools:
             description: Math expression to evaluate
             required: true
 ```
+
+## Calculator Tool
+
+Safe mathematical expression evaluator. LLMs are unreliable at arithmetic; this tool gives agents exact results for any expression involving standard math operations and functions.
+
+```yaml
+tools:
+  - type: calculator
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `max_expression_length` | int | `1000` | Maximum allowed expression length in characters |
+
+### Registered Functions
+
+- **`calculate(expression: str) -> str`** -- Evaluate a mathematical expression and return the result. Supports arithmetic (`+`, `-`, `*`, `/`, `//`, `%`, `**`), math functions (`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sqrt`, `log`, `log10`, `log2`, `exp`, `abs`, `ceil`, `floor`, `round`, `pow`), and constants (`pi`, `e`, `tau`, `inf`).
+
+### Security
+
+Expressions are parsed via Python's `ast` module with a strict allowlist of node types. No `eval()` or `exec()` is used. Only whitelisted function names and constants are accessible. Expressions are capped by length and AST node count (max 100 nodes) to prevent resource exhaustion.
+
+### Example
+
+```yaml
+spec:
+  role: You are a financial analyst. Use the calculator for all numeric computations.
+  model:
+    provider: openai
+    name: gpt-5-mini
+  tools:
+    - type: calculator
+    - type: csv_analysis
+      root_path: ./reports
+```
+
+## PDF Extract Tool
+
+Extract text and metadata from PDF files inline during a conversation. Unlike the ingestion pipeline (which is a bulk ETL step), this tool gives agents on-demand access to PDF content.
+
+Requires the `ingest` extra: `pip install initrunner[ingest]`
+
+```yaml
+tools:
+  - type: pdf_extract
+    root_path: ./documents
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `root_path` | str | `"."` | Root directory for PDF file access |
+| `max_pages` | int | `100` | Maximum pages to extract per call |
+| `max_content_bytes` | int | `512000` | Maximum output size before truncation |
+| `max_file_size_mb` | float | `50.0` | Reject files larger than this |
+
+### Registered Functions
+
+- **`extract_pdf_text(path: str, pages: str = "") -> str`** -- Extract text from a PDF file as markdown. The `pages` parameter accepts ranges like `"1-5"`, `"3,7,10-12"`, or empty for all pages.
+- **`extract_pdf_metadata(path: str) -> str`** -- Extract PDF metadata (title, author, page count, creation date, etc.).
+
+### Security
+
+File paths are validated against `root_path` using `validate_path_within()`. Only `.pdf` extensions are allowed. Symlinks are rejected. Files exceeding `max_file_size_mb` are rejected before opening. Output is truncated to `max_content_bytes`.
+
+### Example
+
+```yaml
+spec:
+  role: You are a document analysis assistant. Extract and summarize PDF content.
+  model:
+    provider: openai
+    name: gpt-5-mini
+  tools:
+    - type: pdf_extract
+      root_path: /data/reports
+      max_pages: 50
+    - type: think
+```
+
+## Image Generation Tool
+
+Generate images via OpenAI DALL-E or Stability AI APIs. Images are saved to disk and the file path is returned to the agent.
+
+```yaml
+tools:
+  - type: image_gen
+    provider: openai
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `provider` | `"openai"` \| `"stability"` | `"openai"` | API provider |
+| `api_key_env` | str | `"${OPENAI_API_KEY}"` | Environment variable containing the API key |
+| `default_size` | str | `"1024x1024"` | Default image dimensions |
+| `default_quality` | str | `"standard"` | Default quality (OpenAI: `"standard"` or `"hd"`) |
+| `default_style` | str | `"natural"` | Default style (OpenAI: `"natural"` or `"vivid"`) |
+| `output_dir` | str | `""` | Directory to save images (empty = temp dir) |
+| `input_root` | str | `""` | Allowed root for `edit_image` input paths (empty = `output_dir` only) |
+| `model` | str | `""` | Model name override (e.g. `"dall-e-3"`) |
+| `timeout_seconds` | int | `120` | API request timeout |
+
+### Registered Functions
+
+- **`generate_image(prompt: str, size: str = "", style: str = "", quality: str = "") -> str`** -- Generate an image from a text prompt. Returns the saved file path.
+- **`edit_image(image_path: str, prompt: str, size: str = "") -> str`** -- Edit an existing image using a prompt (OpenAI only). Returns the saved file path.
+
+### Security
+
+API keys are resolved from environment variables via `resolve_env_vars()` and never logged. The `edit_image` function validates input paths against `output_dir` and `input_root` using `validate_path_within()`. If `input_root` is not set, only images within `output_dir` can be edited (restricting edits to previously generated images).
+
+### Async Support
+
+Both functions support async execution when `prefer_async` is enabled. The async path uses `openai.AsyncOpenAI` for the OpenAI provider and `httpx.AsyncClient` for Stability AI.
+
+### Example
+
+```yaml
+spec:
+  role: You are a creative assistant that generates images based on descriptions.
+  model:
+    provider: openai
+    name: gpt-5-mini
+  tools:
+    - type: image_gen
+      provider: openai
+      default_size: "1024x1024"
+      default_quality: hd
+      output_dir: ./generated_images
+```
+
+## Browser MCP Tool
+
+Browser automation via [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, exposed as an MCP server. Agents consume it through the standard `type: mcp` tool config. Uses agent-browser's snapshot/refs system (`@e1`, `@e2`, ...) which uses 93% less context than raw Playwright accessibility trees.
+
+**Prerequisites:**
+```bash
+npm i -g agent-browser
+agent-browser install
+```
+
+### Usage in Role YAML
+
+```yaml
+# stdio via dedicated entrypoint (recommended)
+tools:
+  - type: mcp
+    transport: stdio
+    command: initrunner-browser-mcp
+    tool_filter:
+      - open_url
+      - snapshot
+      - click
+      - fill
+      - get_text
+      - screenshot
+
+# Or connect to a running server
+tools:
+  - type: mcp
+    transport: streamable-http
+    url: http://localhost:8080/mcp
+```
+
+### Manual Serving
+
+```bash
+# stdio (default)
+initrunner mcp browser
+
+# HTTP server
+initrunner mcp browser --transport streamable-http --port 8080
+
+# With options
+initrunner mcp browser --session-name my-agent --allowed-domains "example.com,docs.example.com"
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `open_url(url, wait_until)` | Navigate to a URL. Returns title + current URL. SSRF-protected. |
+| `snapshot(selector, interactive_only)` | Capture interactive elements with reference IDs (@e1, @e2, ...) |
+| `click(ref, wait_until)` | Click an element by reference |
+| `fill(ref, value)` | Clear and type into a form field |
+| `select(ref, value)` | Select a dropdown option |
+| `press(key)` | Press a keyboard key |
+| `wait_for(ref, text, url_pattern, load, milliseconds, state)` | Wait for a condition (exactly one mode required) |
+| `get_text(ref)` | Get text content of the page or element |
+| `get_url()` | Get current page URL |
+| `get_title()` | Get current page title |
+| `screenshot(full_page, annotate)` | Take a screenshot and return the file path |
+| `close_browser()` | Close the browser session |
+
+### Security
+
+- SSRF protection on every `open_url` call (blocks internal IPs, RFC 1918)
+- Domain allow/block lists via config
+- `file://` URLs always blocked
+- Subprocess environment scrubbed of sensitive keys (API keys, tokens, passwords)
+- Dedicated `initrunner-browser-mcp` entrypoint for tight MCP command allowlisting
+
+### V1 Exclusions
+
+The following agent-browser features are intentionally excluded from v1: `evaluate_js`, auth vault/profile/state-file management, downloads, network inspection, HAR recording, diff, PDF export, clipboard, and device/viewport controls.
+
+### CLI Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--transport` | str | `stdio` | Transport: stdio, sse, streamable-http |
+| `--session-name` | str | | Browser session name for persistence |
+| `--allowed-domains` | str | | Comma-separated allowed domains |
+| `--screenshot-dir` | str | | Directory to save screenshots |
+| `--headed` | bool | false | Run browser in headed (visible) mode |
+| `--agent-browser-path` | str | `agent-browser` | Path to the agent-browser binary |
 
 ## Plugin Tools
 

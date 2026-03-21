@@ -285,12 +285,12 @@ class TestLoadSkill:
         with pytest.raises(SkillLoadError, match="Validation failed"):
             load_skill(path)
 
-    def test_empty_tools_warning(self, tmp_path: Path, caplog):
+    def test_empty_tools_debug_log(self, tmp_path: Path, caplog):
         path = _write_skill(tmp_path, "community-skill", MINIMAL_SKILL_MD)
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level(logging.DEBUG):
                 sd = load_skill(path)
             assert sd.frontmatter.tools == []
             assert "no tool configs" in caplog.text
@@ -491,7 +491,7 @@ class TestMergeSkillTools:
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level(logging.DEBUG):
                 merged = merge_skill_tools([skill], role_tools)
 
             assert len(merged) == 1
@@ -508,7 +508,7 @@ class TestMergeSkillTools:
         ir_logger = logging.getLogger("initrunner")
         ir_logger.addHandler(caplog.handler)
         try:
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level(logging.DEBUG):
                 merged = merge_skill_tools([skill_a, skill_b], [])
 
             assert len(merged) == 1

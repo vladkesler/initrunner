@@ -54,6 +54,10 @@ These rules apply to every task in this codebase:
 - **Dataclasses for DTOs, Pydantic for config**: internal data (RunResult, AuditRecord) uses dataclasses. Role definitions and API schemas use Pydantic.
 - **`services/` is the shared layer**: all business logic lives here. CLI, API, and TUI are thin wrappers that call into `services.<submodule>.*`.
 
+## Skills: Methodology-Only vs Tool-Providing
+
+Skills come in two flavors. **Tool-providing** skills (e.g. kube skill brings `shell` with `allowed_commands: [kubectl, helm]`) declare `tools:` in their SKILL.md frontmatter. **Methodology-only** skills provide only prompt content (MUST/MUST NOT, workflows) and omit the `tools:` field -- the role provides all tools. Both are valid. Tool overlap between skill and role is handled silently (role wins, logged at debug level).
+
 ## Coding Conventions
 
 - Run `ruff check` and `ruff format` before committing. Run `ty check` for type checking.

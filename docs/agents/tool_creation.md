@@ -489,8 +489,9 @@ The following built-in tools provide async variants when `prefer_async=True`:
 | `web_reader` | Async fetch via `fetch_url_as_markdown_async` |
 | `web_scraper` | Async fetch + concurrent embeddings via `asyncio.gather` |
 | `search` | Async HTTP for search APIs (blocking `ddgs` via `run_in_executor`) |
+| `image_gen` | Async OpenAI via `AsyncOpenAI`, async Stability via `httpx.AsyncClient` |
 
-Inherently blocking tools (`filesystem`, `script`, `shell`, `sql`, `git`) ignore `prefer_async` since their I/O is CPU-bound or uses blocking libraries.
+Inherently blocking tools (`filesystem`, `script`, `shell`, `sql`, `git`, `calculator`, `pdf_extract`) ignore `prefer_async` since their I/O is CPU-bound or uses blocking libraries.
 
 ### Custom Tools
 
@@ -520,5 +521,8 @@ For reference, the builtin tool types that are always available:
 | `web_scraper` | Scrape, chunk, embed, and store web pages | [tools.md](tools.md#web-scraper-tool) |
 | `think` | Internal reasoning scratchpad | [tools.md](tools.md#think-tool) |
 | `script` | Inline shell scripts as named tools | [tools.md](tools.md#script-tool) |
+| `calculator` | Safe math expression evaluator | [tools.md](tools.md#calculator-tool) |
+| `pdf_extract` | Extract text/metadata from PDFs | [tools.md](tools.md#pdf-extract-tool) |
+| `image_gen` | Generate images via DALL-E/Stability AI | [tools.md](tools.md#image-generation-tool) |
 
 Any other `type` value is routed to the plugin registry.

@@ -72,6 +72,7 @@ all = [
 
 [project.scripts]
 initrunner = "initrunner.cli.main:app_entry"
+initrunner-browser-mcp = "initrunner.mcp.browser:main"
 
 [project.urls]
 Repository = "https://github.com/vladkesler/initrunner"

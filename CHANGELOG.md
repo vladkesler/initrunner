@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.36.0] - 2026-03-21
+
+### Added
+- **Calculator tool** -- safe AST-based math expression evaluator with trig, log, and utility functions. No `eval()`. Configurable expression length and complexity limits
+- **Image generation tool** -- dual-provider support (OpenAI DALL-E 3, Stability AI). `generate_image()` and `edit_image()` tools with async/sync variants
+- **PDF extraction tool** -- `extract_pdf_text()` (markdown output) and `extract_pdf_metadata()` with page range selection, path sandboxing, and size limits
+- **Browser MCP server** -- FastMCP wrapper around `agent-browser` CLI with 12 tools (navigate, click, fill, screenshot, etc.), SSRF protection, domain filtering. Console script: `initrunner-browser-mcp`
+- **4 new example roles**: `creative-studio` (image generation), `math-assistant` (calculator), `pdf-analyst` (document analysis), `web-researcher` (browser-based research)
+- Skill design documentation: methodology-only vs tool-providing skill patterns
+- 1,287 lines of new test coverage across 4 test files
+
+### Changed
+- Tool schema union updated with `CalculatorToolConfig`, `PdfExtractToolConfig`, `ImageGenToolConfig`
+- `docs/agents/tools.md` and `docs/agents/tool_creation.md` updated with new tool references
+
 ## [1.35.1] - 2026-03-21
 
 ## [1.35.0] - 2026-03-21

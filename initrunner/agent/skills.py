@@ -86,9 +86,8 @@ def load_skill(path: Path) -> SkillDefinition:
         raise SkillLoadError(f"Validation failed for {path}:\n{e}") from e
 
     if not frontmatter.tools:
-        logger.warning(
-            "Skill '%s' has no tool configs"
-            " (may be a community skill without InitRunner extensions)",
+        logger.debug(
+            "Skill '%s' has no tool configs (methodology-only skill)",
             frontmatter.name,
         )
 
@@ -241,7 +240,7 @@ def merge_skill_tools(
     for tool in role_tools:
         tool_type = tool.type
         if tool_type in source:
-            logger.warning(
+            logger.debug(
                 "Tool type '%s' in role overrides same type from skill '%s'",
                 tool_type,
                 source[tool_type],

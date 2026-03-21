@@ -379,6 +379,47 @@ class ThinkToolConfig(ToolConfigBase):
         return "think"
 
 
+class CalculatorToolConfig(ToolConfigBase):
+    type: Literal["calculator"] = "calculator"
+    max_expression_length: int = 1000
+
+    def summary(self) -> str:
+        return "calculator"
+
+
+class PdfExtractToolConfig(ToolConfigBase):
+    type: Literal["pdf_extract"] = "pdf_extract"
+    root_path: str = "."
+    max_pages: int = Field(default=100, ge=1)
+    max_content_bytes: int = 512_000
+    max_file_size_mb: float = 50.0
+
+    def summary(self) -> str:
+        return f"pdf_extract: {self.root_path}"
+
+
+class ImageGenToolConfig(ToolConfigBase):
+    type: Literal["image_gen"] = "image_gen"
+    provider: Literal["openai", "stability"] = "openai"
+    api_key_env: str = ""
+    default_size: str = "1024x1024"
+    default_quality: str = "standard"
+    default_style: str = "natural"
+    output_dir: str = ""
+    input_root: str = ""
+    model: str = ""
+    timeout_seconds: int = 120
+
+    @model_validator(mode="after")
+    def _default_api_key(self) -> ImageGenToolConfig:
+        if not self.api_key_env and self.provider == "openai":
+            self.api_key_env = "${OPENAI_API_KEY}"
+        return self
+
+    def summary(self) -> str:
+        return f"image_gen: {self.provider}"
+
+
 class ScriptParameter(BaseModel):
     """A parameter for a script tool, injected as an uppercase env var."""
 
