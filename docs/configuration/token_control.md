@@ -132,7 +132,7 @@ In the TUI run screen, the session budget is displayed in the status bar with co
 
 ## Daemon Token Budgets
 
-Daemon mode (`initrunner daemon <path>`) supports two independent budget controls that work together. Both are tracked in-memory by a thread-safe `DaemonTokenTracker`.
+Daemon mode (`initrunner run <path> --daemon`) supports two independent budget controls that work together. Both are tracked in-memory by a thread-safe `DaemonTokenTracker`.
 
 ### Lifetime Budget (`daemon_token_budget`)
 

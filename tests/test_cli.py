@@ -839,9 +839,9 @@ class TestTestCommand:
         assert "total" in result.output.lower()
 
 
-class TestDaemon:
+class TestDaemonFlag:
     def test_missing_role_file(self):
-        result = runner.invoke(app, ["daemon", "/nonexistent/role.yaml"])
+        result = runner.invoke(app, ["run", "/nonexistent/role.yaml", "--daemon"])
         assert result.exit_code == 1
 
 

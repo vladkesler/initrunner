@@ -380,7 +380,7 @@ Compose services are standard InitRunner roles. All role features carry over:
 - **Guardrails**: Timeout, token limits, and tool call limits from the role definition apply to each execution.
 - **Skills**: Skills referenced in the role definition are loaded and available.
 
-Services without a compose `sink:` behave identically to running the role with `initrunner daemon` — triggers fire, sinks dispatch, and memory persists as configured.
+Services without a compose `sink:` behave identically to running the role with `initrunner run <role> --daemon` -- triggers fire, sinks dispatch, and memory persists as configured.
 
 ## Runtime Architecture
 

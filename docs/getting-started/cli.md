@@ -17,16 +17,13 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 
 | Command | Description |
 |---------|-------------|
-| `initrunner chat [PATH]` | Start an ephemeral chat REPL or launch a bot |
-| `initrunner run <PATH>` | Run an agent (single-shot or interactive) |
+| `initrunner chat` | Start an ephemeral chat REPL or launch a bot |
+| `initrunner run <PATH>` | Run an agent, team, compose, or pipeline (auto-detected from YAML kind) |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <PATH>` | Ingest documents into vector store |
-| `initrunner daemon <PATH>` | Run in trigger-driven daemon mode |
-| `initrunner serve <PATH>` | Serve agent as an OpenAI-compatible API |
 | `initrunner test <PATH> -s <suite>` | Run a test suite against an agent |
-| `initrunner pipeline <pipeline.yaml>` | Run a pipeline of agents |
 | `initrunner tui` | Launch TUI dashboard |
 | `initrunner ui` | Launch web dashboard (requires `[dashboard]` extra) |
 | `initrunner install <source>` | Install a role from InitHub or OCI registry |
@@ -71,13 +68,13 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner hub info <PACKAGE>` | (deprecated) Show InitHub package details |
 | `initrunner --version` | Print version |
 
-> **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`) or a directory containing one. See [Path resolution](#path-resolution).
+> **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a compose file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
 
 ## Chat options
 
-Synopsis: `initrunner chat [PATH] [OPTIONS]`
+Synopsis: `initrunner chat [OPTIONS]`
 
-Start an ephemeral chat REPL, load a role for interactive use, or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide.
+Start an ephemeral chat REPL or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide. To run a role file interactively, use `initrunner run <PATH> -i` instead.
 
 Running `initrunner` with no subcommand in a TTY starts chat automatically (or shows a setup hint if unconfigured). A tip about `initrunner new` is shown on each chat start.
 
@@ -103,7 +100,7 @@ Running `initrunner` with no subcommand in a TTY starts chat automatically (or s
 
 Synopsis: `initrunner run [PATH] [OPTIONS]`
 
-The path argument is optional when `--sense` is used.
+The path argument is optional when `--sense` is used. The `run` command auto-detects the YAML kind (Agent, Team, Compose, Pipeline) and dispatches accordingly.
 
 | Flag | Description |
 |------|-------------|
@@ -113,6 +110,16 @@ The path argument is optional when `--sense` is used.
 | `--max-iterations N` | Override max iterations for autonomous mode |
 | `--resume` | Resume the previous REPL session (requires `memory:` config) |
 | `--dry-run` | Simulate with TestModel (no API calls) |
+| `--daemon` | Run in trigger-driven daemon mode |
+| `--serve` | Serve agent as an OpenAI-compatible API |
+| `--bot TEXT` | Launch as a bot (`telegram` or `discord`) |
+| `--var TEXT` | Variable in `key=value` format (repeatable). Used with Pipeline kind. |
+| `--host TEXT` | Host to bind to (default: `127.0.0.1`). Used with `--serve`. |
+| `--port INT` | Port to listen on (default: `8000`). Used with `--serve`. |
+| `--api-key TEXT` | API key for Bearer token authentication. Used with `--serve`. |
+| `--cors-origin TEXT` | Allowed CORS origin (repeatable). Used with `--serve`. |
+| `--allowed-users TEXT` | Restrict bot to these usernames (repeatable). Used with `--bot`. |
+| `--allowed-user-ids TEXT` | Restrict bot to these user IDs (repeatable). Used with `--bot`. |
 | `--audit-db PATH` | Custom audit database path |
 | `--no-audit` | Disable audit logging |
 | `--skill-dir PATH` | Extra skill search directory |
@@ -212,16 +219,7 @@ initrunner new
 
 ## Serve options
 
-| Flag | Description |
-|------|-------------|
-| `--host TEXT` | Host to bind to (default: `127.0.0.1`) |
-| `--port INT` | Port to listen on (default: `8000`) |
-| `--api-key TEXT` | API key for Bearer token authentication |
-| `--audit-db PATH` | Custom audit database path |
-| `--no-audit` | Disable audit logging |
-| `--cors-origin TEXT` | Allowed CORS origin (repeatable). Merged with `security.server.cors_origins` from role YAML. |
-| `--skill-dir PATH` | Extra skill search directory |
-| `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
+The `--serve` flag on `initrunner run` starts an OpenAI-compatible API server. Server-specific flags (`--host`, `--port`, `--api-key`, `--cors-origin`) are listed in the [Run options](#run-options) table above.
 
 See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-turn conversations, and usage examples.
 

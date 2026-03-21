@@ -1,4 +1,4 @@
-"""Run commands: run, test, ingest, daemon."""
+"""Run commands: run, test, ingest."""
 
 from __future__ import annotations
 
@@ -12,11 +12,12 @@ from rich.table import Table
 from initrunner.cli._helpers import (
     command_context,
     console,
-    detect_yaml_kind,
+    create_audit_logger,
     load_and_build_or_exit,
     load_role_or_exit,
     resolve_model_override,
     resolve_role_path,
+    resolve_run_target,
     resolve_skill_dirs,
 )
 from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
@@ -53,7 +54,7 @@ def run(
     role_file: Annotated[
         Path | None,
         typer.Argument(
-            help="Agent directory, role YAML, or installed role name. Omit with --sense."
+            help="Agent/Team/Compose/Pipeline YAML, directory, or name. Omit with --sense."
         ),
     ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
@@ -108,15 +109,76 @@ def run(
         typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
     ] = False,
     model: ModelOption = None,
+    # --- Mode flags ---
+    daemon_mode: Annotated[
+        bool, typer.Option("--daemon", help="Run in daemon mode with triggers")
+    ] = False,
+    serve_mode: Annotated[
+        bool, typer.Option("--serve", help="Serve as OpenAI-compatible API")
+    ] = False,
+    bot: Annotated[
+        str | None, typer.Option("--bot", help="Launch as bot (telegram or discord)")
+    ] = None,
+    # --- Serve options ---
+    host: Annotated[
+        str, typer.Option(help="Host to bind to", rich_help_panel="Serve Options")
+    ] = "127.0.0.1",
+    port: Annotated[
+        int, typer.Option(help="Port to listen on", rich_help_panel="Serve Options")
+    ] = 8000,
+    api_key: Annotated[
+        str | None,
+        typer.Option("--api-key", help="API key for auth", rich_help_panel="Serve Options"),
+    ] = None,
+    cors_origin: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--cors-origin", help="CORS origin (repeatable)", rich_help_panel="Serve Options"
+        ),
+    ] = None,
+    # --- Pipeline options ---
+    var: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--var", help="Pipeline variable key=value", rich_help_panel="Pipeline Options"
+        ),
+    ] = None,
+    # --- Bot options ---
+    allowed_users: Annotated[
+        list[str] | None,
+        typer.Option("--allowed-users", help="Bot username filter", rich_help_panel="Bot Options"),
+    ] = None,
+    allowed_user_ids: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--allowed-user-ids",
+            help="Bot user ID filter (repeatable)",
+            rich_help_panel="Bot Options",
+        ),
+    ] = None,
 ) -> None:
-    """Run an agent with a role definition."""
+    """Run an agent, team, compose, or pipeline target."""
+
+    # --- Mutual exclusivity for mode flags ---
+    mode_flags = sum([daemon_mode, serve_mode, autonomous, bool(bot)])
+    if mode_flags > 1:
+        console.print(
+            "[red]Error:[/red] --daemon, --serve, --bot, and --autonomous are mutually exclusive."
+        )
+        raise typer.Exit(1)
+
+    if bot and bot not in ("telegram", "discord"):
+        console.print(f"[red]Error:[/red] --bot must be 'telegram' or 'discord', got '{bot}'.")
+        raise typer.Exit(1)
 
     # --- Intent Sensing resolution ---
     if role_file is not None and sense:
         console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
         raise typer.Exit(1)
     if role_file is None and not sense:
-        console.print("[red]Error:[/red] Provide a role file, installed role name, or use --sense.")
+        console.print(
+            "[red]Error:[/red] Provide a target file, installed role name, or use --sense."
+        )
         raise typer.Exit(1)
     if sense and not prompt:
         console.print("[red]Error:[/red] --sense requires --prompt (-p).")
@@ -146,24 +208,98 @@ def run(
         role_file = selection.candidate.path
     # --- End Intent Sensing ---
 
-    # --- Early resolution for installed role names ---
-    if role_file is not None and not sense:
-        role_file = resolve_role_path(role_file)
+    # --- Resolve target and detect kind ---
+    if role_file is None:
+        raise RuntimeError("role_file unresolved")
 
-    # --- Team mode dispatch ---
-    if role_file is not None and detect_yaml_kind(role_file) == "Team":
-        _run_team(
+    resolved, kind = resolve_run_target(role_file)
+    role_file = resolved
+
+    # --- Kind-specific flag validation ---
+    if kind in ("Compose", "Pipeline"):
+        invalid = []
+        if prompt:
+            invalid.append("--prompt")
+        if interactive:
+            invalid.append("--interactive")
+        if autonomous:
+            invalid.append("--autonomous")
+        if resume:
+            invalid.append("--resume")
+        if attach:
+            invalid.append("--attach")
+        if report:
+            invalid.append("--report")
+        if sense:
+            invalid.append("--sense")
+        if daemon_mode:
+            invalid.append("--daemon")
+        if serve_mode:
+            invalid.append("--serve")
+        if bot:
+            invalid.append("--bot")
+        if invalid:
+            console.print(
+                f"[red]Error:[/red] {', '.join(invalid)} not supported for {kind} targets."
+            )
+            raise typer.Exit(1)
+
+    if kind != "Pipeline" and var:
+        console.print("[red]Error:[/red] --var is only supported for Pipeline targets.")
+        raise typer.Exit(1)
+
+    if kind not in ("Agent",) and (daemon_mode or serve_mode or bot):
+        console.print(
+            "[red]Error:[/red] --daemon, --serve, and --bot are only supported for Agent targets."
+        )
+        raise typer.Exit(1)
+
+    # --- Kind-based dispatch ---
+    if kind == "Team":
+        _run_team(role_file, prompt, dry_run, audit_db, no_audit, report, report_template)
+        return
+
+    if kind == "Compose":
+        _dispatch_compose(role_file, audit_db, no_audit)
+        return
+
+    if kind == "Pipeline":
+        _dispatch_pipeline(role_file, var, dry_run, audit_db, no_audit)
+        return
+
+    # --- Agent mode: flag-based dispatch ---
+    if serve_mode:
+        _dispatch_serve(
             role_file,
-            prompt,
-            dry_run,
+            host,
+            port,
+            api_key,
+            cors_origin,
             audit_db,
             no_audit,
-            report,
-            report_template,
+            skill_dir,
+            model,
         )
         return
-    # --- End Team mode ---
 
+    if bot:
+        _dispatch_bot(
+            role_file,
+            bot,
+            allowed_users,
+            allowed_user_ids,
+            audit_db,
+            no_audit,
+            skill_dir,
+            model,
+        )
+        return
+
+    if daemon_mode:
+        _dispatch_daemon(role_file, audit_db, no_audit, skill_dir, model)
+        return
+
+    # --- Standard Agent execution (single-shot / REPL / autonomous) ---
     if autonomous and not prompt:
         console.print("[red]Error:[/red] --autonomous requires --prompt (-p).")
         raise typer.Exit(1)
@@ -210,9 +346,6 @@ def run(
             console.print(f"[red]Attachment error:[/red] {e}")
             raise typer.Exit(1) from None
 
-    if role_file is None:
-        raise RuntimeError("role_file unresolved")
-
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
@@ -223,6 +356,19 @@ def run(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        # Trigger hint for REPL mode
+        if (
+            not prompt
+            and not autonomous
+            and not daemon_mode
+            and not serve_mode
+            and not bot
+            and role.spec.triggers
+        ):
+            console.print(
+                "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"
+            )
+
         message_history = None
         run_result = None  # RunResult or AutonomousResult
 
@@ -295,6 +441,192 @@ def run(
         # Export for non-interactive branches (after run completes)
         if report is not None and run_result is not None and not (user_prompt and interactive):
             _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+
+
+# ---------------------------------------------------------------------------
+# Dispatch helpers for non-Agent kinds and Agent mode flags
+# ---------------------------------------------------------------------------
+
+
+def _dispatch_compose(compose_file: Path, audit_db: Path | None, no_audit: bool) -> None:
+    """Run a compose file (foreground)."""
+    from initrunner.compose.loader import ComposeLoadError
+    from initrunner.services.compose import load_compose_sync, run_compose_sync
+
+    try:
+        compose = load_compose_sync(compose_file)
+    except ComposeLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    audit_logger = create_audit_logger(audit_db, no_audit)
+
+    try:
+        run_compose_sync(compose, compose_file.parent, audit_logger=audit_logger)
+    finally:
+        if audit_logger is not None:
+            audit_logger.close()
+
+
+def _dispatch_pipeline(
+    pipeline_file: Path,
+    var: list[str] | None,
+    dry_run: bool,
+    audit_db: Path | None,
+    no_audit: bool,
+) -> None:
+    """Run a pipeline file."""
+    from initrunner.pipeline.loader import PipelineLoadError, load_pipeline
+
+    try:
+        pipe = load_pipeline(pipeline_file)
+    except PipelineLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    variables: dict[str, str] = {}
+    for v in var or []:
+        if "=" not in v:
+            console.print(f"[red]Error:[/red] Invalid variable format: '{v}'. Use key=value.")
+            raise typer.Exit(1)
+        key, value = v.split("=", 1)
+        variables[key] = value
+
+    if dry_run:
+        from initrunner.cli.server_cmd import _display_pipeline_dry_run
+
+        _display_pipeline_dry_run(pipe, variables)
+        return
+
+    audit_logger = create_audit_logger(audit_db, no_audit)
+
+    try:
+        from initrunner.pipeline.executor import run_pipeline
+
+        result = run_pipeline(
+            pipe,
+            variables=variables,
+            audit_logger=audit_logger,
+            base_dir=pipeline_file.parent,
+        )
+        from initrunner.cli.server_cmd import _display_pipeline_result
+
+        _display_pipeline_result(result)
+
+        if not result.success:
+            raise typer.Exit(1)
+    finally:
+        if audit_logger is not None:
+            audit_logger.close()
+
+
+def _dispatch_serve(
+    role_file: Path,
+    host: str,
+    port: int,
+    api_key: str | None,
+    cors_origin: list[str] | None,
+    audit_db: Path | None,
+    no_audit: bool,
+    skill_dir: Path | None,
+    model: str | None,
+) -> None:
+    """Serve an agent as an OpenAI-compatible API."""
+    from initrunner.server.app import run_server
+
+    resolved_model = resolve_model_override(model)
+    with command_context(
+        role_file,
+        audit_db=audit_db,
+        no_audit=no_audit,
+        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        model_override=resolved_model,
+    ) as (role, agent, audit_logger, _memory_store, _sink_dispatcher):
+        console.print(f"Serving [cyan]{role.metadata.name}[/cyan] at http://{host}:{port}")
+        console.print(f"  Model ID: {role.metadata.name}")
+        console.print(f"  Health:   http://{host}:{port}/health")
+        console.print(f"  Models:   http://{host}:{port}/v1/models")
+        if api_key:
+            console.print("  Auth:     [yellow]enabled[/yellow] (Bearer token required)")
+        if cors_origin:
+            console.print(f"  CORS:     {', '.join(cors_origin)}")
+
+        run_server(
+            agent,
+            role,
+            host=host,
+            port=port,
+            audit_logger=audit_logger,
+            api_key=api_key,
+            cors_origins=cors_origin,
+        )
+
+
+def _dispatch_daemon(
+    role_file: Path,
+    audit_db: Path | None,
+    no_audit: bool,
+    skill_dir: Path | None,
+    model: str | None,
+) -> None:
+    """Run agent in daemon mode with triggers."""
+    from initrunner.runner import run_daemon
+
+    resolved_model = resolve_model_override(model)
+    extra_skill_dirs = resolve_skill_dirs(skill_dir)
+    with command_context(
+        role_file,
+        audit_db=audit_db,
+        no_audit=no_audit,
+        with_memory=True,
+        with_sinks=True,
+        extra_skill_dirs=extra_skill_dirs,
+        model_override=resolved_model,
+    ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        run_daemon(
+            agent,
+            role,
+            audit_logger=audit_logger,
+            sink_dispatcher=sink_dispatcher,
+            memory_store=memory_store,
+            role_path=role_file.resolve(),
+            extra_skill_dirs=extra_skill_dirs,
+        )
+
+
+def _dispatch_bot(
+    role_file: Path,
+    platform: str,
+    allowed_users: list[str] | None,
+    allowed_user_ids: list[str] | None,
+    audit_db: Path | None,
+    no_audit: bool,
+    skill_dir: Path | None,
+    model: str | None,
+) -> None:
+    """Launch an agent as a Telegram or Discord bot."""
+    from initrunner.runner import run_bot
+
+    resolved_model = resolve_model_override(model)
+    with command_context(
+        role_file,
+        audit_db=audit_db,
+        no_audit=no_audit,
+        with_memory=True,
+        with_sinks=True,
+        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        model_override=resolved_model,
+    ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        run_bot(
+            agent,
+            role,
+            platform,
+            allowed_users=allowed_users,
+            allowed_user_ids=allowed_user_ids,
+            audit_logger=audit_logger,
+            sink_dispatcher=sink_dispatcher,
+            memory_store=memory_store,
+        )
 
 
 def _display_team_result(team_result: object) -> None:
@@ -644,39 +976,3 @@ def _status_color(status: object) -> str:
         FileStatus.SKIPPED: "dim",
         FileStatus.ERROR: "red",
     }.get(status, "white")
-
-
-def daemon(
-    role_file: Annotated[
-        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
-    ],
-    audit_db: AuditDbOption = None,
-    no_audit: NoAuditOption = False,
-    skill_dir: SkillDirOption = None,
-    model: ModelOption = None,
-) -> None:
-    """Run agent in daemon mode with triggers."""
-    role_file = resolve_role_path(role_file)
-
-    from initrunner.runner import run_daemon
-
-    resolved_model = resolve_model_override(model)
-    extra_skill_dirs = resolve_skill_dirs(skill_dir)
-    with command_context(
-        role_file,
-        audit_db=audit_db,
-        no_audit=no_audit,
-        with_memory=True,
-        with_sinks=True,
-        extra_skill_dirs=extra_skill_dirs,
-        model_override=resolved_model,
-    ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
-        run_daemon(
-            agent,
-            role,
-            audit_logger=audit_logger,
-            sink_dispatcher=sink_dispatcher,
-            memory_store=memory_store,
-            role_path=role_file.resolve(),
-            extra_skill_dirs=extra_skill_dirs,
-        )

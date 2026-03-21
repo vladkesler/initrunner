@@ -62,7 +62,7 @@ No attachments queued.
 
 ## Server API (OpenAI Format)
 
-The `initrunner serve` endpoint accepts multimodal content in the standard OpenAI format. The `content` field of a `ChatMessage` can be a string or a list of content parts.
+The `initrunner run --serve` endpoint accepts multimodal content in the standard OpenAI format. The `content` field of a `ChatMessage` can be a string or a list of content parts.
 
 ### Content Part Types
 

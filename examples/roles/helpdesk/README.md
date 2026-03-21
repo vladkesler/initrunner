@@ -18,7 +18,7 @@ initrunner ingest role.yaml
 initrunner run role.yaml -i
 
 # Serve as an OpenAI-compatible API
-initrunner serve role.yaml --api-key my-secret-key
+initrunner run role.yaml --serve --api-key my-secret-key
 ```
 
 Ingestion extras for PDF/DOCX: `pip install initrunner[ingest]`
@@ -47,7 +47,7 @@ Who do I contact for payroll questions?
 
 ```bash
 # Start the server
-initrunner serve role.yaml --api-key my-secret-key --host 0.0.0.0 --port 8000
+initrunner run role.yaml --serve --api-key my-secret-key --host 0.0.0.0 --port 8000
 
 # Query it
 curl http://localhost:8000/v1/chat/completions \

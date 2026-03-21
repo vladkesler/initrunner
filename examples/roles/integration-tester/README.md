@@ -16,7 +16,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
 initrunner run role.yaml -p "Run integration tests"
 
 # Start as daemon (daily 6am UTC + webhook trigger)
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 ## Prerequisites

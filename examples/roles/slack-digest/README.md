@@ -15,7 +15,7 @@ export OPENAI_API_KEY="your-api-key"
 # IMPORTANT: Edit the topic list in role.yaml (see Customization below)
 
 # Start the daemon
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 The agent runs on a cron schedule (weekdays at 9:00 UTC by default).

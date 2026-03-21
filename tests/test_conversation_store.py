@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 import time
 
-from initrunner.runner.daemon import _ConversationStore
+from initrunner.runner._conversations import ConversationStore as _ConversationStore
 
 
 class TestConversationStore:

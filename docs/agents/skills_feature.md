@@ -389,12 +389,12 @@ Creates `web-researcher/SKILL.md` with template frontmatter and prompt. Refuses 
 
 ### `--skill-dir` Option
 
-The `--skill-dir` option is available on `validate`, `run`, `daemon`, and `serve` commands. It adds an extra directory to the skill search path.
+The `--skill-dir` option is available on `validate` and `run` commands. It adds an extra directory to the skill search path.
 
 ```bash
 initrunner run role.yaml -i --skill-dir ./shared-skills
-initrunner daemon role.yaml --skill-dir /opt/skills
-initrunner serve role.yaml --skill-dir ./shared-skills
+initrunner run role.yaml --daemon --skill-dir /opt/skills
+initrunner run role.yaml --serve --skill-dir ./shared-skills
 ```
 
 ### `INITRUNNER_SKILL_DIR` Environment Variable

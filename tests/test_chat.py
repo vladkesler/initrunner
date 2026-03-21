@@ -333,42 +333,6 @@ class TestChatBotMode:
         assert "No API key found" in result.output
 
 
-class TestChatWithRoleFile:
-    def test_chat_with_role_file(self, clean_env, monkeypatch, tmp_path):
-        """chat <role.yaml> loads and runs interactively."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-
-        role_file = tmp_path / "role.yaml"
-        role_file.write_text(
-            """\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: test-agent
-spec:
-  role: You are a test agent.
-  model:
-    provider: openai
-    name: gpt-5-mini
-"""
-        )
-
-        with (
-            patch("initrunner.runner.run_interactive") as mock_repl,
-            patch("initrunner.agent.loader.load_and_build") as mock_load,
-        ):
-            mock_agent = MagicMock()
-            mock_role = MagicMock()
-            mock_role.spec.memory = None
-            mock_role.spec.observability = None
-            mock_role.spec.sinks = []
-            mock_load.return_value = (mock_role, mock_agent)
-            result = runner.invoke(app, ["chat", str(role_file)])
-
-        assert result.exit_code == 0
-        mock_repl.assert_called_once()
-
-
 class TestExtraTools:
     def test_extra_tools_added_to_bot(self, clean_env, monkeypatch):
         """--tools slack with SLACK_WEBHOOK_URL set adds slack to role's tools."""
@@ -439,41 +403,6 @@ class TestExtraTools:
         role = mock_build.call_args[0][0]
         tool_types = [t.type for t in role.spec.tools]
         assert tool_types.count("search") == 1
-
-    def test_tools_ignored_with_role_file(self, clean_env, monkeypatch, tmp_path):
-        """chat role.yaml --tools slack shows info message and uses role file tools."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/test")
-
-        role_file = tmp_path / "role.yaml"
-        role_file.write_text(
-            """\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: test-agent
-spec:
-  role: You are a test agent.
-  model:
-    provider: openai
-    name: gpt-5-mini
-"""
-        )
-
-        with (
-            patch("initrunner.runner.run_interactive"),
-            patch("initrunner.agent.loader.load_and_build") as mock_load,
-        ):
-            mock_agent = MagicMock()
-            mock_role = MagicMock()
-            mock_role.spec.memory = None
-            mock_role.spec.observability = None
-            mock_role.spec.sinks = []
-            mock_load.return_value = (mock_role, mock_agent)
-            result = runner.invoke(app, ["chat", str(role_file), "--tools", "slack"])
-
-        assert result.exit_code == 0
-        assert "--tools ignored" in result.output
 
     def test_list_tools_outputs_supported_and_required_env(self, clean_env):
         """--list-tools prints tool table and exits cleanly."""

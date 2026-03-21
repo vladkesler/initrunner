@@ -88,7 +88,7 @@ What changed since the last scan? Scan only modified files.
 ## Daemon mode
 
 ```bash
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 Runs the cron trigger at 2am UTC daily. The agent detects languages, activates scanner skills, triages findings, and outputs the structured report. Memory persists between runs -- false positives stay suppressed.

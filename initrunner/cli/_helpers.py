@@ -240,6 +240,18 @@ def detect_yaml_kind(path: Path) -> str:
     return "Agent"
 
 
+def resolve_run_target(target: Path) -> tuple[Path, str]:
+    """Resolve a run target to *(resolved_path, kind)*.
+
+    Explicit files may resolve to any kind (Agent, Team, Compose, Pipeline).
+    Directory and installed-name resolution stays Agent/Team-only via
+    :func:`resolve_role_path`.
+    """
+    resolved = resolve_role_path(target)
+    kind = detect_yaml_kind(resolved)
+    return resolved, kind
+
+
 def load_role_or_exit(role_file: Path) -> RoleDefinition:
     role_file = resolve_role_path(role_file)
     from initrunner.agent.loader import RoleLoadError

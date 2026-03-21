@@ -1,21 +1,23 @@
 # OpenAI-Compatible API Server
 
-The `initrunner serve` command exposes any agent as an OpenAI-compatible HTTP API. This lets you use InitRunner agents as drop-in replacements for OpenAI in any client that speaks the chat completions wire format — including the official OpenAI SDKs, `curl`, and tools like Open WebUI.
+The `initrunner run <role> --serve` command exposes any agent as an OpenAI-compatible HTTP API. This lets you use InitRunner agents as drop-in replacements for OpenAI in any client that speaks the chat completions wire format -- including the official OpenAI SDKs, `curl`, and tools like Open WebUI.
 
 ## Quick Start
 
 ```bash
 # Start the server
-initrunner serve role.yaml
+initrunner run role.yaml --serve
 
 # With authentication
-initrunner serve role.yaml --api-key my-secret-key
+initrunner run role.yaml --serve --api-key my-secret-key
 
 # Custom host/port
-initrunner serve role.yaml --host 0.0.0.0 --port 3000
+initrunner run role.yaml --serve --host 0.0.0.0 --port 3000
 ```
 
 ## CLI Options
+
+Use `initrunner run <role> --serve` with the following flags:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -222,7 +224,7 @@ By default, the server sends **no CORS headers** (secure default). CORS origins 
 
 ```bash
 # Add origins via CLI (repeatable flag)
-initrunner serve role.yaml --cors-origin https://myapp.com --cors-origin https://staging.com
+initrunner run role.yaml --serve --cors-origin https://myapp.com --cors-origin https://staging.com
 ```
 
 ## Error Handling
@@ -354,7 +356,7 @@ When a server-side conversation exists (via `X-Conversation-Id`), only the last 
 
 ## Open WebUI Integration
 
-[Open WebUI](https://github.com/open-webui/open-webui) gives you a ChatGPT-like web interface for any InitRunner agent. Because `initrunner serve` speaks the OpenAI wire format, Open WebUI works out of the box — no plugins or adapters needed.
+[Open WebUI](https://github.com/open-webui/open-webui) gives you a ChatGPT-like web interface for any InitRunner agent. Because `initrunner run <role> --serve` speaks the OpenAI wire format, Open WebUI works out of the box -- no plugins or adapters needed.
 
 ### Setup
 
@@ -369,7 +371,7 @@ initrunner ingest examples/roles/support-agent/support-agent.yaml
 **2. Start the InitRunner server**
 
 ```bash
-initrunner serve examples/roles/support-agent/support-agent.yaml --host 0.0.0.0 --port 3000
+initrunner run examples/roles/support-agent/support-agent.yaml --serve --host 0.0.0.0 --port 3000
 ```
 
 > `--host 0.0.0.0` is required so the Docker container can reach the server.

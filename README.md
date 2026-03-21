@@ -177,7 +177,7 @@ spec:
 ```
 
 ```bash
-initrunner daemon role.yaml   # runs until stopped
+initrunner run role.yaml --daemon   # runs until stopped
 ```
 
 See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
@@ -223,7 +223,7 @@ Also includes content filtering, PEP 578 sandboxing, Docker isolation, token bud
 |---------|-----------------|------|
 | **Skills** - reusable tool + prompt bundles, auto-discovered | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
 | **Team mode** - multi-persona on one task | `kind: Team` + `spec: { personas: {…} }` | [Team Mode](docs/orchestration/team_mode.md) |
-| **API server** - OpenAI-compatible endpoint | `initrunner serve agent.yaml --port 3000` | [Server](docs/interfaces/server.md) |
+| **API server** - OpenAI-compatible endpoint | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **Multimodal** - images, audio, video, docs | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
 | **Structured output** - validated JSON schemas | `spec: { output: { schema: {…} } }` | [Structured Output](docs/core/structured-output.md) |
 | **Evals** - test agent output quality | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |

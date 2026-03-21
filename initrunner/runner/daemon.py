@@ -6,8 +6,6 @@ import json
 import logging
 import sys
 import threading
-import time
-from collections import OrderedDict
 from pathlib import Path
 
 from pydantic_ai import Agent
@@ -15,6 +13,7 @@ from pydantic_ai import Agent
 from initrunner.agent.executor import RunResult, execute_run, execute_run_stream
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
+from initrunner.runner._conversations import ConversationStore
 from initrunner.runner.autonomous import run_autonomous
 from initrunner.runner.budget import DaemonTokenTracker
 from initrunner.runner.display import (
@@ -28,43 +27,6 @@ from initrunner.stores.base import MemoryStoreBase
 from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES, TriggerEvent
 
 _logger = logging.getLogger(__name__)
-
-
-class _ConversationStore:
-    """Thread-safe, LRU-bounded store for per-conversation message histories."""
-
-    def __init__(self, *, max_conversations: int = 200, ttl_seconds: float = 3600) -> None:
-        self._max = max_conversations
-        self._ttl = ttl_seconds
-        self._lock = threading.Lock()
-        self._data: OrderedDict[str, tuple[float, list]] = OrderedDict()
-
-    def get(self, key: str | None) -> list | None:
-        """Return stored history if not expired, or None."""
-        if key is None:
-            return None
-        with self._lock:
-            entry = self._data.get(key)
-            if entry is None:
-                return None
-            ts, messages = entry
-            if time.monotonic() - ts > self._ttl:
-                del self._data[key]
-                return None
-            # Mark as recently used
-            self._data.move_to_end(key)
-            return messages
-
-    def put(self, key: str | None, messages: list) -> None:
-        """Store history with current timestamp, evicting oldest if at capacity."""
-        if key is None:
-            return
-        with self._lock:
-            if key in self._data:
-                self._data.move_to_end(key)
-            self._data[key] = (time.monotonic(), messages)
-            while len(self._data) > self._max:
-                self._data.popitem(last=False)
 
 
 class DaemonRunner:
@@ -106,7 +68,7 @@ class DaemonRunner:
         self._schedule_queue = None
         self._scheduling_toolset = None
         self._autonomous_trigger_types: set[str] = set()
-        self._conversations = _ConversationStore()
+        self._conversations = ConversationStore()
         self._reloader = None
         self._dispatcher = None
 

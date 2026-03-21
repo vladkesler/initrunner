@@ -102,7 +102,7 @@ def main(
             platforms = ", ".join(tokens)
             console.print(
                 f"[dim]Hint: bot tokens detected ({platforms}). "
-                f"Use --telegram or --discord to launch a bot.[/dim]"
+                f"Use 'initrunner chat --telegram' or '--discord' to launch a bot.[/dim]"
             )
 
         _load_env()
@@ -149,8 +149,8 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     whoami,
 )
 from initrunner.cli.role_cmd import setup, validate  # noqa: E402
-from initrunner.cli.run_cmd import daemon, ingest, run, test  # noqa: E402
-from initrunner.cli.server_cmd import pipeline, serve, tui, ui  # noqa: E402
+from initrunner.cli.run_cmd import ingest, run, test  # noqa: E402
+from initrunner.cli.server_cmd import tui, ui  # noqa: E402
 
 app.command()(chat)
 app.command()(validate)
@@ -159,9 +159,6 @@ app.command()(setup)
 app.command()(run)
 app.command()(test)
 app.command()(ingest)
-app.command()(daemon)
-app.command()(serve)
-app.command()(pipeline)
 app.command()(ui)
 app.command()(tui)
 app.command()(plugins)

@@ -1,10 +1,11 @@
-"""Runner package: single-shot, interactive, autonomous, and daemon modes."""
+"""Runner package: single-shot, interactive, autonomous, daemon, and bot modes."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 from initrunner.runner.autonomous import run_autonomous
+from initrunner.runner.bot import run_bot
 from initrunner.runner.budget import DaemonTokenTracker
 from initrunner.runner.daemon import run_daemon
 from initrunner.runner.interactive import run_interactive
@@ -18,6 +19,7 @@ __all__ = [
     "DaemonTokenTracker",
     "maybe_prune_sessions",
     "run_autonomous",
+    "run_bot",
     "run_daemon",
     "run_interactive",
     "run_single",

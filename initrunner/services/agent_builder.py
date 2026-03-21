@@ -163,7 +163,7 @@ def build_next_steps(role: RoleDefinition, yaml_path: Path) -> list[str]:
     if role.spec.ingest:
         steps.append(f"initrunner ingest {p}")
     if role.spec.triggers:
-        steps.append(f"initrunner daemon {p}")
+        steps.append(f"initrunner run {p} --daemon")
     if role.spec.memory:
         steps.append(f"initrunner run {p} -i")
 

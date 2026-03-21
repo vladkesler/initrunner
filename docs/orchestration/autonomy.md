@@ -175,7 +175,7 @@ Note: `--autonomous` requires `--prompt` (`-p`) and is mutually exclusive with `
 
 ## Daemon Mode
 
-In daemon mode (`initrunner daemon role.yaml`), triggers can opt into autonomous execution per trigger fire.
+In daemon mode (`initrunner run role.yaml --daemon`), triggers can opt into autonomous execution per trigger fire.
 
 Set `autonomous: true` on any trigger config:
 

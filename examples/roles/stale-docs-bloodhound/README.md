@@ -15,7 +15,7 @@ initrunner ingest role.yaml
 export GITHUB_TOKEN=ghp_...
 
 # Start watching for code changes
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 ## Prerequisites
@@ -83,7 +83,7 @@ Review the diff in abc1234..def5678 for doc staleness
 
 ## Daemon mode
 
-In daemon mode (`initrunner daemon role.yaml`), the file-watch trigger monitors `./src` and `./lib` for changes to source files. When a file is saved, the agent waits 5 seconds (debounce), then runs the full analysis pipeline autonomously.
+In daemon mode (`initrunner run role.yaml --daemon`), the file-watch trigger monitors `./src` and `./lib` for changes to source files. When a file is saved, the agent waits 5 seconds (debounce), then runs the full analysis pipeline autonomously.
 
 The agent caps at 5 issue actions per trigger event to avoid flooding your issue tracker.
 

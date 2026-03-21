@@ -4,7 +4,7 @@ Delegation lets an agent invoke other agents as tool calls. A parent agent sees 
 
 Delegation supports two modes:
 - **Inline** — sub-agent is loaded and run in the same process (local dev, tests)
-- **MCP** — sub-agent is called via HTTP to a remote `initrunner serve` instance (k8s, distributed)
+- **MCP** -- sub-agent is called via HTTP to a remote `initrunner run --serve` instance (k8s, distributed)
 
 Switching modes is a config change — the LLM sees the same tool interface regardless.
 
@@ -80,7 +80,7 @@ tools:
 |-------|------|---------|-------------|
 | `name` | `str` | *(required)* | Agent name. Becomes part of the tool name: `delegate_to_{name}`. |
 | `role_file` | `str \| null` | `null` | Path to the agent's role YAML file. **Required** in `inline` mode. Resolved relative to the parent role file's directory. |
-| `url` | `str \| null` | `null` | Base URL of the agent's `initrunner serve` endpoint. **Required** in `mcp` mode. |
+| `url` | `str \| null` | `null` | Base URL of the agent's `initrunner run --serve` endpoint. **Required** in `mcp` mode. |
 | `description` | `str` | `""` | Tool description shown to the LLM. Should clearly explain what this agent does. |
 | `headers_env` | `dict[str, str]` | `{}` | Maps HTTP header names to environment variable names. Only used in `mcp` mode. Values are resolved at call time. |
 
@@ -127,7 +127,7 @@ Sub-agents share the audit database (`~/.initrunner/audit.db`) with the parent. 
 
 ## MCP Mode
 
-In MCP mode, sub-agents are called via HTTP POST to running `initrunner serve` instances. This is designed for distributed deployment (k8s, multi-host).
+In MCP mode, sub-agents are called via HTTP POST to running `initrunner run --serve` instances. This is designed for distributed deployment (k8s, multi-host).
 
 ```yaml
 tools:
@@ -169,20 +169,20 @@ Missing environment variables result in empty header values (the header is omitt
 
 ### Starting Remote Agents
 
-Each remote agent must be running as an `initrunner serve` instance:
+Each remote agent must be running as an `initrunner run --serve` instance:
 
 ```bash
 # Terminal 1: Start researcher agent
-initrunner serve roles/researcher.yaml --host 0.0.0.0 --port 8000
+initrunner run roles/researcher.yaml --serve --host 0.0.0.0 --port 8000
 
 # Terminal 2: Start summarizer agent
-initrunner serve roles/summarizer.yaml --host 0.0.0.0 --port 8001
+initrunner run roles/summarizer.yaml --serve --host 0.0.0.0 --port 8001
 
 # Terminal 3: Run coordinator
 initrunner run coordinator.yaml -p "Research and summarize AI safety"
 ```
 
-See [Server](../interfaces/server.md) for details on the serve command.
+See [Server](../interfaces/server.md) for details on the `--serve` flag.
 
 ## Depth Tracking
 
@@ -288,7 +288,7 @@ Local dev:                           k8s / distributed:
                                      +----------------------+
 ```
 
-- Each agent runs as `initrunner serve <path>` in its own Deployment + Service
+- Each agent runs as `initrunner run <path> --serve` in its own Deployment + Service
 - The coordinator runs with `mode: mcp` targeting agent service URLs
 - Audit stays local per pod (SQLite per process)
 - No k8s-specific code — users bring their own manifests

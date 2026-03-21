@@ -863,10 +863,16 @@ class TestCORSCLIOverride:
 
 class TestServeCLICorsFlag:
     def test_cors_origin_flag_accepted(self):
-        """CLI parser recognizes the --cors-origin flag."""
+        """CLI parser recognizes the --cors-origin flag on run --serve."""
         result = cli_runner.invoke(
             cli_app,
-            ["serve", "/nonexistent/role.yaml", "--cors-origin", "https://example.com"],
+            [
+                "run",
+                "/nonexistent/role.yaml",
+                "--serve",
+                "--cors-origin",
+                "https://example.com",
+            ],
         )
         # Will fail because role file doesn't exist, but the flag itself is parsed
         assert result.exit_code == 1
@@ -1249,5 +1255,5 @@ class TestSkipDoubleValidation:
 
 class TestServeCLI:
     def test_missing_role_file(self):
-        result = cli_runner.invoke(cli_app, ["serve", "/nonexistent/role.yaml"])
+        result = cli_runner.invoke(cli_app, ["run", "/nonexistent/role.yaml", "--serve"])
         assert result.exit_code == 1

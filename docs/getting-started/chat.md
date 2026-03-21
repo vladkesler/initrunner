@@ -81,21 +81,19 @@ The `--ingest` flag runs the ingestion pipeline before the REPL starts and auto-
 
 ## Role-Based Chat
 
-Load an existing role file with tools, memory, guardrails, and everything else defined in YAML:
+To run an agent defined in a role file interactively, use `initrunner run`:
 
 ```bash
-initrunner chat role.yaml
+initrunner run role.yaml -i
 ```
 
-When a role file is provided, the `--provider`, `--model`, `--tool-profile`, and `--tools` flags are ignored — the role file controls everything. The `--resume` flag works with role files too.
-
-Combine with `-p` to send an initial prompt then continue interactively:
+The role file controls tools, memory, guardrails, and everything else. Combine with `-p` to send an initial prompt then continue interactively:
 
 ```bash
-initrunner chat role.yaml -p "Summarize today's news"
+initrunner run role.yaml -p "Summarize today's news" -i
 
 # Resume a previous role-based session
-initrunner chat role.yaml --resume
+initrunner run role.yaml -i --resume
 ```
 
 ## One-Command Bot Mode
@@ -126,9 +124,9 @@ Bot mode builds an ephemeral role in memory with:
 - Daily token budget: 200,000
 - Autonomous mode: enabled (responds to messages without confirmation)
 
-### `chat --telegram` vs `daemon role.yaml`
+### `chat --telegram` vs `run role.yaml --daemon`
 
-| | `chat --telegram` / `--discord` | `daemon role.yaml` |
+| | `chat --telegram` / `--discord` | `run role.yaml --daemon` |
 |---|---|---|
 | **Config** | Auto-generated in memory | Full YAML with all options |
 | **Tools** | Tool profile + `--tools` extras | Any tools from the registry |
@@ -137,16 +135,15 @@ Bot mode builds an ephemeral role in memory with:
 | **Memory** | Enabled by default (opt out with `--no-memory`) | Configurable |
 | **Use case** | Prototyping, personal use | Production, shared bots |
 
-**Recommendation:** Use `chat --telegram` / `--discord` for quick testing. Switch to a `role.yaml` with `initrunner daemon` for anything shared or long-running.
+**Recommendation:** Use `chat --telegram` / `--discord` for quick testing. Switch to a `role.yaml` with `initrunner run role.yaml --daemon` for anything shared or long-running.
 
 ## CLI Options
 
-Synopsis: `initrunner chat [PATH] [OPTIONS]`
+Synopsis: `initrunner chat [OPTIONS]`
 
 | Flag | Description |
 |------|-------------|
-| `PATH` | Agent directory or role YAML file (positional, optional). Omit for auto-detect mode. |
-| `--provider TEXT` | Model provider — overrides auto-detection. |
+| `--provider TEXT` | Model provider -- overrides auto-detection. |
 | `--model TEXT` | Model name — overrides auto-detection. |
 | `-p, --prompt TEXT` | Send a prompt then enter REPL (or launch bot with this context). |
 | `--telegram` | Launch as a Telegram bot daemon. |
@@ -232,7 +229,7 @@ Error: Tool 'slack' requires SLACK_WEBHOOK_URL.
 
 ### Role-file mode
 
-When a role file is provided (`initrunner chat role.yaml --tools slack`), the `--tools` flag is ignored with an info message. The role file defines its own tools.
+The `chat` command no longer accepts role files. To run an agent from a role file, use `initrunner run role.yaml -i` instead. The role file defines its own tools.
 
 ## Provider Auto-Detection
 
@@ -332,12 +329,7 @@ CLI flags  >  chat.yaml  >  built-in defaults
 
 ### When chat.yaml is ignored
 
-`chat.yaml` is **not** applied when a role file is provided:
-
-```bash
-initrunner chat role.yaml   # chat.yaml ignored — role file controls everything
-initrunner chat              # chat.yaml applied
-```
+`chat.yaml` is only applied in ephemeral chat mode. When running a role file with `initrunner run`, the role file controls everything.
 
 ### Ingest path resolution
 
@@ -352,7 +344,7 @@ Relative paths in `chat.yaml`'s `ingest` list are resolved from the config file 
 - **Bot tokens are secrets.** Store them in environment variables or `.env` files. Never commit tokens to version control. Anyone with the token can impersonate the bot.
 - **Ephemeral bots respond to everyone by default.** Use `--allowed-users` or `--allowed-user-ids` to restrict access. Without these flags, every user who can message the bot can use it — and invoke its tools.
 - **Daily token budget is a cost firewall.** Bot mode defaults to 200,000 tokens/day. For production, tune `daemon_daily_token_budget` in your role's `spec.guardrails` to match expected usage and budget.
-- **Use `role.yaml` for production bots.** The `chat` shortcuts are designed for prototyping and personal use. Production bots should use a role file with explicit access control, token budgets, and tool configuration.
+- **Use `role.yaml` for production bots.** The `chat` shortcuts are designed for prototyping and personal use. Production bots should use a role file with `initrunner run role.yaml --bot telegram` for explicit access control, token budgets, and tool configuration.
 
 ## Troubleshooting
 
@@ -411,7 +403,7 @@ The `--allowed-users` and `--allowed-user-ids` flags only apply to bot mode. Add
 Error: --telegram and --discord are mutually exclusive.
 ```
 
-You can only launch one bot platform at a time. To run both, use two separate role files with `initrunner daemon`.
+You can only launch one bot platform at a time. To run both, use two separate role files with `initrunner run <role> --daemon`.
 
 ### TELEGRAM_BOT_TOKEN / DISCORD_BOT_TOKEN not set
 

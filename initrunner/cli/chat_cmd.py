@@ -105,12 +105,6 @@ def _print_list_tools() -> None:
 
 
 def chat(
-    role_file: Annotated[
-        Path | None,
-        typer.Argument(
-            help="Agent directory, role YAML, or installed role name (omit for auto-detect)"
-        ),
-    ] = None,
     provider: Annotated[
         str | None,
         typer.Option("--provider", help="Model provider (overrides auto-detection)"),
@@ -166,12 +160,11 @@ def chat(
         typer.Option("--allowed-user-ids", help="Restrict bot to these user IDs (repeatable)"),
     ] = None,
 ) -> None:
-    """Start an ephemeral chat REPL or launch a bot.
+    """Zero-config ephemeral chat and bot launcher.
 
-    Without arguments, auto-detects your API provider and starts a REPL
-    with persistent memory enabled by default.
-    With a role file, loads it and starts interactive mode.
-    With --telegram or --discord, launches a bot daemon.
+    Auto-detects your API provider and starts a REPL with persistent memory.
+    Use --telegram or --discord to launch an ephemeral bot.
+    For role-backed execution, use 'initrunner run <role>' instead.
     """
     if list_tools:
         _print_list_tools()
@@ -187,38 +180,28 @@ def chat(
         )
         raise typer.Exit(1)
 
-    # Load chat.yaml config (only applied when no role_file)
+    # Load chat.yaml config
     from initrunner.cli.chat_config import load_chat_config
 
     chat_cfg = load_chat_config()
 
-    # Apply chat.yaml defaults for ephemeral modes (no role_file)
-    if role_file is None:
-        if tool_profile is None:
-            tool_profile = chat_cfg.tool_profile
-        if memory is None:
-            memory = chat_cfg.memory
-        if provider is None and chat_cfg.provider:
-            provider = chat_cfg.provider
-        if model is None and chat_cfg.model:
-            model = chat_cfg.model
-        if extra_tools is None and chat_cfg.tools:
-            extra_tools = chat_cfg.tools
-        if ingest is None and chat_cfg.ingest:
-            from initrunner.cli.chat_config import resolve_ingest_paths
+    if tool_profile is None:
+        tool_profile = chat_cfg.tool_profile
+    if memory is None:
+        memory = chat_cfg.memory
+    if provider is None and chat_cfg.provider:
+        provider = chat_cfg.provider
+    if model is None and chat_cfg.model:
+        model = chat_cfg.model
+    if extra_tools is None and chat_cfg.tools:
+        extra_tools = chat_cfg.tools
+    if ingest is None and chat_cfg.ingest:
+        from initrunner.cli.chat_config import resolve_ingest_paths
 
-            ingest = resolve_ingest_paths(chat_cfg.ingest)
-    else:
-        # With role file: chat.yaml not applied
-        if tool_profile is None:
-            tool_profile = "minimal"
-        if memory is None:
-            memory = True
+        ingest = resolve_ingest_paths(chat_cfg.ingest)
 
-    # Resolve model aliases for ephemeral modes (no role_file).
-    # When --model or chat.yaml model is an alias (e.g. "fast"), resolve it
-    # and split into provider+model so resolve_provider_and_model() works.
-    if role_file is None and model is not None:
+    # Resolve model aliases
+    if model is not None:
         from initrunner.model_aliases import resolve_model_alias
 
         resolved = resolve_model_alias(model)
@@ -238,8 +221,6 @@ def chat(
     # Compute profile tools early so we can filter for missing env vars.
     profile_tools = list(_TOOL_PROFILES.get(tool_profile, []))
 
-    # Always load env and check for missing tool env vars so tool search
-    # can register every available tool (minus those with unset credentials).
     from initrunner.services.providers import _load_env
 
     _load_env()
@@ -250,8 +231,6 @@ def chat(
     # Resolve extra tools (validates names and env vars, exits on error)
     extras = _resolve_extra_tools(extra_tools) if extra_tools else []
 
-    # Build the full set of ephemeral tools (skipping those with missing env)
-    # and determine which ones the agent sees immediately (always_available).
     all_ephemeral_tools = [
         t for t in _EPHEMERAL_EXTRA_TOOL_DEFAULTS.values() if t["type"] not in skip
     ]
@@ -261,25 +240,10 @@ def chat(
 
     bot_mode = "telegram" if telegram else "discord" if discord else None
 
-    # Resolve ephemeral name from chat.yaml (only for non-role-file modes)
-    ephemeral_name = chat_cfg.name if role_file is None else "ephemeral-chat"
-    # Resolve personality from chat.yaml
-    personality = chat_cfg.personality if role_file is None else None
+    ephemeral_name = chat_cfg.name
+    personality = chat_cfg.personality
 
-    if role_file is not None:
-        if extras:
-            console.print("[dim]Info:[/dim] --tools ignored because role file defines tools.")
-        from initrunner.cli._helpers import resolve_model_override
-
-        _chat_with_role_file(
-            role_file,
-            prompt=prompt,
-            audit_db=audit_db,
-            no_audit=no_audit,
-            resume=resume,
-            model_override=resolve_model_override(model),
-        )
-    elif bot_mode is not None:
+    if bot_mode is not None:
         _chat_bot_mode(
             bot_mode,
             provider=provider,
@@ -313,40 +277,6 @@ def chat(
             ingest_paths=ingest,
             name=ephemeral_name,
             personality=personality,
-        )
-
-
-def _chat_with_role_file(
-    role_file: Path,
-    *,
-    prompt: str | None,
-    audit_db: Path | None,
-    no_audit: bool,
-    resume: bool = False,
-    model_override: str | None = None,
-) -> None:
-    """Mode A: chat with an existing role.yaml file."""
-    from initrunner.cli._helpers import command_context
-    from initrunner.runner import run_interactive, run_single
-
-    with command_context(
-        role_file,
-        audit_db=audit_db,
-        no_audit=no_audit,
-        with_memory=True,
-        model_override=model_override,
-    ) as (role, agent, audit_logger, memory_store, _sink_dispatcher):
-        message_history = None
-        if prompt:
-            _result, message_history = run_single(agent, role, prompt, audit_logger=audit_logger)
-
-        run_interactive(
-            agent,
-            role,
-            audit_logger=audit_logger,
-            message_history=message_history,
-            memory_store=memory_store,
-            resume=resume,
         )
 
 

@@ -1,4 +1,4 @@
-"""Server commands: serve, pipeline, ui, tui."""
+"""Server commands: ui, tui. Pipeline display helpers."""
 
 from __future__ import annotations
 
@@ -11,124 +11,15 @@ import typer
 from rich.table import Table
 
 from initrunner.cli._helpers import (
-    command_context,
     console,
     create_audit_logger,
-    resolve_model_override,
-    resolve_skill_dirs,
 )
-from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
+from initrunner.cli._options import AuditDbOption, NoAuditOption
 
 _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 _DOCKER = Path("/.dockerenv").exists()
 _DEFAULT_UI_HOST = "0.0.0.0" if _DOCKER else "127.0.0.1"
-
-
-def serve(
-    role_file: Annotated[
-        Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
-    ],
-    host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
-    port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
-    api_key: Annotated[str | None, typer.Option(help="API key for authentication")] = None,
-    audit_db: AuditDbOption = None,
-    no_audit: NoAuditOption = False,
-    skill_dir: SkillDirOption = None,
-    cors_origin: Annotated[
-        list[str] | None,
-        typer.Option("--cors-origin", help="Allowed CORS origin (repeatable)"),
-    ] = None,
-    model: ModelOption = None,
-) -> None:
-    """Serve an agent as an OpenAI-compatible API."""
-    from initrunner.server.app import run_server
-
-    resolved_model = resolve_model_override(model)
-    with command_context(
-        role_file,
-        audit_db=audit_db,
-        no_audit=no_audit,
-        extra_skill_dirs=resolve_skill_dirs(skill_dir),
-        model_override=resolved_model,
-    ) as (
-        role,
-        agent,
-        audit_logger,
-        _memory_store,
-        _sink_dispatcher,
-    ):
-        console.print(f"Serving [cyan]{role.metadata.name}[/cyan] at http://{host}:{port}")
-        console.print(f"  Model ID: {role.metadata.name}")
-        console.print(f"  Health:   http://{host}:{port}/health")
-        console.print(f"  Models:   http://{host}:{port}/v1/models")
-        if api_key:
-            console.print("  Auth:     [yellow]enabled[/yellow] (Bearer token required)")
-        if cors_origin:
-            console.print(f"  CORS:     {', '.join(cors_origin)}")
-
-        run_server(
-            agent,
-            role,
-            host=host,
-            port=port,
-            audit_logger=audit_logger,
-            api_key=api_key,
-            cors_origins=cors_origin,
-        )
-
-
-def pipeline(
-    pipeline_file: Annotated[Path, typer.Argument(help="Path to pipeline YAML")],
-    var: Annotated[
-        list[str] | None,
-        typer.Option("--var", help="Variable in key=value format"),
-    ] = None,
-    dry_run: Annotated[
-        bool, typer.Option("--dry-run", help="Validate and display step graph without executing")
-    ] = False,
-    audit_db: AuditDbOption = None,
-    no_audit: NoAuditOption = False,
-) -> None:
-    """Run a pipeline of agents."""
-    from initrunner.pipeline.loader import PipelineLoadError, load_pipeline
-
-    try:
-        pipe = load_pipeline(pipeline_file)
-    except PipelineLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    variables: dict[str, str] = {}
-    for v in var or []:
-        if "=" not in v:
-            console.print(f"[red]Error:[/red] Invalid variable format: '{v}'. Use key=value.")
-            raise typer.Exit(1)
-        key, value = v.split("=", 1)
-        variables[key] = value
-
-    if dry_run:
-        _display_pipeline_dry_run(pipe, variables)
-        return
-
-    audit_logger = create_audit_logger(audit_db, no_audit)
-
-    try:
-        from initrunner.pipeline.executor import run_pipeline
-
-        result = run_pipeline(
-            pipe,
-            variables=variables,
-            audit_logger=audit_logger,
-            base_dir=pipeline_file.parent,
-        )
-        _display_pipeline_result(result)
-
-        if not result.success:
-            raise typer.Exit(1)
-    finally:
-        if audit_logger is not None:
-            audit_logger.close()
 
 
 def _display_pipeline_dry_run(pipe: object, variables: dict[str, str]) -> None:

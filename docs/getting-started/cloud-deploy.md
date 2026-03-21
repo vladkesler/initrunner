@@ -121,7 +121,7 @@ The seeded `full-tools-assistant` role includes all tools that work without extr
 To run an OpenAI-compatible API server instead of the dashboard, change the start command:
 
 ```
-initrunner serve /data/roles/full-tools-assistant.yaml --host 0.0.0.0 --port 8000
+initrunner run /data/roles/full-tools-assistant.yaml --serve --host 0.0.0.0 --port 8000
 ```
 
 Update the port mapping and health check path accordingly (`/v1/models` for the API server).

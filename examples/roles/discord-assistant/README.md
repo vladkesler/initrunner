@@ -13,7 +13,7 @@ export DISCORD_BOT_TOKEN="your-token-here"
 export OPENAI_API_KEY="your-api-key"
 
 # Start the bot
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 You should see `Discord bot connected` in the logs.

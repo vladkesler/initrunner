@@ -532,7 +532,7 @@ Validate and start the daemon:
 
 ```bash
 initrunner validate role.yaml
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 Wait about a minute and you should see the trigger fire. The agent fetches the page, saves a report, and the result is logged to the sink file. Check the output:
@@ -659,6 +659,6 @@ Now that you've built a complete agent, explore more of what InitRunner can do:
 - **Compose pipelines**: Orchestrate multiple agents with `compose.yaml` — see [Agent Composer](../orchestration/agent_composer.md)
 - **Web dashboard**: Monitor agents in your browser with `initrunner ui` — see [Dashboard](../interfaces/dashboard.md)
 - **Terminal UI**: Full-featured TUI with `initrunner tui` — see [TUI](../interfaces/tui.md)
-- **API server**: Expose agents as OpenAI-compatible endpoints with `initrunner serve` — see [API Server](../interfaces/server.md)
+- **API server**: Expose agents as OpenAI-compatible endpoints with `initrunner run <role> --serve` -- see [API Server](../interfaces/server.md)
 - **Role generation**: Scaffold new agents with `initrunner new` or generate them from descriptions with `initrunner new "description"` — see [Role Generation](../agents/role_generation.md)
 - **CLI reference**: Full command reference — see [CLI](cli.md)

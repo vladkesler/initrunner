@@ -1,6 +1,6 @@
 # Triggers — Configuration Reference
 
-Triggers allow agents to run automatically in response to events — cron schedules, file changes, incoming webhooks, or messaging platforms. They are configured in the `spec.triggers` list and activated with the `initrunner daemon` command.
+Triggers allow agents to run automatically in response to events — cron schedules, file changes, incoming webhooks, or messaging platforms. They are configured in the `spec.triggers` list and activated with the `initrunner run <role> --daemon` command.
 
 Triggers follow the same discriminated-union pattern as tools and sinks, keyed on the `type` field.
 
@@ -36,7 +36,7 @@ spec:
 Run with:
 
 ```bash
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 ## Cron Trigger
@@ -245,12 +245,12 @@ No new dependencies — uses stdlib `zoneinfo` (Python 3.9+).
 
 ## Daemon Mode
 
-The `initrunner daemon` command starts all configured triggers and waits for events:
+The `initrunner run <role> --daemon` command starts all configured triggers and waits for events:
 
 ```bash
-initrunner daemon role.yaml
-initrunner daemon role.yaml --audit-db ./custom-audit.db
-initrunner daemon role.yaml --no-audit
+initrunner run role.yaml --daemon
+initrunner run role.yaml --daemon --audit-db ./custom-audit.db
+initrunner run role.yaml --daemon --no-audit
 ```
 
 ### CLI Options
@@ -294,7 +294,7 @@ spec:
 
 **Thread safety**: in-flight trigger runs use a snapshot of the old agent/role. New runs after a reload use the updated config. Trigger dispatchers are restarted only if the trigger config actually changed.
 
-Hot-reload requires a `role_path` — it is automatically enabled when running `initrunner daemon role.yaml`. Ephemeral roles (e.g. from `initrunner chat`) do not support hot-reload.
+Hot-reload requires a `role_path` -- it is automatically enabled when running `initrunner run role.yaml --daemon`. Ephemeral roles (e.g. from `initrunner chat`) do not support hot-reload.
 
 ### Signal Handling
 

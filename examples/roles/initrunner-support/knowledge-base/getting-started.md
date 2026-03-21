@@ -137,8 +137,8 @@ Doctor checks API key presence, SDK availability, and Ollama reachability. The `
 | `setup` | Guided provider configuration |
 | `ingest <PATH>` | Ingest documents into the vector store |
 | `doctor` | Check provider config and connectivity |
-| `serve <PATH>` | Launch an OpenAI-compatible API server |
-| `daemon <PATH>` | Run a trigger-driven daemon |
+| `run <PATH> --serve` | Launch an OpenAI-compatible API server |
+| `run <PATH> --daemon` | Run a trigger-driven daemon |
 | `tui` | Launch the terminal UI |
 | `ui` | Launch the web dashboard |
 | `memory <subcommand>` | Manage agent memory (list, clear, export, import) |

@@ -20,7 +20,7 @@ aliases:
 # CLI --model flag
 initrunner run role.yaml -p "Summarize this" --model fast
 initrunner chat --model smart
-initrunner serve role.yaml --model local
+initrunner run role.yaml --serve --model local
 
 # Environment variable
 export INITRUNNER_MODEL=fast
@@ -54,8 +54,8 @@ The `--model` flag (or `INITRUNNER_MODEL` env var) overrides the model defined i
 | Command | Flag | Env var |
 |---------|------|---------|
 | `run` | `--model` | `INITRUNNER_MODEL` |
-| `daemon` | `--model` | `INITRUNNER_MODEL` |
-| `serve` | `--model` | `INITRUNNER_MODEL` |
+| `run --daemon` | `--model` | `INITRUNNER_MODEL` |
+| `run --serve` | `--model` | `INITRUNNER_MODEL` |
 | `test` | `--model` | `INITRUNNER_MODEL` |
 | `chat` (with role file) | `--model` | `INITRUNNER_MODEL` |
 

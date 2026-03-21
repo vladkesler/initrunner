@@ -408,7 +408,7 @@ Proven patterns from the example roles:
 
 ## Triggers
 
-Triggers run agents automatically on a schedule, file change, or incoming HTTP request. They are configured in `spec.triggers` and used with `initrunner daemon <path>`.
+Triggers run agents automatically on a schedule, file change, or incoming HTTP request. They are configured in `spec.triggers` and used with `initrunner run <path> --daemon`.
 
 See [triggers.md](../core/triggers.md) for the full reference.
 

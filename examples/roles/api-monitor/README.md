@@ -15,7 +15,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
 export OPENAI_API_KEY="your-api-key"
 
 # Start monitoring
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 The agent checks your endpoints every 5 minutes during active hours (6:00-22:00 UTC by default).

@@ -94,7 +94,7 @@ The classifier uses the default `openai:gpt-5-mini` model. Both sync and async v
 
 ### `server` -- Server Configuration
 
-Controls the OpenAI-compatible API server (`initrunner serve`).
+Controls the OpenAI-compatible API server (`initrunner run <role> --serve`).
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -119,7 +119,7 @@ You can also add origins via the `--cors-origin` CLI flag (repeatable). CLI orig
 
 ```bash
 # These two origins are added on top of any cors_origins in role YAML
-initrunner serve role.yaml --cors-origin https://dev.example.com --cors-origin http://localhost:3000
+initrunner run role.yaml --serve --cors-origin https://dev.example.com --cors-origin http://localhost:3000
 ```
 
 #### HTTPS Enforcement
@@ -394,7 +394,7 @@ spec:
 
 ## Middleware Execution Order
 
-When running `initrunner serve`, middleware executes in this order (outermost first):
+When running `initrunner run <role> --serve`, middleware executes in this order (outermost first):
 
 1. **HTTPS enforcement** -- 403 if HTTP when `require_https: true`
 2. **Body size check** -- 413 if Content-Length exceeds limit

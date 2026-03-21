@@ -13,7 +13,7 @@ export TELEGRAM_BOT_TOKEN="your-token-here"
 export OPENAI_API_KEY="your-api-key"
 
 # Start the bot
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 You should see `Telegram bot started polling` in the logs.

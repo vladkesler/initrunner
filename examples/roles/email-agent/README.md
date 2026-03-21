@@ -17,7 +17,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T.../B.../..."
 export OPENAI_API_KEY="your-api-key"
 
 # Start monitoring (daemon mode)
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 
 # Or use interactively
 initrunner run role.yaml -i

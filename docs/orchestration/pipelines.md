@@ -27,7 +27,7 @@ spec:
 ```
 
 ```bash
-initrunner pipeline research-pipeline.yaml --var topic="quantum computing"
+initrunner run research-pipeline.yaml --var topic="quantum computing"
 ```
 
 ## Pipeline Definition
@@ -95,7 +95,7 @@ Prompts and conditions support `{{...}}` variable interpolation. There are three
 Passed via `--var` on the command line:
 
 ```bash
-initrunner pipeline p.yaml --var topic="AI safety" --var language=fr
+initrunner run p.yaml --var topic="AI safety" --var language=fr
 ```
 
 ```yaml
@@ -151,10 +151,10 @@ Steps can be conditionally skipped using the `condition` field. The condition is
 
 ```bash
 # translate step runs:
-initrunner pipeline p.yaml --var translate_enabled=true --var language=fr
+initrunner run p.yaml --var translate_enabled=true --var language=fr
 
 # translate step is skipped:
-initrunner pipeline p.yaml --var translate_enabled=false
+initrunner run p.yaml --var translate_enabled=false
 ```
 
 ### Truthiness
@@ -247,7 +247,7 @@ steps:
 ### Run a Pipeline
 
 ```bash
-initrunner pipeline <pipeline.yaml> [options]
+initrunner run <pipeline.yaml> [options]
 ```
 
 | Option | Type | Default | Description |
@@ -262,16 +262,16 @@ initrunner pipeline <pipeline.yaml> [options]
 
 ```bash
 # Basic run with variables
-initrunner pipeline pipeline.yaml --var topic="AI safety" --var language=fr
+initrunner run pipeline.yaml --var topic="AI safety" --var language=fr
 
 # Dry run — validate and show step graph
-initrunner pipeline pipeline.yaml --var topic="testing" --dry-run
+initrunner run pipeline.yaml --var topic="testing" --dry-run
 
 # Disable audit logging
-initrunner pipeline pipeline.yaml --var topic="testing" --no-audit
+initrunner run pipeline.yaml --var topic="testing" --no-audit
 
 # Custom audit database
-initrunner pipeline pipeline.yaml --var topic="testing" --audit-db ./pipeline-audit.db
+initrunner run pipeline.yaml --var topic="testing" --audit-db ./pipeline-audit.db
 ```
 
 ### Dry Run Output
@@ -390,7 +390,7 @@ spec:
 ```
 
 ```bash
-initrunner pipeline research-summarize.yaml --var topic="fusion energy"
+initrunner run research-summarize.yaml --var topic="fusion energy"
 ```
 
 ### Parallel Analysis with Merge
@@ -442,10 +442,10 @@ spec:
 
 ```bash
 # With translation:
-initrunner pipeline translate.yaml --var topic="AI" --var language=fr --var do_translate=true
+initrunner run translate.yaml --var topic="AI" --var language=fr --var do_translate=true
 
 # Without translation (translate step is skipped):
-initrunner pipeline translate.yaml --var topic="AI" --var do_translate=false
+initrunner run translate.yaml --var topic="AI" --var do_translate=false
 ```
 
 ### Mixed Local and Remote

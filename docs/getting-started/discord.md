@@ -81,7 +81,7 @@ spec:
 Start the daemon:
 
 ```bash
-initrunner daemon role.yaml
+initrunner run role.yaml --daemon
 ```
 
 You should see `Discord bot connected` in the logs.
@@ -112,7 +112,7 @@ initrunner chat --discord --no-memory
 
 Run `initrunner chat --list-tools` to see all available tool types.
 
-For production, use the `role.yaml` approach above for access control and budgets. See [Chat & Quick Start](chat.md).
+For production, use the `role.yaml` approach with `initrunner run role.yaml --bot discord` or `--daemon` for access control and budgets. See [Chat & Quick Start](chat.md).
 
 ## Testing
 

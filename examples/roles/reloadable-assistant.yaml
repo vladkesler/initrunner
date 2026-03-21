@@ -13,7 +13,7 @@
 #   - Daemon config itself (spec.daemon)
 #
 # Run with:
-#   initrunner daemon reloadable-assistant.yaml
+#   initrunner run reloadable-assistant.yaml --daemon
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
