@@ -9,7 +9,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3533+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3612+-%2334D058" alt="Tests"></a>
   <img src="https://img.shields.io/badge/latest-v1.38.0-%2334D058" alt="v1.38.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
@@ -21,7 +21,7 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 40+ tools, policy-based authorization. Any model.**
+**Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 25+ built-in tools, policy-based authorization. Any model.**
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
@@ -41,14 +41,35 @@ One YAML file is all it takes to go from idea to running agent - with document s
 
 ## Quickstart
 
+**Install and configure:**
+
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
 initrunner setup        # wizard: pick provider, model, API key
-initrunner new "a research assistant that summarizes papers"  # build an agent
-initrunner chat --ingest ./docs/   # chat with your docs, memory on by default
 ```
 
-Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md), [Setup](docs/getting-started/setup.md), and [Chat](docs/getting-started/chat.md) for details.
+Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
+
+### Use a premade agent from InitHub
+
+Browse [hub.initrunner.ai](https://hub.initrunner.ai/) or search from the terminal:
+
+```bash
+initrunner search "code review"                                    # find agents
+initrunner install alice/code-reviewer                             # install one
+initrunner run alice/code-reviewer -p "Review the latest commit"   # run it
+```
+
+See [Registry docs](docs/agents/registry.md) for version pinning, updates, and OCI sources.
+
+### Or build your own
+
+```bash
+initrunner new "a research assistant that summarizes papers"  # AI-generates a role.yaml
+initrunner chat --ingest ./docs/   # or skip YAML entirely -- chat with your docs, memory on by default
+```
+
+Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-reviewer`. See [Chat](docs/getting-started/chat.md) and [Tutorial](docs/getting-started/tutorial.md).
 
 **Or run with Docker**, no install needed:
 
@@ -86,7 +107,7 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-opus-4-6 }`.
+That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }`.
 
 <p align="center">
   <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
@@ -110,7 +131,7 @@ See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashb
 
 **Zero config to start.** `initrunner chat` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
 
-**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 20+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
+**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 25+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
 
 **Version-control your agents.** Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
 
