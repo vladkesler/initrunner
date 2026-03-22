@@ -13,6 +13,20 @@ from initrunner.runner.display import _display_result, _display_stream_stats, co
 from initrunner.sinks.dispatcher import SinkDispatcher
 
 
+def _build_single_shot_extras(role: RoleDefinition) -> list | None:
+    """Build run-scoped toolsets for single-shot mode, if any are configured."""
+    from initrunner.agent.reflection import ReflectionState
+    from initrunner.agent.tools._registry import is_run_scoped
+
+    has_run_scoped = any(is_run_scoped(t.type) for t in role.spec.tools)
+    if not has_run_scoped:
+        return None
+
+    from initrunner.runner.reasoning import build_run_scoped_toolsets
+
+    return build_run_scoped_toolsets(role, ReflectionState())
+
+
 def run_single(
     agent: Agent,
     role: RoleDefinition,
@@ -27,6 +41,7 @@ def run_single(
     from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
     from initrunner.runner.display import _make_tool_event_printer
 
+    extra_toolsets = _build_single_shot_extras(role)
     token = set_tool_event_callback(_make_tool_event_printer())
     try:
         with console.status("Thinking...", spinner="dots"):
@@ -37,6 +52,7 @@ def run_single(
                 audit_logger=audit_logger,
                 message_history=message_history,
                 model_override=model_override,
+                extra_toolsets=extra_toolsets,
             )
     finally:
         reset_tool_event_callback(token)
@@ -73,6 +89,7 @@ def run_single_stream(
     from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
     from initrunner.runner.display import _make_tool_event_printer
 
+    extra_toolsets = _build_single_shot_extras(role)
     cb_token = set_tool_event_callback(_make_tool_event_printer())
 
     out = console.file
@@ -97,6 +114,7 @@ def run_single_stream(
             message_history=message_history,
             model_override=model_override,
             on_token=on_token,
+            extra_toolsets=extra_toolsets,
         )
     finally:
         reset_tool_event_callback(cb_token)

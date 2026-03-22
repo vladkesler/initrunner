@@ -8,7 +8,6 @@ from pathlib import Path
 from initrunner.agent.executor import AutonomousResult, RunResult
 from initrunner.agent.history import trim_message_history
 from initrunner.agent.reflection import (
-    PlanStep,
     ReflectionState,
     format_reflection_state,
 )
@@ -255,19 +254,20 @@ class TestReflectionStateIntegration:
         """ReflectionState should be mutable across iterations."""
         state = ReflectionState()
 
-        # Iteration 1: create plan
-        state.steps = [
-            PlanStep(description="Step 1", status="in_progress"),
-            PlanStep(description="Step 2", status="pending"),
-        ]
+        # Iteration 1: create todo items
+        item1 = state.todo.add("Step 1")
+        item2 = state.todo.add("Step 2")
+        state.todo.mark_in_progress(item1.id)
 
         # Iteration 2: update progress
-        state.steps[0].status = "completed"
-        state.steps[1].status = "in_progress"
+        state.todo.update(item1.id, status="completed")
+        state.todo.mark_in_progress(item2.id)
 
         formatted = format_reflection_state(state)
-        assert "Step 1 (completed)" in formatted
-        assert "Step 2 (in_progress)" in formatted
+        assert "Step 1" in formatted
+        assert "completed" in formatted
+        assert "Step 2" in formatted
+        assert "in_progress" in formatted
 
         # Iteration 3: finish
         state.completed = True
@@ -275,11 +275,9 @@ class TestReflectionStateIntegration:
         assert state.completed is True
 
     def test_format_state_shows_notes(self):
-        state = ReflectionState(
-            steps=[
-                PlanStep(description="Research", status="completed", notes="Found 3 sources"),
-            ]
-        )
+        state = ReflectionState()
+        item = state.todo.add("Research")
+        state.todo.update(item.id, status="completed", notes="Found 3 sources")
         result = format_reflection_state(state)
         assert "Found 3 sources" in result
 

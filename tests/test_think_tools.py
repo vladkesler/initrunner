@@ -34,6 +34,10 @@ class TestThinkConfig:
         config = ThinkToolConfig()
         assert config.summary() == "think"
 
+    def test_summary_critique(self):
+        config = ThinkToolConfig(critique=True)
+        assert config.summary() == "think (critique)"
+
     def test_round_trip(self):
         config = ThinkToolConfig()
         data = config.model_dump()
@@ -44,6 +48,13 @@ class TestThinkConfig:
         config = ThinkToolConfig.model_validate({"type": "think"})
         assert config.type == "think"
 
+    def test_critique_and_max_thoughts(self):
+        config = ThinkToolConfig.model_validate(
+            {"type": "think", "critique": True, "max_thoughts": 30}
+        )
+        assert config.critique is True
+        assert config.max_thoughts == 30
+
 
 class TestThinkToolset:
     def test_builds_toolset_with_think(self):
@@ -51,26 +62,39 @@ class TestThinkToolset:
         toolset = build_think_toolset(config, _make_ctx())
         assert "think" in toolset.tools
 
-    def test_think_returns_ack(self):
+    def test_think_returns_accumulated_chain(self):
         config = ThinkToolConfig()
         toolset = build_think_toolset(config, _make_ctx())
         fn = toolset.tools["think"].function
         result = fn(thought="I should check the user's timezone first")
-        assert result == "Thought recorded."
+        assert "Thoughts (1):" in result
+        assert "I should check the user's timezone first" in result
+
+    def test_think_accumulates(self):
+        config = ThinkToolConfig()
+        toolset = build_think_toolset(config, _make_ctx())
+        fn = toolset.tools["think"].function
+        fn(thought="First")
+        result = fn(thought="Second")
+        assert "Thoughts (2):" in result
+        assert "First" in result
+        assert "Second" in result
 
     def test_think_empty_string(self):
         config = ThinkToolConfig()
         toolset = build_think_toolset(config, _make_ctx())
         fn = toolset.tools["think"].function
         result = fn(thought="")
-        assert result == "Thought recorded."
+        assert "Thoughts (1):" in result
 
-    def test_think_long_text(self):
-        config = ThinkToolConfig()
+    def test_think_critique_nudge(self):
+        config = ThinkToolConfig(critique=True, max_thoughts=50)
         toolset = build_think_toolset(config, _make_ctx())
         fn = toolset.tools["think"].function
-        result = fn(thought="x" * 10000)
-        assert result == "Thought recorded."
+        for i in range(4):
+            fn(thought=f"Thought {i + 1}")
+        result = fn(thought="Thought 5")
+        assert "critically evaluate" in result
 
 
 class TestThinkRegistration:

@@ -13,6 +13,7 @@ from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.agent.schema.memory import MemoryConfig
 from initrunner.agent.schema.observability import ObservabilityConfig
 from initrunner.agent.schema.output import OutputConfig
+from initrunner.agent.schema.reasoning import ReasoningConfig
 from initrunner.agent.schema.security import ResourceConfig, SecurityPolicy
 from initrunner.agent.schema.sinks import SinkConfig
 from initrunner.agent.schema.tools import PluginToolConfig, ToolConfig
@@ -82,6 +83,7 @@ class AgentSpec(BaseModel):
     ingest: IngestConfig | None = None
     memory: MemoryConfig | None = None
     autonomy: AutonomyConfig | None = None
+    reasoning: ReasoningConfig | None = None
     guardrails: Guardrails = Guardrails()
     resources: ResourceConfig = ResourceConfig()
     security: SecurityPolicy = SecurityPolicy()

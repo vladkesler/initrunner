@@ -374,9 +374,12 @@ class CsvAnalysisToolConfig(ToolConfigBase):
 
 class ThinkToolConfig(ToolConfigBase):
     type: Literal["think"] = "think"
+    critique: bool = False
+    max_thoughts: int = Field(default=50, ge=1, le=200)
 
     def summary(self) -> str:
-        return "think"
+        suffix = " (critique)" if self.critique else ""
+        return f"think{suffix}"
 
 
 class CalculatorToolConfig(ToolConfigBase):
@@ -488,6 +491,50 @@ class ScriptToolConfig(ToolConfigBase):
         names = ", ".join(s.name for s in self.scripts[:3])
         suffix = f" +{len(self.scripts) - 3} more" if len(self.scripts) > 3 else ""
         return f"script: {names}{suffix}"
+
+
+class TodoToolConfig(ToolConfigBase):
+    type: Literal["todo"] = "todo"
+    max_items: int = Field(default=30, ge=1, le=100)
+    shared: bool = False
+    shared_path: str = ""
+
+    @model_validator(mode="after")
+    def _validate_shared(self) -> TodoToolConfig:
+        if self.shared and not self.shared_path:
+            raise ValueError("'shared_path' is required when shared is true")
+        return self
+
+    def summary(self) -> str:
+        suffix = " (shared)" if self.shared else ""
+        return f"todo{suffix}"
+
+
+class SpawnAgentRef(BaseModel):
+    name: str
+    role_file: str | None = None
+    url: str | None = None
+    description: str = ""
+
+
+class SpawnToolConfig(ToolConfigBase):
+    type: Literal["spawn"] = "spawn"
+    agents: list[SpawnAgentRef]
+    max_concurrent: int = Field(default=4, ge=1, le=16)
+    max_depth: int = 3
+    timeout_seconds: int = 300
+    shared_memory: DelegateSharedMemory | None = None
+
+    @model_validator(mode="after")
+    def _validate_agents(self) -> SpawnToolConfig:
+        for agent in self.agents:
+            if not agent.role_file and not agent.url:
+                raise ValueError(f"Spawn agent '{agent.name}' requires 'role_file' or 'url'")
+        return self
+
+    def summary(self) -> str:
+        names = ", ".join(a.name for a in self.agents[:3])
+        return f"spawn: {names}"
 
 
 class PluginToolConfig(ToolConfigBase):

@@ -142,6 +142,24 @@ def build_schema_reference() -> str:
     # Memory
     sections.append(_format_model_fields("spec.memory", MemoryConfig))
 
+    # Reasoning
+    from initrunner.agent.schema.autonomy import AutonomyConfig, CompactionConfig
+    from initrunner.agent.schema.reasoning import ReasoningConfig
+
+    sections.append(_format_model_fields("spec.reasoning", ReasoningConfig))
+    sections.append(_format_model_fields("spec.autonomy", AutonomyConfig))
+    sections.append(_format_model_fields("spec.autonomy.compaction", CompactionConfig))
+    sections.append(
+        "# Reasoning advisory:\n"
+        "# - react is the default; no extra config needed\n"
+        "# - reasoning strategies are meant for autonomous runs (initrunner run -a)\n"
+        "# - todo_driven and plan_execute require type: todo in tools; type: think is recommended\n"
+        "# - reflexion needs reflection_rounds > 0; think with critique: true recommended\n"
+        "# - an explicit spec.autonomy block is recommended for non-react patterns\n"
+        "#   so continuation behavior and limits are visible in generated YAML\n"
+        "# - spec.autonomy.compaction keeps context manageable during long autonomous runs"
+    )
+
     # Spec fields overview
     spec_lines = ["# spec top-level fields:"]
     for fname, finfo in AgentSpec.model_fields.items():

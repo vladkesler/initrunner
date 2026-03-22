@@ -1,14 +1,12 @@
-"""Tests for the reflection toolset (finish_task, update_plan)."""
+"""Tests for ReflectionState, TodoList, and format_reflection_state."""
 
 from __future__ import annotations
 
+from initrunner.agent.reasoning import TodoList
 from initrunner.agent.reflection import (
-    PlanStep,
     ReflectionState,
     format_reflection_state,
 )
-from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.tools.reflection import build_reflection_toolset
 
 
 class TestReflectionState:
@@ -17,105 +15,166 @@ class TestReflectionState:
         assert state.completed is False
         assert state.summary == ""
         assert state.status == "completed"
-        assert state.steps == []
+        assert len(state.todo.items) == 0
 
-    def test_plan_step_defaults(self):
-        step = PlanStep(description="Do something")
-        assert step.status == "pending"
-        assert step.notes == ""
+    def test_check_auto_complete_when_all_done(self):
+        state = ReflectionState()
+        item = state.todo.add("Do something")
+        state.todo.update(item.id, status="completed")
+        state.check_auto_complete()
+        assert state.completed is True
+
+    def test_check_auto_complete_not_done(self):
+        state = ReflectionState()
+        state.todo.add("Do something")
+        state.check_auto_complete()
+        assert state.completed is False
+
+    def test_check_auto_complete_empty_todo(self):
+        state = ReflectionState()
+        state.check_auto_complete()
+        assert state.completed is False
 
 
 class TestFormatReflectionState:
     def test_empty_state(self):
         state = ReflectionState()
         result = format_reflection_state(state)
-        assert result == "(No plan created yet)"
+        assert "No todo items" in result
 
-    def test_with_steps(self):
-        state = ReflectionState(
-            steps=[
-                PlanStep(description="Research topic", status="completed"),
-                PlanStep(description="Write summary", status="in_progress", notes="halfway"),
-                PlanStep(description="Review", status="pending"),
+    def test_with_items(self):
+        state = ReflectionState()
+        item1 = state.todo.add("Research topic")
+        state.todo.update(item1.id, status="completed")
+        item2 = state.todo.add("Write summary")
+        state.todo.mark_in_progress(item2.id)
+        state.todo.update(item2.id, notes="halfway")
+        state.todo.add("Review")
+
+        result = format_reflection_state(state)
+        assert "Todo List:" in result
+        assert "Research topic" in result
+        assert "completed" in result
+        assert "Write summary" in result
+        assert "in_progress" in result
+        assert "halfway" in result
+        assert "Review" in result
+
+    def test_failed_item(self):
+        state = ReflectionState()
+        item = state.todo.add("Step")
+        state.todo.update(item.id, status="failed")
+        result = format_reflection_state(state)
+        assert "[!]" in result
+
+    def test_skipped_item(self):
+        state = ReflectionState()
+        item = state.todo.add("Step")
+        state.todo.update(item.id, status="skipped")
+        result = format_reflection_state(state)
+        assert "[-]" in result
+
+
+class TestTodoList:
+    def test_add_and_get(self):
+        todo = TodoList()
+        item = todo.add("First task")
+        assert item.id in todo.items
+        assert item.description == "First task"
+        assert item.status == "pending"
+        assert item.priority == "medium"
+
+    def test_priority_ordering(self):
+        todo = TodoList()
+        todo.add("Low task", priority="low")
+        todo.add("Critical task", priority="critical")
+        todo.add("High task", priority="high")
+        next_item = todo.get_next()
+        assert next_item is not None
+        assert next_item.description == "Critical task"
+
+    def test_dependency_resolution(self):
+        todo = TodoList()
+        item_a = todo.add("First")
+        item_b = todo.add("Second", depends_on=[item_a.id])
+        # item_b should not be next because item_a is pending
+        next_item = todo.get_next()
+        assert next_item is not None
+        assert next_item.id == item_a.id
+        # Complete item_a
+        todo.update(item_a.id, status="completed")
+        next_item = todo.get_next()
+        assert next_item is not None
+        assert next_item.id == item_b.id
+
+    def test_cycle_detection(self):
+        from initrunner._graph import CycleError
+
+        todo = TodoList()
+        item_a = todo.add("A")
+        item_b = todo.add("B", depends_on=[item_a.id])
+        import pytest
+
+        with pytest.raises(CycleError):
+            todo.add("C", depends_on=[item_b.id])
+            # Now try to create a cycle: A depends on C
+            todo.items[item_a.id].depends_on = [todo.items[list(todo.items.keys())[-1]].id]
+            todo._check_cycles()
+
+    def test_batch_add(self):
+        todo = TodoList()
+        items = todo.batch_add(
+            [
+                {"description": "Step 1"},
+                {"description": "Step 2", "depends_on": ["0"]},
+                {"description": "Step 3", "priority": "high"},
             ]
         )
-        result = format_reflection_state(state)
-        assert "Current Plan:" in result
-        assert "[x] Research topic (completed)" in result
-        assert "[ ] Write summary (in_progress)" in result
-        assert "halfway" in result
-        assert "[ ] Review (pending)" in result
+        assert len(items) == 3
+        assert items[0].id in items[1].depends_on
 
-    def test_failed_step_icon(self):
-        state = ReflectionState(steps=[PlanStep(description="Step", status="failed")])
-        result = format_reflection_state(state)
-        assert "[!] Step (failed)" in result
+    def test_is_all_done(self):
+        todo = TodoList()
+        item = todo.add("Task")
+        assert not todo.is_all_done()
+        todo.update(item.id, status="completed")
+        assert todo.is_all_done()
 
-    def test_skipped_step_icon(self):
-        state = ReflectionState(steps=[PlanStep(description="Step", status="skipped")])
-        result = format_reflection_state(state)
-        assert "[-] Step (skipped)" in result
+    def test_mark_in_progress(self):
+        todo = TodoList()
+        item = todo.add("Task")
+        updated = todo.mark_in_progress(item.id)
+        assert updated.status == "in_progress"
 
+    def test_remove_cleans_deps(self):
+        todo = TodoList()
+        item_a = todo.add("A")
+        item_b = todo.add("B", depends_on=[item_a.id])
+        todo.remove(item_a.id)
+        assert item_a.id not in todo.items
+        assert todo.items[item_b.id].depends_on == []
 
-class TestBuildReflectionToolset:
-    def _build(self):
-        config = AutonomyConfig()
-        state = ReflectionState()
-        toolset = build_reflection_toolset(config, state)
-        return toolset, state
+    def test_max_items_enforced(self):
+        import pytest
 
-    def test_creates_toolset(self):
-        toolset, _ = self._build()
-        assert toolset is not None
+        todo = TodoList(max_items=2)
+        todo.add("One")
+        todo.add("Two")
+        with pytest.raises(ValueError, match="full"):
+            todo.add("Three")
 
-    def test_finish_task_mutates_state(self):
-        state = ReflectionState()
-        assert state.completed is False
-        # Simulate calling finish_task via the closure
-        state.completed = True
-        state.summary = "Done"
-        state.status = "completed"
-        assert state.completed is True
-        assert state.summary == "Done"
+    def test_invalid_dependency(self):
+        import pytest
 
-    def test_update_plan_replaces_steps(self):
-        config = AutonomyConfig(max_plan_steps=5)
-        state = ReflectionState()
-        state.steps = [PlanStep(description="old step")]
+        todo = TodoList()
+        with pytest.raises(ValueError, match="does not exist"):
+            todo.add("Task", depends_on=["nonexistent"])
 
-        build_reflection_toolset(config, state)
-
-        # The update_plan tool replaces steps through the closure
-        new_steps = [
-            PlanStep(description="Step 1", status="completed"),
-            PlanStep(description="Step 2", status="pending"),
-        ]
-        state.steps = new_steps
-        assert len(state.steps) == 2
-        assert state.steps[0].description == "Step 1"
-
-    def test_max_plan_steps_enforced(self):
-        config = AutonomyConfig(max_plan_steps=2)
-        state = ReflectionState()
-        build_reflection_toolset(config, state)
-
-        # Simulate what update_plan does internally
-        steps_input = [{"description": f"Step {i}"} for i in range(10)]
-        # Only first max_plan_steps should be kept
-        valid_steps = steps_input[: config.max_plan_steps]
-        state.steps = [PlanStep(description=s["description"]) for s in valid_steps]
-        assert len(state.steps) == 2
-
-    def test_finish_task_statuses(self):
-        for status in ("completed", "blocked", "failed"):
-            state = ReflectionState()
-            state.completed = True
-            state.status = status
-            assert state.status == status
-
-    def test_toolset_has_tools(self):
-        config = AutonomyConfig()
-        state = ReflectionState()
-        toolset = build_reflection_toolset(config, state)
-        # The toolset should be a FunctionToolset with at least 2 tools
-        assert toolset is not None
+    def test_format(self):
+        todo = TodoList()
+        item = todo.add("Task", priority="high")
+        result = todo.format()
+        assert "Todo List:" in result
+        assert item.id in result
+        assert "high" in result
+        assert "Task" in result

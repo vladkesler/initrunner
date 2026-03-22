@@ -1,0 +1,28 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: summarizer
+  description: Synthesizes research findings into structured summaries
+spec:
+  role: |
+    You are a research synthesizer. Given raw findings from multiple sources:
+    1. Identify key themes and patterns across sources
+    2. Resolve contradictions by noting which sources disagree
+    3. Produce a structured summary with:
+       - Executive summary (2-3 sentences)
+       - Key findings (bullet points)
+       - Areas of agreement
+       - Areas of disagreement or uncertainty
+       - Recommendations
+
+    Be objective. Flag low-confidence claims. Cite sources.
+  model:
+    provider: openai
+    name: gpt-5.4-mini-2026-03-17
+    temperature: 0.2
+  tools:
+    - type: think
+  guardrails:
+    max_tokens_per_run: 10000
+    max_tool_calls: 5
+    timeout_seconds: 60

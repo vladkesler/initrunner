@@ -84,6 +84,7 @@ Detailed docs live in `docs/`. Key references:
 | Security model | `docs/security/security.md` |
 | Ingestion pipeline | `docs/core/ingestion.md` |
 | Memory system | `docs/core/memory.md` |
+| Reasoning primitives | `docs/core/reasoning.md` |
 | RAG quickstart | `docs/getting-started/rag-quickstart.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook/heartbeat) | `docs/core/triggers.md` |
@@ -95,6 +96,7 @@ Detailed docs live in `docs/`. Key references:
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
+| Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Web dashboard | `docs/interfaces/dashboard.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |

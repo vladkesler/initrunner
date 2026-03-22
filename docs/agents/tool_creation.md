@@ -499,6 +499,43 @@ Custom tools (loaded via `type: custom`) are always sync. PydanticAI automatical
 
 ---
 
+## Run-Scoped Tools
+
+Standard tools are built once at agent-build time and reused across runs. **Run-scoped tools** carry per-run state (thought chains, task lists, connection pools) and are built fresh for each run to prevent state leaking across REPL/daemon sessions.
+
+### Creating a run-scoped tool
+
+Add `run_scoped=True` to the `@register_tool` decorator:
+
+```python
+@register_tool("my_counter", MyCounterConfig, run_scoped=True)
+def build_counter_toolset(config: MyCounterConfig, ctx: ToolBuildContext) -> FunctionToolset:
+    count = 0  # fresh per-run
+    toolset = FunctionToolset()
+
+    @toolset.tool_plain
+    def increment() -> str:
+        nonlocal count
+        count += 1
+        return f"Count: {count}"
+
+    return toolset
+```
+
+`build_toolsets()` automatically skips run-scoped tools. The runner calls `build_run_scoped_toolsets()` at the start of each run to construct them.
+
+### Built-in run-scoped tools
+
+| Tool | State | Description |
+|------|-------|-------------|
+| `think` | `ThinkState` (ring buffer of thoughts) | Accumulated reasoning chain |
+| `todo` | `TodoList` via `ReflectionState` | Priority-aware task management |
+| `spawn` | `SpawnPool` (asyncio event loop + futures) | Background agent execution |
+
+See [Reasoning Primitives](../core/reasoning.md) for full documentation.
+
+---
+
 ## Builtin Tool Types
 
 For reference, the builtin tool types that are always available:
@@ -519,7 +556,9 @@ For reference, the builtin tool types that are always available:
 | `shell` | Subprocess shell with allowlist/blocklist | [tools.md](tools.md#shell-tool) |
 | `slack` | Slack webhook messaging with Block Kit | [tools.md](tools.md#slack-tool) |
 | `web_scraper` | Scrape, chunk, embed, and store web pages | [tools.md](tools.md#web-scraper-tool) |
-| `think` | Internal reasoning scratchpad | [tools.md](tools.md#think-tool) |
+| `think` | Accumulated reasoning chain with optional self-critique | [reasoning.md](../core/reasoning.md#think-tool) |
+| `todo` | Priority-aware task management with dependency resolution | [reasoning.md](../core/reasoning.md#todo-tool) |
+| `spawn` | Non-blocking parallel agent execution | [reasoning.md](../core/reasoning.md#spawn-tool) |
 | `script` | Inline shell scripts as named tools | [tools.md](tools.md#script-tool) |
 | `calculator` | Safe math expression evaluator | [tools.md](tools.md#calculator-tool) |
 | `pdf_extract` | Extract text/metadata from PDFs | [tools.md](tools.md#pdf-extract-tool) |

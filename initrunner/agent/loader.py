@@ -86,6 +86,24 @@ def _validate_provider(role: RoleDefinition) -> None:
         raise RoleLoadError(str(e)) from None
 
 
+def _validate_reasoning(role: RoleDefinition) -> None:
+    """Validate reasoning config against tool declarations."""
+    config = role.spec.reasoning
+    if config is None:
+        return
+
+    from initrunner.agent.schema.tools import TodoToolConfig
+
+    has_todo = any(isinstance(t, TodoToolConfig) for t in role.spec.tools)
+
+    if config.pattern in ("todo_driven", "plan_execute") and not has_todo:
+        raise RoleLoadError(
+            f"reasoning.pattern '{config.pattern}' requires a 'todo' tool in spec.tools"
+        )
+    if config.pattern == "reflexion" and config.reflection_rounds == 0:
+        raise RoleLoadError("reasoning.pattern 'reflexion' requires reflection_rounds > 0")
+
+
 def _resolve_skills_and_merge(
     role: RoleDefinition,
     role_dir: Path | None,
@@ -164,6 +182,7 @@ def build_agent(
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
     _validate_provider(role)
+    _validate_reasoning(role)
     system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
         role, role_dir, extra_skill_dirs
     )

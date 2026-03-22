@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.38.0] - 2026-03-22
+
+### Added
+- **Reasoning primitives** -- structured agent cognition with three tool types and four execution strategies
+  - **Think tool** (enhanced) -- accumulated reasoning chain with ring buffer and optional self-critique every 5th thought. Config: `critique`, `max_thoughts`
+  - **Todo tool** -- priority-aware task management (critical/high/medium/low) with dependency resolution via Kahn's algorithm, batch creation, auto-completion when all items terminal. Config: `max_items`, `shared`, `shared_path`
+  - **Spawn tool** -- non-blocking parallel agent execution. Private asyncio event loop in daemon thread, `spawn_agent`/`poll_tasks`/`await_tasks`/`await_any`/`cancel_task`. Config: `agents`, `max_concurrent`, `timeout_seconds`
+- **Reasoning strategies** (`spec.reasoning`) -- execution-layer orchestration across autonomous turns
+  - `react` (default): standard ReAct, no extra orchestration
+  - `todo_driven`: plan-first with auto-plan prompt prefix, todo-oriented continuation
+  - `plan_execute`: two-phase (planning then execution) with automatic phase transition
+  - `reflexion`: post-completion self-critique rounds (`reflection_rounds: 1-3`)
+  - Conservative auto-detection: infers pattern from tool/autonomy config
+- **Run-scoped tool architecture** -- `@register_tool(..., run_scoped=True)` for tools with per-run state. Registry skips them at agent build time; runners build fresh per-run
+- **Loader validation** -- `todo_driven`/`plan_execute` without todo tool, `reflexion` with `reflection_rounds == 0` caught at load time
+- **Wizard schema reference** -- `initrunner new` generates roles with `spec.reasoning`, `spec.autonomy`, and `spec.autonomy.compaction` when users describe autonomous or planning agents
+- **6 example packs** published to InitHub: `reasoning-planner`, `research-team`, `self-correcting-writer`, `long-running-analyst` (v2), `deployment-checker` (v2), `thinker` (v2)
+- **Multi-agent decision guide** (`docs/orchestration/multi-agent-guide.md`) -- task-driven chooser for team vs pipeline vs compose vs spawn vs delegate
+- **Reasoning primitives docs** (`docs/core/reasoning.md`) -- full guide with config tables, YAML examples, composition patterns
+- 85+ new tests across 7 test files
+
+### Changed
+- `ReflectionState` rewritten: `PlanStep`/`steps` removed, replaced with `TodoList` component (composition)
+- `build_reflection_toolset` removed (absorbed by todo tool + `finish_task` in runner)
+- Think tool now always accumulates (old "Thought recorded." behavior removed)
+- `ThinkToolConfig` gains `critique: bool` and `max_thoughts: int`
+- Autonomous runner delegates prompt construction and completion detection to `ReasoningStrategy`
+- Single-shot runner injects run-scoped toolsets via `extra_toolsets`
+- `build_toolsets()` skips `is_run_scoped()` tools automatically
+- Example roles converted from single-file to pack directories with READMEs
+
+### Removed
+- `PlanStep` dataclass
+- `update_plan` tool
+- `initrunner/agent/tools/reflection.py`
+
 ## [1.37.0] - 2026-03-21
 
 ### Added

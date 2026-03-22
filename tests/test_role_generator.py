@@ -64,6 +64,26 @@ class TestBuildSchemaReference:
         assert "spec.memory:" in result
         assert "max_sessions:" in result
 
+    def test_contains_reasoning(self):
+        result = build_schema_reference()
+        assert "spec.reasoning:" in result
+        assert "pattern:" in result
+
+    def test_contains_autonomy(self):
+        result = build_schema_reference()
+        assert "spec.autonomy:" in result
+        assert "continuation_prompt:" in result
+
+    def test_contains_compaction(self):
+        result = build_schema_reference()
+        assert "spec.autonomy.compaction:" in result
+        assert "threshold:" in result
+
+    def test_contains_reasoning_advisory(self):
+        result = build_schema_reference()
+        assert "Reasoning advisory" in result
+        assert "todo_driven" in result
+
     def test_reasonable_size(self):
         """Schema reference should be compact (under 10K chars)."""
         result = build_schema_reference()

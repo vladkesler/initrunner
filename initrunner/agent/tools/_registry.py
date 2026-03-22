@@ -51,6 +51,7 @@ class ToolRegistration:
     type: str
     config_class: type[ToolConfigBase]
     builder: Callable[..., AbstractToolset]
+    run_scoped: bool = False
 
 
 _tool_registry: dict[str, ToolRegistration] = {}
@@ -60,13 +61,29 @@ _registry_lock = threading.Lock()
 _F = TypeVar("_F", bound=Callable[..., "AbstractToolset"])
 
 
-def register_tool(type_name: str, config_class: type[Any]) -> Callable[[_F], _F]:
+def register_tool(
+    type_name: str,
+    config_class: type[Any],
+    *,
+    run_scoped: bool = False,
+) -> Callable[[_F], _F]:
     """Decorator that registers a tool builder.
+
+    Args:
+        type_name: The ``type:`` value in role YAML (e.g. ``"datetime"``).
+        config_class: Pydantic model for validating the tool config block.
+        run_scoped: When ``True`` the tool carries per-run state and must be
+            built fresh by the runner rather than at agent-build time.
+            ``build_toolsets()`` skips run-scoped tools automatically.
 
     Usage::
 
         @register_tool("datetime", DateTimeToolConfig)
         def build_datetime_toolset(config, ctx):
+            ...
+
+        @register_tool("todo", TodoToolConfig, run_scoped=True)
+        def build_todo_toolset(config, ctx, state):
             ...
     """
 
@@ -90,6 +107,7 @@ def register_tool(type_name: str, config_class: type[Any]) -> Callable[[_F], _F]
             type=type_name,
             config_class=config_class,
             builder=func,
+            run_scoped=run_scoped,
         )
         return func
 
@@ -181,3 +199,10 @@ def get_builder(type_name: str) -> Callable[..., AbstractToolset] | None:
     _ensure_discovered()
     reg = _tool_registry.get(type_name)
     return reg.builder if reg else None
+
+
+def is_run_scoped(type_name: str) -> bool:
+    """Return ``True`` if *type_name* is registered as run-scoped."""
+    _ensure_discovered()
+    reg = _tool_registry.get(type_name)
+    return reg.run_scoped if reg else False

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from initrunner.agent.permissions import CerbosToolset
 from initrunner.agent.schema.tools import ToolConfig
-from initrunner.agent.tools._registry import ToolBuildContext, get_builder
+from initrunner.agent.tools._registry import ToolBuildContext, get_builder, is_run_scoped
 from initrunner.stores.base import make_store_config
 
 if TYPE_CHECKING:
@@ -101,6 +101,8 @@ def build_toolsets(
         require_docker()
 
     for tool in tools:
+        if is_run_scoped(tool.type):
+            continue  # Built per-run by the runner with fresh state
         builder = get_builder(tool.type)
         if builder:
             toolset = builder(tool, ctx)

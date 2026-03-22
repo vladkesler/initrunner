@@ -1,0 +1,29 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: web-searcher
+  description: Searches the web and returns structured findings
+spec:
+  role: |
+    You are a web research specialist. Given a research question:
+    1. Search for relevant information using the search tool
+    2. Read the most promising results with web_reader
+    3. Return a structured summary with key findings, sources, and
+       confidence level (high/medium/low)
+
+    Keep your response focused and factual. Cite URLs for every claim.
+  model:
+    provider: openai
+    name: gpt-5.4-mini-2026-03-17
+    temperature: 0.2
+  tools:
+    - type: search
+      provider: duckduckgo
+      max_results: 5
+    - type: web_reader
+      max_content_bytes: 256000
+      timeout_seconds: 10
+  guardrails:
+    max_tokens_per_run: 15000
+    max_tool_calls: 10
+    timeout_seconds: 60

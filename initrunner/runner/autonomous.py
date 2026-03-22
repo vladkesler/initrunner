@@ -77,8 +77,11 @@ def run_autonomous(
 ) -> AutonomousResult:
     """Execute an autonomous agentic loop until completion or budget exhaustion."""
     from initrunner._ids import generate_id
-    from initrunner.agent.reflection import ReflectionState, format_reflection_state
-    from initrunner.agent.tools.reflection import build_reflection_toolset
+    from initrunner.agent.reflection import ReflectionState
+    from initrunner.runner.reasoning import (
+        build_run_scoped_toolsets,
+        resolve_strategy,
+    )
     from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES
 
     autonomous_run_id = generate_id()
@@ -87,12 +90,14 @@ def run_autonomous(
     max_iterations = max_iterations_override or guardrails.max_iterations
     token_budget = guardrails.autonomous_token_budget
 
+    # Unified state + strategy
     reflection_state = ReflectionState()
-    # NOTE: Reflection toolsets are exempt from Cerbos tool-level checks.
-    # They are internal control-flow tools, not user-facing.
-    reflection_toolset = build_reflection_toolset(autonomy_config, reflection_state)
+    strategy = resolve_strategy(role.spec.reasoning, role)
 
-    all_extra = [reflection_toolset]
+    # Build run-scoped toolsets (todo, think, spawn, finish_task)
+    run_scoped = build_run_scoped_toolsets(role, reflection_state, autonomy_config)
+
+    all_extra = list(run_scoped)
     if extra_toolsets:
         all_extra.extend(extra_toolsets)
 
@@ -130,12 +135,11 @@ def run_autonomous(
                 console.print("[yellow]Autonomous token budget exhausted.[/yellow]")
                 break
 
-        # Build prompt
+        # Build prompt via strategy
         if iteration == 1:
-            iter_prompt = prompt
+            iter_prompt = strategy.wrap_initial_prompt(prompt)
         else:
-            state_text = format_reflection_state(reflection_state)
-            iter_prompt = f"{autonomy_config.continuation_prompt}\n\nCURRENT STATUS:\n{state_text}"
+            iter_prompt = strategy.build_continuation_prompt(reflection_state)
 
             # Stronger nudge for messaging triggers when agent didn't use tools
             if consecutive_no_tool_calls > 0 and trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
@@ -143,7 +147,7 @@ def run_autonomous(
                     "\n\nIMPORTANT: You did not use any tools in your last response. "
                     "If you cannot proceed without additional user input, call "
                     "finish_task(summary='...', status='blocked') immediately. "
-                    "Do NOT repeat your question — the user will send a new message."
+                    "Do NOT repeat your question -- the user will send a new message."
                 )
 
         # Execute iteration
@@ -182,8 +186,8 @@ def run_autonomous(
                 message_history, autonomy_config, role, preserve_first=True
             )
 
-        # Check if agent signalled completion
-        if reflection_state.completed:
+        # Check strategy-driven completion
+        if not strategy.should_continue(reflection_state, iteration):
             final_status = reflection_state.status
             break
 
@@ -193,9 +197,7 @@ def run_autonomous(
             error_msg = result.error
             break
 
-        # Conversational triggers: single iteration is sufficient — the agent
-        # already had full tool access within this run.  Further iterations
-        # would just produce a continuation prompt the user never asked for.
+        # Conversational triggers: single iteration is sufficient
         if trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
             final_status = "completed"
             break
