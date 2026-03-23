@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.39.1] - 2026-03-23
+
+### Changed
+- Switched from MIT-only to dual license (MIT OR Apache-2.0)
+- Adopted PEP 639 license metadata (`license-files`, removed Trove classifier, hatchling>=1.27)
+
 ## [1.39.0] - 2026-03-23
 
 ### Changed
