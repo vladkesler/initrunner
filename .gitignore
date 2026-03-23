@@ -212,9 +212,12 @@ __marimo__/
 # Test artifacts (mocked file paths)
 MagicMock/
 
-# Dashboard build artifacts
-initrunner/_dashboard_static/
+# Dashboard build artifacts (keep .gitkeep)
+initrunner/dashboard/_static/*
+!initrunner/dashboard/_static/.gitkeep
 package-lock.json
+node_modules/
+.svelte-kit/
 
 # Dev role file
 role.yaml

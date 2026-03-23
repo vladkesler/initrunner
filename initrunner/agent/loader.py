@@ -54,7 +54,9 @@ def _build_model(model_config: ModelConfig):
 
     base_url = model_config.base_url
     if model_config.provider == "ollama":
-        base_url = base_url or "http://localhost:11434/v1"
+        from initrunner.services.providers import OLLAMA_DEFAULT_BASE_URL
+
+        base_url = base_url or OLLAMA_DEFAULT_BASE_URL
         api_key = "ollama"
     elif model_config.api_key_env:
         api_key = os.environ.get(model_config.api_key_env)
@@ -284,7 +286,7 @@ def build_agent(
     return agent
 
 
-def _load_dotenv(role_dir: Path) -> None:
+def _load_dotenv(role_dir: Path | None) -> None:
     """Load .env files — local first, then global as fallback.
 
     Uses ``override=False`` so existing env vars always win.
@@ -292,9 +294,10 @@ def _load_dotenv(role_dir: Path) -> None:
     """
     from dotenv import load_dotenv
 
-    local_env = role_dir / ".env"
-    if local_env.is_file():
-        load_dotenv(local_env, override=False)
+    if role_dir is not None:
+        local_env = role_dir / ".env"
+        if local_env.is_file():
+            load_dotenv(local_env, override=False)
     from initrunner.config import get_global_env_path
 
     global_env = get_global_env_path()

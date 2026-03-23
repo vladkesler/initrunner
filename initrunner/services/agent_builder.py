@@ -252,7 +252,14 @@ class BuilderSession:
 
     # -- Agent setup ---------------------------------------------------------
 
-    def _get_agent(self, provider: str, model_name: str | None = None):
+    def _get_agent(
+        self,
+        provider: str,
+        model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ):
         """Lazy-init the PydanticAI agent for the builder LLM."""
         if self._agent is not None:
             return self._agent
@@ -273,7 +280,12 @@ class BuilderSession:
             tool_summary=tool_sum,
         )
 
-        gen_model_config = ModelConfig(provider=provider, name=model_name)
+        gen_model_config = ModelConfig(
+            provider=provider,
+            name=model_name,
+            base_url=base_url,
+            api_key_env=api_key_env,
+        )
         model = _build_model(gen_model_config)
 
         self._agent = Agent(model, system_prompt=system)
@@ -349,10 +361,12 @@ class BuilderSession:
         model_name: str | None = None,
         *,
         name_hint: str | None = None,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
     ) -> TurnResult:
         """Seed from a natural language description via LLM."""
         self.seed_source = "description"
-        agent = self._get_agent(provider, model_name)
+        agent = self._get_agent(provider, model_name, base_url=base_url, api_key_env=api_key_env)
 
         user_prompt = f"Create a role.yaml for: {text}"
         if name_hint:
@@ -366,7 +380,9 @@ class BuilderSession:
 
         # Auto-repair on validation failure
         if any(i.severity == "error" for i in self.issues):
-            yaml_content = self._auto_repair(provider, model_name)
+            yaml_content = self._auto_repair(
+                provider, model_name, base_url=base_url, api_key_env=api_key_env
+            )
             if yaml_content is not None:
                 self.yaml_text = yaml_content
 
@@ -441,9 +457,12 @@ class BuilderSession:
         user_input: str,
         provider: str,
         model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
     ) -> TurnResult:
         """Refine the current YAML based on user input."""
-        agent = self._get_agent(provider, model_name)
+        agent = self._get_agent(provider, model_name, base_url=base_url, api_key_env=api_key_env)
 
         prompt = (
             f"Current role.yaml:\n```yaml\n{self._yaml_text}\n```\n\nUser request: {user_input}"
@@ -457,19 +476,28 @@ class BuilderSession:
 
         # Auto-repair on validation failure
         if any(i.severity == "error" for i in self.issues):
-            repaired = self._auto_repair(provider, model_name)
+            repaired = self._auto_repair(
+                provider, model_name, base_url=base_url, api_key_env=api_key_env
+            )
             if repaired is not None:
                 self.yaml_text = repaired
 
         return self._make_turn_result(explanation or "Updated based on your request.")
 
-    def _auto_repair(self, provider: str, model_name: str | None) -> str | None:
+    def _auto_repair(
+        self,
+        provider: str,
+        model_name: str | None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ) -> str | None:
         """One automatic repair retry. Returns fixed YAML or None."""
         errors = [i for i in self.issues if i.severity == "error"]
         if not errors:
             return None
 
-        agent = self._get_agent(provider, model_name)
+        agent = self._get_agent(provider, model_name, base_url=base_url, api_key_env=api_key_env)
         error_text = "\n".join(f"- {e.field}: {e.message}" for e in errors)
         repair_prompt = (
             f"The YAML you generated has validation errors:\n{error_text}\n\n"

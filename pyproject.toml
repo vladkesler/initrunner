@@ -55,6 +55,7 @@ telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 authz = ["cerbos>=0.15.1"]
+dashboard = ["fastapi>=0.115", "uvicorn>=0.34"]
 all = [
     "initrunner[ingest]",
     "initrunner[search]",
@@ -64,6 +65,7 @@ all = [
     "initrunner[observability]",
     "initrunner[channels]",
     "initrunner[authz]",
+    "initrunner[dashboard]",
 ]
 
 [project.scripts]
@@ -90,6 +92,9 @@ path = "initrunner/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["initrunner"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"initrunner/dashboard/_static" = "initrunner/dashboard/_static"
 
 [tool.pytest.ini_options]
 timeout = 60

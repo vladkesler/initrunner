@@ -21,6 +21,7 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
+OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1"
 _OLLAMA_TIMEOUT = 2
 
 

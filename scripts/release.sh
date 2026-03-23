@@ -12,6 +12,12 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(.*)$ ]]; then
   exit 1
 fi
 
+# Build dashboard frontend (if source exists)
+if [ -d "dashboard" ] && [ -f "dashboard/package.json" ]; then
+  echo "Building dashboard frontend..."
+  bash scripts/build-dashboard.sh
+fi
+
 # Ensure clean working tree
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Error: working tree is not clean. Commit or stash changes first." >&2

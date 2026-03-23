@@ -111,13 +111,35 @@ def make_store_config(role: RoleDefinition) -> StoreConfig:
 
 
 def resolve_store_path(store_path: str | None, agent_name: str) -> Path:
-    """Resolve the document store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_STORES_DIR / f"{agent_name}.lance"
+    """Resolve the document store path from config or default.
+
+    Relative paths are resolved against ``~/.initrunner/`` so they pass
+    the ``restrict_db_paths`` security check.
+    """
+    if store_path is None:
+        return DEFAULT_STORES_DIR / f"{agent_name}.lance"
+    p = Path(store_path)
+    if not p.is_absolute():
+        from initrunner.config import get_home_dir
+
+        p = get_home_dir() / p
+    return p
 
 
 def resolve_memory_path(store_path: str | None, agent_name: str) -> Path:
-    """Resolve the memory store path from config or default."""
-    return Path(store_path) if store_path else DEFAULT_MEMORY_DIR / f"{agent_name}.lance"
+    """Resolve the memory store path from config or default.
+
+    Relative paths are resolved against ``~/.initrunner/`` so they pass
+    the ``restrict_db_paths`` security check.
+    """
+    if store_path is None:
+        return DEFAULT_MEMORY_DIR / f"{agent_name}.lance"
+    p = Path(store_path)
+    if not p.is_absolute():
+        from initrunner.config import get_home_dir
+
+        p = get_home_dir() / p
+    return p
 
 
 class FileMetadataStore(abc.ABC):

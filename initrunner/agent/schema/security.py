@@ -13,26 +13,57 @@ from initrunner.agent._subprocess import (
 )
 
 
-def _probe_regex_safe(pattern: str, timeout: float = 1.0) -> bool:
-    """Return True if *pattern* completes a probe match within *timeout* seconds.
+def _regex_probe_worker(pats: list[str], conn: object) -> None:
+    """Subprocess target: match each pattern against a probe string and signal completion."""
+    import re as _re
 
-    Uses a subprocess to avoid GIL issues with CPython's ``re`` module.
+    probe = "a" * 100 + "!"
+    for pat in pats:
+        _re.search(_re.compile(pat), probe)
+        conn.send(True)  # type: ignore[union-attr]
+    conn.close()  # type: ignore[union-attr]
+
+
+def _probe_regexes_safe(patterns: list[str], timeout: float = 5.0) -> str | None:
+    """Test *patterns* for catastrophic backtracking in a single subprocess.
+
+    Returns ``None`` if every pattern is safe, or the first pattern that
+    timed out.  Uses ``spawn`` context and a :class:`~multiprocessing.Pipe`
+    so the subprocess signals after each pattern completes -- letting us
+    identify the exact offender without paying spawn overhead per pattern.
     """
+    if not patterns:
+        return None
+
     import multiprocessing
 
-    def _run(pat: str) -> None:
-        import re as _re
-
-        _re.search(_re.compile(pat), "a" * 100 + "!")
-
-    proc = multiprocessing.Process(target=_run, args=(pattern,))
+    ctx = multiprocessing.get_context("spawn")
+    parent_conn, child_conn = ctx.Pipe(duplex=False)
+    proc = ctx.Process(target=_regex_probe_worker, args=(patterns, child_conn))
     proc.start()
-    proc.join(timeout=timeout)
+    child_conn.close()
+
+    completed = 0
+    while completed < len(patterns):
+        # First poll covers process startup; subsequent ones are just regex time.
+        t = timeout if completed == 0 else 2.0
+        if parent_conn.poll(t):
+            parent_conn.recv()
+            completed += 1
+        else:
+            break
+
+    proc.join(timeout=1)
     if proc.is_alive():
         proc.kill()
         proc.join()
-        return False
-    return proc.exitcode == 0
+    parent_conn.close()
+
+    if completed < len(patterns):
+        return patterns[completed]
+    if proc.exitcode != 0:
+        return patterns[-1]
+    return None
 
 
 class ContentPolicy(BaseModel):
@@ -58,12 +89,13 @@ class ContentPolicy(BaseModel):
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern '{pattern}': {e}") from e
 
-            # Probe for catastrophic backtracking using a subprocess
-            # (threads don't work because re holds the GIL)
-            if not _probe_regex_safe(pattern):
-                raise ValueError(
-                    f"Regex pattern '{pattern}' is too complex (timed out on probe input)"
-                )
+        # Probe for catastrophic backtracking in a single subprocess
+        # (threads don't work because re holds the GIL)
+        failed = _probe_regexes_safe(v)
+        if failed is not None:
+            raise ValueError(
+                f"Regex pattern '{failed}' is too complex (timed out on probe input)"
+            )
         return v
 
 

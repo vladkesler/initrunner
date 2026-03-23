@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -71,6 +72,50 @@ def audit_prune_sync(
         return 0
     with _AuditLogger(db_path) as logger:
         return logger.prune(retention_days=retention_days, max_records=max_records)
+
+
+@dataclass
+class TopAgent:
+    """Agent ranked by run count."""
+
+    name: str
+    count: int
+    avg_duration_ms: int
+
+
+@dataclass
+class AuditStats:
+    """Aggregate audit statistics."""
+
+    total_runs: int
+    success_rate: float
+    total_tokens: int
+    avg_duration_ms: int
+    top_agents: list[TopAgent]
+
+
+def audit_stats_sync(
+    *,
+    agent_name: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    audit_db: Path | None = None,
+) -> AuditStats:
+    """Compute aggregate audit stats (sync)."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return AuditStats(
+            total_runs=0,
+            success_rate=0.0,
+            total_tokens=0,
+            avg_duration_ms=0,
+            top_agents=[],
+        )
+    with _AuditLogger(db_path) as logger:
+        return logger.stats(agent_name=agent_name, since=since, until=until)
 
 
 def query_delegate_events_sync(

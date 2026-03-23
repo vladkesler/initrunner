@@ -550,6 +550,59 @@ class AuditLogger:
             _row_to_delegate_event,
         )
 
+    def stats(
+        self,
+        *,
+        agent_name: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ):
+        """Compute aggregate stats from the audit_log table."""
+        from initrunner.services.operations import AuditStats, TopAgent
+
+        filters: list[tuple[str, object | None]] = [
+            ("agent_name = ?", agent_name),
+            ("timestamp >= ?", since),
+            ("timestamp <= ?", until),
+        ]
+        active = [(c, v) for c, v in filters if v is not None]
+        where, params = _build_where(active)
+
+        sql = f"""
+            SELECT
+                COUNT(*) AS total_runs,
+                COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0) AS successes,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                COALESCE(AVG(duration_ms), 0) AS avg_duration_ms
+            FROM audit_log {where}
+        """
+        top_sql = f"""
+            SELECT agent_name, COUNT(*) AS cnt, COALESCE(AVG(duration_ms), 0) AS avg_dur
+            FROM audit_log {where}
+            GROUP BY agent_name ORDER BY cnt DESC LIMIT 5
+        """
+
+        with self._lock:
+            row = self._conn.execute(sql, params).fetchone()
+            top_rows = self._conn.execute(top_sql, params).fetchall()
+
+        total = row["total_runs"] if row else 0
+        successes = row["successes"] if row else 0
+        rate = (successes / total * 100.0) if total > 0 else 0.0
+
+        top_agents = [
+            TopAgent(name=r["agent_name"], count=r["cnt"], avg_duration_ms=int(r["avg_dur"]))
+            for r in top_rows
+        ]
+
+        return AuditStats(
+            total_runs=total,
+            success_rate=round(rate, 1),
+            total_tokens=row["total_tokens"] if row else 0,
+            avg_duration_ms=int(row["avg_duration_ms"]) if row else 0,
+            top_agents=top_agents,
+        )
+
     def _prune_locked(self, retention_days: int = 90, max_records: int = 100_000) -> int:
         """Core prune logic. Caller must hold self._lock."""
         deleted = 0

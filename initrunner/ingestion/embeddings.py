@@ -106,7 +106,9 @@ def _create_custom_embedder(
     from pydantic_ai.providers.openai import OpenAIProvider
 
     if provider == "ollama":
-        resolved_url = base_url or "http://localhost:11434/v1"
+        from initrunner.services.providers import OLLAMA_DEFAULT_BASE_URL
+
+        resolved_url = base_url or OLLAMA_DEFAULT_BASE_URL
         api_key = "ollama"
         default_model = _DEFAULT_MODELS.get("ollama", "ollama:nomic-embed-text")
     else:

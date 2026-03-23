@@ -133,6 +133,15 @@ wheels = [
 ]
 
 [[package]]
+name = "annotated-doc"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/ba/046ceea27344560984e26a590f90bc7f4a75b06701f653222458922b558c/annotated_doc-0.0.4.tar.gz", hash = "sha256:fbcda96e87e9c92ad167c2e53839e57503ecfda18804ea28102353485033faa4", size = 7288, upload-time = "2025-11-10T22:07:42.062Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/d3/26bf1008eb3d2daa8ef4cacc7f3bfdc11818d111f7e2d0201bc6e3b49d45/annotated_doc-0.0.4-py3-none-any.whl", hash = "sha256:571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320", size = 5303, upload-time = "2025-11-10T22:07:40.673Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -926,6 +935,22 @@ lua = [
 ]
 
 [[package]]
+name = "fastapi"
+version = "0.135.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "annotated-doc" },
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c4/73/5903c4b13beae98618d64eb9870c3fac4f605523dd0312ca5c80dadbd5b9/fastapi-0.135.2.tar.gz", hash = "sha256:88a832095359755527b7f63bb4c6bc9edb8329a026189eed83d6c1afcf419d56", size = 395833, upload-time = "2026-03-23T14:12:41.697Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/ea/18f6d0457f9efb2fc6fa594857f92810cadb03024975726db6546b3d6fcf/fastapi-0.135.2-py3-none-any.whl", hash = "sha256:0af0447d541867e8db2a6a25c23a8c4bd80e2394ac5529bd87501bbb9e240ca5", size = 117407, upload-time = "2026-03-23T14:12:43.284Z" },
+]
+
+[[package]]
 name = "fastavro"
 version = "1.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1555,6 +1580,7 @@ all = [
     { name = "cerbos" },
     { name = "ddgs" },
     { name = "discord-py" },
+    { name = "fastapi" },
     { name = "openpyxl" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation-logging" },
@@ -1563,6 +1589,7 @@ all = [
     { name = "pymupdf4llm" },
     { name = "python-docx" },
     { name = "python-telegram-bot" },
+    { name = "uvicorn" },
     { name = "youtube-transcript-api" },
 ]
 all-models = [
@@ -1580,6 +1607,10 @@ authz = [
 channels = [
     { name = "discord-py" },
     { name = "python-telegram-bot" },
+]
+dashboard = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
 ]
 discord = [
     { name = "discord-py" },
@@ -1639,6 +1670,8 @@ requires-dist = [
     { name = "discord-py", marker = "extra == 'all'", specifier = ">=2.3" },
     { name = "discord-py", marker = "extra == 'channels'", specifier = ">=2.3" },
     { name = "discord-py", marker = "extra == 'discord'", specifier = ">=2.3" },
+    { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.115" },
+    { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.115" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "lancedb", specifier = ">=0.29.2" },
@@ -1670,11 +1703,13 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=14.3.2" },
     { name = "typer", specifier = ">=0.21.1" },
+    { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.34" },
+    { name = "uvicorn", marker = "extra == 'dashboard'", specifier = ">=0.34" },
     { name = "watchfiles", specifier = ">=1.1.1" },
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["all", "all-models", "anthropic", "audio", "authz", "channels", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "telegram"]
+provides-extras = ["all", "all-models", "anthropic", "audio", "authz", "channels", "dashboard", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "telegram"]
 
 [package.metadata.requires-dev]
 dev = [
