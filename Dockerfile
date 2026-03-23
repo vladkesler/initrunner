@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 # Copy source code
 COPY initrunner/ initrunner/
-COPY README.md LICENSE LICENSE-MIT LICENSE-APACHE ./
+COPY README.md LICENSE-MIT LICENSE-APACHE ./
 
 # Build wheel and install into system Python
 RUN uv build --wheel --out-dir /build/dist && \
