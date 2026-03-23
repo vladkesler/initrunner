@@ -144,7 +144,6 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
 )
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import ingest, run, test  # noqa: E402
-from initrunner.cli.server_cmd import tui, ui  # noqa: E402
 
 # --- Getting Started ---
 app.command(rich_help_panel="Getting Started")(chat)
@@ -161,8 +160,6 @@ app.command(rich_help_panel="Run & Test")(validate)
 app.command(rich_help_panel="Run & Test")(configure)
 
 # --- Interfaces ---
-app.command(rich_help_panel="Interfaces")(ui)
-app.command(rich_help_panel="Interfaces")(tui)
 app.add_typer(compose_app, name="compose", rich_help_panel="Interfaces")
 app.add_typer(mcp_app, name="mcp", rich_help_panel="Interfaces")
 

@@ -657,8 +657,6 @@ Now that you've built a complete agent, explore more of what InitRunner can do:
 - **More tools**: [git](../agents/tools.md), [shell](../agents/tools.md), [sql](../agents/tools.md), [http](../agents/tools.md), [slack](../agents/tools.md), [MCP servers](../agents/tools.md), and [custom tools](../agents/tool_creation.md)
 - **Multi-agent delegation**: Have agents call other agents — see [Delegation](../orchestration/delegation.md)
 - **Compose pipelines**: Orchestrate multiple agents with `compose.yaml` — see [Agent Composer](../orchestration/agent_composer.md)
-- **Web dashboard**: Monitor agents in your browser with `initrunner ui` — see [Dashboard](../interfaces/dashboard.md)
-- **Terminal UI**: Full-featured TUI with `initrunner tui` — see [TUI](../interfaces/tui.md)
 - **API server**: Expose agents as OpenAI-compatible endpoints with `initrunner run <role> --serve` -- see [API Server](../interfaces/server.md)
 - **Role generation**: Scaffold new agents with `initrunner new` or generate them from descriptions with `initrunner new "description"` — see [Role Generation](../agents/role_generation.md)
 - **CLI reference**: Full command reference — see [CLI](cli.md)

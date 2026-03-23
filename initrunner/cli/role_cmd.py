@@ -151,10 +151,6 @@ def setup(
         bool,
         typer.Option("--accept-risks", "-y", help="Accept security disclaimer without prompting"),
     ] = False,
-    interfaces: Annotated[
-        str | None,
-        typer.Option(help="Install interfaces: tui, dashboard, both, skip"),
-    ] = None,
     skip_chat_yaml: Annotated[
         bool,
         typer.Option("--skip-chat-yaml", help="Skip chat.yaml generation"),
@@ -170,7 +166,6 @@ def setup(
         skip_test=skip_test,
         output=output,
         accept_risks=accept_risks,
-        interfaces=interfaces,
         model=model,
         skip_chat_yaml=skip_chat_yaml,
     )

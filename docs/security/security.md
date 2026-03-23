@@ -423,24 +423,6 @@ security:
     pii_redaction: true
 ```
 
-## CSRF Protection
-
-The web dashboard relies on `SameSite=strict` session cookies for CSRF protection. Combined with `X-Frame-Options: DENY` and CSP headers, this prevents cross-origin sites from forging requests on behalf of an authenticated user.
-
-**How it works:**
-
-- **`SameSite=strict` cookies**: The browser never sends session cookies on cross-origin requests (including top-level navigations from external sites). This means a malicious page on `evil.com` cannot issue authenticated requests to your InitRunner dashboard.
-- **`X-Frame-Options: DENY`**: Prevents the dashboard from being embedded in iframes, blocking clickjacking attacks.
-- **Content Security Policy (CSP)**: Restricts script sources and frame ancestors, providing defense-in-depth.
-
-**Limitations:**
-
-- `SameSite=strict` is supported by all modern browsers but not enforced by very old browsers (pre-2020). If you must support legacy browsers, consider adding explicit CSRF tokens.
-- Subdomains of the same registrable domain are considered same-site. If an attacker controls a subdomain (e.g. `compromised.example.com`), they could bypass `SameSite` protections for `dashboard.example.com`. Ensure all subdomains are trusted.
-- GET requests are not protected by `SameSite` alone (browsers send cookies on same-site navigations). The dashboard does not perform state-changing operations via GET.
-
-For deployments requiring stricter guarantees, a per-request CSRF token can be added as custom middleware.
-
 ## Webhook Rate Limiting
 
 Webhook triggers have their own rate limiter independent of the server:

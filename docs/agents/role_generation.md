@@ -1,6 +1,6 @@
 # Role Generation
 
-InitRunner provides a single `initrunner new` command for creating `role.yaml` files. It supports multiple seed modes (templates, AI generation, examples, hub bundles, or local files) and an interactive refinement loop for iterating on the YAML before saving. The web dashboard offers a complementary GUI-based flow.
+InitRunner provides a single `initrunner new` command for creating `role.yaml` files. It supports multiple seed modes (templates, AI generation, examples, hub bundles, or local files) and an interactive refinement loop for iterating on the YAML before saving.
 
 ## Quick Start
 
@@ -139,56 +139,9 @@ initrunner new --template tool
 initrunner skill new my-skill
 ```
 
-## Dashboard -- Create Role
-
-The web dashboard at `/roles/new` offers two tabs for role creation.
-
-### Form Builder Tab
-
-A structured form with fields for:
-
-- Name, description
-- Provider, model (dropdown with curated per-provider options and custom input)
-- System prompt
-- Tool checkboxes
-- Memory and ingestion toggles
-- Live YAML preview that updates as you fill in the form
-
-Submitting the form calls `POST /api/roles` with the generated YAML.
-
-### AI Generate Tab
-
-- Enter a natural language description
-- Click **Generate** to produce a `role.yaml` via AI
-- Review and edit the generated YAML
-- Click **Save** to persist
-
-This calls `POST /api/roles/generate` to get the YAML, then `POST /api/roles` to save.
-
-### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/roles` | Create a new role from YAML content (`RoleCreateRequest`) |
-| `POST` | `/api/roles/generate` | Generate YAML from a description (`RoleGenerateRequest`) |
-
-`POST /api/roles` returns `409` if a role file with the same name already exists.
-
-## Dashboard -- Edit Existing Roles
-
-The role detail page (`/roles/{role_id}`) includes an editable YAML tab with **Save** and **Reset** buttons.
-
-- **Save** calls `PUT /api/roles/{role_id}` with the updated YAML content
-- Creates a `.bak` backup of the existing file before overwriting
-- Validates the YAML against `RoleDefinition` before writing
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PUT` | `/api/roles/{role_id}` | Update an existing role's YAML (`RoleYamlUpdateRequest`) |
-
 ## Programmatic Usage
 
-The builder service layer (`services/agent_builder.py`) is UI-agnostic and can be used by CLI, API, and TUI:
+The builder service layer (`services/agent_builder.py`) is UI-agnostic and can be used programmatically:
 
 ```python
 from initrunner.services.agent_builder import BuilderSession
@@ -220,5 +173,4 @@ Legacy one-shot generation is still available via `generate_role()` and `generat
 
 - [CLI Reference](../getting-started/cli.md) -- full list of `new` command flags
 - [Tool Creation](tool_creation.md) -- writing custom tool modules
-- [Web Dashboard](../interfaces/dashboard.md) -- dashboard setup and features
 - [Security Model](../security/security.md) -- guardrails and access controls

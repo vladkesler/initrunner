@@ -36,8 +36,6 @@ from initrunner.services.setup import (
 _INTENT_CHOICES = list(INTENT_DESCRIPTIONS.keys())
 _INTENT_NUMS = {str(i + 1): name for i, name in enumerate(_INTENT_CHOICES)}
 
-_INTERFACE_NUMS = {"1": "tui", "2": "dashboard", "3": "both", "4": "skip"}
-
 
 def _install_provider_sdk(provider: str) -> bool:
     """Best-effort SDK install. Returns True on success."""
@@ -110,7 +108,6 @@ def run_setup(
     skip_test: bool,
     output: Path,
     accept_risks: bool = False,
-    interfaces: str | None = None,
     model: str | None = None,
     skip_chat_yaml: bool = False,
 ) -> None:
@@ -494,32 +491,7 @@ def run_setup(
             ]
 
     # ---------------------------------------------------------------
-    # Step 10: Interface installation
-    # ---------------------------------------------------------------
-    if interfaces is None:
-        console.print()
-        console.print("[bold]Install an interface?[/bold]")
-        console.print("  1. tui       \u2014 Terminal dashboard (Textual)")
-        console.print("  2. dashboard \u2014 Web dashboard (FastAPI)")
-        console.print("  3. both      \u2014 Install both")
-        console.print("  4. skip      \u2014 Skip for now")
-        choice = Prompt.ask("Interface [1-4]")
-        interfaces = _INTERFACE_NUMS.get(choice, choice)
-        if interfaces not in ("tui", "dashboard", "both", "skip"):
-            console.print(f"[red]Invalid choice:[/red] '{choice}'. Skipping.")
-            interfaces = "skip"
-
-    if interfaces in ("tui", "both"):
-        install_extra("tui")
-    if interfaces in ("dashboard", "both"):
-        install_extra("dashboard")
-    if interfaces == "skip":
-        console.print(
-            "[dim]Install later: pip install 'initrunner[tui]' or 'initrunner[dashboard]'[/dim]"
-        )
-
-    # ---------------------------------------------------------------
-    # Step 11: Generate role.yaml + chat.yaml
+    # Step 10: Generate role.yaml + chat.yaml
     # ---------------------------------------------------------------
     config = SetupConfig(
         intent=intent,
@@ -634,10 +606,6 @@ def run_setup(
         "  [dim]Or run the role setup just created:[/dim]",
         f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
         f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
-        "",
-        "  [dim]Interfaces:[/dim]",
-        "  [bold]initrunner tui[/bold]                   [dim]# terminal dashboard[/dim]",
-        "  [bold]initrunner ui[/bold]                    [dim]# web dashboard[/dim]",
     ]
 
     console.print(

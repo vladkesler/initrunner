@@ -8,8 +8,8 @@ InitRunner ships a portable shell installer that works on Linux and macOS. A sin
 # Install latest version
 curl -fsSL https://initrunner.ai/install.sh | sh
 
-# Install with extras (TUI, ingestion, Anthropic provider)
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras tui,ingest
+# Install with extras (ingestion, Anthropic provider)
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest
 
 # Pin to a specific version
 curl -fsSL https://initrunner.ai/install.sh | sh -s -- --version 0.2.0
@@ -35,7 +35,7 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 | Flag | Argument | Description |
 |------|----------|-------------|
 | `--method` | `uv`, `pipx`, or `pip` | Force a specific package installer instead of auto-detection. |
-| `--extras` | comma-separated list | Install optional extras (e.g. `tui,ingest,anthropic`). |
+| `--extras` | comma-separated list | Install optional extras (e.g. `ingest,anthropic`). |
 | `--version` | version string | Pin to a specific PyPI version (e.g. `0.2.0`). Default: `latest`. |
 | `--unmanaged` | *(none)* | Skip all shell profile / PATH modifications. Implies `INITRUNNER_NO_MODIFY_PATH`. |
 | `--uninstall` | *(none)* | Remove initrunner and clean up PATH entries from shell profiles. |
@@ -87,7 +87,7 @@ On systems with an `EXTERNALLY-MANAGED` marker (common on Debian 12+, Ubuntu 23.
 
 ### 5. Package Installation
 
-Builds a package spec from the name, extras, and version (e.g. `initrunner[tui,ingest]==0.2.0`) and installs it:
+Builds a package spec from the name, extras, and version (e.g. `initrunner[ingest]==0.2.0`) and installs it:
 
 | Installer | Command |
 |-----------|---------|
@@ -228,7 +228,7 @@ The installer has a Docker-based test harness in `tests/installer/`. Each scenar
 | `auto-ubuntu` | `ubuntu:24.04` | Auto-detection on a bare Ubuntu image (installs uv automatically) |
 | `method-pip` | `python:3.12-slim` | Explicit `--method pip` |
 | `method-pipx` | `python:3.12-slim` | Explicit `--method pipx` (pre-installs pipx) |
-| `extras` | `python:3.12-slim` | `--extras tui` installs optional dependencies |
+| `extras` | `python:3.12-slim` | `--extras anthropic` installs optional dependencies |
 | `uninstall` | `python:3.12-slim` | Install then `--uninstall`, verifies binary is removed |
 | `e2e-hello` | `ubuntu:24.04` | Full end-to-end: installs, then runs a role with `initrunner run` |
 

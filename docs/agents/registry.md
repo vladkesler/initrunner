@@ -1,6 +1,6 @@
 # Role Registry
 
-InitRunner's role registry lets you install, share, and discover roles from InitHub and OCI registries. Roles are downloaded, validated, and saved to `~/.initrunner/roles/` where they integrate automatically with the CLI and TUI.
+InitRunner's role registry lets you install, share, and discover roles from InitHub and OCI registries. Roles are downloaded, validated, and saved to `~/.initrunner/roles/` where they integrate automatically with the CLI.
 
 ## Quick Start
 
@@ -66,7 +66,7 @@ Installed roles use flat namespaced filenames to prevent collisions between diff
   registry.json
 ```
 
-Two different authors can publish roles with the same `name`. The TUI and CLI display the human-friendly name and disambiguate when collisions exist (e.g. `code-reviewer (jcdenton)` vs `code-reviewer (adamjensen)`).
+Two different authors can publish roles with the same `name`. The CLI displays the human-friendly name and disambiguates when collisions exist (e.g. `code-reviewer (jcdenton)` vs `code-reviewer (adamjensen)`).
 
 ## Authentication
 
@@ -310,15 +310,6 @@ The registry manifest at `~/.initrunner/roles/registry.json` tracks all installe
 | `sha256` | SHA-256 hash of the YAML content for integrity verification. |
 
 The manifest is written atomically (write to `.tmp`, then rename) to prevent corruption.
-
-## TUI Integration
-
-Installed roles appear automatically in the TUI dashboard (`initrunner ui`). The roles screen scans `~/.initrunner/roles/` alongside other directories and handles namespaced filenames:
-
-- Names are displayed without the `owner__` prefix.
-- When two installed roles have the same name from different authors, the display disambiguates them: `code-reviewer (jcdenton)` vs `code-reviewer (adamjensen)`.
-
-No additional configuration is needed. Installed roles are discovered on startup.
 
 ## Using Installed Roles
 

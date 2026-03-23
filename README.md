@@ -31,7 +31,6 @@ One YAML file is all it takes to go from idea to running agent - with document s
 
 - [Quickstart](#quickstart)
 - [Define an Agent in YAML](#define-agent-roles-in-yaml)
-- [User Interfaces](#user-interfaces)
 - [Why InitRunner](#why-initrunner)
 - [Features](#features)
 - [Security & Authorization](#security--authorization)
@@ -113,19 +112,6 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
   <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
   <em>Quick Chat - ask a question, send the answer to Slack</em>
 </p>
-
-## User Interfaces
-
-| | Terminal UI (`tui`) | Web Dashboard (`ui`) |
-|---|---|---|
-| **Launch** | `initrunner tui` | `initrunner ui` |
-| **Install** | `pip install initrunner[tui]` | `pip install initrunner[dashboard]` |
-| **Roles** | Create from template, edit via forms | Form builder with live preview, AI generate |
-| **Chat** | Streaming chat with token counts | SSE streaming with file attachments |
-| **Extras** | Audit log, memory, daemon event log | Audit detail panel, memory, trigger monitor |
-| **Style** | k9s-style keyboard-driven (Textual) | Server-rendered HTML (HTMX + DaisyUI) |
-
-See [TUI docs](docs/interfaces/tui.md) · [Dashboard docs](docs/interfaces/dashboard.md) · [API Server docs](docs/interfaces/server.md)
 
 ## Why InitRunner
 
@@ -291,7 +277,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
 
-**Fly.io:** See [Cloud Deployment Guide](docs/getting-started/cloud-deploy.md#deploy-to-flyio).
+**Fly.io:** See the `deploy/fly.toml` configuration in the repository.
 
 ## Documentation
 
@@ -301,7 +287,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
-| Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [TUI](docs/interfaces/tui.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
+| Interfaces | [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 

@@ -24,8 +24,6 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <PATH>` | Ingest documents into vector store |
 | `initrunner test <PATH> -s <suite>` | Run a test suite against an agent |
-| `initrunner tui` | Launch TUI dashboard |
-| `initrunner ui` | Launch web dashboard (requires `[dashboard]` extra) |
 | `initrunner install <source>` | Install a role from InitHub or OCI registry |
 | `initrunner uninstall <name>` | Remove an installed role |
 | `initrunner search <query>` | Search InitHub for agent packs |
@@ -249,7 +247,6 @@ initrunner new
 | `--skip-test` | Skip connectivity test |
 | `--output PATH` | Role output path (default: `role.yaml`) |
 | `-y, --accept-risks` | Accept security disclaimer without prompting |
-| `--interfaces TEXT` | Install interfaces: `tui`, `dashboard`, `both`, `skip` |
 
 ## Serve options
 

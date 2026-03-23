@@ -139,8 +139,6 @@ Doctor checks API key presence, SDK availability, and Ollama reachability. The `
 | `doctor` | Check provider config and connectivity |
 | `run <PATH> --serve` | Launch an OpenAI-compatible API server |
 | `run <PATH> --daemon` | Run a trigger-driven daemon |
-| `tui` | Launch the terminal UI |
-| `ui` | Launch the web dashboard |
 | `memory <subcommand>` | Manage agent memory (list, clear, export, import) |
 | `install <SOURCE>` | Install a role from InitHub or OCI registry |
 | `publish [PATH]` | Publish a role to InitHub or OCI registry |

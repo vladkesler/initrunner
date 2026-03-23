@@ -120,7 +120,7 @@ jobs:
           PIP_EXTRA_INDEX_URL: ""
         run: |
           WHEEL=$(ls /tmp/testpypi-pkg/initrunner-*.whl)
-          pip install "${WHEEL}[tui,ingest,dashboard]"
+          pip install "${WHEEL}[ingest]"
 
       - name: Smoke test - CLI
         run: |
@@ -137,11 +137,5 @@ jobs:
           print('Core imports OK')
           "
 
-      - name: Smoke test - tui extra
-        run: python -c "import initrunner.tui; print('TUI import OK')"
-
       - name: Smoke test - ingest extra
         run: python -c "import initrunner.ingestion; print('Ingest import OK')"
-
-      - name: Smoke test - dashboard extra
-        run: python -c "import initrunner.api; print('Dashboard import OK')"

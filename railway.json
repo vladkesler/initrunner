@@ -5,9 +5,7 @@
     "dockerfilePath": "./Dockerfile"
   },
   "deploy": {
-    "startCommand": "initrunner ui --role-dir /data/roles --host 0.0.0.0 --port 8420 --no-browser",
-    "healthcheckPath": "/api/health",
-    "healthcheckTimeout": 10,
+    "startCommand": "initrunner --help",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }

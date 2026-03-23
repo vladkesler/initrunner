@@ -34,7 +34,7 @@ spec:
 
 ## Token budgets
 
-Token usage is tracked per-run in the audit log and displayed in the CLI and TUI.
+Token usage is tracked per-run in the audit log and displayed in the CLI.
 
 - **Per-run limits** (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) enforce hard stops on individual agent executions.
 - **Session budgets** (`session_token_budget`) track cumulative usage across REPL turns and warn at 80% consumption.

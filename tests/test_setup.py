@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import stat
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -78,8 +77,6 @@ class TestFreshSetup:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -111,8 +108,6 @@ class TestFreshSetup:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--output",
                 str(output),
             ],
@@ -140,8 +135,6 @@ class TestRerunDetection:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
             ],
             input="\n",  # accept default tools
         )
@@ -177,8 +170,6 @@ class TestProviderEnvVars:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -212,8 +203,6 @@ class TestOllama:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -246,8 +235,6 @@ class TestOllama:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -277,8 +264,6 @@ class TestSkipTest:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -317,8 +302,6 @@ class TestSdkInstall:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -338,9 +321,9 @@ class TestSdkInstall:
             mock_run.return_value = MagicMock(returncode=0)
             from initrunner.cli._helpers import install_extra
 
-            install_extra("tui")
+            install_extra("anthropic")
             cmd = mock_run.call_args[0][0]
-            assert cmd == ["uv", "tool", "install", "--force", "initrunner[tui]"]
+            assert cmd == ["uv", "tool", "install", "--force", "initrunner[anthropic]"]
 
     def test_pipx_env_uses_pipx_install(self, clean_env):
         """When sys.executable is in a pipx venv and pipx is on PATH, use pipx install --force."""
@@ -359,9 +342,9 @@ class TestSdkInstall:
             mock_run.return_value = MagicMock(returncode=0)
             from initrunner.cli._helpers import install_extra
 
-            install_extra("tui")
+            install_extra("anthropic")
             cmd = mock_run.call_args[0][0]
-            assert cmd == ["pipx", "install", "--force", "initrunner[tui]"]
+            assert cmd == ["pipx", "install", "--force", "initrunner[anthropic]"]
 
     def test_pipx_env_without_pipx_falls_back_to_interpreter_pip(self, clean_env):
         """When sys.executable is in a pipx venv but pipx not on PATH, use sys.executable -m pip."""
@@ -374,10 +357,10 @@ class TestSdkInstall:
             mock_run.return_value = MagicMock(returncode=0)
             from initrunner.cli._helpers import install_extra
 
-            install_extra("tui")
+            install_extra("anthropic")
             cmd = mock_run.call_args[0][0]
             assert cmd[0] == fake_exe
-            assert cmd[1:] == ["-m", "pip", "install", "initrunner[tui]"]
+            assert cmd[1:] == ["-m", "pip", "install", "initrunner[anthropic]"]
 
     def test_uv_preferred_over_pip(self, clean_env):
         """When uv is on PATH (non-tool env), should use uv pip install."""
@@ -413,11 +396,11 @@ class TestSdkInstall:
         ):
             from initrunner.cli._helpers import install_extra
 
-            result = install_extra("tui")
+            result = install_extra("anthropic")
             output = buf.getvalue()
 
         assert result is False
-        assert "[tui]" in output
+        assert "[anthropic]" in output
 
     def test_pip_fallback(self, clean_env):
         """When uv is not on PATH, should use pip."""
@@ -455,8 +438,6 @@ class TestRoleExists:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -485,8 +466,6 @@ class TestEnvFilePermissions:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -523,8 +502,6 @@ class TestTestRunFailure:
                     "gpt-5-mini",
                     "--intent",
                     "chatbot",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -557,8 +534,6 @@ class TestPartialSetupRecovery:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -596,8 +571,6 @@ class TestWriteFailure:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -634,8 +607,6 @@ class TestIntentPickerChoices:
                     "--intent",
                     intent_choice,
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -675,8 +646,6 @@ class TestSecurityDisclaimer:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -704,8 +673,6 @@ class TestSecurityDisclaimer:
                     "--intent",
                     "chatbot",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -736,8 +703,6 @@ class TestNextStepsIngestHint:
                 "--intent",
                 "knowledge",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--output",
                 str(output),
             ],
@@ -764,8 +729,6 @@ class TestNextStepsIngestHint:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--output",
                 str(output),
             ],
@@ -795,8 +758,6 @@ class TestNextStepsIngestHint:
                     "--intent",
                     "knowledge",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--output",
                     str(output),
                 ],
@@ -804,162 +765,6 @@ class TestNextStepsIngestHint:
             )
         assert result.exit_code == 0
         assert "initrunner ingest" in result.output
-
-
-class TestInterfaceInstall:
-    """Tests for the interface picker step in the setup wizard."""
-
-    def _base_args(self, output: Path, *, interfaces: str) -> list[str]:
-        return [
-            "setup",
-            "-y",
-            "--provider",
-            "openai",
-            "--model",
-            "gpt-5-mini",
-            "--intent",
-            "chatbot",
-            "--skip-test",
-            "--output",
-            str(output),
-            "--interfaces",
-            interfaces,
-        ]
-
-    def test_interfaces_skip(self, clean_env, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="skip"), input="\n")
-
-        assert result.exit_code == 0
-        mock_install.assert_not_called()
-        assert "Install later" in result.output
-
-    def test_interfaces_tui(self, clean_env, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="tui"), input="\n")
-
-        assert result.exit_code == 0
-        mock_install.assert_called_once_with("tui")
-
-    def test_interfaces_dashboard(self, clean_env, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="dashboard"), input="\n")
-
-        assert result.exit_code == 0
-        mock_install.assert_called_once_with("dashboard")
-        assert "initrunner ui" in result.output
-
-    def test_interfaces_both(self, clean_env, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(app, self._base_args(output, interfaces="both"), input="\n")
-
-        assert result.exit_code == 0
-        assert mock_install.call_count == 2
-        mock_install.assert_any_call("tui")
-        mock_install.assert_any_call("dashboard")
-        assert "initrunner ui" in result.output
-
-    def test_interactive_number_input(self, clean_env, monkeypatch):
-        """Typing '1' in the interactive picker selects tui."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--intent",
-                    "chatbot",
-                    "--skip-test",
-                    "--output",
-                    str(output),
-                ],
-                input="\n1\n",  # tools + pick tui
-            )
-
-        assert result.exit_code == 0
-        mock_install.assert_called_once_with("tui")
-
-    def test_interactive_skip_number(self, clean_env, monkeypatch):
-        """Typing '4' in the interactive picker skips installation."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--intent",
-                    "chatbot",
-                    "--skip-test",
-                    "--output",
-                    str(output),
-                ],
-                input="\n4\n",  # tools + skip
-            )
-
-        assert result.exit_code == 0
-        mock_install.assert_not_called()
-        assert "Install later" in result.output
-
-    def test_interactive_invalid_defaults_to_skip(self, clean_env, monkeypatch):
-        """Invalid input defaults to skip."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        tmp_path = clean_env
-        output = tmp_path / "role.yaml"
-
-        with patch("initrunner.cli.setup_cmd.install_extra") as mock_install:
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--intent",
-                    "chatbot",
-                    "--skip-test",
-                    "--output",
-                    str(output),
-                ],
-                input="\nbanana\n",  # tools + invalid interface
-            )
-
-        assert result.exit_code == 0
-        mock_install.assert_not_called()
-        assert "Invalid choice" in result.output
 
 
 class TestIntentSetup:
@@ -982,8 +787,6 @@ class TestIntentSetup:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--skip-chat-yaml",
                 "--output",
                 str(output),
@@ -1012,8 +815,6 @@ class TestIntentSetup:
                 "--intent",
                 "knowledge",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--skip-chat-yaml",
                 "--output",
                 str(output),
@@ -1047,8 +848,6 @@ class TestIntentSetup:
                     "--intent",
                     "knowledge",
                     "--skip-test",
-                    "--interfaces",
-                    "skip",
                     "--skip-chat-yaml",
                     "--output",
                     str(output),
@@ -1081,8 +880,6 @@ class TestIntentSetup:
                 "--intent",
                 "telegram-bot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--skip-chat-yaml",
                 "--output",
                 str(output),
@@ -1114,8 +911,6 @@ class TestSkipChatYaml:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--interfaces",
-                "skip",
                 "--skip-chat-yaml",
                 "--output",
                 str(output),

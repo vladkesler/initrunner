@@ -41,10 +41,10 @@ Triggered manually via GitHub Actions workflow dispatch. Used to validate packag
 2. **Test** — Same Python matrix (3.11, 3.12, 3.13).
 3. **Build** — Enforces that the package version contains a pre-release suffix (`rc`, `a`, `b`, or `dev`). Rejects stable versions to prevent accidental TestPyPI pollution. Then runs `uv build`.
 4. **Publish** — Uploads to `https://test.pypi.org/legacy/` via OIDC. Runs in the `testpypi` environment.
-5. **Verify Install** — After a 30-second index delay, downloads the published wheel from TestPyPI, installs it with all extras (`tui`, `ingest`, `dashboard`), and runs smoke tests across Python 3.11, 3.12, and 3.13:
+5. **Verify Install** — After a 30-second index delay, downloads the published wheel from TestPyPI, installs it with all extras (`ingest`), and runs smoke tests across Python 3.11, 3.12, and 3.13:
    - CLI: `initrunner --version` and `initrunner --help`
    - Core imports: `initrunner`, `initrunner.agent`, `initrunner.cli`, `initrunner.runner`
-   - Extra imports: `initrunner.tui`, `initrunner.ingestion`, `initrunner.api`
+   - Extra imports: `initrunner.ingestion`
 
 ## OIDC Trusted Publisher
 

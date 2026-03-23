@@ -4,7 +4,7 @@ YAML-first AI agent platform. Define agents as declarative `role.yaml` files —
 
 ## Tech Stack
 
-Python 3.11+ · PydanticAI (agent framework) · Pydantic (config/validation) · Typer + Rich (CLI) · SQLite (audit) · LanceDB (vector stores) · Jinja2 + HTMX + DaisyUI (dashboard) · hatchling (build) · uv (package manager)
+Python 3.11+ · PydanticAI (agent framework) · Pydantic (config/validation) · Typer + Rich (CLI) · SQLite (audit) · LanceDB (vector stores) · hatchling (build) · uv (package manager)
 
 ## Development Workflow
 
@@ -23,7 +23,6 @@ scripts/release.sh <version> # bump version, commit, tag
 initrunner/              # main package (flat layout)
 ├── agent/               # role schema, loader, executor, tool registry
 │   └── tools/           # self-registering tool modules
-├── api/                 # FastAPI web dashboard (server-rendered HTML + JSON API)
 ├── audit/               # append-only SQLite audit trail
 ├── cli/                 # Typer CLI entry point
 ├── compose/             # multi-agent orchestration (compose.yaml)
@@ -32,10 +31,7 @@ initrunner/              # main package (flat layout)
 ├── runner/              # single-shot, REPL, autonomous, daemon modes
 ├── stores/              # DocumentStore + MemoryStore ABCs and zvec impls
 ├── triggers/            # cron, file watcher, webhook triggers
-├── tui/                 # Textual terminal UI
-├── services/            # shared sync business logic (CLI, API, TUI all use this)
-├── _templates/          # Jinja2 HTML templates (HTMX + DaisyUI)
-├── _static/             # static assets (HTMX, Tailwind, DaisyUI CSS, app.js)
+├── services/            # shared sync business logic (CLI uses this)
 ├── _compat.py           # optional dependency helpers
 └── _html.py             # HTML fetch + markdown conversion
 tests/                   # pytest test suite
@@ -52,7 +48,7 @@ These rules apply to every task in this codebase:
 - **Lazy imports in CLI**: CLI commands use lazy imports so `--help` stays fast. Don't add top-level imports in `cli/main.py`.
 - **`audit.log()` never raises**: audit failures must not crash agent runs.
 - **Dataclasses for DTOs, Pydantic for config**: internal data (RunResult, AuditRecord) uses dataclasses. Role definitions and API schemas use Pydantic.
-- **`services/` is the shared layer**: all business logic lives here. CLI, API, and TUI are thin wrappers that call into `services.<submodule>.*`.
+- **`services/` is the shared layer**: all business logic lives here. CLI is a thin wrapper that calls into `services.<submodule>.*`.
 
 ## Skills: Methodology-Only vs Tool-Providing
 
@@ -98,9 +94,7 @@ Detailed docs live in `docs/`. Key references:
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
-| Web dashboard | `docs/interfaces/dashboard.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
-| Textual TUI | `docs/interfaces/tui.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Docker sandbox | `docs/security/docker-sandbox.md` |
 | Agent policy (Cerbos) | `docs/security/agent-policy.md` |
@@ -113,4 +107,3 @@ Detailed docs live in `docs/`. Key references:
 | Report export | `docs/core/reports.md` |
 | Doctor command | `docs/operations/doctor.md` |
 | Shareable templates | `docs/getting-started/shareable-templates.md`, `docs/getting-started/template-tutorial.md` |
-| Cloud deployment | `docs/getting-started/cloud-deploy.md` |

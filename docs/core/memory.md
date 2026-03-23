@@ -205,11 +205,11 @@ Session persistence saves REPL conversation history to SQLite after each turn, e
 
 ### Active Session History Limit
 
-During an active REPL or TUI session, message history is trimmed to `max_resume_messages * 2` (default: 40 messages) after each turn. This prevents unbounded growth during long conversations. The trimming:
+During an active REPL session, message history is trimmed to `max_resume_messages * 2` (default: 40 messages) after each turn. This prevents unbounded growth during long conversations. The trimming:
 
 - Keeps the most recent messages (sliding window).
 - Ensures the history starts with a `ModelRequest` (never a `ModelResponse`).
-- Applies in both the CLI REPL (`initrunner run -i`) and the TUI chat screen.
+- Applies in the CLI REPL (`initrunner run -i`).
 
 ### System Prompt Filtering
 

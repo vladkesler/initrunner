@@ -1,7 +1,7 @@
 # InitRunner — Docker Compose
 #
-# Start the dashboard:  docker compose up
-# Build locally:        docker compose up --build
+# Run:            docker compose up
+# Build locally:  docker compose up --build
 #
 # Do not commit .env files with real API keys.
 # Use `docker compose --env-file` or a secret manager for production.
@@ -14,7 +14,6 @@ services:
     # Uncomment to build from source instead:
     # build: .
     ports:
-      - "8420:8420"
       - "8000:8000"
     volumes:
       # Mount custom roles here to override seeded examples:
@@ -24,9 +23,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}
     restart: unless-stopped
-    command: ["initrunner", "ui", "--role-dir", "/data/roles"]
+    command: ["initrunner", "--help"]
 
 volumes:
   initrunner-data:

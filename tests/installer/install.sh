@@ -1,7 +1,7 @@
 #!/bin/sh
 # initrunner installer
 # Usage: curl -fsSL https://initrunner.ai/install.sh | sh
-#        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras tui,ingest
+#        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --version 0.2.0
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --unmanaged
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --method pipx
@@ -115,7 +115,7 @@ show_help() {
 
   Options:
     --method <uv|pipx|pip>  Force a specific installer
-    --extras <list>         Comma-separated extras (tui,ingest,anthropic)
+    --extras <list>         Comma-separated extras (ingest,anthropic)
     --version <ver>         Pin to a specific version
     --unmanaged             Skip PATH/profile modifications (CI mode)
     --uninstall             Remove initrunner

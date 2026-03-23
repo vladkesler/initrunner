@@ -139,4 +139,4 @@ path = export_report(role, result, prompt, Path("report.md"),
                      template_name="default", dry_run=False)
 ```
 
-The `services.py` layer also provides `export_run_report_sync()` for use from the API or TUI.
+The `services.py` layer also provides `export_run_report_sync()` for use from the API.

@@ -8,10 +8,10 @@ primary_region = "iad"
   INITRUNNER_HOME = "/data"
 
 [processes]
-  app = "initrunner ui --role-dir /data/roles --host 0.0.0.0 --port 8420 --no-browser"
+  app = "initrunner --help"
 
 [http_service]
-  internal_port = 8420
+  internal_port = 8000
   force_https = true
   auto_start_machines = true
   auto_stop_machines = "stop"
@@ -20,13 +20,6 @@ primary_region = "iad"
     type = "connections"
     hard_limit = 100
     soft_limit = 50
-
-  [[http_service.checks]]
-    interval = "15s"
-    grace_period = "10s"
-    method = "GET"
-    path = "/api/health"
-    timeout = "5s"
 
 [[mounts]]
   source = "initrunner_data"

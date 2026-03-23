@@ -88,7 +88,7 @@ fi
 if should_run "$FILTER" "extras"; then
     run_test "extras" \
         "python:3.12-slim" \
-        "--unmanaged --extras tui"
+        "--unmanaged --extras anthropic"
 fi
 
 if should_run "$FILTER" "uninstall"; then

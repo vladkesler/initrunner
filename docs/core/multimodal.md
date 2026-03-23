@@ -1,6 +1,6 @@
 # Multimodal Input
 
-InitRunner supports sending images, audio, video, and documents alongside text prompts. Multimodal input works across the CLI, interactive REPL, OpenAI-compatible API server, and web dashboard.
+InitRunner supports sending images, audio, video, and documents alongside text prompts. Multimodal input works across the CLI, interactive REPL, and OpenAI-compatible API server.
 
 ## Supported File Types
 
@@ -142,19 +142,6 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-## Web Dashboard
-
-The chat interface supports file uploads via a button or drag-and-drop.
-
-**Upload flow:**
-
-1. Files are uploaded to `POST /roles/{role_id}/chat/upload` and staged in memory
-2. The server returns a list of attachment IDs
-3. Attachment IDs are passed to the SSE stream endpoint with the next prompt
-4. Staged files expire after **5 minutes** if unused
-
-**Limits:** 20 MB per file, same supported file types as the CLI.
-
 ## Model Support
 
 Not all models support all modalities. If a model doesn't support a given content type, the provider API will return an error.
@@ -176,6 +163,5 @@ When in doubt, use `gpt-4o` or a Claude model for broad multimodal support.
 | No file extension | `Cannot determine file type — file has no extension: <path>` |
 | Unsupported extension | `Unsupported file type '<ext>' for: <path>. Supported: ...` |
 | File exceeds 20 MB | `File too large (<size> MB): <path>. Maximum: 20 MB` |
-| Dashboard upload too large | `File too large: <filename> (max 20 MB)` (HTTP 400) |
 
 In the interactive REPL, attachment errors are printed and the prompt is not sent. In the CLI, the command exits with a non-zero status.

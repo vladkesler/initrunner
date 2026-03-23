@@ -37,7 +37,6 @@ _SKIP_DIRS = frozenset(
         "dist",
         "build",
         ".eggs",
-        "_dashboard_static",
         ".hg",
         ".svn",
     }

@@ -38,7 +38,6 @@ initrunner setup --skip-test
 | `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
 | `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
 | `-y, --accept-risks` | `bool` | `false` | Accept security disclaimer without prompting. |
-| `--interfaces` | `str` | *(interactive)* | Install interfaces: `tui`, `dashboard`, `both`, or `skip`. |
 | `--skip-chat-yaml` | `bool` | `false` | Skip `chat.yaml` generation. |
 
 ## Supported Providers
@@ -123,20 +122,16 @@ A numbered tool menu is shown with intent-specific defaults pre-marked with `*`.
 - **discord-bot**: Prompts for `DISCORD_BOT_TOKEN`
 - **daemon**: Prompts for trigger type (file_watch or cron) and schedule/paths
 
-### 10. Interface Installation
-
-Optional installation of the TUI (Textual) and/or web dashboard (FastAPI).
-
-### 11. Role + Chat YAML Generation
+### 10. Role + Chat YAML Generation
 
 Generates `role.yaml` at the `--output` path and `~/.initrunner/chat.yaml` for `initrunner chat`. Use `--skip-chat-yaml` to skip chat.yaml generation.
 
-### 12. Post-Generation Actions
+### 11. Post-Generation Actions
 
 - **knowledge**: Offers to run `initrunner ingest` immediately
 - **All intents**: Connectivity test (skippable with `--skip-test`)
 
-### 13. Summary + Next Steps
+### 12. Summary + Next Steps
 
 A summary panel shows the configured intent, provider, model, and file paths. Next-step commands are tailored to the chosen intent.
 
@@ -172,13 +167,13 @@ For CI, automation, or scripting, pass all options as flags to skip all prompts:
 ```bash
 # Fully non-interactive OpenAI chatbot
 export OPENAI_API_KEY="sk-..."
-initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test --interfaces skip -y
+initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test -y
 
 # Knowledge agent with Ollama
-initrunner setup --provider ollama --model llama3.2 --intent knowledge --skip-test --interfaces skip -y
+initrunner setup --provider ollama --model llama3.2 --intent knowledge --skip-test -y
 
 # Skip chat.yaml generation
-initrunner setup --provider openai --intent chatbot --skip-test --skip-chat-yaml --interfaces skip -y
+initrunner setup --provider openai --intent chatbot --skip-test --skip-chat-yaml -y
 ```
 
 The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.

@@ -56,16 +56,16 @@ You can combine specific extras with commas:
 
 ```bash
 # pip
-pip install "initrunner[ingest,search,dashboard]"
+pip install "initrunner[ingest,search]"
 
 # uv
-uv tool install "initrunner[ingest,search,dashboard]"
+uv tool install "initrunner[ingest,search]"
 
 # pipx
-pipx install "initrunner[ingest,search,dashboard]"
+pipx install "initrunner[ingest,search]"
 
 # shell installer (comma-separated)
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest,search,dashboard
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest,search
 ```
 
 ### Available extras
@@ -97,13 +97,6 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest,search,da
 | `telegram` | Telegram bot trigger |
 | `discord` | Discord bot trigger |
 | `channels` | Both Telegram and Discord |
-
-#### Interfaces
-
-| Extra | What it adds |
-|-------|--------------|
-| `tui` | Terminal TUI dashboard (Textual) |
-| `dashboard` | Web dashboard (FastAPI + HTMX + DaisyUI) |
 
 > **Note:** `local-embeddings` (fastembed) is defined but **not yet implemented**. Use [Ollama](../configuration/ollama.md) for local embeddings instead.
 

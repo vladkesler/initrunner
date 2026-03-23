@@ -1,6 +1,6 @@
 # Token Usage Control
 
-InitRunner provides guardrails that limit how many tokens an agent can consume. These controls prevent runaway costs in development, enforce budgets in production daemons, and give visibility into token usage across the CLI, TUI, and dashboard.
+InitRunner provides guardrails that limit how many tokens an agent can consume. These controls prevent runaway costs in development, enforce budgets in production daemons, and give visibility into token usage across the CLI.
 
 All guardrails are configured under `spec.guardrails` in your `role.yaml`.
 
@@ -126,10 +126,6 @@ guardrails:
 
 The budget is checked both before accepting a new prompt and after each run completes.
 
-### TUI Behavior
-
-In the TUI run screen, the session budget is displayed in the status bar with color-coded percentages: green under 80%, yellow at 80-99%, and red at 100%. When the budget is exhausted, the send action is disabled and a notification is shown.
-
 ## Daemon Token Budgets
 
 Daemon mode (`initrunner run <path> --daemon`) supports two independent budget controls that work together. Both are tracked in-memory by a thread-safe `DaemonTokenTracker`.
@@ -199,36 +195,6 @@ Each response panel in interactive mode shows per-turn token usage. When a sessi
 
 ```
 tokens: 1200in/450out | 320ms | budget: 1,650/500,000
-```
-
-### TUI Status Bar
-
-The TUI run screen shows a persistent status bar with cumulative token counts and, when a session budget is configured, a color-coded percentage:
-
-```
-my-agent | openai:gpt-5-mini | 1200 in 450 out | 1,650/500,000 (0%)
-```
-
-The guardrails detail screen in the TUI lists all nine guardrail fields with their current values (showing "unlimited" for unset optional limits).
-
-### Dashboard API
-
-The `/api/roles/{role_id}` endpoint returns a `guardrails` object with all nine fields:
-
-```json
-{
-  "guardrails": {
-    "max_tokens_per_run": 50000,
-    "timeout_seconds": 300,
-    "max_tool_calls": 20,
-    "max_request_limit": 50,
-    "input_tokens_limit": null,
-    "total_tokens_limit": null,
-    "session_token_budget": 500000,
-    "daemon_token_budget": null,
-    "daemon_daily_token_budget": null
-  }
-}
 ```
 
 ### Audit Logs
