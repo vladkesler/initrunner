@@ -55,6 +55,300 @@ def _maybe_export_report(
         console.print(f"[yellow]Warning:[/yellow] Report export failed: {e}")
 
 
+def _validate_flags(
+    *,
+    daemon_mode: bool,
+    serve_mode: bool,
+    autonomous: bool,
+    bot: str | None,
+    output_format: str,
+    no_stream: bool,
+    interactive: bool,
+    sense: bool,
+    role_file: Path | None,
+    prompt: str | None,
+) -> str:
+    """Validate mutual exclusivity and format flags. Returns effective output_format."""
+    mode_flags = sum([daemon_mode, serve_mode, autonomous, bool(bot)])
+    if mode_flags > 1:
+        console.print(
+            "[red]Error:[/red] --daemon, --serve, --bot, and --autonomous are mutually exclusive."
+        )
+        raise typer.Exit(1)
+
+    if bot and bot not in ("telegram", "discord"):
+        console.print(f"[red]Error:[/red] --bot must be 'telegram' or 'discord', got '{bot}'.")
+        raise typer.Exit(1)
+
+    if output_format not in ("auto", "json", "text", "rich"):
+        console.print(
+            f"[red]Error:[/red] Unknown format '{output_format}'. Use: auto, json, text, rich"
+        )
+        raise typer.Exit(1)
+
+    if no_stream:
+        typer.echo("Warning: --no-stream is deprecated; use --format rich", err=True)
+        if output_format == "auto":
+            output_format = "rich"
+
+    if output_format in ("json", "text") and interactive:
+        console.print("[red]Error:[/red] --format json|text is not supported with -i.")
+        raise typer.Exit(1)
+
+    if output_format in ("json", "text") and autonomous:
+        console.print("[red]Error:[/red] --format json|text is not supported with -a.")
+        raise typer.Exit(1)
+
+    if role_file is not None and sense:
+        console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
+        raise typer.Exit(1)
+    if role_file is None and not sense:
+        console.print(
+            "[red]Error:[/red] Provide a role file, installed role name, or use --sense.\n"
+            "[dim]Hint: for quick ephemeral chat, use 'initrunner chat'.\n"
+            "      To create a new agent, use 'initrunner new'.[/dim]"
+        )
+        raise typer.Exit(1)
+    if sense and not prompt:
+        console.print("[red]Error:[/red] --sense requires --prompt (-p).")
+        raise typer.Exit(1)
+
+    return output_format
+
+
+def _resolve_via_sensing(
+    prompt: str,
+    *,
+    role_dir: Path | None,
+    confirm_role: bool,
+    dry_run: bool,
+) -> Path:
+    """Run intent sensing to find the best role. Returns resolved role path."""
+    from initrunner.cli._helpers import display_sense_result
+    from initrunner.services.role_selector import NoRolesFoundError, select_role_sync
+
+    try:
+        with console.status("[dim]Sensing best role...[/dim]"):
+            selection = select_role_sync(
+                prompt,
+                role_dir=role_dir,
+                allow_llm=not dry_run,
+            )
+    except (NoRolesFoundError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    display_sense_result(selection)
+    if confirm_role:
+        if not sys.stdin.isatty():
+            console.print("[red]Error:[/red] --confirm-role requires an interactive terminal.")
+            raise typer.Exit(1)
+        if not typer.confirm("Use this role?", default=True):
+            raise typer.Exit()
+    return selection.candidate.path
+
+
+def _resolve_output_format(
+    output_format: str,
+    *,
+    no_stream: bool,
+    autonomous: bool,
+    output_type: str,
+) -> str:
+    """Resolve auto/json/text/rich/stream based on context."""
+    if output_format in ("json", "text"):
+        effective = output_format
+    elif output_format == "rich":
+        effective = "rich"
+    else:  # auto
+        if not sys.stdout.isatty():
+            effective = "text"
+        elif autonomous:
+            effective = "rich"
+        elif output_type != "text":
+            effective = "rich"
+        else:
+            effective = "stream"
+
+    if no_stream and effective == "stream":
+        effective = "rich"
+
+    return effective
+
+
+def _build_user_prompt(
+    prompt: str | None,
+    attach: list[str] | None,
+) -> str | UserPrompt | None:
+    """Build multimodal prompt if attachments provided."""
+    if attach and prompt:
+        from initrunner.agent.prompt import build_multimodal_prompt
+
+        try:
+            return build_multimodal_prompt(prompt, attach)
+        except (FileNotFoundError, ValueError) as e:
+            console.print(f"[red]Attachment error:[/red] {e}")
+            raise typer.Exit(1) from None
+    return prompt
+
+
+def _run_agent(
+    role_file: Path,
+    *,
+    prompt: str | None,
+    interactive: bool,
+    autonomous: bool,
+    max_iterations: int | None,
+    resume: bool,
+    dry_run: bool,
+    audit_db: Path | None,
+    no_audit: bool,
+    skill_dir: Path | None,
+    attach: list[str] | None,
+    report: Path | None,
+    report_template: str,
+    output_format: str,
+    no_stream: bool,
+    model: str | None,
+) -> None:
+    """Standard agent execution: single-shot, REPL, or autonomous."""
+    if autonomous and not prompt:
+        console.print("[red]Error:[/red] --autonomous requires --prompt (-p).")
+        raise typer.Exit(1)
+    if autonomous and interactive:
+        console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
+        raise typer.Exit(1)
+
+    if report_template != "default" and report is None:
+        console.print("[red]Error:[/red] --report-template requires --report PATH.")
+        raise typer.Exit(1)
+
+    if report is not None:
+        from initrunner.report import BUILT_IN_TEMPLATES
+
+        if report_template not in BUILT_IN_TEMPLATES:
+            console.print(
+                f"[red]Error:[/red] Unknown template '{report_template}'. "
+                f"Available: {', '.join(BUILT_IN_TEMPLATES)}"
+            )
+            raise typer.Exit(1)
+
+    if attach and not prompt and not interactive and sys.stdin.isatty():
+        console.print("[red]Error:[/red] use --prompt with --attach or pipe stdin.")
+        raise typer.Exit(1)
+
+    from initrunner.runner import run_autonomous, run_interactive, run_single, run_single_stream
+
+    model_override = None
+    if dry_run:
+        from pydantic_ai.models.test import TestModel
+
+        model_override = TestModel(
+            custom_output_text="[dry-run] Simulated response.", call_tools=[]
+        )
+
+    user_prompt = _build_user_prompt(prompt, attach)
+
+    resolved_model = resolve_model_override(model)
+    with command_context(
+        role_file,
+        audit_db=audit_db,
+        no_audit=no_audit,
+        with_memory=True,
+        with_sinks=True,
+        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        model_override=resolved_model,
+    ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        if not prompt and not autonomous and role.spec.triggers:
+            console.print(
+                "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"
+            )
+
+        effective = _resolve_output_format(
+            output_format,
+            no_stream=no_stream,
+            autonomous=autonomous,
+            output_type=role.spec.output.type,
+        )
+        use_stream = effective == "stream"
+        _run_single = run_single_stream if use_stream else run_single
+
+        run_result = None
+        message_history = None
+
+        if autonomous:
+            if user_prompt is None:
+                raise RuntimeError("prompt unresolved")
+            run_result = run_autonomous(
+                agent,
+                role,
+                user_prompt,
+                audit_logger=audit_logger,
+                sink_dispatcher=sink_dispatcher,
+                memory_store=memory_store,
+                model_override=model_override,
+                max_iterations_override=max_iterations,
+            )
+        elif user_prompt and not interactive:
+            if effective in ("text", "json"):
+                run_result, _ = _run_formatted(
+                    effective,
+                    agent,
+                    role,
+                    user_prompt,
+                    audit_logger=audit_logger,
+                    sink_dispatcher=sink_dispatcher,
+                    model_override=model_override,
+                )
+            else:
+                run_result, _ = _run_single(
+                    agent,
+                    role,
+                    user_prompt,
+                    audit_logger=audit_logger,
+                    sink_dispatcher=sink_dispatcher,
+                    model_override=model_override,
+                )
+        elif user_prompt and interactive:
+            run_result, message_history = _run_single(
+                agent,
+                role,
+                user_prompt,
+                audit_logger=audit_logger,
+                sink_dispatcher=sink_dispatcher,
+                model_override=model_override,
+            )
+            if report is not None:
+                _maybe_export_report(
+                    role, run_result, user_prompt, report, report_template, dry_run
+                )
+            run_interactive(
+                agent,
+                role,
+                audit_logger=audit_logger,
+                message_history=message_history,
+                memory_store=memory_store,
+                resume=False,
+                sink_dispatcher=sink_dispatcher,
+                model_override=model_override,
+                stream=use_stream,
+            )
+        else:
+            run_interactive(
+                agent,
+                role,
+                audit_logger=audit_logger,
+                memory_store=memory_store,
+                resume=resume,
+                sink_dispatcher=sink_dispatcher,
+                model_override=model_override,
+                stream=use_stream,
+            )
+
+        # Export for non-interactive branches (after run completes)
+        if report is not None and run_result is not None and not (user_prompt and interactive):
+            _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+
+
 def run(
     role_file: Annotated[
         Path | None,
@@ -171,77 +465,28 @@ def run(
     Use -i for interactive REPL, -a for autonomous mode.
     For quick chat without a role file, use 'initrunner chat'.
     """
+    # --- Validate flags ---
+    output_format = _validate_flags(
+        daemon_mode=daemon_mode,
+        serve_mode=serve_mode,
+        autonomous=autonomous,
+        bot=bot,
+        output_format=output_format,
+        no_stream=no_stream,
+        interactive=interactive,
+        sense=sense,
+        role_file=role_file,
+        prompt=prompt,
+    )
 
-    # --- Mutual exclusivity for mode flags ---
-    mode_flags = sum([daemon_mode, serve_mode, autonomous, bool(bot)])
-    if mode_flags > 1:
-        console.print(
-            "[red]Error:[/red] --daemon, --serve, --bot, and --autonomous are mutually exclusive."
-        )
-        raise typer.Exit(1)
-
-    if bot and bot not in ("telegram", "discord"):
-        console.print(f"[red]Error:[/red] --bot must be 'telegram' or 'discord', got '{bot}'.")
-        raise typer.Exit(1)
-
-    # --- Output format validation ---
-    if output_format not in ("auto", "json", "text", "rich"):
-        console.print(
-            f"[red]Error:[/red] Unknown format '{output_format}'. Use: auto, json, text, rich"
-        )
-        raise typer.Exit(1)
-
-    if no_stream:
-        typer.echo("Warning: --no-stream is deprecated; use --format rich", err=True)
-        if output_format == "auto":
-            output_format = "rich"
-
-    if output_format in ("json", "text") and interactive:
-        console.print("[red]Error:[/red] --format json|text is not supported with -i.")
-        raise typer.Exit(1)
-
-    if output_format in ("json", "text") and autonomous:
-        console.print("[red]Error:[/red] --format json|text is not supported with -a.")
-        raise typer.Exit(1)
-
-    # --- Intent Sensing resolution ---
-    if role_file is not None and sense:
-        console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
-        raise typer.Exit(1)
-    if role_file is None and not sense:
-        console.print(
-            "[red]Error:[/red] Provide a role file, installed role name, or use --sense.\n"
-            "[dim]Hint: for quick ephemeral chat, use 'initrunner chat'.\n"
-            "      To create a new agent, use 'initrunner new'.[/dim]"
-        )
-        raise typer.Exit(1)
-    if sense and not prompt:
-        console.print("[red]Error:[/red] --sense requires --prompt (-p).")
-        raise typer.Exit(1)
-
+    # --- Intent sensing ---
     if sense:
-        from initrunner.cli._helpers import display_sense_result
-        from initrunner.services.role_selector import NoRolesFoundError, select_role_sync
-
-        try:
-            with console.status("[dim]Sensing best role...[/dim]"):
-                selection = select_role_sync(
-                    prompt,  # type: ignore[arg-type]  # guarded by sense+prompt check above
-                    role_dir=role_dir,
-                    allow_llm=not dry_run,
-                )
-        except (NoRolesFoundError, ValueError) as e:
-            console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(1) from None
-        display_sense_result(selection)
-        if confirm_role:
-            if not sys.stdin.isatty():
-                console.print("[red]Error:[/red] --confirm-role requires an interactive terminal.")
-                raise typer.Exit(1)
-            if not typer.confirm("Use this role?", default=True):
-                raise typer.Exit()
-        role_file = selection.candidate.path
-    # --- End Intent Sensing ---
+        role_file = _resolve_via_sensing(
+            prompt,  # type: ignore[arg-type]  # guarded by _validate_flags
+            role_dir=role_dir,
+            confirm_role=confirm_role,
+            dry_run=dry_run,
+        )
 
     # --- Resolve target and detect kind ---
     if role_file is None:
@@ -305,28 +550,13 @@ def run(
     # --- Agent mode: flag-based dispatch ---
     if serve_mode:
         _dispatch_serve(
-            role_file,
-            host,
-            port,
-            api_key,
-            cors_origin,
-            audit_db,
-            no_audit,
-            skill_dir,
-            model,
+            role_file, host, port, api_key, cors_origin, audit_db, no_audit, skill_dir, model
         )
         return
 
     if bot:
         _dispatch_bot(
-            role_file,
-            bot,
-            allowed_users,
-            allowed_user_ids,
-            audit_db,
-            no_audit,
-            skill_dir,
-            model,
+            role_file, bot, allowed_users, allowed_user_ids, audit_db, no_audit, skill_dir, model
         )
         return
 
@@ -334,172 +564,25 @@ def run(
         _dispatch_daemon(role_file, audit_db, no_audit, skill_dir, model)
         return
 
-    # --- Standard Agent execution (single-shot / REPL / autonomous) ---
-    if autonomous and not prompt:
-        console.print("[red]Error:[/red] --autonomous requires --prompt (-p).")
-        raise typer.Exit(1)
-    if autonomous and interactive:
-        console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
-        raise typer.Exit(1)
-
-    if report_template != "default" and report is None:
-        console.print("[red]Error:[/red] --report-template requires --report PATH.")
-        raise typer.Exit(1)
-
-    if report is not None:
-        from initrunner.report import BUILT_IN_TEMPLATES
-
-        if report_template not in BUILT_IN_TEMPLATES:
-            console.print(
-                f"[red]Error:[/red] Unknown template '{report_template}'. "
-                f"Available: {', '.join(BUILT_IN_TEMPLATES)}"
-            )
-            raise typer.Exit(1)
-
-    if attach and not prompt and not interactive and sys.stdin.isatty():
-        console.print("[red]Error:[/red] use --prompt with --attach or pipe stdin.")
-        raise typer.Exit(1)
-
-    from initrunner.runner import run_autonomous, run_interactive, run_single, run_single_stream
-
-    model_override = None
-    if dry_run:
-        from pydantic_ai.models.test import TestModel
-
-        model_override = TestModel(
-            custom_output_text="[dry-run] Simulated response.", call_tools=[]
-        )
-
-    # Build multimodal prompt if attachments provided
-    user_prompt = prompt
-    if attach and prompt:
-        from initrunner.agent.prompt import build_multimodal_prompt
-
-        try:
-            user_prompt = build_multimodal_prompt(prompt, attach)
-        except (FileNotFoundError, ValueError) as e:
-            console.print(f"[red]Attachment error:[/red] {e}")
-            raise typer.Exit(1) from None
-
-    resolved_model = resolve_model_override(model)
-    with command_context(
+    # --- Standard agent execution ---
+    _run_agent(
         role_file,
+        prompt=prompt,
+        interactive=interactive,
+        autonomous=autonomous,
+        max_iterations=max_iterations,
+        resume=resume,
+        dry_run=dry_run,
         audit_db=audit_db,
         no_audit=no_audit,
-        with_memory=True,
-        with_sinks=True,
-        extra_skill_dirs=resolve_skill_dirs(skill_dir),
-        model_override=resolved_model,
-    ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
-        # Trigger hint for REPL mode
-        if (
-            not prompt
-            and not autonomous
-            and not daemon_mode
-            and not serve_mode
-            and not bot
-            and role.spec.triggers
-        ):
-            console.print(
-                "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"
-            )
-
-        message_history = None
-        run_result = None  # RunResult or AutonomousResult
-
-        # --- Resolve effective output mode ---
-        if output_format in ("json", "text"):
-            effective = output_format
-        elif output_format == "rich":
-            effective = "rich"
-        else:  # auto
-            if not sys.stdout.isatty():
-                effective = "text"
-            elif autonomous:
-                effective = "rich"
-            elif role.spec.output.type != "text":
-                effective = "rich"
-            else:
-                effective = "stream"
-
-        if no_stream and effective == "stream":
-            effective = "rich"
-
-        use_stream = effective == "stream"
-        _run_single = run_single_stream if use_stream else run_single
-
-        if autonomous:
-            if user_prompt is None:
-                raise RuntimeError("prompt unresolved")
-            run_result = run_autonomous(
-                agent,
-                role,
-                user_prompt,
-                audit_logger=audit_logger,
-                sink_dispatcher=sink_dispatcher,
-                memory_store=memory_store,
-                model_override=model_override,
-                max_iterations_override=max_iterations,
-            )
-        elif user_prompt and not interactive:
-            if effective in ("text", "json"):
-                run_result, _ = _run_formatted(
-                    effective,
-                    agent,
-                    role,
-                    user_prompt,
-                    audit_logger=audit_logger,
-                    sink_dispatcher=sink_dispatcher,
-                    model_override=model_override,
-                )
-            else:
-                run_result, _ = _run_single(
-                    agent,
-                    role,
-                    user_prompt,
-                    audit_logger=audit_logger,
-                    sink_dispatcher=sink_dispatcher,
-                    model_override=model_override,
-                )
-        elif user_prompt and interactive:
-            run_result, message_history = _run_single(
-                agent,
-                role,
-                user_prompt,
-                audit_logger=audit_logger,
-                sink_dispatcher=sink_dispatcher,
-                model_override=model_override,
-            )
-            if report is not None:
-                _maybe_export_report(
-                    role, run_result, user_prompt, report, report_template, dry_run
-                )
-            run_interactive(
-                agent,
-                role,
-                audit_logger=audit_logger,
-                message_history=message_history,
-                memory_store=memory_store,
-                resume=False,
-                sink_dispatcher=sink_dispatcher,
-                model_override=model_override,
-                stream=use_stream,
-            )
-        else:
-            run_interactive(
-                agent,
-                role,
-                audit_logger=audit_logger,
-                memory_store=memory_store,
-                resume=resume,
-                sink_dispatcher=sink_dispatcher,
-                model_override=model_override,
-                stream=use_stream,
-            )
-
-        # Export for non-interactive branches (after run completes)
-        if report is not None and run_result is not None and not (user_prompt and interactive):
-            _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+        skill_dir=skill_dir,
+        attach=attach,
+        report=report,
+        report_template=report_template,
+        output_format=output_format,
+        no_stream=no_stream,
+        model=model,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -524,13 +607,13 @@ def _run_formatted(
     """
     from rich.console import Console as _Console
 
-    from initrunner.agent.executor import execute_run
     from initrunner.agent.prompt import extract_text_from_prompt
     from initrunner.runner.display import _display_result_json, _display_result_plain
+    from initrunner.services.execution import execute_run_sync
 
     stderr_console = _Console(stderr=True)
     with stderr_console.status("Thinking...", spinner="dots"):
-        result, messages = execute_run(
+        result, messages = execute_run_sync(
             agent,
             role,
             prompt,

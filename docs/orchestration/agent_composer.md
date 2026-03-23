@@ -416,7 +416,7 @@ The sync façade is preserved — `ComposeOrchestrator.start()`, `stop()`, and `
 
 Compose services build agents with `prefer_async=True`, which gives I/O-bound tools (HTTP, web scraper, search) async closures. When the agent runs via PydanticAI's async `agent.run()`, these tools execute natively on the event loop without thread-pool overhead. Sync tools are auto-wrapped by PydanticAI.
 
-For async executor details, see `execute_run_async()` and `execute_run_stream_async()` in `agent/executor.py`.
+For async executor details, see `execute_run_async()` and `execute_run_stream_async()` in `services/execution.py` (which delegates to `agent/executor.py`).
 
 ### Queue Bridge
 

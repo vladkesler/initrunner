@@ -119,13 +119,7 @@ def register_tool(
 # ---------------------------------------------------------------------------
 
 # Modules outside of initrunner.agent.tools that contain @register_tool
-_LEGACY_TOOL_MODULES: list[str] = [
-    "initrunner.agent.git_tools",
-    "initrunner.agent.python_tools",
-    "initrunner.agent.sql_tools",
-    "initrunner.agent.shell_tools",
-    "initrunner.agent.slack_tools",
-    "initrunner.agent.api_tools",
+_EXTERNAL_TOOL_MODULES: list[str] = [
     "initrunner.mcp.server",
 ]
 
@@ -157,7 +151,7 @@ def _ensure_discovered() -> None:
                 continue
             all_modules.append(f"initrunner.agent.tools.{modname}")
 
-        all_modules.extend(_LEGACY_TOOL_MODULES)
+        all_modules.extend(_EXTERNAL_TOOL_MODULES)
 
         pending = [m for m in all_modules if m not in _discovered_modules]
         if not pending:

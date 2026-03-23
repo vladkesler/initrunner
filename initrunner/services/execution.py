@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
     from pydantic_ai import Agent
     from pydantic_ai.messages import ModelMessage
+    from pydantic_ai.models import Model
 
     from initrunner.agent.executor import AutonomousResult, RunResult
     from initrunner.agent.prompt import UserPrompt
@@ -18,11 +19,15 @@ if TYPE_CHECKING:
     from initrunner.stores.base import MemoryStoreBase
 
 
-def build_agent_sync(path: Path) -> tuple[RoleDefinition, Agent]:
+def build_agent_sync(
+    path: Path,
+    extra_skill_dirs: list[Path] | None = None,
+    model_override: str | None = None,
+) -> tuple[RoleDefinition, Agent]:
     """Load and build an agent from a role file (sync)."""
     from initrunner.agent.loader import load_and_build
 
-    return load_and_build(path)
+    return load_and_build(path, extra_skill_dirs=extra_skill_dirs, model_override=model_override)
 
 
 def build_agent_from_role_sync(role: RoleDefinition) -> Agent:
@@ -39,6 +44,10 @@ def execute_run_sync(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    model_override: Model | str | None = None,
+    trigger_type: str | None = None,
+    trigger_metadata: dict[str, str] | None = None,
+    skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a single agent run (sync)."""
@@ -50,6 +59,10 @@ def execute_run_sync(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        model_override=model_override,
+        trigger_type=trigger_type,
+        trigger_metadata=trigger_metadata,
+        skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )
 
@@ -84,7 +97,9 @@ def execute_run_stream_sync(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a streaming agent run (sync). Call from a worker thread."""
@@ -96,7 +111,9 @@ def execute_run_stream_sync(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        model_override=model_override,
         on_token=on_token,
+        skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )
 
@@ -108,6 +125,8 @@ async def execute_run_async(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    model_override: Model | str | None = None,
+    skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a single agent run (async)."""
@@ -119,6 +138,8 @@ async def execute_run_async(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        model_override=model_override,
+        skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )
 
@@ -130,7 +151,9 @@ async def execute_run_stream_async(
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
+    model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
     """Execute a streaming agent run (async)."""
@@ -142,6 +165,8 @@ async def execute_run_stream_async(
         prompt,
         audit_logger=audit_logger,
         message_history=message_history,
+        model_override=model_override,
         on_token=on_token,
+        skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )

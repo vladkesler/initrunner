@@ -44,6 +44,7 @@ class TestTodoDrivenStrategy:
     def test_wrap_initial_prompt_with_auto_plan(self):
         s = TodoDrivenStrategy("Continue.", auto_plan=True)
         result = s.wrap_initial_prompt("Build a website")
+        assert isinstance(result, str)
         assert "todo list" in result.lower()
         assert "Build a website" in result
 
@@ -137,7 +138,7 @@ class TestResolveStrategy:
             apiVersion=ApiVersion.V1,
             kind=Kind.AGENT,
             metadata=Metadata(name="test", description=""),
-            spec=AgentSpec(**spec_kwargs),
+            spec=AgentSpec(**spec_kwargs),  # type: ignore[arg-type]
         )
 
     def test_default_is_react(self):

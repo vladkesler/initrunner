@@ -280,15 +280,15 @@ def load_and_build_or_exit(
     model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
-    from initrunner.agent.loader import RoleLoadError, load_and_build
+    from initrunner.agent.loader import RoleLoadError
+    from initrunner.services.execution import build_agent_sync
 
     try:
-        role, agent = load_and_build(
+        return build_agent_sync(
             role_file,
             extra_skill_dirs=extra_skill_dirs,
             model_override=model_override,
         )
-        return role, agent
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

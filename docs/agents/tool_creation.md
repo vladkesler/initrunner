@@ -67,9 +67,9 @@ Every builder receives a `ToolBuildContext` instance as its second argument:
 
 At first access, `_ensure_discovered()` imports every module under `initrunner/agent/tools/` via `pkgutil.iter_modules()`. Modules with `_`-prefixed names (like `_registry.py`) are skipped. Import errors are silently ignored so missing optional dependencies don't crash discovery.
 
-### Legacy modules
+### External modules
 
-Tool modules that live outside the `tools/` package (e.g. `agent/git_tools.py`, `agent/python_tools.py`) are listed in `_LEGACY_TOOL_MODULES` in `_registry.py` and imported during discovery alongside the package modules.
+Tool modules that live outside the `tools/` package (e.g. `mcp/server.py`) are listed in `_EXTERNAL_TOOL_MODULES` in `_registry.py` and imported during discovery alongside the package modules.
 
 ### Checklist
 

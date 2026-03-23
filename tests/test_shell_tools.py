@@ -6,13 +6,13 @@ import os
 from pathlib import Path
 
 from initrunner.agent.schema.tools import ShellToolConfig
-from initrunner.agent.shell_tools import (
+from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.shell import (
     _check_for_shell_operators,
     _parse_command,
     build_shell_toolset,
     validate_command,
 )
-from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):

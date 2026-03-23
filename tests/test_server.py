@@ -195,7 +195,7 @@ class TestModelsEndpoint:
 
 
 class TestChatCompletionsEndpoint:
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -225,7 +225,7 @@ class TestChatCompletionsEndpoint:
         assert data["usage"]["completion_tokens"] == 5
         assert "X-Conversation-Id" in resp.headers
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_error(self, mock_execute):
         mock_execute.return_value = (
             RunResult(run_id="test-123", output="", success=False, error="model error"),
@@ -274,7 +274,7 @@ class TestChatCompletionsEndpoint:
         assert resp.status_code == 400
         assert "no user message" in resp.json()["error"]["message"]
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_conversation_id_returned(self, mock_execute):
         mock_execute.return_value = (
             RunResult(run_id="test", output="Hi", success=True),
@@ -290,7 +290,7 @@ class TestChatCompletionsEndpoint:
         assert conv_id is not None
         assert len(conv_id) > 0
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_excludes_null_fields(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -312,7 +312,7 @@ class TestChatCompletionsEndpoint:
         raw = resp.text
         assert "null" not in raw
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_conversation_tracking_with_header(self, mock_execute):
         mock_execute.return_value = (
             RunResult(run_id="test", output="First reply", success=True),
@@ -499,7 +499,7 @@ class TestRateLimiting:
 
 
 class TestErrorSanitization:
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_exception_details_not_leaked(self, mock_execute):
         mock_execute.side_effect = RuntimeError("secret database password: hunter2")
         client = _create_test_client()
@@ -537,7 +537,7 @@ def _stream_body(content: str = "Hi") -> dict:
 
 
 class TestStreamingEndpoint:
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_uses_executor(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -583,7 +583,7 @@ class TestStreamingEndpoint:
         assert resp.status_code == 400
         assert "Blocked by policy" in resp.json()["error"]["message"]
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_passes_audit_logger(
         self,
@@ -613,7 +613,7 @@ class TestStreamingEndpoint:
         call_kwargs = mock_stream.call_args
         assert call_kwargs.kwargs["audit_logger"] is audit
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_returns_conversation_id(
         self,
@@ -636,7 +636,7 @@ class TestStreamingEndpoint:
         assert resp.status_code == 200
         assert "X-Conversation-Id" in resp.headers
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_openai_sse_format(
         self,
@@ -693,7 +693,7 @@ class TestStreamingEndpoint:
         assert finish_chunk["usage"]["total_tokens"] == 15
         assert chunks[-1] == "[DONE]"
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_exception_handling(
         self,
@@ -715,7 +715,7 @@ class TestStreamingEndpoint:
         assert "secret crash details" not in resp.text
         assert "[DONE]" in resp.text
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_chunks_exclude_null_fields(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -749,7 +749,7 @@ class TestStreamingEndpoint:
             if line.startswith("data: ") and line != "data: [DONE]":
                 assert "null" not in line
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_multi_turn_with_conversation_id(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -883,7 +883,7 @@ class TestServeCLICorsFlag:
 class TestNonStreamingValidation:
     """Tests for pre-flight input validation and error classification (fixes #2, #3)."""
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     @patch("initrunner.server.app.validate_input")
     def test_non_streaming_blocked_input_returns_400(self, mock_validate, mock_execute):
         from initrunner.agent.policies import ValidationResult
@@ -902,7 +902,7 @@ class TestNonStreamingValidation:
         assert "Blocked by content policy" in resp.json()["error"]["message"]
         mock_execute.assert_not_called()
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_timeout_returns_504(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -923,7 +923,7 @@ class TestNonStreamingValidation:
         assert resp.json()["error"]["type"] == "timeout"
         assert resp.json()["error"]["message"] == "Request timed out"
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_output_blocked_returns_400(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -943,7 +943,7 @@ class TestNonStreamingValidation:
         assert resp.status_code == 400
         assert resp.json()["error"]["type"] == "content_filter"
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_usage_limit_from_result_returns_400(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -963,7 +963,7 @@ class TestNonStreamingValidation:
         assert resp.status_code == 400
         assert resp.json()["error"]["type"] == "context_length_exceeded"
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     def test_non_streaming_model_error_sanitized(self, mock_execute):
         mock_execute.return_value = (
             RunResult(
@@ -1013,7 +1013,7 @@ class TestConversationTrimming:
 class TestStreamingHeaders:
     """Tests for streaming response headers (fix #6)."""
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_has_x_accel_buffering_header(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -1062,7 +1062,7 @@ class TestTokenQueueSize:
 class TestStreamingResultChecks:
     """Tests for streaming handler checking result.success after stream completes."""
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_failed_result_does_not_save_conversation(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -1102,7 +1102,7 @@ class TestStreamingResultChecks:
         ]
         assert len(stop_chunks) == 0
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_output_blocked_sends_content_filter(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -1141,7 +1141,7 @@ class TestStreamingResultChecks:
         assert len(finish_chunks) == 1
         assert finish_chunks[0]["choices"][0]["finish_reason"] == "content_filter"
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_timeout_sends_error_sse(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult
@@ -1170,7 +1170,7 @@ class TestStreamingResultChecks:
         assert "timeout" in resp.text
         assert "[DONE]" in resp.text
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_success_still_works(self, mock_validate, mock_stream):
         """Regression guard: successful streaming should still save conversation and send stop."""
@@ -1217,7 +1217,7 @@ class TestStreamingResultChecks:
 class TestSkipDoubleValidation:
     """Tests that the server passes skip_input_validation=True to avoid double validation."""
 
-    @patch("initrunner.server.app.execute_run")
+    @patch("initrunner.server.app.execute_run_sync")
     @patch("initrunner.server.app.validate_input")
     def test_non_streaming_passes_skip_input_validation(self, mock_validate, mock_execute):
         from initrunner.agent.policies import ValidationResult
@@ -1236,7 +1236,7 @@ class TestSkipDoubleValidation:
         call_kwargs = mock_execute.call_args
         assert call_kwargs.kwargs["skip_input_validation"] is True
 
-    @patch("initrunner.server.app.execute_run_stream")
+    @patch("initrunner.server.app.execute_run_stream_sync")
     @patch("initrunner.server.app.validate_input")
     def test_streaming_passes_skip_input_validation(self, mock_validate, mock_stream):
         from initrunner.agent.policies import ValidationResult

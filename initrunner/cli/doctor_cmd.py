@@ -138,10 +138,10 @@ def doctor(
             )
             agent = build_agent(role, role_dir=None)
 
-        from initrunner.agent.executor import execute_run
+        from initrunner.services.execution import execute_run_sync
 
         with console.status("Running smoke prompt...", spinner="dots"):
-            result, _ = execute_run(agent, role, "Say hello in one sentence.")
+            result, _ = execute_run_sync(agent, role, "Say hello in one sentence.")
 
         if result.success:
             preview = result.output[:200]

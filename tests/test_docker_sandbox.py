@@ -547,7 +547,7 @@ class TestDockerRunScript:
 class TestShellToolDockerIntegration:
     def test_uses_docker_when_enabled(self):
         from initrunner.agent.schema.tools import ShellToolConfig
-        from initrunner.agent.shell_tools import build_shell_toolset
+        from initrunner.agent.tools.shell import build_shell_toolset
 
         ctx = _make_ctx(docker_enabled=True)
         config = ShellToolConfig(require_confirmation=False, blocked_commands=[])
@@ -563,7 +563,7 @@ class TestShellToolDockerIntegration:
 
     def test_uses_normal_path_when_disabled(self):
         from initrunner.agent.schema.tools import ShellToolConfig
-        from initrunner.agent.shell_tools import build_shell_toolset
+        from initrunner.agent.tools.shell import build_shell_toolset
 
         ctx = _make_ctx(docker_enabled=False)
         config = ShellToolConfig(require_confirmation=False, blocked_commands=[])
@@ -576,8 +576,8 @@ class TestShellToolDockerIntegration:
 
 class TestPythonToolDockerIntegration:
     def test_uses_docker_when_enabled(self):
-        from initrunner.agent.python_tools import build_python_toolset
         from initrunner.agent.schema.tools import PythonToolConfig
+        from initrunner.agent.tools.python_exec import build_python_toolset
 
         ctx = _make_ctx(docker_enabled=True)
         config = PythonToolConfig(require_confirmation=False)
@@ -592,8 +592,8 @@ class TestPythonToolDockerIntegration:
             assert cmd[:3] == ["docker", "run", "--rm"]
 
     def test_uses_normal_path_when_disabled(self):
-        from initrunner.agent.python_tools import build_python_toolset
         from initrunner.agent.schema.tools import PythonToolConfig
+        from initrunner.agent.tools.python_exec import build_python_toolset
 
         ctx = _make_ctx(docker_enabled=False)
         config = PythonToolConfig(require_confirmation=False)
@@ -605,8 +605,8 @@ class TestPythonToolDockerIntegration:
 
     def test_network_disabled_no_shim_when_docker_none(self):
         """network_disabled + Docker network=none → no shim (Docker provides isolation)."""
-        from initrunner.agent.python_tools import build_python_toolset
         from initrunner.agent.schema.tools import PythonToolConfig
+        from initrunner.agent.tools.python_exec import build_python_toolset
 
         ctx = _make_ctx(docker_enabled=True, docker_network="none")
         config = PythonToolConfig(require_confirmation=False, network_disabled=True)
@@ -623,8 +623,8 @@ class TestPythonToolDockerIntegration:
 
     def test_network_disabled_shim_preserved_when_docker_bridge(self):
         """network_disabled + Docker network=bridge → shim preserved."""
-        from initrunner.agent.python_tools import build_python_toolset
         from initrunner.agent.schema.tools import PythonToolConfig
+        from initrunner.agent.tools.python_exec import build_python_toolset
 
         ctx = _make_ctx(docker_enabled=True, docker_network="bridge")
         config = PythonToolConfig(require_confirmation=False, network_disabled=True)
@@ -648,8 +648,8 @@ class TestPythonToolDockerIntegration:
 
     def test_network_not_disabled_no_shim(self):
         """network_disabled=false + Docker → no shim regardless of network."""
-        from initrunner.agent.python_tools import build_python_toolset
         from initrunner.agent.schema.tools import PythonToolConfig
+        from initrunner.agent.tools.python_exec import build_python_toolset
 
         ctx = _make_ctx(docker_enabled=True, docker_network="bridge")
         config = PythonToolConfig(require_confirmation=False, network_disabled=False)

@@ -117,11 +117,11 @@ class DaemonScreen(RoleScreen):
 
             self.app.call_from_thread(_log_event)
 
-            from initrunner.agent.executor import execute_run
+            from initrunner.services.execution import execute_run_sync
 
             if self._agent is None:
                 raise RuntimeError("Agent not initialized")
-            result, _ = execute_run(
+            result, _ = execute_run_sync(
                 self._agent,
                 self._role,
                 event.prompt,

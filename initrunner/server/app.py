@@ -19,7 +19,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
-from initrunner.agent.executor import execute_run, execute_run_stream
 from initrunner.agent.policies import validate_input
 from initrunner.agent.prompt import extract_text_from_prompt
 from initrunner.agent.schema.role import RoleDefinition
@@ -38,6 +37,7 @@ from initrunner.server.models import (
     StreamChoice,
     Usage,
 )
+from initrunner.services.execution import execute_run_stream_sync, execute_run_sync
 
 _logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ def create_app(
 
         try:
             result, new_messages = await asyncio.to_thread(
-                execute_run,
+                execute_run_sync,
                 agent,
                 role,
                 prompt,
@@ -289,11 +289,10 @@ def create_app(
                 pass
 
         def run_stream():
-            # AuditLogger is thread-safe — the non-streaming path already
-            # invokes execute_run via asyncio.to_thread which calls
-            # audit_logger.log() from the thread pool.
+            # AuditLogger is thread-safe — audit_logger.log() may be
+            # called from the thread pool.
             try:
-                return execute_run_stream(
+                return execute_run_stream_sync(
                     agent,
                     role,
                     prompt,

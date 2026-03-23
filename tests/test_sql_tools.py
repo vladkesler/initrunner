@@ -5,8 +5,8 @@ from __future__ import annotations
 import sqlite3
 
 from initrunner.agent.schema.tools import SqlToolConfig
-from initrunner.agent.sql_tools import build_sql_toolset
 from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.sql import build_sql_toolset
 
 
 def _make_ctx(role_dir=None):

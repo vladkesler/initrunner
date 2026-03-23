@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from initrunner.agent.git_tools import build_git_toolset
 from initrunner.agent.schema.tools import GitToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.git import build_git_toolset
 
 
 def _make_ctx(role_dir=None):
@@ -114,14 +114,14 @@ class TestGitToolset:
 
     def test_log(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["log", "--max-count=20", "--format=oneline"], str(repo), 30, 102_400)
         assert "initial" in output
 
     def test_log_compact_format(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _COMPACT_FORMAT, _run_git
+        from initrunner.agent.tools.git import _COMPACT_FORMAT, _run_git
 
         output = _run_git(
             ["log", "--max-count=20", f"--format={_COMPACT_FORMAT}"], str(repo), 30, 102_400
@@ -141,7 +141,7 @@ class TestGitToolset:
     def test_diff(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
         (repo / "README.md").write_text("# Modified\n")
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["diff"], str(repo), 30, 102_400)
         assert "Modified" in output
@@ -150,7 +150,7 @@ class TestGitToolset:
         repo = _create_test_repo(tmp_path)
         (repo / "README.md").write_text("# Staged\n")
         subprocess.run(["git", "-C", str(repo), "add", "."], capture_output=True, check=True)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["diff", "--cached"], str(repo), 30, 102_400)
         assert "Staged" in output
@@ -164,7 +164,7 @@ class TestGitToolset:
             capture_output=True,
             check=True,
         )
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["diff", "HEAD~1"], str(repo), 30, 100)
         assert "[truncated" in output
@@ -173,7 +173,7 @@ class TestGitToolset:
 
     def test_show(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["show", "--stat", "--patch", "HEAD"], str(repo), 30, 102_400)
         assert "initial" in output
@@ -181,7 +181,7 @@ class TestGitToolset:
 
     def test_blame(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["blame", "README.md"], str(repo), 30, 102_400)
         assert "Test User" in output
@@ -195,7 +195,7 @@ class TestGitToolset:
             capture_output=True,
             check=True,
         )
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["diff", "--name-status", "HEAD~1"], str(repo), 30, 102_400)
         assert "new.txt" in output
@@ -211,7 +211,7 @@ class TestGitToolset:
             capture_output=True,
             check=True,
         )
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["ls-files"], str(repo), 30, 102_400)
         assert "README.md" in output
@@ -228,7 +228,7 @@ class TestGitToolset:
             capture_output=True,
             check=True,
         )
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["ls-files", "sub"], str(repo), 30, 102_400)
         assert "sub/a.py" in output
@@ -236,7 +236,7 @@ class TestGitToolset:
 
     def test_checkout_create_branch(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         _run_git(["checkout", "-b", "feature"], str(repo), 30, 102_400)
         branch = _run_git(["branch", "--show-current"], str(repo), 30, 102_400)
@@ -245,7 +245,7 @@ class TestGitToolset:
     def test_checkout_existing_branch(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
         default = _default_branch(repo)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         _run_git(["checkout", "-b", "feature"], str(repo), 30, 102_400)
         _run_git(["checkout", default], str(repo), 30, 102_400)
@@ -255,7 +255,7 @@ class TestGitToolset:
     def test_commit(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
         (repo / "new.txt").write_text("content")
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         _run_git(["add", "new.txt"], str(repo), 30, 102_400)
         output = _run_git(["commit", "-m", "add new"], str(repo), 30, 102_400)
@@ -263,7 +263,7 @@ class TestGitToolset:
 
     def test_tag(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         _run_git(["tag", "v1.0", "HEAD"], str(repo), 30, 102_400)
         output = _run_git(["tag"], str(repo), 30, 102_400)
@@ -271,7 +271,7 @@ class TestGitToolset:
 
     def test_annotated_tag(self, tmp_path: Path):
         repo = _create_test_repo(tmp_path)
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         _run_git(["tag", "-a", "v2.0", "-m", "release", "HEAD"], str(repo), 30, 102_400)
         output = _run_git(["tag", "-n"], str(repo), 30, 102_400)
@@ -282,7 +282,7 @@ class TestGitToolset:
         repo = _create_test_repo(tmp_path)
         config = GitToolConfig(repo_path=str(repo), max_output_bytes=100)
         build_git_toolset(config, _make_ctx())
-        from initrunner.agent.git_tools import _run_git
+        from initrunner.agent.tools.git import _run_git
 
         output = _run_git(["log", "--format=medium"], str(repo), 30, 100)
         assert "[truncated" in output

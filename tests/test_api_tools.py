@@ -9,15 +9,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from initrunner.agent.api_tools import (
+from initrunner.agent.schema.tools import ApiEndpoint, ApiParameter, ApiToolConfig
+from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.api import (
     _extract_response,
     _format_template,
     _make_endpoint_fn,
     _resolve_headers,
     build_api_toolset,
 )
-from initrunner.agent.schema.tools import ApiEndpoint, ApiParameter, ApiToolConfig
-from initrunner.agent.tools._registry import ToolBuildContext
 
 
 def _make_ctx(role_dir=None):
@@ -186,7 +186,7 @@ class TestMakeEndpointFn:
         fn = _make_endpoint_fn(endpoint, "https://example.com", {})
         assert fn.__doc__ == "DELETE /items/{id}"
 
-    @patch("initrunner.agent.api_tools.httpx.Client")
+    @patch("initrunner.agent.tools.api.httpx.Client")
     def test_makes_correct_request(self, mock_client_cls):
         mock_response = MagicMock()
         mock_response.text = '{"status": "ok"}'
@@ -217,7 +217,7 @@ class TestMakeEndpointFn:
         assert call_kwargs.kwargs["headers"]["X-Key"] == "abc"
         assert call_kwargs.kwargs["json"] == {"item_name": "Python 101"}
 
-    @patch("initrunner.agent.api_tools.httpx.Client")
+    @patch("initrunner.agent.tools.api.httpx.Client")
     def test_query_params(self, mock_client_cls):
         mock_response = MagicMock()
         mock_response.text = "ok"

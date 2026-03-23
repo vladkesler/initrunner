@@ -11,8 +11,8 @@ import pytest
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent.schema.role import AgentSpec
 from initrunner.agent.schema.tools import SlackToolConfig
-from initrunner.agent.slack_tools import build_slack_toolset
 from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.slack import build_slack_toolset
 
 
 def _make_ctx(role_dir=None):
@@ -65,7 +65,7 @@ class TestSlackToolset:
         toolset = build_slack_toolset(config, _make_ctx())
         assert "send_slack_message" in toolset.tools
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_send_simple_message(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -90,7 +90,7 @@ class TestSlackToolset:
         payload = call_args[1]["json"]
         assert payload["text"] == "Hello Slack"
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_send_with_channel_and_username(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -120,7 +120,7 @@ class TestSlackToolset:
         assert payload["username"] == "InitRunner Bot"
         assert payload["icon_emoji"] == ":robot_face:"
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_send_with_blocks(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -145,7 +145,7 @@ class TestSlackToolset:
         assert payload["blocks"] == blocks
         assert payload["text"] == "fallback"
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_channel_override(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -169,7 +169,7 @@ class TestSlackToolset:
         payload = mock_client.post.call_args[1]["json"]
         assert payload["channel"] == "#override"
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_http_error(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 404
@@ -192,7 +192,7 @@ class TestSlackToolset:
         assert "Slack API error" in result
         assert "404" in result
 
-    @patch("initrunner.agent.slack_tools.httpx.Client")
+    @patch("initrunner.agent.tools.slack.httpx.Client")
     def test_connection_error(self, mock_client_cls: MagicMock):
         mock_client = MagicMock()
         mock_client.__enter__ = MagicMock(return_value=mock_client)

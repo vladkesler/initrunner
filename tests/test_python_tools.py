@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 
-from initrunner.agent.python_tools import build_python_toolset
 from initrunner.agent.schema.tools import PythonToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
+from initrunner.agent.tools.python_exec import build_python_toolset
 
 
 def _make_ctx(role_dir=None):
