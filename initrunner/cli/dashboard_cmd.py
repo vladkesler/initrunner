@@ -41,27 +41,25 @@ def dashboard(
     console.print(f"[bold]InitRunner Dashboard[/bold] at [link={url}]{url}[/link]")
 
     if not no_open:
+        import threading
 
-        @app.on_event("startup")
-        async def _open_browser():
-            import asyncio
+        def _open_when_ready() -> None:
+            import time
             import webbrowser
 
-            async def _wait_and_open():
-                import httpx  # type: ignore[import-not-found]
+            import httpx  # type: ignore[import-not-found]
 
-                async with httpx.AsyncClient() as client:
-                    for _ in range(20):
-                        try:
-                            r = await client.get(f"http://localhost:{port}/api/health")
-                            if r.status_code == 200:
-                                break
-                        except httpx.ConnectError:
-                            pass
-                        await asyncio.sleep(0.25)
-                webbrowser.open(f"http://localhost:{port}")
+            for _ in range(20):
+                try:
+                    r = httpx.get(f"http://localhost:{port}/api/health")
+                    if r.status_code == 200:
+                        webbrowser.open(f"http://localhost:{port}")
+                        return
+                except httpx.ConnectError:
+                    pass
+                time.sleep(0.25)
 
-            asyncio.create_task(_wait_and_open())
+        threading.Thread(target=_open_when_ready, daemon=True).start()
 
     import uvicorn  # type: ignore[import-not-found]
 

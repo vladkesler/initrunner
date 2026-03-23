@@ -65,7 +65,7 @@
 	{:else if !hasAgents}
 		<!-- Zero state: Welcome screen -->
 		<div class="flex flex-col items-center justify-center py-20">
-			<div class="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<div class="mb-2 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				{#if version}v{version}{/if}
 			</div>
 			<h1 class="mb-3 text-2xl font-medium text-fg">Welcome to InitRunner</h1>
@@ -94,7 +94,7 @@
 		<div class="flex items-center gap-3">
 			<h1 class="text-lg font-medium text-fg">Launchpad</h1>
 			{#if version}
-				<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[11px] text-fg-faint">v{version}</span>
+				<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">v{version}</span>
 			{/if}
 		</div>
 
@@ -105,28 +105,28 @@
 					<Activity size={16} class="shrink-0 text-fg-faint" />
 					<div>
 						<div class="font-mono text-[18px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
-						<div class="text-[11px] text-fg-faint">total runs</div>
+						<div class="text-[13px] text-fg-faint">total runs</div>
 					</div>
 				</div>
 				<div class="flex items-center gap-3 rounded-sm border border-edge bg-surface-1 px-4 py-3">
 					<CheckCircle size={16} class="shrink-0 {stats.success_rate >= 90 ? 'text-ok' : stats.success_rate >= 70 ? 'text-warn' : 'text-fail'}" />
 					<div>
 						<div class="font-mono text-[18px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
-						<div class="text-[11px] text-fg-faint">success rate</div>
+						<div class="text-[13px] text-fg-faint">success rate</div>
 					</div>
 				</div>
 				<div class="flex items-center gap-3 rounded-sm border border-edge bg-surface-1 px-4 py-3">
 					<Coins size={16} class="shrink-0 text-fg-faint" />
 					<div>
 						<div class="font-mono text-[18px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_tokens.toLocaleString()}</div>
-						<div class="text-[11px] text-fg-faint">total tokens</div>
+						<div class="text-[13px] text-fg-faint">total tokens</div>
 					</div>
 				</div>
 				<div class="flex items-center gap-3 rounded-sm border border-edge bg-surface-1 px-4 py-3">
 					<Timer size={16} class="shrink-0 text-fg-faint" />
 					<div>
 						<div class="font-mono text-[18px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.avg_duration_ms.toLocaleString()}ms</div>
-						<div class="text-[11px] text-fg-faint">avg duration</div>
+						<div class="text-[13px] text-fg-faint">avg duration</div>
 					</div>
 				</div>
 			</div>
@@ -153,7 +153,7 @@
 		<!-- Failing agents -->
 		{#if errorAgents.length > 0}
 			<div>
-				<h2 class="mb-3 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fail">
+				<h2 class="mb-3 flex items-center gap-2 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fail">
 					<AlertTriangle size={12} />
 					Failing Agents
 				</h2>
@@ -164,7 +164,7 @@
 							class="flex items-baseline gap-3 rounded-sm border border-fail/20 bg-fail/5 px-3 py-2 transition-[background-color] duration-150 hover:bg-fail/10"
 						>
 							<span class="text-[13px] font-medium text-fg">{agent.name}</span>
-							<span class="truncate font-mono text-xs text-fail">{agent.error}</span>
+							<span class="truncate font-mono text-sm text-fail">{agent.error}</span>
 						</a>
 					{/each}
 				</div>
@@ -174,7 +174,7 @@
 		<!-- Top agents -->
 		{#if stats && stats.top_agents.length > 0}
 			<div>
-				<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Top Agents (by runs)</h2>
+				<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">Top Agents (by runs)</h2>
 				<div class="space-y-1.5">
 					{#each stats.top_agents as agent}
 						{@const maxCount = stats.top_agents[0]?.count ?? 1}
@@ -182,8 +182,8 @@
 						<div class="relative overflow-hidden rounded-sm border border-edge bg-surface-1 px-3 py-2">
 							<div class="absolute inset-y-0 left-0 bg-orange/10" style="width: {pct}%"></div>
 							<div class="relative flex items-baseline justify-between">
-								<span class="font-mono text-[12px] text-fg-muted">{agent.name}</span>
-								<span class="font-mono text-[11px] text-fg-faint">
+								<span class="font-mono text-[13px] text-fg-muted">{agent.name}</span>
+								<span class="font-mono text-[13px] text-fg-faint">
 									{agent.count} runs &middot; {agent.avg_duration_ms}ms avg
 								</span>
 							</div>
@@ -197,8 +197,8 @@
 		{#if recentAudit.length > 0}
 			<div>
 				<div class="mb-3 flex items-baseline justify-between">
-					<h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Recent Activity</h2>
-					<a href="/audit" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
+					<h2 class="font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">Recent Activity</h2>
+					<a href="/audit" class="text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 				</div>
 				<div class="space-y-0.5">
 					{#each recentAudit as run (run.run_id)}
@@ -208,9 +208,9 @@
 								class:bg-ok={run.success}
 								class:bg-fail={!run.success}
 							></span>
-							<span class="font-mono text-[12px] text-fg-muted">{run.agent_name}</span>
-							<span class="hidden truncate text-[12px] text-fg-faint sm:inline">{truncate(run.user_prompt, 50)}</span>
-							<span class="ml-auto shrink-0 font-mono text-[11px] text-fg-faint">{timeAgo(run.timestamp)}</span>
+							<span class="font-mono text-[13px] text-fg-muted">{run.agent_name}</span>
+							<span class="hidden truncate text-[13px] text-fg-faint sm:inline">{truncate(run.user_prompt, 50)}</span>
+							<span class="ml-auto shrink-0 font-mono text-[13px] text-fg-faint">{timeAgo(run.timestamp)}</span>
 						</div>
 					{/each}
 				</div>

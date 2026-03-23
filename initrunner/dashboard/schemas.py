@@ -19,6 +19,43 @@ class AgentSummary(BaseModel):
     error: str | None = None
 
 
+class ItemSummary(BaseModel):
+    """Flattened summary for tools, triggers, and sinks."""
+
+    type: str
+    summary: str
+
+
+class AgentDetail(BaseModel):
+    """Full agent configuration for the detail page."""
+
+    id: str
+    name: str
+    description: str
+    tags: list[str]
+    path: str
+    error: str | None = None
+    # metadata
+    author: str = ""
+    team: str = ""
+    version: str = ""
+    # existing config blocks (returned directly)
+    model: dict  # ModelConfig serialised
+    output: dict  # OutputConfig serialised
+    guardrails: dict  # Guardrails serialised
+    memory: dict | None = None  # MemoryConfig serialised
+    ingest: dict | None = None  # IngestConfig serialised
+    reasoning: dict | None = None  # ReasoningConfig serialised
+    autonomy: dict | None = None  # AutonomyConfig serialised
+    # flattened summaries (discriminated unions)
+    tools: list[ItemSummary] = []
+    triggers: list[ItemSummary] = []
+    sinks: list[ItemSummary] = []
+    # simple lists
+    skills: list[str] = []
+    features: list[str] = []
+
+
 class RunRequest(BaseModel):
     agent_id: str
     prompt: str

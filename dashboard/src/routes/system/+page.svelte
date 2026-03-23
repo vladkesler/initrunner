@@ -62,7 +62,7 @@
 	<div class="flex items-center gap-3">
 		<h1 class="text-lg font-medium text-fg">System</h1>
 		{#if version}
-			<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[11px] text-fg-faint">v{version}</span>
+			<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">v{version}</span>
 		{/if}
 	</div>
 
@@ -71,7 +71,7 @@
 	{:else}
 		<!-- Providers -->
 		<div>
-			<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Providers</h2>
+			<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">Providers</h2>
 			{#if providers.length === 0}
 				<div class="rounded-sm border border-edge bg-surface-1 px-4 py-8 text-center text-[13px] text-fg-faint">
 					No providers detected. Set API keys to get started.
@@ -81,15 +81,15 @@
 					<table class="w-full">
 						<thead>
 							<tr class="border-b border-edge">
-								<th class="px-4 py-2 text-left text-[11px] font-medium uppercase tracking-[0.05em] text-fg-faint">Provider</th>
-								<th class="px-4 py-2 text-left text-[11px] font-medium uppercase tracking-[0.05em] text-fg-faint">Default Model</th>
+								<th class="px-4 py-2 text-left text-[13px] font-medium uppercase tracking-[0.05em] text-fg-faint">Provider</th>
+								<th class="px-4 py-2 text-left text-[13px] font-medium uppercase tracking-[0.05em] text-fg-faint">Default Model</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each providers as p}
 								<tr class="border-b border-edge-subtle">
 									<td class="px-4 py-2 font-mono text-[13px] text-fg-muted">{p.provider}</td>
-									<td class="px-4 py-2 font-mono text-[12px] text-fg-faint">{p.model}</td>
+									<td class="px-4 py-2 font-mono text-[13px] text-fg-faint">{p.model}</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -101,9 +101,9 @@
 		<!-- Doctor -->
 		<div>
 			<div class="mb-3 flex items-center gap-3">
-				<h2 class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Health Check</h2>
+				<h2 class="font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">Health Check</h2>
 				<button
-					class="flex items-center gap-1.5 rounded-sm border border-edge px-2.5 py-1 text-[11px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="flex items-center gap-1.5 rounded-sm border border-edge px-2.5 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					class:opacity-50={doctorLoading}
 					onclick={loadDoctor}
 					disabled={doctorLoading}
@@ -129,7 +129,7 @@
 						<div class="flex items-center gap-3 rounded-sm border border-edge bg-surface-1 px-4 py-2.5">
 							<Icon size={14} class={statusColor(check.status)} />
 							<span class="font-mono text-[13px] text-fg-muted">{check.name}</span>
-							<span class="ml-auto text-[12px] {statusColor(check.status)}">{check.message}</span>
+							<span class="ml-auto text-[13px] {statusColor(check.status)}">{check.message}</span>
 						</div>
 					{/each}
 				</div>
@@ -138,11 +138,11 @@
 
 		<!-- Tool Registry -->
 		<div>
-			<h2 class="mb-3 flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<h2 class="mb-3 flex items-center gap-2 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				<Wrench size={12} />
 				Tool Registry
 				{#if tools.length > 0}
-					<span class="rounded-sm border border-edge bg-surface-2 px-1.5 py-0.5 text-[10px]">{tools.length}</span>
+					<span class="rounded-sm border border-edge bg-surface-2 px-1.5 py-0.5 text-[12px]">{tools.length}</span>
 				{/if}
 			</h2>
 
@@ -163,8 +163,8 @@
 								class:border-b={i < tools.length - (tools.length % 2 === 0 ? 2 : 1)}
 								class:border-b-edge-subtle={i < tools.length - (tools.length % 2 === 0 ? 2 : 1)}
 							>
-								<div class="font-mono text-[12px] text-fg-muted">{tool.name}</div>
-								<div class="mt-0.5 text-[11px] text-fg-faint">{tool.description}</div>
+								<div class="font-mono text-[13px] text-fg-muted">{tool.name}</div>
+								<div class="mt-0.5 text-[13px] text-fg-faint">{tool.description}</div>
 							</div>
 						{/each}
 					</div>

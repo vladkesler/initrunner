@@ -92,7 +92,7 @@
 	<div class="flex items-center gap-3">
 		<h1 class="text-lg font-medium text-fg">Audit</h1>
 		{#if !loading}
-			<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[11px] text-fg-faint">
+			<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">
 				{filteredRecords.length}
 			</span>
 		{/if}
@@ -105,28 +105,28 @@
 				<Activity size={14} class="shrink-0 text-fg-faint" />
 				<div>
 					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
-					<div class="text-[10px] text-fg-faint">runs</div>
+					<div class="text-[12px] text-fg-faint">runs</div>
 				</div>
 			</div>
 			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
 				<CheckCircle size={14} class="shrink-0 {stats.success_rate >= 90 ? 'text-ok' : stats.success_rate >= 70 ? 'text-warn' : 'text-fail'}" />
 				<div>
 					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
-					<div class="text-[10px] text-fg-faint">success</div>
+					<div class="text-[12px] text-fg-faint">success</div>
 				</div>
 			</div>
 			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
 				<Coins size={14} class="shrink-0 text-fg-faint" />
 				<div>
 					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_tokens.toLocaleString()}</div>
-					<div class="text-[10px] text-fg-faint">tokens</div>
+					<div class="text-[12px] text-fg-faint">tokens</div>
 				</div>
 			</div>
 			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
 				<Timer size={14} class="shrink-0 text-fg-faint" />
 				<div>
 					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.avg_duration_ms.toLocaleString()}ms</div>
-					<div class="text-[10px] text-fg-faint">avg duration</div>
+					<div class="text-[12px] text-fg-faint">avg duration</div>
 				</div>
 			</div>
 		</div>
@@ -153,14 +153,14 @@
 			<input
 				type="date"
 				bind:value={sinceFilter}
-				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[12px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
+				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
 				onchange={load}
 			/>
-			<span class="text-[11px] text-fg-faint">to</span>
+			<span class="text-[13px] text-fg-faint">to</span>
 			<input
 				type="date"
 				bind:value={untilFilter}
-				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[12px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
+				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
 				onchange={load}
 			/>
 		</div>
@@ -168,7 +168,7 @@
 		<!-- Success filter -->
 		<div class="flex items-center gap-0.5 rounded-sm border border-edge bg-surface-1 p-0.5">
 			<button
-				class="rounded-sm px-2.5 py-1 text-[11px] font-medium transition-[color,background-color] duration-150"
+				class="rounded-sm px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
 				class:bg-surface-2={!showFailuresOnly}
 				class:text-fg={!showFailuresOnly}
 				class:text-fg-faint={showFailuresOnly}
@@ -177,7 +177,7 @@
 				All
 			</button>
 			<button
-				class="rounded-sm px-2.5 py-1 text-[11px] font-medium transition-[color,background-color] duration-150"
+				class="rounded-sm px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
 				class:bg-surface-2={showFailuresOnly}
 				class:text-fg={showFailuresOnly}
 				class:text-fg-faint={!showFailuresOnly}
@@ -191,14 +191,14 @@
 			<!-- Export -->
 			<div class="flex items-center gap-0.5 rounded-sm border border-edge bg-surface-1 p-0.5">
 				<button
-					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[11px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={() => exportRecords('json')}
 				>
 					<Download size={11} />
 					JSON
 				</button>
 				<button
-					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[11px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={() => exportRecords('csv')}
 				>
 					<Download size={11} />
@@ -207,7 +207,7 @@
 			</div>
 
 			<button
-				class="flex items-center gap-1.5 rounded-sm border border-edge px-2.5 py-1.5 text-[11px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+				class="flex items-center gap-1.5 rounded-sm border border-edge px-2.5 py-1.5 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 				onclick={load}
 				aria-label="Refresh"
 			>

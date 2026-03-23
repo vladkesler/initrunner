@@ -84,7 +84,7 @@
 		<div class="flex items-center gap-3">
 			<h1 class="text-lg font-medium text-fg">Agents</h1>
 			{#if !loading}
-				<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[11px] text-fg-faint">{agents.length}</span>
+				<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">{agents.length}</span>
 			{/if}
 		</div>
 		<!-- View toggle -->
@@ -137,7 +137,7 @@
 		<div class="flex flex-wrap gap-1.5">
 			{#each allTags as tag}
 				<button
-					class="rounded-sm border px-2 py-0.5 font-mono text-[11px] transition-[color,background-color,border-color] duration-150 {activeTags.has(tag) ? 'border-orange/30 bg-orange/10 text-orange' : 'border-edge bg-surface-1 text-fg-faint'}"
+					class="rounded-sm border px-2 py-0.5 font-mono text-[13px] transition-[color,background-color,border-color] duration-150 {activeTags.has(tag) ? 'border-orange/30 bg-orange/10 text-orange' : 'border-edge bg-surface-1 text-fg-faint'}"
 					onclick={() => toggleTag(tag)}
 				>
 					{tag}
@@ -158,7 +158,7 @@
 			<div class="py-16 text-center">
 				<p class="text-[13px] text-fg-faint">No agents match "{query || [...activeTags].join(', ')}"</p>
 				<button
-					class="mt-2 text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
+					class="mt-2 text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
 					onclick={clearSearch}
 				>
 					Clear filters

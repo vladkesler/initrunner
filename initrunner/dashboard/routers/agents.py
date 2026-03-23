@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
-from initrunner.dashboard.schemas import AgentSummary
+from initrunner.dashboard.schemas import AgentDetail, AgentSummary, ItemSummary
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -59,6 +59,62 @@ async def get_agent(
     if dr is None:
         raise HTTPException(status_code=404, detail="Agent not found")
     return _summary_from(agent_id, dr)
+
+
+def _detail_from(role_id: str, discovered) -> AgentDetail:
+    """Build an AgentDetail from a DiscoveredRole."""
+    if discovered.error or discovered.role is None:
+        from initrunner.agent.schema.base import ModelConfig
+        from initrunner.agent.schema.guardrails import Guardrails
+        from initrunner.agent.schema.output import OutputConfig
+
+        return AgentDetail(
+            id=role_id,
+            name=discovered.path.stem,
+            description="",
+            tags=[],
+            path=str(discovered.path),
+            error=discovered.error,
+            model=ModelConfig(name="unknown").model_dump(),
+            output=OutputConfig().model_dump(),
+            guardrails=Guardrails().model_dump(),
+        )
+    role = discovered.role
+    meta = role.metadata
+    spec = role.spec
+    return AgentDetail(
+        id=role_id,
+        name=meta.name,
+        description=meta.description or "",
+        tags=list(meta.tags or []),
+        path=str(discovered.path),
+        author=meta.author or "",
+        team=meta.team or "",
+        version=meta.version or "",
+        model=spec.model.model_dump(),
+        output=spec.output.model_dump(),
+        guardrails=spec.guardrails.model_dump(),
+        memory=spec.memory.model_dump() if spec.memory else None,
+        ingest=spec.ingest.model_dump() if spec.ingest else None,
+        reasoning=spec.reasoning.model_dump() if spec.reasoning else None,
+        autonomy=spec.autonomy.model_dump() if spec.autonomy else None,
+        tools=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.tools],
+        triggers=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.triggers],
+        sinks=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.sinks],
+        skills=list(spec.skills),
+        features=list(spec.features),
+    )
+
+
+@router.get("/{agent_id}/detail")
+async def get_agent_detail(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> AgentDetail:
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return _detail_from(agent_id, dr)
 
 
 @router.get("/{agent_id}/yaml")

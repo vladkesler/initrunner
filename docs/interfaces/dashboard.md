@@ -60,13 +60,14 @@ After choosing a mode and provider/model, the page generates a role YAML and ope
 
 ### Agent Detail (`/agents/{id}`)
 
-Three tabs:
+Split-panel layout with configuration on the left and the run panel on the right.
 
-| Tab | Contents |
-|-----|----------|
-| **Overview** | Metadata, feature list, tags, file path |
-| **YAML** | Read-only view of the raw role YAML file |
-| **Run** | Prompt input with streaming output. Tokens, tool calls, and duration shown after completion. |
+| Panel | Contents |
+|-------|----------|
+| **Config** (340px sidebar) | Model details, tools with summaries, triggers, guardrails, memory, ingestion, skills, sinks, reasoning, autonomy, metadata, and a collapsible YAML viewer. Sections are collapsible and only render when the agent has data for them. |
+| **Run** (primary, flex-1) | Prompt input with streaming output. Token breakdown (in/out), tool call names, and duration shown after completion. |
+
+On narrow screens (< 1024px) the config panel collapses into a disclosure above the run panel.
 
 Streaming output uses Server-Sent Events. Tokens appear in real time as the model generates them.
 
@@ -108,7 +109,8 @@ initrunner dashboard
   +--> FastAPI (localhost:8100)
   |      /api/health           GET   health check
   |      /api/agents           GET   list discovered roles
-  |      /api/agents/{id}      GET   single role detail
+  |      /api/agents/{id}      GET   single role summary
+  |      /api/agents/{id}/detail GET full role config (model, tools, triggers, guardrails, etc.)
   |      /api/agents/{id}/yaml GET   raw YAML file
   |      /api/builder/templates GET   templates, providers, options
   |      /api/builder/seed     POST  generate YAML from template/description/blank

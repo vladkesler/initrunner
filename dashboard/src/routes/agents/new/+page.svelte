@@ -329,7 +329,7 @@
 		<div class="rounded-sm border border-fail/20 bg-fail/5 px-4 py-3">
 			<p class="text-[13px] text-fail">{optionsError}</p>
 			<button
-				class="mt-2 text-[12px] text-fg-faint underline transition-[color] duration-150 hover:text-fg-muted"
+				class="mt-2 text-[13px] text-fg-faint underline transition-[color] duration-150 hover:text-fg-muted"
 				onclick={() => location.reload()}
 			>
 				Retry
@@ -342,7 +342,7 @@
 	{:else if step === 'configure'}
 		<!-- Mode selection -->
 		<div>
-			<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				Start from
 			</h2>
 			<div class="grid grid-cols-3 gap-3">
@@ -357,7 +357,7 @@
 					>
 						<card.icon size={16} class="mb-2 text-fg-faint" />
 						<div class="text-[13px] font-medium text-fg">{card.label}</div>
-						<div class="mt-0.5 text-[11px] text-fg-faint">{card.desc}</div>
+						<div class="mt-0.5 text-[13px] text-fg-faint">{card.desc}</div>
 					</button>
 				{/each}
 			</div>
@@ -366,7 +366,7 @@
 		<!-- Template picker -->
 		{#if mode === 'template' && options}
 			<div>
-				<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 					Template
 				</h2>
 				<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -380,8 +380,8 @@
 							aria-pressed={selectedTemplate === tpl.name}
 							onclick={() => (selectedTemplate = tpl.name)}
 						>
-							<div class="font-mono text-[12px] font-medium text-fg">{tpl.name}</div>
-							<div class="mt-0.5 text-[11px] text-fg-faint">{tpl.description}</div>
+							<div class="font-mono text-[13px] font-medium text-fg">{tpl.name}</div>
+							<div class="mt-0.5 text-[13px] text-fg-faint">{tpl.description}</div>
 						</button>
 					{/each}
 				</div>
@@ -391,7 +391,7 @@
 		<!-- Description input -->
 		{#if mode === 'description'}
 			<div>
-				<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 					Describe your agent
 				</h2>
 				<textarea
@@ -407,7 +407,7 @@
 		<!-- Provider / Model -->
 		{#if mode}
 			<div>
-				<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 					Model
 				</h2>
 				<div class="flex gap-3">
@@ -469,14 +469,14 @@
 			<!-- Endpoint URL (only for ollama and custom, not known presets) -->
 			{#if showEndpointUrl}
 				<div>
-					<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 						Endpoint
 					</h2>
 					<input
 						type="text"
 						bind:value={customBaseUrl}
 						placeholder={isOllama ? options?.ollama_base_url ?? 'http://localhost:11434/v1' : 'https://...'}
-						class="w-full rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
+						class="w-full rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
 					/>
 				</div>
 			{/if}
@@ -484,11 +484,11 @@
 			<!-- API Key (for custom endpoints, not ollama) -->
 			{#if isCustomEndpoint}
 				<div>
-					<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 						API Key
 					</h2>
 					{#if activePreset?.key_configured && !apiKey}
-						<p class="flex items-center gap-1.5 text-[12px] text-ok">
+						<p class="flex items-center gap-1.5 text-[13px] text-ok">
 							<CheckCircle size={13} />
 							Already configured
 						</p>
@@ -497,10 +497,10 @@
 							type="password"
 							bind:value={apiKey}
 							placeholder="Paste your API key"
-							class="w-full rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
+							class="w-full rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
 						/>
 						{#if activePreset?.key_configured}
-							<p class="mt-1.5 text-[11px] text-fg-faint">
+							<p class="mt-1.5 text-[13px] text-fg-faint">
 								Leave empty to use the existing key
 							</p>
 						{/if}
@@ -525,7 +525,7 @@
 
 				{#if generateError}
 					<div class="mt-3 rounded-sm border-l-2 border-l-fail bg-fail/5 px-3 py-2">
-						<p class="text-[12px] text-fail">{generateError}</p>
+						<p class="text-[13px] text-fail">{generateError}</p>
 					</div>
 				{/if}
 			</div>
@@ -537,7 +537,7 @@
 	{:else if step === 'editor'}
 		{#if explanation}
 			<div class="rounded-sm border-l-2 border-l-info bg-info/5 px-3 py-2">
-				<p class="text-[12px] text-fg-muted">{explanation}</p>
+				<p class="text-[13px] text-fg-muted">{explanation}</p>
 			</div>
 		{/if}
 
@@ -561,7 +561,7 @@
 						{:else}
 							<TriangleAlert size={13} class="mt-0.5 shrink-0 text-warn" />
 						{/if}
-						<span class="font-mono text-[11px]" class:text-fail={issue.severity === 'error'} class:text-warn={issue.severity === 'warning'}>
+						<span class="font-mono text-[13px]" class:text-fail={issue.severity === 'error'} class:text-warn={issue.severity === 'warning'}>
 							{issue.field}: {issue.message}
 						</span>
 					</div>
@@ -570,12 +570,12 @@
 		{/if}
 
 		<div>
-			<h2 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<h2 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				Save to
 			</h2>
 			<div class="flex items-center gap-2">
 				<select
-					class="rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[12px] text-fg outline-none"
+					class="rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none"
 					bind:value={selectedDir}
 				>
 					{#each options?.role_dirs ?? [] as dir}
@@ -586,7 +586,7 @@
 				<input
 					type="text"
 					bind:value={filename}
-					class="min-w-0 flex-1 rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 focus:border-surface-3"
+					class="min-w-0 flex-1 rounded-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 focus:border-surface-3"
 					placeholder="role.yaml"
 				/>
 			</div>
@@ -595,9 +595,9 @@
 		{#if showOverwrite}
 			<div class="flex items-center gap-3 rounded-sm border-l-2 border-l-warn bg-warn/5 px-3 py-2">
 				<TriangleAlert size={14} class="shrink-0 text-warn" />
-				<span class="flex-1 text-[12px] text-fg-muted">File already exists at {selectedDir}/{filename}</span>
+				<span class="flex-1 text-[13px] text-fg-muted">File already exists at {selectedDir}/{filename}</span>
 				<button
-					class="rounded-sm bg-warn/20 px-3 py-1 text-[12px] font-medium text-warn transition-[background-color] duration-150 hover:bg-warn/30"
+					class="rounded-sm bg-warn/20 px-3 py-1 text-[13px] font-medium text-warn transition-[background-color] duration-150 hover:bg-warn/30"
 					onclick={() => handleSave(true)}
 				>
 					Overwrite
@@ -607,7 +607,7 @@
 
 		{#if saveError}
 			<div class="rounded-sm border-l-2 border-l-fail bg-fail/5 px-3 py-2">
-				<p class="text-[12px] text-fail">{saveError}</p>
+				<p class="text-[13px] text-fail">{saveError}</p>
 			</div>
 		{/if}
 
@@ -641,25 +641,25 @@
 				<CheckCircle size={20} class="text-ok" />
 				<h2 class="text-lg font-medium text-fg">Agent created</h2>
 			</div>
-			<p class="mt-2 font-mono text-[12px] text-fg-muted">{saveResult.path}</p>
+			<p class="mt-2 font-mono text-[13px] text-fg-muted">{saveResult.path}</p>
 
 			{#if saveResult.issues.length > 0}
 				<div class="mt-4 space-y-1">
 					{#each saveResult.issues as issue}
-						<p class="font-mono text-[11px] text-warn">{issue}</p>
+						<p class="font-mono text-[13px] text-warn">{issue}</p>
 					{/each}
 				</div>
 			{/if}
 
 			{#if saveResult.next_steps.length > 0}
 				<div class="mt-6">
-					<h3 class="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					<h3 class="mb-3 font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 						Next steps
 					</h3>
 					<div class="space-y-2">
 						{#each saveResult.next_steps as cmd}
 							<div class="flex items-center justify-between rounded-sm border border-edge bg-surface-1 px-3 py-2">
-								<code class="font-mono text-[12px] text-fg-muted">{cmd}</code>
+								<code class="font-mono text-[13px] text-fg-muted">{cmd}</code>
 								<button
 									class="ml-3 shrink-0 text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
 									onclick={() => copyCommand(cmd)}
