@@ -141,4 +141,4 @@ See [CLAUDE.md](CLAUDE.md) for project structure, architecture decisions, and ke
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contributions will be licensed under the same terms as the project ([MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option).
