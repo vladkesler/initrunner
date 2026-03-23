@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-%2334D058" alt="MIT License"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3612+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.38.0-%2334D058" alt="v1.38.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3700+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.39.0-%2334D058" alt="v1.39.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.38.0** -- Reasoning primitives: think (self-critique), todo (priority + deps), spawn (parallel sub-agents), and four reasoning strategies (react, todo_driven, plan_execute, reflexion). Run-scoped tool architecture. 6 new InitHub packs. See the [Changelog](CHANGELOG.md).
+> **v1.39.0** -- Architecture cleanup: legacy tools migrated to auto-discovery, `run()` god-function broken into focused helpers, services layer fully enforced, 91 new security tests for authz and middleware. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -330,4 +330,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center"><sub>v1.38.0</sub></p>
+<p align="center"><sub>v1.39.0</sub></p>

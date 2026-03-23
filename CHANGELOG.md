@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.39.0] - 2026-03-23
+
+### Changed
+- Migrated 6 legacy tool modules from `agent/` to `agent/tools/` (git, python, sql, shell, slack, api) -- now auto-discovered via `pkgutil`, removed hardcoded `_LEGACY_TOOL_MODULES` list (renamed to `_EXTERNAL_TOOL_MODULES` with only `mcp/server` remaining)
+- Broke up 335-line `run()` god-function in `cli/run_cmd.py` into 5 focused helpers: `_validate_flags`, `_resolve_via_sensing`, `_resolve_output_format`, `_build_user_prompt`, `_run_agent`
+- Completed services layer enforcement: `server/app.py`, `cli/run_cmd.py`, `cli/doctor_cmd.py`, `tui/screens/daemon.py` now route execution through `services/execution.py` instead of importing `agent.executor` directly
+- Extended `services/execution.py` wrappers with `skip_input_validation`, `trigger_type`, `trigger_metadata`, `model_override` parameters
+- `cli/_helpers.py:load_and_build_or_exit` delegates to `services.execution.build_agent_sync`
+
+### Added
+- `tests/test_authz.py` -- 47 unit tests for Cerbos authorization module (config parsing, env vars, ContextVars, SDK mocking, health checks)
+- `tests/test_middleware.py` -- 44 unit tests for security middleware (predicates, auth dispatch, rate limiting, body size, HTTPS enforcement, security headers)
+
+### Fixed
+- `ty check` errors in `test_middleware.py` (Response body type) and `test_reasoning_strategies.py` (UserPrompt type narrowing, AgentSpec kwargs)
+
 ## [1.38.0] - 2026-03-22
 
 ### Added
