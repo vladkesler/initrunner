@@ -193,7 +193,7 @@ def build_activate_skill_toolset(
     skill_map = {s.name: s for s in skills}
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def activate_skill(name: str) -> str:
         """Load full instructions for a discovered skill.
 

@@ -283,7 +283,7 @@ async def save_agent(
     if global_roles not in allowed_dirs:
         allowed_dirs.append(global_roles)
     target_dir = Path(req.directory).resolve()
-    if not any(target_dir == d.resolve() for d in allowed_dirs):
+    if not any(target_dir.is_relative_to(d.resolve()) for d in allowed_dirs):
         raise HTTPException(
             status_code=400,
             detail=f"Directory {req.directory} is not within a configured role directory. "

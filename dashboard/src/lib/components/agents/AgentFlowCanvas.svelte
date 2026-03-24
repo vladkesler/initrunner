@@ -124,6 +124,7 @@
 	// ── State ─────────────────────────────────────────────────────────
 
 	const nodeTypes = { agent: AgentNode, categoryLabel: CategoryLabel };
+	// svelte-ignore state_referenced_locally
 	let nodes = $state.raw<Node[]>(buildNodes(agents));
 	let edges = $state.raw<Edge[]>([]);
 

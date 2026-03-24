@@ -20,7 +20,7 @@ def build_slack_toolset(config: SlackToolConfig, ctx: ToolBuildContext) -> Funct
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def send_slack_message(
         text: str,
         channel: str | None = None,

@@ -25,7 +25,9 @@ def test_execute_run(client, mock_roles):
         patch("initrunner.services.execution.build_agent_sync") as mock_build,
         patch("initrunner.services.execution.execute_run_sync") as mock_exec,
     ):
-        mock_build.return_value = (MagicMock(), MagicMock())
+        mock_role = MagicMock()
+        mock_role.spec.memory = None
+        mock_build.return_value = (mock_role, MagicMock())
         mock_exec.return_value = (mock_result, [])
 
         resp = client.post(
@@ -38,6 +40,7 @@ def test_execute_run(client, mock_roles):
     assert data["run_id"] == "run-123"
     assert data["output"] == "Hello!"
     assert data["success"] is True
+    assert data["message_history"] == "[]"
 
 
 def test_execute_run_not_found(client):

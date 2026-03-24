@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 from typing import Annotated
 
-import yaml
 from fastapi import APIRouter, Depends, HTTPException
 
 from initrunner.dashboard.deps import (
@@ -28,8 +27,8 @@ from initrunner.dashboard.schemas import (
     ComposeValidateRequest,
     ComposeValidateResponse,
     PatternInfo,
-    ValidationIssueResponse,
 )
+from initrunner.dashboard.validation import validate_compose_yaml
 
 _logger = logging.getLogger(__name__)
 
@@ -146,7 +145,7 @@ async def seed_compose(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Schema-only validation
-    issues = _validate_compose_yaml(bundle.compose_yaml)
+    issues = validate_compose_yaml(bundle.compose_yaml)
 
     return ComposeSeedResponse(
         compose_yaml=bundle.compose_yaml,
@@ -159,7 +158,7 @@ async def seed_compose(
 @router.post("/validate")
 async def validate_compose(req: ComposeValidateRequest) -> ComposeValidateResponse:
     """Schema-only validation -- does not check that role files exist on disk."""
-    issues = _validate_compose_yaml(req.yaml_text)
+    issues = validate_compose_yaml(req.yaml_text)
     return ComposeValidateResponse(
         issues=issues,
         ready=not any(i.severity == "error" for i in issues),
@@ -187,6 +186,7 @@ async def save_compose(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     cid = _compose_id(result["compose_path"])
+    compose_cache.refresh_one(cid, result["compose_path"])
 
     next_steps = [
         f"cd {project_dir}",
@@ -206,58 +206,6 @@ async def save_compose(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
-    """Parse and validate compose YAML against schema + graph rules only."""
-    from initrunner.compose.schema import ComposeDefinition
-
-    issues: list[ValidationIssueResponse] = []
-    try:
-        raw = yaml.safe_load(yaml_text)
-    except yaml.YAMLError as exc:
-        issues.append(ValidationIssueResponse(field="yaml", message=str(exc), severity="error"))
-        return issues
-
-    if not isinstance(raw, dict):
-        issues.append(
-            ValidationIssueResponse(
-                field="yaml",
-                message="Expected a YAML mapping",
-                severity="error",
-            )
-        )
-        return issues
-
-    spec_raw = raw.get("spec")
-    if not isinstance(spec_raw, dict):
-        issues.append(
-            ValidationIssueResponse(
-                field="spec",
-                message="Missing 'spec' section",
-                severity="error",
-            )
-        )
-        return issues
-
-    try:
-        ComposeDefinition.model_validate(raw)
-    except Exception as ve:
-        if hasattr(ve, "errors"):
-            error_list = ve.errors()
-        else:
-            error_list = [{"msg": str(ve), "loc": ("spec",)}]
-        for err in error_list:
-            loc = ".".join(str(part) for part in err.get("loc", []))
-            issues.append(
-                ValidationIssueResponse(
-                    field=loc or "spec",
-                    message=err.get("msg", str(err)),
-                    severity="error",
-                )
-            )
-
-    return issues
 
 
 def _write_and_validate(project_dir: Path, compose_yaml: str, role_yamls: dict[str, str]) -> dict:

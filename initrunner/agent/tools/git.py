@@ -97,12 +97,12 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
 
     # --- Read tools (always registered) ---
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_status() -> str:
         """Show the working tree status (short format)."""
         return _run_git(["status", "--short"], repo_path, timeout, max_output)
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_log(max_count: int = 20, format: str = "oneline") -> str:
         """Show commit log.
 
@@ -126,7 +126,7 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
             max_output,
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_diff(ref: str = "", staged: bool = False, path: str = "") -> str:
         """Show changes in the working tree or between refs.
 
@@ -147,28 +147,28 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
             args.extend(["--", path])
         return _run_git(args, repo_path, timeout, max_output)
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_show(ref: str = "HEAD") -> str:
         """Show details of a commit (stat and patch)."""
         if err := _sanitize_ref(ref):
             return err
         return _run_git(["show", "--stat", "--patch", ref], repo_path, timeout, max_output)
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_blame(path: str) -> str:
         """Show line-by-line authorship of a file."""
         if err := _sanitize_path(path):
             return err
         return _run_git(["blame", "--", path], repo_path, timeout, max_output)
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_changed_files(ref: str = "HEAD~1") -> str:
         """List files changed compared to a ref (name and status)."""
         if err := _sanitize_ref(ref):
             return err
         return _run_git(["diff", "--name-status", ref], repo_path, timeout, max_output)
 
-    @toolset.tool
+    @toolset.tool_plain
     def git_list_files(path: str = "") -> str:
         """List tracked files in the repository. Optional path to scope to a subdirectory."""
         if path:
@@ -183,7 +183,7 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
 
     if not config.read_only:
 
-        @toolset.tool
+        @toolset.tool_plain
         def git_checkout(branch: str, create: bool = False) -> str:
             """Switch to a branch, or create a new one with create=True."""
             if err := _sanitize_ref(branch):
@@ -194,7 +194,7 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
             args.append(branch)
             return _run_git(args, repo_path, timeout, max_output)
 
-        @toolset.tool
+        @toolset.tool_plain
         def git_commit(message: str, paths: str = ".") -> str:
             """Stage files and create a commit."""
             if err := _sanitize_path(paths):
@@ -204,7 +204,7 @@ def build_git_toolset(config: GitToolConfig, ctx: ToolBuildContext) -> FunctionT
                 return add_result
             return _run_git(["commit", "-m", message], repo_path, timeout, max_output)
 
-        @toolset.tool
+        @toolset.tool_plain
         def git_tag(name: str, message: str = "", ref: str = "HEAD") -> str:
             """Create a tag. If message is provided, creates an annotated tag."""
             if err := _sanitize_ref(name):

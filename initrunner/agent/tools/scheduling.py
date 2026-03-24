@@ -28,7 +28,7 @@ def build_scheduling_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def schedule_followup(prompt: str, delay_seconds: int) -> str:
         """Schedule a follow-up agent run after a delay.
 
@@ -52,7 +52,7 @@ def build_scheduling_toolset(
         _run_schedule_count["count"] += 1
         return f"Scheduled follow-up in {delay_seconds}s (task_id={task_id})."
 
-    @toolset.tool
+    @toolset.tool_plain
     def schedule_followup_at(prompt: str, iso_datetime: str) -> str:
         """Schedule a follow-up agent run at a specific time.
 

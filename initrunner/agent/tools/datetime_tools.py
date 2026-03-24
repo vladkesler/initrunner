@@ -16,7 +16,7 @@ def build_datetime_toolset(config: DateTimeToolConfig, ctx: ToolBuildContext) ->
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def current_time(timezone: str = "") -> str:
         """Get the current date and time. Leave timezone empty to use the default."""
         tz_name = timezone or config.default_timezone
@@ -27,7 +27,7 @@ def build_datetime_toolset(config: DateTimeToolConfig, ctx: ToolBuildContext) ->
         now = datetime.now(tz)
         return f"{now.isoformat()} ({now.strftime('%A, %B %d, %Y %I:%M:%S %p %Z')})"
 
-    @toolset.tool
+    @toolset.tool_plain
     def parse_date(text: str, format: str = "") -> str:
         """Parse a date string. Leave format empty for ISO 8601 auto-detection."""
         try:

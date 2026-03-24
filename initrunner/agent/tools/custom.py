@@ -180,7 +180,7 @@ def build_custom_toolset(
             sandboxed_func.__annotations__ = getattr(original_func, "__annotations__", {})
             func = sandboxed_func
 
-        toolset.tool(func)
+        toolset.tool_plain(func)
     return toolset
 
 
@@ -236,7 +236,7 @@ def build_delegate_toolset(
             delegate_fn.__name__ = f"delegate_to_{name}"
             delegate_fn.__qualname__ = f"delegate_to_{name}"
             delegate_fn.__doc__ = desc
-            toolset.tool(delegate_fn)
+            toolset.tool_plain(delegate_fn)
 
         _make_tool(_invoker, _desc, agent_ref.name)
 

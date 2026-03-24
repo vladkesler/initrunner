@@ -16,7 +16,7 @@ def build_web_reader_toolset(config: WebReaderToolConfig, ctx: ToolBuildContext)
 
     if ctx.prefer_async:
 
-        @toolset.tool
+        @toolset.tool_plain
         async def fetch_page(url: str) -> str:
             """Fetch a web page and return its content as markdown."""
             error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
@@ -39,7 +39,7 @@ def build_web_reader_toolset(config: WebReaderToolConfig, ctx: ToolBuildContext)
 
     else:
 
-        @toolset.tool
+        @toolset.tool_plain
         def fetch_page(url: str) -> str:
             """Fetch a web page and return its content as markdown."""
             error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)

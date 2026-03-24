@@ -113,7 +113,7 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
     """Build a FunctionToolset for audio operations."""
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def get_youtube_transcript(url: str, language: str = "") -> str:
         """Fetch the transcript/captions for a YouTube video.
 
@@ -129,7 +129,7 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
             language,
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def transcribe_audio(file_path: str) -> str:
         """Transcribe a local audio or video file to text using the configured model.
 

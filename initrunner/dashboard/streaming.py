@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pydantic_ai.messages import ModelMessage
+
     from initrunner.audit.logger import AuditLogger
 
 _logger = logging.getLogger(__name__)
@@ -23,6 +25,7 @@ async def stream_run_sse(
     *,
     audit_logger: AuditLogger | None = None,
     model_override: str | None = None,
+    message_history: list[ModelMessage] | None = None,
 ) -> AsyncIterator[str]:
     """SSE generator yielding token/result/error events.
 
@@ -53,6 +56,7 @@ async def stream_run_sse(
                 prompt,
                 audit_logger=audit_logger,
                 on_token=on_token,
+                message_history=message_history,
             )
         finally:
             loop.call_soon_threadsafe(token_queue.put_nowait, None)
@@ -83,7 +87,19 @@ async def stream_run_sse(
 
     # Emit final result or error
     try:
-        result, _ = stream_task.result()
+        result, new_messages = stream_task.result()
+
+        # Serialize trimmed history on success
+        serialized_history = None
+        if result.success:
+            from pydantic_ai.messages import ModelMessagesTypeAdapter
+
+            from initrunner.agent.history import session_limits, trim_message_history
+
+            _, max_history = session_limits(role)
+            trimmed = trim_message_history(new_messages, max_history)
+            serialized_history = ModelMessagesTypeAdapter.dump_json(trimmed).decode("utf-8")
+
         payload = {
             "run_id": result.run_id,
             "output": result.output,
@@ -95,6 +111,7 @@ async def stream_run_sse(
             "duration_ms": result.duration_ms,
             "success": result.success,
             "error": result.error,
+            "message_history": serialized_history,
         }
         event = json.dumps({"type": "result", "data": payload})
         yield f"data: {event}\n\n"

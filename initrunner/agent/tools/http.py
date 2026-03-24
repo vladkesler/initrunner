@@ -22,7 +22,7 @@ def build_http_toolset(config: HttpToolConfig, ctx: ToolBuildContext) -> Functio
 
     if ctx.prefer_async:
 
-        @toolset.tool
+        @toolset.tool_plain
         async def http_request(method: str, path: str, body: str = "") -> str:
             """Make an HTTP request to the configured base URL."""
             method = method.upper()
@@ -45,7 +45,7 @@ def build_http_toolset(config: HttpToolConfig, ctx: ToolBuildContext) -> Functio
 
     else:
 
-        @toolset.tool
+        @toolset.tool_plain
         def http_request(method: str, path: str, body: str = "") -> str:
             """Make an HTTP request to the configured base URL."""
             method = method.upper()

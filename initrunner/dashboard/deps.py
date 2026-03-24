@@ -62,6 +62,18 @@ class ComposeCache:
         _logger.debug("ComposeCache refreshed: %d composes", len(self._cache))
         return self._cache
 
+    def refresh_one(self, compose_id: str, path: Path) -> None:
+        """Re-load a single compose file from disk into the cache."""
+        from initrunner.compose.loader import load_compose
+        from initrunner.services.discovery import DiscoveredCompose
+
+        try:
+            comp = load_compose(path)
+            self._cache[compose_id] = DiscoveredCompose(path=path, compose=comp)
+        except Exception as exc:
+            _logger.warning("Failed to reload compose %s: %s", compose_id, exc)
+            self._cache[compose_id] = DiscoveredCompose(path=path, error=str(exc))
+
     def get(self, compose_id: str) -> DiscoveredCompose | None:
         return self._cache.get(compose_id)
 

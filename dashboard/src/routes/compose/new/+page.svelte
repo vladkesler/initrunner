@@ -249,7 +249,7 @@
 
 			<!-- Pattern picker -->
 			<div>
-				<label class="mb-2 block text-[12px] font-medium text-fg-muted">Pattern</label>
+				<span class="mb-2 block text-[12px] font-medium text-fg-muted">Pattern</span>
 				<div class="grid grid-cols-1 gap-2 md:grid-cols-3">
 					{#if options}
 						{#each options.patterns as pattern}
@@ -281,7 +281,7 @@
 			{#if selectedPattern}
 				<div>
 					<div class="mb-2 flex items-center justify-between">
-						<label class="text-[12px] font-medium text-fg-muted">Services</label>
+						<span class="text-[12px] font-medium text-fg-muted">Services</span>
 						{#if !selectedPattern.fixed_topology}
 							<div class="flex items-center gap-1.5">
 								<button

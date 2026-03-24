@@ -403,7 +403,7 @@ def build_email_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def search_inbox(query: str = "ALL", folder: str = "", limit: int = 0) -> str:
         """Search for emails using IMAP SEARCH syntax (RFC 3501).
 
@@ -430,7 +430,7 @@ def build_email_toolset(
             limit,
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def read_email(message_id: str, folder: str = "") -> str:
         """Read the full content of an email by its Message-ID.
 
@@ -442,14 +442,14 @@ def build_email_toolset(
             params, config.default_folder, config.max_body_chars, message_id, folder
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def list_folders() -> str:
         """List all available mailbox folders."""
         return _do_list_folders(params)
 
     if not config.read_only:
 
-        @toolset.tool
+        @toolset.tool_plain
         def send_email(
             to: str,
             subject: str,

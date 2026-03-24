@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AgentSummary(BaseModel):
@@ -60,6 +60,7 @@ class RunRequest(BaseModel):
     agent_id: str
     prompt: str
     model_override: str | None = None
+    message_history: str | None = None
 
 
 class RunResponse(BaseModel):
@@ -73,6 +74,7 @@ class RunResponse(BaseModel):
     duration_ms: int
     success: bool
     error: str | None = None
+    message_history: str | None = None
 
 
 class AuditRecordResponse(BaseModel):
@@ -281,15 +283,38 @@ class ComposeSummary(BaseModel):
     error: str | None = None
 
 
+class SinkDetail(BaseModel):
+    summary: str
+    strategy: str
+    targets: list[str] = Field(default_factory=list)
+    queue_size: int = 100
+    timeout_seconds: int = 60
+    circuit_breaker_threshold: int | None = None
+
+
+class RestartDetail(BaseModel):
+    condition: str = "none"
+    max_retries: int = 3
+    delay_seconds: int = 5
+
+
+class HealthCheckDetail(BaseModel):
+    interval_seconds: int = 30
+    timeout_seconds: int = 10
+    retries: int = 3
+
+
 class ComposeServiceDetail(BaseModel):
     name: str
     role_path: str
     agent_id: str | None = None
     agent_name: str | None = None
-    sink_summary: str | None = None
-    depends_on: list[str] = []
+    sink: SinkDetail | None = None
+    depends_on: list[str] = Field(default_factory=list)
     trigger_summary: str | None = None
-    restart_condition: str = "none"
+    restart: RestartDetail = Field(default_factory=RestartDetail)
+    health_check: HealthCheckDetail = Field(default_factory=HealthCheckDetail)
+    environment_count: int = 0
 
 
 class ComposeDetail(BaseModel):
@@ -312,6 +337,21 @@ class DelegateEventResponse(BaseModel):
     reason: str | None = None
     trace: str | None = None
     payload_preview: str = ""
+
+
+class ComposeStatsResponse(BaseModel):
+    total_events: int
+    by_status: dict[str, int] = Field(default_factory=dict)
+
+
+class ComposeYamlSaveRequest(BaseModel):
+    yaml_text: str
+
+
+class ComposeYamlSaveResponse(BaseModel):
+    path: str
+    valid: bool
+    issues: list[str] = Field(default_factory=list)
 
 
 # -- Compose: builder ---------------------------------------------------------
@@ -392,3 +432,33 @@ class ComposeSaveResponse(BaseModel):
     issues: list[str]
     next_steps: list[str]
     compose_id: str
+
+
+# -- Agent memory / sessions ---------------------------------------------------
+
+
+class MemoryResponse(BaseModel):
+    id: int
+    content: str
+    category: str
+    memory_type: str
+    created_at: str
+    consolidated_at: str | None = None
+
+
+class SessionSummaryResponse(BaseModel):
+    session_id: str
+    agent_name: str
+    timestamp: str
+    message_count: int
+    preview: str
+
+
+class SessionMessageResponse(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class SessionDetailResponse(BaseModel):
+    session_id: str
+    messages: list[SessionMessageResponse]

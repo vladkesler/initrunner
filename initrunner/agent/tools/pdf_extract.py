@@ -179,7 +179,7 @@ def build_pdf_extract_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def extract_pdf_text(path: str, pages: str = "") -> str:
         """Extract text from a PDF file as markdown.
 
@@ -197,7 +197,7 @@ def build_pdf_extract_toolset(
             pages,
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def extract_pdf_metadata(path: str) -> str:
         """Extract metadata from a PDF file (title, author, page count, dates).
 

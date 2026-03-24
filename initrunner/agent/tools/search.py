@@ -324,7 +324,7 @@ def build_search_toolset(
 
     if ctx.prefer_async:
 
-        @toolset.tool
+        @toolset.tool_plain
         async def web_search(query: str, num_results: int = 5) -> str:
             """Search the web for information.
 
@@ -342,7 +342,7 @@ def build_search_toolset(
                 provider_fn,
             )
 
-        @toolset.tool
+        @toolset.tool_plain
         async def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
             """Search for recent news articles.
 
@@ -365,7 +365,7 @@ def build_search_toolset(
 
     else:
 
-        @toolset.tool
+        @toolset.tool_plain
         def web_search(query: str, num_results: int = 5) -> str:
             """Search the web for information.
 
@@ -383,7 +383,7 @@ def build_search_toolset(
                 provider_fn,
             )
 
-        @toolset.tool
+        @toolset.tool_plain
         def news_search(query: str, num_results: int = 5, days_back: int = 7) -> str:
             """Search for recent news articles.
 

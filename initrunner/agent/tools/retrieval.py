@@ -41,7 +41,7 @@ def build_retrieval_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def search_documents(query: str, top_k: int = 5, source: str | None = None) -> str:
         """Search ingested documents for relevant content.
 

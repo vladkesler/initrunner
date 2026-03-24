@@ -294,7 +294,7 @@ def build_tool_search_toolset(manager: ToolSearchManager) -> FunctionToolset:
     """Build a ``FunctionToolset`` containing the ``search_tools`` meta-tool."""
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def search_tools(query: str, max_results: int = 0) -> str:
         """Search for available tools by keyword.
 

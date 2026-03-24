@@ -283,7 +283,7 @@ def build_csv_analysis_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def inspect_csv(path: str) -> str:
         """Inspect a CSV file: show column names, inferred types, row count, and first 5 rows.
 
@@ -294,7 +294,7 @@ def build_csv_analysis_toolset(
             root / path, root, path, config.max_rows, config.delimiter, config.max_file_size_mb
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def summarize_csv(path: str, column: str = "") -> str:
         """Summarize a CSV file or a single column.
 
@@ -316,7 +316,7 @@ def build_csv_analysis_toolset(
             column,
         )
 
-    @toolset.tool
+    @toolset.tool_plain
     def query_csv(
         path: str,
         filter_column: str = "",

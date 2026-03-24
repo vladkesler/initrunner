@@ -58,7 +58,7 @@ def build_web_scraper_toolset(
 
     if ctx.prefer_async:
 
-        @toolset.tool
+        @toolset.tool_plain
         async def scrape_page(url: str) -> str:
             """Fetch a web page, extract its content, and store it in the document store.
 
@@ -121,7 +121,7 @@ def build_web_scraper_toolset(
 
     else:
 
-        @toolset.tool
+        @toolset.tool_plain
         def scrape_page(url: str) -> str:
             """Fetch a web page, extract its content, and store it in the document store.
 

@@ -1,0 +1,312 @@
+export interface AgentSummary {
+	id: string;
+	name: string;
+	description: string;
+	tags: string[];
+	provider: string;
+	model: string;
+	features: string[];
+	path: string;
+	error: string | null;
+}
+
+// -- Agent Detail -------------------------------------------------------------
+
+export interface ItemSummary {
+	type: string;
+	summary: string;
+}
+
+export interface AgentDetail {
+	id: string;
+	name: string;
+	description: string;
+	tags: string[];
+	path: string;
+	error: string | null;
+	author: string;
+	team: string;
+	version: string;
+	model: Record<string, unknown>;
+	output: Record<string, unknown>;
+	guardrails: Record<string, unknown>;
+	memory: Record<string, unknown> | null;
+	ingest: Record<string, unknown> | null;
+	reasoning: Record<string, unknown> | null;
+	autonomy: Record<string, unknown> | null;
+	tools: ItemSummary[];
+	triggers: ItemSummary[];
+	sinks: ItemSummary[];
+	skills: string[];
+	features: string[];
+}
+
+export interface RunRequest {
+	agent_id: string;
+	prompt: string;
+	model_override?: string | null;
+	message_history?: string | null;
+}
+
+export interface RunResponse {
+	run_id: string;
+	output: string;
+	tokens_in: number;
+	tokens_out: number;
+	total_tokens: number;
+	tool_calls: number;
+	tool_call_names: string[];
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+	message_history?: string | null;
+}
+
+export interface ThreadMessage {
+	role: 'user' | 'assistant';
+	content: string;
+	status: 'complete' | 'streaming' | 'interrupted' | 'error';
+	result?: RunResponse | null;
+	error?: string | null;
+}
+
+export interface AuditRecord {
+	run_id: string;
+	agent_name: string;
+	timestamp: string;
+	user_prompt: string;
+	model: string;
+	provider: string;
+	output: string;
+	tokens_in: number;
+	tokens_out: number;
+	total_tokens: number;
+	tool_calls: number;
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+	trigger_type: string | null;
+}
+
+export interface Provider {
+	provider: string;
+	model: string;
+}
+
+export interface HealthStatus {
+	status: string;
+	version: string;
+}
+
+export type SSEEvent =
+	| { type: 'token'; data: string }
+	| { type: 'result'; data: RunResponse }
+	| { type: 'error'; data: string };
+
+// -- Audit Stats --------------------------------------------------------------
+
+export interface TopAgent {
+	name: string;
+	count: number;
+	avg_duration_ms: number;
+}
+
+export interface AuditStats {
+	total_runs: number;
+	success_rate: number;
+	total_tokens: number;
+	avg_duration_ms: number;
+	top_agents: TopAgent[];
+}
+
+// -- System / Doctor ----------------------------------------------------------
+
+export interface DoctorCheck {
+	name: string;
+	status: 'ok' | 'warn' | 'fail';
+	message: string;
+}
+
+export interface DoctorResponse {
+	checks: DoctorCheck[];
+}
+
+export interface ToolType {
+	name: string;
+	description: string;
+}
+
+// -- Compose ------------------------------------------------------------------
+
+export interface ComposeSummary {
+	id: string;
+	name: string;
+	description: string;
+	service_count: number;
+	service_names: string[];
+	path: string;
+	error: string | null;
+}
+
+export interface SinkDetail {
+	summary: string;
+	strategy: string;
+	targets: string[];
+	queue_size: number;
+	timeout_seconds: number;
+	circuit_breaker_threshold: number | null;
+}
+
+export interface RestartDetail {
+	condition: string;
+	max_retries: number;
+	delay_seconds: number;
+}
+
+export interface HealthCheckDetail {
+	interval_seconds: number;
+	timeout_seconds: number;
+	retries: number;
+}
+
+export interface ComposeServiceDetail {
+	name: string;
+	role_path: string;
+	agent_id: string | null;
+	agent_name: string | null;
+	sink: SinkDetail | null;
+	depends_on: string[];
+	trigger_summary: string | null;
+	restart: RestartDetail;
+	health_check: HealthCheckDetail;
+	environment_count: number;
+}
+
+export interface ComposeDetail {
+	id: string;
+	name: string;
+	description: string;
+	path: string;
+	services: ComposeServiceDetail[];
+	shared_memory_enabled: boolean;
+	shared_documents_enabled: boolean;
+}
+
+export interface DelegateEvent {
+	timestamp: string;
+	source_service: string;
+	target_service: string;
+	status: string;
+	source_run_id: string;
+	compose_name: string | null;
+	reason: string | null;
+	trace: string | null;
+	payload_preview: string;
+}
+
+export interface ComposeStats {
+	total_events: number;
+	by_status: Record<string, number>;
+}
+
+export interface PatternInfo {
+	name: string;
+	description: string;
+	fixed_topology: boolean;
+	slot_names: string[];
+	min_services: number;
+	max_services: number | null;
+}
+
+export interface AgentSlotOption {
+	id: string;
+	name: string;
+	description: string;
+	path: string;
+}
+
+export interface SlotAssignment {
+	slot: string;
+	agent_id: string | null;
+}
+
+export interface ProviderModels {
+	provider: string;
+	models: { name: string; description: string }[];
+}
+
+export interface ProviderPreset {
+	name: string;
+	label: string;
+	base_url: string;
+	api_key_env: string;
+	placeholder: string;
+	key_configured: boolean;
+}
+
+export interface ComposeBuilderOptions {
+	patterns: PatternInfo[];
+	agents: AgentSlotOption[];
+	providers: ProviderModels[];
+	detected_provider: string | null;
+	detected_model: string | null;
+	save_dirs: string[];
+	custom_presets: ProviderPreset[];
+	ollama_models: string[];
+	ollama_base_url: string;
+}
+
+export interface ValidationIssue {
+	field: string;
+	message: string;
+	severity: string;
+}
+
+export interface ComposeSeedResponse {
+	compose_yaml: string;
+	role_yamls: Record<string, string>;
+	issues: ValidationIssue[];
+	ready: boolean;
+}
+
+export interface ComposeValidateResponse {
+	issues: ValidationIssue[];
+	ready: boolean;
+}
+
+export interface ComposeSaveResponse {
+	path: string;
+	valid: boolean;
+	issues: string[];
+	next_steps: string[];
+	compose_id: string;
+}
+
+// -- Agent Memory / Sessions --------------------------------------------------
+
+export interface MemoryItem {
+	id: number;
+	content: string;
+	category: string;
+	memory_type: string;
+	created_at: string;
+	consolidated_at: string | null;
+}
+
+export interface SessionSummary {
+	session_id: string;
+	agent_name: string;
+	timestamp: string;
+	message_count: number;
+	preview: string;
+}
+
+export interface SessionMessage {
+	role: string;
+	content: string;
+}
+
+export interface SessionDetail {
+	session_id: string;
+	messages: SessionMessage[];
+}

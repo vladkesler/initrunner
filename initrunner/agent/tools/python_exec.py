@@ -62,7 +62,7 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def run_python(code: str) -> str:
         """Execute Python code and return the output."""
         if docker_config.enabled:

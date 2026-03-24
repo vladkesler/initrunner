@@ -65,14 +65,14 @@ def build_memory_toolset(
 
     if config.semantic.enabled:
 
-        @toolset.tool
+        @toolset.tool_plain
         def remember(content: str, category: str = "general") -> str:
             """Store a piece of information in long-term memory for later recall."""
             return _store_memory(
                 content, category, MemoryType.SEMANTIC, config.semantic.max_memories, "Remembered"
             )
 
-    @toolset.tool
+    @toolset.tool_plain
     def recall(
         query: str,
         top_k: int = 5,
@@ -110,7 +110,7 @@ def build_memory_toolset(
             )
         return "\n\n---\n\n".join(parts)
 
-    @toolset.tool
+    @toolset.tool_plain
     def list_memories(
         category: str | None = None,
         limit: int = 20,
@@ -141,7 +141,7 @@ def build_memory_toolset(
 
     if config.procedural.enabled:
 
-        @toolset.tool
+        @toolset.tool_plain
         def learn_procedure(content: str, category: str = "general") -> str:
             """Store a learned procedure, policy, or pattern for future reference.
 
@@ -158,7 +158,7 @@ def build_memory_toolset(
 
     if config.episodic.enabled:
 
-        @toolset.tool
+        @toolset.tool_plain
         def record_episode(content: str, category: str = "general") -> str:
             """Record an episode — what happened during a task or interaction.
 

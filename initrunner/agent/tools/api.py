@@ -149,6 +149,6 @@ def build_api_toolset(config: ApiToolConfig, ctx: ToolBuildContext) -> FunctionT
     toolset = FunctionToolset()
     for endpoint in config.endpoints:
         fn = _make_endpoint_fn(endpoint, config.base_url, base_headers)
-        toolset.tool(fn)
+        toolset.tool_plain(fn)
 
     return toolset

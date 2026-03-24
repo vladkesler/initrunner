@@ -26,7 +26,7 @@ def build_filesystem_toolset(
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def read_file(path: str) -> str:
         """Read the contents of a file."""
         raw = root / path
@@ -44,7 +44,7 @@ def build_filesystem_toolset(
         except OSError as e:
             return f"Error reading file: {e}"
 
-    @toolset.tool
+    @toolset.tool_plain
     def list_directory(path: str = ".") -> str:
         """List files and directories at the given path."""
         raw = root / path
@@ -59,7 +59,7 @@ def build_filesystem_toolset(
 
     if not config.read_only:
 
-        @toolset.tool
+        @toolset.tool_plain
         def write_file(path: str, content: str) -> str:
             """Write content to a file."""
             raw = root / path

@@ -18,8 +18,14 @@ from initrunner.dashboard.deps import (
 from initrunner.dashboard.schemas import (
     ComposeDetail,
     ComposeServiceDetail,
+    ComposeStatsResponse,
     ComposeSummary,
+    ComposeYamlSaveRequest,
+    ComposeYamlSaveResponse,
     DelegateEventResponse,
+    HealthCheckDetail,
+    RestartDetail,
+    SinkDetail,
 )
 
 router = APIRouter(prefix="/api/compose", tags=["compose"])
@@ -70,16 +76,40 @@ def _detail_from(cid: str, discovered, role_cache: RoleCache) -> ComposeDetail:
     services = []
     for svc_name, svc_config in comp.spec.services.items():
         agent_id, agent_name = _resolve_agent(svc_config.role, compose_dir, role_cache)
+
+        sink_detail = None
+        if svc_config.sink:
+            raw_target = svc_config.sink.target
+            targets = raw_target if isinstance(raw_target, list) else [raw_target]
+            sink_detail = SinkDetail(
+                summary=svc_config.sink.summary(),
+                strategy=svc_config.sink.strategy,
+                targets=targets,
+                queue_size=svc_config.sink.queue_size,
+                timeout_seconds=svc_config.sink.timeout_seconds,
+                circuit_breaker_threshold=svc_config.sink.circuit_breaker_threshold,
+            )
+
         services.append(
             ComposeServiceDetail(
                 name=svc_name,
                 role_path=svc_config.role,
                 agent_id=agent_id,
                 agent_name=agent_name,
-                sink_summary=svc_config.sink.summary() if svc_config.sink else None,
+                sink=sink_detail,
                 depends_on=svc_config.depends_on,
-                trigger_summary=svc_config.trigger.summary() if svc_config.trigger else None,
-                restart_condition=svc_config.restart.condition,
+                trigger_summary=(svc_config.trigger.summary() if svc_config.trigger else None),
+                restart=RestartDetail(
+                    condition=svc_config.restart.condition,
+                    max_retries=svc_config.restart.max_retries,
+                    delay_seconds=svc_config.restart.delay_seconds,
+                ),
+                health_check=HealthCheckDetail(
+                    interval_seconds=svc_config.health_check.interval_seconds,
+                    timeout_seconds=svc_config.health_check.timeout_seconds,
+                    retries=svc_config.health_check.retries,
+                ),
+                environment_count=len(svc_config.environment),
             )
         )
 
@@ -160,6 +190,75 @@ async def get_compose_events(
         limit=limit,
     )
     return events
+
+
+@router.get("/{compose_id}/stats")
+async def get_compose_stats(
+    compose_id: str,
+    compose_cache: Annotated[ComposeCache, Depends(get_compose_cache)],
+) -> ComposeStatsResponse:
+    dc = compose_cache.get(compose_id)
+    if dc is None:
+        raise HTTPException(status_code=404, detail="Compose not found")
+    if dc.error or dc.compose is None:
+        return ComposeStatsResponse(total_events=0)
+
+    compose_name = dc.compose.metadata.name
+    events = await asyncio.to_thread(
+        _query_events,
+        compose_name=compose_name,
+        source=None,
+        target=None,
+        status=None,
+        since=None,
+        until=None,
+        limit=10_000,
+    )
+    by_status: dict[str, int] = {}
+    for e in events:
+        by_status[e.status] = by_status.get(e.status, 0) + 1
+    return ComposeStatsResponse(total_events=len(events), by_status=by_status)
+
+
+@router.put("/{compose_id}/yaml")
+async def save_compose_yaml(
+    compose_id: str,
+    req: ComposeYamlSaveRequest,
+    compose_cache: Annotated[ComposeCache, Depends(get_compose_cache)],
+) -> ComposeYamlSaveResponse:
+    dc = compose_cache.get(compose_id)
+    if dc is None:
+        raise HTTPException(status_code=404, detail="Compose not found")
+
+    from initrunner.dashboard.validation import validate_compose_yaml
+
+    issues = validate_compose_yaml(req.yaml_text)
+    errors = [i for i in issues if i.severity == "error"]
+    if errors:
+        raise HTTPException(
+            status_code=422,
+            detail=[{"field": i.field, "message": i.message} for i in errors],
+        )
+
+    path = dc.path
+    try:
+        await asyncio.to_thread(path.write_text, req.yaml_text, "utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot write file: {exc}") from exc
+
+    # Refresh cache
+    compose_cache.refresh_one(compose_id, path)
+
+    return ComposeYamlSaveResponse(
+        path=str(path),
+        valid=True,
+        issues=[i.message for i in issues if i.severity == "warning"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def _query_events(

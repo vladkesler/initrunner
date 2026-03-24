@@ -404,6 +404,7 @@ def _process_stream_output(
         result.tokens_in = usage.input_tokens or 0
         result.tokens_out = usage.output_tokens or 0
         result.total_tokens = usage.total_tokens or 0
+        result.tool_calls = usage.tool_calls or 0
 
 
 def _record_span_metrics(span: Any, result: RunResult) -> None:

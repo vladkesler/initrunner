@@ -107,14 +107,18 @@ Each slot can be filled with an existing agent from the dashboard's discovered r
 
 ### Compose Detail (`/compose/{id}`)
 
-Split-panel layout with topology on the left and delegation events on the right.
+Tabbed detail page with a stats bar and four tabs.
 
-| Panel | Contents |
-|-------|----------|
-| **Topology** (340px sidebar) | Service cards showing name, role path (linked to agent detail when matched), sink summary, depends_on, restart policy. Shared memory/documents badges. Collapsible YAML viewer. |
-| **Events** (flex-1) | Table of delegation routing events filtered by `compose_name`. Columns: status (color-coded dot), source, target, time, run ID. Filter controls for source, target, and status. |
+**Stats bar** (4 cards): total events, delivery rate %, service count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
 
-Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each.
+| Tab | Contents |
+|-----|----------|
+| **Graph** (default) | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
+| **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
+| **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. Shared memory/documents badges. |
+| **Editor** | YAML editor with debounced schema validation, in-place save, reset, and copy. Warns when `metadata.name` changes (splits event history). |
+
+Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each. Tab selection persists to localStorage.
 
 ### Audit Log (`/audit`)
 
@@ -168,6 +172,8 @@ initrunner dashboard
   |      /api/compose/{id}     GET   compose detail with service graph
   |      /api/compose/{id}/yaml GET  raw compose YAML
   |      /api/compose/{id}/events GET delegation events
+  |      /api/compose/{id}/stats  GET compose event statistics
+  |      /api/compose/{id}/yaml   PUT save edited compose YAML
   |      /api/compose-builder/options GET patterns, agents, providers
   |      /api/compose-builder/seed POST generate compose YAML
   |      /api/compose-builder/validate POST schema-only validation
@@ -525,10 +531,36 @@ Query delegation routing events for this compose. Filters by `compose_name` in t
 |-------|------|-------------|
 | `source` | string | Filter by source service |
 | `target` | string | Filter by target service |
-| `status` | string | Filter by status (delivered/dropped/filtered/error) |
+| `status` | string | Filter by status (delivered/dropped/filtered/error/policy_denied/circuit_open) |
 | `since` | string | ISO 8601 start time |
 | `until` | string | ISO 8601 end time |
 | `limit` | int | Max events (default 200) |
+
+### `GET /api/compose/{id}/stats`
+
+Returns aggregate event statistics for this composition. Status buckets are dynamic (not hard-coded).
+
+```json
+{
+  "total_events": 42,
+  "by_status": {
+    "delivered": 38,
+    "filtered": 2,
+    "dropped": 1,
+    "policy_denied": 1
+  }
+}
+```
+
+### `PUT /api/compose/{id}/yaml`
+
+Save edited compose YAML in place. Validates against the compose schema before writing; returns 422 with issue details on validation errors. Does not support rename -- writes to the existing file path only.
+
+```json
+{ "yaml_text": "apiVersion: initrunner/v1\nkind: Compose\n..." }
+```
+
+Returns `{ path, valid, issues[] }`.
 
 ### `GET /api/compose-builder/options`
 

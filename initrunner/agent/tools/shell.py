@@ -92,7 +92,7 @@ def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> Funct
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def run_shell(command: str) -> str:
         """Execute a command and return the output."""
         if err := validate_command(

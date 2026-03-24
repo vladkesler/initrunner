@@ -200,6 +200,6 @@ def build_script_toolset(config: ScriptToolConfig, ctx: ToolBuildContext) -> Fun
         fn = _make_script_fn(
             script, config, work_dir, docker_config=docker_config, role_dir=role_dir
         )
-        toolset.tool(fn)
+        toolset.tool_plain(fn)
 
     return toolset

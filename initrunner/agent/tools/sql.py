@@ -59,7 +59,7 @@ def build_sql_toolset(config: SqlToolConfig, ctx: ToolBuildContext) -> FunctionT
 
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def query_database(sql: str) -> str:
         """Execute a SQL query against the configured SQLite database."""
         # Block ATTACH DATABASE to prevent escaping to other databases

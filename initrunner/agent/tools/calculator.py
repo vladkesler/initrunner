@@ -145,7 +145,7 @@ def build_calculator_toolset(
     """Build a FunctionToolset with a single ``calculate`` tool."""
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def calculate(expression: str) -> str:
         """Evaluate a mathematical expression and return the result.
 

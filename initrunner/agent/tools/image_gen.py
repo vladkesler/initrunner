@@ -307,7 +307,7 @@ def build_image_gen_toolset(
 
     if ctx.prefer_async:
 
-        @toolset.tool
+        @toolset.tool_plain
         async def generate_image(
             prompt: str,
             size: str = "",
@@ -336,7 +336,7 @@ def build_image_gen_toolset(
                 output_dir,
             )
 
-        @toolset.tool
+        @toolset.tool_plain
         async def edit_image(
             image_path: str,
             prompt: str,
@@ -368,7 +368,7 @@ def build_image_gen_toolset(
 
     else:
 
-        @toolset.tool
+        @toolset.tool_plain
         def generate_image(
             prompt: str,
             size: str = "",
@@ -397,7 +397,7 @@ def build_image_gen_toolset(
                 output_dir,
             )
 
-        @toolset.tool
+        @toolset.tool_plain
         def edit_image(
             image_path: str,
             prompt: str,

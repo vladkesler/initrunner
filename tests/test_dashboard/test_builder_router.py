@@ -549,6 +549,34 @@ def test_save_outside_role_dirs(builder_client, tmp_path):
     assert "not within" in resp.json()["detail"]
 
 
+def test_save_subdirectory_of_role_dir(builder_client, role_dir):
+    """Saving to a subdirectory of an allowed role dir should not 400."""
+    sub = role_dir / "my-agent"
+    sub.mkdir()
+
+    yaml_text = """\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: nested-agent
+spec:
+  role: You are helpful.
+  model:
+    provider: openai
+    name: gpt-4o
+"""
+    resp = builder_client.post(
+        "/api/builder/save",
+        json={
+            "yaml_text": yaml_text,
+            "directory": str(sub),
+            "filename": "role.yaml",
+        },
+    )
+    assert resp.status_code == 200
+    assert (sub / "role.yaml").exists()
+
+
 # -- _rewrite_model_block unit tests -------------------------------------------
 
 _SAMPLE_YAML = """\
