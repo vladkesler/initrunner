@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from initrunner.agent.schema.ingestion import EmbeddingConfig, _MigratedBackend
+from initrunner.agent.schema.ingestion import EmbeddingConfig
 from initrunner.agent.schema.triggers import TriggerConfig
 from initrunner.stores.base import StoreBackend
 
@@ -42,14 +42,14 @@ class RestartPolicy(BaseModel):
 class SharedMemoryConfig(BaseModel):
     enabled: bool = False
     store_path: str | None = None
-    store_backend: _MigratedBackend = StoreBackend.LANCEDB
+    store_backend: StoreBackend = StoreBackend.LANCEDB
     max_memories: int = 1000
 
 
 class SharedDocumentsConfig(BaseModel):
     enabled: bool = False
     store_path: str | None = None
-    store_backend: _MigratedBackend = StoreBackend.LANCEDB
+    store_backend: StoreBackend = StoreBackend.LANCEDB
     embeddings: EmbeddingConfig = EmbeddingConfig()
 
     @model_validator(mode="after")

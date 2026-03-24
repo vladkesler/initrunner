@@ -77,6 +77,36 @@ Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.
 
 > **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic` with RAG or memory, you need `OPENAI_API_KEY` set for embeddings — even though `ANTHROPIC_API_KEY` handles the LLM. The doctor output makes this explicit.
 
+## Role Validation
+
+When `--role` is provided, `doctor` runs schema and deprecation checks on the role file before the quickstart smoke test. This catches common issues like removed fields, invalid YAML, and schema errors.
+
+```bash
+initrunner doctor --role role.yaml
+```
+
+The validation checks:
+
+| Check | What it verifies |
+|-------|------------------|
+| **YAML parse** | Whether the file is valid YAML |
+| **Deprecation rules** | Whether the role uses removed or renamed fields (see [Deprecations](deprecations.md)) |
+| **Schema validation** | Whether the role validates against the current RoleDefinition schema |
+| **spec_version** | Whether the role's spec_version is current, stale, or unsupported |
+
+If any error-severity issues are found, the command exits with code 1. When combined with `--quickstart`, role errors block the smoke test from running.
+
+Example output with deprecation errors:
+
+```
+       Role Validation: my-agent (spec_version: 1, current: 2)
+┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ ID     ┃ Severity ┃ Issue                                     ┃ Status     ┃
+┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ DEP002 │ error    │ store_backend 'zvec' has been removed...  │ manual fix │
+└────────┴──────────┴───────────────────────────────────────────┴────────────┘
+```
+
 ## Quickstart Smoke Test
 
 With `--quickstart`, the doctor runs a real agent prompt after the config scan:

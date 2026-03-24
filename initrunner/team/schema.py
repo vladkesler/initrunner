@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from initrunner.agent.schema.base import ApiVersion, Metadata, ModelConfig
-from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, _MigratedBackend
+from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
 from initrunner.agent.schema.observability import ObservabilityConfig
 from initrunner.agent.schema.role import parse_tool_list
 from initrunner.agent.schema.tools import ToolConfig
@@ -36,7 +36,7 @@ class TeamDocumentsConfig(BaseModel):
     enabled: bool = False
     sources: list[str] = []
     store_path: str | None = None
-    store_backend: _MigratedBackend = StoreBackend.LANCEDB
+    store_backend: StoreBackend = StoreBackend.LANCEDB
     embeddings: EmbeddingConfig = EmbeddingConfig()
     chunking: ChunkingConfig = ChunkingConfig()
 

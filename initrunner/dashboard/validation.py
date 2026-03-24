@@ -9,7 +9,7 @@ from initrunner.dashboard.schemas import ValidationIssueResponse
 
 def validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
     """Parse and validate compose YAML against schema + graph rules only."""
-    from initrunner.compose.schema import ComposeDefinition
+    from initrunner.deprecations import validate_compose_dict
 
     issues: list[ValidationIssueResponse] = []
     try:
@@ -40,7 +40,11 @@ def validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
         return issues
 
     try:
-        ComposeDefinition.model_validate(raw)
+        validate_compose_dict(raw)
+    except ValueError as ve:
+        issues.append(
+            ValidationIssueResponse(field="deprecation", message=str(ve), severity="error")
+        )
     except Exception as ve:
         if hasattr(ve, "errors"):
             error_list = ve.errors()

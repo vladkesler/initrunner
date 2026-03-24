@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -215,3 +217,136 @@ class TestDoctorQuickstart:
 
         assert result.exit_code == 1
         assert "error" in result.output.lower()
+
+
+def _valid_role_yaml() -> str:
+    return textwrap.dedent("""\
+        apiVersion: initrunner/v1
+        kind: Agent
+        metadata:
+          name: test-valid
+          spec_version: 2
+        spec:
+          role: You are helpful.
+          model:
+            provider: openai
+            name: gpt-5-mini
+    """)
+
+
+class TestDoctorRoleValidation:
+    def test_clean_role(self, tmp_path: Path, monkeypatch):
+        """Valid role shows 'valid and up to date'."""
+        p = tmp_path / "role.yaml"
+        p.write_text(_valid_role_yaml())
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 0
+        assert "valid and up to date" in result.output
+
+    def test_stale_version_note(self, tmp_path: Path, monkeypatch):
+        """spec_version: 1 shows stale note but exits 0."""
+        content = _valid_role_yaml().replace("spec_version: 2", "spec_version: 1")
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 0
+        assert "is behind" in result.output
+
+    def test_zvec_error(self, tmp_path: Path, monkeypatch):
+        """Role with zvec shows error table and exits 1."""
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-zvec
+            spec:
+              role: test
+              model:
+                provider: openai
+                name: gpt-5-mini
+              ingest:
+                sources: ["*.md"]
+                store_backend: zvec
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 1
+        assert "DEP002" in result.output
+
+    def test_max_memories_error(self, tmp_path: Path, monkeypatch):
+        """Role with memory.max_memories shows error and exits 1."""
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-maxmem
+            spec:
+              role: test
+              model:
+                provider: openai
+                name: gpt-5-mini
+              memory:
+                max_memories: 500
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 1
+        assert "DEP001" in result.output
+
+    def test_yaml_parse_error(self, tmp_path: Path, monkeypatch):
+        """Broken YAML shows parse error and exits 1."""
+        p = tmp_path / "role.yaml"
+        p.write_text(":\n  bad: [yaml\n")
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 1
+        assert "Cannot read" in result.output or "Invalid YAML" in result.output
+
+    def test_error_blocks_quickstart(self, tmp_path: Path, monkeypatch):
+        """--role with errors + --quickstart exits at validation, no smoke test."""
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-zvec
+            spec:
+              role: test
+              model:
+                provider: openai
+                name: gpt-5-mini
+              ingest:
+                sources: ["*.md"]
+                store_backend: zvec
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p), "--quickstart"])
+
+        assert result.exit_code == 1
+        assert "DEP002" in result.output
+        # Should NOT reach the smoke test
+        assert "Running quickstart" not in result.output

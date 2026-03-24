@@ -11,7 +11,7 @@ from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
 
 from initrunner._compat import require_provider
-from initrunner._yaml import load_yaml_model
+from initrunner._yaml import load_raw_yaml
 from initrunner.agent.schema.base import ModelConfig
 from initrunner.agent.schema.role import RoleDefinition
 
@@ -34,7 +34,14 @@ class RoleLoadError(Exception):
 
 def load_role(path: Path) -> RoleDefinition:
     """Read a YAML file and validate it as a RoleDefinition."""
-    return load_yaml_model(path, RoleDefinition, RoleLoadError)
+    from initrunner.deprecations import validate_role_dict
+
+    raw = load_raw_yaml(path, RoleLoadError)
+    try:
+        role, _hits = validate_role_dict(raw)
+    except (ValueError, Exception) as e:
+        raise RoleLoadError(f"Validation failed for {path}:\n{e}") from e
+    return role
 
 
 def _build_model(model_config: ModelConfig):

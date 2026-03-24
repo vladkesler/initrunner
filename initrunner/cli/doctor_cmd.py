@@ -104,7 +104,14 @@ def doctor(
         "[dim]Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.[/dim]"
     )
 
-    if not quickstart:
+    # ----- Role Validation (when --role provided) -----
+    has_role_errors = False
+    if role_file is not None:
+        has_role_errors = _check_role_health(role_file)
+
+    if not quickstart or has_role_errors:
+        if has_role_errors:
+            raise typer.Exit(1)
         return
 
     # ----- Step 2: Smoke test (--quickstart) -----
@@ -118,7 +125,7 @@ def doctor(
             role, agent = load_and_build(role_file)
         else:
             from initrunner.agent.loader import build_agent
-            from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+            from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
             from initrunner.agent.schema.guardrails import Guardrails
             from initrunner.agent.schema.role import AgentSpec, RoleDefinition
             from initrunner.services.roles import _detect_provider
@@ -129,7 +136,7 @@ def doctor(
             role = RoleDefinition(
                 apiVersion=ApiVersion.V1,
                 kind=Kind.AGENT,
-                metadata=Metadata(name="doctor-quickstart"),
+                metadata=RoleMetadata(name="doctor-quickstart", spec_version=2),
                 spec=AgentSpec(
                     role="You are a helpful assistant.",
                     model=ModelConfig(provider=detected_provider, name=model_name),
@@ -176,3 +183,89 @@ def doctor(
             )
         )
         raise typer.Exit(1) from None
+
+
+def _check_role_health(path: Path) -> bool:
+    """Validate a role file and display results. Returns True if errors found."""
+    from initrunner._yaml import load_raw_yaml
+    from initrunner.deprecations import CURRENT_ROLE_SPEC_VERSION, inspect_role_data
+
+    console.print()
+
+    # Stage 1: parse YAML
+    try:
+        raw = load_raw_yaml(path, ValueError)
+    except Exception as exc:
+        console.print(
+            Panel(
+                f"[red]Cannot read role file:[/red] {exc}",
+                title="Role Validation",
+                border_style="red",
+            )
+        )
+        return True
+
+    # Stage 2: inspect (non-raising except future version)
+    try:
+        inspection = inspect_role_data(raw)
+    except ValueError as exc:
+        console.print(
+            Panel(
+                f"[red]{exc}[/red]",
+                title="Role Validation",
+                border_style="red",
+            )
+        )
+        return True
+
+    role_name = raw.get("metadata", {}).get("name", path.stem)
+    has_errors = False
+
+    # Display deprecation hits
+    if inspection.hits:
+        hit_table = Table(
+            title=f"Role Validation: {role_name} "
+            f"(spec_version: {inspection.spec_version}, "
+            f"current: {CURRENT_ROLE_SPEC_VERSION})"
+        )
+        hit_table.add_column("ID", style="cyan")
+        hit_table.add_column("Severity")
+        hit_table.add_column("Issue")
+        hit_table.add_column("Status")
+
+        for hit in inspection.hits:
+            severity_style = "red" if hit.severity == "error" else "yellow"
+            hit_table.add_row(
+                hit.id,
+                f"[{severity_style}]{hit.severity}[/{severity_style}]",
+                hit.message,
+                "[green]auto-fixed[/green]" if hit.auto_fixed else "[red]manual fix[/red]",
+            )
+            if hit.severity == "error":
+                has_errors = True
+
+        console.print(hit_table)
+
+    # Display schema errors
+    if inspection.schema_error:
+        has_errors = True
+        console.print(
+            Panel(
+                f"[red]{inspection.schema_error}[/red]",
+                title="Schema Error",
+                border_style="red",
+            )
+        )
+
+    # Summary
+    if not has_errors:
+        if inspection.spec_version < CURRENT_ROLE_SPEC_VERSION:
+            console.print("[green]Role is valid.[/green]")
+            console.print(
+                f"[dim]spec_version {inspection.spec_version} is behind "
+                f"current {CURRENT_ROLE_SPEC_VERSION}.[/dim]"
+            )
+        else:
+            console.print("[green]Role is valid and up to date.[/green]")
+
+    return has_errors

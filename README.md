@@ -290,7 +290,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Deprecations](docs/operations/deprecations.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 See [`docs/`](docs/) for the full index.
 
@@ -302,6 +302,12 @@ initrunner examples copy code-reviewer # copy to current directory
 ```
 
 The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose pipelines.
+
+## Upgrading & Deprecations
+
+Role YAML files now include `metadata.spec_version` to track schema compatibility. When InitRunner removes or renames a config field, the deprecation system gives a clear error message pointing to the fix instead of a cryptic validation failure.
+
+Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
 
 ## Community & Contributing
 

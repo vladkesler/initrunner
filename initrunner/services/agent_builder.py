@@ -71,8 +71,6 @@ class PostCreateResult:
 
 def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIssue]]:
     """Parse and validate YAML text, returning the role and any issues."""
-    from initrunner.agent.schema.role import RoleDefinition as RoleDef
-
     issues: list[ValidationIssue] = []
 
     try:
@@ -97,8 +95,10 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
         )
         return None, issues
 
+    from initrunner.deprecations import validate_role_dict
+
     try:
-        role = RoleDef.model_validate(raw)
+        role, _hits = validate_role_dict(raw)
     except Exception as e:
         issues.append(ValidationIssue(field="schema", message=str(e), severity="error"))
         return None, issues
@@ -239,6 +239,7 @@ the complete YAML in a fenced ```yaml block.
 - The spec.role field is the system prompt -- write a good one that matches the description.
 - For tool configs, only include fields that differ from defaults.
 - Keep YAML clean and minimal.
+- Always include metadata.spec_version: 2.
 - Only include sections the agent actually needs.
 - CRITICAL: The schema reference below uses dotted paths like "spec.model" for readability. \
 In the actual YAML, these MUST be nested under their parent key, NOT used as flat dotted keys.

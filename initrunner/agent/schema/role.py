@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.agent.schema.memory import MemoryConfig
@@ -164,5 +164,12 @@ class SkillDefinition(BaseModel):
 class RoleDefinition(BaseModel):
     apiVersion: ApiVersion
     kind: Kind
-    metadata: Metadata
+    metadata: RoleMetadata
     spec: AgentSpec
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def _coerce_metadata(cls, v: Any) -> Any:
+        if isinstance(v, Metadata) and not isinstance(v, RoleMetadata):
+            return RoleMetadata(**v.model_dump())
+        return v

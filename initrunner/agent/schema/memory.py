@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, model_validator
 
-from initrunner.agent.schema.ingestion import EmbeddingConfig, _MigratedBackend
+from initrunner.agent.schema.ingestion import EmbeddingConfig
 from initrunner.stores.base import StoreBackend
 
 
@@ -34,7 +34,7 @@ class ConsolidationConfig(BaseModel):
 
 class MemoryConfig(BaseModel):
     store_path: str | None = None  # default: ~/.initrunner/memory/{agent-name}.db
-    store_backend: _MigratedBackend = StoreBackend.LANCEDB
+    store_backend: StoreBackend = StoreBackend.LANCEDB
     max_sessions: int = 10
     max_resume_messages: int = 20  # limit history loaded on --resume
     embeddings: EmbeddingConfig = EmbeddingConfig()
@@ -47,11 +47,7 @@ class MemoryConfig(BaseModel):
     @classmethod
     def _reject_legacy_max_memories(cls, data: dict) -> dict:
         if isinstance(data, dict) and "max_memories" in data:
-            raise ValueError(
-                "MemoryConfig.max_memories has been removed. "
-                "Use semantic.max_memories instead:\n"
-                "  memory:\n"
-                "    semantic:\n"
-                "      max_memories: <value>"
-            )
+            from initrunner.deprecations import REMOVED_FIELD_MESSAGE_MAX_MEMORIES
+
+            raise ValueError(REMOVED_FIELD_MESSAGE_MAX_MEMORIES)
         return data

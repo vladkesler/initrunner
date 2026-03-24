@@ -111,8 +111,6 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
     """Parse and validate team YAML, returning the definition and any issues."""
     import yaml
 
-    from initrunner.team.schema import TeamDefinition
-
     issues: list[ValidationIssue] = []
 
     try:
@@ -127,8 +125,13 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
         )
         return None, issues
 
+    from initrunner.deprecations import validate_team_dict
+
     try:
-        team = TeamDefinition.model_validate(raw)
+        team, _hits = validate_team_dict(raw)
+    except ValueError as exc:
+        issues.append(ValidationIssue(field="deprecation", message=str(exc), severity="error"))
+        return None, issues
     except Exception as exc:
         for err in _extract_pydantic_errors(exc):
             issues.append(err)

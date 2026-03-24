@@ -104,6 +104,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: A new InitRunner agent
   tags:
     - general
@@ -133,6 +134,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: RAG agent with document ingestion
   tags:
     - rag
@@ -171,6 +173,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Daemon agent with triggers
   tags:
     - daemon
@@ -216,6 +219,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Agent with long-term memory
   tags:
     - memory
@@ -254,6 +258,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Agent using local Ollama model
   tags:
     - ollama
@@ -325,6 +330,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Agent with declarative API tools
   tags:
     - api
@@ -389,6 +395,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Telegram bot agent
   tags:
     - telegram
@@ -423,6 +430,7 @@ apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: {name}
+  spec_version: 2
   description: Discord bot agent
   tags:
     - discord
@@ -610,6 +618,7 @@ def build_role_yaml(
         "kind": "Agent",
         "metadata": {
             "name": name,
+            "spec_version": 2,
             "description": description,
             "tags": tags if tags is not None else [],
         },

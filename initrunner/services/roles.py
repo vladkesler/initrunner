@@ -41,7 +41,7 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
     """
     import yaml
 
-    from initrunner.agent.schema.role import RoleDefinition as RoleDef
+    from initrunner.deprecations import CURRENT_ROLE_SPEC_VERSION, validate_role_dict
 
     # Parse and validate first
     try:
@@ -52,7 +52,9 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
     if not isinstance(raw, dict):
         raise ValueError("YAML must be a mapping")
 
-    role = RoleDef.model_validate(raw)
+    # Normalize spec_version to current before validation and write
+    raw.setdefault("metadata", {})["spec_version"] = CURRENT_ROLE_SPEC_VERSION
+    role, _hits = validate_role_dict(raw)
 
     # Backup existing file before overwrite
     if path.exists():
@@ -60,7 +62,8 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
         bak_path.write_text(path.read_text())
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml_content)
+    normalized = yaml.dump(raw, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    path.write_text(normalized)
     return role
 
 

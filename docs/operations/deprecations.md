@@ -1,0 +1,111 @@
+# Deprecations & Schema Versioning
+
+InitRunner uses a centralized deprecation system to manage removed or renamed configuration fields across role, compose, and team YAML schemas. When a field is deprecated, you get a clear error message pointing to the replacement instead of a cryptic validation failure.
+
+## spec_version
+
+Role YAML files include a `metadata.spec_version` field that tracks which schema version the file was written against.
+
+```yaml
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: my-agent
+  spec_version: 2   # current version
+  description: ...
+```
+
+**Behavior:**
+
+| spec_version | Runtime | Doctor |
+|---|---|---|
+| Current (2) | Loads normally | "Valid and up to date" |
+| Older (1) | Loads normally | Shows informational note |
+| Future (>2) | Rejected with error | Rejected with error |
+
+When you save or generate a role through InitRunner (builder, templates, `initrunner new`), `spec_version` is automatically set to the current version.
+
+## Current Deprecation Rules
+
+| ID | Applies to | Field | Error |
+|---|---|---|---|
+| DEP001 | Role | `spec.memory.max_memories` | Removed. Use `memory.semantic.max_memories` instead. |
+| DEP002 | Role | `spec.ingest.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+| DEP003 | Role | `spec.memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+| DEP004 | Compose, Team | `spec.shared_memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+| DEP005 | Compose, Team | `spec.shared_documents.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+
+All current rules are error-severity with no automatic migration. Fix the YAML manually using the guidance in the error message.
+
+## Checking Your Role
+
+Run `doctor --role` to check a role file for deprecation issues, schema errors, and spec version status:
+
+```bash
+initrunner doctor --role role.yaml
+```
+
+Example output for a role with a deprecated field:
+
+```
+       Role Validation: my-agent (spec_version: 1, current: 2)
+┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ ID     ┃ Severity ┃ Issue                                     ┃ Status     ┃
+┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ DEP002 │ error    │ store_backend 'zvec' has been removed...  │ manual fix │
+└────────┴──────────┴───────────────────────────────────────────┴────────────┘
+```
+
+When the role is clean:
+
+```
+Role is valid and up to date.
+```
+
+When the role is valid but uses an older spec version:
+
+```
+Role is valid.
+spec_version 1 is behind current 2.
+```
+
+If `--quickstart` is also provided and role validation finds errors, the smoke test is skipped and the command exits with code 1.
+
+## Fixing Deprecated Fields
+
+### memory.max_memories (DEP001)
+
+**Before:**
+```yaml
+spec:
+  memory:
+    max_memories: 500
+```
+
+**After:**
+```yaml
+spec:
+  memory:
+    semantic:
+      max_memories: 500
+```
+
+### store_backend: zvec (DEP002-DEP005)
+
+**Before:**
+```yaml
+spec:
+  ingest:
+    sources: ["*.md"]
+    store_backend: zvec
+```
+
+**After:**
+```yaml
+spec:
+  ingest:
+    sources: ["*.md"]
+    store_backend: lancedb
+```
+
+The same fix applies to `memory.store_backend`, `shared_memory.store_backend`, and `shared_documents.store_backend` in role, compose, and team files.

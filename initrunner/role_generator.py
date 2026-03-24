@@ -56,6 +56,7 @@ def build_schema_reference() -> str:
 
     # Metadata
     sections.append(_format_model_fields("metadata", Metadata))
+    sections.append("# metadata.spec_version: 2  # required for new roles")
 
     # Model config
     sections.append(_format_model_fields("spec.model", ModelConfig))
@@ -208,11 +209,11 @@ def _strip_yaml_fences(text: str) -> str:
 
 def _validate_yaml(text: str) -> tuple[bool, str]:
     """Validate YAML text against RoleDefinition. Returns (valid, error_msg)."""
-    from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.deprecations import validate_role_dict
 
     try:
         raw = yaml.safe_load(text)
-        RoleDefinition.model_validate(raw)
+        validate_role_dict(raw)
         return True, ""
     except Exception as e:
         return False, str(e)

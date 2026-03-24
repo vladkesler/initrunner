@@ -11,6 +11,27 @@ from pydantic import BaseModel, ValidationError
 _T = TypeVar("_T", bound=BaseModel)
 
 
+def load_raw_yaml(path: Path, error_cls: type[Exception]) -> dict:
+    """Read and parse a YAML file, returning the raw dict.
+
+    Raises *error_cls* on read or parse failure.
+    """
+    try:
+        raw = path.read_text()
+    except OSError as e:
+        raise error_cls(f"Cannot read {path}: {e}") from e
+
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as e:
+        raise error_cls(f"Invalid YAML in {path}: {e}") from e
+
+    if not isinstance(data, dict):
+        raise error_cls(f"Expected a YAML mapping in {path}, got {type(data).__name__}")
+
+    return data
+
+
 def load_yaml_model(
     path: Path,
     model_cls: type[_T],
@@ -26,18 +47,7 @@ def load_yaml_model(
     Returns:
         A validated instance of *model_cls*.
     """
-    try:
-        raw = path.read_text()
-    except OSError as e:
-        raise error_cls(f"Cannot read {path}: {e}") from e
-
-    try:
-        data = yaml.safe_load(raw)
-    except yaml.YAMLError as e:
-        raise error_cls(f"Invalid YAML in {path}: {e}") from e
-
-    if not isinstance(data, dict):
-        raise error_cls(f"Expected a YAML mapping in {path}, got {type(data).__name__}")
+    data = load_raw_yaml(path, error_cls)
 
     try:
         return model_cls.model_validate(data)

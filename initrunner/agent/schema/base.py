@@ -37,6 +37,10 @@ class Metadata(BaseModel):
     bundle: BundleConfig | None = None
 
 
+class RoleMetadata(Metadata):
+    spec_version: int = 1
+
+
 class ModelConfig(BaseModel):
     provider: str = ""
     name: str

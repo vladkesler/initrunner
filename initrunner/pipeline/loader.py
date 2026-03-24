@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 from pydantic import ValidationError
 
+from initrunner._yaml import load_raw_yaml
 from initrunner.pipeline.schema import PipelineDefinition
 
 
@@ -16,19 +16,7 @@ class PipelineLoadError(Exception):
 
 def load_pipeline(path: Path) -> PipelineDefinition:
     """Read a YAML file and validate it as a PipelineDefinition."""
-    try:
-        raw = path.read_text()
-    except OSError as e:
-        raise PipelineLoadError(f"Cannot read {path}: {e}") from e
-
-    try:
-        data = yaml.safe_load(raw)
-    except yaml.YAMLError as e:
-        raise PipelineLoadError(f"Invalid YAML in {path}: {e}") from e
-
-    if not isinstance(data, dict):
-        raise PipelineLoadError(f"Expected a YAML mapping in {path}, got {type(data).__name__}")
-
+    data = load_raw_yaml(path, PipelineLoadError)
     try:
         return PipelineDefinition.model_validate(data)
     except ValidationError as e:
