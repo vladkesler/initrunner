@@ -16,9 +16,9 @@ from initrunner.dashboard.deps import (
     get_compose_cache,
     get_role_cache,
 )
+from initrunner.dashboard.routers._agent_options import build_agent_options
 from initrunner.dashboard.routers._provider_options import gather_provider_options
 from initrunner.dashboard.schemas import (
-    AgentSlotOption,
     ComposeBuilderOptionsResponse,
     ComposeSaveRequest,
     ComposeSaveResponse,
@@ -84,22 +84,9 @@ async def compose_builder_options(
 ) -> ComposeBuilderOptionsResponse:
     opts = await gather_provider_options(role_cache._settings)
 
-    agents = []
-    for rid, dr in role_cache.all().items():
-        if dr.error or dr.role is None:
-            continue
-        agents.append(
-            AgentSlotOption(
-                id=rid,
-                name=dr.role.metadata.name,
-                description=dr.role.metadata.description or "",
-                path=str(dr.path),
-            )
-        )
-
     return ComposeBuilderOptionsResponse(
         patterns=_pattern_infos(),
-        agents=agents,
+        agents=build_agent_options(role_cache),
         providers=opts.providers,
         detected_provider=opts.detected_provider,
         detected_model=opts.detected_model,

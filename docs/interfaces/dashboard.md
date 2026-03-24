@@ -100,7 +100,7 @@ Create a new multi-agent composition through a 3-step flow: **Configure -> Edito
 | **Fan-out** | One dispatcher fans to multiple workers | Adjustable service count (min 3) |
 | **Route** | Intake routes to specialists via LLM intent sensing | Fixed 4 services (intake, researcher, responder, escalator) |
 
-Each slot can be filled with an existing agent from the dashboard's discovered roles, or left as a placeholder (a generic role is generated). Provider/model selection and shared memory toggle are available for placeholder roles.
+Each slot uses an **Agent Picker** -- a searchable inline dropdown that shows all discovered agents with their name, description, model badge, and feature pills. Search filters across name, description, tags, features, and path. Slots default to "Generate placeholder" (a generic role YAML is created at seed time). When an agent is selected, the trigger shows the agent name and model; clearing it reverts to the placeholder label. Provider/model selection and shared memory toggle are available for placeholder roles.
 
 **Editor** -- review and edit the generated `compose.yaml` with live schema validation. Placeholder role YAMLs are shown in a collapsible section. Pick a save directory and project name, then save.
 
@@ -138,6 +138,7 @@ Create a new multi-persona team through a 3-step flow: **Configure -> Editor -> 
 | **Parallel** | All personas execute simultaneously, outputs are combined |
 
 Personas are configured individually through expandable cards (2-8). Each card has:
+- **Role source** -- toggle between "Custom" (write a role description manually) and "From agent" (pick an existing agent via the Agent Picker). Selecting an agent copies its description into the role field, auto-renames the persona if the name is still a default, and pre-fills the model override with the agent's provider/model/endpoint. The copied fields remain fully editable. A "Seeded from `<agent-name>`" indicator shows the source while the link is active. This is a one-time copy; saved team YAML contains plain persona data with no agent reference.
 - **Name** -- editable, validated against kebab-case naming rules, unique across the team
 - **Role** -- textarea describing what the persona does (becomes the persona's system prompt)
 - **Model override** -- optional toggle to use a different model than the team default, with full provider parity (cloud, Ollama, OpenRouter, custom endpoints with API key persistence via `/api/builder/save-key`)

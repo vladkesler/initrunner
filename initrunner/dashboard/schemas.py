@@ -398,11 +398,23 @@ class PatternInfo(BaseModel):
     max_services: int | None = None
 
 
+class AgentSlotModel(BaseModel):
+    """Model metadata for an agent picker option."""
+
+    provider: str
+    name: str
+    base_url: str | None = None
+    api_key_env: str | None = None
+
+
 class AgentSlotOption(BaseModel):
     id: str
     name: str
     description: str
     path: str
+    tags: list[str] = []
+    features: list[str] = []
+    model: AgentSlotModel | None = None
 
 
 class SlotAssignment(BaseModel):
@@ -551,6 +563,7 @@ class TeamRunResponse(BaseModel):
 
 class TeamBuilderOptionsResponse(BaseModel):
     providers: list[ProviderModels]
+    agents: list[AgentSlotOption] = []
     detected_provider: str | None = None
     detected_model: str | None = None
     save_dirs: list[str]

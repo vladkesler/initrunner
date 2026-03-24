@@ -39,9 +39,9 @@
 
 	// Personas
 	let personas = $state<PersonaEntry[]>([
-		{ name: 'analyst', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
-		{ name: 'reviewer', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
-		{ name: 'advisor', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
+		{ name: 'analyst', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
+		{ name: 'reviewer', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
+		{ name: 'advisor', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
 	]);
 
 	// Editor
@@ -220,9 +220,9 @@
 		teamName = '';
 		strategy = 'sequential';
 		personas = [
-			{ name: 'analyst', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
-			{ name: 'reviewer', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
-			{ name: 'advisor', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '' },
+			{ name: 'analyst', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
+			{ name: 'reviewer', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
+			{ name: 'advisor', role: '', modelOverride: false, modelProvider: '', modelName: '', modelCustomName: '', modelBaseUrl: '', modelApiKey: '', agentId: null, agentName: null },
 		];
 		yamlText = '';
 		issues = [];
@@ -326,6 +326,7 @@
 						customPresets={options.custom_presets}
 						ollamaModels={options.ollama_models}
 						ollamaBaseUrl={options.ollama_base_url}
+						agents={options.agents}
 					/>
 				{/if}
 			</div>

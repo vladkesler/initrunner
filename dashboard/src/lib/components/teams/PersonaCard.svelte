@@ -1,12 +1,21 @@
 <script lang="ts">
 	import { ChevronUp, ChevronDown, X } from 'lucide-svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
-	import type { ProviderModels, ProviderPreset } from '$lib/api/types';
+	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
+	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '$lib/api/types';
+
+	const DEFAULT_NAMES = [
+		'analyst', 'reviewer', 'advisor', 'checker',
+		'specialist', 'evaluator', 'auditor', 'planner'
+	];
+	const AUTO_NAME_RE = /^persona-\d+$/;
 
 	let {
 		index,
 		name,
 		role,
+		agentId = null,
+		agentName = null,
 		modelOverride,
 		modelProvider,
 		modelName,
@@ -21,6 +30,7 @@
 		customPresets,
 		ollamaModels,
 		ollamaBaseUrl,
+		agents = [],
 		nameError,
 		onUpdate,
 		onRemove,
@@ -30,6 +40,8 @@
 		index: number;
 		name: string;
 		role: string;
+		agentId: string | null;
+		agentName: string | null;
 		modelOverride: boolean;
 		modelProvider: string;
 		modelName: string;
@@ -44,12 +56,15 @@
 		customPresets: ProviderPreset[];
 		ollamaModels: string[];
 		ollamaBaseUrl: string;
+		agents: AgentSlotOption[];
 		nameError: string | null;
 		onUpdate: (field: string, value: any) => void;
 		onRemove: () => void;
 		onMoveUp: () => void;
 		onMoveDown: () => void;
 	} = $props();
+
+	let useAgent = $state(false);
 
 	const NAME_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 
@@ -59,6 +74,10 @@
 			.replace(/[^a-z0-9-]/g, '-')
 			.replace(/-{2,}/g, '-')
 			.replace(/^-+|-+$/g, '');
+	}
+
+	function isAutoName(n: string): boolean {
+		return DEFAULT_NAMES.includes(n) || AUTO_NAME_RE.test(n);
 	}
 
 	function handleNameBlur() {
@@ -76,6 +95,64 @@
 				onUpdate('modelName', providers[0].models[0].name);
 			}
 		}
+	}
+
+	function handleAgentSelect(agent: AgentSlotOption | null) {
+		if (!agent) {
+			onUpdate('agentId', null);
+			onUpdate('agentName', null);
+			return;
+		}
+
+		// Copy role description
+		onUpdate('role', agent.description);
+		onUpdate('agentId', agent.id);
+		onUpdate('agentName', agent.name);
+
+		// Auto-rename only if current name is auto-generated
+		if (isAutoName(name)) {
+			const sanitized = sanitizeName(agent.name);
+			if (sanitized) onUpdate('name', sanitized);
+		}
+
+		// Map model
+		if (agent.model) {
+			const m = agent.model;
+			onUpdate('modelOverride', true);
+
+			if (m.provider === 'ollama') {
+				onUpdate('modelProvider', 'ollama');
+				onUpdate('modelName', m.name);
+				onUpdate('modelBaseUrl', m.base_url ?? ollamaBaseUrl);
+				onUpdate('modelCustomName', '');
+				onUpdate('modelApiKey', '');
+			} else if (m.base_url) {
+				// Custom endpoint or preset (OpenRouter, etc.)
+				const preset = customPresets.find((p) => p.base_url === m.base_url);
+				if (preset) {
+					onUpdate('modelProvider', preset.name);
+				} else {
+					onUpdate('modelProvider', 'custom');
+				}
+				onUpdate('modelCustomName', m.name);
+				onUpdate('modelBaseUrl', m.base_url);
+				onUpdate('modelApiKey', m.api_key_env ?? '');
+				onUpdate('modelName', '');
+			} else {
+				// Standard provider
+				onUpdate('modelProvider', m.provider);
+				onUpdate('modelName', m.name);
+				onUpdate('modelCustomName', '');
+				onUpdate('modelBaseUrl', '');
+				onUpdate('modelApiKey', '');
+			}
+		}
+	}
+
+	function clearAgentSource() {
+		useAgent = false;
+		onUpdate('agentId', null);
+		onUpdate('agentName', null);
 	}
 </script>
 
@@ -137,13 +214,50 @@
 		<p class="mt-1 font-mono text-[11px] text-status-fail">{nameError}</p>
 	{/if}
 
+	<!-- Role source toggle -->
+	{#if agents.length > 0}
+		<div class="mt-3 flex items-center gap-1">
+			<button
+				class="rounded-full px-2.5 py-1 font-mono text-[11px] transition-[color,background-color,border-color] duration-150 {!useAgent ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:text-fg-muted'}"
+				onclick={() => { clearAgentSource(); }}
+			>
+				Custom
+			</button>
+			<button
+				class="rounded-full px-2.5 py-1 font-mono text-[11px] transition-[color,background-color,border-color] duration-150 {useAgent ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:text-fg-muted'}"
+				onclick={() => { useAgent = true; }}
+			>
+				From agent
+			</button>
+		</div>
+	{/if}
+
+	<!-- Agent picker -->
+	{#if useAgent && agents.length > 0}
+		<div class="mt-2">
+			<AgentPicker
+				{agents}
+				selected={agentId}
+				onSelect={handleAgentSelect}
+				placeholder="Pick an agent..."
+			/>
+		</div>
+	{/if}
+
+	<!-- Seeded-from indicator -->
+	{#if agentName}
+		<p class="mt-1.5 font-mono text-[11px] text-fg-faint">
+			Seeded from <span class="text-fg-muted">{agentName}</span>
+		</p>
+	{/if}
+
 	<!-- Role textarea -->
 	<textarea
 		value={role}
 		oninput={(e) => onUpdate('role', e.currentTarget.value)}
 		placeholder="Describe this persona's role..."
 		rows="2"
-		class="mt-3 w-full resize-none border border-edge bg-surface-0 px-2.5 py-2 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40"
+		class="mt-2 w-full resize-none border border-edge bg-surface-0 px-2.5 py-2 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40"
 	></textarea>
 
 	<!-- Model override toggle -->

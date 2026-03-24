@@ -265,11 +265,21 @@ export interface PatternInfo {
 	max_services: number | null;
 }
 
+export interface AgentSlotModel {
+	provider: string;
+	name: string;
+	base_url: string | null;
+	api_key_env: string | null;
+}
+
 export interface AgentSlotOption {
 	id: string;
 	name: string;
 	description: string;
 	path: string;
+	tags: string[];
+	features: string[];
+	model: AgentSlotModel | null;
 }
 
 export interface SlotAssignment {
@@ -443,6 +453,7 @@ export type TeamSSEEvent =
 
 export interface TeamBuilderOptions {
 	providers: ProviderModels[];
+	agents: AgentSlotOption[];
 	detected_provider: string | null;
 	detected_model: string | null;
 	save_dirs: string[];

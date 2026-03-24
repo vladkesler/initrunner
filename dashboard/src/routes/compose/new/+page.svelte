@@ -8,6 +8,7 @@
 	} from '$lib/api/compose';
 	import { ApiError } from '$lib/api/client';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
 	import type {
 		ComposeBuilderOptions,
 		PatternInfo,
@@ -314,21 +315,16 @@
 							<div class="flex items-center gap-2">
 								<span class="w-24 shrink-0 text-right font-mono text-[12px] text-fg-faint">{slot.name}</span>
 								<ArrowRight size={12} class="shrink-0 text-fg-faint/40" />
-								<select
-									class="flex-1 border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[12px] text-fg outline-none transition-[border-color] duration-150 focus:border-accent-primary/40"
-									value={slot.agentId ?? ''}
-									onchange={(e) => {
-										const val = (e.target as HTMLSelectElement).value;
-										slots[idx].agentId = val || null;
-									}}
-								>
-									<option value="">Generate placeholder</option>
-									{#if options}
-										{#each options.agents as agent}
-											<option value={agent.id}>{agent.name} - {agent.description || agent.path}</option>
-										{/each}
-									{/if}
-								</select>
+								{#if options}
+									<div class="flex-1">
+										<AgentPicker
+											agents={options.agents}
+											selected={slot.agentId}
+											onSelect={(agent) => { slots[idx].agentId = agent?.id ?? null; }}
+											placeholder="Generate placeholder"
+										/>
+									</div>
+								{/if}
 							</div>
 						{/each}
 					</div>

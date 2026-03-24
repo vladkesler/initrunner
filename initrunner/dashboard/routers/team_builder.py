@@ -9,7 +9,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from initrunner.dashboard.deps import TeamCache, _team_id, get_team_cache
+from initrunner.dashboard.deps import RoleCache, TeamCache, _team_id, get_role_cache, get_team_cache
 from initrunner.dashboard.routers._provider_options import (
     gather_provider_options,
     resolve_custom_provider,
@@ -31,14 +31,18 @@ router = APIRouter(prefix="/api/team-builder", tags=["team-builder"])
 
 
 @router.get("/options")
-async def get_options() -> TeamBuilderOptionsResponse:
+async def get_options(
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> TeamBuilderOptionsResponse:
     from initrunner.dashboard.config import DashboardSettings
+    from initrunner.dashboard.routers._agent_options import build_agent_options
 
     settings = DashboardSettings()
     opts = await gather_provider_options(settings)
 
     return TeamBuilderOptionsResponse(
         providers=opts.providers,
+        agents=build_agent_options(role_cache),
         detected_provider=opts.detected_provider,
         detected_model=opts.detected_model,
         save_dirs=opts.save_dirs,

@@ -218,6 +218,72 @@ def test_options_endpoint(client):
     data = resp.json()
     assert "providers" in data
     assert "save_dirs" in data
+    assert "agents" in data
+    assert isinstance(data["agents"], list)
+
+
+def test_options_include_agents(tmp_path, monkeypatch):
+    """Team builder options include discovered agents with enriched fields."""
+    from initrunner.dashboard.deps import RoleCache, _role_id, get_role_cache
+    from initrunner.templates import build_role_yaml
+
+    # Write two agent files
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+    for name in ("beta-agent", "alpha-agent"):
+        yaml_text = build_role_yaml(name=name, description=f"Desc for {name}", provider="openai")
+        (roles_dir / f"{name}.yaml").write_text(yaml_text)
+
+    settings = DashboardSettings()
+    monkeypatch.setattr(settings, "get_role_dirs", lambda: [roles_dir])
+
+    app = create_app(settings)
+
+    # Isolated role cache
+    class _IsolatedRoleCache(RoleCache):
+        def __init__(self, dirs):
+            self._settings = settings
+            self._dirs = dirs
+            self._cache = {}
+
+        def refresh(self):
+            from initrunner.services.discovery import discover_roles_sync
+
+            roles = discover_roles_sync(self._dirs)
+            self._cache = {_role_id(r.path): r for r in roles}
+            return self._cache
+
+    role_cache = _IsolatedRoleCache([roles_dir])
+    role_cache.refresh()
+
+    team_cache = _IsolatedTeamCache([tmp_path])
+    team_cache.refresh()
+
+    app.dependency_overrides[get_role_cache] = lambda: role_cache
+    app.dependency_overrides[get_team_cache] = lambda: team_cache
+    tc = TestClient(app)
+
+    resp = tc.get("/api/team-builder/options")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    agents = data["agents"]
+    assert len(agents) == 2
+    # Sorted by name
+    assert agents[0]["name"] == "alpha-agent"
+    assert agents[1]["name"] == "beta-agent"
+
+    # Enriched fields present
+    for agent in agents:
+        assert "model" in agent
+        assert isinstance(agent["tags"], list)
+        assert isinstance(agent["features"], list)
+        assert isinstance(agent["path"], str)
+        if agent["model"] is not None:
+            assert "provider" in agent["model"]
+            assert "name" in agent["model"]
+            assert "base_url" in agent["model"]
+            assert "api_key_env" in agent["model"]
 
 
 # -- Structured persona tests -------------------------------------------------

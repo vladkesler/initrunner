@@ -256,6 +256,10 @@ Active item uses a background tint (`bg-accent-primary/10 text-accent-primary`) 
 
 **Collapsed flyout**: In icon-only mode (48px width), groups render as a single icon button. On hover or focus, a sharp flyout (`border-edge bg-surface-1 shadow-lg`) appears with a mono uppercase section header (`text-[11px] tracking-[0.12em]`) and child links. Focus management keeps the flyout open while focus moves between its children and closes on blur outside.
 
+### Agent Picker
+
+Inline searchable dropdown for selecting agents in compose and team builders (`AgentPicker.svelte`). Sharp-cornered trigger and dropdown panel. Trigger shows selected agent name + model pill badge when set; when unset, shows `noneLabel` if provided (e.g. "Generate placeholder"), otherwise the `placeholder` text, with a chevron. Dropdown panel (`role="listbox"`, `tabindex="0"`): search input at top, scrollable agent list with name (mono 13px), description (12px faint, truncated), model pill (mono 10px), and up to 3 feature pills with "+N" overflow. Highlight: `bg-accent-primary/[0.06]`. Selected: left border accent + tinted background. Keyboard: arrow keys navigate, Enter selects, Escape closes. Click-outside closes via window click handler.
+
 ### Command Palette
 
 Sharp panel with faint lime border (`border-accent-primary/10`). Selected item: `bg-accent-primary/[0.08]`. Kbd badges use `rounded-full`. Group headers: `text-[11px] tracking-[0.12em]`.

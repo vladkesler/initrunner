@@ -102,10 +102,20 @@ def test_builder_options(client):
     assert route["fixed_topology"] is True
     assert len(route["slot_names"]) == 4
 
-    # Agents
+    # Agents -- sorted by name, with enriched fields
     assert len(data["agents"]) == 2
-    agent_names = {a["name"] for a in data["agents"]}
-    assert agent_names == {"fetcher", "summarizer"}
+    agent_names = [a["name"] for a in data["agents"]]
+    assert agent_names == ["fetcher", "summarizer"]  # sorted
+
+    # Each agent carries model, tags, features
+    for agent in data["agents"]:
+        assert "model" in agent
+        assert isinstance(agent["tags"], list)
+        assert isinstance(agent["features"], list)
+        assert isinstance(agent["path"], str)
+        if agent["model"] is not None:
+            assert "provider" in agent["model"]
+            assert "name" in agent["model"]
 
     # Provider surface
     assert len(data["providers"]) > 0

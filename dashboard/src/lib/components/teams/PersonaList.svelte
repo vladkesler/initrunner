@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Plus, ArrowDown } from 'lucide-svelte';
 	import PersonaCard from './PersonaCard.svelte';
-	import type { ProviderModels, ProviderPreset } from '$lib/api/types';
+	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '$lib/api/types';
 
 	const DEFAULT_NAMES = [
 		'analyst',
@@ -25,6 +25,8 @@
 		modelCustomName: string;
 		modelBaseUrl: string;
 		modelApiKey: string;
+		agentId: string | null;
+		agentName: string | null;
 	}
 
 	let {
@@ -33,7 +35,8 @@
 		providers,
 		customPresets,
 		ollamaModels,
-		ollamaBaseUrl
+		ollamaBaseUrl,
+		agents = []
 	}: {
 		personas: PersonaEntry[];
 		strategy: 'sequential' | 'parallel';
@@ -41,6 +44,7 @@
 		customPresets: ProviderPreset[];
 		ollamaModels: string[];
 		ollamaBaseUrl: string;
+		agents: AgentSlotOption[];
 	} = $props();
 
 	// -- Validation ---------------------------------------------------------------
@@ -76,7 +80,9 @@
 				modelName: providers[0]?.models[0]?.name ?? '',
 				modelCustomName: '',
 				modelBaseUrl: '',
-				modelApiKey: ''
+				modelApiKey: '',
+				agentId: null,
+				agentName: null
 			}
 		];
 	}
@@ -116,6 +122,8 @@
 			index={idx}
 			name={persona.name}
 			role={persona.role}
+			agentId={persona.agentId}
+			agentName={persona.agentName}
 			modelOverride={persona.modelOverride}
 			bind:modelProvider={persona.modelProvider}
 			bind:modelName={persona.modelName}
@@ -130,6 +138,7 @@
 			{customPresets}
 			{ollamaModels}
 			{ollamaBaseUrl}
+			{agents}
 			nameError={nameError(idx)}
 			onUpdate={(field, value) => updateField(idx, field, value)}
 			onRemove={() => removePersona(idx)}
