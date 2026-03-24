@@ -252,6 +252,10 @@ Sharp corners (0px). Focus state: `focus:border-accent-primary/40 focus:shadow-[
 
 Active item uses a background tint (`bg-accent-primary/10 text-accent-primary`) instead of the traditional border-left indicator. A faint lime gradient line decorates the top of the sidebar's right edge.
 
+**Collapsible groups**: The sidebar supports collapsible nav groups (e.g. "Orchestration" containing Compose and Teams). The group header is a `<button>` with a `ChevronRight` indicator that rotates 90deg when open. When a child route is active, the group is pinned open (toggle is inert) and the group header receives `text-accent-primary` without background tint, while the active child gets the full `bg-accent-primary/10 text-accent-primary` treatment. Children are indented via a `ml-3` (12px) wrapper. Open/closed state persists to localStorage via `safeGet`/`safeSet`.
+
+**Collapsed flyout**: In icon-only mode (48px width), groups render as a single icon button. On hover or focus, a sharp flyout (`border-edge bg-surface-1 shadow-lg`) appears with a mono uppercase section header (`text-[11px] tracking-[0.12em]`) and child links. Focus management keeps the flyout open while focus moves between its children and closes on blur outside.
+
 ### Command Palette
 
 Sharp panel with faint lime border (`border-accent-primary/10`). Selected item: `bg-accent-primary/[0.08]`. Kbd badges use `rounded-full`. Group headers: `text-[11px] tracking-[0.12em]`.

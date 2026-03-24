@@ -18,6 +18,7 @@ from initrunner.dashboard.routers._provider_options import (
     CUSTOM_PRESETS,
     CUSTOM_PROVIDER_NAMES,
     gather_provider_options,
+    resolve_custom_provider,
 )
 from initrunner.dashboard.schemas import (
     BuilderOptionsResponse,
@@ -179,16 +180,9 @@ async def seed_agent(
 
     # Normalize custom providers to openai for runtime
     is_custom = req.provider in CUSTOM_PROVIDER_NAMES
-    runtime_provider = "openai" if is_custom else req.provider
-
-    # Resolve base_url/api_key_env from presets if not explicitly provided
-    base_url = req.base_url
-    api_key_env = req.api_key_env
-    if is_custom and base_url is None:
-        preset = next((p for p in CUSTOM_PRESETS if p.name == req.provider), None)
-        if preset and preset.base_url:
-            base_url = preset.base_url
-            api_key_env = api_key_env or preset.api_key_env
+    runtime_provider, base_url, api_key_env = resolve_custom_provider(
+        req.provider, req.base_url, req.api_key_env
+    )
 
     # Validation
     if is_custom and req.provider == "custom" and not base_url:

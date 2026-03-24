@@ -3,7 +3,7 @@
 	import { fetchComposeList } from '$lib/api/compose';
 	import type { ComposeSummary } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Search, X, Workflow, Plus } from 'lucide-svelte';
+	import { Search, X, Workflow, Plus, ExternalLink } from 'lucide-svelte';
 
 	let composes = $state<ComposeSummary[]>([]);
 	let loading = $state(true);
@@ -49,6 +49,14 @@
 			{#if !loading}
 				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">{composes.length}</span>
 			{/if}
+			<a
+				href="https://www.initrunner.ai/docs/compose"
+				target="_blank"
+				rel="noopener"
+				class="inline-flex items-center gap-1 font-mono text-[11px] text-accent-primary/60 transition-[color] duration-150 hover:text-accent-primary"
+			>
+				Docs <ExternalLink size={10} />
+			</a>
 		</div>
 		<a
 			href="/compose/new"

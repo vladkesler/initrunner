@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { Search, Blocks, ScanEye, Cpu, Compass, Plus } from 'lucide-svelte';
+	import { Search, Blocks, ScanEye, Cpu, Compass, Plus, Users, Workflow } from 'lucide-svelte';
 	import { listAgents } from '$lib/api/agents';
-	import type { AgentSummary } from '$lib/api/types';
+	import { fetchComposeList } from '$lib/api/compose';
+	import { fetchTeamList } from '$lib/api/teams';
+	import type { AgentSummary, ComposeSummary, TeamSummary } from '$lib/api/types';
 
 	let open = $state(false);
 	let query = $state('');
 	let agents = $state<AgentSummary[]>([]);
+	let composes = $state<ComposeSummary[]>([]);
+	let teams = $state<TeamSummary[]>([]);
 	let selectedIndex = $state(0);
 	let inputEl: HTMLInputElement | undefined = $state();
 
@@ -23,9 +27,13 @@
 	const staticItems: PaletteItem[] = [
 		{ id: 'nav-launchpad', label: 'Launchpad', href: '/', icon: Compass, group: 'Pages' },
 		{ id: 'nav-agents', label: 'Agents', href: '/agents', icon: Blocks, group: 'Pages' },
+		{ id: 'nav-compose', label: 'Compose', href: '/compose', icon: Workflow, group: 'Pages' },
 		{ id: 'nav-audit', label: 'Audit', href: '/audit', icon: ScanEye, group: 'Pages' },
+		{ id: 'nav-teams', label: 'Teams', href: '/teams', icon: Users, group: 'Pages' },
 		{ id: 'nav-system', label: 'System', href: '/system', icon: Cpu, group: 'Pages' },
-		{ id: 'action-new', label: 'New Agent', href: '/agents/new', icon: Plus, group: 'Actions' }
+		{ id: 'action-new', label: 'New Agent', href: '/agents/new', icon: Plus, group: 'Actions' },
+		{ id: 'action-new-compose', label: 'New Compose', href: '/compose/new', icon: Plus, group: 'Actions' },
+		{ id: 'action-new-team', label: 'New Team', href: '/teams/new', icon: Plus, group: 'Actions' }
 	];
 
 	const allItems = $derived.by(() => {
@@ -37,7 +45,23 @@
 			icon: Blocks,
 			group: 'Agents'
 		}));
-		return [...staticItems, ...agentItems];
+		const composeItems: PaletteItem[] = composes.map((c) => ({
+			id: `compose-${c.id}`,
+			label: c.name,
+			sublabel: c.description,
+			href: `/compose/${c.id}`,
+			icon: Workflow,
+			group: 'Compositions'
+		}));
+		const teamItems: PaletteItem[] = teams.map((t) => ({
+			id: `team-${t.id}`,
+			label: t.name,
+			sublabel: t.description,
+			href: `/teams/${t.id}`,
+			icon: Users,
+			group: 'Teams'
+		}));
+		return [...staticItems, ...agentItems, ...composeItems, ...teamItems];
 	});
 
 	const filtered = $derived.by(() => {
@@ -74,7 +98,7 @@
 		if (open) {
 			query = '';
 			selectedIndex = 0;
-			loadAgents();
+			loadData();
 			// Focus input after render
 			requestAnimationFrame(() => inputEl?.focus());
 		}
@@ -109,15 +133,22 @@
 		}
 	}
 
-	async function loadAgents() {
+	async function loadData() {
 		try {
-			agents = await listAgents();
+			const [a, c, t] = await Promise.all([
+				listAgents().catch(() => [] as AgentSummary[]),
+				fetchComposeList().catch(() => [] as ComposeSummary[]),
+				fetchTeamList().catch(() => [] as TeamSummary[])
+			]);
+			agents = a;
+			composes = c;
+			teams = t;
 		} catch {
 			// API not available
 		}
 	}
 
-	onMount(loadAgents);
+	onMount(loadData);
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -143,7 +174,7 @@
 				<input
 					bind:this={inputEl}
 					bind:value={query}
-					placeholder="Search agents, pages, actions..."
+					placeholder="Search agents, compositions, teams..."
 					class="w-full bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-faint"
 				/>
 				<kbd class="shrink-0 rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[12px] text-fg-faint">ESC</kbd>

@@ -44,6 +44,7 @@
 					case 'intelligence': return a.features.includes('ingest') || a.features.includes('memory');
 					case 'connected': return a.features.includes('sinks');
 					case 'skilled': return a.features.includes('skills');
+					case 'cognitive': return a.features.includes('reasoning') || a.features.includes('autonomy');
 					case 'errored': return a.error !== null;
 					default: return true;
 				}

@@ -35,23 +35,22 @@ initrunner dashboard --no-open
 Action-oriented home page. When agents exist, shows:
 
 - **Stats strip**: total runs, success rate, total tokens, average duration
-- **Quick actions**: "New Agent" and "Run Doctor" buttons
+- **Quick actions**: "New Agent", "New Compose", "New Team", and "Run Doctor" buttons
 - **Failing agents**: red-bordered cards for agents with load errors
 - **Top agents**: bar chart of the 5 most-used agents (by run count)
 - **Recent activity**: compact timeline of last 10 runs
+- **Orchestration**: section header grouping the Compositions and Teams cards (appears when either exists)
 
 When no agents exist, shows a welcome screen with onboarding CTAs.
-
-When compose files exist, a **Compositions** card appears showing the first 3 compose projects with links to `/compose`.
 
 ### Agents (`/agents`)
 
 Two views, toggled in the header bar:
 
-- **Flow view** (default, desktop): Interactive SvelteFlow canvas. Agents render as draggable nodes organized into category sections (Reactive, Intelligence, Skilled, Connected, Equipped, Other). Each node shows the agent name, model, description, capability glyph, and a hero icon matching its primary feature. Category labels separate the sections. Canvas supports pan, zoom, minimap, and an auto-arrange button. Node positions persist to localStorage. On mobile (< 1024px), falls back to list view automatically.
+- **Flow view** (default, desktop): Interactive SvelteFlow canvas. Agents render as draggable nodes organized into category sections (Reactive, Intelligence, Skilled, Cognitive, Connected, Equipped, Other). Each node shows the agent name, model, description, capability glyph, and a hero icon matching its primary feature. Category labels separate the sections. Canvas supports pan, zoom, minimap, and an auto-arrange button. Node positions persist to localStorage. On mobile (< 1024px), falls back to list view automatically.
 - **List view**: Sortable table with status dot, name, description, model, and capability glyph columns.
 
-A toolbar above the canvas (or list) provides search, capability filter buttons (All, Equipped, Reactive, Intelligence, Connected, Skilled, Errored), a result count, and the view toggle. In flow view, filtering dims non-matching nodes instead of hiding them. Click any node/row to open the detail view.
+A toolbar above the canvas (or list) provides search, capability filter buttons (All, Equipped, Reactive, Intelligence, Connected, Skilled, Cognitive, Errored), a result count, and the view toggle. The **Cognitive** filter shows agents with non-default reasoning patterns (todo_driven, plan_execute, reflexion) or autonomy configuration. In flow view, filtering dims non-matching nodes instead of hiding them. Click any node/row to open the detail view.
 
 ### New Agent (`/agents/new`)
 
@@ -66,7 +65,9 @@ Create a new agent through four modes, presented in a 2x2 card grid:
 
 All modes include a provider/model selector so the generated (or loaded) YAML uses the user's preferred model. For InitHub, the bundle's original model config is replaced with the user's selection.
 
-After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
+After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. A **Cognition** toggle (lime-tinted, always visible) in the toolbar opens a structured side panel for configuring reasoning patterns, autonomy, think, and todo tools without hand-editing YAML. The panel includes a link to the [reasoning docs](https://www.initrunner.ai/docs/reasoning). It reads from and writes to the YAML text using `js-yaml` (client-side parse/dump). Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
+
+Validation issues use three severity levels: **error** (blocks save), **warning** (advisory), and **info** (recommendations such as "Think tool with critique recommended for reflexion pattern").
 
 InitHub packages may contain sidecar files (knowledge bases, etc.) that are not loaded into the editor. Use `initrunner install owner/name` from the CLI for full package installation with all assets.
 
@@ -76,7 +77,7 @@ Split-panel layout with configuration on the left and the run panel on the right
 
 | Panel | Contents |
 |-------|----------|
-| **Config** (340px sidebar) | Model details, tools with summaries, triggers, guardrails, memory, ingestion, skills, sinks, reasoning, autonomy, metadata, and a collapsible YAML viewer. Sections are collapsible and only render when the agent has data for them. |
+| **Config** (340px sidebar) | Model details, tools with summaries, triggers, guardrails, **cognition** (unified section grouping reasoning pattern, autonomy settings, think tool, and todo tool configs), memory, ingestion, skills, sinks, metadata, and a collapsible YAML viewer. Sections are collapsible and only render when the agent has data for them. |
 | **Run** (primary, flex-1) | Prompt input with streaming output. Token breakdown (in/out), tool call names, and duration shown after completion. |
 
 On narrow screens (< 1024px) the config panel collapses into a disclosure above the run panel.
@@ -85,7 +86,7 @@ Streaming output uses Server-Sent Events. Tokens appear in real time as the mode
 
 ### Compose (`/compose`)
 
-Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. Click a card to open the detail view.
+Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. A [Docs](https://www.initrunner.ai/docs/compose) link in the header opens the compose documentation. Click a card to open the detail view.
 
 ### New Compose (`/compose/new`)
 
@@ -121,6 +122,45 @@ Tabbed detail page with a stats bar and five tabs.
 
 Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each. Tab selection persists to localStorage.
 
+### Teams (`/teams`)
+
+Card grid of all discovered team YAML files. Each card shows the team name, description, strategy badge (sequential/parallel), model overrides badge, persona name pills, and feature badges for shared memory and shared documents. Click a card to open the detail view.
+
+### New Team (`/teams/new`)
+
+Create a new multi-persona team through a 3-step flow: **Configure -> Editor -> Success**.
+
+**Configure** -- pick a strategy, define personas, and select a team-level model:
+
+| Strategy | Description |
+|----------|-------------|
+| **Sequential** | Personas execute in order, each receiving the previous persona's output |
+| **Parallel** | All personas execute simultaneously, outputs are combined |
+
+Personas are configured individually through expandable cards (2-8). Each card has:
+- **Name** -- editable, validated against kebab-case naming rules, unique across the team
+- **Role** -- textarea describing what the persona does (becomes the persona's system prompt)
+- **Model override** -- optional toggle to use a different model than the team default, with full provider parity (cloud, Ollama, OpenRouter, custom endpoints with API key persistence via `/api/builder/save-key`)
+
+For sequential teams, arrow connectors between cards show execution order, and up/down buttons allow reordering (persona order in the YAML determines execution order). Default persona names are assigned from a pool (analyst, reviewer, advisor, checker, specialist, evaluator, auditor, planner).
+
+The team-level model selector supports the same provider options as agent creation (cloud providers, Ollama, custom presets, custom endpoints).
+
+**Editor** -- review and edit the generated `team.yaml` with live validation. Pick a save directory and filename, then save.
+
+**Success** -- shows the saved path and CLI command to run the team.
+
+### Team Detail (`/teams/{id}`)
+
+Tabbed detail page with four tabs.
+
+| Tab | Contents |
+|-----|----------|
+| **Pipeline** (default) | Strategy-aware visualization. Sequential shows a vertical chain of persona cards with handoff arrows; parallel shows a fan-out/fan-in layout. Cards display persona name, model override badge, tool count, duration, and token counts. Cards animate through states: idle, active (pulsing dot), pending, complete (checkmark), error (X). |
+| **Run** | Chat interface for running prompts through the team. Active persona indicator matches the pipeline visualization. Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
+| **Config** | Collapsible sections: model, strategy (with handoff_max_chars), guardrails, shared memory, shared documents, tools, observability. |
+| **Editor** | YAML editor with live validation, in-place save, and copy. Warns when name changes (affects team ID). |
+
 ### Audit Log (`/audit`)
 
 Filterable table of all agent runs with analytics.
@@ -144,10 +184,12 @@ Three sections:
 
 Press `Cmd+K` (or `Ctrl+K`) anywhere to open the command palette. Provides:
 
-- Fuzzy search across all agents by name, tags, and description
-- Quick navigation to any page
-- Quick actions (e.g. "New Agent")
+- Fuzzy search across all agents, compositions, and teams by name and description
+- Quick navigation to any page (Launchpad, Agents, Compose, Teams, Audit, System)
+- Quick actions: "New Agent", "New Compose", "New Team"
 - Keyboard navigation with arrow keys and Enter
+
+Results are grouped: Pages, Actions, Agents, Compositions, Teams.
 
 ## Architecture
 
@@ -180,6 +222,15 @@ initrunner dashboard
   |      /api/compose-builder/seed POST generate compose YAML
   |      /api/compose-builder/validate POST schema-only validation
   |      /api/compose-builder/save POST write compose + roles to disk
+  |      /api/teams            GET   list discovered team files
+  |      /api/teams/{id}      GET   team detail with personas
+  |      /api/teams/{id}/yaml GET   raw team YAML
+  |      /api/teams/{id}/yaml PUT   save edited team YAML
+  |      /api/teams/{id}/run/stream POST streaming team run (SSE)
+  |      /api/team-builder/options GET strategies, providers
+  |      /api/team-builder/seed POST generate team YAML
+  |      /api/team-builder/validate POST schema validation
+  |      /api/team-builder/save POST write team YAML to disk
   |      /api/runs             POST  execute single run
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
@@ -303,7 +354,7 @@ Returns a list of all discovered agents.
     "tags": ["code"],
     "provider": "openai",
     "model": "gpt-4o",
-    "features": ["tools", "memory"],
+    "features": ["tools", "memory", "reasoning", "autonomy"],
     "path": "/home/user/agents/reviewer.yaml",
     "error": null
   }
@@ -340,7 +391,7 @@ Response includes `yaml_text`, `explanation`, `issues[]`, and `ready` (true when
 
 ### `POST /api/builder/validate`
 
-Validate YAML text against the role schema.
+Validate YAML text against the role schema. Performs Pydantic schema validation, cross-field reasoning checks (e.g. `todo_driven` requires a `todo` tool, `reflexion` requires `reflection_rounds > 0`), and emits recommendation-level `info` issues (e.g. think tool recommended for reflexion). Issues have severity `error`, `warning`, or `info`.
 
 ```json
 {"yaml_text": "apiVersion: initrunner/v1\n..."}
@@ -611,6 +662,99 @@ Schema-only validation of compose YAML. Does not check that role files exist on 
 Write compose YAML and placeholder roles to disk. Performs full validation (compose schema + role file existence).
 
 Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `compose_id`. Returns 409 if the project directory already exists.
+
+### `GET /api/teams`
+
+Returns all discovered team definitions.
+
+```json
+[
+  {
+    "id": "b2c3d4e5f6a7",
+    "name": "research-team",
+    "description": "Multi-persona research pipeline",
+    "strategy": "sequential",
+    "persona_count": 3,
+    "personas": ["researcher", "analyst", "writer"],
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "path": "/home/user/teams/research.yaml",
+    "error": null
+  }
+]
+```
+
+### `GET /api/teams/{id}`
+
+Returns full team detail with persona definitions and configuration.
+
+### `GET /api/teams/{id}/yaml`
+
+Returns raw team YAML content.
+
+### `PUT /api/teams/{id}/yaml`
+
+Save edited team YAML in place. Validates against the team schema before writing.
+
+```json
+{ "yaml_text": "apiVersion: initrunner/v1\nkind: Team\n..." }
+```
+
+Returns `{ path, valid, issues[] }`.
+
+### `POST /api/teams/{id}/run/stream`
+
+Run a prompt through the team via SSE.
+
+```json
+{ "prompt": "Research quantum computing advances" }
+```
+
+SSE events:
+- `persona_start` -- persona name about to execute
+- `persona_complete` -- per-persona result (name, output preview, duration, tokens, success)
+- `result` -- final `TeamRunResponse` with output, steps, and aggregate tokens
+- `error` -- error string
+
+### `GET /api/team-builder/options`
+
+Returns available strategies, provider/model options, and save directories.
+
+### `POST /api/team-builder/seed`
+
+Generate team YAML from a strategy and persona definitions.
+
+```json
+{
+  "mode": "blank",
+  "strategy": "sequential",
+  "name": "my-team",
+  "persona_count": 3,
+  "personas": [
+    {"name": "analyst", "role": "Analyze the input data", "model": null},
+    {"name": "reviewer", "role": "Review the analysis for errors", "model": null},
+    {
+      "name": "advisor",
+      "role": "Provide recommendations",
+      "model": {"provider": "anthropic", "name": "claude-opus-4-6", "base_url": null, "api_key_env": null}
+    }
+  ],
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514"
+}
+```
+
+When `personas` is provided, it takes precedence over `persona_count`. Each persona entry specifies a `name`, `role`, and optional `model` override. Custom preset providers (e.g. `"openrouter"`) are resolved to canonical form (`provider: "openai"` with injected `base_url`/`api_key_env`). When `personas` is omitted, falls back to generating default persona names from a pool.
+
+Response includes `yaml_text`, `explanation`, `issues[]`, and `ready`.
+
+### `POST /api/team-builder/validate`
+
+Schema-only validation of team YAML.
+
+### `POST /api/team-builder/save`
+
+Write team YAML to disk. Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `team_id`. Returns 409 if the file already exists and `force` is false.
 
 ### `GET /api/health`
 

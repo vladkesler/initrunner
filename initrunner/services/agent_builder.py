@@ -38,7 +38,7 @@ _logger = logging.getLogger(__name__)
 class ValidationIssue:
     field: str
     message: str
-    severity: Literal["error", "warning"]
+    severity: Literal["error", "warning", "info"]
 
 
 @dataclass
@@ -103,6 +103,14 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
         issues.append(ValidationIssue(field="schema", message=str(e), severity="error"))
         return None, issues
 
+    # Cross-field reasoning validation
+    from initrunner.agent.loader import RoleLoadError, _validate_reasoning
+
+    try:
+        _validate_reasoning(role)
+    except RoleLoadError as e:
+        issues.append(ValidationIssue(field="spec.reasoning", message=str(e), severity="error"))
+
     # Warnings for common issues
     if role.spec.role and len(role.spec.role.strip()) < 10:
         issues.append(
@@ -110,6 +118,31 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
                 field="spec.role",
                 message="System prompt is very short",
                 severity="warning",
+            )
+        )
+
+    # Recommendations
+    from initrunner.agent.schema.tools import ThinkToolConfig
+
+    if role.spec.reasoning and role.spec.reasoning.pattern == "reflexion":
+        has_think_critique = any(
+            isinstance(t, ThinkToolConfig) and t.critique for t in role.spec.tools
+        )
+        if not has_think_critique:
+            issues.append(
+                ValidationIssue(
+                    field="spec.tools",
+                    message="Think tool with critique: true recommended for reflexion pattern",
+                    severity="info",
+                )
+            )
+
+    if role.spec.reasoning and role.spec.reasoning.pattern != "react" and not role.spec.autonomy:
+        issues.append(
+            ValidationIssue(
+                field="spec.autonomy",
+                message="Autonomy block recommended for non-react reasoning patterns",
+                severity="info",
             )
         )
 

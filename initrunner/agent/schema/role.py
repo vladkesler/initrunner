@@ -108,6 +108,10 @@ class AgentSpec(BaseModel):
             out.append("sinks")
         if self.skills:
             out.append("skills")
+        if self.reasoning and self.reasoning.pattern != "react":
+            out.append("reasoning")
+        if self.autonomy:
+            out.append("autonomy")
         return out
 
     @field_validator("tools", mode="before")

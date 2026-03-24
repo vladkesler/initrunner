@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { AgentSummary } from '$lib/api/types';
-	import { Layers, Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle } from 'lucide-svelte';
+	import { Layers, Wrench, Zap, BookOpen, Plug, Sparkles, Brain, AlertTriangle } from 'lucide-svelte';
 
 	let {
 		agents,
@@ -19,6 +19,7 @@
 		{ key: 'intelligence', label: 'Intelligence', icon: BookOpen, accent: 'primary' as const },
 		{ key: 'connected', label: 'Connected', icon: Plug, accent: 'secondary' as const },
 		{ key: 'skilled', label: 'Skilled', icon: Sparkles, accent: 'primary' as const },
+		{ key: 'cognitive', label: 'Cognitive', icon: Brain, accent: 'primary' as const },
 		{ key: 'errored', label: 'Errored', icon: AlertTriangle, accent: 'fail' as const },
 	] as const;
 
@@ -30,6 +31,7 @@
 			case 'intelligence': return agent.features.includes('ingest') || agent.features.includes('memory');
 			case 'connected': return agent.features.includes('sinks');
 			case 'skilled': return agent.features.includes('skills');
+			case 'cognitive': return agent.features.includes('reasoning') || agent.features.includes('autonomy');
 			case 'errored': return agent.error !== null;
 			default: return true;
 		}

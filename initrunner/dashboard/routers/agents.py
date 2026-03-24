@@ -97,7 +97,10 @@ def _detail_from(role_id: str, discovered) -> AgentDetail:
         ingest=spec.ingest.model_dump() if spec.ingest else None,
         reasoning=spec.reasoning.model_dump() if spec.reasoning else None,
         autonomy=spec.autonomy.model_dump() if spec.autonomy else None,
-        tools=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.tools],
+        tools=[
+            ItemSummary(type=t.type, summary=t.summary(), config=t.model_dump(exclude={"type"}))
+            for t in spec.tools
+        ],
         triggers=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.triggers],
         sinks=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.sinks],
         skills=list(spec.skills),

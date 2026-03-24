@@ -55,8 +55,9 @@ def _build_agent_prompt(
     """Build the prompt for a persona including prior outputs."""
     parts: list[str] = [f"## Task\n\n{task}"]
 
+    per_output_chars = handoff_max_chars // max(len(prior_outputs), 1)
     for name, output in prior_outputs:
-        truncated = _truncate_handoff(output, handoff_max_chars)
+        truncated = _truncate_handoff(output, per_output_chars)
         parts.append(
             f"## Output from '{name}'\n\n"
             f"<prior-agent-output>\n{truncated}\n</prior-agent-output>\n\n"
@@ -247,6 +248,7 @@ def run_team(
     audit_logger: AuditLogger | None = None,
     dry_run_model: Any = None,
     on_persona_start: Callable[[str], None] | None = None,
+    on_persona_complete: Callable[[str, RunResult], None] | None = None,
 ) -> TeamResult:
     """Execute all personas sequentially, passing output between them.
 
@@ -254,6 +256,8 @@ def run_team(
         dry_run_model: A ``Model``, model name string, or ``None``.
         on_persona_start: Optional callback invoked with the persona name
             at the start of each persona's execution.
+        on_persona_complete: Optional callback invoked with the persona name
+            and run result after each persona finishes (success or failure).
     """
     from initrunner.agent.executor import execute_run
     from initrunner.agent.loader import _load_dotenv, build_agent
@@ -330,6 +334,8 @@ def run_team(
                 )
 
             _accumulate_result(result, persona_name, run_result)
+            if on_persona_complete is not None:
+                on_persona_complete(persona_name, run_result)
 
             if not run_result.success:
                 result.success = False
@@ -361,6 +367,7 @@ def run_team_parallel(
     audit_logger: AuditLogger | None = None,
     dry_run_model: Any = None,
     on_persona_start: Callable[[str], None] | None = None,
+    on_persona_complete: Callable[[str, RunResult], None] | None = None,
 ) -> TeamResult:
     """Execute all personas in parallel.
 
@@ -409,6 +416,8 @@ def run_team_parallel(
             trigger_type="team",
             trigger_metadata=trigger_metadata,
         )
+        if on_persona_complete is not None:
+            on_persona_complete(persona_name, run_result)
         return run_result
 
     try:

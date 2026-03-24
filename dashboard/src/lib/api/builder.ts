@@ -53,7 +53,7 @@ export interface BuilderOptions {
 export interface ValidationIssue {
 	field: string;
 	message: string;
-	severity: 'error' | 'warning';
+	severity: 'error' | 'warning' | 'info';
 }
 
 export interface SeedResult {

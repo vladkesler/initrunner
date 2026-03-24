@@ -33,6 +33,7 @@
 		{ key: 'intelligence', label: 'Intelligence', icon: 'BookOpen', test: (a: AgentSummary) => a.features.includes('ingest') || a.features.includes('memory') },
 		{ key: 'connected', label: 'Connected', icon: 'Plug', test: (a: AgentSummary) => a.features.includes('sinks') },
 		{ key: 'skilled', label: 'Skilled', icon: 'Sparkles', test: (a: AgentSummary) => a.features.includes('skills') },
+		{ key: 'cognitive', label: 'Cognitive', icon: 'Brain', test: (a: AgentSummary) => a.features.includes('reasoning') || a.features.includes('autonomy') },
 		{ key: 'equipped', label: 'Equipped', icon: 'Wrench', test: (a: AgentSummary) => a.features.includes('tools') },
 		{ key: 'bare', label: 'Other', icon: 'Box', test: () => true },
 	] as const;

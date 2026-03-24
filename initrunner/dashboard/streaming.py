@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from initrunner.audit.logger import AuditLogger
     from initrunner.compose.schema import ComposeDefinition
+    from initrunner.team.schema import TeamDefinition
 
 _logger = logging.getLogger(__name__)
 _TOKEN_QUEUE_MAX = 65536
@@ -250,4 +251,127 @@ async def stream_compose_run_sse(
         yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
     except Exception as exc:
         _logger.exception("Error during compose SSE streaming")
+        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+
+async def stream_team_run_sse(
+    team: TeamDefinition,
+    team_dir: Path,
+    prompt: str,
+    *,
+    audit_logger: AuditLogger | None = None,
+) -> AsyncIterator[str]:
+    """SSE generator yielding persona_start/persona_complete/result/error events.
+
+    Runs ``run_team_dispatch`` in a thread pool. Persona start/complete
+    callbacks push progress events to an ``asyncio.Queue``.
+    """
+    from initrunner.agent.executor import RunResult
+    from initrunner.team.runner import run_team_dispatch
+
+    loop = asyncio.get_running_loop()
+    event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    def on_persona_start(name: str) -> None:
+        evt = json.dumps({"type": "persona_start", "data": name})
+        try:
+            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
+    def on_persona_complete(name: str, result: RunResult) -> None:
+        evt = json.dumps(
+            {
+                "type": "persona_complete",
+                "data": {
+                    "persona_name": name,
+                    "output": result.output[:500],
+                    "duration_ms": result.duration_ms,
+                    "tokens_in": result.tokens_in,
+                    "tokens_out": result.tokens_out,
+                    "tool_calls": result.tool_calls,
+                    "tool_call_names": result.tool_call_names,
+                    "success": result.success,
+                    "error": result.error,
+                },
+            }
+        )
+        try:
+            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
+    def run_team():
+        try:
+            return run_team_dispatch(
+                team,
+                prompt,
+                team_dir=team_dir,
+                audit_logger=audit_logger,
+                on_persona_start=on_persona_start,
+                on_persona_complete=on_persona_complete,
+            )
+        finally:
+            try:
+                loop.call_soon_threadsafe(event_queue.put_nowait, None)
+            except RuntimeError:
+                pass
+
+    team_task = loop.run_in_executor(None, run_team)
+
+    # Forward progress events as SSE
+    heartbeat_counter = 0
+    while not team_task.done():
+        try:
+            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+            if event is None:
+                break
+            yield event
+            heartbeat_counter = 0
+        except TimeoutError:
+            heartbeat_counter += 1
+            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
+                yield ": heartbeat\n\n"
+                heartbeat_counter = 0
+
+    # Drain remaining events
+    while not event_queue.empty():
+        event = event_queue.get_nowait()
+        if event is None:
+            break
+        yield event
+
+    # Emit final result or error
+    try:
+        team_result = team_task.result()
+
+        payload = {
+            "team_run_id": team_result.team_run_id,
+            "output": team_result.final_output,
+            "steps": [
+                {
+                    "persona_name": name,
+                    "output": res.output,
+                    "tokens_in": res.tokens_in,
+                    "tokens_out": res.tokens_out,
+                    "duration_ms": res.duration_ms,
+                    "tool_calls": res.tool_calls,
+                    "tool_call_names": res.tool_call_names,
+                    "success": res.success,
+                    "error": res.error,
+                }
+                for name, res in zip(
+                    team_result.agent_names, team_result.agent_results, strict=True
+                )
+            ],
+            "tokens_in": team_result.total_tokens_in,
+            "tokens_out": team_result.total_tokens_out,
+            "total_tokens": team_result.total_tokens,
+            "duration_ms": team_result.total_duration_ms,
+            "success": team_result.success,
+            "error": team_result.error,
+        }
+        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+    except Exception as exc:
+        _logger.exception("Error during team SSE streaming")
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"

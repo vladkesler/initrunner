@@ -34,6 +34,31 @@ CUSTOM_PRESETS = [
 CUSTOM_PROVIDER_NAMES = {p.name for p in CUSTOM_PRESETS}
 
 
+def resolve_custom_provider(
+    provider: str,
+    base_url: str | None,
+    api_key_env: str | None,
+) -> tuple[str, str | None, str | None]:
+    """Normalize a custom/preset provider to canonical runtime fields.
+
+    Returns ``(runtime_provider, resolved_base_url, resolved_api_key_env)``.
+    Custom preset names (e.g. ``"openrouter"``) are mapped to ``"openai"``
+    with their preset ``base_url`` / ``api_key_env`` injected when not
+    explicitly provided.  Standard providers pass through unchanged.
+    """
+    if provider not in CUSTOM_PROVIDER_NAMES:
+        return provider, base_url, api_key_env
+
+    runtime_provider = "openai"
+    if base_url is None:
+        preset = next((p for p in CUSTOM_PRESETS if p.name == provider), None)
+        if preset and preset.base_url:
+            base_url = preset.base_url
+            api_key_env = api_key_env or preset.api_key_env
+
+    return runtime_provider, base_url, api_key_env
+
+
 @dataclasses.dataclass
 class ProviderOptions:
     """Provider/model data shared between agent and compose builders."""

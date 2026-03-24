@@ -15,6 +15,7 @@ export interface AgentSummary {
 export interface ItemSummary {
 	type: string;
 	summary: string;
+	config: Record<string, unknown>;
 }
 
 export interface AgentDetail {
@@ -355,4 +356,130 @@ export interface SessionMessage {
 export interface SessionDetail {
 	session_id: string;
 	messages: SessionMessage[];
+}
+
+// -- Team ---------------------------------------------------------------------
+
+export interface PersonaDetail {
+	name: string;
+	role: string;
+	model: Record<string, unknown> | null;
+	tools: ItemSummary[];
+	tools_mode: string;
+	environment_count: number;
+}
+
+export interface TeamSummary {
+	id: string;
+	name: string;
+	description: string;
+	strategy: string;
+	persona_count: number;
+	persona_names: string[];
+	provider: string;
+	model: string;
+	has_model_overrides: boolean;
+	features: string[];
+	path: string;
+	error: string | null;
+}
+
+export interface TeamDetail {
+	id: string;
+	name: string;
+	description: string;
+	path: string;
+	error: string | null;
+	strategy: string;
+	model: Record<string, unknown>;
+	personas: PersonaDetail[];
+	guardrails: Record<string, unknown>;
+	handoff_max_chars: number;
+	shared_memory: Record<string, unknown>;
+	shared_documents: Record<string, unknown>;
+	tools: ItemSummary[];
+	observability: Record<string, unknown> | null;
+	features: string[];
+}
+
+export interface PersonaStepResponse {
+	persona_name: string;
+	output: string;
+	tokens_in: number;
+	tokens_out: number;
+	duration_ms: number;
+	tool_calls: number;
+	tool_call_names: string[];
+	success: boolean;
+	error: string | null;
+}
+
+export interface TeamRunResponse {
+	team_run_id: string;
+	output: string;
+	steps: PersonaStepResponse[];
+	tokens_in: number;
+	tokens_out: number;
+	total_tokens: number;
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+}
+
+export interface TeamThreadMessage {
+	role: 'user' | 'assistant';
+	content: string;
+	status: 'complete' | 'streaming' | 'interrupted' | 'error';
+	activePersona?: string | null;
+	result?: TeamRunResponse | null;
+	error?: string | null;
+}
+
+export type TeamSSEEvent =
+	| { type: 'persona_start'; data: string }
+	| { type: 'persona_complete'; data: PersonaStepResponse }
+	| { type: 'result'; data: TeamRunResponse }
+	| { type: 'error'; data: string };
+
+export interface TeamBuilderOptions {
+	providers: ProviderModels[];
+	detected_provider: string | null;
+	detected_model: string | null;
+	save_dirs: string[];
+	custom_presets: ProviderPreset[];
+	ollama_models: string[];
+	ollama_base_url: string;
+}
+
+export interface PersonaSeedModel {
+	provider: string;
+	name: string;
+	base_url: string | null;
+	api_key_env: string | null;
+}
+
+export interface PersonaSeedEntry {
+	name: string;
+	role: string;
+	model: PersonaSeedModel | null;
+}
+
+export interface TeamSeedResponse {
+	yaml_text: string;
+	explanation: string;
+	issues: ValidationIssue[];
+	ready: boolean;
+}
+
+export interface TeamValidateResponse {
+	issues: ValidationIssue[];
+	ready: boolean;
+}
+
+export interface TeamSaveResponse {
+	path: string;
+	valid: boolean;
+	issues: string[];
+	next_steps: string[];
+	team_id: string;
 }

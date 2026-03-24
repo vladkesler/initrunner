@@ -16,6 +16,8 @@
 	} from '$lib/api/builder';
 	import { ApiError } from '$lib/api/client';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import CognitionPanel from '$lib/components/agents/CognitionPanel.svelte';
+	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import {
 		ArrowLeft,
 		LayoutTemplate,
@@ -31,7 +33,8 @@
 		Check,
 		Download,
 		Info,
-		ExternalLink
+		ExternalLink,
+		Brain
 	} from 'lucide-svelte';
 
 	// -- State ----------------------------------------------------------------
@@ -74,6 +77,7 @@
 	let issues: ValidationIssue[] = $state([]);
 	let validating = $state(false);
 	let validateTimer: ReturnType<typeof setTimeout> | null = $state(null);
+	let cognitionOpen = $state(false);
 
 	// Save state
 	let selectedDir = $state('');
@@ -100,42 +104,10 @@
 	);
 
 	const isCustomEndpoint = $derived(customPresetNames.has(selectedProvider));
-	const isOllama = $derived(selectedProvider === 'ollama');
 
 	const activePreset = $derived(
 		(options?.custom_presets ?? []).find((p: { name: string }) => p.name === selectedProvider) ?? null
 	);
-
-	// For presets with known base_url, no endpoint field needed
-	const showEndpointUrl = $derived(
-		isOllama || (isCustomEndpoint && selectedProvider === 'custom')
-	);
-
-	// Show API key field for custom endpoints (not ollama)
-	const showApiKey = $derived(
-		isCustomEndpoint && !(activePreset?.key_configured && !apiKey)
-	);
-
-	const cloudProviders = $derived(
-		(options?.providers ?? []).filter((p: { provider: string }) => p.provider !== 'ollama')
-	);
-
-	const ollamaProvider = $derived(
-		(options?.providers ?? []).find((p: { provider: string }) => p.provider === 'ollama')
-	);
-
-	const ollamaModels = $derived(() => {
-		if (!options) return [] as string[];
-		if (options.ollama_models.length > 0) return options.ollama_models;
-		return ollamaProvider?.models.map((m: { name: string }) => m.name) ?? [];
-	});
-
-	const filteredModels = $derived(() => {
-		if (!options || !selectedProvider) return [] as { name: string; description: string }[];
-		if (isOllama) return [];
-		const provider = options.providers.find((p: { provider: string }) => p.provider === selectedProvider);
-		return provider?.models ?? [];
-	});
 
 	const canGenerate = $derived(() => {
 		if (!mode || !selectedProvider) return false;
@@ -197,24 +169,6 @@
 		} finally {
 			hubFeaturedLoading = false;
 			hubFeaturedLoaded = true;
-		}
-	}
-
-	function selectProvider(provider: string) {
-		selectedProvider = provider;
-		apiKey = '';
-		customModelName = '';
-
-		if (provider === 'ollama') {
-			customBaseUrl = '';
-			const models = ollamaModels();
-			selectedModel = models[0] ?? '';
-		} else if (customPresetNames.has(provider)) {
-			customBaseUrl = '';
-		} else {
-			customBaseUrl = '';
-			const p = options?.providers.find((p) => p.provider === provider);
-			selectedModel = p?.models[0]?.name ?? '';
 		}
 	}
 
@@ -741,108 +695,18 @@
 		{/if}
 
 		<!-- Provider / Model -->
-		{#if mode}
-			<div>
-				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-					Model
-				</h2>
-				<div class="flex gap-3">
-					<!-- Provider select with optgroups -->
-					<select
-						class="border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none"
-						bind:value={selectedProvider}
-						onchange={(e) => selectProvider(e.currentTarget.value)}
-					>
-						<optgroup label="Cloud">
-							{#each cloudProviders as p}
-								<option value={p.provider}>{p.provider}</option>
-							{/each}
-						</optgroup>
-						{#if ollamaProvider}
-							<optgroup label="Local">
-								<option value="ollama">ollama</option>
-							</optgroup>
-						{/if}
-						{#if options && options.custom_presets.length > 0}
-							<optgroup label="Custom endpoint">
-								{#each options.custom_presets as preset}
-									<option value={preset.name}>{preset.label}</option>
-								{/each}
-							</optgroup>
-						{/if}
-					</select>
-
-					<!-- Model: dropdown for cloud/ollama, text input for custom -->
-					{#if isCustomEndpoint}
-						<input
-							type="text"
-							bind:value={customModelName}
-							placeholder={activePreset?.placeholder ?? 'model-name'}
-							class="min-w-0 flex-1 border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
-						/>
-					{:else if isOllama}
-						<select
-							class="min-w-0 flex-1 border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none"
-							bind:value={selectedModel}
-						>
-							{#each ollamaModels() as m}
-								<option value={m}>{m}</option>
-							{/each}
-						</select>
-					{:else}
-						<select
-							class="min-w-0 flex-1 border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none"
-							bind:value={selectedModel}
-						>
-							{#each filteredModels() as m}
-								<option value={m.name}>{m.name} -- {m.description}</option>
-							{/each}
-						</select>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Endpoint URL (only for ollama and custom, not known presets) -->
-			{#if showEndpointUrl}
-				<div>
-					<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-						Endpoint
-					</h2>
-					<input
-						type="text"
-						bind:value={customBaseUrl}
-						placeholder={isOllama ? options?.ollama_base_url ?? 'http://localhost:11434/v1' : 'https://...'}
-						class="w-full border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
-					/>
-				</div>
-			{/if}
-
-			<!-- API Key (for custom endpoints, not ollama) -->
-			{#if isCustomEndpoint}
-				<div>
-					<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-						API Key
-					</h2>
-					{#if activePreset?.key_configured && !apiKey}
-						<p class="flex items-center gap-1.5 text-[13px] text-ok">
-							<CheckCircle size={13} />
-							Already configured
-						</p>
-					{:else}
-						<input
-							type="password"
-							bind:value={apiKey}
-							placeholder="Paste your API key"
-							class="w-full border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
-						/>
-						{#if activePreset?.key_configured}
-							<p class="mt-1.5 text-[13px] text-fg-faint">
-								Leave empty to use the existing key
-							</p>
-						{/if}
-					{/if}
-				</div>
-			{/if}
+		{#if mode && options}
+			<ModelSelector
+				providers={options.providers}
+				customPresets={options.custom_presets}
+				ollamaModels={options.ollama_models}
+				ollamaBaseUrl={options.ollama_base_url}
+				bind:selectedProvider
+				bind:selectedModel
+				bind:customModelName
+				bind:customBaseUrl
+				bind:apiKey
+			/>
 
 			<!-- Generate button -->
 			<div>
@@ -877,33 +741,69 @@
 			</div>
 		{/if}
 
-		<textarea
-			bind:value={yamlText}
-			oninput={handleYamlInput}
-			class="w-full resize-y border border-edge bg-surface-0 p-4 font-mono text-[13px] leading-relaxed text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
-			style="min-height: 400px"
-			spellcheck="false"
-			aria-label="Role YAML editor"
-		></textarea>
+		<!-- Toolbar -->
+		<div class="flex items-center justify-end">
+			<button
+				class="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[12px] transition-[color,background-color,border-color] duration-150 border
+					{cognitionOpen
+						? 'border-accent-primary/30 bg-accent-primary/10 text-accent-primary'
+						: 'border-accent-primary/20 bg-accent-primary/[0.06] text-accent-primary/70 hover:bg-accent-primary/10 hover:text-accent-primary'}"
+				onclick={() => (cognitionOpen = !cognitionOpen)}
+				aria-pressed={cognitionOpen}
+			>
+				<Brain size={13} strokeWidth={1.5} />
+				Cognition
+			</button>
+		</div>
 
-		{#if issues.length > 0}
-			<div class="space-y-1" role="alert">
-				{#each issues as issue}
-					<div
-						class="flex items-start gap-2 px-3 py-1.5 {issue.severity === 'error' ? 'bg-fail/5' : 'bg-warn/5'}"
-					>
-						{#if issue.severity === 'error'}
-							<CircleX size={13} class="mt-0.5 shrink-0 text-fail" />
-						{:else}
-							<TriangleAlert size={13} class="mt-0.5 shrink-0 text-warn" />
-						{/if}
-						<span class="font-mono text-[13px]" class:text-fail={issue.severity === 'error'} class:text-warn={issue.severity === 'warning'}>
-							{issue.field}: {issue.message}
-						</span>
+		<!-- Editor + Cognition panel -->
+		<div class="flex gap-4">
+			<!-- YAML editor column -->
+			<div class="min-w-0 flex-1 space-y-0">
+				<textarea
+					bind:value={yamlText}
+					oninput={handleYamlInput}
+					class="w-full resize-y border border-edge bg-surface-0 p-4 font-mono text-[13px] leading-relaxed text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+					style="min-height: 400px"
+					spellcheck="false"
+					aria-label="Role YAML editor"
+				></textarea>
+
+				{#if issues.length > 0}
+					<div class="space-y-1" role="alert">
+						{#each issues as issue}
+							<div
+								class="flex items-start gap-2 px-3 py-1.5 {issue.severity === 'error' ? 'bg-fail/5' : issue.severity === 'warning' ? 'bg-warn/5' : ''}"
+							>
+								{#if issue.severity === 'error'}
+									<CircleX size={13} class="mt-0.5 shrink-0 text-fail" />
+								{:else if issue.severity === 'warning'}
+									<TriangleAlert size={13} class="mt-0.5 shrink-0 text-warn" />
+								{:else}
+									<Info size={13} class="mt-0.5 shrink-0 text-fg-faint" />
+								{/if}
+								<span class="font-mono text-[13px]" class:text-fail={issue.severity === 'error'} class:text-warn={issue.severity === 'warning'} class:text-fg-faint={issue.severity === 'info'}>
+									{issue.field}: {issue.message}
+								</span>
+							</div>
+						{/each}
 					</div>
-				{/each}
+				{/if}
 			</div>
-		{/if}
+
+			<!-- Cognition panel column -->
+			{#if cognitionOpen}
+				<div class="w-72 shrink-0 border border-edge bg-surface-0 p-4">
+					<CognitionPanel
+						{yamlText}
+						onUpdate={(newYaml) => {
+							yamlText = newYaml;
+							handleYamlInput();
+						}}
+					/>
+				</div>
+			{/if}
+		</div>
 
 		<div>
 			<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">

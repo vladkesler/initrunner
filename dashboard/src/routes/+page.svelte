@@ -6,12 +6,14 @@
 	import { request } from '$lib/api/client';
 	import type { AgentSummary, AuditRecord, AuditStats, HealthStatus } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Plus, Stethoscope, Activity, CheckCircle, Coins, Timer, AlertTriangle, ArrowUpRight, Workflow } from 'lucide-svelte';
+	import { Plus, Stethoscope, Activity, CheckCircle, Coins, Timer, AlertTriangle, ArrowUpRight, Workflow, Users } from 'lucide-svelte';
 	import { fetchComposeList } from '$lib/api/compose';
-	import type { ComposeSummary } from '$lib/api/types';
+	import { fetchTeamList } from '$lib/api/teams';
+	import type { ComposeSummary, TeamSummary } from '$lib/api/types';
 
 	let agents = $state<AgentSummary[]>([]);
 	let composes = $state<ComposeSummary[]>([]);
+	let teams = $state<TeamSummary[]>([]);
 	let recentAudit = $state<AuditRecord[]>([]);
 	let stats = $state<AuditStats | null>(null);
 	let version = $state('');
@@ -43,15 +45,17 @@
 
 	onMount(async () => {
 		try {
-			const [a, c, audit, s, health] = await Promise.all([
+			const [a, c, t, audit, s, health] = await Promise.all([
 				listAgents(),
 				fetchComposeList().catch(() => [] as ComposeSummary[]),
+				fetchTeamList().catch(() => [] as TeamSummary[]),
 				queryAudit({ limit: 10 }),
 				fetchAuditStats(),
 				request<HealthStatus>('/api/health')
 			]);
 			agents = a;
 			composes = c;
+			teams = t;
 			recentAudit = audit;
 			stats = s;
 			version = health.version;
@@ -122,6 +126,13 @@
 					>
 						<Workflow size={14} />
 						New Compose
+					</a>
+					<a
+						href="/teams/new"
+						class="flex items-center gap-2 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-5 py-2 text-[13px] font-medium text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+					>
+						<Users size={14} />
+						New Team
 					</a>
 					<a
 						href="/system"
@@ -252,6 +263,13 @@
 				</div>
 			{/if}
 
+			<!-- Orchestration -->
+			{#if composes.length > 0 || teams.length > 0}
+				<h2 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint lg:col-span-3">
+					Orchestration
+				</h2>
+			{/if}
+
 			<!-- Compositions card -->
 			{#if composes.length > 0}
 				<div class="lg:col-span-1">
@@ -270,6 +288,33 @@
 									<span class="font-mono text-[12px] text-fg-muted">{compose.name}</span>
 								</div>
 								<span class="font-mono text-[11px] text-fg-faint">{compose.service_count} svc</span>
+							</a>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Teams card -->
+			{#if teams.length > 0}
+				<div class="lg:col-span-1">
+					<div class="mb-3 flex items-baseline justify-between">
+						<h2 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Teams</h2>
+						<a href="/teams" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
+					</div>
+					<div class="space-y-1">
+						{#each teams.slice(0, 3) as team}
+							<a
+								href="/teams/{team.id}"
+								class="flex items-center justify-between border border-edge bg-surface-1 px-3 py-2 transition-[border-color,background-color] duration-150 hover:border-accent-primary/20"
+							>
+								<div class="flex items-center gap-2">
+									<Users size={12} class="text-fg-faint" />
+									<span class="font-mono text-[12px] text-fg-muted">{team.name}</span>
+								</div>
+								<div class="flex items-center gap-2">
+									<span class="rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">{team.strategy}</span>
+									<span class="font-mono text-[11px] text-fg-faint">{team.persona_count} personas</span>
+								</div>
 							</a>
 						{/each}
 					</div>

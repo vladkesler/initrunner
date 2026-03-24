@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { NodeProps } from '@xyflow/svelte';
-	import { Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle, Box, Layers } from 'lucide-svelte';
+	import { Wrench, Zap, BookOpen, Plug, Sparkles, Brain, AlertTriangle, Box, Layers } from 'lucide-svelte';
 
 	let { data }: NodeProps<{ label: string; icon: string; count: number }> = $props();
 
 	const icons: Record<string, any> = {
-		Zap, Wrench, BookOpen, Plug, Sparkles, AlertTriangle, Box, Layers,
+		Zap, Wrench, BookOpen, Plug, Sparkles, Brain, AlertTriangle, Box, Layers,
 	};
 
 	const Icon = $derived(icons[data.icon] ?? Layers);

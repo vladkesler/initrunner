@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { AgentDetail } from '$lib/api/types';
 	import ConfigSection from './ConfigSection.svelte';
-	import { Copy, Check } from 'lucide-svelte';
+	import { Copy, Check, ExternalLink } from 'lucide-svelte';
 
 	let { detail, yaml = '' }: { detail: AgentDetail; yaml?: string } = $props();
 
@@ -25,8 +25,21 @@
 		watch?: boolean;
 		chunking?: { strategy?: string; chunk_size?: number };
 	} | null);
-	const reasoning = $derived(detail.reasoning as { pattern?: string } | null);
-	const autonomy = $derived(detail.autonomy as { max_iterations?: number; max_plan_steps?: number } | null);
+	const reasoning = $derived(detail.reasoning as {
+		pattern?: string;
+		auto_plan?: boolean;
+		reflection_rounds?: number;
+		auto_detect?: boolean;
+	} | null);
+	const autonomy = $derived(detail.autonomy as {
+		max_plan_steps?: number;
+		max_history_messages?: number;
+		iteration_delay_seconds?: number;
+		compaction?: { enabled?: boolean; threshold?: number; tail_messages?: number };
+	} | null);
+	const thinkTool = $derived(detail.tools.find((t) => t.type === 'think'));
+	const todoTool = $derived(detail.tools.find((t) => t.type === 'todo'));
+	const hasCognition = $derived(reasoning || autonomy || thinkTool || todoTool);
 
 	async function copyYaml() {
 		await navigator.clipboard.writeText(yaml);
@@ -168,28 +181,92 @@
 		</ConfigSection>
 	{/if}
 
-	<!-- Reasoning -->
-	{#if reasoning}
-		<ConfigSection title="Reasoning">
-			<div class="font-mono text-[13px]">
-				<span class="text-fg-faint">pattern</span>
-				<span class="ml-1 text-fg-muted">{reasoning.pattern ?? 'react'}</span>
+	<!-- Cognition -->
+	{#if hasCognition}
+		<ConfigSection title="Cognition">
+			<div class="mb-2">
+				<a
+					href="https://www.initrunner.ai/docs/reasoning"
+					target="_blank"
+					rel="noopener"
+					class="inline-flex items-center gap-1 font-mono text-[11px] text-accent-primary/60 transition-[color] duration-150 hover:text-accent-primary"
+				>
+					Docs <ExternalLink size={10} />
+				</a>
 			</div>
-		</ConfigSection>
-	{/if}
+			<div class="space-y-3 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
+				{#if reasoning}
+					<div class="space-y-1">
+						<div>
+							<span class="text-fg-faint">pattern</span>
+							<span class="ml-1 text-fg-muted">{reasoning.pattern ?? 'react'}</span>
+						</div>
+						{#if reasoning.auto_plan}
+							<div>
+								<span class="text-fg-faint">auto_plan</span>
+								<span class="ml-1 text-fg-muted">true</span>
+							</div>
+						{/if}
+						{#if reasoning.pattern === 'reflexion' && (reasoning.reflection_rounds ?? 0) > 0}
+							<div>
+								<span class="text-fg-faint">reflection_rounds</span>
+								<span class="ml-1 text-fg-muted">{reasoning.reflection_rounds}</span>
+							</div>
+						{/if}
+						{#if reasoning.auto_detect === false}
+							<div>
+								<span class="text-fg-faint">auto_detect</span>
+								<span class="ml-1 text-fg-muted">false</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
-	<!-- Autonomy -->
-	{#if autonomy}
-		<ConfigSection title="Autonomy">
-			<div class="flex gap-4 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
-				<span>
-					<span class="text-fg-faint">max iter</span>
-					<span class="ml-1 text-fg-muted">{autonomy.max_iterations ?? 10}</span>
-				</span>
-				<span>
-					<span class="text-fg-faint">plan steps</span>
-					<span class="ml-1 text-fg-muted">{autonomy.max_plan_steps ?? 20}</span>
-				</span>
+				{#if autonomy}
+					<div class="space-y-1">
+						<div class="text-fg-faint">autonomy</div>
+						<div class="pl-2 space-y-1">
+							<div>
+								<span class="text-fg-faint">max plan steps</span>
+								<span class="ml-1 text-fg-muted">{autonomy.max_plan_steps ?? 20}</span>
+							</div>
+							<div>
+								<span class="text-fg-faint">max history</span>
+								<span class="ml-1 text-fg-muted">{autonomy.max_history_messages ?? 40}</span>
+							</div>
+							{#if (autonomy.iteration_delay_seconds ?? 0) > 0}
+								<div>
+									<span class="text-fg-faint">delay</span>
+									<span class="ml-1 text-fg-muted">{autonomy.iteration_delay_seconds}s</span>
+								</div>
+							{/if}
+							{#if autonomy.compaction?.enabled}
+								<div>
+									<span class="text-fg-faint">compaction</span>
+									<span class="ml-1 text-fg-muted">on (threshold: {autonomy.compaction.threshold ?? 30}, tail: {autonomy.compaction.tail_messages ?? 6})</span>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				{#if thinkTool}
+					<div>
+						<span class="text-fg-faint">think</span>
+						<span class="ml-1 text-fg-muted">
+							{thinkTool.config.critique ? 'critique' : 'standard'}{thinkTool.config.max_thoughts ? `, ${thinkTool.config.max_thoughts} max` : ''}
+						</span>
+					</div>
+				{/if}
+
+				{#if todoTool}
+					<div>
+						<span class="text-fg-faint">todo</span>
+						<span class="ml-1 text-fg-muted">
+							{todoTool.config.max_items ?? 30} items{todoTool.config.shared ? ', shared' : ''}
+						</span>
+					</div>
+				{/if}
 			</div>
 		</ConfigSection>
 	{/if}
