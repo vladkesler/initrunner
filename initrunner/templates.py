@@ -5,6 +5,33 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+# Setup guidance for templates that require external prerequisites.
+# Only populated for templates needing env vars, extras, or multi-step setup.
+TEMPLATE_SETUP: dict[str, dict[str, Any]] = {
+    "discord": {
+        "steps": [
+            "Create a Discord Application at discord.com/developers/applications",
+            "Go to Bot tab > Reset Token > copy the token",
+            "Enable Message Content Intent (Bot > Privileged Gateway Intents)",
+            "OAuth2 tab: select 'bot' scope, enable Send Messages + Read Message History",
+            "Copy the invite URL and add the bot to your server",
+        ],
+        "env_vars": ["DISCORD_BOT_TOKEN"],
+        "extras": ["discord"],
+        "docs_url": "https://www.initrunner.ai/docs/discord",
+    },
+    "telegram": {
+        "steps": [
+            "Open Telegram and search for @BotFather",
+            "Send /newbot and follow the prompts to name your bot",
+            "Copy the token BotFather gives you",
+        ],
+        "env_vars": ["TELEGRAM_BOT_TOKEN"],
+        "extras": ["telegram"],
+        "docs_url": "https://www.initrunner.ai/docs/telegram",
+    },
+}
+
 # Curated popular models per provider. First entry is the default.
 # Keep this list up-to-date when providers release new models.
 # Users can always type a custom model name not in this list.

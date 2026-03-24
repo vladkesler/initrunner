@@ -1,0 +1,110 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: code-review-agent
+  description: "Automated code review agent: reads repo changes, produces detailed reviews, stores findings in memory, and notifies Slack."
+  tags:
+    - code-review
+    - slack
+    - memory
+    - automation
+  author: "Your Name"
+  team: "Engineering"
+  version: "0.1.0"
+spec:
+  role: |
+    You are a specialized Code Review Agent. Your goals:
+    - Analyze code changes, diffs, and repository files to provide clear, actionable code reviews.
+    - Produce: concise summary, list of findings grouped by severity (critical, major, minor), concrete suggestions and examples/patch snippets when helpful, and an overall recommendation (approve, request changes, or ask clarifying questions).
+    - Run only safe static analysis steps using available repository files (do not execute untrusted code unless explicitly instructed).
+    - Record important decisions, followups, and persistent knowledge as memory entries (concise titles + body). Use memory for remembering prior review decisions, recurring code-style preferences, and long-lived action items.
+    - Notify the configured Slack channel with a summary and link/reference to the full review details.
+    - When a request lacks context (tests, CI results, or target branch), ask for missing information.
+    - Respect confidentiality: avoid exposing secrets or sensitive data from the repository in Slack notifications.
+    Tools available:
+    - git: to load files and diffs from the repository path.
+    - slack: to post review summaries to a channel.
+    Memory:
+    - Save review summaries, recurring issues, and follow-ups as structured memories.
+    Be concise in Slack notifications; keep full details in the agent's review output. If multiple files are changed, create an organized checklist per file/component.
+  output:
+    type: text
+  model:
+    provider: openai
+    name: gpt-4o-mini
+    api_key_env: OPENAI_API_KEY
+    temperature: 0.15
+    max_tokens: 2048
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 30
+    timeout_seconds: 600
+    max_iterations: 20
+  tools:
+    - type: git
+      name: repo
+      description: "Read-only access to the repository for reviewing files and diffs."
+      repo_path: "."
+      read_only: true
+    - type: slack
+      name: slack-notifier
+      description: "Post code review summaries to Slack."
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#code-reviews"
+  triggers:
+    - type: webhook
+      path: /review
+      port: 8080
+      method: POST
+      secret: "${REVIEW_WEBHOOK_SECRET}"
+      rate_limit_rpm: 60
+      autonomous: false
+  memory:
+    store_backend: lancedb
+    store_path: memory/lancedb
+    max_sessions: 50
+    max_resume_messages: 50
+    embeddings:
+      provider: openai
+      model: text-embedding-3-small
+      api_key_env: OPENAI_API_KEY
+    episodic:
+      enabled: true
+      max_episodes: 1000
+    semantic:
+      enabled: true
+      max_memories: 5000
+    procedural:
+      enabled: true
+      max_procedures: 100
+    consolidation:
+      enabled: true
+      interval: after_session
+      max_episodes_per_run: 20
+  reasoning:
+    pattern: react
+    auto_plan: false
+    reflection_rounds: 0
+    auto_detect: true
+  autonomy:
+    continuation_prompt: "Continue the review. Check outstanding items and act on the highest-priority remaining task. If finished, summarize and mark completion."
+    max_history_messages: 40
+    max_plan_steps: 20
+    iteration_delay_seconds: 0
+    max_no_tool_call_iterations: 2
+    max_scheduled_per_run: 3
+    max_scheduled_total: 50
+    max_schedule_delay_seconds: 86400
+    compaction:
+      enabled: true
+      threshold: 30
+      tail_messages: 6
+      summary_prefix: "[CONVERSATION HISTORY SUMMARY]\n"
+  auto_skills:
+    enabled: true
+    max_skills: 50
+  tool_search:
+    enabled: false
+  daemon:
+    hot_reload: true
+    reload_debounce_seconds: 1.0

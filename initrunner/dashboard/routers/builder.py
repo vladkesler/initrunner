@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
@@ -13,11 +14,17 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException
 
 from initrunner.dashboard.deps import RoleCache, _role_id, get_role_cache
+from initrunner.dashboard.routers._provider_options import (
+    CUSTOM_PRESETS,
+    CUSTOM_PROVIDER_NAMES,
+    gather_provider_options,
+)
 from initrunner.dashboard.schemas import (
     BuilderOptionsResponse,
-    ModelOption,
-    ProviderModels,
-    ProviderPreset,
+    EnvVarStatus,
+    HubSearchResponse,
+    HubSearchResultResponse,
+    HubSeedRequest,
     SaveKeyRequest,
     SaveKeyResponse,
     SaveRequest,
@@ -25,6 +32,7 @@ from initrunner.dashboard.schemas import (
     SeedRequest,
     SeedResponse,
     TemplateInfo,
+    TemplateSetup,
     ValidateRequest,
     ValidationIssueResponse,
 )
@@ -52,25 +60,6 @@ spec:
     name: {model}
 """
 
-_CUSTOM_PRESETS = [
-    ProviderPreset(
-        name="openrouter",
-        label="OpenRouter",
-        base_url="https://openrouter.ai/api/v1",
-        api_key_env="OPENROUTER_API_KEY",
-        placeholder="anthropic/claude-sonnet-4",
-    ),
-    ProviderPreset(
-        name="custom",
-        label="Custom endpoint",
-        base_url="",
-        api_key_env="",
-        placeholder="model-name",
-    ),
-]
-
-_CUSTOM_PROVIDER_NAMES = {p.name for p in _CUSTOM_PRESETS}
-
 
 def _issues_to_response(issues: list) -> list[ValidationIssueResponse]:
     return [
@@ -79,25 +68,65 @@ def _issues_to_response(issues: list) -> list[ValidationIssueResponse]:
     ]
 
 
-def _inject_model_fields(yaml_text: str, **fields: str | None) -> str:
-    """Insert key-value pairs into the spec.model section after the name: line."""
+def _rewrite_model_block(
+    yaml_text: str,
+    *,
+    provider: str | None = None,
+    name: str | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
+) -> str:
+    """Replace or inject fields in the spec.model block.
+
+    Scoped by indentation: enters the block when ``  model:`` is found
+    (spec-level indent) and exits when indentation returns to that level
+    or above.  ``provider:`` and ``name:`` lines are *replaced* in-place;
+    ``base_url`` and ``api_key_env`` are *injected* after the ``name:`` line.
+    """
     lines = yaml_text.split("\n")
     result: list[str] = []
-    in_model_block = False
+    in_model = False
+    model_indent = 0
     injected = False
+
     for line in lines:
-        result.append(line)
         stripped = line.lstrip()
-        # Enter model block at spec-level indentation (2+ spaces before "model:")
-        if not in_model_block and stripped == "model:" and line.startswith("  model:"):
-            in_model_block = True
-        elif in_model_block and stripped.startswith("name:") and not injected:
-            indent = " " * (len(line) - len(stripped))
-            for k, v in fields.items():
-                if v is not None:
-                    result.append(f"{indent}{k}: {v}")
-            injected = True
-            in_model_block = False
+
+        # Detect entry into spec.model block
+        if not in_model and stripped == "model:" and line.startswith("  model:"):
+            in_model = True
+            model_indent = len(line) - len(stripped)
+            result.append(line)
+            continue
+
+        # Inside model block -- check if we've exited (indentation <= model key)
+        if in_model and stripped and not stripped.startswith("#"):
+            current_indent = len(line) - len(stripped)
+            if current_indent <= model_indent:
+                in_model = False
+
+        if in_model:
+            field_indent = " " * (len(line) - len(stripped))
+            # Replace provider: line
+            if provider is not None and stripped.startswith("provider:"):
+                result.append(f"{field_indent}provider: {provider}")
+                continue
+            # Replace name: line, then inject trailing fields
+            if stripped.startswith("name:"):
+                if name is not None:
+                    result.append(f"{field_indent}name: {name}")
+                else:
+                    result.append(line)
+                if not injected:
+                    if base_url is not None:
+                        result.append(f"{field_indent}base_url: {base_url}")
+                    if api_key_env is not None:
+                        result.append(f"{field_indent}api_key_env: {api_key_env}")
+                    injected = True
+                continue
+
+        result.append(line)
+
     return "\n".join(result)
 
 
@@ -110,77 +139,35 @@ def _inject_model_fields(yaml_text: str, **fields: str | None) -> str:
 async def builder_options(
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
 ) -> BuilderOptionsResponse:
-    from initrunner.services.providers import OLLAMA_DEFAULT_BASE_URL
-    from initrunner.templates import LISTABLE_TEMPLATES, PROVIDER_MODELS
+    from initrunner.templates import LISTABLE_TEMPLATES, TEMPLATE_SETUP
+
+    opts = await gather_provider_options(role_cache._settings)
 
     templates = [
         TemplateInfo(name=name, description=desc) for name, desc in LISTABLE_TEMPLATES.items()
     ]
 
-    providers = [
-        ProviderModels(
-            provider=prov,
-            models=[ModelOption(name=m, description=d) for m, d in models],
-        )
-        for prov, models in PROVIDER_MODELS.items()
-    ]
-
-    detected_provider: str | None = None
-    detected_model: str | None = None
-    try:
-        from initrunner.services.providers import detect_provider_and_model
-
-        detected = await asyncio.to_thread(detect_provider_and_model)
-        if detected is not None:
-            detected_provider = detected.provider
-            detected_model = detected.model
-    except Exception:
-        _logger.debug("Provider detection failed", exc_info=True)
-
-    # Ollama models -- query running instance
-    ollama_models: list[str] = []
-    try:
-        from initrunner.services.providers import list_ollama_models
-
-        ollama_models = await asyncio.to_thread(list_ollama_models)
-    except Exception:
-        _logger.debug("Ollama model detection failed", exc_info=True)
-
-    from initrunner.config import get_roles_dir
-
-    # Primary save dir is ~/.initrunner/roles (create if needed)
-    save_dir = get_roles_dir()
-    save_dir.mkdir(parents=True, exist_ok=True)
-    role_dirs = [str(save_dir)]
-    for d in role_cache._settings.extra_role_dirs:
-        ds = str(d)
-        if ds not in role_dirs:
-            role_dirs.append(ds)
-
-    # Check which preset keys are already configured
-    presets = []
-    for p in _CUSTOM_PRESETS:
-        configured = bool(p.api_key_env and os.environ.get(p.api_key_env))
-        presets.append(
-            ProviderPreset(
-                name=p.name,
-                label=p.label,
-                base_url=p.base_url,
-                api_key_env=p.api_key_env,
-                placeholder=p.placeholder,
-                key_configured=configured,
-            )
+    template_setups: dict[str, TemplateSetup] = {}
+    for tpl_name, setup in TEMPLATE_SETUP.items():
+        template_setups[tpl_name] = TemplateSetup(
+            steps=setup["steps"],
+            env_vars=[
+                EnvVarStatus(name=v, is_set=bool(os.environ.get(v))) for v in setup["env_vars"]
+            ],
+            extras=setup["extras"],
+            docs_url=setup["docs_url"],
         )
 
     return BuilderOptionsResponse(
         templates=templates,
-        providers=providers,
-        detected_provider=detected_provider,
-        detected_model=detected_model,
-        role_dirs=role_dirs,
-        custom_presets=presets,
-        ollama_models=ollama_models,
-        ollama_base_url=OLLAMA_DEFAULT_BASE_URL,
+        providers=opts.providers,
+        detected_provider=opts.detected_provider,
+        detected_model=opts.detected_model,
+        role_dirs=opts.save_dirs,
+        custom_presets=opts.custom_presets,
+        ollama_models=opts.ollama_models,
+        ollama_base_url=opts.ollama_base_url,
+        template_setups=template_setups,
     )
 
 
@@ -191,14 +178,14 @@ async def seed_agent(
     from initrunner.services.agent_builder import BuilderSession
 
     # Normalize custom providers to openai for runtime
-    is_custom = req.provider in _CUSTOM_PROVIDER_NAMES
+    is_custom = req.provider in CUSTOM_PROVIDER_NAMES
     runtime_provider = "openai" if is_custom else req.provider
 
     # Resolve base_url/api_key_env from presets if not explicitly provided
     base_url = req.base_url
     api_key_env = req.api_key_env
     if is_custom and base_url is None:
-        preset = next((p for p in _CUSTOM_PRESETS if p.name == req.provider), None)
+        preset = next((p for p in CUSTOM_PRESETS if p.name == req.provider), None)
         if preset and preset.base_url:
             base_url = preset.base_url
             api_key_env = api_key_env or preset.api_key_env
@@ -248,7 +235,7 @@ async def seed_agent(
 
     # Inject base_url/api_key_env into the generated YAML
     if is_custom and base_url:
-        yaml_text = _inject_model_fields(
+        yaml_text = _rewrite_model_block(
             yaml_text,
             base_url=base_url,
             api_key_env=api_key_env if api_key_env else None,
@@ -257,7 +244,7 @@ async def seed_agent(
         from initrunner.services.providers import OLLAMA_DEFAULT_BASE_URL
 
         if base_url != OLLAMA_DEFAULT_BASE_URL:
-            yaml_text = _inject_model_fields(yaml_text, base_url=base_url)
+            yaml_text = _rewrite_model_block(yaml_text, base_url=base_url)
 
     return SeedResponse(
         yaml_text=yaml_text,
@@ -337,7 +324,7 @@ async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
 
     # Determine env var name
     if req.preset:
-        preset = next((p for p in _CUSTOM_PRESETS if p.name == req.preset), None)
+        preset = next((p for p in CUSTOM_PRESETS if p.name == req.preset), None)
         if preset is None or not preset.api_key_env:
             raise HTTPException(status_code=400, detail=f"Unknown preset: {req.preset}")
         env_name = preset.api_key_env
@@ -372,3 +359,166 @@ async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
     os.environ[env_name] = req.api_key
 
     return SaveKeyResponse(env_var=env_name)
+
+
+# ---------------------------------------------------------------------------
+# InitHub endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/hub-search")
+async def hub_search_endpoint(
+    q: str = "",
+    tag: list[str] | None = None,
+) -> HubSearchResponse:
+    from initrunner.hub import HubError, hub_search
+
+    if len(q) < 2:
+        return HubSearchResponse(items=[])
+
+    try:
+        results = await asyncio.to_thread(hub_search, q, tags=tag)
+    except HubError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    return HubSearchResponse(
+        items=[
+            HubSearchResultResponse(
+                owner=r.owner,
+                name=r.name,
+                description=r.description,
+                tags=r.tags,
+                downloads=r.downloads,
+                latest_version=r.latest_version,
+            )
+            for r in results
+        ]
+    )
+
+
+# Featured packages cache (module-level, 5-min TTL)
+_featured_cache: tuple[float, list[HubSearchResultResponse]] = (0.0, [])
+_FEATURED_TTL = 300
+
+
+@router.get("/hub-featured")
+async def hub_featured_endpoint() -> HubSearchResponse:
+    global _featured_cache
+
+    from initrunner.hub import HubError, hub_browse
+
+    now = time.monotonic()
+    cached_at, cached_items = _featured_cache
+    if cached_items and (now - cached_at) < _FEATURED_TTL:
+        return HubSearchResponse(items=cached_items)
+
+    try:
+        results = await asyncio.to_thread(hub_browse, 12)
+    except HubError:
+        _logger.debug("hub_browse failed, returning cached/empty", exc_info=True)
+        return HubSearchResponse(items=cached_items)
+
+    items = [
+        HubSearchResultResponse(
+            owner=r.owner,
+            name=r.name,
+            description=r.description,
+            tags=r.tags,
+            downloads=r.downloads,
+            latest_version=r.latest_version,
+        )
+        for r in results
+    ]
+    _featured_cache = (now, items)
+    return HubSearchResponse(items=items)
+
+
+@router.post("/hub-seed")
+async def hub_seed_endpoint(req: HubSeedRequest) -> SeedResponse:
+    import tarfile
+    import tempfile
+
+    from initrunner.hub import HubError, hub_download, parse_hub_source
+    from initrunner.services.agent_builder import _validate_yaml
+
+    # Parse ref into owner/name/version
+    try:
+        owner, name, version = parse_hub_source(req.ref)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # Download bundle
+    try:
+        bundle_bytes = await asyncio.to_thread(hub_download, owner, name, version)
+    except HubError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    # Extract to temp dir, read primary YAML, clean up immediately
+    import io
+
+    yaml_text = ""
+    omitted: list[str] = []
+    try:
+        with tempfile.TemporaryDirectory(prefix="initrunner_hub_") as stage:
+            stage_path = Path(stage)
+            with tarfile.open(fileobj=io.BytesIO(bundle_bytes), mode="r:gz") as tar:
+                tar.extractall(stage_path, filter="data")
+
+            # Find primary YAML
+            yamls = list(stage_path.glob("*.yaml")) + list(stage_path.glob("*.yml"))
+            if not yamls:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No YAML files found in hub bundle '{req.ref}'",
+                )
+            primary = yamls[0]
+            yaml_text = primary.read_text(encoding="utf-8")
+
+            # Catalog sidecars
+            for f in stage_path.rglob("*"):
+                if f.is_file() and f != primary:
+                    omitted.append(str(f.relative_to(stage_path)))
+    except tarfile.TarError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid bundle archive: {e}") from e
+
+    # Rewrite model block with user's provider/model choice
+    is_custom = req.provider in CUSTOM_PROVIDER_NAMES
+    runtime_provider = "openai" if is_custom else req.provider
+
+    # Resolve base_url/api_key_env from presets
+    base_url = req.base_url
+    api_key_env = req.api_key_env
+    if is_custom and base_url is None:
+        preset = next((p for p in CUSTOM_PRESETS if p.name == req.provider), None)
+        if preset and preset.base_url:
+            base_url = preset.base_url
+            api_key_env = api_key_env or preset.api_key_env
+
+    yaml_text = _rewrite_model_block(
+        yaml_text,
+        provider=runtime_provider,
+        name=req.model or None,
+        base_url=base_url,
+        api_key_env=api_key_env,
+    )
+
+    # Validate
+    _, issues = await asyncio.to_thread(_validate_yaml, yaml_text)
+    ready = not any(i.severity == "error" for i in issues)
+
+    explanation = f"Loaded from InitHub: {owner}/{name}"
+    if version:
+        explanation += f"@{version}"
+    if omitted:
+        explanation += (
+            f"\nNote: Bundle contains additional files not loaded: "
+            f"{', '.join(omitted)}. Use 'initrunner install {owner}/{name}' "
+            f"for the full package."
+        )
+
+    return SeedResponse(
+        yaml_text=yaml_text,
+        explanation=explanation,
+        issues=_issues_to_response(issues),
+        ready=ready,
+    )

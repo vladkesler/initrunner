@@ -35,6 +35,15 @@ def run_compose_sync(
 # ---------------------------------------------------------------------------
 
 _ROUTE_SERVICES = 4  # intake + researcher + responder + escalator
+_ROUTE_SLOT_NAMES = ["intake", "researcher", "responder", "escalator"]
+
+
+@dataclasses.dataclass
+class ComposeBundle:
+    """Pure data: compose YAML + any generated placeholder role YAMLs."""
+
+    compose_yaml: str
+    role_yamls: dict[str, str]  # filename -> yaml (placeholders only)
 
 
 @dataclasses.dataclass
@@ -44,6 +53,64 @@ class ScaffoldResult:
     project_dir: Path
     compose_path: Path
     role_paths: list[Path]
+
+
+def build_compose(
+    name: str,
+    *,
+    pattern: str = "pipeline",
+    slot_assignments: dict[str, Path | None] | None = None,
+    service_count: int = 3,
+    shared_memory: bool = False,
+    provider: str = "openai",
+    model_name: str | None = None,
+) -> ComposeBundle:
+    """Generate compose YAML + placeholder role YAMLs (pure, writes nothing).
+
+    *slot_assignments* maps slot name to an existing role path (or ``None``
+    for a generated placeholder).  When a slot has a path, the compose
+    service ``role:`` field points to that path and no placeholder YAML is
+    emitted.  If *slot_assignments* is ``None`` every slot gets a placeholder
+    (backwards-compatible with the CLI).
+
+    Route pattern ignores *service_count* -- it always produces 4 services.
+    """
+    import yaml
+
+    from initrunner.templates import COMPOSE_PATTERNS
+
+    if pattern not in COMPOSE_PATTERNS:
+        raise ValueError(f"Unknown pattern '{pattern}'. Choose from: {', '.join(COMPOSE_PATTERNS)}")
+
+    if pattern == "fan-out" and service_count < 3:
+        raise ValueError("fan-out requires at least 3 services (1 dispatcher + 2 workers).")
+    if pattern == "pipeline" and service_count < 2:
+        raise ValueError("pipeline requires at least 2 services.")
+
+    builders = {
+        "pipeline": _build_pipeline,
+        "fan-out": _build_fan_out,
+        "route": _build_route,
+    }
+    compose_dict, roles = builders[pattern](
+        name=name,
+        service_count=service_count,
+        slot_assignments=slot_assignments or {},
+        provider=provider,
+        model_name=model_name,
+    )
+
+    if shared_memory:
+        compose_dict["spec"]["shared_memory"] = {
+            "enabled": True,
+            "store_path": ".memory",
+            "max_memories": 1000,
+        }
+
+    compose_yaml = yaml.dump(
+        compose_dict, default_flow_style=False, sort_keys=False, allow_unicode=True
+    )
+    return ComposeBundle(compose_yaml=compose_yaml, role_yamls=roles)
 
 
 def scaffold_compose_project(
@@ -64,34 +131,17 @@ def scaffold_compose_project(
     Raises ``ValueError`` for invalid arguments and ``FileExistsError`` if the
     target directory already exists (unless *force* is True).
     """
-    import yaml
-
     from initrunner.agent.loader import load_role
     from initrunner.compose.loader import load_compose
-    from initrunner.templates import COMPOSE_PATTERNS
-
-    if pattern not in COMPOSE_PATTERNS:
-        raise ValueError(f"Unknown pattern '{pattern}'. Choose from: {', '.join(COMPOSE_PATTERNS)}")
-
-    if pattern == "route" and services != 3:
-        raise ValueError(
-            "The route pattern has a fixed topology (intake, researcher, responder, "
-            "escalator). --services is not supported for this pattern."
-        )
-    if pattern == "fan-out" and services < 3:
-        raise ValueError("fan-out requires at least 3 services (1 dispatcher + 2 workers).")
-    if pattern == "pipeline" and services < 2:
-        raise ValueError("pipeline requires at least 2 services.")
 
     project_dir = output_dir / name
     if project_dir.exists() and not force:
         raise FileExistsError(f"Directory already exists: {project_dir}")
 
-    # Build compose dict + role YAML strings
-    compose_dict, roles = _build_pattern(
-        name=name,
+    bundle = build_compose(
+        name,
         pattern=pattern,
-        services=services,
+        service_count=services,
         shared_memory=shared_memory,
         provider=provider,
         model_name=model_name,
@@ -102,13 +152,10 @@ def scaffold_compose_project(
     roles_dir.mkdir(parents=True, exist_ok=True)
 
     compose_path = project_dir / "compose.yaml"
-    compose_yaml = yaml.dump(
-        compose_dict, default_flow_style=False, sort_keys=False, allow_unicode=True
-    )
-    compose_path.write_text(compose_yaml)
+    compose_path.write_text(bundle.compose_yaml)
 
     role_paths: list[Path] = []
-    for filename, role_yaml in roles.items():
+    for filename, role_yaml in bundle.role_yamls.items():
         p = roles_dir / filename
         p.write_text(role_yaml)
         role_paths.append(p)
@@ -125,36 +172,19 @@ def scaffold_compose_project(
     )
 
 
-def _build_pattern(
-    *,
-    name: str,
-    pattern: str,
-    services: int,
-    shared_memory: bool,
-    provider: str,
-    model_name: str | None,
-) -> tuple[dict, dict[str, str]]:
-    """Return (compose_dict, {filename: role_yaml_str}) for the given pattern."""
-    builders = {
-        "pipeline": _build_pipeline,
-        "fan-out": _build_fan_out,
-        "route": _build_route,
-    }
-    compose_dict, roles = builders[pattern](
-        name=name,
-        services=services,
-        provider=provider,
-        model_name=model_name,
-    )
+def _slot_role_path(
+    svc_name: str,
+    slot_assignments: dict[str, Path | None],
+) -> tuple[str, bool]:
+    """Return (role path string, is_existing) for a service slot.
 
-    if shared_memory:
-        compose_dict["spec"]["shared_memory"] = {
-            "enabled": True,
-            "store_path": ".memory",
-            "max_memories": 1000,
-        }
-
-    return compose_dict, roles
+    If the slot has an assigned existing role path, returns the absolute path
+    string.  Otherwise returns the default ``roles/<name>.yaml`` relative path.
+    """
+    assigned = slot_assignments.get(svc_name)
+    if assigned is not None:
+        return str(assigned.resolve()), True
+    return f"roles/{svc_name}.yaml", False
 
 
 def _make_compose_dict(name: str, description: str, services_dict: dict) -> dict:
@@ -169,18 +199,20 @@ def _make_compose_dict(name: str, description: str, services_dict: dict) -> dict
 def _build_pipeline(
     *,
     name: str,
-    services: int,
+    service_count: int,
+    slot_assignments: dict[str, Path | None],
     provider: str,
     model_name: str | None,
 ) -> tuple[dict, dict[str, str]]:
     from initrunner.templates import build_role_yaml
 
-    svc_names = [f"step-{i}" for i in range(1, services + 1)]
+    svc_names = [f"step-{i}" for i in range(1, service_count + 1)]
     services_dict: dict[str, dict] = {}
     roles: dict[str, str] = {}
 
     for idx, svc_name in enumerate(svc_names):
-        svc: dict = {"role": f"roles/{svc_name}.yaml"}
+        role_path, is_existing = _slot_role_path(svc_name, slot_assignments)
+        svc: dict = {"role": role_path}
 
         if idx > 0:
             svc["depends_on"] = [svc_names[idx - 1]]
@@ -190,25 +222,26 @@ def _build_pipeline(
         svc["restart"] = {"condition": "on-failure"}
         services_dict[svc_name] = svc
 
-        if idx == 0:
-            position = "first"
-        elif idx == len(svc_names) - 1:
-            position = "last"
-        else:
-            position = f"stage {idx + 1}"
-        roles[f"{svc_name}.yaml"] = build_role_yaml(
-            name=svc_name,
-            description=f"Stage {idx + 1} of the {name} pipeline",
-            provider=provider,
-            model_name=model_name,
-            system_prompt=(
-                f"You are the {position} stage in a processing pipeline.\n"
-                "Analyze the input and produce structured output for the next stage."
-            ),
-        )
+        if not is_existing:
+            if idx == 0:
+                position = "first"
+            elif idx == len(svc_names) - 1:
+                position = "last"
+            else:
+                position = f"stage {idx + 1}"
+            roles[f"{svc_name}.yaml"] = build_role_yaml(
+                name=svc_name,
+                description=f"Stage {idx + 1} of the {name} pipeline",
+                provider=provider,
+                model_name=model_name,
+                system_prompt=(
+                    f"You are the {position} stage in a processing pipeline.\n"
+                    "Analyze the input and produce structured output for the next stage."
+                ),
+            )
 
     return (
-        _make_compose_dict(name, f"A {services}-service pipeline.", services_dict),
+        _make_compose_dict(name, f"A {service_count}-service pipeline.", services_dict),
         roles,
     )
 
@@ -216,25 +249,28 @@ def _build_pipeline(
 def _build_fan_out(
     *,
     name: str,
-    services: int,
+    service_count: int,
+    slot_assignments: dict[str, Path | None],
     provider: str,
     model_name: str | None,
 ) -> tuple[dict, dict[str, str]]:
     from initrunner.templates import build_role_yaml
 
-    worker_count = services - 1
+    worker_count = service_count - 1
     worker_names = [f"worker-{i}" for i in range(1, worker_count + 1)]
 
+    disp_path, disp_existing = _slot_role_path("dispatcher", slot_assignments)
     services_dict: dict[str, dict] = {
         "dispatcher": {
-            "role": "roles/dispatcher.yaml",
+            "role": disp_path,
             "sink": {"type": "delegate", "target": worker_names},
             "restart": {"condition": "on-failure"},
         },
     }
 
-    roles: dict[str, str] = {
-        "dispatcher.yaml": build_role_yaml(
+    roles: dict[str, str] = {}
+    if not disp_existing:
+        roles["dispatcher.yaml"] = build_role_yaml(
             name="dispatcher",
             description=f"Dispatches work to {worker_count} workers",
             provider=provider,
@@ -243,24 +279,25 @@ def _build_fan_out(
                 "You are a dispatcher agent. Analyze incoming requests and produce "
                 "a structured summary. Your output is forwarded to all workers."
             ),
-        ),
-    }
+        )
 
     for wname in worker_names:
+        w_path, w_existing = _slot_role_path(wname, slot_assignments)
         services_dict[wname] = {
-            "role": f"roles/{wname}.yaml",
+            "role": w_path,
             "depends_on": ["dispatcher"],
             "restart": {"condition": "on-failure"},
         }
-        roles[f"{wname}.yaml"] = build_role_yaml(
-            name=wname,
-            description=f"Worker in the {name} fan-out",
-            provider=provider,
-            model_name=model_name,
-            system_prompt=(
-                "You are a worker agent. Process the dispatched work item and produce a result."
-            ),
-        )
+        if not w_existing:
+            roles[f"{wname}.yaml"] = build_role_yaml(
+                name=wname,
+                description=f"Worker in the {name} fan-out",
+                provider=provider,
+                model_name=model_name,
+                system_prompt=(
+                    "You are a worker agent. Process the dispatched work item and produce a result."
+                ),
+            )
 
     return (
         _make_compose_dict(
@@ -275,7 +312,8 @@ def _build_fan_out(
 def _build_route(
     *,
     name: str,
-    services: int,  # ignored, fixed topology
+    service_count: int,  # ignored -- fixed topology
+    slot_assignments: dict[str, Path | None],
     provider: str,
     model_name: str | None,
 ) -> tuple[dict, dict[str, str]]:
@@ -312,9 +350,10 @@ def _build_route(
 
     specialist_names = [s[0] for s in specialists]
 
+    intake_path, intake_existing = _slot_role_path("intake", slot_assignments)
     services_dict: dict[str, dict] = {
         "intake": {
-            "role": "roles/intake.yaml",
+            "role": intake_path,
             "sink": {
                 "type": "delegate",
                 "strategy": "sense",
@@ -323,8 +362,9 @@ def _build_route(
         },
     }
 
-    roles: dict[str, str] = {
-        "intake.yaml": build_role_yaml(
+    roles: dict[str, str] = {}
+    if not intake_existing:
+        roles["intake.yaml"] = build_role_yaml(
             name="intake",
             description="Receives requests and summarizes them for triage",
             provider=provider,
@@ -336,22 +376,23 @@ def _build_route(
                 "of action needed (research, direct response, or escalation). "
                 "Be factual and brief."
             ),
-        ),
-    }
+        )
 
     for sname, desc, tags, prompt in specialists:
+        s_path, s_existing = _slot_role_path(sname, slot_assignments)
         services_dict[sname] = {
-            "role": f"roles/{sname}.yaml",
+            "role": s_path,
             "depends_on": ["intake"],
         }
-        roles[f"{sname}.yaml"] = build_role_yaml(
-            name=sname,
-            description=desc,
-            provider=provider,
-            model_name=model_name,
-            tags=tags,
-            system_prompt=prompt,
-        )
+        if not s_existing:
+            roles[f"{sname}.yaml"] = build_role_yaml(
+                name=sname,
+                description=desc,
+                provider=provider,
+                model_name=model_name,
+                tags=tags,
+                system_prompt=prompt,
+            )
 
     return (
         _make_compose_dict(

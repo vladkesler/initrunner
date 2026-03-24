@@ -60,12 +60,14 @@ class DelegateSink(SinkBase):
         circuit_breaker_reset_seconds: int = 60,
         source_metadata: Metadata | None = None,
         target_metadata: Metadata | None = None,
+        compose_name: str | None = None,
     ) -> None:
         self._source_service = source_service
         self._target_service = target_service
         self._target_queue = target_queue
         self._timeout_seconds = timeout_seconds
         self._audit_logger = audit_logger
+        self._compose_name = compose_name
         self._source_metadata = source_metadata
         self._target_metadata = target_metadata
         self._counter_lock = threading.Lock()
@@ -163,6 +165,7 @@ class DelegateSink(SinkBase):
                     "reason": reason,
                     "trace": trace,
                     "payload_preview": payload_preview,
+                    "compose_name": self._compose_name,
                 }
             )
         except Exception:

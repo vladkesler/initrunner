@@ -95,6 +95,7 @@ Detailed docs live in `docs/`. Key references:
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Dashboard (web UI) | `docs/interfaces/dashboard.md` |
+| Dashboard design system | `docs/interfaces/design-system.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Docker sandbox | `docs/security/docker-sandbox.md` |

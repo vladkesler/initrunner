@@ -99,6 +99,46 @@ _VALID_YAML_WITH_MEMORY = textwrap.dedent("""\
           max_memories: 1000
 """)
 
+_VALID_YAML_WITH_DISCORD = textwrap.dedent("""\
+    apiVersion: initrunner/v1
+    kind: Agent
+    metadata:
+      name: discord-bot
+      description: Discord bot
+    spec:
+      role: You respond to Discord messages.
+      model:
+        provider: openai
+        name: gpt-5-mini
+      guardrails:
+        timeout_seconds: 30
+      triggers:
+        - type: discord
+          token_env: DISCORD_BOT_TOKEN
+          channel_ids: []
+          prompt_template: "{message}"
+""")
+
+_VALID_YAML_WITH_TELEGRAM = textwrap.dedent("""\
+    apiVersion: initrunner/v1
+    kind: Agent
+    metadata:
+      name: telegram-bot
+      description: Telegram bot
+    spec:
+      role: You respond to Telegram messages.
+      model:
+        provider: openai
+        name: gpt-5-mini
+      guardrails:
+        timeout_seconds: 30
+      triggers:
+        - type: telegram
+          token_env: TELEGRAM_BOT_TOKEN
+          allowed_users: []
+          prompt_template: "{message}"
+""")
+
 
 @dataclass
 class _FakeResult:
@@ -258,6 +298,22 @@ class TestBuildNextSteps:
         assert role is not None
         steps = build_next_steps(role, Path("role.yaml"))
         assert any("-i" in s for s in steps)
+
+    def test_discord_trigger_hints(self):
+        role, _ = _validate_yaml(_VALID_YAML_WITH_DISCORD)
+        assert role is not None
+        steps = build_next_steps(role, Path("role.yaml"))
+        assert any("DISCORD_BOT_TOKEN" in s for s in steps)
+        assert any("--extra discord" in s for s in steps)
+        assert any("--daemon" in s for s in steps)
+
+    def test_telegram_trigger_hints(self):
+        role, _ = _validate_yaml(_VALID_YAML_WITH_TELEGRAM)
+        assert role is not None
+        steps = build_next_steps(role, Path("role.yaml"))
+        assert any("TELEGRAM_BOT_TOKEN" in s for s in steps)
+        assert any("--extra telegram" in s for s in steps)
+        assert any("--daemon" in s for s in steps)
 
 
 # ---------------------------------------------------------------------------

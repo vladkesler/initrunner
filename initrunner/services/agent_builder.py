@@ -160,6 +160,18 @@ def build_next_steps(role: RoleDefinition, yaml_path: Path) -> list[str]:
     steps: list[str] = []
     p = str(yaml_path)
 
+    # Trigger-specific prerequisites (deduped)
+    seen_extras: set[str] = set()
+    for trigger in role.spec.triggers or []:
+        if trigger.type == "discord" and "discord" not in seen_extras:
+            seen_extras.add("discord")
+            steps.append("export DISCORD_BOT_TOKEN='your-token-here'")
+            steps.append("uv sync --extra discord")
+        elif trigger.type == "telegram" and "telegram" not in seen_extras:
+            seen_extras.add("telegram")
+            steps.append("export TELEGRAM_BOT_TOKEN='your-token-here'")
+            steps.append("uv sync --extra telegram")
+
     if role.spec.ingest:
         steps.append(f"initrunner ingest {p}")
     if role.spec.triggers:
@@ -167,7 +179,7 @@ def build_next_steps(role: RoleDefinition, yaml_path: Path) -> list[str]:
     if role.spec.memory:
         steps.append(f"initrunner run {p} -i")
 
-    if not steps:
+    if not any(s.startswith("initrunner") for s in steps):
         steps.append(f"initrunner run {p} -p 'hello'")
 
     steps.append(f"initrunner validate {p}")

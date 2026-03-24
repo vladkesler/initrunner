@@ -5,33 +5,38 @@
 /* ── Design Tokens ───────────────────────────────────────────────── */
 
 @theme {
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Single accent */
-  --color-orange: oklch(0.70 0.17 45);
-  --color-orange-hover: oklch(0.75 0.16 50);
+  /* Primary accent — electric lime */
+  --color-accent-primary: oklch(0.91 0.20 128);
+  --color-accent-primary-hover: oklch(0.95 0.18 128);
+  --color-accent-primary-muted: oklch(0.91 0.20 128 / 0.15);
 
-  /* Status -- semantic only */
+  /* Secondary accent — electric cyan */
+  --color-accent-secondary: oklch(0.82 0.14 195);
+  --color-accent-secondary-muted: oklch(0.82 0.14 195 / 0.12);
+
+  /* Status — semantic only */
   --color-ok: #34d399;
   --color-warn: #fbbf24;
-  --color-fail: #f87171;
+  --color-fail: #ff4d6a;
   --color-info: #60a5fa;
 
-  /* Surfaces -- zinc scale */
-  --color-surface-0: #09090b;
-  --color-surface-1: #18181b;
-  --color-surface-2: #27272a;
-  --color-surface-3: #3f3f46;
+  /* Surfaces — warm charcoal */
+  --color-surface-0: #0e0e10;
+  --color-surface-1: #161618;
+  --color-surface-2: #1e1e22;
+  --color-surface-3: #2a2a30;
 
   /* Text hierarchy */
-  --color-fg: #fafafa;
-  --color-fg-muted: #d4d4d8;
-  --color-fg-faint: #a1a1aa;
+  --color-fg: #f0f0f0;
+  --color-fg-muted: #c0c0c8;
+  --color-fg-faint: #70707c;
 
   /* Borders */
-  --color-edge: #27272a;
-  --color-edge-subtle: #1c1c1f;
+  --color-edge: #2a2a30;
+  --color-edge-subtle: #1e1e22;
 }
 
 /* shadcn-svelte CSS variable bridge */
@@ -62,27 +67,27 @@
 }
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --popover: #27272a;
-  --popover-foreground: #fafafa;
-  --primary: #f97316;
-  --primary-foreground: #fff7ed;
-  --secondary: #27272a;
-  --secondary-foreground: #d4d4d8;
-  --muted: #18181b;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #f87171;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #f97316;
-  --radius: 0.125rem;
-  --sidebar: #18181b;
-  --sidebar-foreground: #d4d4d8;
+  --background: #0e0e10;
+  --foreground: #f0f0f0;
+  --card: #161618;
+  --card-foreground: #f0f0f0;
+  --popover: #1e1e22;
+  --popover-foreground: #f0f0f0;
+  --primary: #c8ff00;
+  --primary-foreground: #0e0e10;
+  --secondary: #1e1e22;
+  --secondary-foreground: #c0c0c8;
+  --muted: #161618;
+  --muted-foreground: #70707c;
+  --accent: #1e1e22;
+  --accent-foreground: #f0f0f0;
+  --destructive: #ff4d6a;
+  --border: #2a2a30;
+  --input: #2a2a30;
+  --ring: #c8ff00;
+  --radius: 0rem;
+  --sidebar: #111113;
+  --sidebar-foreground: #c0c0c8;
 
   color-scheme: dark;
 }
@@ -97,6 +102,35 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Glow Effects ─────────────────────────────────────────────────── */
+
+.glow-lime {
+  box-shadow:
+    0 0 20px oklch(0.91 0.20 128 / 0.12),
+    inset 0 1px 0 oklch(0.91 0.20 128 / 0.06);
+}
+
+.glow-cyan {
+  box-shadow:
+    0 0 16px oklch(0.82 0.14 195 / 0.10),
+    inset 0 1px 0 oklch(0.82 0.14 195 / 0.05);
+}
+
+.glow-lime-subtle {
+  box-shadow: 0 0 0 1px oklch(0.91 0.20 128 / 0.15);
+}
+
+/* ── Card Surface — lime top-edge highlight ───────────────────────── */
+
+.card-surface {
+  border: 1px solid #2a2a30;
+  border-top-color: oklch(0.91 0.20 128 / 0.15);
+}
+
+.card-surface:hover {
+  border-top-color: oklch(0.91 0.20 128 / 0.30);
+}
+
 /* ── Noise Grain Texture ──────────────────────────────────────────── */
 
 body::after {
@@ -105,11 +139,11 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  opacity: 0.035;
+  opacity: 0.045;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
-  mix-blend-mode: overlay;
+  mix-blend-mode: soft-light;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────── */
@@ -124,12 +158,42 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
+  background: #2a2a30;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: #3a3a42;
+}
+
+/* ── Animations ───────────────────────────────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 16px oklch(0.91 0.20 128 / 0.08);
+  }
+  50% {
+    box-shadow: 0 0 24px oklch(0.91 0.20 128 / 0.18);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out both;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
 }
 
 /* ── Reduced Motion ───────────────────────────────────────────────── */

@@ -14,6 +14,7 @@ from initrunner.hub import (
     HubError,
     HubPackageInfo,
     _hub_request,
+    hub_browse,
     hub_download,
     hub_publish,
     hub_search,
@@ -356,6 +357,39 @@ class TestHubSearch:
         assert len(results) == 1
         assert results[0].latest_version == ""
         assert results[0].tags == []
+
+
+# ---------------------------------------------------------------------------
+# hub_browse
+# ---------------------------------------------------------------------------
+
+
+class TestHubBrowse:
+    def test_browse_returns_results(self):
+        api_response = {
+            "items": [
+                {
+                    "slug": "popular-agent",
+                    "description": "Very popular",
+                    "owner": {"username": "topdev"},
+                    "downloads_total": 500,
+                    "latest_version": {"version": "3.0.0", "tags": ["popular"]},
+                },
+            ]
+        }
+        with patch("initrunner.hub._hub_request", return_value=api_response) as mock_req:
+            results = hub_browse(limit=12)
+
+        assert len(results) == 1
+        assert results[0].owner == "topdev"
+        assert results[0].name == "popular-agent"
+        assert results[0].downloads == 500
+        mock_req.assert_called_once_with("/packages?limit=12&sort=downloads")
+
+    def test_browse_empty(self):
+        with patch("initrunner.hub._hub_request", return_value={"items": []}):
+            results = hub_browse()
+        assert results == []
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.compose.schema import ComposeDefinition
 
 
 @dataclass
@@ -107,6 +108,64 @@ def get_default_role_dirs(explicit_dir: Path | None = None) -> list[Path]:
     if global_roles.is_dir():
         dirs.append(global_roles)
     return dirs
+
+
+@dataclass
+class DiscoveredCompose:
+    """A compose YAML file discovered on disk."""
+
+    path: Path
+    compose: ComposeDefinition | None = None
+    error: str | None = None
+
+
+def discover_composes_sync(dirs: list[Path]) -> list[DiscoveredCompose]:
+    """Scan directories for compose YAML files (sync).
+
+    Uses the same ``os.walk`` + pruning strategy as ``discover_roles_sync``
+    but filters for ``kind: Compose``.
+    """
+    import yaml
+
+    from initrunner.compose.loader import ComposeLoadError, load_compose
+
+    results: list[DiscoveredCompose] = []
+    seen: set[Path] = set()
+
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for root, dirnames, filenames in os.walk(d):
+            dirnames[:] = sorted(dn for dn in dirnames if dn not in _SKIP_DIRS)
+            for fn in sorted(filenames):
+                if not (fn.endswith(".yaml") or fn.endswith(".yml")):
+                    continue
+                p = Path(root) / fn
+                resolved = p.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+
+                try:
+                    with open(p) as f:
+                        raw = yaml.safe_load(f)
+                    if not isinstance(raw, dict) or raw.get("apiVersion") != "initrunner/v1":
+                        continue
+                    if raw.get("kind") != "Compose":
+                        continue
+                except Exception as e:
+                    _logger.debug("Skipping %s: %s", p, e)
+                    continue
+
+                try:
+                    compose = load_compose(p)
+                    results.append(DiscoveredCompose(path=p, compose=compose))
+                except ComposeLoadError as e:
+                    results.append(DiscoveredCompose(path=p, error=str(e)))
+                except Exception as e:
+                    results.append(DiscoveredCompose(path=p, error=str(e)))
+
+    return results
 
 
 def load_role_sync(path: Path) -> RoleDefinition:

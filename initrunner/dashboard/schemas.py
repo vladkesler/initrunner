@@ -146,6 +146,18 @@ class TemplateInfo(BaseModel):
     description: str
 
 
+class EnvVarStatus(BaseModel):
+    name: str
+    is_set: bool
+
+
+class TemplateSetup(BaseModel):
+    steps: list[str]
+    env_vars: list[EnvVarStatus]
+    extras: list[str]
+    docs_url: str
+
+
 class ModelOption(BaseModel):
     name: str
     description: str
@@ -174,6 +186,7 @@ class BuilderOptionsResponse(BaseModel):
     custom_presets: list[ProviderPreset]
     ollama_models: list[str]
     ollama_base_url: str
+    template_setups: dict[str, TemplateSetup] = {}
 
 
 class SeedRequest(BaseModel):
@@ -229,3 +242,153 @@ class SaveKeyRequest(BaseModel):
 
 class SaveKeyResponse(BaseModel):
     env_var: str
+
+
+# -- InitHub -------------------------------------------------------------------
+
+
+class HubSearchResultResponse(BaseModel):
+    owner: str
+    name: str
+    description: str
+    tags: list[str]
+    downloads: int
+    latest_version: str
+
+
+class HubSearchResponse(BaseModel):
+    items: list[HubSearchResultResponse]
+
+
+class HubSeedRequest(BaseModel):
+    ref: str  # "owner/name@version"
+    provider: str
+    model: str | None = None
+    base_url: str | None = None
+    api_key_env: str | None = None
+
+
+# -- Compose: list / detail ---------------------------------------------------
+
+
+class ComposeSummary(BaseModel):
+    id: str
+    name: str
+    description: str
+    service_count: int
+    service_names: list[str]
+    path: str
+    error: str | None = None
+
+
+class ComposeServiceDetail(BaseModel):
+    name: str
+    role_path: str
+    agent_id: str | None = None
+    agent_name: str | None = None
+    sink_summary: str | None = None
+    depends_on: list[str] = []
+    trigger_summary: str | None = None
+    restart_condition: str = "none"
+
+
+class ComposeDetail(BaseModel):
+    id: str
+    name: str
+    description: str
+    path: str
+    services: list[ComposeServiceDetail]
+    shared_memory_enabled: bool = False
+    shared_documents_enabled: bool = False
+
+
+class DelegateEventResponse(BaseModel):
+    timestamp: str
+    source_service: str
+    target_service: str
+    status: str
+    source_run_id: str
+    compose_name: str | None = None
+    reason: str | None = None
+    trace: str | None = None
+    payload_preview: str = ""
+
+
+# -- Compose: builder ---------------------------------------------------------
+
+
+class PatternInfo(BaseModel):
+    name: str
+    description: str
+    fixed_topology: bool
+    slot_names: list[str]
+    min_services: int
+    max_services: int | None = None
+
+
+class AgentSlotOption(BaseModel):
+    id: str
+    name: str
+    description: str
+    path: str
+
+
+class SlotAssignment(BaseModel):
+    slot: str
+    agent_id: str | None = None
+
+
+class ComposeBuilderOptionsResponse(BaseModel):
+    patterns: list[PatternInfo]
+    agents: list[AgentSlotOption]
+    providers: list[ProviderModels]
+    detected_provider: str | None = None
+    detected_model: str | None = None
+    save_dirs: list[str]
+    custom_presets: list[ProviderPreset]
+    ollama_models: list[str]
+    ollama_base_url: str
+
+
+class ComposeSeedRequest(BaseModel):
+    pattern: str
+    name: str
+    services: list[SlotAssignment]
+    service_count: int = 3
+    shared_memory: bool = False
+    provider: str = "openai"
+    model: str | None = None
+    base_url: str | None = None
+    api_key_env: str | None = None
+
+
+class ComposeSeedResponse(BaseModel):
+    compose_yaml: str
+    role_yamls: dict[str, str]
+    issues: list[ValidationIssueResponse]
+    ready: bool
+
+
+class ComposeValidateRequest(BaseModel):
+    yaml_text: str
+
+
+class ComposeValidateResponse(BaseModel):
+    issues: list[ValidationIssueResponse]
+    ready: bool
+
+
+class ComposeSaveRequest(BaseModel):
+    compose_yaml: str
+    role_yamls: dict[str, str]
+    directory: str
+    project_name: str
+    force: bool = False
+
+
+class ComposeSaveResponse(BaseModel):
+    path: str
+    valid: bool
+    issues: list[str]
+    next_steps: list[str]
+    compose_id: str

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from initrunner.dashboard.config import DashboardSettings
-from initrunner.dashboard.deps import RoleCache, get_role_cache
+from initrunner.dashboard.deps import ComposeCache, RoleCache, get_compose_cache, get_role_cache
 from initrunner.dashboard.schemas import HealthResponse
 
 _logger = logging.getLogger(__name__)
@@ -25,12 +25,14 @@ _STATIC_DIR = Path(__file__).parent / "_static"
 def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     settings = settings or DashboardSettings()
     role_cache = RoleCache(settings)
+    compose_cache = ComposeCache(settings)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         import asyncio
 
         await asyncio.to_thread(role_cache.refresh)
+        await asyncio.to_thread(compose_cache.refresh)
         yield
 
     app = FastAPI(
@@ -48,8 +50,9 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # -- Dependency override: inject RoleCache as a singleton ---------------
+    # -- Dependency overrides: inject caches as singletons ------------------
     app.dependency_overrides[get_role_cache] = lambda: role_cache
+    app.dependency_overrides[get_compose_cache] = lambda: compose_cache
 
     # -- Health endpoint ----------------------------------------------------
     @app.get("/api/health", tags=["health"])
@@ -62,6 +65,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     from initrunner.dashboard.routers.agents import router as agents_router
     from initrunner.dashboard.routers.audit import router as audit_router
     from initrunner.dashboard.routers.builder import router as builder_router
+    from initrunner.dashboard.routers.compose import router as compose_router
+    from initrunner.dashboard.routers.compose_builder import router as compose_builder_router
     from initrunner.dashboard.routers.providers import router as providers_router
     from initrunner.dashboard.routers.runs import router as runs_router
     from initrunner.dashboard.routers.system import router as system_router
@@ -72,6 +77,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     app.include_router(providers_router)
     app.include_router(system_router)
     app.include_router(builder_router)
+    app.include_router(compose_router)
+    app.include_router(compose_builder_router)
 
     # -- Static file serving (production) -----------------------------------
     if _STATIC_DIR.is_dir():

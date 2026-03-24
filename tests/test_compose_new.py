@@ -149,11 +149,19 @@ class TestRoutePattern:
         researcher = load_role(roles_dir / "researcher.yaml")
         assert "research" in researcher.metadata.tags
 
-    def test_rejects_custom_services(self, tmp_path: Path) -> None:
-        with pytest.raises(ValueError, match="not supported"):
-            scaffold_compose_project(
-                "rt", pattern="route", services=5, output_dir=tmp_path, provider="openai"
-            )
+    def test_ignores_custom_service_count(self, tmp_path: Path) -> None:
+        """Route has a fixed 4-service topology; service_count is silently ignored."""
+        result = scaffold_compose_project(
+            "rt", pattern="route", services=5, output_dir=tmp_path, provider="openai"
+        )
+        assert len(result.role_paths) == 4
+        data = yaml.safe_load(result.compose_path.read_text())
+        assert set(data["spec"]["services"].keys()) == {
+            "intake",
+            "researcher",
+            "responder",
+            "escalator",
+        }
 
     def test_compose_yaml_is_valid(self, tmp_path: Path) -> None:
         from initrunner.compose.loader import load_compose

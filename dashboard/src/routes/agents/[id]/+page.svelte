@@ -39,16 +39,16 @@
 	</a>
 
 	{#if loading}
-		<Skeleton class="h-6 w-48 rounded-sm bg-surface-1" />
-		<Skeleton class="h-64 rounded-sm bg-surface-1" />
+		<Skeleton class="h-6 w-48 bg-surface-1" />
+		<Skeleton class="h-64 bg-surface-1" />
 	{:else if detail}
 		<!-- Header -->
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-lg font-medium text-fg" style="text-wrap: balance">{detail.name}</h1>
+				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg" style="text-wrap: balance">{detail.name}</h1>
 				{#if detail.model.provider}
 					<span
-						class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint"
+						class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint"
 					>
 						{detail.model.provider}/{detail.model.name}
 					</span>
@@ -61,7 +61,7 @@
 
 		<!-- Error block -->
 		{#if detail.error}
-			<div class="rounded-sm border-l-2 border-l-fail bg-fail/5 px-3 py-2">
+			<div class="border-l-2 border-l-fail bg-fail/5 px-3 py-2">
 				<p class="font-mono text-sm text-fail">{detail.error}</p>
 			</div>
 		{/if}
@@ -69,7 +69,7 @@
 		<!-- Split layout -->
 		<div class="flex min-h-0 flex-1 flex-col gap-5 lg:flex-row lg:gap-0">
 			<!-- Config panel: sidebar on lg, collapsible on mobile -->
-			<div class="shrink-0 lg:w-[340px] lg:overflow-y-auto lg:border-r lg:border-edge lg:bg-surface-1 lg:pr-5">
+			<div class="shrink-0 lg:w-[360px] lg:overflow-y-auto lg:border-r lg:border-edge lg:bg-surface-1 lg:pr-5">
 				<!-- Mobile toggle -->
 				<button
 					class="flex w-full items-center gap-1.5 border-b border-edge pb-3 lg:hidden"
@@ -80,7 +80,7 @@
 						size={12}
 						class="shrink-0 text-fg-faint transition-transform duration-150 {configOpen ? 'rotate-90' : ''}"
 					/>
-					<span class="font-mono text-[13px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
 						Configuration
 					</span>
 				</button>

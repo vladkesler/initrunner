@@ -149,6 +149,27 @@ def hub_search(query: str, tags: list[str] | None = None) -> list[HubSearchResul
     return results
 
 
+def hub_browse(limit: int = 12) -> list[HubSearchResult]:
+    """Fetch popular packages from InitHub (no search query required)."""
+    params = f"?limit={limit}&sort=downloads"
+    data = _hub_request(f"/packages{params}")
+    results = []
+    for item in data.get("items", []):
+        owner_data = item.get("owner", {})
+        latest = item.get("latest_version")
+        results.append(
+            HubSearchResult(
+                owner=owner_data.get("username", ""),
+                name=item.get("slug", ""),
+                description=item.get("description", ""),
+                tags=latest.get("tags", []) if latest else [],
+                downloads=item.get("downloads_total", 0),
+                latest_version=latest.get("version", "") if latest else "",
+            )
+        )
+    return results
+
+
 def hub_resolve(owner: str, name: str, version: str | None = None) -> HubPackageInfo:
     """Get package metadata from InitHub."""
     data = _hub_request(f"/packages/{owner}/{name}")

@@ -507,6 +507,7 @@ class ComposeOrchestrator:
                     circuit_breaker_reset_seconds=config.sink.circuit_breaker_reset_seconds,
                     source_metadata=source_role.metadata,
                     target_metadata=target_service.role.metadata,
+                    compose_name=self._compose.metadata.name,
                 )
                 sinks_by_target[target_name] = delegate
 

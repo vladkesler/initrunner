@@ -34,6 +34,7 @@ class DelegateAuditEvent:
     reason: str | None  # None for delivered; payload.error / "queue_full" / str(exc)
     trace: str | None  # Comma-separated service chain e.g. "a,b,c"
     payload_preview: str  # First 200 chars of payload output, secret-scrubbed
+    compose_name: str | None = None  # Compose project identity for filtering
 
 
 @dataclass
@@ -160,7 +161,8 @@ CREATE TABLE IF NOT EXISTS delegate_events (
     source_run_id TEXT NOT NULL,
     reason TEXT,
     trace TEXT,
-    payload_preview TEXT NOT NULL
+    payload_preview TEXT NOT NULL,
+    compose_name TEXT
 );
 """
 
@@ -170,13 +172,14 @@ _CREATE_DELEGATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_del_status ON delegate_events (status);",
     "CREATE INDEX IF NOT EXISTS idx_del_timestamp ON delegate_events (timestamp);",
     "CREATE INDEX IF NOT EXISTS idx_del_run_id ON delegate_events (source_run_id);",
+    "CREATE INDEX IF NOT EXISTS idx_del_compose ON delegate_events (compose_name);",
 ]
 
 _INSERT_DELEGATE_EVENT = """\
 INSERT INTO delegate_events (
     timestamp, source_service, target_service, status,
-    source_run_id, reason, trace, payload_preview
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    source_run_id, reason, trace, payload_preview, compose_name
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 
@@ -224,6 +227,14 @@ def _migrate_add_principal_column(conn: sqlite3.Connection) -> None:
         pass
 
 
+def _migrate_add_compose_name_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add compose_name to delegate_events."""
+    try:
+        conn.execute("ALTER TABLE delegate_events ADD COLUMN compose_name TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
 def _build_where(
     filters: list[tuple[str, object]],
 ) -> tuple[str, list[object]]:
@@ -242,6 +253,11 @@ def _build_where(
 
 def _row_to_delegate_event(row: sqlite3.Row) -> DelegateAuditEvent:
     """Convert a sqlite3.Row to a DelegateAuditEvent."""
+    # compose_name may be absent in pre-migration rows
+    try:
+        compose_name = row["compose_name"]
+    except (IndexError, KeyError):
+        compose_name = None
     return DelegateAuditEvent(
         timestamp=row["timestamp"],
         source_service=row["source_service"],
@@ -251,6 +267,7 @@ def _row_to_delegate_event(row: sqlite3.Row) -> DelegateAuditEvent:
         reason=row["reason"],
         trace=row["trace"],
         payload_preview=row["payload_preview"],
+        compose_name=compose_name,
     )
 
 
@@ -342,6 +359,7 @@ class AuditLogger:
             self._conn.execute(_CREATE_DELEGATE_EVENTS_TABLE)
             _migrate_add_trigger_columns(self._conn)
             _migrate_add_principal_column(self._conn)
+            _migrate_add_compose_name_column(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -504,6 +522,7 @@ class AuditLogger:
         reason: str | None = None,
         trace: str | None = None,
         payload_preview: str = "",
+        compose_name: str | None = None,
     ) -> None:
         """Log a delegate routing event. Never raises."""
         ts = datetime.now(UTC).isoformat()
@@ -520,6 +539,7 @@ class AuditLogger:
                 scrubbed_reason,
                 trace,
                 scrubbed_preview,
+                compose_name,
             ),
             error_label="delegate event",
         )
@@ -531,6 +551,7 @@ class AuditLogger:
         target_service: str | None = None,
         status: str | None = None,
         source_run_id: str | None = None,
+        compose_name: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 1000,
@@ -543,6 +564,7 @@ class AuditLogger:
                 ("target_service = ?", target_service),
                 ("status = ?", status),
                 ("source_run_id = ?", source_run_id),
+                ("compose_name = ?", compose_name),
                 ("timestamp >= ?", since),
                 ("timestamp <= ?", until),
             ],

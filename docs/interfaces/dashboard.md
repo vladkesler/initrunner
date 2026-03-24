@@ -42,21 +42,28 @@ Action-oriented home page. When agents exist, shows:
 
 When no agents exist, shows a welcome screen with onboarding CTAs.
 
+When compose files exist, a **Compositions** card appears showing the first 3 compose projects with links to `/compose`.
+
 ### Agents (`/agents`)
 
 Card grid of all discovered roles. Each card shows the agent name, model/provider, enabled features, and description. Click a card to open the detail view.
 
 ### New Agent (`/agents/new`)
 
-Create a new agent through three modes:
+Create a new agent through four modes, presented in a 2x2 card grid:
 
 | Mode | Description |
 |------|-------------|
-| **Template** | Pick from 8 preset templates (basic, rag, daemon, memory, ollama, api, telegram, discord) |
 | **Describe** | Type a natural language description and an LLM generates the role YAML |
+| **Template** | Pick from 8 preset templates (basic, rag, daemon, memory, ollama, api, telegram, discord) |
 | **Blank** | Start from a minimal YAML skeleton |
+| **InitHub** | Search and browse packages on hub.initrunner.ai, select one to load its YAML |
+
+All modes include a provider/model selector so the generated (or loaded) YAML uses the user's preferred model. For InitHub, the bundle's original model config is replaced with the user's selection.
 
 After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
+
+InitHub packages may contain sidecar files (knowledge bases, etc.) that are not loaded into the editor. Use `initrunner install owner/name` from the CLI for full package installation with all assets.
 
 ### Agent Detail (`/agents/{id}`)
 
@@ -70,6 +77,39 @@ Split-panel layout with configuration on the left and the run panel on the right
 On narrow screens (< 1024px) the config panel collapses into a disclosure above the run panel.
 
 Streaming output uses Server-Sent Events. Tokens appear in real time as the model generates them.
+
+### Compose (`/compose`)
+
+Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. Click a card to open the detail view.
+
+### New Compose (`/compose/new`)
+
+Create a new multi-agent composition through a 3-step flow: **Configure -> Editor -> Success**.
+
+**Configure** -- pick a pattern and wire agents into slots:
+
+| Pattern | Description | Topology |
+|---------|-------------|----------|
+| **Pipeline** | Linear A -> B -> C chain | Adjustable service count (min 2) |
+| **Fan-out** | One dispatcher fans to multiple workers | Adjustable service count (min 3) |
+| **Route** | Intake routes to specialists via LLM intent sensing | Fixed 4 services (intake, researcher, responder, escalator) |
+
+Each slot can be filled with an existing agent from the dashboard's discovered roles, or left as a placeholder (a generic role is generated). Provider/model selection and shared memory toggle are available for placeholder roles.
+
+**Editor** -- review and edit the generated `compose.yaml` with live schema validation. Placeholder role YAMLs are shown in a collapsible section. Pick a save directory and project name, then save.
+
+**Success** -- shows the saved path and CLI commands to validate and run the composition.
+
+### Compose Detail (`/compose/{id}`)
+
+Split-panel layout with topology on the left and delegation events on the right.
+
+| Panel | Contents |
+|-------|----------|
+| **Topology** (340px sidebar) | Service cards showing name, role path (linked to agent detail when matched), sink summary, depends_on, restart policy. Shared memory/documents badges. Collapsible YAML viewer. |
+| **Events** (flex-1) | Table of delegation routing events filtered by `compose_name`. Columns: status (color-coded dot), source, target, time, run ID. Filter controls for source, target, and status. |
+
+Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each.
 
 ### Audit Log (`/audit`)
 
@@ -116,6 +156,17 @@ initrunner dashboard
   |      /api/builder/seed     POST  generate YAML from template/description/blank
   |      /api/builder/validate POST  validate YAML text
   |      /api/builder/save     POST  save YAML to disk
+  |      /api/builder/hub-search GET search InitHub packages
+  |      /api/builder/hub-featured GET popular InitHub packages (5-min cache)
+  |      /api/builder/hub-seed POST  load YAML from hub bundle
+  |      /api/compose          GET   list discovered compose files
+  |      /api/compose/{id}     GET   compose detail with service graph
+  |      /api/compose/{id}/yaml GET  raw compose YAML
+  |      /api/compose/{id}/events GET delegation events
+  |      /api/compose-builder/options GET patterns, agents, providers
+  |      /api/compose-builder/seed POST generate compose YAML
+  |      /api/compose-builder/validate POST schema-only validation
+  |      /api/compose-builder/save POST write compose + roles to disk
   |      /api/runs             POST  execute single run
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
@@ -178,13 +229,12 @@ The built static files are served by the FastAPI backend in production. During d
 
 ### Design System
 
-The dashboard uses a dark-only design language:
+See [Design System](design-system.md) for the full reference (colors, typography, radius rules, component patterns, animation). Key points:
 
-- **Surfaces**: Near-black zinc scale (`#09090b` base) with elevated layers
-- **Primary accent**: Orange (`oklch(0.70 0.17 45)`) for CTAs and active states
-- **Status colors**: Green (ok), amber (warn), red (fail), blue (info)
-- **Typography**: Geist (body), JetBrains Mono (data/code)
-- **Depth**: Borders only, no shadows
+- **Theme**: "Electric Charcoal" -- dark-only, warm charcoal surfaces, electric lime accent
+- **Typography**: Space Grotesk (display/body), IBM Plex Mono (data/code)
+- **Radius rule**: Sharp (0px) for containers, pill for interactive elements
+- **Tokens**: All defined in `dashboard/src/app.css`
 
 ## Security
 
@@ -253,6 +303,50 @@ Validate YAML text against the role schema.
 ```json
 {"yaml_text": "apiVersion: initrunner/v1\n..."}
 ```
+
+### `GET /api/builder/hub-search`
+
+Search InitHub for agent packages. Query parameters:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `q` | string | Search query (min 2 characters) |
+| `tag` | string | Filter by tag (repeatable) |
+
+```json
+{
+  "items": [
+    {
+      "owner": "alice",
+      "name": "code-reviewer",
+      "description": "Reviews pull requests for bugs",
+      "tags": ["code", "review"],
+      "downloads": 42,
+      "latest_version": "1.0.0"
+    }
+  ]
+}
+```
+
+Returns 502 if InitHub is unreachable.
+
+### `GET /api/builder/hub-featured`
+
+Fetch popular packages from InitHub. No parameters. Returns the same `HubSearchResponse` shape as hub-search. Results are cached server-side with a 5-minute TTL. On error, returns stale cache or empty list (never 502).
+
+### `POST /api/builder/hub-seed`
+
+Load a role YAML from an InitHub package and rewrite the model block with the user's provider/model.
+
+```json
+{
+  "ref": "alice/code-reviewer@1.0.0",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514"
+}
+```
+
+Response is the same `SeedResponse` as `/api/builder/seed`. The explanation notes any sidecar files not loaded.
 
 ### `POST /api/builder/save`
 
@@ -362,6 +456,79 @@ Returns all registered tool types.
   {"name": "http", "description": "Make HTTP requests to external APIs."}
 ]
 ```
+
+### `GET /api/compose`
+
+Returns all discovered compose definitions.
+
+```json
+[
+  {
+    "id": "f1e2d3c4b5a6",
+    "name": "support-desk",
+    "description": "Intake routes to specialists via intent sensing.",
+    "service_count": 4,
+    "service_names": ["intake", "researcher", "responder", "escalator"],
+    "path": "/home/user/support-desk/compose.yaml",
+    "error": null
+  }
+]
+```
+
+### `GET /api/compose/{id}`
+
+Returns full compose detail with service topology and agent cross-references.
+
+### `GET /api/compose/{id}/yaml`
+
+Returns raw compose YAML content.
+
+### `GET /api/compose/{id}/events`
+
+Query delegation routing events for this compose. Filters by `compose_name` in the audit DB.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `source` | string | Filter by source service |
+| `target` | string | Filter by target service |
+| `status` | string | Filter by status (delivered/dropped/filtered/error) |
+| `since` | string | ISO 8601 start time |
+| `until` | string | ISO 8601 end time |
+| `limit` | int | Max events (default 200) |
+
+### `GET /api/compose-builder/options`
+
+Returns available patterns, discovered agents (for slot assignment), provider/model options, and save directories.
+
+### `POST /api/compose-builder/seed`
+
+Generate compose YAML from a pattern and slot assignments.
+
+```json
+{
+  "pattern": "pipeline",
+  "name": "my-pipeline",
+  "services": [
+    {"slot": "step-1", "agent_id": "a1b2c3d4e5f6"},
+    {"slot": "step-2", "agent_id": null}
+  ],
+  "service_count": 2,
+  "shared_memory": false,
+  "provider": "openai"
+}
+```
+
+Response includes `compose_yaml`, `role_yamls` (placeholder roles only), `issues[]`, and `ready`.
+
+### `POST /api/compose-builder/validate`
+
+Schema-only validation of compose YAML. Does not check that role files exist on disk.
+
+### `POST /api/compose-builder/save`
+
+Write compose YAML and placeholder roles to disk. Performs full validation (compose schema + role file existence).
+
+Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `compose_id`. Returns 409 if the project directory already exists.
 
 ### `GET /api/health`
 

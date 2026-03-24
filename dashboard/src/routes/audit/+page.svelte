@@ -90,9 +90,9 @@
 <div class="space-y-5">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<h1 class="text-lg font-medium text-fg">Audit</h1>
+		<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Audit</h1>
 		{#if !loading}
-			<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">
+			<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">
 				{filteredRecords.length}
 			</span>
 		{/if}
@@ -101,31 +101,31 @@
 	<!-- Stats strip -->
 	{#if stats && !loading}
 		<div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
-				<Activity size={14} class="shrink-0 text-fg-faint" />
+			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 0ms">
+				<Activity size={14} class="shrink-0 text-accent-primary/60" />
 				<div>
-					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
+					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
 					<div class="text-[12px] text-fg-faint">runs</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
+			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 60ms">
 				<CheckCircle size={14} class="shrink-0 {stats.success_rate >= 90 ? 'text-ok' : stats.success_rate >= 70 ? 'text-warn' : 'text-fail'}" />
 				<div>
-					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
+					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
 					<div class="text-[12px] text-fg-faint">success</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
-				<Coins size={14} class="shrink-0 text-fg-faint" />
+			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 120ms">
+				<Coins size={14} class="shrink-0 text-accent-primary/60" />
 				<div>
-					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.total_tokens.toLocaleString()}</div>
+					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.total_tokens.toLocaleString()}</div>
 					<div class="text-[12px] text-fg-faint">tokens</div>
 				</div>
 			</div>
-			<div class="flex items-center gap-2.5 rounded-sm border border-edge bg-surface-1 px-3 py-2">
-				<Timer size={14} class="shrink-0 text-fg-faint" />
+			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 180ms">
+				<Timer size={14} class="shrink-0 text-accent-primary/60" />
 				<div>
-					<div class="font-mono text-[15px] font-medium text-fg" style="font-variant-numeric: tabular-nums">{stats.avg_duration_ms.toLocaleString()}ms</div>
+					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.avg_duration_ms.toLocaleString()}ms</div>
 					<div class="text-[12px] text-fg-faint">avg duration</div>
 				</div>
 			</div>
@@ -137,14 +137,14 @@
 		<input
 			bind:value={agentFilter}
 			placeholder="Filter by agent..."
-			class="max-w-[180px] rounded-sm border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
+			class="max-w-[180px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
 			onkeydown={(e) => e.key === 'Enter' && load()}
 		/>
 
 		<input
 			bind:value={triggerFilter}
 			placeholder="Trigger type..."
-			class="max-w-[140px] rounded-sm border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
+			class="max-w-[140px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
 			onkeydown={(e) => e.key === 'Enter' && load()}
 		/>
 
@@ -153,22 +153,22 @@
 			<input
 				type="date"
 				bind:value={sinceFilter}
-				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
+				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40"
 				onchange={load}
 			/>
 			<span class="text-[13px] text-fg-faint">to</span>
 			<input
 				type="date"
 				bind:value={untilFilter}
-				class="rounded-sm border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-surface-3"
+				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40"
 				onchange={load}
 			/>
 		</div>
 
 		<!-- Success filter -->
-		<div class="flex items-center gap-0.5 rounded-sm border border-edge bg-surface-1 p-0.5">
+		<div class="flex items-center gap-0.5 rounded-full border border-edge bg-surface-1 p-0.5">
 			<button
-				class="rounded-sm px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
+				class="rounded-full px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
 				class:bg-surface-2={!showFailuresOnly}
 				class:text-fg={!showFailuresOnly}
 				class:text-fg-faint={showFailuresOnly}
@@ -177,7 +177,7 @@
 				All
 			</button>
 			<button
-				class="rounded-sm px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
+				class="rounded-full px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
 				class:bg-surface-2={showFailuresOnly}
 				class:text-fg={showFailuresOnly}
 				class:text-fg-faint={!showFailuresOnly}
@@ -189,16 +189,16 @@
 
 		<div class="ml-auto flex items-center gap-2">
 			<!-- Export -->
-			<div class="flex items-center gap-0.5 rounded-sm border border-edge bg-surface-1 p-0.5">
+			<div class="flex items-center gap-0.5 border border-edge bg-surface-1 p-0.5">
 				<button
-					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="flex items-center gap-1 px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={() => exportRecords('json')}
 				>
 					<Download size={11} />
 					JSON
 				</button>
 				<button
-					class="flex items-center gap-1 rounded-sm px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="flex items-center gap-1 px-2 py-1 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={() => exportRecords('csv')}
 				>
 					<Download size={11} />
@@ -207,7 +207,7 @@
 			</div>
 
 			<button
-				class="flex items-center gap-1.5 rounded-sm border border-edge px-2.5 py-1.5 text-[13px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+				class="flex items-center gap-1.5 rounded-full border border-edge px-3 py-1.5 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-accent-primary/20"
 				onclick={load}
 				aria-label="Refresh"
 			>
@@ -219,9 +219,9 @@
 
 	<!-- Table -->
 	{#if loading}
-		<Skeleton class="h-64 rounded-sm bg-surface-1" />
+		<Skeleton class="h-64 bg-surface-1" />
 	{:else}
-		<div class="overflow-hidden rounded-sm border border-edge">
+		<div class="overflow-hidden border border-edge">
 			<AuditTable records={filteredRecords} onRowClick={(r) => (selectedRecord = r)} />
 		</div>
 	{/if}

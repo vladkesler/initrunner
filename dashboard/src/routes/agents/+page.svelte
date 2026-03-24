@@ -82,15 +82,15 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
-			<h1 class="text-lg font-medium text-fg">Agents</h1>
+			<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Agents</h1>
 			{#if !loading}
-				<span class="rounded-sm border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[13px] text-fg-faint">{agents.length}</span>
+				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">{agents.length}</span>
 			{/if}
 		</div>
 		<!-- View toggle -->
-		<div class="flex items-center gap-0.5 rounded-sm border border-edge bg-surface-1 p-0.5">
+		<div class="flex items-center gap-0.5 rounded-full border border-edge bg-surface-1 p-0.5">
 			<button
-				class="flex items-center justify-center rounded-sm p-1.5 transition-[color,background-color] duration-150"
+				class="flex items-center justify-center rounded-full p-1.5 transition-[color,background-color] duration-150"
 				class:bg-surface-2={viewMode === 'grid'}
 				class:text-fg={viewMode === 'grid'}
 				class:text-fg-faint={viewMode !== 'grid'}
@@ -100,7 +100,7 @@
 				<LayoutGrid size={14} />
 			</button>
 			<button
-				class="flex items-center justify-center rounded-sm p-1.5 transition-[color,background-color] duration-150"
+				class="flex items-center justify-center rounded-full p-1.5 transition-[color,background-color] duration-150"
 				class:bg-surface-2={viewMode === 'list'}
 				class:text-fg={viewMode === 'list'}
 				class:text-fg-faint={viewMode !== 'list'}
@@ -119,7 +119,7 @@
 			bind:this={searchEl}
 			bind:value={query}
 			placeholder="Search agents..."
-			class="w-full rounded-sm border border-edge bg-surface-1 py-2 pl-9 pr-8 font-mono text-[13px] text-fg outline-none transition-[border-color] duration-150 placeholder:text-fg-faint focus:border-surface-3"
+			class="w-full border border-edge bg-surface-1 py-2 pl-9 pr-8 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
 		/>
 		{#if query}
 			<button
@@ -137,7 +137,7 @@
 		<div class="flex flex-wrap gap-1.5">
 			{#each allTags as tag}
 				<button
-					class="rounded-sm border px-2 py-0.5 font-mono text-[13px] transition-[color,background-color,border-color] duration-150 {activeTags.has(tag) ? 'border-orange/30 bg-orange/10 text-orange' : 'border-edge bg-surface-1 text-fg-faint'}"
+					class="rounded-full border px-2.5 py-0.5 font-mono text-[12px] transition-[color,background-color,border-color] duration-150 {activeTags.has(tag) ? 'border-accent-primary/30 bg-accent-primary/10 text-accent-primary' : 'border-edge bg-surface-1 text-fg-faint'}"
 					onclick={() => toggleTag(tag)}
 				>
 					{tag}
@@ -149,7 +149,7 @@
 	{#if loading}
 		<div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
 			{#each Array(6) as _}
-				<Skeleton class="h-28 rounded-sm bg-surface-1" />
+				<Skeleton class="h-28 bg-surface-1" />
 			{/each}
 		</div>
 	{:else}
