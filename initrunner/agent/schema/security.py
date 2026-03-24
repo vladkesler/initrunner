@@ -93,9 +93,7 @@ class ContentPolicy(BaseModel):
         # (threads don't work because re holds the GIL)
         failed = _probe_regexes_safe(v)
         if failed is not None:
-            raise ValueError(
-                f"Regex pattern '{failed}' is too complex (timed out on probe input)"
-            )
+            raise ValueError(f"Regex pattern '{failed}' is too complex (timed out on probe input)")
         return v
 
 

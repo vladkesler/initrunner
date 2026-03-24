@@ -139,9 +139,10 @@ def _ensure_gi() -> None:
 
     try:
         result = subprocess.run(
-            [base_exe, "-c",
-             "import gi, pathlib; print(pathlib.Path(gi.__file__).parent.parent)"],
-            capture_output=True, text=True, timeout=5,
+            [base_exe, "-c", "import gi, pathlib; print(pathlib.Path(gi.__file__).parent.parent)"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except Exception:
         _fail_gi()
@@ -212,9 +213,7 @@ def _fail_gi() -> None:
 # -- webview helpers -----------------------------------------------------------
 
 
-def _start_webview(
-    webview: object, WebViewException: type, url: str
-) -> None:
+def _start_webview(webview: object, WebViewException: type, url: str) -> None:
     """Open the native window, suppressing pywebview's internal traceback noise."""
     import logging
 
