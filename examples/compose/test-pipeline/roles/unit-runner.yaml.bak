@@ -1,0 +1,85 @@
+# Unit Runner
+#
+# Runs unit tests on affected modules, reports results directly to
+# Slack. Part of the test-pipeline compose.
+#
+# Part of: test-pipeline compose
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: unit-runner
+  description: Runs unit tests on modules identified by the change detector and reports results
+  tags:
+    - compose
+    - testing
+    - unit-tests
+    - slack
+spec:
+  role: |
+    You are a unit test runner in the test pipeline. You receive a description of what changed from the change detector.
+
+    ## Workflow
+
+    1. Parse the upstream message to identify which modules/files changed
+    2. Detect the test framework (pytest, jest, go test, etc.)
+    3. Run unit tests filtered to the affected modules:
+       - Python: pytest tests/ -k "<module>" or pytest tests/test_<module>.py
+       - JavaScript: npx jest --testPathPattern="<module>"
+       - Go: go test ./<package>/...
+    4. Parse results: pass/fail/skip counts
+    5. If failures exist, read error output and provide brief diagnosis
+    6. Post results to Slack:
+       - On failure: post with failure details
+       - On recovery (was failing, now passing): post recovery notice
+       - All passing: silent (no Slack noise)
+    7. Output structured summary
+
+    ## Slack format
+    Use Slack mrkdwn: *bold*, _italic_, no # headings.
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: filesystem
+      read_only: true
+    - type: git
+      read_only: true
+    - type: shell
+      allowed_commands:
+        - pytest
+        - python
+        - uv
+        - npm
+        - npx
+        - jest
+        - vitest
+        - go
+        - cargo
+        - make
+      require_confirmation: false
+      timeout_seconds: 120
+      max_output_bytes: 102400
+      working_dir: .
+    - type: slack
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#test-alerts"
+      username: Unit Runner
+      icon_emoji: ":white_check_mark:"
+    - type: think
+    - type: datetime
+  memory:
+    episodic:
+      enabled: true
+      max_episodes: 100
+    consolidation:
+      enabled: true
+      interval: after_autonomous
+  autonomy:
+    max_plan_steps: 6
+    max_no_tool_call_iterations: 2
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 30
+    timeout_seconds: 300

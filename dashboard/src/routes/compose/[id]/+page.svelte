@@ -11,6 +11,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import FlowCanvas from '$lib/components/compose/FlowCanvas.svelte';
+	import RunPanel from '$lib/components/compose/RunPanel.svelte';
 	import EventsTab from '$lib/components/compose/EventsTab.svelte';
 	import ConfigPanel from '$lib/components/compose/ConfigPanel.svelte';
 	import EditorTab from '$lib/components/compose/EditorTab.svelte';
@@ -20,6 +21,7 @@
 		CheckCircle,
 		Layers,
 		AlertTriangle,
+		Play,
 		GitBranch,
 		List,
 		Settings,
@@ -39,7 +41,7 @@
 
 	// Tab persistence
 	const tabKey = $derived(`compose-tab-${composeId}`);
-	let activeTab = $state('graph');
+	let activeTab = $state('run');
 
 	const serviceNames = $derived(detail ? detail.services.map((s) => s.name) : []);
 
@@ -87,7 +89,7 @@
 		// Restore saved tab
 		try {
 			const saved = localStorage.getItem(tabKey);
-			if (saved && ['graph', 'events', 'config', 'editor'].includes(saved)) {
+			if (saved && ['run', 'graph', 'events', 'config', 'editor'].includes(saved)) {
 				activeTab = saved;
 			}
 		} catch {
@@ -228,6 +230,13 @@
 				class="w-full justify-start gap-0 border-b border-edge bg-transparent px-0"
 			>
 				<TabsTrigger
+					value="run"
+					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
+				>
+					<Play size={13} />
+					Run
+				</TabsTrigger>
+				<TabsTrigger
 					value="graph"
 					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
 				>
@@ -256,6 +265,17 @@
 					Editor
 				</TabsTrigger>
 			</TabsList>
+
+			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
+				<RunPanel {composeId} onRunCompleted={async () => {
+					const [s, e] = await Promise.allSettled([
+						fetchComposeStats(composeId),
+						fetchComposeEvents(composeId)
+					]);
+					if (s.status === 'fulfilled') stats = s.value;
+					if (e.status === 'fulfilled') events = e.value;
+				}} />
+			</TabsContent>
 
 			<TabsContent value="graph" class="min-h-0 flex-1 pt-4">
 				<div class="h-[calc(100vh-360px)] min-h-[400px]">

@@ -1,0 +1,257 @@
+<script lang="ts">
+	import type { AgentDetail } from '$lib/api/types';
+	import ConfigSection from './ConfigSection.svelte';
+	import { Copy, Check } from 'lucide-svelte';
+
+	let { detail, yaml = '' }: { detail: AgentDetail; yaml?: string } = $props();
+
+	let copied = $state(false);
+
+	const model = $derived(detail.model as { provider?: string; name?: string; temperature?: number; max_tokens?: number });
+	const guardrails = $derived(detail.guardrails as {
+		max_tokens_per_run?: number;
+		max_tool_calls?: number;
+		timeout_seconds?: number;
+		max_iterations?: number;
+	});
+	const memory = $derived(detail.memory as {
+		episodic?: { enabled?: boolean };
+		semantic?: { enabled?: boolean };
+		procedural?: { enabled?: boolean };
+		max_sessions?: number;
+	} | null);
+	const ingest = $derived(detail.ingest as {
+		sources?: string[];
+		watch?: boolean;
+		chunking?: { strategy?: string; chunk_size?: number };
+	} | null);
+	const reasoning = $derived(detail.reasoning as { pattern?: string } | null);
+	const autonomy = $derived(detail.autonomy as { max_iterations?: number; max_plan_steps?: number } | null);
+
+	async function copyYaml() {
+		await navigator.clipboard.writeText(yaml);
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
+</script>
+
+<div class="space-y-1">
+	<!-- Model (always visible, not collapsible) -->
+	<div class="pb-3">
+		<h3 class="mb-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			Model
+		</h3>
+		<div class="pl-0.5 font-mono text-[13px]">
+			<span class="text-fg-muted">{model.provider || 'unknown'}</span>
+			<span class="text-fg-faint">/</span>
+			<span class="text-fg-muted">{model.name || 'unknown'}</span>
+		</div>
+		<div class="mt-1 flex gap-4 pl-0.5 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
+			<span><span class="text-fg-faint">temp</span> <span class="text-fg-muted">{model.temperature ?? 0.1}</span></span>
+			<span><span class="text-fg-faint">max</span> <span class="text-fg-muted">{(model.max_tokens ?? 4096).toLocaleString()}</span></span>
+		</div>
+	</div>
+
+	<!-- Tools -->
+	{#if detail.tools.length > 0}
+		<ConfigSection title="Tools" count={detail.tools.length}>
+			<div class="space-y-1">
+				{#each detail.tools as tool}
+					<div class="font-mono text-[13px]">
+						<span class="text-accent-primary">{tool.type}</span>
+						<span class="ml-1.5 text-fg-muted">{tool.summary}</span>
+					</div>
+				{/each}
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Triggers -->
+	{#if detail.triggers.length > 0}
+		<ConfigSection title="Triggers" count={detail.triggers.length}>
+			<div class="space-y-1">
+				{#each detail.triggers as trigger}
+					<div class="font-mono text-[13px]">
+						<span class="text-accent-secondary">{trigger.type}</span>
+						<span class="ml-1.5 text-fg-muted">{trigger.summary}</span>
+					</div>
+				{/each}
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Guardrails (always visible) -->
+	<ConfigSection title="Guardrails">
+		<div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
+			<div>
+				<span class="text-fg-faint">max tokens</span>
+				<span class="ml-1 text-fg-muted">{(guardrails.max_tokens_per_run ?? 50000).toLocaleString()}</span>
+			</div>
+			<div>
+				<span class="text-fg-faint">timeout</span>
+				<span class="ml-1 text-fg-muted">{guardrails.timeout_seconds ?? 300}s</span>
+			</div>
+			<div>
+				<span class="text-fg-faint">tool calls</span>
+				<span class="ml-1 text-fg-muted">{guardrails.max_tool_calls ?? 20}</span>
+			</div>
+			<div>
+				<span class="text-fg-faint">iterations</span>
+				<span class="ml-1 text-fg-muted">{guardrails.max_iterations ?? 10}</span>
+			</div>
+		</div>
+	</ConfigSection>
+
+	<!-- Memory -->
+	{#if memory}
+		<ConfigSection title="Memory">
+			<div class="flex flex-wrap gap-3 font-mono text-[13px]">
+				<span class={memory.episodic?.enabled ? 'text-fg-muted' : 'text-fg-faint line-through'}>episodic</span>
+				<span class={memory.semantic?.enabled ? 'text-fg-muted' : 'text-fg-faint line-through'}>semantic</span>
+				<span class={memory.procedural?.enabled ? 'text-fg-muted' : 'text-fg-faint line-through'}>procedural</span>
+			</div>
+			{#if memory.max_sessions}
+				<div class="mt-1 font-mono text-[13px]">
+					<span class="text-fg-faint">max sessions</span>
+					<span class="ml-1 text-fg-muted">{memory.max_sessions}</span>
+				</div>
+			{/if}
+		</ConfigSection>
+	{/if}
+
+	<!-- Ingestion -->
+	{#if ingest}
+		<ConfigSection title="Ingestion">
+			<div class="space-y-1 font-mono text-[13px]">
+				{#if ingest.sources}
+					<div>
+						<span class="text-fg-faint">sources</span>
+						<span class="ml-1 text-fg-muted">{ingest.sources.join(', ')}</span>
+					</div>
+				{/if}
+				{#if ingest.chunking}
+					<div>
+						<span class="text-fg-faint">chunking</span>
+						<span class="ml-1 text-fg-muted">{ingest.chunking.strategy} / {ingest.chunking.chunk_size}</span>
+					</div>
+				{/if}
+				<div>
+					<span class="text-fg-faint">watch</span>
+					<span class="ml-1 text-fg-muted">{ingest.watch ? 'on' : 'off'}</span>
+				</div>
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Skills -->
+	{#if detail.skills.length > 0}
+		<ConfigSection title="Skills" count={detail.skills.length}>
+			<div class="flex flex-wrap gap-1.5">
+				{#each detail.skills as skill}
+					<span class="font-mono text-[13px] text-fg-muted">{skill}</span>
+				{/each}
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Sinks -->
+	{#if detail.sinks.length > 0}
+		<ConfigSection title="Sinks" count={detail.sinks.length}>
+			<div class="space-y-1">
+				{#each detail.sinks as sink}
+					<div class="font-mono text-[13px]">
+						<span class="text-accent-primary">{sink.type}</span>
+						<span class="ml-1.5 text-fg-muted">{sink.summary}</span>
+					</div>
+				{/each}
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Reasoning -->
+	{#if reasoning}
+		<ConfigSection title="Reasoning">
+			<div class="font-mono text-[13px]">
+				<span class="text-fg-faint">pattern</span>
+				<span class="ml-1 text-fg-muted">{reasoning.pattern ?? 'react'}</span>
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Autonomy -->
+	{#if autonomy}
+		<ConfigSection title="Autonomy">
+			<div class="flex gap-4 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
+				<span>
+					<span class="text-fg-faint">max iter</span>
+					<span class="ml-1 text-fg-muted">{autonomy.max_iterations ?? 10}</span>
+				</span>
+				<span>
+					<span class="text-fg-faint">plan steps</span>
+					<span class="ml-1 text-fg-muted">{autonomy.max_plan_steps ?? 20}</span>
+				</span>
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- Metadata (if any) -->
+	{#if detail.author || detail.team || detail.version || detail.tags.length > 0}
+		<ConfigSection title="Metadata" defaultOpen={false}>
+			<div class="space-y-1 font-mono text-[13px]">
+				{#if detail.author}
+					<div>
+						<span class="text-fg-faint">author</span>
+						<span class="ml-1 text-fg-muted">{detail.author}</span>
+					</div>
+				{/if}
+				{#if detail.team}
+					<div>
+						<span class="text-fg-faint">team</span>
+						<span class="ml-1 text-fg-muted">{detail.team}</span>
+					</div>
+				{/if}
+				{#if detail.version}
+					<div>
+						<span class="text-fg-faint">version</span>
+						<span class="ml-1 text-fg-muted">{detail.version}</span>
+					</div>
+				{/if}
+				{#if detail.tags.length > 0}
+					<div>
+						<span class="text-fg-faint">tags</span>
+						<span class="ml-1 text-fg-muted">{detail.tags.join(', ')}</span>
+					</div>
+				{/if}
+				<div>
+					<span class="text-fg-faint">path</span>
+					<span class="ml-1 text-fg-muted">{detail.path}</span>
+				</div>
+			</div>
+		</ConfigSection>
+	{/if}
+
+	<!-- YAML (collapsed by default) -->
+	{#if yaml}
+		<ConfigSection title="YAML" defaultOpen={false}>
+			<div class="overflow-hidden border border-edge">
+				<div class="flex items-center justify-between border-b border-edge bg-surface-0 px-3 py-1.5">
+					<span class="font-mono text-[13px] text-fg-faint">{detail.path.split('/').pop()}</span>
+					<button
+						class="flex items-center gap-1.5 text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
+						onclick={copyYaml}
+						aria-label="Copy YAML"
+					>
+						{#if copied}
+							<Check size={14} class="text-ok" />
+							<span class="text-ok">Copied</span>
+						{:else}
+							<Copy size={14} />
+							<span>Copy</span>
+						{/if}
+					</button>
+				</div>
+				<pre class="max-h-[400px] overflow-auto bg-surface-0 p-4 font-mono text-[13px] leading-relaxed text-fg-muted">{yaml}</pre>
+			</div>
+		</ConfigSection>
+	{/if}
+</div>

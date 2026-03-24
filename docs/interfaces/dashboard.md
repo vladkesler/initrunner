@@ -107,13 +107,14 @@ Each slot can be filled with an existing agent from the dashboard's discovered r
 
 ### Compose Detail (`/compose/{id}`)
 
-Tabbed detail page with a stats bar and four tabs.
+Tabbed detail page with a stats bar and five tabs.
 
 **Stats bar** (4 cards): total events, delivery rate %, service count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
 
 | Tab | Contents |
 |-----|----------|
-| **Graph** (default) | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
+| **Run** (default) | Chat interface for running prompts through the pipeline. The entry service (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Service-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal service shows output directly, fan-out shows per-service trace expanded. Collapsible pipeline trace under each response shows per-service name, duration, tokens, and output preview. Message history scoped to entry service for multi-turn conversations. |
+| **Graph** | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
 | **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
 | **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. Shared memory/documents badges. |
 | **Editor** | YAML editor with debounced schema validation, in-place save, reset, and copy. Warns when `metadata.name` changes (splits event history). |
@@ -174,6 +175,7 @@ initrunner dashboard
   |      /api/compose/{id}/events GET delegation events
   |      /api/compose/{id}/stats  GET compose event statistics
   |      /api/compose/{id}/yaml   PUT save edited compose YAML
+  |      /api/compose/{id}/run/stream POST streaming compose run (SSE)
   |      /api/compose-builder/options GET patterns, agents, providers
   |      /api/compose-builder/seed POST generate compose YAML
   |      /api/compose-builder/validate POST schema-only validation
@@ -561,6 +563,20 @@ Save edited compose YAML in place. Validates against the compose schema before w
 ```
 
 Returns `{ path, valid, issues[] }`.
+
+### `POST /api/compose/{id}/run/stream`
+
+Run a single prompt through the compose pipeline via SSE. Uses the real orchestrator wiring (shared memory, delegate sinks, routing strategies) in one-shot mode -- triggers and non-delegate role sinks are suppressed.
+
+```json
+{ "prompt": "Analyze this email...", "message_history": null }
+```
+
+SSE events:
+- `service_start` -- service name about to execute
+- `service_complete` -- per-service result (name, output preview, duration, tokens, success)
+- `result` -- final `ComposeRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, and entry service `message_history`
+- `error` -- error string
 
 ### `GET /api/compose-builder/options`
 

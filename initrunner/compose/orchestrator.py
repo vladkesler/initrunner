@@ -6,7 +6,9 @@ import asyncio
 import concurrent.futures
 import queue
 import threading
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic_ai import Agent
@@ -14,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from initrunner._log import get_logger
-from initrunner.agent.executor import execute_run
+from initrunner.agent.executor import RunResult, execute_run
 from initrunner.agent.loader import _load_dotenv, build_agent, load_and_build, load_role
 from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
@@ -80,6 +82,37 @@ def apply_shared_documents(
         )
 
 
+@dataclass
+class ServiceStepResult:
+    """Per-service result from a ``run_once`` execution."""
+
+    service_name: str
+    output: str = ""
+    tokens_in: int = 0
+    tokens_out: int = 0
+    duration_ms: int = 0
+    tool_calls: int = 0
+    tool_call_names: list[str] = field(default_factory=list)
+    success: bool = True
+    error: str | None = None
+
+
+@dataclass
+class ComposeRunResult:
+    """Aggregate result from a ``run_once`` execution."""
+
+    output: str
+    output_mode: str  # "single" | "multiple" | "none"
+    final_service_name: str | None
+    steps: list[ServiceStepResult] = field(default_factory=list)
+    entry_messages: list | None = None
+    total_tokens_in: int = 0
+    total_tokens_out: int = 0
+    total_duration_ms: int = 0
+    success: bool = True
+    error: str | None = None
+
+
 class ComposeService:
     """Wraps a single service within a compose orchestration."""
 
@@ -112,6 +145,12 @@ class ComposeService:
         self._run_count = 0
         self._error_count = 0
         self._shutdown_grace_seconds = shutdown_grace_seconds
+
+        # run_once support
+        self._last_result: RunResult | None = None
+        self._last_messages: list | None = None
+        self._on_start: Callable | None = None
+        self._on_complete: Callable | None = None
 
         # Async internals (set when scheduled on a shared loop)
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -158,11 +197,15 @@ class ComposeService:
         *,
         trigger_type: str | None = None,
         trigger_metadata: dict[str, str] | None = None,
+        message_history: list | None = None,
     ) -> None:
         """Execute a prompt and dispatch results to sinks."""
         with self._execution_lock:
             with self._counter_lock:
                 self._run_count += 1
+
+            if self._on_start is not None:
+                self._on_start(self.name)
 
             from initrunner.observability import extract_trace_context
 
@@ -174,11 +217,12 @@ class ComposeService:
                 ctx_token = context.attach(parent_ctx)
 
             try:
-                result, _ = execute_run(
+                result, new_messages = execute_run(
                     self.agent,
                     self.role,
                     prompt,
                     audit_logger=self.audit_logger,
+                    message_history=message_history,
                     trigger_type=trigger_type,
                     trigger_metadata=trigger_metadata or {},
                 )
@@ -187,6 +231,9 @@ class ComposeService:
                     from opentelemetry import context
 
                     context.detach(ctx_token)
+
+            self._last_result = result
+            self._last_messages = new_messages
 
             if not result.success:
                 with self._counter_lock:
@@ -202,6 +249,9 @@ class ComposeService:
                 trigger_type=trigger_type or "delegate",
                 trigger_metadata=trigger_metadata,
             )
+
+            if self._on_complete is not None:
+                self._on_complete(self.name, result)
 
     def _on_trigger(self, event: TriggerEvent) -> None:
         """Callback for trigger-driven execution.
@@ -270,8 +320,9 @@ class ComposeService:
                     executor,
                     lambda e=event: self._handle_prompt(
                         e.prompt,
-                        trigger_type="delegate",
+                        trigger_type=e.trigger_type,
                         trigger_metadata=e.metadata,
+                        message_history=e.message_history,
                     ),
                 )
         finally:
@@ -305,8 +356,9 @@ class ComposeService:
                 )
                 self._handle_prompt(
                     event.prompt,
-                    trigger_type="delegate",
+                    trigger_type=event.trigger_type,
                     trigger_metadata=event.metadata,
+                    message_history=event.message_history,
                 )
         finally:
             if self._trigger_dispatcher is not None:
@@ -398,8 +450,14 @@ class ComposeOrchestrator:
     def services(self) -> dict[str, ComposeService]:
         return dict(self._services)
 
-    def _build_services(self) -> None:
-        """Load roles and create ComposeService instances."""
+    def _build_services(self, *, one_shot: bool = False) -> None:
+        """Load roles and create ComposeService instances.
+
+        When *one_shot* is True, triggers and non-delegate role sinks are
+        suppressed.  This prevents dashboard runs from firing real webhooks
+        or file-write sinks while still preserving shared memory/documents
+        and delegate wiring.
+        """
         shared_mem = self._compose.spec.shared_memory
         shared_doc = self._compose.spec.shared_documents
         shared_mem_path: str | None = None
@@ -447,15 +505,17 @@ class ComposeOrchestrator:
                     audit_logger=self._audit_logger,
                 )
 
-                # Build triggers from role definition
-                if role.spec.triggers:
+                # Build triggers from role definition (skip in one_shot mode)
+                if not one_shot and role.spec.triggers:
                     dispatcher = TriggerDispatcher(role.spec.triggers, service._on_trigger)
                     service.set_trigger_dispatcher(dispatcher)
 
                 # Build role sinks: always when no compose sink (daemon parity),
                 # or when delegate sink explicitly keeps existing sinks.
-                should_build_role_sinks = (config.sink is None) or (
-                    config.sink is not None and config.sink.keep_existing_sinks
+                # In one_shot mode, skip entirely to avoid firing webhooks/file sinks.
+                should_build_role_sinks = not one_shot and (
+                    (config.sink is None)
+                    or (config.sink is not None and config.sink.keep_existing_sinks)
                 )
                 if should_build_role_sinks and role.spec.sinks:
                     role_dir = role_path.parent
@@ -641,11 +701,7 @@ class ComposeOrchestrator:
         self._stop_loop()
 
         # Flush remaining audit events from delegate sinks
-        for sink in self._delegate_sinks:
-            sink.close()
-        # Close router sinks (which close their wrapped delegate sinks)
-        for router in self._router_sinks:
-            router.close()
+        self._cleanup_delegates()
 
     def delegate_health(self) -> list[dict]:
         """Return per-sink delegate routing health info."""
@@ -663,6 +719,188 @@ class ComposeOrchestrator:
             }
             for sink in all_delegate_sinks
         ]
+
+    def _cleanup_delegates(self) -> None:
+        """Flush and close all delegate sinks."""
+        for sink in self._delegate_sinks:
+            sink.close()
+        for router in self._router_sinks:
+            router.close()
+
+    def _find_entry(self, entry_service: str | None = None) -> ComposeService:
+        """Identify the entry service (first with no incoming sink targets)."""
+        if entry_service is not None:
+            if entry_service not in self._services:
+                raise ValueError(f"Entry service '{entry_service}' not found")
+            return self._services[entry_service]
+
+        # Build set of services that are targeted by some other service's sink
+        targeted: set[str] = set()
+        for config in self._compose.spec.services.values():
+            if config.sink is not None:
+                raw = config.sink.target
+                targets = raw if isinstance(raw, list) else [raw]
+                targeted.update(targets)
+
+        # First service in topological order not in the targeted set
+        for tier in self._topological_order():
+            for name in tier:
+                if name not in targeted and name in self._services:
+                    return self._services[name]
+
+        # Fallback: first service in topological order
+        for tier in self._topological_order():
+            for name in tier:
+                if name in self._services:
+                    return self._services[name]
+
+        raise RuntimeError("No services available")
+
+    def run_once(
+        self,
+        prompt: str,
+        *,
+        entry_service: str | None = None,
+        message_history: list | None = None,
+        timeout_seconds: float = 300,
+        on_service_start: Callable[[str], None] | None = None,
+        on_service_complete: Callable[[str, RunResult], None] | None = None,
+    ) -> ComposeRunResult:
+        """Run a single prompt through the compose chain synchronously.
+
+        Builds services in one_shot mode (no triggers, no role sinks),
+        wires delegates, then walks the delegation chain via synchronous BFS.
+        """
+        import time as _time
+
+        t0 = _time.monotonic()
+
+        self._build_services(one_shot=True)
+        self._wire_delegates()
+
+        # Install callbacks
+        for svc in self._services.values():
+            svc._on_start = on_service_start
+            svc._on_complete = on_service_complete
+
+        entry = self._find_entry(entry_service)
+
+        # Run entry service synchronously
+        entry._handle_prompt(
+            prompt,
+            message_history=message_history,
+            trigger_type="dashboard",
+        )
+
+        # BFS drain: _handle_prompt is sync, DelegateSink.send() is sync,
+        # so after each call returns all delegate events are in target queues.
+        timed_out = False
+        changed = True
+        while changed:
+            if _time.monotonic() - t0 > timeout_seconds:
+                timed_out = True
+                break
+            changed = False
+            for svc in self._services.values():
+                while not svc.inbox.empty():
+                    if _time.monotonic() - t0 > timeout_seconds:
+                        timed_out = True
+                        changed = False
+                        break
+                    event = svc.inbox.get_nowait()
+                    svc._handle_prompt(
+                        event.prompt,
+                        trigger_type=event.trigger_type,
+                        trigger_metadata=event.metadata,
+                        message_history=event.message_history,
+                    )
+                    changed = True
+                if timed_out:
+                    break
+
+        # Flush delegate audit events
+        self._cleanup_delegates()
+
+        total_ms = int((_time.monotonic() - t0) * 1000)
+        return self._collect_results(entry, total_ms, timed_out=timed_out)
+
+    def _collect_results(
+        self,
+        entry: ComposeService,
+        total_duration_ms: int,
+        *,
+        timed_out: bool = False,
+    ) -> ComposeRunResult:
+        """Collect per-service results into a ComposeRunResult."""
+        steps: list[ServiceStepResult] = []
+        total_in = 0
+        total_out = 0
+
+        # Determine terminal services (ran and have no delegate sink targets)
+        terminal_names: set[str] = set()
+        for name, config in self._compose.spec.services.items():
+            svc = self._services.get(name)
+            if svc is None or svc._last_result is None:
+                continue
+            has_delegate_targets = config.sink is not None and config.sink.target
+            if not has_delegate_targets:
+                terminal_names.add(name)
+
+        for name, svc in self._services.items():
+            r = svc._last_result
+            if r is None:
+                continue
+            steps.append(
+                ServiceStepResult(
+                    service_name=name,
+                    output=r.output,
+                    tokens_in=r.tokens_in,
+                    tokens_out=r.tokens_out,
+                    duration_ms=r.duration_ms,
+                    tool_calls=r.tool_calls,
+                    tool_call_names=list(r.tool_call_names),
+                    success=r.success,
+                    error=r.error,
+                )
+            )
+            total_in += r.tokens_in
+            total_out += r.tokens_out
+
+        # Determine output mode from terminal services
+        terminal_steps = [s for s in steps if s.service_name in terminal_names]
+        if len(terminal_steps) == 1:
+            output_mode = "single"
+            final_name = terminal_steps[0].service_name
+            output = terminal_steps[0].output
+        elif len(terminal_steps) > 1:
+            output_mode = "multiple"
+            final_name = None
+            output = "\n\n".join(
+                f"**{s.service_name}**\n{s.output}" for s in terminal_steps if s.output
+            )
+        else:
+            output_mode = "none"
+            final_name = None
+            output = ""
+
+        error = None
+        if timed_out:
+            error = f"Pipeline timed out after {total_duration_ms}ms"
+        elif any(not s.success for s in steps):
+            error = next((s.error for s in steps if s.error), None)
+
+        return ComposeRunResult(
+            output=output,
+            output_mode=output_mode,
+            final_service_name=final_name,
+            steps=steps,
+            entry_messages=entry._last_messages,
+            total_tokens_in=total_in,
+            total_tokens_out=total_out,
+            total_duration_ms=total_duration_ms,
+            success=not timed_out and all(s.success for s in steps),
+            error=error,
+        )
 
     def __enter__(self) -> ComposeOrchestrator:
         self.start()

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.responses import StreamingResponse
 
 from initrunner.dashboard.deps import (
     ComposeCache,
@@ -17,6 +18,7 @@ from initrunner.dashboard.deps import (
 )
 from initrunner.dashboard.schemas import (
     ComposeDetail,
+    ComposeRunRequest,
     ComposeServiceDetail,
     ComposeStatsResponse,
     ComposeSummary,
@@ -253,6 +255,42 @@ async def save_compose_yaml(
         path=str(path),
         valid=True,
         issues=[i.message for i in issues if i.severity == "warning"],
+    )
+
+
+@router.post("/{compose_id}/run/stream")
+async def stream_compose_run(
+    compose_id: str,
+    req: ComposeRunRequest,
+    compose_cache: Annotated[ComposeCache, Depends(get_compose_cache)],
+) -> StreamingResponse:
+    dc = compose_cache.get(compose_id)
+    if dc is None:
+        raise HTTPException(status_code=404, detail="Compose not found")
+    if dc.error or dc.compose is None:
+        raise HTTPException(status_code=422, detail=dc.error or "Invalid compose file")
+
+    message_history = None
+    if req.message_history:
+        from initrunner.dashboard.routers.runs import _parse_message_history
+
+        message_history = _parse_message_history(req.message_history)
+
+    from initrunner.dashboard.streaming import stream_compose_run_sse
+
+    return StreamingResponse(
+        stream_compose_run_sse(
+            dc.compose,
+            dc.path.parent,
+            req.prompt,
+            message_history=message_history,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

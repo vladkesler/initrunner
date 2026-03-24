@@ -62,11 +62,22 @@ export interface RunResponse {
 	message_history?: string | null;
 }
 
+/** Fields ConversationThread actually renders from a run result. */
+export interface ThreadResultMeta {
+	tokens_in: number;
+	tokens_out: number;
+	duration_ms: number;
+	tool_calls: number;
+	tool_call_names: string[];
+	success: boolean;
+	error: string | null;
+}
+
 export interface ThreadMessage {
 	role: 'user' | 'assistant';
 	content: string;
 	status: 'complete' | 'streaming' | 'interrupted' | 'error';
-	result?: RunResponse | null;
+	result?: ThreadResultMeta | null;
 	error?: string | null;
 }
 
@@ -202,6 +213,41 @@ export interface DelegateEvent {
 	reason: string | null;
 	trace: string | null;
 	payload_preview: string;
+}
+
+export interface ServiceStepResponse {
+	service_name: string;
+	output: string;
+	tokens_in: number;
+	tokens_out: number;
+	duration_ms: number;
+	tool_calls: number;
+	tool_call_names: string[];
+	success: boolean;
+	error: string | null;
+}
+
+export interface ComposeRunResponse {
+	output: string;
+	output_mode: 'single' | 'multiple' | 'none';
+	final_service_name: string | null;
+	steps: ServiceStepResponse[];
+	tokens_in: number;
+	tokens_out: number;
+	total_tokens: number;
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+	message_history: string | null;
+}
+
+export interface ComposeThreadMessage {
+	role: 'user' | 'assistant';
+	content: string;
+	status: 'complete' | 'streaming' | 'interrupted' | 'error';
+	activeService?: string | null;
+	result?: ComposeRunResponse | null;
+	error?: string | null;
 }
 
 export interface ComposeStats {

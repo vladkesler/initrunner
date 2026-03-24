@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from initrunner.audit.logger import AuditLogger
+    from initrunner.compose.orchestrator import ComposeRunResult
     from initrunner.compose.schema import ComposeDefinition
 
 
@@ -28,6 +30,33 @@ def run_compose_sync(
     from initrunner.compose.orchestrator import run_compose
 
     run_compose(compose, base_dir, audit_logger=audit_logger)
+
+
+def run_compose_once_sync(
+    compose: ComposeDefinition,
+    base_dir: Path,
+    prompt: str,
+    *,
+    message_history: list | None = None,
+    audit_logger: AuditLogger | None = None,
+    on_service_start: Callable[[str], None] | None = None,
+    on_service_complete: Callable | None = None,
+) -> ComposeRunResult:
+    """Run a single prompt through a compose pipeline (sync).
+
+    Builds services in one_shot mode (no triggers, no role sinks), wires
+    delegates, walks the delegation chain via synchronous BFS, and returns
+    per-service results.  DelegateSinks write audit events normally.
+    """
+    from initrunner.compose.orchestrator import ComposeOrchestrator
+
+    orchestrator = ComposeOrchestrator(compose, base_dir, audit_logger=audit_logger)
+    return orchestrator.run_once(
+        prompt,
+        message_history=message_history,
+        on_service_start=on_service_start,
+        on_service_complete=on_service_complete,
+    )
 
 
 # ---------------------------------------------------------------------------

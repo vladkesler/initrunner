@@ -344,6 +344,37 @@ class ComposeStatsResponse(BaseModel):
     by_status: dict[str, int] = Field(default_factory=dict)
 
 
+class ComposeRunRequest(BaseModel):
+    prompt: str
+    message_history: str | None = None
+
+
+class ServiceStepResponse(BaseModel):
+    service_name: str
+    output: str = ""
+    tokens_in: int = 0
+    tokens_out: int = 0
+    duration_ms: int = 0
+    tool_calls: int = 0
+    tool_call_names: list[str] = Field(default_factory=list)
+    success: bool = True
+    error: str | None = None
+
+
+class ComposeRunResponse(BaseModel):
+    output: str = ""
+    output_mode: str = "none"
+    final_service_name: str | None = None
+    steps: list[ServiceStepResponse] = Field(default_factory=list)
+    tokens_in: int = 0
+    tokens_out: int = 0
+    total_tokens: int = 0
+    duration_ms: int = 0
+    success: bool = True
+    error: str | None = None
+    message_history: str | None = None
+
+
 class ComposeYamlSaveRequest(BaseModel):
     yaml_text: str
 

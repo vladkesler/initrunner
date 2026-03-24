@@ -35,6 +35,8 @@ class DelegateEvent:
     metadata: dict[str, str] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     trace: list[str] = field(default_factory=list)
+    trigger_type: str = "delegate"
+    message_history: list | None = None
 
 
 class DelegateSink(SinkBase):

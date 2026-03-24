@@ -203,8 +203,8 @@
 	// ── State ─────────────────────────────────────────────────────────
 
 	const nodeTypes = { composeService: ServiceNode };
-	const initial = buildGraph(detail.services);
 	// svelte-ignore state_referenced_locally
+	const initial = buildGraph(detail.services);
 	let nodes = $state.raw<Node[]>(initial.nodes);
 	let edges = $state.raw<Edge[]>(initial.edges);
 
