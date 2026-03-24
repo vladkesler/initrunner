@@ -46,7 +46,12 @@ When compose files exist, a **Compositions** card appears showing the first 3 co
 
 ### Agents (`/agents`)
 
-Card grid of all discovered roles. Each card shows the agent name, model/provider, enabled features, and description. Click a card to open the detail view.
+Two views, toggled in the header bar:
+
+- **Flow view** (default, desktop): Interactive SvelteFlow canvas. Agents render as draggable nodes organized into category sections (Reactive, Intelligence, Skilled, Connected, Equipped, Other). Each node shows the agent name, model, description, capability glyph, and a hero icon matching its primary feature. Category labels separate the sections. Canvas supports pan, zoom, minimap, and an auto-arrange button. Node positions persist to localStorage. On mobile (< 1024px), falls back to list view automatically.
+- **List view**: Sortable table with status dot, name, description, model, and capability glyph columns.
+
+A toolbar above the canvas (or list) provides search, capability filter buttons (All, Equipped, Reactive, Intelligence, Connected, Skilled, Errored), a result count, and the view toggle. In flow view, filtering dims non-matching nodes instead of hiding them. Click any node/row to open the detail view.
 
 ### New Agent (`/agents/new`)
 

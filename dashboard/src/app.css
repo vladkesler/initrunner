@@ -131,6 +131,87 @@ body {
   border-top-color: oklch(0.91 0.20 128 / 0.30);
 }
 
+/* ── Scrollbar Hide ──────────────────────────────────────────────── */
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Card Surface — error variant ────────────────────────────────── */
+
+.card-surface-error {
+  border: 1px solid #2a2a30;
+  border-top-color: oklch(0.91 0.20 128 / 0.10);
+  border-left: 2px solid var(--color-fail);
+}
+
+.card-surface-error:hover {
+  border-top-color: oklch(0.91 0.20 128 / 0.20);
+}
+
+/* ── SvelteFlow — Electric Charcoal overrides ────────────────────── */
+
+.svelte-flow {
+  --xy-background-color: var(--color-surface-0);
+  --xy-node-border-radius: 0px;
+  --xy-minimap-background-color: var(--color-surface-1);
+  --xy-minimap-mask-background-color: oklch(0.06 0.01 260 / 0.85);
+  --xy-edge-stroke: var(--color-edge);
+  --xy-node-background-color: var(--color-surface-1);
+  --xy-node-border-color: var(--color-edge);
+  --xy-node-color: var(--color-fg);
+}
+
+.svelte-flow__background {
+  --xy-background-pattern-color: oklch(0.91 0.20 128 / 0.05);
+}
+
+.svelte-flow__minimap {
+  border: 1px solid var(--color-edge) !important;
+  border-radius: 0px !important;
+}
+
+.svelte-flow__controls {
+  border: 1px solid var(--color-edge);
+  border-radius: 0px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.svelte-flow__controls button {
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-edge);
+  color: var(--color-fg-faint);
+  width: 28px;
+  height: 28px;
+  fill: var(--color-fg-faint);
+}
+
+.svelte-flow__controls button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  fill: var(--color-fg);
+}
+
+.svelte-flow__controls button svg {
+  fill: inherit;
+}
+
+.svelte-flow__node.dimmed {
+  opacity: 0.12;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+
+.svelte-flow__node {
+  transition: opacity 200ms;
+}
+
 /* ── Noise Grain Texture ──────────────────────────────────────────── */
 
 body::after {

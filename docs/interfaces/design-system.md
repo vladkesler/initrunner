@@ -136,7 +136,22 @@ The `.card-surface` utility creates a border with a lime-tinted top edge, mimick
 }
 ```
 
-Used on: stat cards, agent cards, top-agents bars, doctor check items.
+Used on: stat cards, agent flow nodes, top-agents bars, doctor check items.
+
+### Card Surface -- Error Variant
+
+The `.card-surface-error` utility adds a red left border accent while preserving the lime top tint (dimmed). Used on agent nodes with load errors.
+
+```css
+.card-surface-error {
+  border: 1px solid #2a2a30;
+  border-top-color: oklch(0.91 0.20 128 / 0.10);
+  border-left: 2px solid var(--color-fail);
+}
+.card-surface-error:hover {
+  border-top-color: oklch(0.91 0.20 128 / 0.20);
+}
+```
 
 ### Noise Grain
 
@@ -248,6 +263,7 @@ All design tokens live in `dashboard/src/app.css`:
 - **`@theme` block** -- Tailwind CSS v4 custom theme tokens (fonts, colors, surfaces)
 - **`@theme inline` block** -- Bridge from shadcn-svelte CSS variables to Tailwind tokens
 - **`:root` block** -- shadcn-svelte CSS variable values (background, foreground, primary, etc.)
-- **Utility classes** -- `.card-surface`, `.glow-lime`, `.glow-cyan`, `.animate-fade-in-up`, `.animate-glow-pulse`
+- **Utility classes** -- `.card-surface`, `.card-surface-error`, `.glow-lime`, `.glow-cyan`, `.glow-lime-subtle`, `.scrollbar-none`, `.animate-fade-in-up`, `.animate-glow-pulse`
+- **SvelteFlow overrides** -- Custom CSS variables for dark mode canvas, minimap, controls, background dots, and node dimming (`.svelte-flow__node.dimmed`)
 
 To change the color scheme, update the `@theme` and `:root` blocks. All components reference tokens by name, not hardcoded values.
