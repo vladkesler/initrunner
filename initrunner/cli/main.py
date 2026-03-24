@@ -129,6 +129,8 @@ from initrunner.cli.chat_cmd import chat  # noqa: E402
 from initrunner.cli.dashboard_cmd import dashboard  # noqa: E402
 from initrunner.cli.desktop_cmd import desktop  # noqa: E402
 from initrunner.cli.doctor_cmd import doctor  # noqa: E402
+from initrunner.cli.eval_cmd import test  # noqa: E402
+from initrunner.cli.ingest_cmd import ingest  # noqa: E402
 from initrunner.cli.new_cmd import new  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
@@ -145,7 +147,7 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     whoami,
 )
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
-from initrunner.cli.run_cmd import ingest, run, test  # noqa: E402
+from initrunner.cli.run_cmd import run  # noqa: E402
 
 # --- Getting Started ---
 app.command(rich_help_panel="Getting Started")(chat)

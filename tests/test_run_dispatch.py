@@ -183,7 +183,7 @@ class TestTriggerHint:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", return_value=(agent_yaml, "Agent")),
-            patch("initrunner.cli.run_cmd.command_context", _ctx),
+            patch("initrunner.cli._run_agent.command_context", _ctx),
             patch("initrunner.runner.run_interactive"),
         ):
             result = runner.invoke(app, ["run", str(agent_yaml)])

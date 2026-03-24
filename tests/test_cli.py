@@ -311,7 +311,7 @@ class TestRunStreaming:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
 
@@ -319,7 +319,7 @@ class TestRunStreaming:
         mock_run_stream.assert_called_once()
         mock_run_single.assert_not_called()
 
-    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.cli._run_agent._run_formatted")
     @patch("initrunner.runner.run_single_stream")
     @patch("initrunner.agent.loader.load_and_build")
     def test_non_tty_uses_plain_text(self, mock_load, mock_run_stream, mock_formatted, tmp_path):
@@ -341,7 +341,7 @@ class TestRunStreaming:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = False
             result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
 
@@ -372,7 +372,7 @@ class TestRunStreaming:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(
                 app, ["run", str(role_file), "-p", "hello", "--no-stream", "--no-audit"]
@@ -406,7 +406,7 @@ class TestRunStreaming:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(app, ["run", str(role_file), "-p", "hi", "-i", "--no-audit"])
 
@@ -440,7 +440,7 @@ class TestRunStreaming:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(app, ["run", str(role_file), "-a", "-p", "hi", "--no-audit"])
 
@@ -463,7 +463,7 @@ class TestRunOutputFormat:
         role.spec.output = OutputConfig(type="text")
         return role
 
-    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.cli._run_agent._run_formatted")
     @patch("initrunner.agent.loader.load_and_build")
     def test_format_json_calls_run_formatted(self, mock_load, mock_formatted, tmp_path):
         """--format json should use _run_formatted with effective='json'."""
@@ -487,7 +487,7 @@ class TestRunOutputFormat:
         mock_formatted.assert_called_once()
         assert mock_formatted.call_args[0][0] == "json"
 
-    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.cli._run_agent._run_formatted")
     @patch("initrunner.agent.loader.load_and_build")
     def test_format_text_calls_run_formatted(self, mock_load, mock_formatted, tmp_path):
         """--format text should use _run_formatted with effective='text'."""
@@ -511,7 +511,7 @@ class TestRunOutputFormat:
         mock_formatted.assert_called_once()
         assert mock_formatted.call_args[0][0] == "text"
 
-    @patch("initrunner.cli.run_cmd._run_formatted")
+    @patch("initrunner.cli._run_agent._run_formatted")
     @patch("initrunner.runner.run_single_stream")
     @patch("initrunner.agent.loader.load_and_build")
     def test_format_auto_non_tty_uses_text(
@@ -530,7 +530,7 @@ class TestRunOutputFormat:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = False
             result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
 
@@ -558,7 +558,7 @@ class TestRunOutputFormat:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
 
@@ -583,7 +583,7 @@ class TestRunOutputFormat:
         role_file = tmp_path / "role.yaml"
         role_file.write_text("dummy")
 
-        with patch("initrunner.cli.run_cmd.sys") as mock_sys:
+        with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(
                 app, ["run", str(role_file), "-p", "hello", "--format", "rich", "--no-audit"]
@@ -644,7 +644,7 @@ class TestRunOutputFormat:
                 "initrunner.runner.run_single",
                 return_value=(RunResult(run_id="t", output="ok", success=True), []),
             ),
-            patch("initrunner.cli.run_cmd.sys") as mock_sys,
+            patch("initrunner.cli._run_agent.sys") as mock_sys,
         ):
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(

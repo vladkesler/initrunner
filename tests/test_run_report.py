@@ -75,7 +75,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
@@ -106,7 +106,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
@@ -137,7 +137,7 @@ class TestExportReportCLI:
         report_file = tmp_path / "report.md"
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             result = runner.invoke(
                 app,
@@ -160,7 +160,7 @@ class TestExportReportCLI:
         """--report-template without --report must error."""
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             result = runner.invoke(
                 app,
@@ -184,7 +184,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd.command_context", _mock_command_context()),
+            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:
                 mock_run.return_value = (result_obj, [])
