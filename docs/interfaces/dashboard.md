@@ -197,6 +197,35 @@ Agent runs use SSE (Server-Sent Events). The backend runs `execute_run_stream_sy
 | `result` | Full `RunResponse` with token counts, tool calls, duration |
 | `error` | Error message string |
 
+## Desktop App
+
+Open the dashboard in a native window instead of the browser. Uses the OS WebView (WebKitGTK on Linux, WebView2 on Windows, WKWebView on macOS).
+
+### Install
+
+```bash
+pip install "initrunner[desktop]"   # or: uv add "initrunner[desktop]"
+```
+
+### Usage
+
+```bash
+initrunner desktop                  # opens native window on port 8100
+initrunner desktop --port 9000      # custom port
+```
+
+If a dashboard is already running on the port (e.g. from `initrunner dashboard --no-open`), the desktop window connects to it. Otherwise, an embedded backend starts and shuts down when the window closes.
+
+### System Requirements
+
+- **macOS**: No extra packages. WKWebView ships with the OS.
+- **Windows**: No extra packages. WebView2 ships with Edge (Windows 10+).
+- **Linux**: Requires system GTK/WebKit packages. Most GNOME desktops already have them. If missing, the command prints the exact install command for your distro (apt/dnf/pacman). For example on Ubuntu/Debian:
+  ```bash
+  sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1
+  ```
+  The desktop command automatically bridges system-installed PyGObject into isolated venvs (uv, virtualenv). This works when the venv Python matches the distro Python ABI. If you use a uv-managed Python that differs from the distro version (e.g. distro ships 3.12 but venv uses 3.13), install PyGObject into the venv manually: `uv pip install PyGObject pycairo` (requires `libgirepository-2.0-dev`).
+
 ## Development
 
 For frontend hot-reload during development, run the backend and frontend separately:

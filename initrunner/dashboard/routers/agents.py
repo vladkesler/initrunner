@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -46,7 +45,7 @@ def _summary_from(role_id: str, discovered) -> AgentSummary:
 async def list_agents(
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
 ) -> list[AgentSummary]:
-    roles = await asyncio.to_thread(role_cache.refresh)
+    roles = role_cache.all()
     return [_summary_from(rid, dr) for rid, dr in roles.items()]
 
 

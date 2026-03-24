@@ -1,2 +1,2 @@
-// SPA mode -- no SSR. Required for adapter-static and future Tauri.
+// SPA mode -- no SSR. Required for adapter-static.
 export const ssr = false;

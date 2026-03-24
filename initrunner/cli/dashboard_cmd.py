@@ -45,17 +45,18 @@ def dashboard(
 
         def _open_when_ready() -> None:
             import time
+            import urllib.request
             import webbrowser
-
-            import httpx  # type: ignore[import-not-found]
 
             for _ in range(20):
                 try:
-                    r = httpx.get(f"http://localhost:{port}/api/health")
-                    if r.status_code == 200:
-                        webbrowser.open(f"http://localhost:{port}")
-                        return
-                except httpx.ConnectError:
+                    with urllib.request.urlopen(
+                        f"http://localhost:{port}/api/health", timeout=2
+                    ) as resp:
+                        if resp.status == 200:
+                            webbrowser.open(f"http://localhost:{port}")
+                            return
+                except Exception:
                     pass
                 time.sleep(0.25)
 

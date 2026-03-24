@@ -5,6 +5,7 @@
 	import AgentList from '$lib/components/agents/AgentList.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, LayoutGrid, List, X } from 'lucide-svelte';
+	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let agents = $state<AgentSummary[]>([]);
 	let loading = $state(true);
@@ -58,13 +59,12 @@
 	}
 
 	onMount(async () => {
-		const stored = localStorage.getItem('agents-view-mode');
-		if (stored === 'list' || stored === 'grid') viewMode = stored;
-
 		try {
+			const stored = safeGet('agents-view-mode');
+			if (stored === 'list' || stored === 'grid') viewMode = stored;
 			agents = await listAgents();
 		} catch {
-			// API not available
+			// API or storage not available
 		} finally {
 			loading = false;
 		}
@@ -72,7 +72,7 @@
 
 	function setViewMode(mode: 'grid' | 'list') {
 		viewMode = mode;
-		localStorage.setItem('agents-view-mode', mode);
+		safeSet('agents-view-mode', mode);
 	}
 </script>
 

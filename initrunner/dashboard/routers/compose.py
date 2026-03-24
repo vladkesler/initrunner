@@ -98,7 +98,7 @@ def _detail_from(cid: str, discovered, role_cache: RoleCache) -> ComposeDetail:
 async def list_composes(
     compose_cache: Annotated[ComposeCache, Depends(get_compose_cache)],
 ) -> list[ComposeSummary]:
-    composes = await asyncio.to_thread(compose_cache.refresh)
+    composes = compose_cache.all()
     return [_summary_from(cid, dc) for cid, dc in composes.items()]
 
 
