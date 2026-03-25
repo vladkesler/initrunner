@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 from starlette.responses import StreamingResponse
 
 from initrunner.dashboard.deps import (

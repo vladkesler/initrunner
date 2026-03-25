@@ -6,8 +6,8 @@ import asyncio
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
+from fastapi.responses import StreamingResponse  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
 from initrunner.dashboard.schemas import RunRequest, RunResponse

@@ -386,3 +386,76 @@ class TestSkipInputValidation:
         with patch("initrunner.agent.executor._validate_input_or_fail") as mock_validate:
             execute_run_stream(agent, role, "Hello", skip_input_validation=True)
             mock_validate.assert_not_called()
+
+
+class TestContentBlockedError:
+    """Tests that ContentBlockedError from capabilities produces RunResult(success=False)."""
+
+    def test_execute_run_catches_content_blocked(self):
+        from initrunner.agent.capabilities.content_guard import ContentBlockedError
+
+        agent = MagicMock()
+        agent.run_sync.side_effect = ContentBlockedError("Input matches blocked pattern")
+        role = _make_role()
+
+        result, messages = execute_run(agent, role, "Hello")
+
+        assert result.success is False
+        assert result.error == "Input matches blocked pattern"
+        assert messages == []
+
+    def test_execute_run_stream_catches_content_blocked(self):
+        from initrunner.agent.capabilities.content_guard import ContentBlockedError
+
+        agent = MagicMock()
+        agent.run_stream_sync.side_effect = ContentBlockedError("Blocked")
+        role = _make_role()
+
+        result, messages = execute_run_stream(agent, role, "Hello")
+
+        assert result.success is False
+        assert result.error == "Blocked"
+        assert messages == []
+
+    def test_content_blocked_audit_logged(self, tmp_path):
+        import sqlite3
+
+        from initrunner.agent.capabilities.content_guard import ContentBlockedError
+
+        db_path = tmp_path / "test_audit.db"
+        agent = MagicMock()
+        agent.run_sync.side_effect = ContentBlockedError("Blocked by policy")
+        role = _make_role()
+
+        with AuditLogger(db_path) as logger:
+            result, _ = execute_run(agent, role, "Hello", audit_logger=logger)
+
+        assert result.success is False
+
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute("SELECT * FROM audit_log").fetchall()
+        conn.close()
+        assert len(rows) == 1
+
+
+class TestSkipInputValidationMetadata:
+    """Tests that skip_input_validation=True passes metadata to the agent."""
+
+    def test_metadata_set_when_skip_true(self):
+        agent = _make_mock_agent()
+        role = _make_role()
+
+        execute_run(agent, role, "Hello", skip_input_validation=True)
+
+        call_kwargs = agent.run_sync.call_args.kwargs
+        assert call_kwargs.get("metadata") == {"input_validated": True}
+
+    def test_metadata_set_when_preflight_passes(self):
+        """When skip_input_validation=False and validation passes, metadata is still set."""
+        agent = _make_mock_agent()
+        role = _make_role()
+
+        execute_run(agent, role, "Hello", skip_input_validation=False)
+
+        call_kwargs = agent.run_sync.call_args.kwargs
+        assert call_kwargs.get("metadata") == {"input_validated": True}

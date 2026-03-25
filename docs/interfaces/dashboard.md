@@ -89,6 +89,8 @@ InitHub packages may contain sidecar files (knowledge bases, etc.) that are not 
 
 Header with agent name, model badge, and status indicator. A **Delete** button opens a confirmation dialog requiring the agent name. Stats bar shows runs, success rate, tokens, and avg duration.
 
+**Provider warning**: when the agent's provider SDK is not installed or its API key is missing, a warning banner appears below the header with an actionable message (e.g., install command or env var to set). The Run tab is disabled until the issue is resolved. Build errors during streaming runs are also caught and displayed inline in the conversation thread instead of leaving the UI stuck.
+
 Six tabs below the stats bar:
 
 | Tab | Contents |

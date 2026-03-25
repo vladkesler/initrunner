@@ -8,7 +8,7 @@ import os
 import re
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException  # type: ignore[import-not-found]
 
 from initrunner.dashboard.schemas import (
     ProviderResponse,

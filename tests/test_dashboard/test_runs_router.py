@@ -1,8 +1,10 @@
 """Tests for /api/runs routes."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from initrunner.agent.loader import RoleLoadError
 from initrunner.dashboard.deps import _role_id
 
 
@@ -57,3 +59,31 @@ def test_stream_run_not_found(client):
         json={"agent_id": "000000000000", "prompt": "Hello"},
     )
     assert resp.status_code == 404
+
+
+def test_stream_run_build_error_emits_sse_error(client, mock_roles):
+    """When build_agent_sync raises RoleLoadError, the SSE stream emits an error event."""
+    agent_id = _role_id(Path("/tmp/roles/agent-a.yaml"))
+
+    with patch(
+        "initrunner.services.execution.build_agent_sync",
+        side_effect=RoleLoadError(
+            "Provider 'anthropic' requires: uv pip install initrunner[anthropic]"
+        ),
+    ):
+        resp = client.post(
+            "/api/runs/stream",
+            json={"agent_id": agent_id, "prompt": "Hello"},
+        )
+
+    assert resp.status_code == 200  # SSE always starts 200
+
+    events = []
+    for line in resp.text.splitlines():
+        if line.startswith("data: "):
+            events.append(json.loads(line[6:]))
+
+    assert len(events) == 1
+    assert events[0]["type"] == "error"
+    assert "anthropic" in events[0]["data"]
+    assert "uv pip install" in events[0]["data"]

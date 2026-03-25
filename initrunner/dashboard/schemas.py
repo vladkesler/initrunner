@@ -52,9 +52,12 @@ class AgentDetail(BaseModel):
     tools: list[ItemSummary] = []
     triggers: list[ItemSummary] = []
     sinks: list[ItemSummary] = []
+    capabilities: list[ItemSummary] = []
     # simple lists
     skills: list[str] = []
     features: list[str] = []
+    # runtime readiness
+    provider_warning: str | None = None
 
 
 class RunRequest(BaseModel):

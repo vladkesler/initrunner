@@ -1,8 +1,13 @@
 """Tests for /api/agents routes."""
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
-from initrunner.dashboard.deps import _role_id
+from initrunner.agent.schema.base import ModelConfig
+from initrunner.agent.schema.guardrails import Guardrails
+from initrunner.agent.schema.output import OutputConfig
+from initrunner.dashboard.deps import _role_id, get_role_cache
+from tests.test_dashboard.conftest import MockRoleCache
 
 
 def test_list_agents(client, mock_roles):
@@ -94,3 +99,72 @@ def test_delete_agent(client, mock_roles, tmp_path):
 def test_delete_agent_not_found(client):
     resp = client.delete("/api/agents/doesnotexist")
     assert resp.status_code == 404
+
+
+def _make_detail_role(path: str, name: str, provider: str = "openai", model: str = "gpt-4o"):
+    """Create a mock DiscoveredRole with real Pydantic models for _detail_from."""
+    dr = MagicMock()
+    dr.path = Path(path)
+    dr.error = None
+    dr.role.metadata.name = name
+    dr.role.metadata.description = f"Description of {name}"
+    dr.role.metadata.tags = ["test"]
+    dr.role.metadata.author = ""
+    dr.role.metadata.team = ""
+    dr.role.metadata.version = ""
+    dr.role.spec.model = ModelConfig(provider=provider, name=model)
+    dr.role.spec.output = OutputConfig()
+    dr.role.spec.guardrails = Guardrails()
+    dr.role.spec.memory = None
+    dr.role.spec.ingest = None
+    dr.role.spec.reasoning = None
+    dr.role.spec.autonomy = None
+    dr.role.spec.tools = []
+    dr.role.spec.triggers = []
+    dr.role.spec.sinks = []
+    dr.role.spec.capabilities = []
+    dr.role.spec.skills = []
+    dr.role.spec.features = []
+    return dr
+
+
+def test_agent_detail_provider_warning_sdk_missing(client):
+    """provider_warning is populated when the provider SDK is not installed."""
+    role = _make_detail_role("/tmp/roles/agent-c.yaml", "agent-c", provider="anthropic")
+    cache = MockRoleCache([role])
+    client.app.dependency_overrides[get_role_cache] = lambda: cache
+    agent_id = _role_id(Path("/tmp/roles/agent-c.yaml"))
+
+    with (
+        patch("initrunner.agent.loader._load_dotenv"),
+        patch(
+            "initrunner._compat.require_provider",
+            side_effect=RuntimeError(
+                "Provider 'anthropic' requires: uv pip install initrunner[anthropic]"
+            ),
+        ),
+    ):
+        resp = client.get(f"/api/agents/{agent_id}/detail")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["provider_warning"] is not None
+    assert "anthropic" in data["provider_warning"]
+    assert "uv pip install" in data["provider_warning"]
+
+
+def test_agent_detail_provider_warning_none_when_ready(client, monkeypatch):
+    """provider_warning is null when provider SDK and API key are available."""
+    role = _make_detail_role("/tmp/roles/agent-d.yaml", "agent-d", provider="openai")
+    cache = MockRoleCache([role])
+    client.app.dependency_overrides[get_role_cache] = lambda: cache
+    agent_id = _role_id(Path("/tmp/roles/agent-d.yaml"))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    with patch("initrunner.agent.loader._load_dotenv"):
+        resp = client.get(f"/api/agents/{agent_id}/detail")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["provider_warning"] is None

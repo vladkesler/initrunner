@@ -45,7 +45,7 @@
 					<div class="flex flex-col gap-1.5">
 						<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">You</span>
 						<div class="border-l-2 border-accent-primary/30 bg-accent-primary/[0.03] px-4 py-2.5">
-							<pre class="whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-fg">{msg.content}</pre>
+							<pre class="select-text cursor-text whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-fg">{msg.content}</pre>
 						</div>
 					</div>
 				{:else}
@@ -59,7 +59,7 @@
 							class:glow-lime={msg.status === 'streaming'}
 						>
 							{#if msg.content}
-								<div class="whitespace-pre-wrap break-words text-[14px] leading-[1.7] text-fg">{msg.content}</div>
+								<div class="select-text cursor-text whitespace-pre-wrap break-words text-[14px] leading-[1.7] text-fg">{msg.content}</div>
 							{:else if msg.status === 'streaming'}
 								<span class="text-[13px] text-fg-faint">Thinking...</span>
 							{/if}

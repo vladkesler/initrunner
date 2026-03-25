@@ -41,11 +41,35 @@ def load_role(path: Path) -> RoleDefinition:
         role, _hits = validate_role_dict(raw)
     except (ValueError, Exception) as e:
         raise RoleLoadError(f"Validation failed for {path}:\n{e}") from e
+    validate_capability_tool_conflicts(role)
     return role
 
 
+# Capability names that conflict with InitRunner tool types.
+# These pairs provide duplicate functionality and confuse the model.
+_CAP_TOOL_CONFLICTS: dict[str, str] = {
+    "WebSearch": "search",
+    "WebFetch": "web_reader",
+    "ImageGeneration": "image_gen",
+}
+
+
+def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
+    """Raise RoleLoadError if a capability and tool provide duplicate functionality."""
+    cap_names = {s.name for s in role.spec.capabilities if hasattr(s, "name")}
+    tool_types = {t.type for t in role.spec.tools}
+    for cap_name, tool_type in _CAP_TOOL_CONFLICTS.items():
+        if cap_name in cap_names and tool_type in tool_types:
+            raise RoleLoadError(
+                f"'{cap_name}' capability and '{tool_type}' tool both provide the "
+                f"same functionality. Remove one:\n"
+                f"  - Remove the capability to use InitRunner's '{tool_type}' tool\n"
+                f"  - Remove the tool to use PydanticAI's native {cap_name} capability"
+            )
+
+
 def _build_model(model_config: ModelConfig):
-    """Build a PydanticAI model — string for standard providers, OpenAIChatModel for custom."""
+    """Build a PydanticAI model -- string for standard providers, OpenAI model for custom."""
     if not model_config.needs_custom_provider():
         env_var = model_config.api_key_env or _PROVIDER_API_KEY_ENVS.get(model_config.provider)
         if env_var and not os.environ.get(env_var):
@@ -54,9 +78,14 @@ def _build_model(model_config: ModelConfig):
                 f"  export {env_var}=your-key-here\n"
                 f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
             )
-        return model_config.to_model_string()
+        provider = model_config.provider
+        # Default OpenAI to the Responses API. It is a superset of Chat
+        # Completions and required for reasoning_effort + tools, builtin
+        # capabilities (WebSearch, ImageGeneration), and newer models.
+        if provider == "openai":
+            provider = "openai-responses"
+        return f"{provider}:{model_config.name}"
 
-    from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
 
     base_url = model_config.base_url
@@ -84,7 +113,28 @@ def _build_model(model_config: ModelConfig):
             )
 
     provider = OpenAIProvider(base_url=base_url, api_key=api_key)
+
+    from pydantic_ai.models.openai import OpenAIChatModel
+
     return OpenAIChatModel(model_config.name, provider=provider)
+
+
+def _inject_local_fallbacks(caps: list) -> None:
+    """Wire InitRunner's functions as local fallbacks for capabilities that lack them.
+
+    PydanticAI's ``WebFetch`` has no default local, and ``WebFetchTool`` is not
+    supported by any model's builtin list.  Injecting InitRunner's SSRF-protected
+    URL fetcher makes ``- WebFetch`` work seamlessly in YAML.
+    """
+    from pydantic_ai.capabilities.web_fetch import WebFetch  # type: ignore[import-not-found]
+
+    for cap in caps:
+        if isinstance(cap, WebFetch) and not cap.local:
+            from pydantic_ai.tools import Tool  # type: ignore[import-not-found]
+
+            from initrunner._html import fetch_url_as_markdown_async
+
+            cap.local = Tool(fetch_url_as_markdown_async, name="web_fetch")
 
 
 def _validate_provider(role: RoleDefinition) -> None:
@@ -163,6 +213,7 @@ def _create_agent(
     output_type: type,
     instrument: Any = None,
     prepare_tools: Any = None,
+    capabilities: list | None = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
     model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}
@@ -178,6 +229,8 @@ def _create_agent(
         kwargs["instrument"] = instrument
     if prepare_tools is not None:
         kwargs["prepare_tools"] = prepare_tools
+    if capabilities:
+        kwargs["capabilities"] = capabilities
     return Agent(_build_model(role.spec.model), **kwargs)
 
 
@@ -205,6 +258,59 @@ def build_agent(
     from initrunner.agent.tools import build_toolsets
 
     toolsets = build_toolsets(all_tools, role, role_dir=role_dir, prefer_async=prefer_async)
+
+    # PydanticAI capabilities — native NamedSpec only
+    capabilities = None
+    if role.spec.capabilities:
+        from pydantic_ai.agent.spec import (
+            load_capability_from_nested_spec,  # type: ignore[import-not-found]
+        )
+
+        caps = [
+            load_capability_from_nested_spec(s.model_dump(mode="json"))
+            for s in role.spec.capabilities
+        ]
+        capabilities = caps
+
+        # Auto-inject local fallbacks for capabilities that lack them.
+        # WebFetch has no default local in PydanticAI and WebFetchTool is not
+        # supported by any model's builtin list, so it always needs a local.
+        _inject_local_fallbacks(caps)
+
+        # Defensive: catch conflicts that slipped past load_role / dashboard validation.
+        validate_capability_tool_conflicts(role)
+
+        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
+        if "Thinking" in cap_names and role.spec.reasoning is not None:
+            logger.warning(
+                "Both a Thinking capability and spec.reasoning are declared. "
+                "Thinking controls model-level extended thinking; "
+                "spec.reasoning controls InitRunner orchestration patterns "
+                "(react, reflexion, etc.). These are orthogonal but may cause confusion.",
+            )
+        if "MCP" in cap_names and any(t.type == "mcp" for t in role.spec.tools):
+            logger.warning(
+                "Both an MCP capability and an 'mcp' tool are declared. "
+                "The MCP capability is PydanticAI's native MCP integration; "
+                "the 'mcp' tool is InitRunner's tool-registry MCP wrapper. "
+                "Both will be active -- ensure this is intentional.",
+            )
+
+    # Auto-construct guardrail capabilities from security.content config.
+    # The InputGuardCapability fires in ``before_run`` (both streaming and
+    # non-streaming) and raises ContentBlockedError to abort blocked runs.
+    content = role.spec.security.content
+    _has_input_guard = (
+        content.blocked_input_patterns
+        or content.profanity_filter
+        or content.llm_classifier_enabled
+        or content.max_prompt_length != 50_000
+    )
+    if _has_input_guard:
+        from initrunner.agent.capabilities import InputGuardCapability
+
+        auto_guard = InputGuardCapability(policy=content)
+        capabilities = [auto_guard] + (capabilities or [])
 
     # Auto-discovered skills — progressive disclosure via activate_skill tool
     auto_skill_activated: set[str] = set()
@@ -267,6 +373,7 @@ def build_agent(
         output_type,
         instrument=instrument,
         prepare_tools=prepare_tools,
+        capabilities=capabilities,
     )
 
     # Register dynamic system prompt for procedural memory injection.

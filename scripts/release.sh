@@ -22,8 +22,6 @@ fi
 if [ -d "dashboard" ] && [ -f "dashboard/package.json" ]; then
   echo "Building dashboard frontend..."
   bash scripts/build-dashboard.sh
-  # Restore .gitkeep if the build overwrote _static/
-  git checkout -- initrunner/dashboard/_static/.gitkeep 2>/dev/null || true
 fi
 
 # Read current version

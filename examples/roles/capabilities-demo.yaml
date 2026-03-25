@@ -1,0 +1,15 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: capabilities-demo
+  description: Demonstrates PydanticAI native capabilities
+  spec_version: 2
+spec:
+  role: You are a helpful research assistant with extended thinking and web search.
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+  capabilities:
+    - Thinking: high
+    - WebSearch:
+        allowed_domains: [docs.python.org, pydantic.dev]

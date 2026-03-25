@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query  # type: ignore[import-not-found]
 
 from initrunner.dashboard.schemas import AuditRecordResponse, AuditStatsResponse, TopAgentResponse
 

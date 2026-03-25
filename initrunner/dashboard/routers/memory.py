@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
 from initrunner.dashboard.schemas import (

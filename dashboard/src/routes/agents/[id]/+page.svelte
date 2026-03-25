@@ -15,6 +15,7 @@
 	import IngestTab from '$lib/components/agents/IngestTab.svelte';
 	import EditorTab from '$lib/components/agents/EditorTab.svelte';
 	import {
+		AlertTriangle,
 		ArrowLeft,
 		Activity,
 		CheckCircle,
@@ -166,6 +167,14 @@
 			</div>
 		{/if}
 
+		<!-- Provider warning -->
+		{#if detail.provider_warning}
+			<div class="flex items-start gap-2.5 border border-warn/30 bg-warn/5 px-4 py-3">
+				<AlertTriangle size={14} class="mt-0.5 shrink-0 text-warn" />
+				<span class="font-mono text-[13px] text-fg-muted">{detail.provider_warning}</span>
+			</div>
+		{/if}
+
 		<!-- Stats bar -->
 		{#if statsLoading}
 			<div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -300,7 +309,7 @@
 			</TabsList>
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
-				<RunPanel agentId={agentId} onRunCompleted={() => { runVersion++; refreshStats(); }} />
+				<RunPanel agentId={agentId} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }} />
 			</TabsContent>
 
 			<TabsContent value="history" class="min-h-0 flex-1 pt-4">

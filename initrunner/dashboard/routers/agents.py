@@ -5,12 +5,33 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
 from initrunner.dashboard.schemas import AgentDetail, AgentSummary, DeleteResponse, ItemSummary
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+
+
+def _capability_summaries(specs: list) -> list[ItemSummary]:
+    """Build dashboard summaries from capability NamedSpec entries."""
+    result = []
+    for spec in specs:
+        name = spec.name
+        args = spec.arguments
+        if args is None:
+            summary = name
+            config: dict = {}
+        elif isinstance(args, dict):
+            parts = [f"{k}={v}" for k, v in args.items()]
+            summary = f"{name}: {', '.join(parts)}"
+            config = args
+        else:
+            # tuple -- single positional arg
+            summary = f"{name}: {args[0]}"
+            config = {"value": args[0]}
+        result.append(ItemSummary(type=name, summary=summary, config=config))
+    return result
 
 
 def _summary_from(role_id: str, discovered) -> AgentSummary:
@@ -61,6 +82,25 @@ async def get_agent(
     return _summary_from(agent_id, dr)
 
 
+def _check_provider(discovered) -> str | None:
+    """Check provider SDK and API key availability, mirroring runtime."""
+    import os
+
+    from initrunner._compat import require_provider
+    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
+
+    spec = discovered.role.spec
+    _load_dotenv(discovered.path.parent)
+    try:
+        require_provider(spec.model.provider)
+    except RuntimeError as e:
+        return str(e)
+    env_var = spec.model.api_key_env or _PROVIDER_API_KEY_ENVS.get(spec.model.provider)
+    if env_var and not os.environ.get(env_var):
+        return f"API key not set. Export {env_var} or add it to ~/.initrunner/.env"
+    return None
+
+
 def _detail_from(role_id: str, discovered) -> AgentDetail:
     """Build an AgentDetail from a DiscoveredRole."""
     if discovered.error or discovered.role is None:
@@ -75,7 +115,7 @@ def _detail_from(role_id: str, discovered) -> AgentDetail:
             tags=[],
             path=str(discovered.path),
             error=discovered.error,
-            model=ModelConfig(name="unknown").model_dump(),
+            model=ModelConfig(provider="unknown", name="unknown").model_dump(),
             output=OutputConfig().model_dump(),
             guardrails=Guardrails().model_dump(),
         )
@@ -104,8 +144,10 @@ def _detail_from(role_id: str, discovered) -> AgentDetail:
         ],
         triggers=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.triggers],
         sinks=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.sinks],
+        capabilities=_capability_summaries(spec.capabilities),
         skills=list(spec.skills),
         features=list(spec.features),
+        provider_warning=_check_provider(discovered),
     )
 
 

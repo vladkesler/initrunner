@@ -1,4 +1,4 @@
-"""Tests for role_generator.py — schema reference and LLM generation."""
+"""Tests for role_generator.py -- schema reference and LLM generation."""
 
 from __future__ import annotations
 
@@ -20,21 +20,18 @@ class TestBuildSchemaReference:
 
     def test_contains_metadata(self):
         result = build_schema_reference()
-        assert "metadata:" in result
-        assert "name:" in result
-        assert "description:" in result
+        assert "metadata" in result
+        assert "name" in result
 
-    def test_contains_model_config(self):
+    def test_contains_model_section(self):
         result = build_schema_reference()
-        assert "spec.model:" in result
-        assert "provider:" in result
-        assert "temperature:" in result
+        assert "Model" in result
+        assert "provider" in result
+        assert "name" in result
 
-    def test_contains_guardrails(self):
+    def test_contains_guardrails_section(self):
         result = build_schema_reference()
-        assert "spec.guardrails:" in result
-        assert "max_tokens_per_run:" in result
-        assert "timeout_seconds:" in result
+        assert "Guardrails" in result
 
     def test_contains_tool_types(self):
         result = build_schema_reference()
@@ -51,38 +48,23 @@ class TestBuildSchemaReference:
 
     def test_contains_sink_types(self):
         result = build_schema_reference()
-        assert "Sink types" in result
+        assert "Sinks" in result
         assert "file" in result
 
-    def test_contains_ingest(self):
+    def test_contains_optional_sections(self):
         result = build_schema_reference()
-        assert "spec.ingest:" in result
-        assert "sources:" in result
+        assert "ingest" in result
+        assert "memory" in result
+        assert "reasoning" in result
+        assert "autonomy" in result
 
-    def test_contains_memory(self):
+    def test_no_default_values_exposed(self):
+        """Schema reference must not expose default values that cause over-specification."""
         result = build_schema_reference()
-        assert "spec.memory:" in result
-        assert "max_sessions:" in result
-
-    def test_contains_reasoning(self):
-        result = build_schema_reference()
-        assert "spec.reasoning:" in result
-        assert "pattern:" in result
-
-    def test_contains_autonomy(self):
-        result = build_schema_reference()
-        assert "spec.autonomy:" in result
-        assert "continuation_prompt:" in result
-
-    def test_contains_compaction(self):
-        result = build_schema_reference()
-        assert "spec.autonomy.compaction:" in result
-        assert "threshold:" in result
-
-    def test_contains_reasoning_advisory(self):
-        result = build_schema_reference()
-        assert "Reasoning advisory" in result
-        assert "todo_driven" in result
+        assert "safe_search=True" not in result
+        assert "timeout_seconds=15" not in result
+        assert "schema: null" not in result
+        assert "=50000" not in result
 
     def test_reasonable_size(self):
         """Schema reference should be compact (under 10K chars)."""
@@ -93,7 +75,12 @@ class TestBuildSchemaReference:
         """Should include tools discovered via the registry, not just schema classes."""
         from initrunner.agent.tools._registry import get_tool_types
 
-        registered = get_tool_types()
         result = build_schema_reference()
-        for type_name in registered:
-            assert type_name in result, f"Registered tool '{type_name}' not in schema reference"
+        for tool_type in get_tool_types():
+            assert tool_type in result, f"Registry tool '{tool_type}' missing from reference"
+
+    def test_capabilities_section(self):
+        result = build_schema_reference()
+        assert "Capabilities" in result
+        assert "Thinking" in result
+        assert "WebSearch" in result

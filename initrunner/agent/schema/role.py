@@ -78,6 +78,7 @@ class AgentSpec(BaseModel):
     output: OutputConfig = OutputConfig()
     tools: list[ToolConfig] = []
     skills: list[str] = []
+    capabilities: list = []
     triggers: list[TriggerConfig] = []
     sinks: list[SinkConfig] = []
     ingest: IngestConfig | None = None
@@ -108,6 +109,8 @@ class AgentSpec(BaseModel):
             out.append("sinks")
         if self.skills:
             out.append("skills")
+        if self.capabilities:
+            out.append("capabilities")
         if self.reasoning and self.reasoning.pattern != "react":
             out.append("reasoning")
         if self.autonomy:
@@ -118,6 +121,15 @@ class AgentSpec(BaseModel):
     @classmethod
     def _parse_tools(cls, v: Any) -> list:
         return parse_tool_list(v)
+
+    @field_validator("capabilities", mode="before")
+    @classmethod
+    def _parse_capabilities(cls, v: Any) -> list:
+        if not isinstance(v, list):
+            return v
+        from pydantic_ai._spec import NamedSpec  # type: ignore[import-not-found]
+
+        return [NamedSpec.model_validate(item) for item in v]
 
 
 class RequiresConfig(BaseModel):
