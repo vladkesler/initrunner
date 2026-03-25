@@ -6,7 +6,7 @@
 		validateCompose,
 		saveCompose
 	} from '$lib/api/compose';
-	import { saveKey } from '$lib/api/builder';
+	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
@@ -127,7 +127,7 @@
 		try {
 			let resolvedApiKeyEnv: string | undefined;
 			if (apiKey.trim() && isCustomEndpoint) {
-				const keyResult = await saveKey({
+				const keyResult = await saveProviderKey({
 					preset: activePreset?.name !== 'custom' ? activePreset?.name : undefined,
 					base_url: selectedProvider === 'custom' ? customBaseUrl : undefined,
 					api_key: apiKey.trim()

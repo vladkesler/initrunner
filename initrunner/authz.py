@@ -281,7 +281,9 @@ def require_cerbos() -> None:
     try:
         import cerbos.sdk  # type: ignore[import-not-found]  # noqa: F401
     except ImportError:
-        raise RuntimeError("Cerbos authorization requires: pip install initrunner[authz]") from None
+        raise RuntimeError(
+            "Cerbos authorization requires: uv pip install initrunner[authz]"
+        ) from None
 
 
 # ---------------------------------------------------------------------------

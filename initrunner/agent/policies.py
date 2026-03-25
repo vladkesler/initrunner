@@ -180,7 +180,7 @@ def _check_profanity(text: str) -> ValidationResult:
             valid=False,
             reason=(
                 "Profanity filter requires 'better-profanity'. "
-                "Install with: pip install initrunner[safety]"
+                "Install with: uv pip install initrunner[safety]"
             ),
             validator="profanity",
         )

@@ -40,7 +40,7 @@ def _search_duckduckgo(
         from ddgs import DDGS  # type: ignore[import-not-found]
     except ImportError:
         raise ImportError(
-            "ddgs is required: pip install ddgs or pip install initrunner[search]"
+            "ddgs is required: uv pip install ddgs or uv pip install initrunner[search]"
         ) from None
 
     safesearch = "moderate" if safe_search else "off"

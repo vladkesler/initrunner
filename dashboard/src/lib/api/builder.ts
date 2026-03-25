@@ -90,10 +90,6 @@ export interface SaveResult {
 	agent_id: string;
 }
 
-export interface SaveKeyResult {
-	env_var: string;
-}
-
 export interface HubSearchResult {
 	owner: string;
 	name: string;
@@ -148,17 +144,6 @@ export function saveAgent(body: {
 	force?: boolean;
 }): Promise<SaveResult> {
 	return request('/api/builder/save', {
-		method: 'POST',
-		body: JSON.stringify(body)
-	});
-}
-
-export function saveKey(body: {
-	preset?: string;
-	base_url?: string;
-	api_key: string;
-}): Promise<SaveKeyResult> {
-	return request('/api/builder/save-key', {
 		method: 'POST',
 		body: JSON.stringify(body)
 	});

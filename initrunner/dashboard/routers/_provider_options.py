@@ -146,6 +146,16 @@ async def gather_provider_options(settings: DashboardSettings) -> ProviderOption
         )
         for prov, env_var in _PROVIDER_PRIORITY
     ]
+    # Include custom presets (OpenRouter, etc.)
+    for p in CUSTOM_PRESETS:
+        if p.api_key_env:
+            prov_status.append(
+                ProviderStatus(
+                    provider=p.name,
+                    env_var=p.api_key_env,
+                    is_configured=bool(os.environ.get(p.api_key_env)),
+                )
+            )
     if ollama_models:
         prov_status.append(ProviderStatus(provider="ollama", env_var="", is_configured=True))
 

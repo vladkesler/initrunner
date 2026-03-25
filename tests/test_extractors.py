@@ -58,9 +58,9 @@ class TestExtractors:
         f.write_text("fake pdf")
         with patch(
             "initrunner._compat.require_ingest",
-            side_effect=RuntimeError("pip install initrunner[ingest]"),
+            side_effect=RuntimeError("uv pip install initrunner[ingest]"),
         ):
-            with pytest.raises(RuntimeError, match="pip install initrunner"):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner"):
                 extract_text(f)
 
     def test_docx_requires_extra(self, tmp_path):
@@ -68,9 +68,9 @@ class TestExtractors:
         f.write_text("fake docx")
         with patch(
             "initrunner._compat.require_ingest",
-            side_effect=RuntimeError("pip install initrunner[ingest]"),
+            side_effect=RuntimeError("uv pip install initrunner[ingest]"),
         ):
-            with pytest.raises(RuntimeError, match="pip install initrunner"):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner"):
                 extract_text(f)
 
     def test_xlsx_requires_extra(self, tmp_path):
@@ -78,9 +78,9 @@ class TestExtractors:
         f.write_text("fake xlsx")
         with patch(
             "initrunner._compat.require_ingest",
-            side_effect=RuntimeError("pip install initrunner[ingest]"),
+            side_effect=RuntimeError("uv pip install initrunner[ingest]"),
         ):
-            with pytest.raises(RuntimeError, match="pip install initrunner"):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner"):
                 extract_text(f)
 
 

@@ -67,7 +67,8 @@ def _do_get_youtube_transcript(
         )
     except ImportError:
         return (
-            "Error: youtube-transcript-api is required. Install with: pip install initrunner[audio]"
+            "Error: youtube-transcript-api is required."
+            " Install with: uv pip install initrunner[audio]"
         )
 
     video_id = _extract_video_id(url)

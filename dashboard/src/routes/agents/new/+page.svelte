@@ -3,7 +3,6 @@
 	import {
 		getBuilderOptions,
 		seedAgent,
-		saveKey,
 		validateYaml,
 		saveAgent,
 		hubSearch,
@@ -14,11 +13,13 @@
 		type SaveResult,
 		type HubSearchResult
 	} from '$lib/api/builder';
+	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
 	import { page } from '$app/state';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import CognitionPanel from '$lib/components/agents/CognitionPanel.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
+	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 	import {
 		ArrowLeft,
 		LayoutTemplate,
@@ -190,6 +191,18 @@
 		}
 	});
 
+	async function reloadOptions() {
+		try {
+			options = await getBuilderOptions();
+			if (options.detected_provider) {
+				selectedProvider = options.detected_provider;
+				selectedModel = options.detected_model ?? '';
+			}
+		} catch {
+			// best effort
+		}
+	}
+
 	// -- Actions --------------------------------------------------------------
 
 	function selectMode(m: Mode) {
@@ -262,7 +275,7 @@
 			// Save API key first if provided
 			let resolvedApiKeyEnv: string | undefined;
 			if (apiKey.trim() && isCustomEndpoint) {
-				const keyResult = await saveKey({
+				const keyResult = await saveProviderKey({
 					preset: activePreset?.name !== 'custom' ? activePreset?.name : undefined,
 					base_url: selectedProvider === 'custom' ? customBaseUrl : undefined,
 					api_key: apiKey.trim()
@@ -463,19 +476,12 @@
 	<!-- ============================================================ -->
 	{:else if step === 'configure'}
 		<!-- Provider warning -->
-		{#if noProviders}
-			<div class="border border-warn/30 bg-warn/5 px-4 py-3">
-				<div class="flex items-start gap-2">
-					<TriangleAlert size={14} class="mt-0.5 shrink-0 text-warn" />
-					<div>
-						<p class="text-[13px] text-fg-muted">No AI provider detected. Set an API key before creating an agent.</p>
-						<div class="mt-2 flex gap-3">
-							<a href="https://www.initrunner.ai/docs/providers" target="_blank" rel="noopener" class="text-[13px] text-accent-primary transition-[color] duration-150 hover:text-accent-primary-hover">Provider setup guide</a>
-							<a href="https://www.initrunner.ai/docs/quickstart" target="_blank" rel="noopener" class="text-[13px] text-accent-primary transition-[color] duration-150 hover:text-accent-primary-hover">Quickstart guide</a>
-						</div>
-					</div>
-				</div>
-			</div>
+		{#if noProviders && options}
+			<ProviderStatusBanner
+				providerStatus={options.provider_status}
+				detectedProvider={options.detected_provider}
+				onConfigured={reloadOptions}
+			/>
 		{/if}
 
 		<!-- Agent name -->

@@ -75,6 +75,14 @@
 			loading = false;
 		}
 	});
+
+	async function reloadProviders() {
+		try {
+			builderOptions = await getBuilderOptions();
+		} catch {
+			// best effort
+		}
+	}
 </script>
 
 <div>
@@ -100,6 +108,7 @@
 				<ProviderStatusBanner
 					providerStatus={builderOptions.provider_status}
 					detectedProvider={builderOptions.detected_provider}
+					onConfigured={reloadProviders}
 				/>
 			{/if}
 

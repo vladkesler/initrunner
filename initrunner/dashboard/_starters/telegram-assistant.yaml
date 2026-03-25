@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   Telegram bot created via @BotFather
-#   pip install initrunner[telegram]
+#   uv pip install initrunner[telegram]
 #
 # Usage:
 #   initrunner daemon role.yaml

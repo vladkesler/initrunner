@@ -23,17 +23,17 @@ class TestRequireProvider:
 
     def test_bedrock_known_provider(self):
         """bedrock should get an import hint, not 'Unknown provider'."""
-        with pytest.raises(RuntimeError, match="pip install initrunner"):
+        with pytest.raises(RuntimeError, match="uv pip install initrunner"):
             require_provider("bedrock")
 
     def test_missing_provider_gives_install_hint(self):
         # groq is unlikely to be installed in test env
-        with pytest.raises(RuntimeError, match="pip install initrunner"):
+        with pytest.raises(RuntimeError, match="uv pip install initrunner"):
             require_provider("groq")
 
 
 class TestRequireIngest:
     def test_missing_package_gives_hint(self):
         with patch("importlib.import_module", side_effect=ImportError("not installed")):
-            with pytest.raises(RuntimeError, match="pip install initrunner\\[ingest\\]"):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner\\[ingest\\]"):
                 require_ingest("pymupdf4llm")

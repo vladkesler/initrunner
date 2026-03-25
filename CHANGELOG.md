@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.42.0] - 2026-03-25
+
+### Added
+- **Dashboard provider setup** -- configure API keys directly from the dashboard. Inline key entry form on the launchpad zero-state, agent creation page, and System page.
+- **Provider management (System page)** -- full-mode provider banner shows configured providers with status dots and an "Add provider" form. Replaces the static table.
+- **`GET /api/providers/status`** -- all providers (standard + OpenRouter + Ollama) with config flags and detected provider/model.
+- **`POST /api/providers/save-key`** -- save keys for standard providers and OpenRouter. Optional key validation for OpenAI/Anthropic.
+- **CLI dashboard hint** -- "Setup Required" panel mentions `initrunner dashboard` as alternative.
+
+### Changed
+- `save-key` moved from `/api/builder/` to `/api/providers/`. All builder callers updated.
+- Provider status includes OpenRouter alongside standard providers.
+- Error messages use `uv pip install` instead of `pip install`.
+- Starter template model names updated.
+
+### Infra
+- Dashboard upgraded to Vite 8, lucide-svelte 1.0.
+- CI actions bumped to latest.
+
 ## [1.41.0] - 2026-03-25
 
 ### Added

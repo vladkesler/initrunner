@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 import time
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -26,8 +24,6 @@ from initrunner.dashboard.schemas import (
     HubSearchResponse,
     HubSearchResultResponse,
     HubSeedRequest,
-    SaveKeyRequest,
-    SaveKeyResponse,
     SaveRequest,
     SaveResponse,
     SeedRequest,
@@ -413,49 +409,6 @@ async def save_agent(
         next_steps=result.next_steps,
         agent_id=agent_id,
     )
-
-
-@router.post("/save-key")
-async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
-    from initrunner.config import get_global_env_path
-
-    # Determine env var name
-    if req.preset:
-        preset = next((p for p in CUSTOM_PRESETS if p.name == req.preset), None)
-        if preset is None or not preset.api_key_env:
-            raise HTTPException(status_code=400, detail=f"Unknown preset: {req.preset}")
-        env_name = preset.api_key_env
-    elif req.base_url:
-        host = urlparse(req.base_url).hostname or "endpoint"
-        sanitized = re.sub(r"[^A-Z0-9]", "_", host.upper()).strip("_")
-        env_name = f"INITRUNNER_{sanitized}_KEY"
-    else:
-        raise HTTPException(status_code=400, detail="Either preset or base_url is required")
-
-    # Write to ~/.initrunner/.env
-    env_path = get_global_env_path()
-    env_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def _write():
-        existing = env_path.read_text() if env_path.exists() else ""
-        lines = existing.splitlines()
-        # Update existing or append
-        updated = False
-        for i, line in enumerate(lines):
-            if line.startswith(f"{env_name}="):
-                lines[i] = f"{env_name}={req.api_key}"
-                updated = True
-                break
-        if not updated:
-            lines.append(f"{env_name}={req.api_key}")
-        env_path.write_text("\n".join(lines).strip() + "\n")
-
-    await asyncio.to_thread(_write)
-
-    # Set in current process so seed/run can use it immediately
-    os.environ[env_name] = req.api_key
-
-    return SaveKeyResponse(env_var=env_name)
 
 
 # ---------------------------------------------------------------------------
