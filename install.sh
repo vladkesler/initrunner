@@ -472,10 +472,12 @@ verify_install() {
 print_summary() {
     printf "\n"
     printf "  %bGet started:%b\n" "$BOLD" "$RESET"
-    printf "    initrunner setup\n"
-    printf "    initrunner init --name my-agent\n"
-    printf "    initrunner run role.yaml -p \"Hello!\"\n"
-    printf "    initrunner --help\n"
+    printf "    initrunner setup                     %b# configure provider & API key%b\n" "$DIM" "$RESET"
+    printf "    initrunner chat                      %b# quick chat, no setup needed%b\n" "$DIM" "$RESET"
+    printf "    initrunner new                       %b# create an agent role%b\n" "$DIM" "$RESET"
+    printf "    initrunner dashboard                 %b# web UI%b\n" "$DIM" "$RESET"
+    printf "\n"
+    printf "  %bDocs:%b https://initrunner.ai/docs\n" "$DIM" "$RESET"
     printf "\n"
 }
 
