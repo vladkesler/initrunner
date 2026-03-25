@@ -38,6 +38,12 @@ export interface TemplateSetup {
 	docs_url: string;
 }
 
+export interface ProviderStatus {
+	provider: string;
+	env_var: string;
+	is_configured: boolean;
+}
+
 export interface BuilderOptions {
 	templates: TemplateInfo[];
 	providers: ProviderModels[];
@@ -48,6 +54,19 @@ export interface BuilderOptions {
 	ollama_models: string[];
 	ollama_base_url: string;
 	template_setups: Record<string, TemplateSetup>;
+	provider_status: ProviderStatus[];
+}
+
+export interface StarterInfo {
+	slug: string;
+	name: string;
+	description: string;
+	tags: string[];
+	features: string[];
+}
+
+export interface StartersResponse {
+	starters: StarterInfo[];
 }
 
 export interface ValidationIssue {
@@ -95,10 +114,11 @@ export function getBuilderOptions(): Promise<BuilderOptions> {
 }
 
 export function seedAgent(body: {
-	mode: 'template' | 'description' | 'blank';
+	mode: 'template' | 'description' | 'blank' | 'starter';
 	name: string;
 	template?: string;
 	description?: string;
+	starter_slug?: string;
 	provider: string;
 	model?: string;
 	base_url?: string;
@@ -108,6 +128,10 @@ export function seedAgent(body: {
 		method: 'POST',
 		body: JSON.stringify(body)
 	});
+}
+
+export function getStarters(): Promise<StartersResponse> {
+	return request('/api/builder/starters');
 }
 
 export function validateYaml(yaml_text: string): Promise<SeedResult> {

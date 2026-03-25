@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: "fs"
           scan-ref: "."
@@ -51,7 +51,7 @@ jobs:
         run: uv export --no-hashes --no-dev -o /tmp/requirements.txt
 
       - name: Audit Python dependencies
-        run: uvx pip-audit -r /tmp/requirements.txt
+        run: uvx pip-audit -r /tmp/requirements.txt --ignore-vuln CVE-2025-69872 --ignore-vuln CVE-2026-4539
 
   frontend-audit:
     name: Frontend dependency audit

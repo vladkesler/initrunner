@@ -32,7 +32,19 @@ initrunner dashboard --no-open
 
 ### Launchpad (`/`)
 
-Action-oriented home page. When agents exist, shows:
+Action-oriented home page with two states.
+
+**Zero state** (no agents, composes, or teams):
+
+Onboarding surface designed to reduce time-to-first-agent:
+
+- **Provider status banner**: shows which AI providers are configured (env var presence + Ollama). When no providers are configured, shows a warning with links to the provider setup guide and the quickstart guide.
+- **Primary CTAs**: "Create an Agent" and "Read the Quickstart" (links to `https://www.initrunner.ai/docs/quickstart`).
+- **Starter template cards**: up to 6 curated single-file Agent starters from `_starters/` (helpdesk, rag-agent, memory-assistant, telegram, discord, email). Each card shows name, description, and derived feature badges (RAG, Memory, Triggers, Web, etc.). Clicking a card navigates to `/agents/new?starter={slug}`, which auto-loads the starter YAML into the editor when a provider is detected.
+- **Capability chips**: pill links to RAG, Memory, Triggers, Compose, and Teams docs/creation flows.
+- **Full documentation link**: external link to the quickstart guide.
+
+**Full state** (agents, composes, or teams exist):
 
 - **Stats strip**: total runs, success rate, total tokens, average duration
 - **Quick actions**: "New Agent", "New Compose", "New Team", and "Run Doctor" buttons
@@ -40,8 +52,6 @@ Action-oriented home page. When agents exist, shows:
 - **Top agents**: bar chart of the 5 most-used agents (by run count)
 - **Recent activity**: compact timeline of last 10 runs
 - **Orchestration**: section header grouping the Compositions and Teams cards (appears when either exists)
-
-When no agents exist, shows a welcome screen with onboarding CTAs.
 
 ### Agents (`/agents`)
 
@@ -64,6 +74,10 @@ Create a new agent through four modes, presented in a 2x2 card grid:
 | **InitHub** | Search and browse packages on hub.initrunner.ai, select one to load its YAML |
 
 All modes include a provider/model selector so the generated (or loaded) YAML uses the user's preferred model. For InitHub, the bundle's original model config is replaced with the user's selection.
+
+**Provider warning**: when no providers are configured (no API keys set and Ollama not running), a warning banner appears at the top of the configure step with links to the provider setup guide and quickstart guide.
+
+**Starter URL parameter**: navigating to `/agents/new?starter={slug}` (e.g. from a launchpad starter card) loads a starter template. When a provider is detected, it auto-loads the YAML into the editor with the detected provider/model rewritten in. When no provider is detected, it stays on the configure step with the starter intent preserved, so the user can pick a provider first.
 
 After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. A **Cognition** toggle (lime-tinted, always visible) in the toolbar opens a structured side panel for configuring reasoning patterns, autonomy, think, and todo tools without hand-editing YAML. The panel includes a link to the [reasoning docs](https://www.initrunner.ai/docs/reasoning). It reads from and writes to the YAML text using `js-yaml` (client-side parse/dump). Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
 
