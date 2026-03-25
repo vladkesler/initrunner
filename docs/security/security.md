@@ -2,6 +2,38 @@
 
 InitRunner includes a unified `SecurityPolicy` configuration surface that enforces content policies, rate limiting, tool sandboxing, and audit compliance across the execution pipeline. All security features are **optional and backward-compatible** -- existing roles without a `security:` key get safe defaults with all checks disabled.
 
+## Supply Chain Security
+
+InitRunner's CI pipeline includes automated vulnerability scanning across the full dependency surface.
+
+### Dependency Management
+
+[Dependabot](../../.github/dependabot.yml) monitors three ecosystems for known vulnerabilities and outdated packages:
+
+| Ecosystem | Scope | Schedule |
+|-----------|-------|----------|
+| `pip` | Python dependencies (`pyproject.toml`, `uv.lock`) | Weekly |
+| `npm` | Dashboard frontend (`dashboard/pnpm-lock.yaml`) | Weekly |
+| `github-actions` | CI workflow actions | Weekly |
+
+Related packages are grouped (pydantic, AI providers, svelte, tailwind) so updates arrive as single PRs rather than one per package.
+
+### Vulnerability Scanning
+
+A dedicated [Security workflow](../../.github/workflows/security.yml) runs on PRs that touch dependency files, on a weekly schedule, and on manual dispatch:
+
+- **Trivy repository scan** -- detects CVEs in `uv.lock` and `pnpm-lock.yaml`, plus Dockerfile misconfigurations. CRITICAL and HIGH severity findings are uploaded as SARIF to the GitHub Security tab.
+- **pip-audit** -- audits Python dependencies against the PyPI advisory database.
+- **pnpm audit** -- audits frontend dependencies against the npm advisory database.
+
+### Container Image Scanning
+
+The [Docker publish workflow](../../.github/workflows/docker-publish.yml) runs a post-publish Trivy scan of the container image, detecting OS-level CVEs in the base image and installed packages. Results appear in the GitHub Security tab under the `trivy-image` category.
+
+### Branch Protection
+
+The `main` branch is protected with rulesets requiring pull requests, passing status checks (`lint`, `test`), and blocking force pushes and deletions.
+
 ## Quick Start
 
 Add a `security:` block to your `role.yaml`:
