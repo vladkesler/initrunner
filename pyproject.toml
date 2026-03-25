@@ -91,6 +91,9 @@ dev = [
 [tool.hatch.version]
 path = "initrunner/__init__.py"
 
+[tool.hatch.build]
+artifacts = ["initrunner/dashboard/_static/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["initrunner"]
 

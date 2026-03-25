@@ -42,6 +42,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: dashboard/pnpm-lock.yaml
+      - name: Build dashboard frontend
+        run: bash scripts/build-dashboard.sh
+
       - name: Verify tag matches package version
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"

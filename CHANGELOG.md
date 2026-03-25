@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.40.4] - 2026-03-25
+
+### Fixed
+- Dashboard returns 404 after install from PyPI -- static assets were excluded from wheel due to gitignore. Added hatch `artifacts` config and dashboard build step to CI
+
 ## [1.40.3] - 2026-03-25
 
 ## [1.40.2] - 2026-03-25

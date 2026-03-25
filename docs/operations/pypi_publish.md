@@ -27,7 +27,7 @@ Triggered when a `v*` tag is pushed to the repository. The pipeline runs five jo
 
 1. **Lint** — Ruff check, Ruff format check, and ty type check on Python 3.13.
 2. **Test** — `pytest tests/ -v` across Python 3.11, 3.12, and 3.13. All three must pass.
-3. **Build** — Verifies the git tag matches the installed package version, then runs `uv build` and uploads the sdist and wheel as artifacts.
+3. **Build** — Installs pnpm/Node.js and builds the dashboard frontend (`scripts/build-dashboard.sh`), then verifies the git tag matches the installed package version, runs `uv build`, and uploads the sdist and wheel as artifacts. The `[tool.hatch.build] artifacts` config in `pyproject.toml` ensures the gitignored `_static/` build output is included in the wheel.
 4. **Publish** — Downloads the build artifacts and publishes to PyPI via OIDC using `pypa/gh-action-pypi-publish`. Runs in the `pypi` environment.
 5. **GitHub Release** — Extracts release notes from `CHANGELOG.md` for the tagged version, creates a GitHub Release, and attaches the dist artifacts.
 
@@ -39,12 +39,13 @@ Triggered manually via GitHub Actions workflow dispatch. Used to validate packag
 
 1. **Lint** — Same checks as production (Ruff + ty).
 2. **Test** — Same Python matrix (3.11, 3.12, 3.13).
-3. **Build** — Enforces that the package version contains a pre-release suffix (`rc`, `a`, `b`, or `dev`). Rejects stable versions to prevent accidental TestPyPI pollution. Then runs `uv build`.
+3. **Build** — Builds the dashboard frontend, then enforces that the package version contains a pre-release suffix (`rc`, `a`, `b`, or `dev`). Rejects stable versions to prevent accidental TestPyPI pollution. Then runs `uv build`.
 4. **Publish** — Uploads to `https://test.pypi.org/legacy/` via OIDC. Runs in the `testpypi` environment.
-5. **Verify Install** — After a 30-second index delay, downloads the published wheel from TestPyPI, installs it with all extras (`ingest`), and runs smoke tests across Python 3.11, 3.12, and 3.13:
+5. **Verify Install** — After a 30-second index delay, downloads the published wheel from TestPyPI, installs it with extras (`ingest,dashboard`), and runs smoke tests across Python 3.11, 3.12, and 3.13:
    - CLI: `initrunner --version` and `initrunner --help`
    - Core imports: `initrunner`, `initrunner.agent`, `initrunner.cli`, `initrunner.runner`
    - Extra imports: `initrunner.ingestion`
+   - Dashboard assets: verifies `_static/index.html` exists in the installed package
 
 ## OIDC Trusted Publisher
 

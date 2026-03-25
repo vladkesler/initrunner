@@ -47,6 +47,17 @@ jobs:
 
       - run: uv sync --dev
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: dashboard/pnpm-lock.yaml
+      - name: Build dashboard frontend
+        run: bash scripts/build-dashboard.sh
+
       - name: Verify package version is a pre-release
         run: |
           PKG_VERSION=$(uv run python -c "import importlib.metadata; print(importlib.metadata.version('initrunner'))")
@@ -120,7 +131,7 @@ jobs:
           PIP_EXTRA_INDEX_URL: ""
         run: |
           WHEEL=$(ls /tmp/testpypi-pkg/initrunner-*.whl)
-          pip install "${WHEEL}[ingest]"
+          pip install "${WHEEL}[ingest,dashboard]"
 
       - name: Smoke test - CLI
         run: |
@@ -139,3 +150,13 @@ jobs:
 
       - name: Smoke test - ingest extra
         run: python -c "import initrunner.ingestion; print('Ingest import OK')"
+
+      - name: Smoke test - dashboard assets
+        run: |
+          python3 -c "
+          from pathlib import Path
+          import initrunner.dashboard
+          static = Path(initrunner.dashboard.__file__).parent / '_static' / 'index.html'
+          assert static.exists(), f'Dashboard index.html missing at {static}'
+          print('Dashboard assets OK')
+          "

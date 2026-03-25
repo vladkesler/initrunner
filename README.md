@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.40.0** -- Full dashboard rewrite: SvelteKit + FastAPI replaces old TUI and HTMX dashboard. SvelteFlow canvas views, visual compose/team builders, ingestion management with file upload and URL addition, native desktop app, centralized deprecation system, model lists updated to March 2026, bundled starter examples. See the [Changelog](CHANGELOG.md).
+> **v1.40.4** -- Fixes dashboard packaging: `initrunner dashboard` now works out of the box after `pip install`. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
