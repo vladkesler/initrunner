@@ -109,11 +109,6 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 
 That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }`.
 
-<p align="center">
-  <img src="assets/screenshot-quick-chat.png" alt="InitRunner Quick Chat" width="550"><br>
-  <em>Quick Chat - ask a question, send the answer to Slack</em>
-</p>
-
 ## Why InitRunner
 
 **Zero config to start.** `initrunner chat` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
@@ -369,4 +364,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.39.0</sub></p>
+<p align="center"><sub>v1.40.0</sub></p>
