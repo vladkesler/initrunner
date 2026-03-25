@@ -209,6 +209,11 @@ Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration
 
 ## User Interfaces
 
+<p align="center">
+  <img src="assets/screenshot-dashboard.png" alt="InitRunner Dashboard" width="800"><br>
+  <em>Dashboard Launchpad - agents, activity, compositions, and teams at a glance</em>
+</p>
+
 Manage agents, run prompts, build compositions, and browse audit trails from a visual interface. Two modes are available: a web dashboard that opens in your browser, and a native desktop app.
 
 ### Dashboard (web)
@@ -247,11 +252,6 @@ If a dashboard is already running on the port, the desktop window connects to it
 - **System health** -- detected providers, doctor checks, and tool registry
 
 See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](docs/interfaces/design-system.md).
-
-<p align="center">
-  <img src="assets/screenshot-dashboard.png" alt="InitRunner Dashboard" width="800"><br>
-  <em>Dashboard Launchpad - agents, activity, compositions, and teams at a glance</em>
-</p>
 
 ## Security & Authorization
 
