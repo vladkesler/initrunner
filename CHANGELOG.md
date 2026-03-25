@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.40.0] - 2026-03-25
+
 ### Removed
 - **Textual TUI** (`initrunner/tui/`) -- k9s-style terminal UI with screens for roles, runs, audit, memory, daemon, ingest. Removed `tui` optional dependency
 - **Jinja2/HTMX web dashboard** (`initrunner/api/`) -- server-rendered HTML dashboard with DaisyUI, HTMX, templates, static assets, FaceHash avatars, chat UI
