@@ -8,7 +8,7 @@ import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.eval.runner import (
     CaseResult,
@@ -25,7 +25,7 @@ def _make_role() -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

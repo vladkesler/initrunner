@@ -283,6 +283,25 @@ class LanceDocumentStore(DocumentStore):
             hashes = arrow_tbl.column("content_hash").to_pylist()
             return dict(zip(sources, hashes, strict=True))
 
+    def list_all_file_metadata(self) -> list[tuple[str, str, float, str, int]]:
+        with self._lock:
+            tbl = self._db.open_table("file_metadata")
+            if tbl.count_rows() == 0:
+                return []
+            at = tbl.to_arrow().select(
+                ["source", "content_hash", "last_modified", "ingested_at", "chunk_count"]
+            )
+            return list(
+                zip(
+                    at.column("source").to_pylist(),
+                    at.column("content_hash").to_pylist(),
+                    at.column("last_modified").to_pylist(),
+                    at.column("ingested_at").to_pylist(),
+                    at.column("chunk_count").to_pylist(),
+                    strict=True,
+                )
+            )
+
     def replace_source(
         self,
         source: str,

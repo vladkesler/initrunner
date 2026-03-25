@@ -12,7 +12,7 @@ from initrunner.agent.reflection import (
     format_reflection_state,
 )
 from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.schema.triggers import (
@@ -31,7 +31,7 @@ def _make_role(
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test agent.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
@@ -231,7 +231,7 @@ class TestTrimHistoryPreserveFirst:
             ModelRequest(parts=[UserPromptPart(content="msg 1")]),
             ModelRequest(parts=[UserPromptPart(content="msg 2")]),
         ]
-        result = trim_message_history(msgs, 10, preserve_first=True)
+        result = trim_message_history(msgs, 10, preserve_first=True)  # type: ignore[invalid-argument-type]
         assert len(result) == 2
 
     def test_preserve_first_false_default(self):

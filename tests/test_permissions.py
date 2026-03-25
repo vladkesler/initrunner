@@ -245,8 +245,8 @@ class TestBuildToolsetsPermissions:
             from initrunner.agent.schema.base import (
                 ApiVersion,
                 Kind,
-                Metadata,
                 ModelConfig,
+                RoleMetadata,
             )
             from initrunner.agent.schema.role import AgentSpec, RoleDefinition
             from initrunner.agent.tools.registry import build_toolsets
@@ -254,7 +254,7 @@ class TestBuildToolsetsPermissions:
             role = RoleDefinition(
                 apiVersion=ApiVersion.V1,
                 kind=Kind.AGENT,
-                metadata=Metadata(name="test-agent", description=""),
+                metadata=RoleMetadata(name="test-agent", description=""),
                 spec=AgentSpec(
                     role="test",
                     model=ModelConfig(provider="openai", name="gpt-4o"),
@@ -287,8 +287,8 @@ class TestBuildToolsetsPermissions:
             from initrunner.agent.schema.base import (
                 ApiVersion,
                 Kind,
-                Metadata,
                 ModelConfig,
+                RoleMetadata,
             )
             from initrunner.agent.schema.role import AgentSpec, RoleDefinition
             from initrunner.agent.tools.registry import build_toolsets
@@ -296,7 +296,7 @@ class TestBuildToolsetsPermissions:
             role = RoleDefinition(
                 apiVersion=ApiVersion.V1,
                 kind=Kind.AGENT,
-                metadata=Metadata(name="test-agent", description=""),
+                metadata=RoleMetadata(name="test-agent", description=""),
                 spec=AgentSpec(
                     role="test",
                     model=ModelConfig(provider="openai", name="gpt-4o"),

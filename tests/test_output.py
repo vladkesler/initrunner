@@ -22,7 +22,7 @@ def _minimal_role_data(**spec_overrides: object) -> dict:
             "model": {"provider": "anthropic", "name": "claude-sonnet-4-5-20250929"},
         },
     }
-    data["spec"].update(spec_overrides)
+    data["spec"].update(spec_overrides)  # type: ignore[no-matching-overload]
     return data
 
 

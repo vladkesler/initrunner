@@ -61,3 +61,36 @@ def test_get_agent_yaml(client, mock_roles, tmp_path):
 def test_get_agent_yaml_not_found(client):
     resp = client.get("/api/agents/doesnotexist/yaml")
     assert resp.status_code == 404
+
+
+def test_delete_agent(client, mock_roles, tmp_path):
+    """DELETE /api/agents/{id} removes the YAML file and evicts from cache."""
+    yaml_file = tmp_path / "agent-a.yaml"
+    yaml_file.write_text("apiVersion: initrunner/v1\nkind: Agent\n")
+
+    # Point the mock role's path to the real temp file
+    mock_roles[0].path = yaml_file
+
+    # Re-inject the cache with updated path
+    from initrunner.dashboard.deps import RoleCache, get_role_cache
+
+    cache = RoleCache.__new__(RoleCache)
+    cache._settings = None
+    cache._cache = {}
+    for r in mock_roles:
+        cache._cache[_role_id(r.path)] = r
+
+    client.app.dependency_overrides[get_role_cache] = lambda: cache
+
+    agent_id = _role_id(yaml_file)
+    resp = client.delete(f"/api/agents/{agent_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == agent_id
+    assert not yaml_file.exists()
+    assert cache.get(agent_id) is None
+
+
+def test_delete_agent_not_found(client):
+    resp = client.delete("/api/agents/doesnotexist")
+    assert resp.status_code == 404

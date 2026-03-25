@@ -1,15 +1,18 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import {
 		fetchComposeDetail,
 		fetchComposeYaml,
 		fetchComposeEvents,
-		fetchComposeStats
+		fetchComposeStats,
+		deleteCompose
 	} from '$lib/api/compose';
 	import type { ComposeDetail, ComposeStats, DelegateEvent } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import FlowCanvas from '$lib/components/compose/FlowCanvas.svelte';
 	import RunPanel from '$lib/components/compose/RunPanel.svelte';
 	import EventsTab from '$lib/components/compose/EventsTab.svelte';
@@ -25,7 +28,8 @@
 		GitBranch,
 		List,
 		Settings,
-		FileCode
+		FileCode,
+		Trash2
 	} from 'lucide-svelte';
 
 	let detail: ComposeDetail | null = $state(null);
@@ -36,6 +40,7 @@
 	let loading = $state(true);
 	let statsLoading = $state(true);
 	let eventsLoading = $state(true);
+	let deleteDialogOpen = $state(false);
 
 	const composeId = $derived(page.params.id ?? '');
 
@@ -141,6 +146,13 @@
 				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">
 					{detail.services.length} services
 				</span>
+				<button
+					class="ml-auto flex items-center gap-1 rounded-[min(var(--radius-md),12px)] border border-transparent bg-destructive/10 px-2.5 py-1 text-[0.8rem] font-medium text-destructive transition-all hover:bg-destructive/20"
+					onclick={() => (deleteDialogOpen = true)}
+				>
+					<Trash2 size={13} />
+					Delete
+				</button>
 			</div>
 			{#if detail.description}
 				<p class="mt-1 text-[13px] text-fg-muted">{detail.description}</p>
@@ -305,6 +317,17 @@
 				/>
 			</TabsContent>
 		</Tabs>
+
+		<ConfirmDeleteDialog
+			entityName={detail.name}
+			entityType="compose pipeline"
+			bind:open={deleteDialogOpen}
+			onConfirm={async () => {
+				await deleteCompose(composeId);
+				goto('/compose');
+			}}
+			onCancel={() => (deleteDialogOpen = false)}
+		/>
 	{:else}
 		<p class="text-[13px] text-fg-faint">Composition not found.</p>
 	{/if}

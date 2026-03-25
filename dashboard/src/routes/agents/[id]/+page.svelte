@@ -1,15 +1,18 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getAgentDetail, getAgentYaml } from '$lib/api/agents';
+	import { getAgentDetail, getAgentYaml, deleteAgent } from '$lib/api/agents';
 	import { fetchAuditStats } from '$lib/api/system';
 	import type { AgentDetail, AuditStats } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
 	import RunPanel from '$lib/components/runs/RunPanel.svelte';
 	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
 	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
+	import IngestTab from '$lib/components/agents/IngestTab.svelte';
 	import EditorTab from '$lib/components/agents/EditorTab.svelte';
 	import {
 		ArrowLeft,
@@ -20,8 +23,10 @@
 		Play,
 		History,
 		Brain,
+		Database,
 		Settings,
-		FileCode
+		FileCode,
+		Trash2
 	} from 'lucide-svelte';
 
 	let detail: AgentDetail | null = $state(null);
@@ -31,6 +36,7 @@
 	let loading = $state(true);
 	let statsLoading = $state(true);
 	let runVersion = $state(0);
+	let deleteDialogOpen = $state(false);
 
 	const agentId = $derived(page.params.id ?? '');
 
@@ -84,7 +90,7 @@
 		// Restore saved tab
 		try {
 			const saved = localStorage.getItem(tabKey);
-			if (saved && ['run', 'history', 'memory', 'config', 'editor'].includes(saved)) {
+			if (saved && ['run', 'history', 'memory', 'ingest', 'config', 'editor'].includes(saved)) {
 				activeTab = saved;
 			}
 		} catch {
@@ -140,6 +146,13 @@
 					class="inline-block h-2 w-2 rounded-full {statusColor}"
 					style="box-shadow: 0 0 6px {statusGlow}"
 				></span>
+				<button
+					class="ml-auto flex items-center gap-1 rounded-[min(var(--radius-md),12px)] border border-transparent bg-destructive/10 px-2.5 py-1 text-[0.8rem] font-medium text-destructive transition-all hover:bg-destructive/20"
+					onclick={() => (deleteDialogOpen = true)}
+				>
+					<Trash2 size={13} />
+					Delete
+				</button>
 			</div>
 			{#if detail.description}
 				<p class="mt-1 text-[13px] text-fg-muted">{detail.description}</p>
@@ -264,6 +277,13 @@
 					Memory
 				</TabsTrigger>
 				<TabsTrigger
+					value="ingest"
+					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
+				>
+					<Database size={13} />
+					Ingest
+				</TabsTrigger>
+				<TabsTrigger
 					value="config"
 					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
 				>
@@ -291,6 +311,10 @@
 				<MemoryTab agentId={agentId} hasMemory={!!detail.memory} />
 			</TabsContent>
 
+			<TabsContent value="ingest" class="min-h-0 flex-1 pt-4">
+				<IngestTab agentId={agentId} hasIngest={!!detail.ingest} />
+			</TabsContent>
+
 			<TabsContent value="config" class="min-h-0 flex-1 pt-4">
 				<div class="max-w-2xl">
 					<ConfigPanel {detail} />
@@ -310,6 +334,17 @@
 				/>
 			</TabsContent>
 		</Tabs>
+
+		<ConfirmDeleteDialog
+			entityName={detail.name}
+			entityType="agent"
+			bind:open={deleteDialogOpen}
+			onConfirm={async () => {
+				await deleteAgent(agentId);
+				goto('/agents');
+			}}
+			onCancel={() => (deleteDialogOpen = false)}
+		/>
 	{:else}
 		<p class="text-fg-faint">Agent not found</p>
 	{/if}

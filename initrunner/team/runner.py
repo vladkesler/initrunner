@@ -14,7 +14,7 @@ from typing import Any
 
 from initrunner._ids import generate_id
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema.base import Kind, Metadata
+from initrunner.agent.schema.base import Kind, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.audit.logger import AuditLogger
@@ -104,7 +104,7 @@ def _persona_to_role(
         guardrails=guardrails,
         observability=team.spec.observability,
     )
-    metadata = Metadata(name=name)
+    metadata = RoleMetadata(name=name)
     return RoleDefinition(
         apiVersion=team.apiVersion,
         kind=Kind.AGENT,
@@ -120,7 +120,7 @@ def _team_report_role(team: TeamDefinition) -> RoleDefinition:
         model=team.spec.model,
         tools=list(team.spec.tools),
     )
-    metadata = Metadata(name=team.metadata.name)
+    metadata = RoleMetadata(name=team.metadata.name)
     return RoleDefinition(
         apiVersion=team.apiVersion,
         kind=Kind.AGENT,

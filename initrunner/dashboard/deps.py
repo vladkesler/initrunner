@@ -6,9 +6,16 @@ import hashlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from initrunner.dashboard.config import DashboardSettings
+
+if TYPE_CHECKING:
+    from initrunner.services.discovery import (  # noqa: F401
+        DiscoveredCompose,
+        DiscoveredRole,
+        DiscoveredTeam,
+    )
 
 _logger = logging.getLogger(__name__)
 
@@ -44,6 +51,10 @@ class _YamlFileCache(Generic[T]):
 
     def get(self, item_id: str) -> T | None:
         return self._cache.get(item_id)
+
+    def evict(self, item_id: str) -> T | None:
+        """Remove an item from the cache by ID. Returns the evicted item, or None."""
+        return self._cache.pop(item_id, None)
 
     def all(self) -> dict[str, T]:
         return self._cache

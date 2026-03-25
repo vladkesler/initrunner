@@ -261,7 +261,32 @@ def test_team_cache_refresh(tmp_path):
     tid = next(iter(result.keys()))
     found = cache.get(tid)
     assert found is not None
-    assert found.team.metadata.name == "cached-team"
+    assert found.team is not None and found.team.metadata.name == "cached-team"
 
     # Unknown ID returns None
     assert cache.get("nonexistent") is None
+
+
+# -- DELETE /api/teams/{id} ----------------------------------------------------
+
+
+def test_delete_team(client, team_dir):
+    """DELETE removes the team YAML and evicts from cache."""
+    teams = client.get("/api/teams").json()
+    tid = teams[0]["id"]
+    team_path = teams[0]["path"]
+
+    resp = client.delete(f"/api/teams/{tid}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == tid
+    assert not Path(team_path).exists()
+
+    # Should be gone from cache
+    resp = client.get(f"/api/teams/{tid}")
+    assert resp.status_code == 404
+
+
+def test_delete_team_not_found(client):
+    resp = client.delete("/api/teams/nonexistent")
+    assert resp.status_code == 404

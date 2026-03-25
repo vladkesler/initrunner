@@ -28,13 +28,13 @@ def test_submodule_imports(module_name: str) -> None:
 
 def test_role_aggregates_all_domains() -> None:
     """RoleDefinition should be constructable from the split modules."""
-    from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
     from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 
     role = RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test agent.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

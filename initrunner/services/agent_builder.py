@@ -372,33 +372,42 @@ class BuilderSession:
 
     # -- Seed flows ----------------------------------------------------------
 
-    def seed_blank(self, provider: str, model: str | None = None) -> TurnResult:
+    def seed_blank(
+        self, provider: str, model: str | None = None, *, agent_name: str = "my-agent"
+    ) -> TurnResult:
         """Seed from the basic template."""
         from initrunner.templates import template_basic
 
         self.seed_source = "blank"
-        self.yaml_text = template_basic("my-agent", provider, model)
+        self.yaml_text = template_basic(agent_name, provider, model)
         return self._make_turn_result("Started from blank template. Refine as needed.")
 
-    def seed_template(self, name: str, provider: str, model: str | None = None) -> TurnResult:
+    def seed_template(
+        self,
+        template_name: str,
+        provider: str,
+        model: str | None = None,
+        *,
+        agent_name: str = "my-agent",
+    ) -> TurnResult:
         """Seed from a named template."""
         from initrunner.templates import TEMPLATES
 
-        builder = TEMPLATES.get(name)
+        builder = TEMPLATES.get(template_name)
         if builder is None:
             available = ", ".join(sorted(TEMPLATES.keys()))
-            raise ValueError(f"Unknown template '{name}'. Available: {available}")
+            raise ValueError(f"Unknown template '{template_name}'. Available: {available}")
 
         # Templates that produce non-YAML (tool, skill) are not valid seeds
-        if name in ("tool", "skill"):
+        if template_name in ("tool", "skill"):
             raise ValueError(
-                f"Template '{name}' produces a {name} scaffold, not a role YAML. "
-                f"Use 'initrunner init --template {name}' instead."
+                f"Template '{template_name}' produces a {template_name} scaffold, not a role YAML. "
+                f"Use 'initrunner init --template {template_name}' instead."
             )
 
-        self.seed_source = f"template:{name}"
-        self.yaml_text = builder("my-agent", provider, model)
-        return self._make_turn_result(f"Started from '{name}' template. Refine as needed.")
+        self.seed_source = f"template:{template_name}"
+        self.yaml_text = builder(agent_name, provider, model)
+        return self._make_turn_result(f"Started from '{template_name}' template. Refine as needed.")
 
     def seed_description(
         self,

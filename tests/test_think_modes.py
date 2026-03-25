@@ -40,7 +40,7 @@ class TestThinkState:
 
 class TestThinkToolBuilder:
     def _build(self, critique: bool = False, max_thoughts: int = 50):
-        from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+        from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
         from initrunner.agent.schema.role import AgentSpec, RoleDefinition
         from initrunner.agent.schema.tools import ThinkToolConfig
         from initrunner.agent.tools._registry import ToolBuildContext
@@ -49,7 +49,7 @@ class TestThinkToolBuilder:
         role = RoleDefinition(
             apiVersion=ApiVersion.V1,
             kind=Kind.AGENT,
-            metadata=Metadata(name="test", description=""),
+            metadata=RoleMetadata(name="test", description=""),
             spec=AgentSpec(role="", model=ModelConfig(provider="openai", name="dummy")),
         )
         config = ThinkToolConfig(critique=critique, max_thoughts=max_thoughts)

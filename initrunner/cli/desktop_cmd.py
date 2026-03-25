@@ -138,7 +138,7 @@ def _ensure_gi() -> None:
         _fail_gi()
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # type: ignore[no-matching-overload]
             [base_exe, "-c", "import gi, pathlib; print(pathlib.Path(gi.__file__).parent.parent)"],
             capture_output=True,
             text=True,
@@ -226,7 +226,7 @@ def _start_webview(webview: object, WebViewException: type, url: str) -> None:
             "InitRunner", url, width=1280, height=800, min_size=(900, 600)
         )
         webview.start()  # type: ignore[union-attr]
-    except WebViewException as exc:
+    except WebViewException as exc:  # type: ignore[invalid-exception-caught]
         _handle_webview_error(exc)
     finally:
         wv_logger.setLevel(old_level)

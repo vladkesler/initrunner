@@ -48,7 +48,7 @@ When no agents exist, shows a welcome screen with onboarding CTAs.
 Two views, toggled in the header bar:
 
 - **Flow view** (default, desktop): Interactive SvelteFlow canvas. Agents render as draggable nodes organized into category sections (Reactive, Intelligence, Skilled, Cognitive, Connected, Equipped, Other). Each node shows the agent name, model, description, capability glyph, and a hero icon matching its primary feature. Category labels separate the sections. Canvas supports pan, zoom, minimap, and an auto-arrange button. Node positions persist to localStorage. On mobile (< 1024px), falls back to list view automatically.
-- **List view**: Sortable table with status dot, name, description, model, and capability glyph columns.
+- **List view**: Sortable table with status dot, name, description, model, and capability glyph columns. Each row has a trash icon (visible on hover) to delete the agent with a name-typing confirmation dialog.
 
 A toolbar above the canvas (or list) provides search, capability filter buttons (All, Equipped, Reactive, Intelligence, Connected, Skilled, Cognitive, Errored), a result count, and the view toggle. The **Cognitive** filter shows agents with non-default reasoning patterns (todo_driven, plan_execute, reflexion) or autonomy configuration. In flow view, filtering dims non-matching nodes instead of hiding them. Click any node/row to open the detail view.
 
@@ -73,20 +73,37 @@ InitHub packages may contain sidecar files (knowledge bases, etc.) that are not 
 
 ### Agent Detail (`/agents/{id}`)
 
-Split-panel layout with configuration on the left and the run panel on the right.
+Header with agent name, model badge, and status indicator. A **Delete** button opens a confirmation dialog requiring the agent name. Stats bar shows runs, success rate, tokens, and avg duration.
 
-| Panel | Contents |
-|-------|----------|
-| **Config** (340px sidebar) | Model details, tools with summaries, triggers, guardrails, **cognition** (unified section grouping reasoning pattern, autonomy settings, think tool, and todo tool configs), memory, ingestion, skills, sinks, metadata, and a collapsible YAML viewer. Sections are collapsible and only render when the agent has data for them. |
-| **Run** (primary, flex-1) | Prompt input with streaming output. Token breakdown (in/out), tool call names, and duration shown after completion. |
+Six tabs below the stats bar:
 
-On narrow screens (< 1024px) the config panel collapses into a disclosure above the run panel.
+| Tab | Contents |
+|-----|----------|
+| **Run** (default) | Prompt input with SSE streaming output. Token breakdown, tool call names, and duration after completion. Multi-turn message history. |
+| **History** | Audit log filtered to this agent. |
+| **Memory** | Memory items and conversation sessions (shown when agent has `memory` config). Filter by type, consolidate memories. |
+| **Ingest** | Document management for RAG agents (shown when agent has `ingest` config). See below. |
+| **Config** | Read-only nested sections: model, tools, triggers, guardrails, cognition, memory, ingestion, skills, sinks, metadata. |
+| **Editor** | YAML editor with live validation and save. |
 
-Streaming output uses Server-Sent Events. Tokens appear in real time as the model generates them.
+#### Ingest Tab
+
+Available for agents with `spec.ingest` configured. Provides full document lifecycle management without leaving the UI.
+
+**Summary strip** -- three stat cards: total documents, total chunks, last ingested timestamp.
+
+**Actions:**
+- **Re-ingest** -- runs the full ingestion pipeline (config sources + managed sources). Progress streamed via SSE with per-file status badges (new/updated/skipped/error).
+- **Force Re-ingest** -- same but with `force=true` (wipes store on embedding model change).
+- **Upload Files** -- multipart file upload. Files are saved to `~/.initrunner/uploads/{agent_name}/` and ingested as managed sources.
+- **Add URL** -- inline URL input. The URL is fetched, extracted, chunked, embedded, and registered as a managed source.
+- **Delete** -- removes a managed source from the store and manifest. Only available for managed sources (dashboard-added). Config-sourced documents (from `ingest.sources` globs) show a "from config" badge and cannot be deleted individually.
+
+**Managed sources** persist in the store's `_meta` table as a JSON manifest. They survive re-ingestion (not purged by glob resolution) and survive store wipes (manifest is read before wipe and restored after). See [Managed Sources](../core/ingestion.md#managed-sources-dashboard) in the ingestion docs.
 
 ### Compose (`/compose`)
 
-Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. A [Docs](https://www.initrunner.ai/docs/compose) link in the header opens the compose documentation. Click a card to open the detail view.
+Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. Each card has a trash icon (visible on hover) to delete the composition with a name-typing confirmation dialog. A [Docs](https://www.initrunner.ai/docs/compose) link in the header opens the compose documentation. Click a card to open the detail view.
 
 ### New Compose (`/compose/new`)
 
@@ -108,7 +125,7 @@ Each slot uses an **Agent Picker** -- a searchable inline dropdown that shows al
 
 ### Compose Detail (`/compose/{id}`)
 
-Tabbed detail page with a stats bar and five tabs.
+Tabbed detail page with a stats bar and five tabs. A **Delete** button in the header opens a confirmation dialog requiring the composition name to be typed. Deleting removes only the `compose.yaml` file (referenced role files are not affected) and redirects to the compose list.
 
 **Stats bar** (4 cards): total events, delivery rate %, service count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
 
@@ -124,7 +141,7 @@ Events are filtered by `compose_name` (stored in the `delegate_events` audit tab
 
 ### Teams (`/teams`)
 
-Card grid of all discovered team YAML files. Each card shows the team name, description, strategy badge (sequential/parallel), model overrides badge, persona name pills, and feature badges for shared memory and shared documents. Click a card to open the detail view.
+Card grid of all discovered team YAML files. Each card shows the team name, description, strategy badge (sequential/parallel), model overrides badge, persona name pills, and feature badges for shared memory and shared documents. Each card has a trash icon (visible on hover) to delete the team with a name-typing confirmation dialog. Click a card to open the detail view.
 
 ### New Team (`/teams/new`)
 
@@ -153,7 +170,7 @@ The team-level model selector supports the same provider options as agent creati
 
 ### Team Detail (`/teams/{id}`)
 
-Tabbed detail page with four tabs.
+Tabbed detail page with four tabs. A **Delete** button in the header opens a confirmation dialog requiring the team name to be typed. Deleting removes the team YAML file and redirects to the teams list.
 
 | Tab | Contents |
 |-----|----------|
@@ -205,6 +222,7 @@ initrunner dashboard
   |      /api/agents/{id}      GET   single role summary
   |      /api/agents/{id}/detail GET full role config (model, tools, triggers, guardrails, etc.)
   |      /api/agents/{id}/yaml GET   raw YAML file
+  |      /api/agents/{id}      DELETE delete agent YAML and evict from cache
   |      /api/builder/templates GET   templates, providers, options
   |      /api/builder/seed     POST  generate YAML from template/description/blank
   |      /api/builder/validate POST  validate YAML text
@@ -218,6 +236,7 @@ initrunner dashboard
   |      /api/compose/{id}/events GET delegation events
   |      /api/compose/{id}/stats  GET compose event statistics
   |      /api/compose/{id}/yaml   PUT save edited compose YAML
+  |      /api/compose/{id}        DELETE delete compose YAML and evict from cache
   |      /api/compose/{id}/run/stream POST streaming compose run (SSE)
   |      /api/compose-builder/options GET patterns, agents, providers
   |      /api/compose-builder/seed POST generate compose YAML
@@ -227,6 +246,7 @@ initrunner dashboard
   |      /api/teams/{id}      GET   team detail with personas
   |      /api/teams/{id}/yaml GET   raw team YAML
   |      /api/teams/{id}/yaml PUT   save edited team YAML
+  |      /api/teams/{id}      DELETE delete team YAML and evict from cache
   |      /api/teams/{id}/run/stream POST streaming team run (SSE)
   |      /api/team-builder/options GET strategies, providers
   |      /api/team-builder/seed POST generate team YAML
@@ -459,6 +479,37 @@ Returns the raw YAML file content.
 ```json
 {"yaml": "apiVersion: initrunner/v1\n...", "path": "/home/user/agents/reviewer.yaml"}
 ```
+
+### `GET /api/agents/{id}/ingest/documents`
+
+List all ingested documents for an agent. Returns source path, chunk count, ingested timestamp, content hash, `is_url` flag, and `is_managed` flag (true for dashboard-added sources).
+
+### `GET /api/agents/{id}/ingest/summary`
+
+Aggregate ingestion stats: total documents, total chunks, store path, configured source patterns, managed source count, and last ingested timestamp.
+
+### `POST /api/agents/{id}/ingest/run?force=false`
+
+Trigger a full re-ingestion via SSE. Ingests all sources from `ingest.sources` config plus managed sources from the manifest. SSE events:
+- `progress` -- per-file status (`new`, `updated`, `skipped`, `error`)
+- `result` -- final `IngestStatsResponse`
+- `error` -- error string
+
+### `POST /api/agents/{id}/ingest/upload`
+
+Multipart file upload. Files are saved to `~/.initrunner/uploads/{agent_name}/` and ingested as managed sources. Returns `IngestStatsResponse`.
+
+### `POST /api/agents/{id}/ingest/add-url`
+
+Add a URL source. The URL is fetched, chunked, embedded, and registered as a managed source.
+
+```json
+{"url": "https://docs.example.com/api-reference"}
+```
+
+### `DELETE /api/agents/{id}/ingest/documents?source=...`
+
+Remove a single source from the store and manifest. For managed file sources, also deletes the uploaded file. Returns `{"chunks_deleted": N}`.
 
 ### `POST /api/runs`
 

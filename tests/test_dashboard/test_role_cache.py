@@ -73,3 +73,36 @@ def test_same_name_different_dirs():
     p1 = Path("/dir1/agent.yaml")
     p2 = Path("/dir2/agent.yaml")
     assert _role_id(p1) != _role_id(p2)
+
+
+def test_evict_returns_item():
+    """evict() removes and returns the evicted item."""
+    from initrunner.dashboard.config import DashboardSettings
+
+    mock_role = MagicMock()
+    mock_role.path = Path("/tmp/role.yaml")
+
+    settings = DashboardSettings()
+    with (
+        patch(
+            "initrunner.services.discovery.discover_roles_sync",
+            return_value=[mock_role],
+        ),
+        patch.object(settings, "get_role_dirs", return_value=[Path("/tmp")]),
+    ):
+        cache = RoleCache(settings)
+        cache.refresh()
+
+    rid = _role_id(Path("/tmp/role.yaml"))
+    evicted = cache.evict(rid)
+    assert evicted is mock_role
+    assert cache.get(rid) is None
+
+
+def test_evict_missing_returns_none():
+    """evict() returns None for an unknown ID."""
+    from initrunner.dashboard.config import DashboardSettings
+
+    settings = DashboardSettings()
+    cache = RoleCache(settings)
+    assert cache.evict("nonexistent") is None

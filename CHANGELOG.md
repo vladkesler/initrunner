@@ -1,5 +1,42 @@
 # Changelog
 
+### Removed
+- **Textual TUI** (`initrunner/tui/`) -- k9s-style terminal UI with screens for roles, runs, audit, memory, daemon, ingest. Removed `tui` optional dependency
+- **Jinja2/HTMX web dashboard** (`initrunner/api/`) -- server-rendered HTML dashboard with DaisyUI, HTMX, templates, static assets, FaceHash avatars, chat UI
+
+### Added
+- **SvelteKit + FastAPI dashboard** -- complete rewrite from scratch. SvelteKit TypeScript frontend with Tailwind CSS, ShadcN Svelte components, and 12 FastAPI backend routers. Pages for agents, compose, teams, audit, system, and builder wizards
+- **"Electric Charcoal" design system** -- dark-only mission control aesthetic with OKLCH color system, Space Grotesk / IBM Plex Mono typography, lime accent (#c8ff00), and binary border radius pattern
+- **Desktop command** (`initrunner desktop`) -- launches dashboard in a native pywebview window (1280x800) with embedded FastAPI backend, health polling, GTK/WebKit detection on Linux. New `desktop` optional extra
+- **SvelteFlow canvas view** -- agents page with draggable node graph, auto-categorization (Reactive, Intelligence, Connected, Skilled, Cognitive, Equipped), auto-layout, localStorage position persistence, minimap, search with `/` shortcut, and capability filters (tools, triggers, ingest, memory, sinks, skills, reasoning, autonomy). Auto-switches to list view on mobile
+- **Compose visual editor** -- SvelteFlow graph for compose pipelines with service nodes, visual connections, and pattern templates (pipeline, fan-out, route). Tabbed detail view with YAML editor, events stream, and config panel
+- **Team builder** -- structured persona configuration with SvelteFlow pipeline visualization, run panel with streaming output, shared `AgentPicker` component for compose and team builders
+- **Agent builder** -- multi-turn LLM-powered wizard for drafting and refining agent roles via dashboard
+- **Dashboard ingestion management** -- `IngestTab` with document lifecycle: upload files, add URLs, re-ingest with SSE progress streaming, per-document delete. Summary cards showing document count, chunk count, last ingested timestamp
+- **Ingestion manifest system** (`initrunner/ingestion/manifest.py`) -- persistent tracking of dashboard-added sources in document store metadata. Managed sources survive re-ingestion (not purged by glob resolution) and survive store wipes (saved before wipe, restored after)
+- **Ingestion service layer** (`initrunner/services/ingestion.py`) and REST API (`/api/agents/{id}/ingest/*`) -- endpoints for document listing, summary, upload, URL addition, re-ingestion (SSE), and deletion
+- **Delete endpoints** -- `DELETE /api/agents/{id}`, `DELETE /api/teams/{id}`, `DELETE /api/compose/{id}` with cache eviction. New `ConfirmDeleteDialog` component with type-to-confirm pattern
+- **ModelCombobox component** -- enhanced model selector with search filtering, keyboard navigation (arrows, Enter, Escape), custom model entry mode, and provider-specific presets
+- **`list_all_file_metadata()`** on `FileMetadataStore` and LanceDB implementation -- returns source, hash, modified, ingested_at, chunk_count for document listing
+- **Embedding provider health checks** -- system doctor page and `/api/system/doctor` report embedding provider API key status alongside model providers
+- **Centralized deprecation system** (`initrunner/deprecations.py`) -- registry of deprecation rules (DEP001-DEP005) with `spec_version` field, auto-migration callbacks, severity levels, and `validate_role_dict()` enforcement. Doctor command validates spec version and deprecations
+- **Dashboard validation module** (`initrunner/dashboard/validation.py`) -- shared compose YAML validation with structured error reporting
+- **Dashboard caching layer** -- `RoleCache`, `ComposeCache`, `TeamCache` with factory pattern dependency injection and `evict()` for deletion support
+- **Bundled starter examples** -- 9 curated examples (helpdesk, email-agent, rag-agent, memory-assistant, telegram, discord, code-review team, support-desk compose, ci-pipeline compose) shipped with the package and visible in the dashboard on fresh installs
+- **Zero ty type checking errors** -- resolved all 73 pre-existing diagnostics across source and test files
+- 200+ new tests across dashboard routers, deprecation system, doctor command, ingestion manifest, managed pipeline, safe_substitute, ingestion service, store metadata
+
+### Changed
+- **CLI refactored** -- split 952-line `run_cmd.py` into mode-specific modules: `_run_agent.py` (single-shot/REPL/daemon), `_run_pipeline.py` (compose), `_run_team.py` (team mode)
+- **Ingestion pipeline refactored** -- extracted `_execute_ingest_core()` shared between `run_ingest()` (glob-based with purge) and `run_ingest_managed()` (explicit files/URLs, no purge)
+- **`safe_substitute()` extracted to `initrunner/_text.py`** -- replaces `str.format()` in triggers (Discord, Telegram, file watcher) and API tool to prevent template injection
+- **Model lists updated to March 2026** -- GPT-5.4, GPT-5-mini, GPT-5-nano, o4-mini, o3, Claude Sonnet 4.6, Claude Opus 4.6, Claude Haiku 4.5, Gemini 2.5 Flash/Pro/Flash-Lite, Grok 4, Llama 4 Scout, Devstral, Command-A, Qwen 2.5
+- **Agent builder accepts `name` parameter** -- `SeedRequest` schema gains required `name` field, auto-generates filename from name
+- **`DoctorResponse` schema** gains `embedding_checks` field
+- **Providers endpoint** includes custom presets (OpenRouter etc.) when their API key env var is set
+- **README** -- new "User Interfaces" section with dashboard and desktop command documentation, updated screenshot
+- **`dashboard` optional extra** updated from Jinja2/HTMX stack to FastAPI + uvicorn for API-only backend
+
 ## [1.39.2] - 2026-03-23
 
 ## [1.39.1] - 2026-03-23

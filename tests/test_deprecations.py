@@ -38,8 +38,8 @@ def _minimal_role_dict(**overrides) -> dict:
         parts = key.split(".")
         cursor = d
         for part in parts[:-1]:
-            cursor = cursor.setdefault(part, {})
-        cursor[parts[-1]] = val
+            cursor = cursor.setdefault(part, {})  # type: ignore[no-matching-overload]
+        cursor[parts[-1]] = val  # type: ignore[invalid-assignment]
     return d
 
 

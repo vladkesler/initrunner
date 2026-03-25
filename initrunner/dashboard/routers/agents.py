@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
-from initrunner.dashboard.schemas import AgentDetail, AgentSummary, ItemSummary
+from initrunner.dashboard.schemas import AgentDetail, AgentSummary, DeleteResponse, ItemSummary
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -132,3 +133,20 @@ async def get_agent_yaml(
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Cannot read file: {exc}") from exc
     return {"yaml": content, "path": str(dr.path)}
+
+
+@router.delete("/{agent_id}")
+async def delete_agent(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> DeleteResponse:
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    path = dr.path
+    try:
+        await asyncio.to_thread(path.unlink, True)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
+    role_cache.evict(agent_id)
+    return DeleteResponse(id=agent_id, path=str(path))

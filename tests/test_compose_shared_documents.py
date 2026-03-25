@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig, IngestConfig
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.compose.orchestrator import apply_shared_documents
@@ -24,7 +24,7 @@ def _make_role(*, ingest: IngestConfig | None = None) -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

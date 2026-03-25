@@ -120,7 +120,7 @@ class TestReflexionStrategy:
 
 class TestResolveStrategy:
     def _make_role(self, tools=None, autonomy=None, reasoning=None):
-        from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+        from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
         from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 
         spec_kwargs = {
@@ -137,7 +137,7 @@ class TestResolveStrategy:
         return RoleDefinition(
             apiVersion=ApiVersion.V1,
             kind=Kind.AGENT,
-            metadata=Metadata(name="test", description=""),
+            metadata=RoleMetadata(name="test", description=""),
             spec=AgentSpec(**spec_kwargs),  # type: ignore[arg-type]
         )
 

@@ -169,6 +169,16 @@ class FileMetadataStore(abc.ABC):
         """Return {source: content_hash} for all tracked files."""
         ...
 
+    @abc.abstractmethod
+    def list_all_file_metadata(
+        self,
+    ) -> list[tuple[str, str, float, str, int]]:
+        """Return all file metadata rows.
+
+        Each tuple is ``(source, content_hash, last_modified, ingested_at, chunk_count)``.
+        """
+        ...
+
 
 class DocumentStore(FileMetadataStore):
     """Abstract interface for document vector stores.

@@ -375,7 +375,7 @@ class TestCompactionExemption:
                 ]
             ),
         ]
-        text = _serialize_messages_for_summary(messages)
+        text = _serialize_messages_for_summary(messages)  # type: ignore[invalid-argument-type]
         assert "[skill instructions preserved in context]" in text
         assert "[truncated]" not in text
 
@@ -395,7 +395,7 @@ class TestCompactionExemption:
                 ]
             ),
         ]
-        text = _serialize_messages_for_summary(messages)
+        text = _serialize_messages_for_summary(messages)  # type: ignore[invalid-argument-type]
         assert "[truncated]" in text
 
 

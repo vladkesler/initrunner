@@ -122,7 +122,7 @@ def test_template_setups_env_var_status(builder_client, monkeypatch):
 def test_seed_template(builder_client):
     resp = builder_client.post(
         "/api/builder/seed",
-        json={"mode": "template", "template": "basic", "provider": "openai"},
+        json={"mode": "template", "template": "basic", "provider": "openai", "name": "test-agent"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -135,7 +135,7 @@ def test_seed_template(builder_client):
 def test_seed_blank(builder_client):
     resp = builder_client.post(
         "/api/builder/seed",
-        json={"mode": "blank", "provider": "anthropic"},
+        json={"mode": "blank", "provider": "anthropic", "name": "test-agent"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -145,18 +145,52 @@ def test_seed_blank(builder_client):
     assert len(data["yaml_text"]) < 500
 
 
-def test_seed_template_missing_name(builder_client):
+def test_seed_blank_uses_custom_name(builder_client):
+    """Blank seed uses the supplied name in metadata."""
     resp = builder_client.post(
         "/api/builder/seed",
-        json={"mode": "template", "provider": "openai"},
+        json={"mode": "blank", "provider": "openai", "name": "code-reviewer"},
+    )
+    assert resp.status_code == 200
+    yaml_text = resp.json()["yaml_text"]
+    assert "name: code-reviewer" in yaml_text
+    assert "my-agent" not in yaml_text
+
+
+def test_seed_template_uses_custom_name(builder_client):
+    """Template seed uses the supplied name in metadata."""
+    resp = builder_client.post(
+        "/api/builder/seed",
+        json={"mode": "template", "template": "basic", "provider": "openai", "name": "my-reviewer"},
+    )
+    assert resp.status_code == 200
+    yaml_text = resp.json()["yaml_text"]
+    assert "name: my-reviewer" in yaml_text
+    assert "my-agent" not in yaml_text
+
+
+def test_seed_template_missing_template(builder_client):
+    """Missing template field returns 400."""
+    resp = builder_client.post(
+        "/api/builder/seed",
+        json={"mode": "template", "provider": "openai", "name": "test-agent"},
     )
     assert resp.status_code == 400
+
+
+def test_seed_missing_name(builder_client):
+    """Missing required name field returns 422."""
+    resp = builder_client.post(
+        "/api/builder/seed",
+        json={"mode": "blank", "provider": "openai"},
+    )
+    assert resp.status_code == 422
 
 
 def test_seed_description_missing_text(builder_client):
     resp = builder_client.post(
         "/api/builder/seed",
-        json={"mode": "description", "provider": "openai"},
+        json={"mode": "description", "provider": "openai", "name": "test-agent"},
     )
     assert resp.status_code == 400
 
@@ -164,7 +198,12 @@ def test_seed_description_missing_text(builder_client):
 def test_seed_template_unknown(builder_client):
     resp = builder_client.post(
         "/api/builder/seed",
-        json={"mode": "template", "template": "nonexistent", "provider": "openai"},
+        json={
+            "mode": "template",
+            "template": "nonexistent",
+            "provider": "openai",
+            "name": "test-agent",
+        },
     )
     assert resp.status_code == 400
 
@@ -180,13 +219,14 @@ def test_seed_description(builder_client):
     with patch(
         "initrunner.services.agent_builder.BuilderSession.seed_description",
         return_value=mock_turn,
-    ):
+    ) as mock_seed:
         resp = builder_client.post(
             "/api/builder/seed",
             json={
                 "mode": "description",
                 "description": "a code review agent",
                 "provider": "openai",
+                "name": "code-reviewer",
             },
         )
 
@@ -194,6 +234,10 @@ def test_seed_description(builder_client):
     data = resp.json()
     assert data["explanation"] == "Here is your agent."
     assert "apiVersion" in data["yaml_text"]
+    # Verify name_hint was passed through to seed_description
+    mock_seed.assert_called_once()
+    call_kwargs = mock_seed.call_args
+    assert call_kwargs.kwargs.get("name_hint") == "code-reviewer"
 
 
 # -- POST /api/builder/validate ------------------------------------------------
@@ -340,6 +384,7 @@ def test_seed_openrouter(builder_client):
             "mode": "blank",
             "provider": "openrouter",
             "model": "anthropic/claude-sonnet-4",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 200
@@ -360,6 +405,7 @@ def test_seed_custom_endpoint(builder_client):
             "model": "my-model",
             "base_url": "https://my-vllm.example.com/v1",
             "api_key_env": "MY_API_KEY",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 200
@@ -378,6 +424,7 @@ def test_seed_custom_missing_base_url(builder_client):
             "mode": "blank",
             "provider": "custom",
             "model": "my-model",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 400
@@ -391,6 +438,7 @@ def test_seed_openrouter_missing_model(builder_client):
         json={
             "mode": "blank",
             "provider": "openrouter",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 400
@@ -404,6 +452,7 @@ def test_seed_ollama_default_url(builder_client):
         json={
             "mode": "blank",
             "provider": "ollama",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 200
@@ -420,6 +469,7 @@ def test_seed_ollama_custom_url(builder_client):
             "mode": "blank",
             "provider": "ollama",
             "base_url": "http://gpu-server:11434/v1",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 200
@@ -437,6 +487,7 @@ def test_seed_openrouter_template(builder_client):
             "template": "basic",
             "provider": "openrouter",
             "model": "openai/gpt-4o",
+            "name": "test-agent",
         },
     )
     assert resp.status_code == 200

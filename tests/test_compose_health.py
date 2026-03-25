@@ -34,12 +34,12 @@ def _make_mock_service(
 class TestHealthMonitor:
     def test_creation(self):
         services = {"a": _make_mock_service()}
-        monitor = HealthMonitor(services, check_interval=1.0)
+        monitor = HealthMonitor(services, check_interval=1.0)  # type: ignore[invalid-argument-type]
         assert monitor.restart_counts == {"a": 0}
 
     def test_start_stop(self):
         services = {"a": _make_mock_service()}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor.start()
         time.sleep(0.2)
         monitor.stop()
@@ -47,14 +47,14 @@ class TestHealthMonitor:
     def test_no_restart_when_alive(self):
         svc = _make_mock_service(alive=True, restart_condition="always")
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
         svc.start.assert_not_called()
 
     def test_no_restart_when_policy_none(self):
         svc = _make_mock_service(alive=False, restart_condition="none")
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
         svc.start.assert_not_called()
 
@@ -66,7 +66,7 @@ class TestHealthMonitor:
             delay_seconds=0,
         )
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
         svc.start.assert_called_once()
         assert monitor.restart_counts["a"] == 1
@@ -79,7 +79,7 @@ class TestHealthMonitor:
             delay_seconds=0,
         )
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
         svc.start.assert_not_called()
 
@@ -90,7 +90,7 @@ class TestHealthMonitor:
             delay_seconds=0,
         )
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
         svc.start.assert_called_once()
 
@@ -102,7 +102,7 @@ class TestHealthMonitor:
             delay_seconds=0,
         )
         services = {"a": svc}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
 
         # First two restarts succeed
         monitor._check_and_restart()
@@ -121,7 +121,7 @@ class TestHealthMonitor:
             delay_seconds=0,
         )
         services = {"healthy": healthy, "dead": dead}
-        monitor = HealthMonitor(services, check_interval=0.1)
+        monitor = HealthMonitor(services, check_interval=0.1)  # type: ignore[invalid-argument-type]
         monitor._check_and_restart()
 
         healthy.start.assert_not_called()

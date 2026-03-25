@@ -279,7 +279,7 @@ class TestEvaluateAssertions:
             ContainsAssertion(value="hello"),
             NotContainsAssertion(value="error"),
         ]
-        results = evaluate_assertions(assertions, EvalContext(output="hello world"))
+        results = evaluate_assertions(assertions, EvalContext(output="hello world"))  # type: ignore[invalid-argument-type]
         assert all(r.passed for r in results)
         assert len(results) == 2
 
@@ -288,7 +288,7 @@ class TestEvaluateAssertions:
             ContainsAssertion(value="hello"),
             ContainsAssertion(value="missing"),
         ]
-        results = evaluate_assertions(assertions, EvalContext(output="hello world"))
+        results = evaluate_assertions(assertions, EvalContext(output="hello world"))  # type: ignore[invalid-argument-type]
         assert results[0].passed is True
         assert results[1].passed is False
 
@@ -303,6 +303,6 @@ class TestEvaluateAssertions:
 
     def test_dry_run_passed_through(self):
         assertions = [LLMJudgeAssertion(criteria=["Is good"])]
-        results = evaluate_assertions(assertions, EvalContext(output="output"), dry_run=True)
+        results = evaluate_assertions(assertions, EvalContext(output="output"), dry_run=True)  # type: ignore[invalid-argument-type]
         assert results[0].passed is False
         assert "[skipped]" in results[0].message

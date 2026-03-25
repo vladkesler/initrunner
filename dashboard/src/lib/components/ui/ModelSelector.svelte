@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CheckCircle } from 'lucide-svelte';
 	import type { ProviderModels, ProviderPreset } from '$lib/api/types';
+	import ModelCombobox from './ModelCombobox.svelte';
 
 	let {
 		providers = [],
@@ -146,14 +147,11 @@
 					{/each}
 				</select>
 			{:else}
-				<select
-					class="min-w-0 flex-1 {selectClass}"
+				<ModelCombobox
+					models={filteredModels()}
 					bind:value={selectedModel}
-				>
-					{#each filteredModels() as m}
-						<option value={m.name}>{compact ? m.name : `${m.name} -- ${m.description}`}</option>
-					{/each}
-				</select>
+					{compact}
+				/>
 			{/if}
 		</div>
 	</div>

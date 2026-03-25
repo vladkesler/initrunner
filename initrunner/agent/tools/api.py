@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 from pydantic_ai.toolsets.function import FunctionToolset
 
+from initrunner._text import safe_substitute as _safe_substitute
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._urls import SSRFBlocked, SSRFSafeTransport
 from initrunner.agent.schema.tools import ApiEndpoint, ApiToolConfig
@@ -25,14 +26,6 @@ _JSON_SCHEMA_TO_PYTHON: dict[str, type] = {
 def _resolve_headers(headers: dict[str, str]) -> dict[str, str]:
     """Resolve environment variable references in header values (${VAR} syntax)."""
     return {key: resolve_env_vars(value) for key, value in headers.items()}
-
-
-def _safe_substitute(template_str: str, values: dict[str, Any]) -> str:
-    """Replace ``{key}`` placeholders with values using str.replace (no format injection)."""
-    result = template_str
-    for k, v in values.items():
-        result = result.replace(f"{{{k}}}", str(v))
-    return result
 
 
 def _format_template(template: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:

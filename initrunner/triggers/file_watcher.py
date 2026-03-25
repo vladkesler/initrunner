@@ -8,6 +8,7 @@ from pathlib import Path
 
 from watchfiles import watch
 
+from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import FileWatchTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent
 
@@ -48,7 +49,7 @@ class FileWatchTrigger(TriggerBase):
                         continue
                     if extensions and not any(child.name.endswith(ext) for ext in extensions):
                         continue
-                    prompt = self._config.prompt_template.format(path=str(child))
+                    prompt = safe_substitute(self._config.prompt_template, {"path": str(child)})
                     self._callback(
                         TriggerEvent(
                             trigger_type="file_watch",
@@ -66,7 +67,7 @@ class FileWatchTrigger(TriggerBase):
             if self._stop_event.is_set():
                 break
             for _change_type, path in changes:
-                prompt = self._config.prompt_template.format(path=path)
+                prompt = safe_substitute(self._config.prompt_template, {"path": path})
                 event = TriggerEvent(
                     trigger_type="file_watch",
                     prompt=prompt,

@@ -1,0 +1,153 @@
+# Helpdesk Knowledge Base Agent
+#
+# A generic internal helpdesk agent powered by RAG and long-term memory.
+# Populate knowledge-base/ with your own docs and serve as an API.
+#
+# Supports: .md, .txt, .pdf, .html, .docx
+#
+# Prerequisites:
+#   pip install initrunner[ingest]   # required for PDF/DOCX support
+#
+# Usage:
+#   initrunner ingest role.yaml
+#   initrunner run role.yaml -i
+#   initrunner serve role.yaml --api-key <key>
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: helpdesk
+  description: >
+    Drop your company docs in and get an AI helpdesk. Ingests markdown,
+    PDF, HTML, Word, and plain text. Answers questions with citations,
+    remembers users across sessions, and serves as an OpenAI-compatible API.
+  version: "1.0.1"
+  author: InitRunner Team
+  tags: [helpdesk, rag, memory, api-server, knowledge-base, example]
+  bundle:
+    include:
+      - README.md
+spec:
+  role: |
+    You are a helpdesk assistant that answers questions using the ingested
+    knowledge base. You serve internal users who need quick, accurate answers.
+
+    ## How to answer questions
+
+    1. ALWAYS call search_documents before answering a question. Base your
+       answers on the knowledge base, not on assumptions.
+    2. Cite your sources. When referencing information from a document, mention
+       which article or section it came from.
+    3. If search_documents returns no relevant results, say so honestly.
+       Never fabricate answers, policies, procedures, or links.
+    4. Use read_file to view a full document when a search snippet lacks
+       sufficient context.
+    5. Use think to reason through multi-part questions or when you need
+       to combine information from multiple sources.
+
+    ## Response style
+
+    - Be concise and professional. Lead with the answer, then explain.
+    - Use bullet points for lists and steps.
+    - Use fenced code blocks for commands, URLs, or configuration snippets.
+    - Keep answers focused -- one question at a time.
+
+    ## Memory usage
+
+    You have three types of long-term memory. Use them proactively:
+
+    - **remember(content, category)** -- store facts the user shares:
+      their department, role, preferences, or recurring questions.
+      Good categories: "preference", "department", "role", "fact".
+    - **recall(query)** -- search memory before answering questions that
+      could benefit from prior context (e.g. "what team am I on?").
+    - **record_episode(content, category)** -- capture notable outcomes:
+      resolved issues, escalations, answers that needed correction.
+      Good categories: "resolved", "escalation", "correction".
+    - **learn_procedure(content, category)** -- save rules or workflows
+      you discover, like "PTO requests need manager approval first".
+      Good categories: "workflow", "rule", "process".
+    - **list_memories()** -- browse stored memories when the user asks
+      what you know about them.
+
+    Be transparent: briefly mention when you store or recall information.
+
+    ## Scope boundaries
+
+    - Only answer questions based on content in the knowledge base.
+    - Do not fabricate policies, procedures, or contact information.
+    - Do not take actions on behalf of the user (e.g. filing tickets,
+      sending emails). Provide instructions for how to do so.
+    - If a question is outside the knowledge base, suggest who to contact
+      or where to escalate.
+
+    ## Time awareness
+
+    Use the datetime tool when answers depend on schedules, deadlines,
+    or time-sensitive policies (e.g. "Is today a holiday?").
+  model:
+    provider: openai
+    name: gpt-5-mini
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: datetime
+    - type: think
+    - type: filesystem
+      root_path: ./knowledge-base
+      read_only: true
+      allowed_extensions: [.md, .txt]
+  ingest:
+    sources:
+      - "./knowledge-base/**/*.md"
+      - "./knowledge-base/**/*.txt"
+      - "./knowledge-base/**/*.pdf"
+      - "./knowledge-base/**/*.html"
+      - "./knowledge-base/**/*.docx"
+    chunking:
+      strategy: fixed
+      chunk_size: 512
+      chunk_overlap: 50
+  memory:
+    max_sessions: 20
+    max_resume_messages: 30
+    semantic:
+      enabled: true
+      max_memories: 1000
+    episodic:
+      enabled: true
+      max_episodes: 500
+    procedural:
+      enabled: true
+      max_procedures: 100
+    consolidation:
+      enabled: true
+      interval: after_session
+  security:
+    content:
+      max_prompt_length: 10000
+      max_output_length: 20000
+      blocked_input_patterns:
+        - "(?i)ignore.*previous.*instructions"
+        - "(?i)ignore.*above.*instructions"
+        - "(?i)disregard.*instructions"
+        - "(?i)reveal.*system.*prompt"
+        - "(?i)show.*system.*prompt"
+        - "(?i)repeat.*instructions.*verbatim"
+      blocked_output_patterns:
+        - "(?i)password\\s*[:=]"
+      output_action: strip
+      pii_redaction: true
+    server:
+      cors_origins: []
+      require_https: false
+      max_request_body_bytes: 524288
+      max_conversations: 500
+    rate_limit:
+      requests_per_minute: 30
+      burst_size: 5
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15
+    timeout_seconds: 120
+    max_request_limit: 30

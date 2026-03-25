@@ -31,13 +31,13 @@ def resolve_func_names(tool_configs: list[dict]) -> list[str]:
     and inspects the resulting toolset to extract function names.
     Used to compute always_available for ToolSearchConfig.
     """
-    from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
     from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 
     dummy_role = RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="introspect", description=""),
+        metadata=RoleMetadata(name="introspect", description=""),
         spec=AgentSpec(
             role="",
             model=ModelConfig(provider="openai", name="dummy"),

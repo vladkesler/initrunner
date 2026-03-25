@@ -1,0 +1,24 @@
+apiVersion: initrunner/v1
+kind: Team
+metadata:
+  name: code-review-team
+  description: Multi-perspective code review
+spec:
+  model:
+    provider: openai
+    name: gpt-5-mini
+  personas:
+    architect: "review for design patterns, SOLID principles, and architecture issues"
+    security: "find security vulnerabilities, injection risks, auth issues"
+    maintainer: "check readability, naming, test coverage gaps, docs"
+  tools:
+    - type: filesystem
+      root_path: .
+      read_only: true
+    - type: git
+      repo_path: .
+      read_only: true
+  guardrails:
+    max_tokens_per_run: 50000
+    timeout_seconds: 300
+    team_token_budget: 150000

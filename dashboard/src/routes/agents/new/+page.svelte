@@ -50,6 +50,7 @@
 	let optionsLoading = $state(true);
 	let optionsError: string | null = $state(null);
 	let selectedTemplate: string | null = $state(null);
+	let agentName = $state('');
 	let description = $state('');
 	let selectedProvider = $state('');
 	let selectedModel = $state('');
@@ -111,6 +112,7 @@
 
 	const canGenerate = $derived(() => {
 		if (!mode || !selectedProvider) return false;
+		if (mode !== 'hub' && !agentName.trim()) return false;
 		if (mode === 'template' && !selectedTemplate) return false;
 		if (mode === 'description' && !description.trim()) return false;
 		if (mode === 'hub' && !selectedHubRef) return false;
@@ -239,6 +241,7 @@
 			} else {
 				result = await seedAgent({
 					mode: mode!,
+					name: agentName.trim(),
 					template: mode === 'template' ? selectedTemplate! : undefined,
 					description: mode === 'description' ? description.trim() : undefined,
 					provider: selectedProvider,
@@ -250,6 +253,11 @@
 			yamlText = result.yaml_text;
 			explanation = result.explanation;
 			issues = result.issues;
+			// Auto-suggest filename from agent name (non-hub only)
+			if (mode !== 'hub' && agentName.trim()) {
+				const slug = agentName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+				filename = slug ? `${slug}.yaml` : 'role.yaml';
+			}
 			step = 'editor';
 		} catch (e) {
 			if (e instanceof ApiError) {
@@ -319,6 +327,7 @@
 	function createAnother() {
 		step = 'configure';
 		mode = null;
+		agentName = '';
 		selectedTemplate = null;
 		description = '';
 		yamlText = '';
@@ -399,6 +408,19 @@
 	<!-- CONFIGURE SCREEN                                             -->
 	<!-- ============================================================ -->
 	{:else if step === 'configure'}
+		<!-- Agent name -->
+		{#if mode !== 'hub'}
+			<div>
+				<label for="agent-name" class="mb-1 block text-[12px] font-medium text-fg-muted">Agent name</label>
+				<input
+					id="agent-name"
+					bind:value={agentName}
+					placeholder="my-agent"
+					class="w-full max-w-sm border border-edge bg-surface-1 px-3 py-2 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+				/>
+			</div>
+		{/if}
+
 		<!-- Mode selection -->
 		<div>
 			<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">

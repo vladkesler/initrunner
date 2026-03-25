@@ -1,0 +1,32 @@
+apiVersion: initrunner/v1
+kind: Compose
+metadata:
+  name: ci-pipeline
+  description: >
+    CI event processing pipeline. A webhook receiver accepts CI webhooks,
+    a build analyzer diagnoses failures, and a notifier sends Slack alerts
+    and updates GitHub commit status.
+spec:
+  services:
+    webhook-receiver:
+      role: roles/webhook-receiver.yaml
+      sink:
+        type: delegate
+        target: build-analyzer
+
+    build-analyzer:
+      role: roles/build-analyzer.yaml
+      depends_on:
+        - webhook-receiver
+      sink:
+        type: delegate
+        target: notifier
+
+    notifier:
+      role: roles/notifier.yaml
+      depends_on:
+        - build-analyzer
+      restart:
+        condition: on-failure
+        max_retries: 3
+        delay_seconds: 5

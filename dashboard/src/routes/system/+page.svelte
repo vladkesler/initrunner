@@ -9,6 +9,7 @@
 	let version = $state('');
 	let providers = $state<Provider[]>([]);
 	let doctorChecks = $state<DoctorCheck[]>([]);
+	let embeddingChecks = $state<DoctorCheck[]>([]);
 	let tools = $state<ToolType[]>([]);
 	let loading = $state(true);
 	let doctorLoading = $state(false);
@@ -31,6 +32,7 @@
 		try {
 			const res = await runDoctor();
 			doctorChecks = res.checks;
+			embeddingChecks = res.embedding_checks;
 		} catch {
 			// API not available
 		} finally {
@@ -135,6 +137,24 @@
 				</div>
 			{/if}
 		</div>
+
+		<!-- Embedding Providers -->
+		{#if embeddingChecks.length > 0}
+			<div>
+				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Embedding Providers</h2>
+				<div class="space-y-1">
+					{#each embeddingChecks as check}
+						{@const Icon = statusIcon(check.status)}
+						<div class="card-surface flex items-center gap-3 bg-surface-1 px-4 py-2.5">
+							<Icon size={14} class={statusColor(check.status)} />
+							<span class="font-mono text-[13px] text-fg-muted">{check.name}</span>
+							<span class="ml-auto text-[13px] {statusColor(check.status)}">{check.message}</span>
+						</div>
+					{/each}
+				</div>
+				<p class="mt-2 text-[12px] text-fg-faint">Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.</p>
+			</div>
+		{/if}
 
 		<!-- Tool Registry -->
 		<div>

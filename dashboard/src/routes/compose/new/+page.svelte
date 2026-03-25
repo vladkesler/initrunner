@@ -6,9 +6,11 @@
 		validateCompose,
 		saveCompose
 	} from '$lib/api/compose';
+	import { saveKey } from '$lib/api/builder';
 	import { ApiError } from '$lib/api/client';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
+	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import type {
 		ComposeBuilderOptions,
 		PatternInfo,
@@ -44,6 +46,9 @@
 	let sharedMemory = $state(false);
 	let selectedProvider = $state('');
 	let selectedModel = $state('');
+	let customModelName = $state('');
+	let customBaseUrl = $state('');
+	let apiKey = $state('');
 	let projectName = $state('');
 	let generating = $state(false);
 	let generateError: string | null = $state(null);
@@ -70,6 +75,14 @@
 	// -- Derived --------------------------------------------------------------
 
 	const canGenerate = $derived(selectedPattern !== null && projectName.trim().length > 0);
+
+	const customPresetNames = $derived(
+		new Set((options?.custom_presets ?? []).map((p) => p.name))
+	);
+	const isCustomEndpoint = $derived(customPresetNames.has(selectedProvider));
+	const activePreset = $derived(
+		(options?.custom_presets ?? []).find((p) => p.name === selectedProvider) ?? null
+	);
 
 	// -- Slot management ------------------------------------------------------
 
@@ -112,6 +125,18 @@
 		generating = true;
 		generateError = null;
 		try {
+			let resolvedApiKeyEnv: string | undefined;
+			if (apiKey.trim() && isCustomEndpoint) {
+				const keyResult = await saveKey({
+					preset: activePreset?.name !== 'custom' ? activePreset?.name : undefined,
+					base_url: selectedProvider === 'custom' ? customBaseUrl : undefined,
+					api_key: apiKey.trim()
+				});
+				resolvedApiKeyEnv = keyResult.env_var;
+			} else if (isCustomEndpoint && activePreset?.key_configured) {
+				resolvedApiKeyEnv = activePreset.api_key_env;
+			}
+
 			const services: SlotAssignment[] = slots.map((s) => ({
 				slot: s.name,
 				agent_id: s.agentId
@@ -123,7 +148,9 @@
 				service_count: serviceCount,
 				shared_memory: sharedMemory,
 				provider: selectedProvider || 'openai',
-				model: selectedModel || null
+				model: (isCustomEndpoint ? customModelName.trim() : selectedModel) || null,
+				base_url: customBaseUrl || null,
+				api_key_env: resolvedApiKeyEnv
 			});
 			composeYaml = result.compose_yaml;
 			roleYamls = result.role_yamls;
@@ -182,6 +209,9 @@
 		serviceCount = 3;
 		slots = [];
 		sharedMemory = false;
+		customModelName = '';
+		customBaseUrl = '';
+		apiKey = '';
 		projectName = '';
 		composeYaml = '';
 		roleYamls = {};
@@ -336,22 +366,22 @@
 						<input type="checkbox" bind:checked={sharedMemory} class="accent-accent-primary" />
 						Shared memory
 					</label>
-
-					{#if options}
-						<div class="flex items-center gap-2">
-							<label for="provider" class="text-[12px] text-fg-faint">Provider</label>
-							<select
-								id="provider"
-								bind:value={selectedProvider}
-								class="border border-edge bg-surface-1 px-2 py-1 font-mono text-[12px] text-fg outline-none"
-							>
-								{#each options.providers as p}
-									<option value={p.provider}>{p.provider}</option>
-								{/each}
-							</select>
-						</div>
-					{/if}
 				</div>
+
+				{#if options}
+					<ModelSelector
+						providers={options.providers}
+						customPresets={options.custom_presets}
+						ollamaModels={options.ollama_models}
+						ollamaBaseUrl={options.ollama_base_url}
+						bind:selectedProvider
+						bind:selectedModel
+						bind:customModelName
+						bind:customBaseUrl
+						bind:apiKey
+						compact={true}
+					/>
+				{/if}
 
 				<!-- Generate button -->
 				<div class="flex items-center gap-3">

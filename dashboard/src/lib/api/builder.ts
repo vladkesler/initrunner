@@ -96,6 +96,7 @@ export function getBuilderOptions(): Promise<BuilderOptions> {
 
 export function seedAgent(body: {
 	mode: 'template' | 'description' | 'blank';
+	name: string;
 	template?: string;
 	description?: string;
 	provider: string;

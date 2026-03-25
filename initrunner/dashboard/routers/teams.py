@@ -10,6 +10,7 @@ from starlette.responses import StreamingResponse
 
 from initrunner.dashboard.deps import TeamCache, get_team_cache
 from initrunner.dashboard.schemas import (
+    DeleteResponse,
     ItemSummary,
     PersonaDetail,
     TeamDetail,
@@ -217,3 +218,20 @@ async def stream_team_run(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.delete("/{team_id}")
+async def delete_team(
+    team_id: str,
+    cache: Annotated[TeamCache, Depends(get_team_cache)],
+) -> DeleteResponse:
+    dt = cache.get(team_id)
+    if dt is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+    path = dt.path
+    try:
+        await asyncio.to_thread(path.unlink, True)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
+    cache.evict(team_id)
+    return DeleteResponse(id=team_id, path=str(path))

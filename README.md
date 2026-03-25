@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-3700+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.39.2-%2334D058" alt="v1.39.0">
+  <img src="https://img.shields.io/badge/latest-v1.40.0-%2334D058" alt="v1.40.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.39.0** -- Architecture cleanup: legacy tools migrated to auto-discovery, `run()` god-function broken into focused helpers, services layer fully enforced, 91 new security tests for authz and middleware. See the [Changelog](CHANGELOG.md).
+> **v1.40.0** -- Full dashboard rewrite: SvelteKit + FastAPI replaces old TUI and HTMX dashboard. SvelteFlow canvas views, visual compose/team builders, ingestion management with file upload and URL addition, native desktop app, centralized deprecation system, model lists updated to March 2026, bundled starter examples. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -33,6 +33,7 @@ One YAML file is all it takes to go from idea to running agent - with document s
 - [Define an Agent in YAML](#define-agent-roles-in-yaml)
 - [Why InitRunner](#why-initrunner)
 - [Features](#features)
+- [User Interfaces](#user-interfaces)
 - [Security & Authorization](#security--authorization)
 - [Distribution & Deployment](#distribution--deployment)
 - [Documentation](#documentation)
@@ -211,6 +212,52 @@ spec:
 
 Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
+## User Interfaces
+
+Manage agents, run prompts, build compositions, and browse audit trails from a visual interface. Two modes are available: a web dashboard that opens in your browser, and a native desktop app.
+
+### Dashboard (web)
+
+```bash
+pip install "initrunner[dashboard]"   # included in initrunner[all]
+initrunner dashboard                  # opens http://localhost:8100
+```
+
+The browser opens automatically. Flags:
+
+| Flag | Description |
+|------|-------------|
+| `--port` | Listen on a different port (default: `8100`) |
+| `--no-open` | Don't open the browser automatically |
+| `--expose` | Bind to `0.0.0.0` instead of localhost |
+| `--roles-dir` | Extra directories to scan for role YAML files (repeatable) |
+
+### Desktop (native window)
+
+```bash
+pip install "initrunner[desktop]"     # adds pywebview
+initrunner desktop                    # opens a native OS window
+```
+
+No browser needed. The desktop app embeds the dashboard in a native window using the platform's WebView (WKWebView on macOS, WebView2 on Windows). On Linux, GTK and WebKit packages are required -- the command detects missing packages and prints the install command for your distro.
+
+If a dashboard is already running on the port, the desktop window connects to it instead of starting a second backend.
+
+### What's in the UI
+
+- **Agent management** -- browse, create, delete, and inspect agents in a flow canvas or list view
+- **Run panel** -- send prompts and stream responses in real time
+- **Compose and Team builders** -- visual pipeline editors for multi-agent orchestration
+- **Audit log** -- filterable run history with token usage and durations
+- **System health** -- detected providers, doctor checks, and tool registry
+
+See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](docs/interfaces/design-system.md).
+
+<p align="center">
+  <img src="assets/screenshot-dashboard.png" alt="InitRunner Dashboard" width="800"><br>
+  <em>Dashboard Launchpad - agents, activity, compositions, and teams at a glance</em>
+</p>
+
 ## Security & Authorization
 
 Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, API, and pipeline:
@@ -230,7 +277,6 @@ Also includes content filtering, PEP 578 sandboxing, Docker isolation, token bud
 |---------|-----------------|------|
 | **Skills** - reusable tool + prompt bundles, auto-discovered | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
 | **Team mode** - multi-persona on one task | `kind: Team` + `spec: { personas: {…} }` | [Team Mode](docs/orchestration/team_mode.md) |
-| **Dashboard** - web UI for agent management | `initrunner dashboard` | [Dashboard](docs/interfaces/dashboard.md) |
 | **API server** - OpenAI-compatible endpoint | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **Multimodal** - images, audio, video, docs | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
 | **Structured output** - validated JSON schemas | `spec: { output: { schema: {…} } }` | [Structured Output](docs/core/structured-output.md) |

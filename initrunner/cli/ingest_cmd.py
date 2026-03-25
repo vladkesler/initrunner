@@ -13,7 +13,7 @@ from initrunner.cli._helpers import console, load_role_or_exit
 def _status_color(status: object) -> str:
     from initrunner.ingestion.pipeline import FileStatus
 
-    return {
+    return {  # type: ignore[no-matching-overload]
         FileStatus.NEW: "green",
         FileStatus.UPDATED: "yellow",
         FileStatus.SKIPPED: "dim",

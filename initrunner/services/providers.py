@@ -408,7 +408,7 @@ def build_ephemeral_role(
     tool_search: ToolSearchConfig | None = None,
 ) -> RoleDefinition:
     """Create an in-memory RoleDefinition without writing YAML."""
-    from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
     from initrunner.agent.schema.guardrails import Guardrails
     from initrunner.agent.schema.role import AgentSpec
     from initrunner.agent.schema.role import RoleDefinition as RoleDef
@@ -450,6 +450,6 @@ def build_ephemeral_role(
     return RoleDef(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name=name, description="Ephemeral chat agent"),
+        metadata=RoleMetadata(name=name, description="Ephemeral chat agent"),
         spec=AgentSpec(**spec_kwargs),
     )

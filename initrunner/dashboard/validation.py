@@ -47,7 +47,7 @@ def validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
         )
     except Exception as ve:
         if hasattr(ve, "errors"):
-            error_list = ve.errors()
+            error_list = ve.errors()  # type: ignore[union-attr]
         else:
             error_list = [{"msg": str(ve), "loc": ("spec",)}]
         for err in error_list:
@@ -55,7 +55,7 @@ def validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
             issues.append(
                 ValidationIssueResponse(
                     field=loc or "spec",
-                    message=err.get("msg", str(err)),
+                    message=str(err.get("msg", str(err))),
                     severity="error",
                 )
             )

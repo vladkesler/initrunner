@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchTeamList } from '$lib/api/teams';
+	import { fetchTeamList, deleteTeam } from '$lib/api/teams';
 	import type { TeamSummary } from '$lib/api/types';
 	import TeamList from '$lib/components/teams/TeamList.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Users, Plus } from 'lucide-svelte';
 
 	let teams = $state<TeamSummary[]>([]);
 	let loading = $state(true);
 	let query = $state('');
+	let pendingDelete: TeamSummary | null = $state(null);
 	let searchEl: HTMLInputElement | undefined = $state();
 
 	const filtered = $derived(() => {
@@ -119,7 +121,22 @@
 				</button>
 			</div>
 		{:else}
-			<TeamList teams={results} />
+			<TeamList teams={results} onDelete={(team) => (pendingDelete = team)} />
 		{/if}
+	{/if}
+
+	{#if pendingDelete}
+		<ConfirmDeleteDialog
+			entityName={pendingDelete.name}
+			entityType="team"
+			open={true}
+			onConfirm={async () => {
+				const id = pendingDelete!.id;
+				await deleteTeam(id);
+				teams = teams.filter((t) => t.id !== id);
+				pendingDelete = null;
+			}}
+			onCancel={() => (pendingDelete = null)}
+		/>
 	{/if}
 </div>

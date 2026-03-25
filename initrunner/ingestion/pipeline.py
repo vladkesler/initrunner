@@ -495,10 +495,14 @@ def _embed_and_store(
     *,
     existing_store: DocumentStore | None = None,
     stack: ExitStack | None = None,
+    purge_resolved_sources: set[str] | None = None,
 ) -> DocumentStore | None:
     """Embed per-file in batches, store results, and purge deleted sources.
 
     Returns the opened store (or *existing_store*) so URL pipeline can reuse it.
+
+    If *purge_resolved_sources* is a set, purge file sources not in it.
+    If ``None``, skip purging (managed-source additions).
     """
     items: list[_SourceItem] = []
     for f, status, chunks in file_chunks:
@@ -523,9 +527,9 @@ def _embed_and_store(
         stack=stack,
     )
 
-    # Purge deleted files (only file sources — URL sources are never auto-purged)
-    if store is not None:
-        _purge_deleted(store, resolved_sources)
+    # Purge deleted files (only file sources -- URL sources are never auto-purged)
+    if purge_resolved_sources is not None and store is not None:
+        _purge_deleted(store, purge_resolved_sources)
 
     return store
 
@@ -561,24 +565,41 @@ def _embed_and_store_urls(
     )
 
 
-def run_ingest(
+def _execute_ingest_core(
+    files: list[Path],
+    urls: list[str],
     config: IngestConfig,
     agent_name: str,
-    provider: str = "openai",
+    provider: str,
     *,
-    base_dir: Path | None = None,
     force: bool = False,
     progress_callback: Callable[[Path, FileStatus], None] | None = None,
     max_file_size_mb: float = 0,
     max_total_ingest_mb: float = 0,
+    purge_resolved_sources: set[str] | None = None,
 ) -> IngestStats:
-    """Run the full ingestion pipeline synchronously. Returns IngestStats."""
-    from opentelemetry import trace
+    """Shared pipeline core: lock, embedder, model check, classify, embed, store, purge.
+
+    Args:
+        files: Resolved file paths to ingest.
+        urls: URLs to ingest.
+        config: Ingestion configuration.
+        agent_name: Agent name (used for store path resolution).
+        provider: Default embedding provider.
+        force: Force re-ingestion of all files.
+        progress_callback: Called per-file with (path, status).
+        max_file_size_mb: Skip files larger than this (0 = no limit).
+        max_total_ingest_mb: Skip once cumulative size exceeds this (0 = no limit).
+        purge_resolved_sources: If a set, purge file sources not in the set.
+            If ``None``, skip purging entirely (used by managed-source additions).
+    """
+    from opentelemetry import trace  # type: ignore[import-not-found]
+
+    from initrunner.ingestion.manifest import read_manifest, serialize_manifest
 
     tracer = trace.get_tracer("initrunner")
 
     stats = IngestStats()
-    files, urls = resolve_sources(config.sources, base_dir=base_dir)
     if not files and not urls:
         return stats
 
@@ -611,11 +632,17 @@ def run_ingest(
             from initrunner.stores.base import EmbeddingModelChangedError
             from initrunner.stores.lance_store import wipe_document_store
 
+            saved_manifest_json: str | None = None
             with create_document_store(config.store_backend, db_path) as check_store:
                 stored_identity = check_store.read_store_meta("embedding_model")
+                # Preserve manifest before potential wipe
+                if stored_identity is not None and stored_identity != current_identity:
+                    manifest = read_manifest(check_store)
+                    if manifest:
+                        saved_manifest_json = serialize_manifest(manifest)
 
             if stored_identity is None:
-                # Legacy store — record current identity, don't wipe
+                # Legacy store -- record current identity, don't wipe
                 logging.getLogger(__name__).warning(
                     "No embedding model recorded in store. "
                     "Recording '%s' for future change detection.",
@@ -632,6 +659,10 @@ def run_ingest(
                         current_identity,
                     )
                     wipe_document_store(db_path)
+                    # Restore managed source manifest to fresh store
+                    if saved_manifest_json:
+                        with create_document_store(config.store_backend, db_path) as fresh_store:
+                            fresh_store.write_store_meta("managed_sources", saved_manifest_json)
                 else:
                     raise EmbeddingModelChangedError(
                         f"Embedding model changed from {stored_identity} to {current_identity}. "
@@ -671,14 +702,17 @@ def run_ingest(
                         file_resolved_sources,
                         progress_callback,
                         stack=stack,
+                        purge_resolved_sources=purge_resolved_sources,
                     )
-                elif not to_process and file_resolved_sources:
-                    # All skipped/errored — still need to purge deleted files
+                elif (
+                    not to_process and file_resolved_sources and purge_resolved_sources is not None
+                ):
+                    # All skipped/errored -- still need to purge deleted files
                     if db_path.exists():
                         store = stack.enter_context(
                             create_document_store(config.store_backend, db_path)
                         )
-                        _purge_deleted(store, file_resolved_sources)
+                        _purge_deleted(store, purge_resolved_sources)
 
             # --- URL pipeline ---
             if urls:
@@ -714,6 +748,114 @@ def run_ingest(
     ingest_span.set_attribute("initrunner.ingest.files_processed", stats.new + stats.updated)
     ingest_span.set_attribute("initrunner.ingest.chunks_created", stats.total_chunks)
     ingest_span.end()
+
+    return stats
+
+
+def _merge_managed_sources(config: IngestConfig, agent_name: str) -> tuple[list[Path], list[str]]:
+    """Read the managed source manifest and return (files, urls) to merge."""
+    from initrunner.ingestion.manifest import read_manifest
+
+    db_path = _get_store_path(agent_name, config.store_path)
+    if not db_path.exists():
+        return [], []
+
+    try:
+        with create_document_store(config.store_backend, db_path) as store:
+            manifest = read_manifest(store)
+    except Exception:
+        logger.debug("Could not read managed source manifest", exc_info=True)
+        return [], []
+
+    files = [Path(s.path) for s in manifest if s.source_type == "file" and Path(s.path).is_file()]
+    urls = [s.path for s in manifest if s.source_type == "url"]
+    return files, urls
+
+
+def run_ingest(
+    config: IngestConfig,
+    agent_name: str,
+    provider: str = "openai",
+    *,
+    base_dir: Path | None = None,
+    force: bool = False,
+    progress_callback: Callable[[Path, FileStatus], None] | None = None,
+    max_file_size_mb: float = 0,
+    max_total_ingest_mb: float = 0,
+) -> IngestStats:
+    """Run the full ingestion pipeline synchronously. Returns IngestStats."""
+    files, urls = resolve_sources(config.sources, base_dir=base_dir)
+
+    # Merge managed sources (dashboard uploads/URLs)
+    managed_files, managed_urls = _merge_managed_sources(config, agent_name)
+    all_files = files + managed_files
+    all_urls = list(dict.fromkeys(urls + managed_urls))  # deduplicate, preserve order
+    all_resolved = {str(p) for p in all_files}
+
+    return _execute_ingest_core(
+        all_files,
+        all_urls,
+        config,
+        agent_name,
+        provider,
+        force=force,
+        progress_callback=progress_callback,
+        max_file_size_mb=max_file_size_mb,
+        max_total_ingest_mb=max_total_ingest_mb,
+        purge_resolved_sources=all_resolved,
+    )
+
+
+def run_ingest_managed(
+    files: list[Path],
+    urls: list[str],
+    config: IngestConfig,
+    agent_name: str,
+    provider: str = "openai",
+    *,
+    progress_callback: Callable[[Path, FileStatus], None] | None = None,
+    max_file_size_mb: float = 0,
+    max_total_ingest_mb: float = 0,
+) -> IngestStats:
+    """Ingest explicit files/URLs and register them in the managed source manifest.
+
+    Does NOT purge deleted sources. Does NOT resolve globs.
+    Used by the dashboard for uploads and URL additions.
+    """
+    from initrunner.ingestion.manifest import ManagedSource, add_to_manifest
+
+    stats = _execute_ingest_core(
+        files,
+        urls,
+        config,
+        agent_name,
+        provider,
+        purge_resolved_sources=None,
+        progress_callback=progress_callback,
+        max_file_size_mb=max_file_size_mb,
+        max_total_ingest_mb=max_total_ingest_mb,
+    )
+
+    # Only add successfully ingested sources to the manifest
+    ok_paths: set[str] = set()
+    for r in stats.file_results:
+        if r.status != FileStatus.ERROR:
+            ok_paths.add(str(r.path))
+
+    now = datetime.now(UTC).isoformat()
+    new_entries: list[ManagedSource] = []
+    for f in files:
+        if str(f) in ok_paths:
+            new_entries.append(ManagedSource(path=str(f), source_type="file", added_at=now))
+    for u in urls:
+        if u in ok_paths:
+            new_entries.append(ManagedSource(path=u, source_type="url", added_at=now))
+
+    if new_entries:
+        db_path = _get_store_path(agent_name, config.store_path)
+        if db_path.exists():
+            with create_document_store(config.store_backend, db_path) as store:
+                add_to_manifest(store, new_entries)
 
     return stats
 

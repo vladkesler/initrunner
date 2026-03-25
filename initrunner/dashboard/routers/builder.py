@@ -51,7 +51,7 @@ _BLANK_TEMPLATE = """\
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: my-agent
+  name: {name}
   description: ""
 spec:
   role: |
@@ -199,12 +199,16 @@ async def seed_agent(
             from initrunner.templates import _default_model_name
 
             model = req.model or _default_model_name(runtime_provider)
-            session.yaml_text = _BLANK_TEMPLATE.format(provider=runtime_provider, model=model)
+            session.yaml_text = _BLANK_TEMPLATE.format(
+                name=req.name, provider=runtime_provider, model=model
+            )
             turn = session._make_turn_result("Minimal skeleton. Edit as needed.")
         elif req.mode == "template":
             if not req.template:
                 raise ValueError("template field is required for mode=template")
-            turn = session.seed_template(req.template, runtime_provider, req.model)
+            turn = session.seed_template(
+                req.template, runtime_provider, req.model, agent_name=req.name
+            )
         elif req.mode == "description":
             if not req.description:
                 raise ValueError("description field is required for mode=description")
@@ -212,6 +216,7 @@ async def seed_agent(
                 req.description,
                 runtime_provider,
                 req.model,
+                name_hint=req.name,
                 base_url=base_url,
                 api_key_env=api_key_env,
             )

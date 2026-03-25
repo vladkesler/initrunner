@@ -131,7 +131,7 @@ class TestBuildAgentPrompt:
 
     def test_prior_output_truncated(self):
         prior = [("alpha", "x" * 5000)]
-        prompt = _build_agent_prompt("task", "bravo", prior, 100)
+        prompt = _build_agent_prompt("task", "bravo", prior, 100)  # type: ignore[invalid-argument-type]
         assert "[truncated]" in prompt
 
     def test_budget_divided_across_prior_outputs(self):

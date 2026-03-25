@@ -1,20 +1,23 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml } from '$lib/api/teams';
+	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml, deleteTeam } from '$lib/api/teams';
 	import type { TeamDetail } from '$lib/api/types';
 	import PersonaPipeline from '$lib/components/teams/PersonaPipeline.svelte';
 	import TeamRunPanel from '$lib/components/teams/TeamRunPanel.svelte';
 	import ConfigPanel from '$lib/components/teams/ConfigPanel.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { ArrowLeft, Play, GitBranch, Settings, FileCode } from 'lucide-svelte';
+	import { ArrowLeft, Play, GitBranch, Settings, FileCode, Trash2 } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let detail: TeamDetail | null = $state(null);
 	let yaml = $state('');
 	let teamPath = $state('');
 	let loading = $state(true);
+	let deleteDialogOpen = $state(false);
 
 	const teamId = $derived(page.params.id ?? '');
 
@@ -98,6 +101,13 @@
 				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">
 					{detail.personas.length} personas
 				</span>
+				<button
+					class="ml-auto flex items-center gap-1 rounded-[min(var(--radius-md),12px)] border border-transparent bg-destructive/10 px-2.5 py-1 text-[0.8rem] font-medium text-destructive transition-all hover:bg-destructive/20"
+					onclick={() => (deleteDialogOpen = true)}
+				>
+					<Trash2 size={13} />
+					Delete
+				</button>
 			</div>
 			{#if detail.description}
 				<p class="mt-1 text-[13px] text-fg-muted">{detail.description}</p>
@@ -147,6 +157,17 @@
 				{/if}
 			</div>
 		</div>
+
+		<ConfirmDeleteDialog
+			entityName={detail.name}
+			entityType="team"
+			bind:open={deleteDialogOpen}
+			onConfirm={async () => {
+				await deleteTeam(teamId);
+				goto('/teams');
+			}}
+			onCancel={() => (deleteDialogOpen = false)}
+		/>
 	{:else}
 		<p class="text-[13px] text-fg-faint">Team not found.</p>
 	{/if}

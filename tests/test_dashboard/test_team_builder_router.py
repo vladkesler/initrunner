@@ -533,7 +533,7 @@ def test_resolve_custom_provider():
     # OpenRouter preset
     prov, burl, akenv = resolve_custom_provider("openrouter", None, None)
     assert prov == "openai"
-    assert "openrouter.ai" in burl
+    assert burl is not None and "openrouter.ai" in burl
     assert akenv == "OPENROUTER_API_KEY"
 
     # Standard provider passes through

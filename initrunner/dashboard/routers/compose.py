@@ -25,6 +25,7 @@ from initrunner.dashboard.schemas import (
     ComposeYamlSaveRequest,
     ComposeYamlSaveResponse,
     DelegateEventResponse,
+    DeleteResponse,
     HealthCheckDetail,
     RestartDetail,
     SinkDetail,
@@ -334,3 +335,20 @@ def _query_events(
         )
         for e in raw
     ]
+
+
+@router.delete("/{compose_id}")
+async def delete_compose(
+    compose_id: str,
+    compose_cache: Annotated[ComposeCache, Depends(get_compose_cache)],
+) -> DeleteResponse:
+    dc = compose_cache.get(compose_id)
+    if dc is None:
+        raise HTTPException(status_code=404, detail="Compose not found")
+    path = dc.path
+    try:
+        await asyncio.to_thread(path.unlink, True)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
+    compose_cache.evict(compose_id)
+    return DeleteResponse(id=compose_id, path=str(path))

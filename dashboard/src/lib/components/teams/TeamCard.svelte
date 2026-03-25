@@ -1,14 +1,18 @@
 <script lang="ts">
 	import type { TeamSummary } from '$lib/api/types';
-	import { Database, FileText } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
+	import { Database, FileText, Trash2 } from 'lucide-svelte';
 
-	let { team, idx }: { team: TeamSummary; idx: number } = $props();
+	let { team, idx, onDelete }: { team: TeamSummary; idx: number; onDelete?: (team: TeamSummary) => void } = $props();
 </script>
 
-<a
-	href="/teams/{team.id}"
-	class="group border bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-accent-primary/20 hover:bg-gradient-to-br hover:from-accent-primary/[0.03] hover:to-transparent {team.error ? 'card-surface-error' : 'card-surface'}"
+<div
+	class="group cursor-pointer border bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-accent-primary/20 hover:bg-gradient-to-br hover:from-accent-primary/[0.03] hover:to-transparent {team.error ? 'card-surface-error' : 'card-surface'}"
 	style="animation: fadeIn 300ms ease-out {idx * 50}ms both"
+	role="link"
+	tabindex="0"
+	onclick={() => goto(`/teams/${team.id}`)}
+	onkeydown={(e) => { if (e.key === 'Enter') goto(`/teams/${team.id}`); }}
 >
 	<div class="flex items-start justify-between gap-2">
 		<h3 class="font-mono text-[13px] font-medium text-fg">{team.name}</h3>
@@ -20,6 +24,15 @@
 				<span class="rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-fg-faint">
 					mixed models
 				</span>
+			{/if}
+			{#if onDelete}
+				<button
+					class="flex items-center justify-center rounded-md p-1 text-fg-faint opacity-0 transition-all duration-150 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+					onclick={(e) => { e.stopPropagation(); onDelete(team); }}
+					aria-label="Delete {team.name}"
+				>
+					<Trash2 size={13} />
+				</button>
 			{/if}
 		</div>
 	</div>
@@ -65,4 +78,4 @@
 			</div>
 		{/if}
 	{/if}
-</a>
+</div>

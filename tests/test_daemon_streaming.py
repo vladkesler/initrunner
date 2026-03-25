@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.output import OutputConfig
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.runner.daemon import DaemonRunner
@@ -16,7 +16,7 @@ def _make_role(output_type: str = "text") -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-daemon"),
+        metadata=RoleMetadata(name="test-daemon"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

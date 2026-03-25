@@ -379,6 +379,44 @@ initrunner ingest role.yaml --force
 
 The command displays the agent name, a spinner during processing, and the total number of chunks stored on completion.
 
+## Managed Sources (Dashboard)
+
+The dashboard Ingest tab lets you add documents without editing the role YAML. These are called **managed sources** -- files uploaded through the UI or URLs added via the "Add URL" form.
+
+### How it works
+
+Managed sources are persisted as a JSON manifest in the document store's `_meta` table (key: `managed_sources`). Each entry records the source path, type (`file` or `url`), and timestamp.
+
+At ingestion time, `run_ingest()` merges managed sources with the configured `ingest.sources` globs:
+
+```
+resolved config sources (globs) + managed sources (manifest) = full source set
+```
+
+This merged set is what `_purge_deleted` sees, so managed files are never purged during re-ingestion.
+
+### Upload location
+
+Uploaded files are stored in `~/.initrunner/uploads/{agent_name}/`, under the InitRunner home directory. This avoids assuming role directories are writable.
+
+### Difference from config sources
+
+| | Config sources (`ingest.sources`) | Managed sources (dashboard) |
+|---|---|---|
+| **Defined in** | Role YAML | Store `_meta` manifest |
+| **Added via** | Edit YAML, run `initrunner ingest` | Dashboard upload / add URL |
+| **Purge behavior** | Files removed from globs are auto-purged | Never auto-purged; delete explicitly |
+| **Store wipe** | Re-ingested from disk/URL | Manifest preserved across wipe, re-ingested |
+| **Delete from UI** | Cannot delete (reappears on next ingest) | Delete button removes from store + manifest |
+
+### Store wipe behavior
+
+When the embedding model changes and `force=true` is used, the entire store is wiped. The manifest is read before the wipe and written back to the fresh store, so managed sources are re-ingested with the new embedding model.
+
+### Pipeline entry point
+
+Dashboard operations use `run_ingest_managed()` which calls the same shared pipeline core (`_execute_ingest_core`) as `run_ingest()`. The only difference: it skips glob resolution and source purging, and adds successfully ingested sources to the manifest.
+
 ## Troubleshooting
 
 ### No results from `search_documents`

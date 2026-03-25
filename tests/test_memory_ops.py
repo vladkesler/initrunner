@@ -13,7 +13,7 @@ from initrunner.agent.memory_ops import (
     finalize_turn,
     save_session,
 )
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.memory import MemoryConfig, ProceduralMemoryConfig
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.stores.base import Memory, MemoryType
@@ -23,7 +23,7 @@ def _make_role(*, memory: MemoryConfig | None = None) -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

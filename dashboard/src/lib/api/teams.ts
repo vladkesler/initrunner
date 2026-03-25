@@ -78,6 +78,10 @@ export function saveTeam(req: {
 	});
 }
 
+export function deleteTeam(id: string): Promise<{ id: string; path: string }> {
+	return request(`/api/teams/${id}`, { method: 'DELETE' });
+}
+
 export function streamTeamRun(
 	teamId: string,
 	req: { prompt: string },

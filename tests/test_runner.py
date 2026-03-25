@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
 from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.runner import DaemonTokenTracker, run_autonomous, run_single, run_single_stream
@@ -20,7 +20,7 @@ def _make_role(
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

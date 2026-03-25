@@ -20,13 +20,13 @@ class TestPromptModelSelection:
         """Typing '2' selects the second model in the list."""
         with patch("rich.prompt.Prompt.ask", return_value="2"):
             result = prompt_model_selection("openai")
-        assert result == "gpt-4o"
+        assert result == "gpt-5-mini"
 
     def test_number_input_first(self):
         """Typing '1' selects the first model."""
         with patch("rich.prompt.Prompt.ask", return_value="1"):
             result = prompt_model_selection("anthropic")
-        assert result == "claude-sonnet-4-5-20250929"
+        assert result == "claude-sonnet-4-6"
 
     def test_custom_model_name(self):
         """Typing a custom model name returns it verbatim."""
@@ -70,4 +70,4 @@ class TestPromptModelSelection:
         """Empty string returns the default model."""
         with patch("rich.prompt.Prompt.ask", return_value=""):
             result = prompt_model_selection("openai")
-        assert result == "gpt-5-mini"
+        assert result == "gpt-5.4"

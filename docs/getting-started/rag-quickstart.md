@@ -104,6 +104,10 @@ initrunner chat --ingest "./my-docs/**/*.md"
 
 This auto-detects your provider, runs ingestion, and starts a REPL with `search_documents` available. See [Chat & Quick Start](chat.md#document-qa---ingest) for details.
 
+## Adding Documents from the Dashboard
+
+After initial setup, you can add more documents without editing the role YAML. Open the agent in the dashboard (`initrunner dashboard`), switch to the **Ingest** tab, and use **Upload Files** or **Add URL**. These are tracked as managed sources and persist across re-ingestion. See [Managed Sources](../core/ingestion.md#managed-sources-dashboard) for details.
+
 ## What's Next
 
 - [RAG Patterns & Guide](../core/rag-guide.md) — common patterns, source filtering, auto re-indexing

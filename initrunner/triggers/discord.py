@@ -6,6 +6,7 @@ import logging
 import os
 import re
 
+from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import DiscordTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent, _chunk_text
 
@@ -137,7 +138,7 @@ class DiscordTrigger(TriggerBase):
                     content,
                 ).strip()
 
-            prompt = self._config.prompt_template.format(message=content)
+            prompt = safe_substitute(self._config.prompt_template, {"message": content})
             event = TriggerEvent(
                 trigger_type="discord",
                 prompt=prompt,

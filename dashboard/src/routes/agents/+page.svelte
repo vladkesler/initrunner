@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { listAgents } from '$lib/api/agents';
+	import { listAgents, deleteAgent } from '$lib/api/agents';
 	import type { AgentSummary } from '$lib/api/types';
 	import AgentList from '$lib/components/agents/AgentList.svelte';
 	import AgentFlowCanvas from '$lib/components/agents/AgentFlowCanvas.svelte';
 	import CapabilityFilterBar from '$lib/components/agents/CapabilityFilterBar.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, Workflow, List, X } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
@@ -16,6 +17,7 @@
 	let viewMode = $state<'flow' | 'list'>('flow');
 	let searchEl: HTMLInputElement | undefined = $state();
 	let isMobile = $state(false);
+	let pendingDelete: AgentSummary | null = $state(null);
 
 	const isFiltering = $derived(activeFilter !== 'all' || query.trim().length > 0);
 
@@ -219,8 +221,23 @@
 					<button class="mt-2 text-[13px] text-fg-faint hover:text-fg-muted" onclick={clearFilters}>Clear filters</button>
 				</div>
 			{:else}
-				<AgentList agents={results} />
+				<AgentList agents={results} onDelete={(agent) => (pendingDelete = agent)} />
 			{/if}
 		{/if}
 	</div>
+
+	{#if pendingDelete}
+		<ConfirmDeleteDialog
+			entityName={pendingDelete.name}
+			entityType="agent"
+			open={true}
+			onConfirm={async () => {
+				const id = pendingDelete!.id;
+				await deleteAgent(id);
+				agents = agents.filter((a) => a.id !== id);
+				pendingDelete = null;
+			}}
+			onCancel={() => (pendingDelete = null)}
+		/>
+	{/if}
 {/if}

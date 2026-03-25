@@ -162,6 +162,10 @@ def get_default_role_dirs(explicit_dir: Path | None = None) -> list[Path]:
     global_roles = get_roles_dir()
     if global_roles.is_dir():
         dirs.append(global_roles)
+    # Bundled starter examples shipped with the package
+    starters = Path(__file__).resolve().parent.parent / "dashboard" / "_starters"
+    if starters.is_dir():
+        dirs.append(starters)
     return dirs
 
 

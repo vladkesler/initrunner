@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
+from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import TelegramTriggerConfig
 from initrunner.triggers.base import TriggerBase, TriggerEvent, _chunk_text
 
@@ -79,7 +80,7 @@ class TelegramTrigger(TriggerBase):
                         loop,
                     )
 
-            prompt = self._config.prompt_template.format(message=update.message.text)
+            prompt = safe_substitute(self._config.prompt_template, {"message": update.message.text})
             event = TriggerEvent(
                 trigger_type="telegram",
                 prompt=prompt,

@@ -37,53 +37,55 @@ TEMPLATE_SETUP: dict[str, dict[str, Any]] = {
 # Users can always type a custom model name not in this list.
 PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     "openai": [
+        ("gpt-5.4", "Latest frontier model"),
         ("gpt-5-mini", "Fast, affordable"),
-        ("gpt-4o", "High capability GPT-4"),
-        ("gpt-4.1", "Latest GPT-4.1"),
-        ("gpt-4.1-mini", "Small GPT-4.1"),
-        ("gpt-4.1-nano", "Fastest GPT-4.1"),
-        ("o3-mini", "Reasoning model"),
+        ("gpt-5-nano", "Smallest, ultra-fast"),
+        ("gpt-4.1", "GPT-4.1"),
+        ("o4-mini", "Fast reasoning"),
+        ("o3", "Reasoning model"),
     ],
     "anthropic": [
-        ("claude-sonnet-4-5-20250929", "Balanced, fast"),
-        ("claude-haiku-35-20241022", "Compact, very fast"),
-        ("claude-opus-4-20250514", "Most capable"),
+        ("claude-sonnet-4-6", "Balanced, fast"),
+        ("claude-opus-4-6", "Most capable"),
+        ("claude-haiku-4-5-20251001", "Compact, very fast"),
     ],
     "google": [
-        ("gemini-2.0-flash", "Fast multimodal"),
-        ("gemini-2.5-pro-preview-05-06", "Most capable"),
-        ("gemini-2.0-flash-lite", "Lightweight"),
+        ("gemini-2.5-flash", "Fast multimodal"),
+        ("gemini-2.5-pro", "Most capable"),
+        ("gemini-2.5-flash-lite", "Lightweight"),
     ],
     "groq": [
+        ("llama-4-scout-17b-16e", "Llama 4 Scout"),
         ("llama-3.3-70b-versatile", "Fast Llama 70B"),
         ("llama-3.1-8b-instant", "Ultra-fast 8B"),
-        ("mixtral-8x7b-32768", "Mixtral MoE"),
     ],
     "mistral": [
         ("mistral-large-latest", "Most capable"),
         ("mistral-small-latest", "Fast, efficient"),
         ("codestral-latest", "Code-optimized"),
+        ("devstral-small-2505", "Agentic coding"),
     ],
     "cohere": [
+        ("command-a", "Most capable, 256K context"),
         ("command-r-plus", "Advanced RAG"),
         ("command-r", "Balanced"),
-        ("command-light", "Fast"),
     ],
     "bedrock": [
-        ("us.anthropic.claude-sonnet-4-20250514-v1:0", "Claude Sonnet via Bedrock"),
-        ("us.anthropic.claude-haiku-4-20250514-v1:0", "Claude Haiku via Bedrock"),
-        ("us.meta.llama3-2-90b-instruct-v1:0", "Llama 3.2 90B via Bedrock"),
+        ("us.anthropic.claude-sonnet-4-6-v1:0", "Claude Sonnet 4.6 via Bedrock"),
+        ("us.anthropic.claude-haiku-4-5-v1:0", "Claude Haiku 4.5 via Bedrock"),
+        ("us.meta.llama4-scout-17b-instruct-v1:0", "Llama 4 Scout via Bedrock"),
     ],
     "xai": [
-        ("grok-3", "Most capable Grok"),
-        ("grok-3-mini", "Fast Grok"),
+        ("grok-4", "Most capable Grok"),
+        ("grok-4-fast", "Fast, 2M context"),
+        ("grok-3-mini-beta", "Lightweight"),
     ],
     "ollama": [
         ("llama3.2", "Llama 3.2"),
         ("llama3.1", "Llama 3.1"),
         ("mistral", "Mistral 7B"),
         ("codellama", "Code Llama"),
-        ("phi3", "Microsoft Phi-3"),
+        ("qwen2.5", "Qwen 2.5"),
     ],
 }
 
@@ -640,22 +642,22 @@ def build_role_yaml(
     }
 
     if tools:
-        role["spec"]["tools"] = tools
+        role["spec"]["tools"] = tools  # type: ignore[invalid-assignment]
 
     if triggers:
-        role["spec"]["triggers"] = triggers
+        role["spec"]["triggers"] = triggers  # type: ignore[invalid-assignment]
 
     if sinks:
-        role["spec"]["sinks"] = sinks
+        role["spec"]["sinks"] = sinks  # type: ignore[invalid-assignment]
 
     if memory:
-        role["spec"]["memory"] = {
+        role["spec"]["memory"] = {  # type: ignore[invalid-assignment]
             "max_sessions": 10,
             "max_resume_messages": 20,
             "semantic": {"max_memories": 1000},
         }
 
     if ingest:
-        role["spec"]["ingest"] = ingest
+        role["spec"]["ingest"] = ingest  # type: ignore[invalid-assignment]
 
     return yaml.dump(role, default_flow_style=False, sort_keys=False, allow_unicode=True)

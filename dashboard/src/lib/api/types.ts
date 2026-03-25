@@ -141,6 +141,7 @@ export interface DoctorCheck {
 
 export interface DoctorResponse {
 	checks: DoctorCheck[];
+	embedding_checks: DoctorCheck[];
 }
 
 export interface ToolType {
@@ -338,6 +339,47 @@ export interface ComposeSaveResponse {
 	next_steps: string[];
 	compose_id: string;
 }
+
+// -- Ingestion ----------------------------------------------------------------
+
+export interface IngestDocument {
+	source: string;
+	chunk_count: number;
+	ingested_at: string;
+	content_hash: string;
+	is_url: boolean;
+	is_managed: boolean;
+}
+
+export interface IngestSummary {
+	total_documents: number;
+	total_chunks: number;
+	store_path: string;
+	sources_config: string[];
+	managed_count: number;
+	last_ingested_at: string | null;
+}
+
+export interface IngestFileResult {
+	path: string;
+	status: 'new' | 'updated' | 'skipped' | 'error';
+	chunks: number;
+	error: string | null;
+}
+
+export interface IngestStats {
+	new: number;
+	updated: number;
+	skipped: number;
+	errored: number;
+	total_chunks: number;
+	file_results: IngestFileResult[];
+}
+
+export type IngestSSEEvent =
+	| { type: 'progress'; data: { path: string; status: string } }
+	| { type: 'result'; data: IngestStats }
+	| { type: 'error'; data: string };
 
 // -- Agent Memory / Sessions --------------------------------------------------
 

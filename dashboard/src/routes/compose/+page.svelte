@@ -1,13 +1,16 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { fetchComposeList } from '$lib/api/compose';
+	import { fetchComposeList, deleteCompose } from '$lib/api/compose';
 	import type { ComposeSummary } from '$lib/api/types';
+	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Search, X, Workflow, Plus, ExternalLink } from 'lucide-svelte';
+	import { Search, X, Workflow, Plus, ExternalLink, Trash2 } from 'lucide-svelte';
 
 	let composes = $state<ComposeSummary[]>([]);
 	let loading = $state(true);
 	let query = $state('');
+	let pendingDelete: ComposeSummary | null = $state(null);
 	let searchEl: HTMLInputElement | undefined = $state();
 
 	const filtered = $derived(() => {
@@ -128,16 +131,28 @@
 		{:else}
 			<div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
 				{#each results as compose, idx}
-					<a
-						href="/compose/{compose.id}"
-						class="group border border-edge bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-accent-primary/20 hover:bg-gradient-to-br hover:from-accent-primary/[0.03] hover:to-transparent"
+					<div
+						class="group cursor-pointer border border-edge bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-accent-primary/20 hover:bg-gradient-to-br hover:from-accent-primary/[0.03] hover:to-transparent"
 						style="animation: fadeIn 300ms ease-out {idx * 50}ms both"
+						role="link"
+						tabindex="0"
+						onclick={() => goto(`/compose/${compose.id}`)}
+						onkeydown={(e) => { if (e.key === 'Enter') goto(`/compose/${compose.id}`); }}
 					>
 						<div class="flex items-start justify-between gap-2">
 							<h3 class="font-mono text-[13px] font-medium text-fg">{compose.name}</h3>
-							<span class="shrink-0 border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-fg-faint">
-								{compose.service_count} services
-							</span>
+							<div class="flex shrink-0 items-center gap-1.5">
+								<span class="border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-fg-faint">
+									{compose.service_count} services
+								</span>
+								<button
+									class="flex items-center justify-center rounded-md p-1 text-fg-faint opacity-0 transition-all duration-150 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+									onclick={(e) => { e.stopPropagation(); pendingDelete = compose; }}
+									aria-label="Delete {compose.name}"
+								>
+									<Trash2 size={13} />
+								</button>
+							</div>
 						</div>
 						{#if compose.description}
 							<p class="mt-1 text-[12px] text-fg-faint line-clamp-2">{compose.description}</p>
@@ -154,9 +169,24 @@
 								{/if}
 							</div>
 						{/if}
-					</a>
+					</div>
 				{/each}
 			</div>
 		{/if}
+	{/if}
+
+	{#if pendingDelete}
+		<ConfirmDeleteDialog
+			entityName={pendingDelete.name}
+			entityType="compose pipeline"
+			open={true}
+			onConfirm={async () => {
+				const id = pendingDelete!.id;
+				await deleteCompose(id);
+				composes = composes.filter((c) => c.id !== id);
+				pendingDelete = null;
+			}}
+			onCancel={() => (pendingDelete = null)}
+		/>
 	{/if}
 </div>

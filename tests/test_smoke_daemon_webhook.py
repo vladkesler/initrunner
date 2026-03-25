@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 import httpx
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.memory import MemoryConfig
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.schema.triggers import WebhookTriggerConfig
@@ -73,7 +73,7 @@ def _make_role(
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="Test agent",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

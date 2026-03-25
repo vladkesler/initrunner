@@ -72,7 +72,7 @@ class TestMemoryStoreDimensions:
         with LanceMemoryStore(store_path) as store:
             assert store.dimensions is None
             messages = [ModelRequest(parts=[UserPromptPart(content="hello")])]
-            store.save_session("s1", "agent-a", messages)
+            store.save_session("s1", "agent-a", messages)  # type: ignore[invalid-argument-type]
             loaded = store.load_latest_session("agent-a")
             assert loaded is not None
             assert len(loaded) == 1

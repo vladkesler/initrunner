@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from initrunner.agent.executor import _enter_agent_context, _exit_agent_context
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.authz import get_current_agent_principal
 
@@ -16,7 +16,7 @@ def _make_role(name: str = "test-agent", team: str = "") -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name=name, description="test", team=team),
+        metadata=RoleMetadata(name=name, description="test", team=team),
         spec=AgentSpec(
             role="test role",
             model=ModelConfig(provider="openai", name="gpt-4o-mini"),

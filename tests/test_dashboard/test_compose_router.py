@@ -163,3 +163,28 @@ def test_get_compose_events_empty(client):
     resp = client.get(f"/api/compose/{cid}/events")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# -- DELETE /api/compose/{id} --------------------------------------------------
+
+
+def test_delete_compose(client, compose_dir):
+    """DELETE removes the compose YAML and evicts from cache."""
+    composes = client.get("/api/compose").json()
+    cid = composes[0]["id"]
+    compose_path = composes[0]["path"]
+
+    resp = client.delete(f"/api/compose/{cid}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == cid
+    assert not Path(compose_path).exists()
+
+    # Should be gone from cache
+    resp = client.get(f"/api/compose/{cid}")
+    assert resp.status_code == 404
+
+
+def test_delete_compose_not_found(client):
+    resp = client.delete("/api/compose/nonexistent")
+    assert resp.status_code == 404

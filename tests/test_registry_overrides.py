@@ -140,7 +140,7 @@ class TestOverridePersistenceAcrossReinstall:
             "installed_at": "2026-03-21T00:00:00",
         }
         if existing_overrides:
-            new_entry["overrides"] = existing_overrides
+            new_entry["overrides"] = existing_overrides  # type: ignore[invalid-assignment]
 
         manifest["roles"][qualified_key] = new_entry
         save_manifest(manifest)

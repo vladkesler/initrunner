@@ -104,6 +104,10 @@ export function saveCompose(req: {
 	});
 }
 
+export function deleteCompose(id: string): Promise<{ id: string; path: string }> {
+	return request(`/api/compose/${id}`, { method: 'DELETE' });
+}
+
 export function streamComposeRun(
 	composeId: string,
 	req: { prompt: string; message_history?: string | null },

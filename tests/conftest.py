@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.tools._registry import ToolBuildContext
@@ -34,7 +34,7 @@ def make_role(
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name=name),
+        metadata=RoleMetadata(name=name),
         spec=AgentSpec(
             role=system_prompt,
             model=ModelConfig(provider=provider, name=model_name),

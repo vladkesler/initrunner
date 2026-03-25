@@ -464,7 +464,7 @@ class TestMergeSkillTools:
         skill = _make_resolved_skill("sk", tools=[{"type": "web_reader"}])
         role_tools = [DateTimeToolConfig()]
 
-        merged = merge_skill_tools([skill], role_tools)
+        merged = merge_skill_tools([skill], role_tools)  # type: ignore[invalid-argument-type]
         types = [t.type for t in merged]
         assert types == ["web_reader", "datetime"]
 
@@ -480,7 +480,7 @@ class TestMergeSkillTools:
         skill = _make_resolved_skill("sk", tools=[])
         role_tools = [DateTimeToolConfig()]
 
-        merged = merge_skill_tools([skill], role_tools)
+        merged = merge_skill_tools([skill], role_tools)  # type: ignore[invalid-argument-type]
         assert len(merged) == 1
         assert merged[0].type == "datetime"
 
@@ -492,7 +492,7 @@ class TestMergeSkillTools:
         ir_logger.addHandler(caplog.handler)
         try:
             with caplog.at_level(logging.DEBUG, logger="initrunner"):
-                merged = merge_skill_tools([skill], role_tools)
+                merged = merge_skill_tools([skill], role_tools)  # type: ignore[invalid-argument-type]
 
             assert len(merged) == 1
             assert isinstance(merged[0], WebReaderToolConfig)

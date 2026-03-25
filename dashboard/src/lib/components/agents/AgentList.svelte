@@ -1,9 +1,10 @@
 <script lang="ts">
 	import type { AgentSummary } from '$lib/api/types';
 	import { goto } from '$app/navigation';
+	import { Trash2 } from 'lucide-svelte';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';
 
-	let { agents }: { agents: AgentSummary[] } = $props();
+	let { agents, onDelete }: { agents: AgentSummary[]; onDelete?: (agent: AgentSummary) => void } = $props();
 </script>
 
 {#if agents.length === 0}
@@ -23,12 +24,13 @@
 					<th class="hidden px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint md:table-cell">Description</th>
 					<th class="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Model</th>
 					<th class="w-20 px-3 py-2 text-right text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Capabilities</th>
+					{#if onDelete}<th class="w-10 px-2 py-2"></th>{/if}
 				</tr>
 			</thead>
 			<tbody>
 				{#each agents as agent (agent.id)}
 					<tr
-						class="cursor-pointer border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-accent-primary/[0.03] {agent.error ? 'border-l-2 border-l-fail' : ''}"
+						class="group cursor-pointer border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-accent-primary/[0.03] {agent.error ? 'border-l-2 border-l-fail' : ''}"
 						onclick={() => goto(`/agents/${agent.id}`)}
 						onkeydown={(e) => { if (e.key === 'Enter') goto(`/agents/${agent.id}`); }}
 						tabindex="0"
@@ -55,6 +57,17 @@
 								<CapabilityGlyph features={agent.features} size="md" />
 							</div>
 						</td>
+						{#if onDelete}
+							<td class="w-10 px-2 py-2">
+								<button
+									class="flex items-center justify-center rounded-md p-1 text-fg-faint opacity-0 transition-all duration-150 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+									onclick={(e) => { e.stopPropagation(); onDelete(agent); }}
+									aria-label="Delete {agent.name}"
+								>
+									<Trash2 size={13} />
+								</button>
+							</td>
+						{/if}
 					</tr>
 				{/each}
 			</tbody>

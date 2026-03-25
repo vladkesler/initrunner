@@ -10,7 +10,7 @@ from starlette.testclient import TestClient
 from typer.testing import CliRunner
 
 from initrunner.agent.executor import RunResult
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.schema.security import RateLimitConfig, SecurityPolicy, ServerConfig
@@ -26,7 +26,7 @@ def _make_role(name: str = "test-agent") -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name=name),
+        metadata=RoleMetadata(name=name),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
@@ -386,7 +386,7 @@ def _make_security_role(**security_kwargs) -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),

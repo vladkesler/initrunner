@@ -281,7 +281,7 @@ class TestSinkDispatcher:
             WebhookSinkConfig(url="https://example.com/hook"),
             FileSinkConfig(path="/tmp/test.jsonl"),
         ]
-        dispatcher = SinkDispatcher(configs, role)
+        dispatcher = SinkDispatcher(configs, role)  # type: ignore[invalid-argument-type]
         assert dispatcher.count == 2
 
     def test_dispatch_calls_all_sinks(self):
@@ -353,7 +353,7 @@ class TestSinkDispatcher:
     def test_build_custom_sink(self, tmp_path):
         role = RoleDefinition.model_validate(_make_role_data())
         configs = [CustomSinkConfig(module="my_mod", function="my_func")]
-        dispatcher = SinkDispatcher(configs, role, role_dir=tmp_path)
+        dispatcher = SinkDispatcher(configs, role, role_dir=tmp_path)  # type: ignore[invalid-argument-type]
         assert dispatcher.count == 1
 
 

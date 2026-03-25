@@ -19,7 +19,7 @@ from initrunner.agent.history_compaction import (
     maybe_compact_message_history,
 )
 from initrunner.agent.schema.autonomy import AutonomyConfig, CompactionConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 
 
@@ -27,7 +27,7 @@ def _make_role() -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
         kind=Kind.AGENT,
-        metadata=Metadata(name="test-agent"),
+        metadata=RoleMetadata(name="test-agent"),
         spec=AgentSpec(
             role="You are a test agent.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
@@ -199,7 +199,7 @@ class TestSerialization:
         msgs = [
             ModelRequest(parts=[ToolReturnPart(tool_name="search", content="3 results found")]),
         ]
-        text = _serialize_messages_for_summary(msgs)
+        text = _serialize_messages_for_summary(msgs)  # type: ignore[invalid-argument-type]
         assert "Tool (search): 3 results found" in text
 
     def test_tool_call_serialized(self):
@@ -210,7 +210,7 @@ class TestSerialization:
                 ]
             ),
         ]
-        text = _serialize_messages_for_summary(msgs)
+        text = _serialize_messages_for_summary(msgs)  # type: ignore[invalid-argument-type]
         assert "Assistant [tool_call]: web_search(...)" in text
 
     def test_truncation(self):
