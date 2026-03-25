@@ -162,7 +162,7 @@ async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
     if req.verify and validation_supported:
         from initrunner.services.setup import validate_api_key
 
-        validated = await asyncio.to_thread(validate_api_key, req.provider, req.api_key)
+        validated = await asyncio.to_thread(validate_api_key, req.provider or "", req.api_key)
 
     return SaveKeyResponse(
         env_var=env_name,
