@@ -223,6 +223,28 @@ class TestValidateYaml:
         warnings = [i for i in issues if i.severity == "warning"]
         assert any("short" in w.message.lower() for w in warnings)
 
+    def test_capability_tool_conflict_error(self):
+        conflict_yaml = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: conflict-test
+              description: test
+              spec_version: 2
+            spec:
+              role: You are helpful.
+              model:
+                provider: anthropic
+                name: claude-sonnet-4-5-20250929
+              tools:
+                - type: search
+              capabilities:
+                - WebSearch
+        """)
+        _role, issues = _validate_yaml(conflict_yaml)
+        errors = [i for i in issues if i.severity == "error"]
+        assert any("WebSearch" in e.message and "search" in e.message for e in errors)
+
 
 # ---------------------------------------------------------------------------
 # _strip_yaml_fences
@@ -257,7 +279,7 @@ class TestBuildToolSummary:
     def test_returns_string(self):
         summary = build_tool_summary()
         assert isinstance(summary, str)
-        assert "Available tools" in summary
+        assert "Tools" in summary
 
     def test_includes_filesystem(self):
         summary = build_tool_summary()
@@ -330,10 +352,11 @@ class TestBuilderSessionProperties:
         assert session._role_cache is not None
         assert session._issues_cache is not None
 
-        # Now set via property setter -- should invalidate
+        # Now set via property setter -- should reflect new YAML
         session.yaml_text = _VALID_YAML_WITH_MEMORY
-        assert session._role_cache is None
-        assert session._issues_cache is None
+        # Canonicalizer re-parses, so cache is populated with new role
+        assert session._role_cache is not None
+        assert session._role_cache.metadata.name == "memory-agent"
 
     def test_role_property_parses_on_demand(self):
         session = BuilderSession()
@@ -423,8 +446,9 @@ class TestBuilderSessionSeedFile:
         f = tmp_path / "role.yaml"
         f.write_text(_VALID_YAML)
         session = BuilderSession()
-        turn = session.seed_from_file(f)
-        assert turn.yaml_text == _VALID_YAML
+        session.seed_from_file(f)
+        assert session.role is not None
+        assert session.role.metadata.name == "test-agent"
         assert "file:" in session.seed_source
 
     def test_seed_from_file_not_found(self, tmp_path):
@@ -444,8 +468,9 @@ class TestBuilderSessionSeedExample:
             primary_file="role.yaml",
         )
         session = BuilderSession()
-        turn = session.seed_from_example("hello-world")
-        assert turn.yaml_text == _VALID_YAML
+        session.seed_from_example("hello-world")
+        assert session.role is not None
+        assert session.role.metadata.name == "test-agent"
         assert session.omitted_assets == []
 
     @patch("initrunner.examples.get_example")
@@ -459,7 +484,8 @@ class TestBuilderSessionSeedExample:
         )
         session = BuilderSession()
         turn = session.seed_from_example("multi-example")
-        assert turn.yaml_text == _VALID_YAML
+        assert session.role is not None
+        assert session.role.metadata.name == "test-agent"
         assert "skills/review/SKILL.md" in session.omitted_assets
         assert "config.json" in session.omitted_assets
         assert "role.yaml" not in session.omitted_assets
@@ -487,8 +513,9 @@ class TestBuilderSessionSeedDescription:
         mock_get_agent.return_value = _make_fake_agent(response)
 
         session = BuilderSession()
-        turn = session.seed_description("a code review bot", "openai")
-        assert turn.yaml_text.strip() == _VALID_YAML.strip()
+        session.seed_description("a code review bot", "openai")
+        assert session.role is not None
+        assert session.role.metadata.name == "test-agent"
         assert session.seed_source == "description"
 
     @patch("initrunner.services.agent_builder.BuilderSession._get_agent")

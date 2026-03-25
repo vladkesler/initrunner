@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter  # type: ignore[import-not-found]
 
 from initrunner.dashboard.schemas import DoctorCheck, DoctorResponse, ToolTypeResponse
 

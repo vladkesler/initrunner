@@ -5,8 +5,15 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import (  # type: ignore[import-not-found]
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+)
+from fastapi.responses import StreamingResponse  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
 from initrunner.dashboard.schemas import (

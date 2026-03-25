@@ -62,8 +62,7 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
         bak_path.write_text(path.read_text())
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    normalized = yaml.dump(raw, default_flow_style=False, sort_keys=False, allow_unicode=True)
-    path.write_text(normalized)
+    path.write_text(canonicalize_role_yaml(role))
     return role
 
 
@@ -96,6 +95,88 @@ def build_role_yaml_sync(
         ingest=ingest,
         triggers=triggers,
         sinks=sinks,
+    )
+
+
+def canonicalize_role_yaml(role: RoleDefinition) -> str:
+    """Serialize a RoleDefinition to minimal YAML, omitting default and null values.
+
+    Uses Pydantic's ``exclude_defaults`` + ``exclude_none`` to strip fields that
+    match their schema default.  ``metadata.spec_version`` is always re-injected.
+    Multiline strings render as YAML block scalars for readability.
+    """
+    import yaml
+
+    data = role.model_dump(mode="json", by_alias=True, exclude_defaults=True, exclude_none=True)
+
+    # Discriminated union items (tools, triggers, sinks) need special handling:
+    # exclude_defaults strips the `type` discriminator, but we need it for
+    # deserialization. Dump each item with exclude_defaults, then re-inject type.
+    for key in ("tools", "triggers", "sinks"):
+        items = getattr(role.spec, key, [])
+        if items:
+            serialized = []
+            for item in items:
+                d = item.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+                d = {"type": item.type, **d}
+                serialized.append(d)
+            data.setdefault("spec", {})[key] = serialized
+
+    # Remove empty dicts/lists left after stripping defaults
+    def _prune(d: dict) -> dict:
+        return {
+            k: _prune(v) if isinstance(v, dict) else v
+            for k, v in d.items()
+            if v != {} and v != [] and v is not None
+        }
+
+    data = _prune(data)
+
+    # Always include these structural fields
+    data.setdefault("apiVersion", "initrunner/v1")
+    data.setdefault("kind", "Agent")
+    data.setdefault("metadata", {})["spec_version"] = 2
+
+    # spec.role and spec.model are always required even if they matched defaults
+    if "spec" in data:
+        spec = data["spec"]
+        spec.setdefault("role", role.spec.role)
+        model_data = role.spec.model.model_dump(mode="json", exclude_none=True)
+        spec.setdefault("model", model_data)
+
+        # Capabilities: serialize NamedSpec back to YAML-native form.
+        # model_dump produces {"name": "Thinking", "arguments": ("high",)}
+        # but YAML expects "Thinking: high" or bare "Thinking".
+        if role.spec.capabilities:
+            yaml_caps = []
+            for cap_spec in role.spec.capabilities:
+                name = cap_spec.name
+                args = cap_spec.arguments
+                if args is None:
+                    yaml_caps.append(name)
+                elif isinstance(args, tuple) and len(args) == 1:
+                    yaml_caps.append({name: args[0]})
+                else:
+                    yaml_caps.append({name: args})
+            spec["capabilities"] = yaml_caps
+
+    # Block-scalar representer for multiline strings
+    class _BlockDumper(yaml.SafeDumper):
+        pass
+
+    def _str_representer(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
+        if "\n" in data:
+            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data)
+
+    _BlockDumper.add_representer(str, _str_representer)
+
+    return yaml.dump(
+        data,
+        Dumper=_BlockDumper,
+        default_flow_style=False,
+        sort_keys=False,
+        allow_unicode=True,
     )
 
 

@@ -36,6 +36,7 @@ export function streamRun(
 			const reader = res.body!.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';
+			let gotTerminal = false;
 
 			while (true) {
 				const { done, value } = await reader.read();
@@ -49,13 +50,23 @@ export function streamRun(
 					if (!line.startsWith('data: ')) continue;
 					try {
 						const event: SSEEvent = JSON.parse(line.slice(6));
-						if (event.type === 'token') callbacks.onToken(event.data);
-						else if (event.type === 'result') callbacks.onResult(event.data);
-						else if (event.type === 'error') callbacks.onError(event.data);
+						if (event.type === 'token') {
+							callbacks.onToken(event.data);
+						} else if (event.type === 'result') {
+							gotTerminal = true;
+							callbacks.onResult(event.data);
+						} else if (event.type === 'error') {
+							gotTerminal = true;
+							callbacks.onError(event.data);
+						}
 					} catch {
 						// skip malformed lines
 					}
 				}
+			}
+
+			if (!gotTerminal) {
+				callbacks.onError('Connection closed before run completed');
 			}
 		})
 		.catch((err) => {

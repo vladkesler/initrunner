@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, _role_id, get_role_cache
 from initrunner.dashboard.routers._provider_options import (

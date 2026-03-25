@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient  # type: ignore[import-not-found]
 
 from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.ingestion import IngestConfig

@@ -104,12 +104,22 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
         return None, issues
 
     # Cross-field reasoning validation
-    from initrunner.agent.loader import RoleLoadError, _validate_reasoning
+    from initrunner.agent.loader import (
+        RoleLoadError,
+        _validate_reasoning,
+        validate_capability_tool_conflicts,
+    )
 
     try:
         _validate_reasoning(role)
     except RoleLoadError as e:
         issues.append(ValidationIssue(field="spec.reasoning", message=str(e), severity="error"))
+
+    # Capability / tool conflict validation
+    try:
+        validate_capability_tool_conflicts(role)
+    except RoleLoadError as e:
+        issues.append(ValidationIssue(field="spec.capabilities", message=str(e), severity="error"))
 
     # Warnings for common issues
     if role.spec.role and len(role.spec.role.strip()) < 10:
@@ -168,24 +178,10 @@ def _strip_yaml_fences(text: str) -> str:
 
 
 def build_tool_summary() -> str:
-    """Generate a concise tool summary from the live registry."""
-    from initrunner.agent.tools._registry import get_tool_types
+    """Generate a concise tool summary (delegates to shared implementation)."""
+    from initrunner.role_generator import build_tool_summary as _shared
 
-    tool_types = get_tool_types()
-    lines = ["# Available tools (use in spec.tools list):"]
-    for type_name, config_cls in sorted(tool_types.items()):
-        desc_parts = []
-        for fname, finfo in config_cls.model_fields.items():
-            if fname in ("type", "permissions"):
-                continue
-            from pydantic_core import PydanticUndefined
-
-            if finfo.default is not PydanticUndefined:
-                desc_parts.append(f"{fname}={finfo.default!r}")
-            else:
-                desc_parts.append(f"{fname}=(required)")
-        lines.append(f"- type: {type_name}  # {', '.join(desc_parts)}")
-    return "\n".join(lines)
+    return _shared()
 
 
 def build_next_steps(role: RoleDefinition, yaml_path: Path) -> list[str]:
@@ -225,26 +221,59 @@ def build_next_steps(role: RoleDefinition, yaml_path: Path) -> list[str]:
 
 
 _BUILDER_SYSTEM_PROMPT = """\
-You are an expert InitRunner agent builder. You help users create and refine \
-role.yaml configuration files through conversation.
+You are an expert InitRunner agent builder. You produce minimal role.yaml files.
 
 Rules:
-- When given a description or refinement request, produce a complete role.yaml.
-- Output a brief explanation of what you did or questions you have, followed by \
-the complete YAML in a fenced ```yaml block.
-- Use apiVersion: initrunner/v1 and kind: Agent.
+- Output a brief explanation followed by the YAML in a fenced ```yaml block.
 - metadata.name must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (lowercase, hyphens only).
-- Pick appropriate tools, triggers, and features based on the description.
-- Use sensible defaults for guardrails.
-- The spec.role field is the system prompt -- write a good one that matches the description.
-- For tool configs, only include fields that differ from defaults.
-- Keep YAML clean and minimal.
 - Always include metadata.spec_version: 2.
-- Only include sections the agent actually needs.
-- CRITICAL: The schema reference below uses dotted paths like "spec.model" for readability. \
-In the actual YAML, these MUST be nested under their parent key, NOT used as flat dotted keys.
-- When refining, preserve the user's existing choices unless they ask to change them.
-- Ask clarifying questions when the request is ambiguous.
+- spec.role is the system prompt -- write a focused one for the agent's task.
+- NEVER include fields that match their default value. Omit them entirely.
+- NEVER include null or empty fields.
+- NEVER include sections the agent doesn't need (output, auto_skills, tool_search, daemon, \
+security, observability -- omit unless the user explicitly asks for them).
+- For tools, only write `- type: <name>`. Add fields only when non-default.
+- NEVER declare both a capability and its equivalent tool. \
+NEVER declare both a capability and its equivalent tool. Choose the best one per function:
+- Web search: use WebSearch capability (model-native search, reliable). \
+Only use type: search if the user needs a specific provider (brave, serpapi, tavily).
+- URL fetching: use type: web_reader tool (SSRF protection, domain filtering). \
+Do NOT use WebFetch capability.
+- Image generation: use ImageGeneration capability. \
+Only use type: image_gen if the user needs a non-OpenAI model.
+- Thinking: use Thinking capability for extended reasoning.
+- When refining, preserve existing choices unless asked to change them.
+- A typical role is 30-50 lines. If yours exceeds 60, you are over-specifying.
+
+Example of a well-structured minimal role:
+```yaml
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: news-monitor
+  description: Monitors and summarizes breaking news
+  tags: [news, monitoring]
+  spec_version: 2
+spec:
+  model:
+    provider: openai
+    name: gpt-5.4-mini-2026-03-17
+  role: |
+    You monitor breaking news. Search for the latest headlines,
+    summarize key events, and cite sources with links.
+  tools:
+    - type: web_reader
+  capabilities:
+    - WebSearch
+    - Thinking: low
+  triggers:
+    - type: cron
+      schedule: "0 * * * *"
+      prompt: Summarize the latest breaking news.
+      autonomous: true
+```
+
+Add memory, autonomy, ingest, or other sections only when the user's description calls for them.
 
 {schema_reference}
 
@@ -280,6 +309,7 @@ class BuilderSession:
         self._yaml_text = value
         self._role_cache = None
         self._issues_cache = None
+        self._canonicalize_if_valid()
 
     @property
     def role(self) -> RoleDefinition | None:
@@ -295,6 +325,16 @@ class BuilderSession:
                 return []
             self._role_cache, self._issues_cache = _validate_yaml(self._yaml_text)
         return self._issues_cache
+
+    def _canonicalize_if_valid(self) -> None:
+        """Minimize YAML if it parses and validates without errors."""
+        role, issues = _validate_yaml(self._yaml_text)
+        self._role_cache = role
+        self._issues_cache = issues
+        if role is not None and not any(i.severity == "error" for i in issues):
+            from initrunner.services.roles import canonicalize_role_yaml
+
+            self._yaml_text = canonicalize_role_yaml(role)
 
     # -- Agent setup ---------------------------------------------------------
 

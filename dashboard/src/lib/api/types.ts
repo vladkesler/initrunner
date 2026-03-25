@@ -38,8 +38,10 @@ export interface AgentDetail {
 	tools: ItemSummary[];
 	triggers: ItemSummary[];
 	sinks: ItemSummary[];
+	capabilities: ItemSummary[];
 	skills: string[];
 	features: string[];
+	provider_warning: string | null;
 }
 
 export interface RunRequest {

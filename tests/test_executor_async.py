@@ -167,6 +167,43 @@ class TestExecuteRunAsync:
         assert "timed out" in (result.error or "")
 
 
+class TestAsyncSkipInputValidationMetadata:
+    @pytest.mark.asyncio
+    async def test_metadata_set_when_skip_true(self):
+        role = _make_role()
+        agent = MagicMock()
+        agent.run = AsyncMock(
+            return_value=MagicMock(
+                output="ok",
+                usage=MagicMock(input_tokens=0, output_tokens=0, total_tokens=0, tool_calls=0),
+                all_messages=MagicMock(return_value=[]),
+            )
+        )
+
+        await execute_run_async(agent, role, "Hello", skip_input_validation=True)
+
+        call_kwargs = agent.run.call_args.kwargs
+        assert call_kwargs.get("metadata") == {"input_validated": True}
+
+    @pytest.mark.asyncio
+    async def test_metadata_set_when_preflight_passes(self):
+        """When skip_input_validation=False and validation passes, metadata is still set."""
+        role = _make_role()
+        agent = MagicMock()
+        agent.run = AsyncMock(
+            return_value=MagicMock(
+                output="ok",
+                usage=MagicMock(input_tokens=0, output_tokens=0, total_tokens=0, tool_calls=0),
+                all_messages=MagicMock(return_value=[]),
+            )
+        )
+
+        await execute_run_async(agent, role, "Hello", skip_input_validation=False)
+
+        call_kwargs = agent.run.call_args.kwargs
+        assert call_kwargs.get("metadata") == {"input_validated": True}
+
+
 class TestExecuteRunStreamAsync:
     @pytest.mark.asyncio
     async def test_blocked_input_returns_early(self):

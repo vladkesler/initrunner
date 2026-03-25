@@ -79,6 +79,20 @@
 		</ConfigSection>
 	{/if}
 
+	<!-- Capabilities -->
+	{#if detail.capabilities.length > 0}
+		<ConfigSection title="Capabilities" count={detail.capabilities.length}>
+			<div class="space-y-1">
+				{#each detail.capabilities as cap}
+					<div class="font-mono text-[13px]">
+						<span class="text-accent-secondary">{cap.type}</span>
+						<span class="ml-1.5 text-fg-muted">{cap.summary}</span>
+					</div>
+				{/each}
+			</div>
+		</ConfigSection>
+	{/if}
+
 	<!-- Triggers -->
 	{#if detail.triggers.length > 0}
 		<ConfigSection title="Triggers" count={detail.triggers.length}>

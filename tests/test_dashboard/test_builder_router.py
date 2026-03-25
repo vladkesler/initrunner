@@ -290,6 +290,35 @@ def test_validate_missing_fields(builder_client):
     assert data["ready"] is False
 
 
+def test_validate_capability_tool_conflict(builder_client):
+    yaml_text = """\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: conflict-agent
+  description: test
+  spec_version: 2
+spec:
+  role: You are helpful.
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+  tools:
+    - type: search
+  capabilities:
+    - WebSearch
+"""
+    resp = builder_client.post(
+        "/api/builder/validate",
+        json={"yaml_text": yaml_text},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is False
+    errors = [i for i in data["issues"] if i["severity"] == "error"]
+    assert any("WebSearch" in e["message"] for e in errors)
+
+
 # -- POST /api/builder/save ----------------------------------------------------
 
 

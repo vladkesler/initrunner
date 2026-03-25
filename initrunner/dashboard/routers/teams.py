@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 from starlette.responses import StreamingResponse
 
 from initrunner.dashboard.deps import TeamCache, get_team_cache

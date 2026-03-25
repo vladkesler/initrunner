@@ -6,6 +6,8 @@
 		{ key: 'memory', label: 'Memory' },
 		{ key: 'sinks', label: 'Sinks' },
 		{ key: 'skills', label: 'Skills' },
+		{ key: 'capabilities', label: 'Capabilities' },
+		{ key: 'reasoning', label: 'Reasoning' },
 	] as const;
 
 	let { features, size = 'sm' }: { features: string[]; size?: 'sm' | 'md' } = $props();

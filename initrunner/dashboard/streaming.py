@@ -40,9 +40,14 @@ async def stream_run_sse(
     loop = asyncio.get_running_loop()
     token_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
-    role, agent = await asyncio.to_thread(
-        build_agent_sync, role_path, model_override=model_override
-    )
+    try:
+        role, agent = await asyncio.to_thread(
+            build_agent_sync, role_path, model_override=model_override
+        )
+    except Exception as exc:
+        _logger.error("Agent build failed: %s", exc)
+        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+        return
 
     def on_token(chunk: str) -> None:
         try:

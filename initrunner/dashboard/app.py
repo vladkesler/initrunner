@@ -7,10 +7,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI  # type: ignore[import-not-found]
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+from fastapi.responses import FileResponse, JSONResponse  # type: ignore[import-not-found]
+from fastapi.staticfiles import StaticFiles  # type: ignore[import-not-found]
 from starlette.requests import Request
 
 from initrunner.dashboard.config import DashboardSettings

@@ -94,7 +94,7 @@ class TestBuildModel:
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         mc = ModelConfig(provider="openai", name="gpt-5-mini")
         result = _build_model(mc)
-        assert result == "openai:gpt-5-mini"
+        assert result == "openai-responses:gpt-5-mini"
 
     def test_ollama_returns_openai_chat_model(self):
         from pydantic_ai.models.openai import OpenAIChatModel
@@ -333,7 +333,7 @@ class TestApiKeyValidation:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
         mc = ModelConfig(provider="openai", name="gpt-5-mini")
         result = _build_model(mc)
-        assert result == "openai:gpt-5-mini"
+        assert result == "openai-responses:gpt-5-mini"
 
     def test_api_key_env_override_on_standard_provider(self, monkeypatch):
         """When api_key_env is set on a standard provider (no base_url), it checks that var."""
@@ -347,7 +347,7 @@ class TestApiKeyValidation:
         monkeypatch.setenv("MY_CUSTOM_KEY", "sk-custom")
         mc = ModelConfig(provider="openai", name="gpt-5-mini", api_key_env="MY_CUSTOM_KEY")
         result = _build_model(mc)
-        assert result == "openai:gpt-5-mini"
+        assert result == "openai-responses:gpt-5-mini"
 
     def test_ollama_skips_key_check(self):
         """Ollama uses custom provider path — no API key needed."""

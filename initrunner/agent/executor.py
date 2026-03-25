@@ -21,6 +21,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
 
 from initrunner._ids import generate_id
+from initrunner.agent.capabilities.content_guard import ContentBlockedError
 from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger, AuditRecord
@@ -470,10 +471,20 @@ def _prepare_run(
         )
 
     guardrails = role.spec.guardrails
+
+    # Builtin capabilities (WebSearch, WebFetch, etc.) register model-native
+    # tools that PydanticAI counts against tool_calls_limit.  Disable that
+    # guardrail when builtins are active so they don't starve actual tools.
+    _BUILTIN_CAP_NAMES = {"WebSearch", "WebFetch", "ImageGeneration", "MCP"}
+    has_builtins = any(
+        hasattr(s, "name") and s.name in _BUILTIN_CAP_NAMES for s in role.spec.capabilities
+    )
+    tool_calls_limit = guardrails.max_tool_calls + 20 if has_builtins else guardrails.max_tool_calls
+
     usage_limits = UsageLimits(
         output_tokens_limit=guardrails.max_tokens_per_run,
         request_limit=guardrails.max_request_limit,
-        tool_calls_limit=guardrails.max_tool_calls,
+        tool_calls_limit=tool_calls_limit,
         input_tokens_limit=guardrails.input_tokens_limit,
         total_tokens_limit=guardrails.total_tokens_limit,
     )
@@ -485,6 +496,10 @@ def _prepare_run(
     }
     if extra_toolsets:
         run_kwargs["toolsets"] = extra_toolsets
+    # Tell InputGuardCapability to skip validation when the caller already
+    # checked (e.g. the API server pre-flight) or when pre-flight passed.
+    if skip_input_validation or blocked is None:
+        run_kwargs["metadata"] = {"input_validated": True}
 
     return run_id, usage_limits, run_kwargs, blocked
 
@@ -537,6 +552,9 @@ def execute_run(
                     timeout=role.spec.guardrails.timeout_seconds,
                 )
                 new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,
@@ -653,6 +671,9 @@ def execute_run_stream(
                 _process_stream_output(
                     output_parts, stream_state["usage"], new_messages, result, role
                 )
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,
@@ -729,6 +750,9 @@ async def execute_run_async(
                     timeout=timeout,
                 )
                 new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,
@@ -829,6 +853,9 @@ async def execute_run_stream_async(
                     timeout=timeout,
                 )
                 _process_stream_output(output_parts, usage, new_messages, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,

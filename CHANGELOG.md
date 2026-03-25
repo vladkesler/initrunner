@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.43.0] - 2026-03-25
+
+### Added
+- **PydanticAI capabilities in role YAML** -- `spec.capabilities` accepts native NamedSpec entries (Thinking, WebSearch, WebFetch, ImageGeneration, MCP) with bare-string, single-value-dict, or kwargs-dict syntax
+- **InputGuardCapability** -- content policy enforcement via `security.content_policy`; blocks harmful/off-topic prompts before they reach the model
+- **Capability/tool conflict validation** -- rejects configs declaring both a capability and its equivalent tool (WebSearch+search, WebFetch+web_reader, ImageGeneration+image_gen)
+- **WebFetch local fallback** -- auto-injects SSRF-protected URL fetcher as local implementation
+- **OpenAI Responses API auto-switch** -- OpenAI provider uses `openai-responses:` prefix for builtin capability support
+- **Tool call limit headroom** -- builtin capabilities increase `tool_calls_limit` by 20
+- **Dashboard provider warnings** -- agent detail shows banner when provider SDK missing or API key not set
+- **Dashboard SSE error handling** -- `stream_run_sse` catches build failures; client detects premature close
+- **Dashboard capabilities UI** -- capability filter chip, config panel section, glyph badges
+- **YAML canonicalizer** -- `canonicalize_role_yaml()` serializes to minimal YAML, omitting defaults
+
+### Changed
+- Builder system prompt refined with capability vs tool guidance
+- Builder tool summary delegates to shared `role_generator.build_tool_summary()`
+- PydanticAI bumped from >=1.70.0 to >=1.71.0
+- Dashboard fastapi imports annotated with `# type: ignore[import-not-found]` for ty compatibility
+
+### Removed
+- Custom pack-local capability loading (`capabilities/loader.py`, `CustomCapabilityConfig`)
+- `custom-capability-demo` example
+
 ## [1.42.0] - 2026-03-25
 
 ### Added

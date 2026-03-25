@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import (
     ComposeCache,

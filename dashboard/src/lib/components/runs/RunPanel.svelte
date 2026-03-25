@@ -4,7 +4,7 @@
 	import ConversationThread from './ConversationThread.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { agentId, onRunCompleted }: { agentId: string; onRunCompleted?: () => void } = $props();
+	let { agentId, onRunCompleted, blockedReason = null }: { agentId: string; onRunCompleted?: () => void; blockedReason?: string | null } = $props();
 
 	let prompt = $state('');
 	let messages: ThreadMessage[] = $state([]);
@@ -14,7 +14,7 @@
 	let requestVersion = $state(0);
 
 	function handleRun() {
-		if (!prompt.trim() || running) return;
+		if (!prompt.trim() || running || blockedReason) return;
 
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
@@ -128,7 +128,7 @@
 				class="w-full resize-none border-none bg-transparent p-3 font-mono text-[13px] text-fg outline-none placeholder:text-fg-faint"
 				style="min-height: 80px"
 				onkeydown={handleKeydown}
-				disabled={running}
+				disabled={running || !!blockedReason}
 			></textarea>
 			<div class="flex items-center justify-between border-t border-edge-subtle px-3 py-1.5">
 				<span class="font-mono text-[12px] text-fg-faint">{isMac ? 'Cmd' : 'Ctrl'}+Enter to run</span>
@@ -144,7 +144,7 @@
 					<button
 						class="flex h-7 w-7 items-center justify-center rounded-full border border-edge bg-surface-2 text-accent-primary transition-[border-color,background-color] duration-150 hover:border-accent-primary/40 hover:bg-accent-primary/5 disabled:opacity-30 disabled:pointer-events-none"
 						onclick={handleRun}
-						disabled={!prompt.trim()}
+						disabled={!prompt.trim() || !!blockedReason}
 						aria-label="Run"
 					>
 						<Play size={14} fill="currentColor" />

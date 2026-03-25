@@ -212,9 +212,8 @@ __marimo__/
 # Test artifacts (mocked file paths)
 MagicMock/
 
-# Dashboard build artifacts (keep .gitkeep)
-initrunner/dashboard/_static/*
-!initrunner/dashboard/_static/.gitkeep
+# Dashboard build artifacts (included via hatch artifacts config)
+initrunner/dashboard/_static/
 package-lock.json
 node_modules/
 .svelte-kit/
