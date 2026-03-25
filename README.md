@@ -50,6 +50,8 @@ initrunner setup        # wizard: pick provider, model, API key
 
 Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
 
+**Upgrade:** re-run the install command, or: `uv tool upgrade initrunner` / `pipx upgrade initrunner`.
+
 ### Use a premade agent from InitHub
 
 Browse [hub.initrunner.ai](https://hub.initrunner.ai/) or search from the terminal:

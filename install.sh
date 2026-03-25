@@ -339,7 +339,7 @@ install_with_uv() {
 }
 
 install_with_pipx() {
-    pipx install --force "$1"
+    pipx upgrade "$1" 2>/dev/null || pipx install "$1"
 }
 
 install_with_pip() {
