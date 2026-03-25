@@ -15,6 +15,7 @@
 		type HubSearchResult
 	} from '$lib/api/builder';
 	import { ApiError } from '$lib/api/client';
+	import { page } from '$app/state';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import CognitionPanel from '$lib/components/agents/CognitionPanel.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
@@ -92,8 +93,16 @@
 	let copied = $state(false);
 	let setupCopied = $state(false);
 
+	// Starter state (from ?starter= URL param)
+	let pendingStarter: string | null = $state(null);
+
 	// -- Derived --------------------------------------------------------------
 
+	const noProviders = $derived(
+		options !== null &&
+		!options.detected_provider &&
+		(options.provider_status ?? []).every((p) => !p.is_configured)
+	);
 	const hasErrors = $derived(issues.some((i) => i.severity === 'error'));
 
 	const templateSetup = $derived(
@@ -139,6 +148,40 @@
 			}
 			if (options.role_dirs.length > 0) {
 				selectedDir = options.role_dirs[0];
+			}
+
+			// Handle ?starter= URL param
+			const starterSlug = page.url.searchParams.get('starter');
+			if (starterSlug) {
+				if (options.detected_provider) {
+					// Provider available: auto-load into editor
+					generating = true;
+					try {
+						const result = await seedAgent({
+							mode: 'starter',
+							name: starterSlug,
+							starter_slug: starterSlug,
+							provider: options.detected_provider,
+							model: options.detected_model ?? undefined
+						});
+						yamlText = result.yaml_text;
+						explanation = result.explanation;
+						issues = result.issues;
+						agentName = starterSlug;
+						mode = 'template';
+						step = 'editor';
+						filename = `${starterSlug}.yaml`;
+					} catch (e) {
+						generateError = e instanceof ApiError ? e.detail : String(e);
+					} finally {
+						generating = false;
+					}
+				} else {
+					// No provider: stay on configure, preserve starter intent
+					pendingStarter = starterSlug;
+					agentName = starterSlug;
+					mode = 'template';
+				}
 			}
 		} catch {
 			optionsError = 'Could not load builder options.';
@@ -238,6 +281,17 @@
 					base_url: customBaseUrl || undefined,
 					api_key_env: resolvedApiKeyEnv
 				});
+			} else if (pendingStarter) {
+				result = await seedAgent({
+					mode: 'starter',
+					name: agentName.trim(),
+					starter_slug: pendingStarter,
+					provider: selectedProvider,
+					model: (isCustomEndpoint ? customModelName.trim() : selectedModel) || undefined,
+					base_url: customBaseUrl || undefined,
+					api_key_env: resolvedApiKeyEnv
+				});
+				pendingStarter = null;
 			} else {
 				result = await seedAgent({
 					mode: mode!,
@@ -408,6 +462,22 @@
 	<!-- CONFIGURE SCREEN                                             -->
 	<!-- ============================================================ -->
 	{:else if step === 'configure'}
+		<!-- Provider warning -->
+		{#if noProviders}
+			<div class="border border-warn/30 bg-warn/5 px-4 py-3">
+				<div class="flex items-start gap-2">
+					<TriangleAlert size={14} class="mt-0.5 shrink-0 text-warn" />
+					<div>
+						<p class="text-[13px] text-fg-muted">No AI provider detected. Set an API key before creating an agent.</p>
+						<div class="mt-2 flex gap-3">
+							<a href="https://www.initrunner.ai/docs/providers" target="_blank" rel="noopener" class="text-[13px] text-accent-primary transition-[color] duration-150 hover:text-accent-primary-hover">Provider setup guide</a>
+							<a href="https://www.initrunner.ai/docs/quickstart" target="_blank" rel="noopener" class="text-[13px] text-accent-primary transition-[color] duration-150 hover:text-accent-primary-hover">Quickstart guide</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Agent name -->
 		{#if mode !== 'hub'}
 			<div>

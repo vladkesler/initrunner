@@ -8,7 +8,12 @@ import logging
 import os
 
 from initrunner.dashboard.config import DashboardSettings
-from initrunner.dashboard.schemas import ModelOption, ProviderModels, ProviderPreset
+from initrunner.dashboard.schemas import (
+    ModelOption,
+    ProviderModels,
+    ProviderPreset,
+    ProviderStatus,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -70,6 +75,7 @@ class ProviderOptions:
     ollama_models: list[str]
     ollama_base_url: str
     save_dirs: list[str]
+    provider_status: list[ProviderStatus]
 
 
 async def gather_provider_options(settings: DashboardSettings) -> ProviderOptions:
@@ -129,6 +135,20 @@ async def gather_provider_options(settings: DashboardSettings) -> ProviderOption
             )
         )
 
+    # Build provider status from env var presence (no connectivity test).
+    from initrunner.services.providers import _PROVIDER_PRIORITY
+
+    prov_status = [
+        ProviderStatus(
+            provider=prov,
+            env_var=env_var,
+            is_configured=bool(os.environ.get(env_var)),
+        )
+        for prov, env_var in _PROVIDER_PRIORITY
+    ]
+    if ollama_models:
+        prov_status.append(ProviderStatus(provider="ollama", env_var="", is_configured=True))
+
     return ProviderOptions(
         providers=providers,
         detected_provider=detected_provider,
@@ -137,4 +157,5 @@ async def gather_provider_options(settings: DashboardSettings) -> ProviderOption
         ollama_models=ollama_models,
         ollama_base_url=OLLAMA_DEFAULT_BASE_URL,
         save_dirs=save_dirs,
+        provider_status=prov_status,
     )

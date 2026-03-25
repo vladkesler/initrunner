@@ -188,6 +188,12 @@ class ProviderPreset(BaseModel):
     key_configured: bool = False
 
 
+class ProviderStatus(BaseModel):
+    provider: str
+    env_var: str
+    is_configured: bool
+
+
 class BuilderOptionsResponse(BaseModel):
     templates: list[TemplateInfo]
     providers: list[ProviderModels]
@@ -198,13 +204,27 @@ class BuilderOptionsResponse(BaseModel):
     ollama_models: list[str]
     ollama_base_url: str
     template_setups: dict[str, TemplateSetup] = {}
+    provider_status: list[ProviderStatus] = []
+
+
+class StarterInfo(BaseModel):
+    slug: str
+    name: str
+    description: str
+    tags: list[str]
+    features: list[str]
+
+
+class StartersResponse(BaseModel):
+    starters: list[StarterInfo]
 
 
 class SeedRequest(BaseModel):
-    mode: Literal["template", "description", "blank"]
+    mode: Literal["template", "description", "blank", "starter"]
     name: str
     template: str | None = None
     description: str | None = None
+    starter_slug: str | None = None
     provider: str
     model: str | None = None
     base_url: str | None = None

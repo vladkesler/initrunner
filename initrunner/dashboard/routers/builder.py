@@ -32,6 +32,8 @@ from initrunner.dashboard.schemas import (
     SaveResponse,
     SeedRequest,
     SeedResponse,
+    StarterInfo,
+    StartersResponse,
     TemplateInfo,
     TemplateSetup,
     ValidateRequest,
@@ -46,6 +48,8 @@ router = APIRouter(prefix="/api/builder", tags=["builder"])
 # ---------------------------------------------------------------------------
 # Constants & helpers
 # ---------------------------------------------------------------------------
+
+_STARTERS_DIR = Path(__file__).resolve().parent.parent / "_starters"
 
 _BLANK_TEMPLATE = """\
 apiVersion: initrunner/v1
@@ -169,7 +173,87 @@ async def builder_options(
         ollama_models=opts.ollama_models,
         ollama_base_url=opts.ollama_base_url,
         template_setups=template_setups,
+        provider_status=opts.provider_status,
     )
+
+
+# Curated display order for launchpad starter cards.
+_STARTER_ORDER = [
+    "helpdesk",
+    "rag-agent",
+    "memory-assistant",
+    "telegram-assistant",
+    "discord-assistant",
+    "email-agent",
+]
+
+# Spec keys that map to user-facing feature labels.
+_FEATURE_MAP: list[tuple[str, str]] = [
+    ("ingest", "RAG"),
+    ("memory", "Memory"),
+    ("triggers", "Triggers"),
+]
+
+
+def _derive_features(spec: dict) -> list[str]:
+    """Derive user-facing feature labels from a role spec dict."""
+    features: list[str] = []
+    for key, label in _FEATURE_MAP:
+        if spec.get(key):
+            features.append(label)
+    tools = spec.get("tools") or []
+    tool_types = {t.get("type", "") for t in tools if isinstance(t, dict)}
+    if "search" in tool_types or "web_reader" in tool_types:
+        features.append("Web")
+    if "shell" in tool_types:
+        features.append("Shell")
+    return features
+
+
+def _load_starters() -> list[StarterInfo]:
+    """Read single-file Agent starters from _starters/ directory."""
+    import yaml
+
+    starters: dict[str, StarterInfo] = {}
+    if not _STARTERS_DIR.is_dir():
+        return []
+
+    for path in _STARTERS_DIR.glob("*.yaml"):
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except Exception:
+            _logger.debug("Failed to parse starter %s", path.name, exc_info=True)
+            continue
+
+        if not isinstance(data, dict):
+            continue
+        if data.get("kind") != "Agent":
+            continue
+
+        meta = data.get("metadata") or {}
+        spec = data.get("spec") or {}
+        slug = path.stem
+        starters[slug] = StarterInfo(
+            slug=slug,
+            name=meta.get("name", slug),
+            description=meta.get("description", ""),
+            tags=meta.get("tags") or [],
+            features=_derive_features(spec),
+        )
+
+    # Return in curated order, then any remaining alphabetically.
+    ordered: list[StarterInfo] = []
+    for slug in _STARTER_ORDER:
+        if slug in starters:
+            ordered.append(starters.pop(slug))
+    ordered.extend(sorted(starters.values(), key=lambda s: s.slug))
+    return ordered
+
+
+@router.get("/starters")
+async def list_starters() -> StartersResponse:
+    starters = await asyncio.to_thread(_load_starters)
+    return StartersResponse(starters=starters)
 
 
 @router.post("/seed")
@@ -220,6 +304,20 @@ async def seed_agent(
                 base_url=base_url,
                 api_key_env=api_key_env,
             )
+        elif req.mode == "starter":
+            if not req.starter_slug:
+                raise ValueError("starter_slug is required for mode=starter")
+            starter_path = _STARTERS_DIR / f"{req.starter_slug}.yaml"
+            if not starter_path.is_file():
+                raise ValueError(f"Starter not found: {req.starter_slug}")
+            raw = starter_path.read_text(encoding="utf-8")
+            # Rewrite model block with the user's chosen provider/model
+            from initrunner.templates import _default_model_name
+
+            model = req.model or _default_model_name(runtime_provider)
+            raw = _rewrite_model_block(raw, provider=runtime_provider, name=model)
+            session.yaml_text = raw
+            turn = session._make_turn_result(f"Loaded starter: {req.starter_slug}")
         else:
             raise ValueError(f"Unknown mode: {req.mode}")
         return turn.explanation, turn.yaml_text, turn.issues, turn.ready

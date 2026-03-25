@@ -136,7 +136,7 @@ The `.card-surface` utility creates a border with a lime-tinted top edge, mimick
 }
 ```
 
-Used on: stat cards, agent flow nodes, top-agents bars, doctor check items.
+Used on: stat cards, agent flow nodes, top-agents bars, doctor check items, starter template cards.
 
 ### Card Surface -- Error Variant
 

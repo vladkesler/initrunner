@@ -6,10 +6,14 @@
 	import { request } from '$lib/api/client';
 	import type { AgentSummary, AuditRecord, AuditStats, HealthStatus } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Plus, Stethoscope, Activity, CheckCircle, Coins, Timer, AlertTriangle, ArrowUpRight, Workflow, Users } from 'lucide-svelte';
+	import { Plus, BookOpen, Stethoscope, Activity, CheckCircle, Coins, Timer, AlertTriangle, ArrowUpRight, Workflow, Users, ExternalLink } from 'lucide-svelte';
 	import { fetchComposeList } from '$lib/api/compose';
 	import { fetchTeamList } from '$lib/api/teams';
+	import { getBuilderOptions, getStarters, type BuilderOptions, type StarterInfo } from '$lib/api/builder';
 	import type { ComposeSummary, TeamSummary } from '$lib/api/types';
+	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
+	import StarterCard from '$lib/components/ui/StarterCard.svelte';
+	import CapabilityChips from '$lib/components/ui/CapabilityChips.svelte';
 
 	let agents = $state<AgentSummary[]>([]);
 	let composes = $state<ComposeSummary[]>([]);
@@ -18,9 +22,11 @@
 	let stats = $state<AuditStats | null>(null);
 	let version = $state('');
 	let loading = $state(true);
+	let builderOptions = $state<BuilderOptions | null>(null);
+	let starters = $state<StarterInfo[]>([]);
 
 	const errorAgents = $derived(agents.filter((a) => a.error));
-	const hasAgents = $derived(agents.length > 0);
+	const isEmpty = $derived(agents.length === 0 && composes.length === 0 && teams.length === 0);
 	const agentIdByName = $derived(new Map(agents.map((a) => [a.name, a.id])));
 
 	function timeAgo(ts: string): string {
@@ -45,13 +51,15 @@
 
 	onMount(async () => {
 		try {
-			const [a, c, t, audit, s, health] = await Promise.all([
+			const [a, c, t, audit, s, health, opts, st] = await Promise.all([
 				listAgents(),
 				fetchComposeList().catch(() => [] as ComposeSummary[]),
 				fetchTeamList().catch(() => [] as TeamSummary[]),
 				queryAudit({ limit: 10 }),
 				fetchAuditStats(),
-				request<HealthStatus>('/api/health')
+				request<HealthStatus>('/api/health'),
+				getBuilderOptions().catch(() => null as BuilderOptions | null),
+				getStarters().catch(() => ({ starters: [] }))
 			]);
 			agents = a;
 			composes = c;
@@ -59,6 +67,8 @@
 			recentAudit = audit;
 			stats = s;
 			version = health.version;
+			builderOptions = opts;
+			starters = st.starters;
 		} catch {
 			// API not available
 		} finally {
@@ -74,17 +84,27 @@
 			<Skeleton class="h-40 bg-surface-1" />
 			<Skeleton class="h-64 bg-surface-1" />
 		</div>
-	{:else if !hasAgents}
-		<!-- Zero state: Welcome screen -->
-		<div class="flex flex-col items-center justify-center py-20">
-			<div class="mb-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-				{#if version}v{version}{/if}
+	{:else if isEmpty}
+		<!-- Zero state: Onboarding -->
+		<div class="space-y-8 py-8">
+			<!-- Header -->
+			<div class="flex items-center gap-3">
+				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Welcome to InitRunner</h1>
+				{#if version}
+					<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">v{version}</span>
+				{/if}
 			</div>
-			<h1 class="mb-3 text-2xl font-semibold tracking-[-0.02em] text-fg">Welcome to InitRunner</h1>
-			<p class="mb-10 max-w-md text-center text-[14px] leading-relaxed text-fg-muted">
-				Define AI agents as YAML, run them anywhere. Create your first agent to get started.
-			</p>
-			<div class="flex gap-4">
+
+			<!-- Provider status -->
+			{#if builderOptions}
+				<ProviderStatusBanner
+					providerStatus={builderOptions.provider_status}
+					detectedProvider={builderOptions.detected_provider}
+				/>
+			{/if}
+
+			<!-- Primary CTAs -->
+			<div class="flex flex-wrap gap-4">
 				<a
 					href="/agents/new"
 					class="flex items-center gap-2 rounded-full bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
@@ -93,11 +113,51 @@
 					Create an Agent
 				</a>
 				<a
-					href="/system"
+					href="https://www.initrunner.ai/docs/quickstart"
+					target="_blank"
+					rel="noopener"
 					class="flex items-center gap-2 rounded-full border border-edge bg-surface-1 px-6 py-2.5 text-[13px] font-medium text-fg-muted transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg hover:border-accent-primary/20"
 				>
-					<Stethoscope size={16} />
-					Run Doctor
+					<BookOpen size={16} />
+					Read the Quickstart
+					<ExternalLink size={12} />
+				</a>
+			</div>
+
+			<!-- Starter templates -->
+			{#if starters.length > 0}
+				<div>
+					<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+						Start from a template
+					</h2>
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						{#each starters.slice(0, 6) as starter, i}
+							<StarterCard {starter} index={i} />
+						{/each}
+					</div>
+					<a
+						href="/agents/new"
+						class="mt-3 inline-block text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
+					>
+						View all templates
+					</a>
+				</div>
+			{/if}
+
+			<!-- Explore capabilities -->
+			<div>
+				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					Explore
+				</h2>
+				<CapabilityChips />
+				<a
+					href="https://www.initrunner.ai/docs/quickstart"
+					target="_blank"
+					rel="noopener"
+					class="mt-3 inline-flex items-center gap-1 text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
+				>
+					Full documentation
+					<ExternalLink size={12} />
 				</a>
 			</div>
 		</div>
