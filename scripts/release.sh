@@ -12,16 +12,18 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(.*)$ ]]; then
   exit 1
 fi
 
+# Ensure clean working tree (before build, which may touch gitignored files)
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Error: working tree is not clean. Commit or stash changes first." >&2
+  exit 1
+fi
+
 # Build dashboard frontend (if source exists)
 if [ -d "dashboard" ] && [ -f "dashboard/package.json" ]; then
   echo "Building dashboard frontend..."
   bash scripts/build-dashboard.sh
-fi
-
-# Ensure clean working tree
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "Error: working tree is not clean. Commit or stash changes first." >&2
-  exit 1
+  # Restore .gitkeep if the build overwrote _static/
+  git checkout -- initrunner/dashboard/_static/.gitkeep 2>/dev/null || true
 fi
 
 # Read current version
