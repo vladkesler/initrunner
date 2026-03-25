@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: uv sync --dev
+      - run: uv sync --dev --extra dashboard
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run ty check initrunner/
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --dev
+      - run: uv sync --dev --extra dashboard
       - run: uv run pytest tests/ -v
 
   build:
