@@ -94,10 +94,6 @@ path = "initrunner/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["initrunner"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"initrunner/dashboard/_static" = "initrunner/dashboard/_static"
-"initrunner/dashboard/_starters" = "initrunner/dashboard/_starters"
-
 [tool.pytest.ini_options]
 timeout = 60
 
