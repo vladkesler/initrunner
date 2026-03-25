@@ -387,7 +387,7 @@ class TestSearchErrorHandling:
     def test_missing_ddgs_package(self):
         """When ddgs is not installed, error message is returned."""
         config = SearchToolConfig()
-        err_msg = "ddgs is required: pip install ddgs or pip install initrunner[search]"
+        err_msg = "ddgs is required: uv pip install ddgs or uv pip install initrunner[search]"
 
         with patch(
             "initrunner.agent.tools.search._PROVIDERS",

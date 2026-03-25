@@ -42,7 +42,7 @@ class TestPluginsEmptyState:
 
         result = runner.invoke(app, ["plugins"])
 
-        assert "pip install initrunner-<plugin-name>" in result.output
+        assert "uv pip install initrunner-<plugin-name>" in result.output
 
 
 class _DummyConfig(BaseModel):

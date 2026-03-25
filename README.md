@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3715+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.41.0-%2334D058" alt="v1.41.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3720+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.42.0-%2334D058" alt="v1.42.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
 
-> **v1.41.0** -- New dashboard onboarding: provider status, starter template cards, quickstart links. New users see what's configured and can start from a template with one click. See the [Changelog](CHANGELOG.md).
+> **v1.42.0** -- Dashboard provider setup: configure API keys directly from the browser. Inline key entry on the launchpad, System page, and agent creation. No CLI setup required. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 

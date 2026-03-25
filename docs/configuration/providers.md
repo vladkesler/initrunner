@@ -26,6 +26,8 @@ spec:
 
 Install all provider extras at once with `pip install initrunner[all-models]`.
 
+> **Dashboard setup:** API keys can also be configured from the dashboard. Run `initrunner dashboard` and use the inline key form on the launchpad, or navigate to the System page for full provider management. Keys are saved to `~/.initrunner/.env`.
+
 ### Provider snippets
 
 **OpenAI** (no extra required):

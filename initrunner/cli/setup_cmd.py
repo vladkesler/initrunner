@@ -258,7 +258,7 @@ def run_setup(
             else:
                 console.print(
                     f"[dim]Hint: install later with: "
-                    f"pip install initrunner[{_PROVIDER_EXTRAS.get(provider, provider)}][/dim]"
+                    f"uv pip install initrunner[{_PROVIDER_EXTRAS.get(provider, provider)}][/dim]"
                 )
 
     # ---------------------------------------------------------------

@@ -576,7 +576,7 @@ def _verify_bot_sdk(platform: str) -> None:
         except ImportError:
             console.print(
                 "[red]Error:[/red] python-telegram-bot is not installed.\n"
-                "  Install it: [bold]pip install initrunner[telegram][/bold]"
+                "  Install it: [bold]uv pip install initrunner[telegram][/bold]"
             )
             raise typer.Exit(1) from None
     elif platform == "discord":
@@ -585,6 +585,6 @@ def _verify_bot_sdk(platform: str) -> None:
         except ImportError:
             console.print(
                 "[red]Error:[/red] discord.py is not installed.\n"
-                "  Install it: [bold]pip install initrunner[discord][/bold]"
+                "  Install it: [bold]uv pip install initrunner[discord][/bold]"
             )
             raise typer.Exit(1) from None

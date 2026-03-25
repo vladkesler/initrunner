@@ -6,7 +6,7 @@
 # Supports: .md, .txt, .pdf, .html, .docx
 #
 # Prerequisites:
-#   pip install initrunner[ingest]   # required for PDF/DOCX support
+#   uv pip install initrunner[ingest]   # required for PDF/DOCX support
 #
 # Usage:
 #   initrunner ingest role.yaml

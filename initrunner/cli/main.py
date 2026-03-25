@@ -74,7 +74,9 @@ def main(
 
         console.print(
             Panel(
-                "No provider configured yet.\nRun [bold]initrunner setup[/bold] to get started.",
+                "No provider configured yet.\n"
+                "Run [bold]initrunner setup[/bold] to get started,\n"
+                "or launch [bold]initrunner dashboard[/bold] to configure in the browser.",
                 title="Setup Required",
                 border_style="yellow",
             )

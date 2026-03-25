@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   Discord bot with Message Content Intent enabled
-#   pip install initrunner[discord]
+#   uv pip install initrunner[discord]
 #
 # Usage:
 #   initrunner daemon role.yaml

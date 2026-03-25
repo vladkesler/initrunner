@@ -482,7 +482,7 @@ class TestRequireCerbos:
                 saved[key] = sys.modules.pop(key)
         try:
             with patch.dict("sys.modules", {"cerbos": None, "cerbos.sdk": None}):
-                with pytest.raises(RuntimeError, match="pip install initrunner"):
+                with pytest.raises(RuntimeError, match="uv pip install initrunner"):
                     require_cerbos()
         finally:
             sys.modules.update(saved)

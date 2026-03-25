@@ -267,13 +267,23 @@ class SaveResponse(BaseModel):
 
 
 class SaveKeyRequest(BaseModel):
+    provider: str | None = None  # standard provider name (e.g. "openai", "anthropic")
     preset: str | None = None  # e.g. "openrouter" -- uses known env var name
     base_url: str | None = None  # for custom -- derives env var name from URL
     api_key: str
+    verify: bool = False  # attempt real API call validation (openai/anthropic only)
 
 
 class SaveKeyResponse(BaseModel):
     env_var: str
+    validated: bool = False
+    validation_supported: bool = False
+
+
+class ProviderStatusResponse(BaseModel):
+    providers: list[ProviderStatus]
+    detected_provider: str | None = None
+    detected_model: str | None = None
 
 
 # -- InitHub -------------------------------------------------------------------

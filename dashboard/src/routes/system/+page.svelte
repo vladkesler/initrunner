@@ -2,12 +2,14 @@
 	import { onMount } from 'svelte';
 	import { request } from '$lib/api/client';
 	import { runDoctor, listToolTypes } from '$lib/api/system';
-	import type { Provider, HealthStatus, DoctorCheck, ToolType } from '$lib/api/types';
+	import { getProviderStatus, type ProviderStatusResponse } from '$lib/api/providers';
+	import type { HealthStatus, DoctorCheck, ToolType } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Stethoscope, RefreshCw, CheckCircle, AlertTriangle, XCircle, Wrench } from 'lucide-svelte';
+	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 
 	let version = $state('');
-	let providers = $state<Provider[]>([]);
+	let providerData = $state<ProviderStatusResponse | null>(null);
 	let doctorChecks = $state<DoctorCheck[]>([]);
 	let embeddingChecks = $state<DoctorCheck[]>([]);
 	let tools = $state<ToolType[]>([]);
@@ -40,15 +42,27 @@
 		}
 	}
 
+	async function reloadProviders() {
+		try {
+			providerData = await getProviderStatus();
+			// Refresh doctor if already loaded
+			if (doctorChecks.length > 0) {
+				loadDoctor();
+			}
+		} catch {
+			// best effort
+		}
+	}
+
 	onMount(async () => {
 		try {
-			const [health, p, t] = await Promise.all([
+			const [health, pd, t] = await Promise.all([
 				request<HealthStatus>('/api/health'),
-				request<Provider[]>('/api/providers'),
+				getProviderStatus(),
 				listToolTypes()
 			]);
 			version = health.version;
-			providers = p;
+			providerData = pd;
 			tools = t;
 		} catch {
 			// API not available
@@ -74,29 +88,13 @@
 		<!-- Providers -->
 		<div>
 			<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Providers</h2>
-			{#if providers.length === 0}
-				<div class="border border-edge bg-surface-1 px-4 py-8 text-center text-[13px] text-fg-faint">
-					No providers detected. Set API keys to get started.
-				</div>
-			{:else}
-				<div class="overflow-hidden border border-edge">
-					<table class="w-full">
-						<thead>
-							<tr class="border-b-2 border-edge">
-								<th class="px-4 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Provider</th>
-								<th class="px-4 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Default Model</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each providers as p}
-								<tr class="border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-accent-primary/[0.03]">
-									<td class="px-4 py-2 font-mono text-[13px] text-fg-muted">{p.provider}</td>
-									<td class="px-4 py-2 font-mono text-[13px] text-fg-faint">{p.model}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
+			{#if providerData}
+				<ProviderStatusBanner
+					providerStatus={providerData.providers}
+					detectedProvider={providerData.detected_provider}
+					mode="full"
+					onConfigured={reloadProviders}
+				/>
 			{/if}
 		</div>
 

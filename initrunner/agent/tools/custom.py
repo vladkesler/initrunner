@@ -121,7 +121,8 @@ def build_custom_toolset(
         if role_dir_str is not None and role_dir_str in sys.path:
             sys.path.remove(role_dir_str)
         raise ValueError(
-            f"Could not find module '{config.module}'. Install it with: pip install {config.module}"
+            f"Could not find module '{config.module}'."
+            f" Install it with: uv pip install {config.module}"
         )
 
     if spec.origin and Path(spec.origin).is_file():
@@ -134,7 +135,7 @@ def build_custom_toolset(
         missing = e.name or config.module
         raise ValueError(
             f"Could not load module '{config.module}': missing dependency '{missing}'. "
-            f"Install it with: pip install {missing}"
+            f"Install it with: uv pip install {missing}"
         ) from e
     finally:
         # Clean up sys.path to avoid polluting it for unrelated imports
@@ -257,11 +258,11 @@ def build_plugin_toolset(config: PluginToolConfig, ctx: ToolBuildContext) -> Abs
             raise ValueError(
                 f"Tool type '{config.type}' not found. "
                 f"Installed plugins: {installed}. "
-                f"Did you forget to pip install initrunner-{config.type}?"
+                f"Did you forget to uv pip install initrunner-{config.type}?"
             )
         raise ValueError(
             f"Tool type '{config.type}' not found. No plugins installed. "
-            f"Install one with: pip install initrunner-{config.type}"
+            f"Install one with: uv pip install initrunner-{config.type}"
         )
 
     validated = plugin.config_class.model_validate({"type": config.type, **config.config})

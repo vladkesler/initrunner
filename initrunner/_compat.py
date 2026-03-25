@@ -42,7 +42,7 @@ def require_provider(provider: str) -> None:
     except ImportError:
         extra = _PROVIDER_EXTRAS.get(provider, "all-models")
         raise RuntimeError(
-            f"Provider '{provider}' requires: pip install initrunner[{extra}]"
+            f"Provider '{provider}' requires: uv pip install initrunner[{extra}]"
         ) from None
 
 
@@ -52,7 +52,7 @@ def require_observability() -> None:
         importlib.import_module("opentelemetry.sdk")
     except ImportError:
         raise RuntimeError(
-            "OpenTelemetry observability requires: pip install initrunner[observability]"
+            "OpenTelemetry observability requires: uv pip install initrunner[observability]"
         ) from None
 
 
@@ -63,5 +63,5 @@ def require_ingest(package: str) -> None:
     except ImportError:
         pip_name = _INGEST_PACKAGES.get(package, package)
         raise RuntimeError(
-            f"'{pip_name}' is required for this file type: pip install initrunner[ingest]"
+            f"'{pip_name}' is required for this file type: uv pip install initrunner[ingest]"
         ) from None

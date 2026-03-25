@@ -38,7 +38,7 @@ Action-oriented home page with two states.
 
 Onboarding surface designed to reduce time-to-first-agent:
 
-- **Provider status banner**: shows which AI providers are configured (env var presence + Ollama). When no providers are configured, shows a warning with links to the provider setup guide and the quickstart guide.
+- **Provider status banner**: shows which AI providers are configured (env var presence + Ollama). When no providers are configured, shows an inline key entry form (provider dropdown + API key input + "Save & Verify" button) so users can configure a provider without leaving the dashboard. Links to the provider setup guide and the System page for full provider management.
 - **Primary CTAs**: "Create an Agent" and "Read the Quickstart" (links to `https://www.initrunner.ai/docs/quickstart`).
 - **Starter template cards**: up to 6 curated single-file Agent starters from `_starters/` (helpdesk, rag-agent, memory-assistant, telegram, discord, email). Each card shows name, description, and derived feature badges (RAG, Memory, Triggers, Web, etc.). Clicking a card navigates to `/agents/new?starter={slug}`, which auto-loads the starter YAML into the editor when a provider is detected.
 - **Capability chips**: pill links to RAG, Memory, Triggers, Compose, and Teams docs/creation flows.
@@ -75,7 +75,7 @@ Create a new agent through four modes, presented in a 2x2 card grid:
 
 All modes include a provider/model selector so the generated (or loaded) YAML uses the user's preferred model. For InitHub, the bundle's original model config is replaced with the user's selection.
 
-**Provider warning**: when no providers are configured (no API keys set and Ollama not running), a warning banner appears at the top of the configure step with links to the provider setup guide and quickstart guide.
+**Provider warning**: when no providers are configured (no API keys set and Ollama not running), an inline provider setup form appears at the top of the configure step. Users can select a provider, enter an API key, and save it directly. For OpenAI and Anthropic, the key is validated against the provider API before saving. Once saved, the form disappears and the configure step unlocks.
 
 **Starter URL parameter**: navigating to `/agents/new?starter={slug}` (e.g. from a launchpad starter card) loads a starter template. When a provider is detected, it auto-loads the YAML into the editor with the detected provider/model rewritten in. When no provider is detected, it stays on the configure step with the starter intent preserved, so the user can pick a provider first.
 
@@ -172,7 +172,7 @@ Personas are configured individually through expandable cards (2-8). Each card h
 - **Role source** -- toggle between "Custom" (write a role description manually) and "From agent" (pick an existing agent via the Agent Picker). Selecting an agent copies its description into the role field, auto-renames the persona if the name is still a default, and pre-fills the model override with the agent's provider/model/endpoint. The copied fields remain fully editable. A "Seeded from `<agent-name>`" indicator shows the source while the link is active. This is a one-time copy; saved team YAML contains plain persona data with no agent reference.
 - **Name** -- editable, validated against kebab-case naming rules, unique across the team
 - **Role** -- textarea describing what the persona does (becomes the persona's system prompt)
-- **Model override** -- optional toggle to use a different model than the team default, with full provider parity (cloud, Ollama, OpenRouter, custom endpoints with API key persistence via `/api/builder/save-key`)
+- **Model override** -- optional toggle to use a different model than the team default, with full provider parity (cloud, Ollama, OpenRouter, custom endpoints with API key persistence via `/api/providers/save-key`)
 
 For sequential teams, arrow connectors between cards show execution order, and up/down buttons allow reordering (persona order in the YAML determines execution order). Default persona names are assigned from a pool (analyst, reviewer, advisor, checker, specialist, evaluator, auditor, planner).
 
@@ -208,7 +208,7 @@ Three sections:
 
 | Section | Contents |
 |---------|----------|
-| **Providers** | Table of detected providers with their default models |
+| **Providers** | Full provider management. Shows configured providers as card-surface rows (name + env var + green status dot). Includes an inline form to add new provider API keys -- select a provider, enter the key, and save. For OpenAI and Anthropic, keys are validated against the provider API. Supports standard providers, OpenRouter, and custom endpoints. Keys are written to `~/.initrunner/.env`. |
 | **Health Check** | "Run Doctor" button that checks API key validity, SDK availability, Ollama connectivity, and Docker status. Results shown as a checklist with green/amber/red indicators. |
 | **Tool Registry** | List of all registered tool types with descriptions. Useful when deciding what tools to add to an agent. |
 
@@ -271,6 +271,8 @@ initrunner dashboard
   |      /api/audit            GET   query audit records
   |      /api/audit/stats      GET   aggregate audit statistics
   |      /api/providers        GET   detected providers
+  |      /api/providers/status GET   all providers with config status
+  |      /api/providers/save-key POST save API key to ~/.initrunner/.env
   |      /api/system/doctor    GET   provider health checks
   |      /api/system/tools     GET   registered tool types
   |      /                     static SvelteKit build

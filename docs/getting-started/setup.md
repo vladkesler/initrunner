@@ -2,6 +2,8 @@
 
 The `initrunner setup` command is a guided, intent-driven wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml` plus a `~/.initrunner/chat.yaml` for `initrunner chat`.
 
+> **Prefer a browser?** Run `initrunner dashboard` to configure providers, add API keys, and create agents from the web UI. The dashboard's System page provides full provider management, and the launchpad offers inline key setup for first-time users.
+
 ## Quick Start
 
 ```bash

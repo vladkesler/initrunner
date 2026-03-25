@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchTeamBuilderOptions, seedTeam, validateTeam, saveTeam } from '$lib/api/teams';
-	import { saveKey } from '$lib/api/builder';
+	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
 	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -113,7 +113,7 @@
 
 					if (p.modelApiKey.trim() && isCustom) {
 						const preset = options.custom_presets.find((pr) => pr.name === p.modelProvider);
-						const keyResult = await saveKey({
+						const keyResult = await saveProviderKey({
 							preset: preset?.name !== 'custom' ? preset?.name : undefined,
 							base_url: p.modelProvider === 'custom' ? p.modelBaseUrl : undefined,
 							api_key: p.modelApiKey.trim()
@@ -141,7 +141,7 @@
 			let teamApiKeyEnv: string | null = null;
 			if (apiKey.trim() && teamIsCustom) {
 				const preset = options.custom_presets.find((pr) => pr.name === selectedProvider);
-				const keyResult = await saveKey({
+				const keyResult = await saveProviderKey({
 					preset: preset?.name !== 'custom' ? preset?.name : undefined,
 					base_url: selectedProvider === 'custom' ? customBaseUrl : undefined,
 					api_key: apiKey.trim()

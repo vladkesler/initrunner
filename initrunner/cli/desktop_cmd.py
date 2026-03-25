@@ -33,7 +33,7 @@ def desktop(
     except ImportError:
         console.print(
             "[red]Desktop mode requires pywebview.[/red]\n"
-            "Install with: [bold]pip install 'initrunner\\[desktop]'[/bold]"
+            "Install with: [bold]uv pip install 'initrunner\\[desktop]'[/bold]"
         )
         raise SystemExit(1) from None
 
