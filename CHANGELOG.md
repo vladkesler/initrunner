@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.41.0] - 2026-03-25
+
+### Added
+- **Dashboard onboarding** -- redesigned zero-state launchpad with provider status banner, starter template cards (helpdesk, rag-agent, memory-assistant, telegram, discord, email), capability chips, and quickstart links
+- **Starter templates API** -- `GET /api/builder/starters` returns curated Agent starters with derived feature labels
+- **Starter seed mode** -- `POST /api/builder/seed` accepts `mode: "starter"` to load and customize starter YAMLs
+- **Provider status** -- `BuilderOptionsResponse` includes `provider_status` with per-provider configuration state
+- **`?starter=` URL param** -- `/agents/new?starter={slug}` auto-loads starter into editor when a provider is detected
+- **Provider warning** -- agent creation shows setup links when no providers are configured
+
+### Changed
+- Zero-state condition checks agents, composes, and teams (not just agents)
+- "Run Doctor" replaced with "Read the Quickstart" on zero-state launchpad
+
+### Fixed
+- CI: updated trivy-action to v0.35.0 (0.28.0 tag no longer resolvable)
+- CI: pip-audit ignores CVE-2025-69872 (diskcache) and CVE-2026-4539 (pygments) pending upstream fixes
+
+### Security
+- Bumped security dependencies (uv.lock refresh)
+
 ## [1.40.4] - 2026-03-25
 
 ### Fixed
