@@ -55,6 +55,38 @@ uv run pytest tests/ -v          # tests
 
 All four are declared in the `[dependency-groups] dev` section of `pyproject.toml` and installed via `uv sync --dev`.
 
+## Security Scanning
+
+A standalone **Security** workflow (`.github/workflows/security.yml`) runs on PRs that touch dependency files, on a weekly schedule (Wednesday), and on manual dispatch. It runs three parallel jobs:
+
+### Trivy Repository Scan
+
+Scans the full repository filesystem for known CVEs in `uv.lock` and `pnpm-lock.yaml`, plus Dockerfile misconfigurations. Filters to CRITICAL and HIGH severity. Results are uploaded as SARIF to the GitHub Security tab.
+
+### pip-audit
+
+Exports Python dependencies via `uv export` and audits them against the PyPI advisory database using `pip-audit`.
+
+### pnpm audit
+
+Runs `pnpm audit --prod` against the dashboard's frontend dependencies. This job uses `continue-on-error` since pnpm audit exits non-zero even for low-severity advisories with no available fix.
+
+### Container Image Scan
+
+The Docker publish workflow (`.github/workflows/docker-publish.yml`) includes a post-publish Trivy scan of the container image. This detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image` category.
+
+## Dependabot
+
+Dependabot is configured in `.github/dependabot.yml` for three ecosystems:
+
+| Ecosystem | Directory | Schedule | Grouping |
+|-----------|-----------|----------|----------|
+| `pip` | `/` | Weekly (Monday) | pydantic, AI providers, observability |
+| `npm` | `/dashboard` | Weekly (Monday) | svelte, tailwind |
+| `github-actions` | `/` | Weekly (Monday) | -- |
+
+Related packages are grouped to reduce PR noise (e.g., all pydantic packages update in a single PR).
+
 ## Python Version Support
 
 The project declares `requires-python = ">=3.11"` and CI tests against 3.11, 3.12, and 3.13. Ruff and ty are both configured to target Python 3.13 for lint and type-check rules.

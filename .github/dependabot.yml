@@ -1,0 +1,45 @@
+version: 2
+updates:
+  # Python dependencies (uv/pip ecosystem)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      pydantic:
+        patterns: ["pydantic*"]
+      ai-providers:
+        patterns: ["pydantic-ai*", "openai*", "anthropic*", "google-*", "groq*", "mistral*", "cohere*"]
+      observability:
+        patterns: ["opentelemetry*"]
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencies", "python"]
+    open-pull-requests-limit: 10
+
+  # Dashboard frontend dependencies (pnpm/npm ecosystem)
+  - package-ecosystem: "npm"
+    directory: "/dashboard"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      svelte:
+        patterns: ["@sveltejs/*", "svelte"]
+      tailwind:
+        patterns: ["tailwindcss", "@tailwindcss/*", "tailwind-*"]
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencies", "frontend"]
+    open-pull-requests-limit: 5
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies", "ci"]
