@@ -133,6 +133,20 @@ class AuditStatsResponse(BaseModel):
     top_agents: list[TopAgentResponse]
 
 
+class TriggerStatResponse(BaseModel):
+    """Per-trigger operational stats for the agent detail page."""
+
+    trigger_type: str
+    summary: str
+    fire_count: int = 0
+    success_count: int = 0
+    fail_count: int = 0
+    last_fire_time: str | None = None
+    avg_duration_ms: int = 0
+    last_error: str | None = None
+    next_check_time: str | None = None
+
+
 # -- System / Doctor -----------------------------------------------------------
 
 

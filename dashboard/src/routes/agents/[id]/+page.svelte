@@ -2,9 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getAgentDetail, getAgentYaml, deleteAgent } from '$lib/api/agents';
+	import { getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats } from '$lib/api/agents';
 	import { fetchAuditStats } from '$lib/api/system';
-	import type { AgentDetail, AuditStats } from '$lib/api/types';
+	import type { AgentDetail, AuditStats, TriggerStat } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -12,6 +12,7 @@
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
+	import TriggerPanel from '$lib/components/agents/TriggerPanel.svelte';
 	import RunPanel from '$lib/components/runs/RunPanel.svelte';
 	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
 	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
@@ -37,6 +38,7 @@
 	let yaml = $state('');
 	let agentPath = $state('');
 	let stats: AuditStats | null = $state(null);
+	let triggerStats: TriggerStat[] = $state([]);
 	let loading = $state(true);
 	let loadError = $state(false);
 	let statsLoading = $state(true);
@@ -89,6 +91,13 @@
 		} catch {
 			// stats are best-effort
 		}
+		if (detail.triggers.length > 0) {
+			try {
+				triggerStats = await getAgentTriggerStats(agentId);
+			} catch {
+				// trigger stats are best-effort
+			}
+		}
 	}
 
 	onMount(async () => {
@@ -107,7 +116,7 @@
 		if (!result.ok && !result.notFound) loadError = true;
 		loading = false;
 
-		// Stage 2: stats (needs detail.name)
+		// Stage 2: stats + trigger stats (needs detail.name)
 		if (detail) {
 			await refreshStats();
 		}
@@ -254,6 +263,11 @@
 					</div>
 				</div>
 			</div>
+		{/if}
+
+		<!-- Trigger status panel -->
+		{#if triggerStats.length > 0}
+			<TriggerPanel stats={triggerStats} />
 		{/if}
 
 		<!-- Tabs -->

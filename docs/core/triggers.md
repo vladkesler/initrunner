@@ -317,6 +317,26 @@ Every trigger fires a `TriggerEvent` containing:
 | `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, user, etc.) |
 | `reply_fn` | `Callable \| None` | Optional callback to send the agent's response back to the originating channel |
 
+## Dashboard Monitoring
+
+The dashboard provides operational visibility for triggered agents. On the agent detail page (`/agents/{id}`), a **Trigger Panel** appears above the tabs for agents with configured triggers.
+
+Each trigger displays:
+
+| Field | Source | Description |
+|-------|--------|-------------|
+| Type + summary | Trigger config | e.g. `cron: 0 9 * * *` |
+| Fire count | Audit trail | Total number of trigger-initiated runs |
+| Success rate | Audit trail | Color-coded (green/yellow/red) |
+| Avg duration | Audit trail | Mean execution time across all fires |
+| Last fired | Audit trail | Relative time (e.g. "2m ago") |
+| Next check | Computed | Cron: next schedule evaluation (UTC). Heartbeat: last fire + interval. |
+| Last error | Audit trail | Most recent error from a failed trigger run (collapsed) |
+
+Stats are derived from the audit trail. No additional runtime state is required. The Config tab preserves the static trigger configuration listing as a fallback.
+
+**Limitation (v1)**: stats are aggregated per `trigger_type`. If an agent has two triggers of the same type (e.g. two cron schedules), their stats are combined.
+
 ## Telegram Trigger
 
 Responds to Telegram messages using long-polling via [python-telegram-bot](https://python-telegram-bot.org/). Outbound HTTPS only — no ports opened, no inbound connections required.

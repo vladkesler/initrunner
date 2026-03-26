@@ -117,6 +117,20 @@ export type SSEEvent =
 	| { type: 'result'; data: RunResponse }
 	| { type: 'error'; data: string };
 
+// -- Trigger Stats ------------------------------------------------------------
+
+export interface TriggerStat {
+	trigger_type: string;
+	summary: string;
+	fire_count: number;
+	success_count: number;
+	fail_count: number;
+	last_fire_time: string | null;
+	avg_duration_ms: number;
+	last_error: string | null;
+	next_check_time: string | null;
+}
+
 // -- Audit Stats --------------------------------------------------------------
 
 export interface TopAgent {

@@ -8,7 +8,8 @@ import type {
 	IngestSummary,
 	MemoryItem,
 	SessionDetail,
-	SessionSummary
+	SessionSummary,
+	TriggerStat
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -56,6 +57,10 @@ export function consolidateMemories(agentId: string): Promise<{ consolidated: nu
 
 export function deleteAgent(id: string): Promise<{ id: string; path: string }> {
 	return request(`/api/agents/${id}`, { method: 'DELETE' });
+}
+
+export function getAgentTriggerStats(agentId: string): Promise<TriggerStat[]> {
+	return request(`/api/agents/${agentId}/trigger-stats`);
 }
 
 // -- Ingestion ----------------------------------------------------------------

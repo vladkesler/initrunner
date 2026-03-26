@@ -94,6 +94,19 @@ class AuditStats:
     top_agents: list[TopAgent]
 
 
+@dataclass
+class TriggerStat:
+    """Per-trigger-type operational stats derived from the audit trail."""
+
+    trigger_type: str
+    fire_count: int
+    success_count: int
+    fail_count: int
+    last_fire_time: str | None
+    avg_duration_ms: int
+    last_error: str | None
+
+
 def audit_stats_sync(
     *,
     agent_name: str | None = None,
@@ -116,6 +129,51 @@ def audit_stats_sync(
         )
     with _AuditLogger(db_path) as logger:
         return logger.stats(agent_name=agent_name, since=since, until=until)
+
+
+def trigger_stats_sync(
+    *,
+    agent_name: str,
+    audit_db: Path | None = None,
+) -> list[TriggerStat]:
+    """Per-trigger-type stats for an agent, derived from the audit trail (sync)."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return []
+    with _AuditLogger(db_path) as logger:
+        return logger.trigger_stats(agent_name=agent_name)
+
+
+def next_cron_check(schedule: str) -> str | None:
+    """Compute the next cron fire time in UTC. Returns ISO string or None on error."""
+    try:
+        from datetime import UTC, datetime
+
+        from croniter import croniter  # type: ignore[import-not-found]
+
+        now = datetime.now(UTC)
+        cron = croniter(schedule, now)
+        return cron.get_next(datetime).isoformat()
+    except Exception:
+        return None
+
+
+def next_heartbeat_check(last_fire_time: str | None, interval_seconds: int) -> str | None:
+    """Compute the next heartbeat check from last fire + interval. Returns None when unknown."""
+    if not last_fire_time:
+        return None
+    try:
+        from datetime import UTC, datetime, timedelta
+
+        last = datetime.fromisoformat(last_fire_time)
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=UTC)
+        return (last + timedelta(seconds=interval_seconds)).isoformat()
+    except Exception:
+        return None
 
 
 def query_delegate_events_sync(

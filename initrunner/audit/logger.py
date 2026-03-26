@@ -625,6 +625,51 @@ class AuditLogger:
             top_agents=top_agents,
         )
 
+    def trigger_stats(self, *, agent_name: str) -> list:
+        """Per-trigger-type stats for an agent. Returns list[TriggerStat]."""
+        from initrunner.services.operations import TriggerStat
+
+        agg_sql = """\
+            SELECT
+                trigger_type,
+                COUNT(*) AS fire_count,
+                SUM(CASE WHEN success THEN 1 ELSE 0 END) AS success_count,
+                SUM(CASE WHEN NOT success THEN 1 ELSE 0 END) AS fail_count,
+                MAX(timestamp) AS last_fire_time,
+                CAST(AVG(duration_ms) AS INTEGER) AS avg_duration_ms
+            FROM audit_log
+            WHERE agent_name = ? AND trigger_type IS NOT NULL
+            GROUP BY trigger_type
+        """
+        error_sql = """\
+            SELECT error FROM audit_log
+            WHERE agent_name = ? AND trigger_type = ? AND success = 0 AND error IS NOT NULL
+            ORDER BY timestamp DESC LIMIT 1
+        """
+
+        with self._lock:
+            rows = self._conn.execute(agg_sql, (agent_name,)).fetchall()
+            results: list[TriggerStat] = []
+            for row in rows:
+                ttype = row["trigger_type"]
+                last_error: str | None = None
+                if row["fail_count"] > 0:
+                    err_row = self._conn.execute(error_sql, (agent_name, ttype)).fetchone()
+                    if err_row:
+                        last_error = err_row["error"]
+                results.append(
+                    TriggerStat(
+                        trigger_type=ttype,
+                        fire_count=row["fire_count"],
+                        success_count=row["success_count"],
+                        fail_count=row["fail_count"],
+                        last_fire_time=row["last_fire_time"],
+                        avg_duration_ms=int(row["avg_duration_ms"]),
+                        last_error=last_error,
+                    )
+                )
+        return results
+
     def _prune_locked(self, retention_days: int = 90, max_records: int = 100_000) -> int:
         """Core prune logic. Caller must hold self._lock."""
         deleted = 0

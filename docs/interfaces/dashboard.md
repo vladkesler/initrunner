@@ -91,7 +91,9 @@ Header with agent name, model badge, and status indicator. A **Delete** button o
 
 **Provider warning**: when the agent's provider SDK is not installed or its API key is missing, a warning banner appears below the header with an actionable message (e.g., install command or env var to set). The Run tab is disabled until the issue is resolved. Build errors during streaming runs are also caught and displayed inline in the conversation thread instead of leaving the UI stuck.
 
-Six tabs below the stats bar:
+**Trigger panel**: for agents with triggers configured, an operational status panel appears between the stats bar and tabs. Each trigger shows its type, config summary, fire count, success rate (color-coded), average duration, last fired time (relative), and next check time (for cron and heartbeat triggers). Last errors are shown in a collapsed section. Stats are derived from the audit trail via `GET /api/agents/{id}/trigger-stats`. The static trigger listing in the Config tab is preserved as a fallback. Fire counts are aggregated per trigger type (v1 limitation: multiple triggers of the same type share aggregated stats).
+
+Six tabs below the trigger panel:
 
 | Tab | Contents |
 |-----|----------|
@@ -239,6 +241,7 @@ initrunner dashboard
   |      /api/agents/{id}/detail GET full role config (model, tools, triggers, guardrails, etc.)
   |      /api/agents/{id}/yaml GET   raw YAML file
   |      /api/agents/{id}      DELETE delete agent YAML and evict from cache
+  |      /api/agents/{id}/trigger-stats GET per-trigger-type operational stats
   |      /api/builder/templates GET   templates, providers, options
   |      /api/builder/seed     POST  generate YAML from template/description/blank
   |      /api/builder/validate POST  validate YAML text

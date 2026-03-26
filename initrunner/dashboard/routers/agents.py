@@ -8,7 +8,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import RoleCache, get_role_cache
-from initrunner.dashboard.schemas import AgentDetail, AgentSummary, DeleteResponse, ItemSummary
+from initrunner.dashboard.schemas import (
+    AgentDetail,
+    AgentSummary,
+    DeleteResponse,
+    ItemSummary,
+    TriggerStatResponse,
+)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -192,3 +198,60 @@ async def delete_agent(
         raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
     role_cache.evict(agent_id)
     return DeleteResponse(id=agent_id, path=str(path))
+
+
+@router.get("/{agent_id}/trigger-stats")
+async def get_trigger_stats(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> list[TriggerStatResponse]:
+    from initrunner.agent.schema.triggers import CronTriggerConfig, HeartbeatTriggerConfig
+    from initrunner.config import get_audit_db_path
+    from initrunner.services.operations import (
+        next_cron_check,
+        next_heartbeat_check,
+        trigger_stats_sync,
+    )
+
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if dr.role is None:
+        return []
+
+    triggers = dr.role.spec.triggers
+    if not triggers:
+        return []
+
+    stats_list = await asyncio.to_thread(
+        trigger_stats_sync,
+        agent_name=dr.role.metadata.name,
+        audit_db=get_audit_db_path(),
+    )
+    stats_by_type = {s.trigger_type: s for s in stats_list}
+
+    results: list[TriggerStatResponse] = []
+    for cfg in triggers:
+        s = stats_by_type.get(cfg.type)
+
+        check_time: str | None = None
+        if isinstance(cfg, CronTriggerConfig):
+            check_time = next_cron_check(cfg.schedule)
+        elif isinstance(cfg, HeartbeatTriggerConfig):
+            last = s.last_fire_time if s else None
+            check_time = next_heartbeat_check(last, cfg.interval_seconds)
+
+        results.append(
+            TriggerStatResponse(
+                trigger_type=cfg.type,
+                summary=cfg.summary(),
+                fire_count=s.fire_count if s else 0,
+                success_count=s.success_count if s else 0,
+                fail_count=s.fail_count if s else 0,
+                last_fire_time=s.last_fire_time if s else None,
+                avg_duration_ms=s.avg_duration_ms if s else 0,
+                last_error=s.last_error if s else None,
+                next_check_time=check_time,
+            )
+        )
+    return results
