@@ -6,12 +6,14 @@
 
 ### Added
 - **Clarify tool** -- agent-initiated `clarify()` asks the user a question mid-run and blocks until answered. Works in REPL, bot, daemon, and autonomous modes. Add `{ type: clarify }` to your role's tools list.
-- **Context budget guard** -- PydanticAI history processor that summarizes older conversation turns to prevent context window overflow during long autonomous runs
-- **Context-aware-scraper example** -- autonomous web scraper demonstrating the context budget guard with history summarization
-- **Clarify-researcher example** -- research assistant demonstrating human-in-the-loop clarify tool before acting
+- **Context budget guard** -- PydanticAI history processor that truncates oversized parts and drops oldest message pairs when estimated tokens exceed the budget. Runs as a pre-request history processor and between autonomous/daemon iterations.
+- **`model.context_window` field** -- explicit context window override in `spec.model`; auto-detected per provider when omitted (200k Anthropic, 128k OpenAI/Gemini, etc.)
 - **Dashboard trigger visibility panel** -- agent detail page shows trigger configuration, fire counts, and next-run times
 - **Dashboard toast notification system** -- global toast store with auto-dismiss; load-error recovery across all pages
+- **Dashboard agent wizard refactor** -- creation wizard extracted into composable screen components (ConfigureScreen, EditorScreen, HubSearchPanel, SuccessScreen)
 - **Trigger stats API** -- `GET /api/agents/{name}/trigger-stats` endpoint with fire counts and schedule info
+- **Context-aware-scraper example** -- autonomous web scraper demonstrating the context budget guard with history summarization
+- **Clarify-researcher example** -- research assistant demonstrating human-in-the-loop clarify tool before acting
 
 ### Removed
 - **`kind: Pipeline` orchestration** -- removed in favor of Team for one-shot multi-agent workflows and Compose for long-running services. For complex DAG workflows, use pydantic-graph directly. Running a Pipeline YAML now shows a migration message.

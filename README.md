@@ -193,6 +193,22 @@ spec:
 
 The agent calls `clarify("Which branch should I deploy?")` and blocks until the user responds. Works in REPL, Telegram/Discord bots, daemon mode, and autonomous runs. See [Tools](docs/agents/tools.md).
 
+### Context budget guard
+
+Long autonomous runs accumulate history that can exceed the context window. The built-in history processor estimates token usage and drops oldest message pairs when the budget is exceeded:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    context_window: 200000   # optional -- auto-detected per provider
+  autonomy:
+    max_iterations: 50
+```
+
+No extra config needed -- the guard activates automatically for autonomous and daemon runs. See [Autonomy](docs/orchestration/autonomy.md).
+
 ### Triggers
 
 Turn it into a daemon that reacts to events - cron, file watch, webhook, heartbeat, Telegram, or Discord:
