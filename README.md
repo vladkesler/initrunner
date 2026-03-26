@@ -54,11 +54,11 @@ Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools,
 **Install and configure:**
 
 ```bash
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+curl -fsSL https://initrunner.ai/install.sh | sh
 initrunner setup        # wizard: pick provider, model, API key
 ```
 
-Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
+Or install with a package manager: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
 
 **Upgrade:** re-run the install command, or: `uv tool upgrade initrunner` / `pipx upgrade initrunner`.
 

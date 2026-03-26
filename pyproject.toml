@@ -57,6 +57,11 @@ channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 authz = ["cerbos>=0.15.1"]
 dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
 desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
+recommended = [
+    "initrunner[search]",
+    "initrunner[ingest]",
+    "initrunner[dashboard]",
+]
 all = [
     "initrunner[ingest]",
     "initrunner[search]",

@@ -1,7 +1,7 @@
 #!/bin/sh
 # initrunner installer
 # Usage: curl -fsSL https://initrunner.ai/install.sh | sh
-#        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras tui,ingest
+#        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --version 0.2.0
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --unmanaged
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --method pipx
@@ -62,7 +62,7 @@ header() {
 # ── Argument parsing ─────────────────────────────────────────────────
 
 INSTALL_METHOD="${INITRUNNER_INSTALL_METHOD:-auto}"
-EXTRAS="${INITRUNNER_EXTRAS:-}"
+EXTRAS="${INITRUNNER_EXTRAS:-recommended}"
 VERSION="${INITRUNNER_VERSION:-latest}"
 NO_MODIFY_PATH="${INITRUNNER_NO_MODIFY_PATH:-}"
 UNMANAGED=false
@@ -115,7 +115,7 @@ show_help() {
 
   Options:
     --method <uv|pipx|pip>  Force a specific installer
-    --extras <list>         Comma-separated extras (tui,ingest,anthropic)
+    --extras <list>         Comma-separated extras (default: recommended; use 'none' for bare install)
     --version <ver>         Pin to a specific version
     --unmanaged             Skip PATH/profile modifications (CI mode)
     --uninstall             Remove initrunner
@@ -123,7 +123,7 @@ show_help() {
 
   Environment variables:
     INITRUNNER_INSTALL_METHOD   Force installer (uv/pipx/pip)
-    INITRUNNER_EXTRAS           Comma-separated extras
+    INITRUNNER_EXTRAS           Comma-separated extras (default: recommended)
     INITRUNNER_VERSION          Pin version
     INITRUNNER_NO_MODIFY_PATH   Skip shell profile edits
 
@@ -305,7 +305,7 @@ install_uv_bootstrap() {
 build_pkg_spec() {
     _spec="$PACKAGE_NAME"
 
-    if [ -n "$EXTRAS" ]; then
+    if [ -n "$EXTRAS" ] && [ "$EXTRAS" != "none" ]; then
         _spec="${_spec}[${EXTRAS}]"
     fi
 
