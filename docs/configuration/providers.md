@@ -246,6 +246,7 @@ spec:
 | `api_key_env` | string | *null* | Environment variable containing the API key |
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |
 | `max_tokens` | int | `4096` | Maximum tokens per response (1-128000) |
+| `context_window` | int \| null | *null* | Model context window in tokens. Used by the [context budget guard](../orchestration/autonomy.md#context-budget-guard) to prevent history overflow. Auto-detected from provider when null. |
 
 ## Embedding Configuration
 

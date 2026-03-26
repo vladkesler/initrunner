@@ -131,7 +131,7 @@ schedule_followup_at(prompt: str, iso_datetime: str) -> str
 
 2. **Iterations 2+**: The reasoning strategy builds a continuation prompt that includes the current todo state (rendered as a formatted checklist). This ensures the agent always sees its progress even if earlier messages were trimmed.
 
-3. **History compaction and trimming**: After each iteration, if `compaction.enabled` is true and the history exceeds `compaction.threshold`, older messages are summarized by an LLM call and replaced with a single summary message. The most recent `compaction.tail_messages` messages are kept verbatim. After compaction, history is trimmed to `max_history_messages`. The first message (original prompt) is always preserved to maintain task context. Compaction follows the never-raises pattern — if the summarization LLM call fails, the original history is kept and trimming proceeds normally.
+3. **History compaction, trimming, and budget enforcement**: After each iteration, if `compaction.enabled` is true and the history exceeds `compaction.threshold`, older messages are summarized by an LLM call and replaced with a single summary message. The most recent `compaction.tail_messages` messages are kept verbatim. After compaction, history is trimmed to `max_history_messages`. The first message (original prompt) is always preserved to maintain task context. Compaction follows the never-raises pattern -- if the summarization LLM call fails, the original history is kept and trimming proceeds normally. Finally, a token budget guard enforces that the trimmed history fits within the model's context window (see [Context Budget Guard](#context-budget-guard)).
 
 4. **Budget check**: Before each iteration, cumulative token usage is compared against `autonomous_token_budget`. If exceeded, the loop stops with status `budget_exceeded`.
 
@@ -329,6 +329,59 @@ spec:
 
 This uses an LLM call to produce a summary of the dropped messages, preserving key decisions, tool results, and open tasks. The summary is injected as a single message before the recent tail. You can use `model_override` to route summarization to a cheaper model.
 
+Additionally, the context budget guard (see below) protects against context window overflow from oversized tool results, even without compaction enabled.
+
 ### Agent makes no tool calls
 
 If the agent responds with text but doesn't use tools, the loop logs a debug message and continues to the next iteration with a nudge. If this persists, ensure your system prompt instructs the agent to use the available tools and call `finish_task`.
+
+## Context Budget Guard
+
+Long-running agents (autonomous and daemon modes) can accumulate message history that exceeds the model's context window, causing API errors. The context budget guard prevents this by automatically enforcing a token budget before every model call.
+
+### How it works
+
+A PydanticAI `history_processor` is registered on every role-driven agent. Before each model API call, it:
+
+1. **Estimates tokens** in the message history using a fast heuristic (`len(text) // 4`)
+2. If under budget (75% of the model's context window), passes through unchanged
+3. If over budget, applies two stages:
+   - **Truncate oversized parts**: any text-bearing part (tool returns, assistant responses, user prompts) exceeding `budget // 20` characters is truncated with a `[truncated]` suffix
+   - **Drop oldest message pairs**: if still over budget, oldest request-response pairs are removed and replaced with a synthetic summary (`[N earlier messages dropped to fit context budget; tools used: ...]`)
+
+Changes made by the processor are permanent for the rest of the run (PydanticAI writes processed history back into run state). The same reducer also runs between iterations via `reduce_history()`, after LLM compaction and count-based trimming.
+
+### Configuration
+
+Set `context_window` on `spec.model` to tell the guard your model's context size:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+    context_window: 200000  # tokens
+```
+
+If `context_window` is not set, the guard uses provider-level defaults:
+
+| Provider | Default context window |
+|---|---|
+| `anthropic` | 200,000 |
+| `openai` | 128,000 |
+| `google` | 1,000,000 |
+| `groq` | 128,000 |
+| `bedrock` | 200,000 |
+| Unknown | 32,000 (with warning) |
+
+For unknown providers, the guard falls back to a conservative 32,000 tokens and logs a warning. Set `context_window` explicitly to avoid this.
+
+### Interaction with other limits
+
+The context budget guard is complementary to:
+
+- **Message count trimming** (`autonomy.max_history_messages`): trims by count, not tokens. A few large tool results can still overflow the context window.
+- **LLM compaction** (`autonomy.compaction`): produces high-quality summaries but is opt-in, runs between iterations only, and only compresses the older prefix (not oversized recent parts).
+- **`guardrails.input_tokens_limit`**: a hard cap that raises an error. The budget guard proactively compresses before reaching that limit.
+
+For best results in long-running agents, combine all three: enable compaction for quality, rely on the budget guard for safety, and set `input_tokens_limit` as a hard cap.

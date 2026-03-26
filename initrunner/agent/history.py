@@ -55,20 +55,31 @@ def reduce_history(
     *,
     preserve_first: bool = False,
 ) -> list[ModelMessage]:
-    """Compact then trim message history in one step.
+    """Compact, trim, then enforce token budget in one step.
 
-    Combines :func:`maybe_compact_message_history` and
-    :func:`trim_message_history` — the sequence that autonomous and daemon
-    runners both need after each iteration.
+    Combines :func:`maybe_compact_message_history`,
+    :func:`trim_message_history`, and :func:`enforce_token_budget` -- the
+    sequence that autonomous and daemon runners both need after each
+    iteration.
     """
     compacted = maybe_compact_message_history(
         messages, autonomy_config, role, preserve_first=preserve_first
     )
-    return trim_message_history(
+    trimmed = trim_message_history(
         compacted,
         autonomy_config.max_history_messages,
         preserve_first=preserve_first,
     )
+
+    from initrunner.agent.history_summarizer import (
+        _BUDGET_FRACTION,
+        enforce_token_budget,
+        resolve_context_window,
+    )
+
+    ctx_window = resolve_context_window(role.spec.model)
+    token_budget = int(ctx_window * _BUDGET_FRACTION)
+    return enforce_token_budget(trimmed, token_budget, preserve_first=preserve_first)
 
 
 def session_limits(role: RoleDefinition) -> tuple[int, int]:
