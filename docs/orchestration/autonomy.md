@@ -385,3 +385,7 @@ The context budget guard is complementary to:
 - **`guardrails.input_tokens_limit`**: a hard cap that raises an error. The budget guard proactively compresses before reaching that limit.
 
 For best results in long-running agents, combine all three: enable compaction for quality, rely on the budget guard for safety, and set `input_tokens_limit` as a hard cap.
+
+### Example
+
+See [`examples/roles/context-aware-scraper/`](../../examples/roles/context-aware-scraper/) for a complete autonomous scraper that fetches large web pages without hitting context limits. It combines `context_window`, LLM compaction, and token budgets.
