@@ -60,11 +60,7 @@ def skill_dir(tmp_path: Path) -> Path:
     broken = skills / "broken-skill"
     broken.mkdir()
     (broken / "SKILL.md").write_text(
-        "---\n"
-        "name: [not, a, string]\n"
-        "description: A broken skill\n"
-        "---\n\n"
-        "Some body.\n"
+        "---\nname: [not, a, string]\ndescription: A broken skill\n---\n\nSome body.\n"
     )
 
     return tmp_path
@@ -92,8 +88,8 @@ class TestDiscoverSkillsFull:
         from initrunner.services.skill_service import discover_skills_full
 
         results = discover_skills_full([skill_dir])
-        web = [s for s in results if s.name == "web-researcher"][0]
-        code = [s for s in results if s.name == "code-tools"][0]
+        web = next(s for s in results if s.name == "web-researcher")
+        code = next(s for s in results if s.name == "code-tools")
         assert web.is_directory_form is True
         assert code.is_directory_form is False
 
@@ -101,8 +97,8 @@ class TestDiscoverSkillsFull:
         from initrunner.services.skill_service import discover_skills_full
 
         results = discover_skills_full([skill_dir])
-        kube = [s for s in results if s.name == "kube-tools"][0]
-        web = [s for s in results if s.name == "web-researcher"][0]
+        kube = next(s for s in results if s.name == "kube-tools")
+        web = next(s for s in results if s.name == "web-researcher")
         assert kube.has_resources is True
         assert web.has_resources is False
 
@@ -143,13 +139,7 @@ class TestValidateSkillContent:
     def test_valid_content(self):
         from initrunner.services.skill_service import validate_skill_content
 
-        content = (
-            "---\n"
-            "name: test-skill\n"
-            "description: A test skill\n"
-            "---\n\n"
-            "Some instructions.\n"
-        )
+        content = "---\nname: test-skill\ndescription: A test skill\n---\n\nSome instructions.\n"
         issues = validate_skill_content(content)
         errors = [i for i in issues if i.severity == "error"]
         assert len(errors) == 0
@@ -178,7 +168,7 @@ class TestSaveSkillContent:
         path = tmp_path / "test.md"
         path.write_text("")
         content = "---\nname: test\ndescription: Test\n---\n\nBody.\n"
-        valid, issues = save_skill_content(path, content)
+        valid, _issues = save_skill_content(path, content)
         assert valid is True
         assert path.read_text() == content
 

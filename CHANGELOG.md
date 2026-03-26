@@ -11,6 +11,9 @@
 - **Dashboard trigger visibility panel** -- agent detail page shows trigger configuration, fire counts, and next-run times
 - **Dashboard toast notification system** -- global toast store with auto-dismiss; load-error recovery across all pages
 - **Dashboard agent wizard refactor** -- creation wizard extracted into composable screen components (ConfigureScreen, EditorScreen, HubSearchPanel, SuccessScreen)
+- **Dashboard skills management** -- browse, search, create, and edit skills from the dashboard. Path-based skill discovery, scope badges, requirement indicators, config panel, and editor tab. Full CRUD API via `/api/skills/` endpoints.
+- **Skill service layer** -- `SkillService` with path-based discovery, SKILL.md parsing, validation, and CRUD operations (`initrunner/services/skill_service.py`)
+- **Agent skills sidebar** -- agent config panel shows attached skills with scope and requirement badges
 - **Trigger stats API** -- `GET /api/agents/{name}/trigger-stats` endpoint with fire counts and schedule info
 - **Context-aware-scraper example** -- autonomous web scraper demonstrating the context budget guard with history summarization
 - **Clarify-researcher example** -- research assistant demonstrating human-in-the-loop clarify tool before acting

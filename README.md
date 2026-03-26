@@ -9,7 +9,7 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3798+-%2334D058" alt="Tests"></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
   <img src="https://img.shields.io/badge/latest-v1.44.0-%2334D058" alt="v1.44.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, compose orchestration, and API servers without rewriting anything.
 
-> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard for long autonomous runs, trigger visibility panel, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
+> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard, skills management dashboard, trigger visibility, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
