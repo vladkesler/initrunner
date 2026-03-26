@@ -4,12 +4,14 @@
 	import { onMount } from 'svelte';
 	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml, deleteTeam } from '$lib/api/teams';
 	import type { TeamDetail } from '$lib/api/types';
+	import { loadOr404 } from '$lib/utils/load';
 	import PersonaPipeline from '$lib/components/teams/PersonaPipeline.svelte';
 	import TeamRunPanel from '$lib/components/teams/TeamRunPanel.svelte';
 	import ConfigPanel from '$lib/components/teams/ConfigPanel.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import { ArrowLeft, Play, GitBranch, Settings, FileCode, Trash2 } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 
@@ -17,6 +19,7 @@
 	let yaml = $state('');
 	let teamPath = $state('');
 	let loading = $state(true);
+	let loadError = $state(false);
 	let deleteDialogOpen = $state(false);
 
 	const teamId = $derived(page.params.id ?? '');
@@ -66,13 +69,9 @@
 			activeTab = saved;
 		}
 
-		try {
-			await reload();
-		} catch {
-			// not found
-		} finally {
-			loading = false;
-		}
+		const result = await loadOr404(() => reload(), 'Failed to load team');
+		if (!result.ok && !result.notFound) loadError = true;
+		loading = false;
 	});
 </script>
 
@@ -90,6 +89,8 @@
 		<Skeleton class="h-6 w-48 bg-surface-1" />
 		<Skeleton class="h-10 bg-surface-1" />
 		<Skeleton class="h-64 bg-surface-1" />
+	{:else if loadError}
+		<LoadError message="Failed to load team" onRetry={() => location.reload()} />
 	{:else if detail}
 		<!-- Header -->
 		<div>

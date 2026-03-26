@@ -17,6 +17,7 @@
 	import { ApiError } from '$lib/api/client';
 	import { page } from '$app/state';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import CognitionPanel from '$lib/components/agents/CognitionPanel.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
@@ -461,15 +462,7 @@
 		<Skeleton class="h-24 bg-surface-1" />
 		<Skeleton class="h-40 bg-surface-1" />
 	{:else if optionsError}
-		<div class="border border-fail/20 bg-fail/5 px-4 py-3">
-			<p class="text-[13px] text-fail">{optionsError}</p>
-			<button
-				class="mt-2 text-[13px] text-fg-faint underline transition-[color] duration-150 hover:text-fg-muted"
-				onclick={() => location.reload()}
-			>
-				Retry
-			</button>
-		</div>
+		<LoadError message={optionsError} onRetry={() => location.reload()} />
 
 	<!-- ============================================================ -->
 	<!-- CONFIGURE SCREEN                                             -->

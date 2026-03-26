@@ -9,6 +9,7 @@
 	import type { MemoryItem, SessionSummary, SessionDetail } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { RefreshCw, Sparkles, ChevronRight } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let { agentId, hasMemory }: { agentId: string; hasMemory: boolean } = $props();
 
@@ -38,7 +39,7 @@
 		try {
 			memories = await getAgentMemories(agentId);
 		} catch {
-			// unavailable
+			toast.error('Failed to load memories');
 		} finally {
 			memoriesLoading = false;
 		}
@@ -49,7 +50,7 @@
 		try {
 			sessions = await getAgentSessions(agentId);
 		} catch {
-			// unavailable
+			toast.error('Failed to load sessions');
 		} finally {
 			sessionsLoading = false;
 		}
@@ -63,7 +64,7 @@
 			consolidateResult = result.consolidated;
 			await loadMemories();
 		} catch {
-			// failed
+			toast.error('Failed to consolidate memories');
 		} finally {
 			consolidating = false;
 		}
@@ -81,7 +82,7 @@
 		try {
 			expandedSession = await getAgentSession(agentId, sessionId);
 		} catch {
-			// failed
+			toast.error('Failed to load session detail');
 		} finally {
 			sessionLoading = false;
 		}

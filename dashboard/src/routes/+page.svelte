@@ -11,6 +11,7 @@
 	import { fetchTeamList } from '$lib/api/teams';
 	import { getBuilderOptions, getStarters, type BuilderOptions, type StarterInfo } from '$lib/api/builder';
 	import type { ComposeSummary, TeamSummary } from '$lib/api/types';
+	import { toast } from '$lib/stores/toast.svelte';
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 	import StarterCard from '$lib/components/ui/StarterCard.svelte';
 	import CapabilityChips from '$lib/components/ui/CapabilityChips.svelte';
@@ -70,7 +71,7 @@
 			builderOptions = opts;
 			starters = st.starters;
 		} catch {
-			// API not available
+			toast.error('Failed to connect to API server');
 		} finally {
 			loading = false;
 		}
@@ -80,7 +81,7 @@
 		try {
 			builderOptions = await getBuilderOptions();
 		} catch {
-			// best effort
+			toast.error('Failed to refresh provider status');
 		}
 	}
 </script>

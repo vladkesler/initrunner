@@ -8,7 +8,9 @@
 	} from '$lib/api/compose';
 	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import type {
@@ -38,6 +40,7 @@
 	let step: Step = $state('configure');
 	let options = $state<ComposeBuilderOptions | null>(null);
 	let optionsLoading = $state(true);
+	let optionsError: string | null = $state(null);
 
 	// Configure
 	let selectedPattern = $state<PatternInfo | null>(null);
@@ -236,7 +239,8 @@
 			if (options.detected_model) selectedModel = options.detected_model;
 			if (options.save_dirs.length > 0) selectedDir = options.save_dirs[0];
 		} catch {
-			// API not available
+			optionsError = 'Could not load builder options.';
+			toast.error('Failed to load builder options');
 		} finally {
 			optionsLoading = false;
 		}
@@ -261,6 +265,9 @@
 
 	{#if optionsLoading}
 		<Skeleton class="h-64 bg-surface-1" />
+
+	{:else if optionsError}
+		<LoadError message={optionsError} onRetry={() => location.reload()} />
 
 	{:else if step === 'configure'}
 		<!-- STEP 1: CONFIGURE -->

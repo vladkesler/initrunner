@@ -7,6 +7,7 @@
 	import AuditTable from '$lib/components/audit/AuditTable.svelte';
 	import AuditDetailDrawer from '$lib/components/audit/AuditDetailDrawer.svelte';
 	import { RefreshCw, Download, Activity, CheckCircle, Coins, Timer } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let records = $state<AuditRecord[]>([]);
 	let stats = $state<AuditStats | null>(null);
@@ -43,7 +44,7 @@
 			records = r;
 			stats = s;
 		} catch {
-			// API not available
+			toast.error('Failed to load audit data');
 		} finally {
 			loading = false;
 		}

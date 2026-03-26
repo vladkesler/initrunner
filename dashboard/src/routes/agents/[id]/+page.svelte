@@ -5,9 +5,12 @@
 	import { getAgentDetail, getAgentYaml, deleteAgent } from '$lib/api/agents';
 	import { fetchAuditStats } from '$lib/api/system';
 	import type { AgentDetail, AuditStats } from '$lib/api/types';
+	import { loadOr404 } from '$lib/utils/load';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
 	import RunPanel from '$lib/components/runs/RunPanel.svelte';
 	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
@@ -35,6 +38,7 @@
 	let agentPath = $state('');
 	let stats: AuditStats | null = $state(null);
 	let loading = $state(true);
+	let loadError = $state(false);
 	let statsLoading = $state(true);
 	let runVersion = $state(0);
 	let deleteDialogOpen = $state(false);
@@ -83,7 +87,7 @@
 		try {
 			stats = await fetchAuditStats({ agent_name: detail.name });
 		} catch {
-			// stats unavailable
+			// stats are best-effort
 		}
 	}
 
@@ -99,13 +103,9 @@
 		}
 
 		// Stage 1: detail + yaml (parallel)
-		try {
-			await reload();
-		} catch {
-			// not found
-		} finally {
-			loading = false;
-		}
+		const result = await loadOr404(() => reload(), 'Failed to load agent');
+		if (!result.ok && !result.notFound) loadError = true;
+		loading = false;
 
 		// Stage 2: stats (needs detail.name)
 		if (detail) {
@@ -129,6 +129,8 @@
 		<Skeleton class="h-6 w-48 bg-surface-1" />
 		<Skeleton class="h-10 bg-surface-1" />
 		<Skeleton class="h-64 bg-surface-1" />
+	{:else if loadError}
+		<LoadError message="Failed to load agent" onRetry={() => location.reload()} />
 	{:else if detail}
 		<!-- Header -->
 		<div>
