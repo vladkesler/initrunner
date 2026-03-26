@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3765+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.43.0-%2334D058" alt="v1.43.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3798+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.44.0-%2334D058" alt="v1.44.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -25,7 +25,7 @@
 
 One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, compose orchestration, and API servers without rewriting anything.
 
-> **v1.43.0** -- PydanticAI capabilities in role YAML: Thinking, WebSearch, WebFetch, ImageGeneration, MCP. Capability/tool conflict validation, InputGuardCapability, OpenAI Responses API auto-switch, dashboard provider warnings. See the [Changelog](CHANGELOG.md).
+> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard for long autonomous runs, trigger visibility panel, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -165,6 +165,33 @@ initrunner run role.yaml -i --resume   # search_documents + memory ready
 ```
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
+
+### Capabilities
+
+Use native PydanticAI capabilities directly in YAML -- no tool wiring needed:
+
+```yaml
+spec:
+  capabilities:
+    - Thinking
+    - WebSearch
+    - WebFetch: { max_size: 1048576 }
+  model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }
+```
+
+Capabilities like Thinking, WebSearch, WebFetch, ImageGeneration, and MCP are resolved at build time. `InputGuardCapability` enforces content policy from `security.content_policy`. See [Capabilities](docs/core/capabilities.md).
+
+### Clarify tool
+
+Let agents ask follow-up questions mid-run instead of guessing:
+
+```yaml
+spec:
+  tools:
+    - type: clarify
+```
+
+The agent calls `clarify("Which branch should I deploy?")` and blocks until the user responds. Works in REPL, Telegram/Discord bots, daemon mode, and autonomous runs. See [Tools](docs/agents/tools.md).
 
 ### Triggers
 
@@ -366,4 +393,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.40.0</sub></p>
+<p align="center"><sub>v1.44.0</sub></p>

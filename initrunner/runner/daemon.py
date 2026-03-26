@@ -8,8 +8,12 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent
+
+if TYPE_CHECKING:
+    from initrunner.agent.clarify import ClarifyCallback
 
 from initrunner.agent.executor import RunResult, execute_run, execute_run_stream
 from initrunner.agent.schema.role import RoleDefinition
@@ -357,7 +361,7 @@ class DaemonRunner:
         conv_key: str | None,
         reply_fn: object | None,
         timeout: float,
-    ) -> object | None:
+    ) -> ClarifyCallback | None:
         """Build a ClarifyCallback for daemon mode, or ``None`` if not possible."""
         if conv_key is None or reply_fn is None:
             return None

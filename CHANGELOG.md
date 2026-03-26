@@ -2,9 +2,21 @@
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-03-26
+
+### Added
+- **Clarify tool** -- agent-initiated `clarify()` asks the user a question mid-run and blocks until answered. Works in REPL, bot, daemon, and autonomous modes. Add `{ type: clarify }` to your role's tools list.
+- **Context budget guard** -- PydanticAI history processor that summarizes older conversation turns to prevent context window overflow during long autonomous runs
+- **Context-aware-scraper example** -- autonomous web scraper demonstrating the context budget guard with history summarization
+- **Clarify-researcher example** -- research assistant demonstrating human-in-the-loop clarify tool before acting
+- **Dashboard trigger visibility panel** -- agent detail page shows trigger configuration, fire counts, and next-run times
+- **Dashboard toast notification system** -- global toast store with auto-dismiss; load-error recovery across all pages
+- **Trigger stats API** -- `GET /api/agents/{name}/trigger-stats` endpoint with fire counts and schedule info
+
 ### Removed
 - **`kind: Pipeline` orchestration** -- removed in favor of Team for one-shot multi-agent workflows and Compose for long-running services. For complex DAG workflows, use pydantic-graph directly. Running a Pipeline YAML now shows a migration message.
 - **`--var` flag** from `initrunner run` (was Pipeline-only)
+- Pipeline executor, schema, loader, and tests (`initrunner/pipeline/`)
 
 ### Changed
 - **Compose scaffold pattern renamed** -- `--pattern pipeline` is now `--pattern chain`. Default for `initrunner compose new` updated accordingly.
