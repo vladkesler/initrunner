@@ -40,6 +40,7 @@ export interface AgentDetail {
 	sinks: ItemSummary[];
 	capabilities: ItemSummary[];
 	skills: string[];
+	skill_refs: SkillRef[];
 	features: string[];
 	provider_warning: string | null;
 }
@@ -116,6 +117,20 @@ export type SSEEvent =
 	| { type: 'token'; data: string }
 	| { type: 'result'; data: RunResponse }
 	| { type: 'error'; data: string };
+
+// -- Trigger Stats ------------------------------------------------------------
+
+export interface TriggerStat {
+	trigger_type: string;
+	summary: string;
+	fire_count: number;
+	success_count: number;
+	fail_count: number;
+	last_fire_time: string | null;
+	avg_duration_ms: number;
+	last_error: string | null;
+	next_check_time: string | null;
+}
 
 // -- Audit Stats --------------------------------------------------------------
 
@@ -494,6 +509,66 @@ export type TeamSSEEvent =
 	| { type: 'persona_complete'; data: PersonaStepResponse }
 	| { type: 'result'; data: TeamRunResponse }
 	| { type: 'error'; data: string };
+
+// -- Skills -------------------------------------------------------------------
+
+export interface RequirementStatus {
+	name: string;
+	kind: 'env' | 'bin';
+	met: boolean;
+	detail: string;
+}
+
+export interface SkillToolSummary {
+	type: string;
+	summary: string;
+}
+
+export interface SkillSummary {
+	id: string;
+	name: string;
+	description: string;
+	scope: string;
+	has_tools: boolean;
+	tool_count: number;
+	is_directory_form: boolean;
+	requirements_met: boolean;
+	requirement_count: number;
+	path: string;
+	error: string | null;
+}
+
+export interface SkillAgentRef {
+	id: string;
+	name: string;
+}
+
+export interface SkillDetail {
+	id: string;
+	name: string;
+	description: string;
+	scope: string;
+	path: string;
+	is_directory_form: boolean;
+	has_resources: boolean;
+	error: string | null;
+	license: string;
+	compatibility: string;
+	metadata: Record<string, string>;
+	tools: SkillToolSummary[];
+	requirements: RequirementStatus[];
+	requirements_met: boolean;
+	prompt: string;
+	prompt_preview: string;
+	used_by_agents: SkillAgentRef[];
+}
+
+export interface SkillRef {
+	name: string;
+	skill_id: string | null;
+}
+
+// -- Team ---------------------------------------------------------------------
 
 export interface TeamBuilderOptions {
 	providers: ProviderModels[];

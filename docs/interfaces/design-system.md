@@ -264,6 +264,23 @@ Inline searchable dropdown for selecting agents in compose and team builders (`A
 
 Sharp panel with faint lime border (`border-accent-primary/10`). Selected item: `bg-accent-primary/[0.08]`. Kbd badges use `rounded-full`. Group headers: `text-[11px] tracking-[0.12em]`.
 
+### Scope Badge
+
+Pill badge (`rounded-full`) for skill scope classification (`ScopeBadge.svelte`). Uses the same structural pattern as capability filter pills: `border px-2 py-0.5 font-mono text-[12px]`. Color varies by scope to convey resolution priority:
+
+| Scope | Color treatment | Rationale |
+|-------|----------------|-----------|
+| `role-local` | `border-accent-secondary/30 bg-accent-secondary/10 text-accent-secondary` | Cyan = closest to agent, highest priority |
+| `project` | `border-accent-primary/30 bg-accent-primary/10 text-accent-primary` | Lime = project-level shared resource |
+| `extra` | `border-warn/30 bg-warn/10 text-warn` | Amber = externally provided |
+| `user` | `border-edge bg-surface-1 text-fg-faint` | Muted outline = global default |
+
+Always includes a text label (never color alone).
+
+### Requirement Indicator
+
+Compact status dot with tooltip (`RequirementIndicator.svelte`). Green (`bg-ok`) dot with `box-shadow: 0 0 4px var(--color-ok)` when all requirements are met; amber (`bg-warn`) when some are unmet. Accompanied by mono `text-[12px] text-fg-faint` count text (e.g. "2/3 met"). Tooltip lists each requirement with check/cross marks. Hidden when no requirements exist.
+
 ## Token Source
 
 All design tokens live in `dashboard/src/app.css`:

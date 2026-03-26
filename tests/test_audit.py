@@ -208,6 +208,98 @@ class TestTriggerFields:
         assert record.trigger_metadata is None
 
 
+class TestTriggerStats:
+    def test_empty_db(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            stats = logger.trigger_stats(agent_name="agent-a")
+        assert stats == []
+
+    def test_no_trigger_records(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(agent_name="agent-a"))
+            stats = logger.trigger_stats(agent_name="agent-a")
+        assert stats == []
+
+    def test_single_trigger_type(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(agent_name="a", trigger_type="cron", duration_ms=100))
+            logger.log(_make_record(agent_name="a", trigger_type="cron", duration_ms=200))
+            stats = logger.trigger_stats(agent_name="a")
+        assert len(stats) == 1
+        s = stats[0]
+        assert s.trigger_type == "cron"
+        assert s.fire_count == 2
+        assert s.success_count == 2
+        assert s.fail_count == 0
+        assert s.avg_duration_ms == 150
+        assert s.last_error is None
+
+    def test_multiple_trigger_types(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(agent_name="a", trigger_type="cron"))
+            logger.log(_make_record(agent_name="a", trigger_type="webhook"))
+            logger.log(_make_record(agent_name="a", trigger_type="webhook"))
+            stats = logger.trigger_stats(agent_name="a")
+        by_type = {s.trigger_type: s for s in stats}
+        assert len(by_type) == 2
+        assert by_type["cron"].fire_count == 1
+        assert by_type["webhook"].fire_count == 2
+
+    def test_mixed_success_failure(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(agent_name="a", trigger_type="cron", success=True))
+            logger.log(
+                _make_record(
+                    agent_name="a",
+                    trigger_type="cron",
+                    success=False,
+                    error="timeout",
+                    timestamp="2025-01-01T00:00:00Z",
+                )
+            )
+            logger.log(
+                _make_record(
+                    agent_name="a",
+                    trigger_type="cron",
+                    success=False,
+                    error="rate limited",
+                    timestamp="2025-06-01T00:00:00Z",
+                )
+            )
+            stats = logger.trigger_stats(agent_name="a")
+        assert len(stats) == 1
+        s = stats[0]
+        assert s.success_count == 1
+        assert s.fail_count == 2
+        assert s.last_error == "rate limited"
+
+    def test_last_fire_time(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(
+                _make_record(agent_name="a", trigger_type="cron", timestamp="2025-01-01T00:00:00Z")
+            )
+            logger.log(
+                _make_record(agent_name="a", trigger_type="cron", timestamp="2025-06-15T12:00:00Z")
+            )
+            stats = logger.trigger_stats(agent_name="a")
+        assert stats[0].last_fire_time == "2025-06-15T12:00:00Z"
+
+    def test_filters_by_agent(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(agent_name="a", trigger_type="cron"))
+            logger.log(_make_record(agent_name="b", trigger_type="cron"))
+            stats = logger.trigger_stats(agent_name="a")
+        assert len(stats) == 1
+        assert stats[0].fire_count == 1
+
+
 class TestMigration:
     def test_migrate_old_schema(self, tmp_path):
         """Opening a DB created with old schema adds trigger columns."""

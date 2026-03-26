@@ -14,7 +14,7 @@ from initrunner.services.compose import build_compose
 
 def _write_compose(tmp_path: Path, name: str = "test-compose") -> Path:
     """Generate and write a valid compose project, return compose.yaml path."""
-    bundle = build_compose(name, pattern="pipeline", service_count=2, provider="openai")
+    bundle = build_compose(name, pattern="chain", service_count=2, provider="openai")
 
     project_dir = tmp_path / name
     roles_dir = project_dir / "roles"

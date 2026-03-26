@@ -6,6 +6,7 @@
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Users, Plus } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let teams = $state<TeamSummary[]>([]);
 	let loading = $state(true);
@@ -35,7 +36,7 @@
 		try {
 			teams = await fetchTeamList();
 		} catch {
-			// API not available
+			toast.error('Failed to load teams');
 		} finally {
 			loading = false;
 		}

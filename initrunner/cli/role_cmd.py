@@ -23,6 +23,12 @@ def validate(
 
     role_file = resolve_role_path(role_file)
     kind = detect_yaml_kind(role_file)
+    if kind == "Pipeline":
+        console.print(
+            "[red]Error:[/red] kind: Pipeline has been removed.\n"
+            "Use Team for one-shot multi-agent workflows, or Compose for long-running services."
+        )
+        raise typer.Exit(1)
     if kind == "Team":
         _validate_team(role_file)
         return

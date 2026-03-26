@@ -7,6 +7,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Stethoscope, RefreshCw, CheckCircle, AlertTriangle, XCircle, Wrench } from 'lucide-svelte';
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let version = $state('');
 	let providerData = $state<ProviderStatusResponse | null>(null);
@@ -36,7 +37,7 @@
 			doctorChecks = res.checks;
 			embeddingChecks = res.embedding_checks;
 		} catch {
-			// API not available
+			toast.error('Failed to run health check');
 		} finally {
 			doctorLoading = false;
 		}
@@ -50,7 +51,7 @@
 				loadDoctor();
 			}
 		} catch {
-			// best effort
+			toast.error('Failed to reload providers');
 		}
 	}
 
@@ -65,7 +66,7 @@
 			providerData = pd;
 			tools = t;
 		} catch {
-			// API not available
+			toast.error('Failed to load system status');
 		} finally {
 			loading = false;
 			toolsLoading = false;

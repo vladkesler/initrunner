@@ -27,6 +27,16 @@ def _build_single_shot_extras(role: RoleDefinition) -> list | None:
     return build_run_scoped_toolsets(role, ReflectionState())
 
 
+def _get_clarify_timeout(role: RoleDefinition) -> float | None:
+    """Return the clarify tool timeout if configured, else ``None``."""
+    from initrunner.agent.schema.tools import ClarifyToolConfig
+
+    for tool in role.spec.tools:
+        if isinstance(tool, ClarifyToolConfig):
+            return float(tool.timeout_seconds)
+    return None
+
+
 def run_single(
     agent: Agent,
     role: RoleDefinition,
@@ -38,11 +48,22 @@ def run_single(
     model_override: Model | str | None = None,
 ) -> tuple[RunResult, list]:
     """Execute a single prompt and display the result."""
+    from initrunner.agent.clarify import (
+        make_cli_clarify_callback,
+        reset_clarify_callback,
+        set_clarify_callback,
+    )
     from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
     from initrunner.runner.display import _make_tool_event_printer
 
     extra_toolsets = _build_single_shot_extras(role)
     token = set_tool_event_callback(_make_tool_event_printer())
+    clarify_timeout = _get_clarify_timeout(role)
+    clarify_token = (
+        set_clarify_callback(make_cli_clarify_callback(timeout=clarify_timeout))
+        if clarify_timeout is not None
+        else None
+    )
     try:
         with console.status("Thinking...", spinner="dots"):
             result, messages = execute_run(
@@ -55,6 +76,8 @@ def run_single(
                 extra_toolsets=extra_toolsets,
             )
     finally:
+        if clarify_token is not None:
+            reset_clarify_callback(clarify_token)
         reset_tool_event_callback(token)
     _display_result(result)
     if sink_dispatcher is not None:
@@ -85,12 +108,23 @@ def run_single_stream(
             model_override=model_override,
         )
 
+    from initrunner.agent.clarify import (
+        make_cli_clarify_callback,
+        reset_clarify_callback,
+        set_clarify_callback,
+    )
     from initrunner.agent.executor import execute_run_stream
     from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
     from initrunner.runner.display import _make_tool_event_printer
 
     extra_toolsets = _build_single_shot_extras(role)
     cb_token = set_tool_event_callback(_make_tool_event_printer())
+    clarify_timeout = _get_clarify_timeout(role)
+    clarify_token = (
+        set_clarify_callback(make_cli_clarify_callback(timeout=clarify_timeout))
+        if clarify_timeout is not None
+        else None
+    )
 
     out = console.file
     status = console.status("Thinking...", spinner="dots")
@@ -117,6 +151,8 @@ def run_single_stream(
             extra_toolsets=extra_toolsets,
         )
     finally:
+        if clarify_token is not None:
+            reset_clarify_callback(clarify_token)
         reset_tool_event_callback(cb_token)
         if first_token:
             status.stop()

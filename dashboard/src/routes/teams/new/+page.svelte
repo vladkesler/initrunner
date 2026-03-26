@@ -4,7 +4,9 @@
 	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
 	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import PersonaList, { type PersonaEntry } from '$lib/components/teams/PersonaList.svelte';
 	import {
@@ -25,6 +27,7 @@
 	let step: Step = $state('configure');
 	let options = $state<TeamBuilderOptions | null>(null);
 	let optionsLoading = $state(true);
+	let optionsError: string | null = $state(null);
 
 	// Configure
 	let teamName = $state('');
@@ -250,7 +253,8 @@
 			if (options.detected_model) selectedModel = options.detected_model;
 			if (options.save_dirs.length > 0) selectedDir = options.save_dirs[0];
 		} catch {
-			// API not available
+			optionsError = 'Could not load builder options.';
+			toast.error('Failed to load builder options');
 		} finally {
 			optionsLoading = false;
 		}
@@ -275,6 +279,9 @@
 
 	{#if optionsLoading}
 		<Skeleton class="h-64 bg-surface-1" />
+
+	{:else if optionsError}
+		<LoadError message={optionsError} onRetry={() => location.reload()} />
 
 	{:else if step === 'configure'}
 		<!-- STEP 1: CONFIGURE -->

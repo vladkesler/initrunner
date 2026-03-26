@@ -243,7 +243,7 @@ def detect_yaml_kind(path: Path) -> str:
 def resolve_run_target(target: Path) -> tuple[Path, str]:
     """Resolve a run target to *(resolved_path, kind)*.
 
-    Explicit files may resolve to any kind (Agent, Team, Compose, Pipeline).
+    Explicit files may resolve to any kind (Agent, Team, Compose).
     Directory and installed-name resolution stays Agent/Team-only via
     :func:`resolve_role_path`.
     """

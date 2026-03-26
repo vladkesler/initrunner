@@ -55,6 +55,7 @@ class AgentDetail(BaseModel):
     capabilities: list[ItemSummary] = []
     # simple lists
     skills: list[str] = []
+    skill_refs: list[SkillRef] = []
     features: list[str] = []
     # runtime readiness
     provider_warning: str | None = None
@@ -131,6 +132,20 @@ class AuditStatsResponse(BaseModel):
     total_tokens: int
     avg_duration_ms: int
     top_agents: list[TopAgentResponse]
+
+
+class TriggerStatResponse(BaseModel):
+    """Per-trigger operational stats for the agent detail page."""
+
+    trigger_type: str
+    summary: str
+    fire_count: int = 0
+    success_count: int = 0
+    fail_count: int = 0
+    last_fire_time: str | None = None
+    avg_duration_ms: int = 0
+    last_error: str | None = None
+    next_check_time: str | None = None
 
 
 # -- System / Doctor -----------------------------------------------------------
@@ -765,3 +780,103 @@ class AddUrlRequest(BaseModel):
         if not parsed.hostname:
             raise ValueError("URL must have a hostname")
         return v
+
+
+# -- Skills ----------------------------------------------------------------
+
+
+class RequirementStatusResponse(BaseModel):
+    name: str
+    kind: str  # "env" | "bin"
+    met: bool
+    detail: str
+
+
+class SkillToolSummary(BaseModel):
+    type: str
+    summary: str
+
+
+class SkillSummary(BaseModel):
+    id: str
+    name: str
+    description: str
+    scope: str
+    has_tools: bool
+    tool_count: int
+    is_directory_form: bool
+    requirements_met: bool
+    requirement_count: int
+    path: str
+    error: str | None = None
+
+
+class SkillAgentRef(BaseModel):
+    id: str
+    name: str
+
+
+class SkillDetail(BaseModel):
+    id: str
+    name: str
+    description: str
+    scope: str
+    path: str
+    is_directory_form: bool
+    has_resources: bool = False
+    error: str | None = None
+    license: str = ""
+    compatibility: str = ""
+    metadata: dict[str, str] = {}
+    tools: list[SkillToolSummary] = []
+    requirements: list[RequirementStatusResponse] = []
+    requirements_met: bool = True
+    prompt: str = ""
+    prompt_preview: str = ""
+    used_by_agents: list[SkillAgentRef] = []
+
+
+class SkillContentResponse(BaseModel):
+    content: str
+    path: str
+
+
+class SkillContentSaveRequest(BaseModel):
+    content: str
+
+
+class SkillContentSaveResponse(BaseModel):
+    """Validate-before-save: valid=False means content was NOT written."""
+
+    path: str
+    valid: bool
+    issues: list[str] = Field(default_factory=list)
+
+
+class SkillCreateRequest(BaseModel):
+    name: str
+    directory: str
+    provider: str = "openai"
+
+
+class SkillCreateResponse(BaseModel):
+    id: str
+    path: str
+    name: str
+
+
+class SkillDeleteBlockedResponse(BaseModel):
+    """Returned when delete is blocked by resource files."""
+
+    id: str
+    path: str
+    blocked: bool = True
+    resource_files: list[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class SkillRef(BaseModel):
+    """Resolved skill reference for agent detail cross-linking."""
+
+    name: str
+    skill_id: str | None = None

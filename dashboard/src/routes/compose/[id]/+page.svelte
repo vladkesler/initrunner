@@ -10,7 +10,9 @@
 		deleteCompose
 	} from '$lib/api/compose';
 	import type { ComposeDetail, ComposeStats, DelegateEvent } from '$lib/api/types';
+	import { loadOr404 } from '$lib/utils/load';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import FlowCanvas from '$lib/components/compose/FlowCanvas.svelte';
@@ -38,6 +40,7 @@
 	let stats: ComposeStats | null = $state(null);
 	let events = $state<DelegateEvent[]>([]);
 	let loading = $state(true);
+	let loadError = $state(false);
 	let statsLoading = $state(true);
 	let eventsLoading = $state(true);
 	let deleteDialogOpen = $state(false);
@@ -102,13 +105,9 @@
 		}
 
 		// Stage 1: detail + yaml (parallel)
-		try {
-			await reload();
-		} catch {
-			// not found
-		} finally {
-			loading = false;
-		}
+		const result = await loadOr404(() => reload(), 'Failed to load composition');
+		if (!result.ok && !result.notFound) loadError = true;
+		loading = false;
 
 		// Stage 2: stats + events (parallel, needs compose loaded)
 		if (detail) {
@@ -138,6 +137,8 @@
 		<Skeleton class="h-6 w-48 bg-surface-1" />
 		<Skeleton class="h-10 bg-surface-1" />
 		<Skeleton class="h-64 bg-surface-1" />
+	{:else if loadError}
+		<LoadError message="Failed to load composition" onRetry={() => location.reload()} />
 	{:else if detail}
 		<!-- Header -->
 		<div>
@@ -320,7 +321,7 @@
 
 		<ConfirmDeleteDialog
 			entityName={detail.name}
-			entityType="compose pipeline"
+			entityType="compose"
 			bind:open={deleteDialogOpen}
 			onConfirm={async () => {
 				await deleteCompose(composeId);

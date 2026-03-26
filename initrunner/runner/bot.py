@@ -88,8 +88,37 @@ def run_bot(
     )
     stop = threading.Event()
 
+    # Clarification state
+    from dataclasses import dataclass
+    from dataclasses import field as dc_field
+
+    from initrunner.agent.schema.tools import ClarifyToolConfig
+
+    @dataclass
+    class _PendingClarification:
+        event: threading.Event = dc_field(default_factory=threading.Event)
+        answer: str = ""
+
+    _pending_clarifications: dict[str, _PendingClarification] = {}
+    _pending_lock = threading.Lock()
+
+    _clarify_timeout = next(
+        (float(t.timeout_seconds) for t in role.spec.tools if isinstance(t, ClarifyToolConfig)),
+        None,
+    )
+
     def on_trigger(event: TriggerEvent) -> None:
         """Handle each incoming bot message."""
+        # Fast path: deliver clarification answer (bypass budget)
+        conv_key = event.conversation_key
+        if conv_key is not None:
+            with _pending_lock:
+                pending = _pending_clarifications.get(conv_key)
+                if pending is not None:
+                    pending.answer = event.prompt
+                    pending.event.set()
+                    return
+
         allowed, reason = tracker.check_before_run()
         if not allowed:
             console.print(f"\n[yellow]Budget exceeded: {reason}[/yellow]")
@@ -97,19 +126,45 @@ def run_bot(
 
         console.print(f"\n[dim]Bot ({event.trigger_type}):[/dim] {event.prompt[:80]}")
 
-        conv_key = event.conversation_key
         prior_history = conversations.get(conv_key) if conv_key else None
 
-        result, new_messages = execute_run(
-            agent,
-            role,
-            event.prompt,
-            audit_logger=audit_logger,
-            message_history=prior_history,
-            trigger_type=event.trigger_type,
-            trigger_metadata=event.metadata or {},
-            principal_id=event.principal_id,
-        )
+        # Set up clarify callback for this run
+        from initrunner.agent.clarify import reset_clarify_callback, set_clarify_callback
+
+        clarify_cb = None
+        if _clarify_timeout is not None and conv_key is not None and event.reply_fn is not None:
+            reply_fn = event.reply_fn
+
+            def _bot_clarify(question: str) -> str:
+                pc = _PendingClarification()
+                with _pending_lock:
+                    _pending_clarifications[conv_key] = pc
+                try:
+                    reply_fn(f"[Clarification needed]\n{question}")
+                    if not pc.event.wait(timeout=_clarify_timeout):
+                        raise TimeoutError(f"No response within {int(_clarify_timeout)}s")
+                    return pc.answer
+                finally:
+                    with _pending_lock:
+                        _pending_clarifications.pop(conv_key, None)
+
+            clarify_cb = _bot_clarify
+
+        clarify_token = set_clarify_callback(clarify_cb) if clarify_cb is not None else None
+        try:
+            result, new_messages = execute_run(
+                agent,
+                role,
+                event.prompt,
+                audit_logger=audit_logger,
+                message_history=prior_history,
+                trigger_type=event.trigger_type,
+                trigger_metadata=event.metadata or {},
+                principal_id=event.principal_id,
+            )
+        finally:
+            if clarify_token is not None:
+                reset_clarify_callback(clarify_token)
 
         tracker.record_usage(result.total_tokens)
 

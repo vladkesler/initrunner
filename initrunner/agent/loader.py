@@ -231,6 +231,11 @@ def _create_agent(
         kwargs["prepare_tools"] = prepare_tools
     if capabilities:
         kwargs["capabilities"] = capabilities
+
+    from initrunner.agent.history_summarizer import build_history_processor
+
+    kwargs["history_processors"] = [build_history_processor(role.spec.model)]
+
     return Agent(_build_model(role.spec.model), **kwargs)
 
 

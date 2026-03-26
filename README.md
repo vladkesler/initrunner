@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3765+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.43.0-%2334D058" alt="v1.43.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.44.0-%2334D058" alt="v1.44.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -23,9 +23,9 @@
 
 **Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 25+ built-in tools, policy-based authorization. Any model.**
 
-One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
+One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, compose orchestration, and API servers without rewriting anything.
 
-> **v1.43.0** -- PydanticAI capabilities in role YAML: Thinking, WebSearch, WebFetch, ImageGeneration, MCP. Capability/tool conflict validation, InputGuardCapability, OpenAI Responses API auto-switch, dashboard provider warnings. See the [Changelog](CHANGELOG.md).
+> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard, skills management dashboard, trigger visibility, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -166,6 +166,49 @@ initrunner run role.yaml -i --resume   # search_documents + memory ready
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
+### Capabilities
+
+Use native PydanticAI capabilities directly in YAML -- no tool wiring needed:
+
+```yaml
+spec:
+  capabilities:
+    - Thinking
+    - WebSearch
+    - WebFetch: { max_size: 1048576 }
+  model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }
+```
+
+Capabilities like Thinking, WebSearch, WebFetch, ImageGeneration, and MCP are resolved at build time. `InputGuardCapability` enforces content policy from `security.content_policy`. See [Capabilities](docs/core/capabilities.md).
+
+### Clarify tool
+
+Let agents ask follow-up questions mid-run instead of guessing:
+
+```yaml
+spec:
+  tools:
+    - type: clarify
+```
+
+The agent calls `clarify("Which branch should I deploy?")` and blocks until the user responds. Works in REPL, Telegram/Discord bots, daemon mode, and autonomous runs. See [Tools](docs/agents/tools.md).
+
+### Context budget guard
+
+Long autonomous runs accumulate history that can exceed the context window. The built-in history processor estimates token usage and drops oldest message pairs when the budget is exceeded:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    context_window: 200000   # optional -- auto-detected per provider
+  autonomy:
+    max_iterations: 50
+```
+
+No extra config needed -- the guard activates automatically for autonomous and daemon runs. See [Autonomy](docs/orchestration/autonomy.md).
+
 ### Triggers
 
 Turn it into a daemon that reacts to events - cron, file watch, webhook, heartbeat, Telegram, or Discord:
@@ -189,12 +232,12 @@ See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegra
 
 ### Compose agents
 
-Orchestrate multiple agents into a pipeline - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
+Orchestrate multiple agents into a chain - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
 
 ```yaml
 apiVersion: initrunner/v1
 kind: Compose
-metadata: { name: email-pipeline }
+metadata: { name: email-chain }
 spec:
   services:
     inbox-watcher:
@@ -207,7 +250,7 @@ spec:
     responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
+Run with `initrunner compose up compose.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
 ## User Interfaces
 
@@ -249,7 +292,7 @@ If a dashboard is already running on the port, the desktop window connects to it
 
 - **Agent management** -- browse, create, delete, and inspect agents in a flow canvas or list view
 - **Run panel** -- send prompts and stream responses in real time
-- **Compose and Team builders** -- visual pipeline editors for multi-agent orchestration
+- **Compose and Team builders** -- visual editors for multi-agent orchestration
 - **Audit log** -- filterable run history with token usage and durations
 - **System health** -- detected providers, doctor checks, and tool registry
 
@@ -257,7 +300,7 @@ See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](
 
 ## Security & Authorization
 
-Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, API, and pipeline:
+Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, and API:
 
 ```bash
 pip install initrunner[authz]
@@ -344,7 +387,7 @@ initrunner examples list               # see all available examples
 initrunner examples copy code-reviewer # copy to current directory
 ```
 
-The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose pipelines.
+The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose projects.
 
 ## Upgrading & Deprecations
 
@@ -366,4 +409,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.40.0</sub></p>
+<p align="center"><sub>v1.44.0</sub></p>

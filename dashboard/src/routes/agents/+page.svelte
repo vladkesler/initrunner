@@ -9,6 +9,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, Workflow, List, X } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let agents = $state<AgentSummary[]>([]);
 	let loading = $state(true);
@@ -84,7 +85,7 @@
 
 		listAgents()
 			.then((result) => (agents = result))
-			.catch(() => {})
+			.catch(() => { toast.error('Failed to load agents'); })
 			.finally(() => (loading = false));
 	});
 

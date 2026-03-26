@@ -6,6 +6,7 @@
 	import AuditTable from '$lib/components/audit/AuditTable.svelte';
 	import AuditDetailDrawer from '$lib/components/audit/AuditDetailDrawer.svelte';
 	import { RefreshCw } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let { agentName, refreshKey = 0 }: { agentName: string; refreshKey?: number } = $props();
 
@@ -33,7 +34,7 @@
 				limit: 200
 			});
 		} catch {
-			// API not available
+			toast.error('Failed to load session history');
 		} finally {
 			loading = false;
 		}

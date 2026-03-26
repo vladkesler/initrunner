@@ -584,7 +584,7 @@ LISTABLE_TEMPLATES: dict[str, str] = {
 
 # Compose scaffold patterns
 COMPOSE_PATTERNS: dict[str, str] = {
-    "pipeline": "Linear A -> B -> C chain",
+    "chain": "Linear A -> B -> C chain",
     "fan-out": "One dispatcher fans out to multiple workers",
     "route": "Intake routes to specialists via intent sensing",
 }

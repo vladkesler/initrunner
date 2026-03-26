@@ -13,14 +13,9 @@ Do you need multiple agents?
   |     (todo_driven, plan_execute, reflexion)
   |     See: docs/core/reasoning.md
   |
-  Yes --> Is the workflow a fixed sequence of stages?
+  Yes --> Is it one-shot work with multiple perspectives?
             |
-            Yes --> Pipeline
-            |       (stage1 -> stage2 -> stage3, each a different role)
-            |
-            No --> Is it one-shot work with multiple perspectives?
-                    |
-                    Yes --> Team
+            Yes --> Team
                     |       (2+ personas, sequential handoff or parallel)
                     |
                     No --> Is it long-running with triggers or events?
@@ -39,17 +34,17 @@ Do you need multiple agents?
 
 ## Quick Comparison
 
-| | Single + Reasoning | Team | Pipeline | Compose | Spawn | Delegate |
-|--|-------------------|------|----------|---------|-------|----------|
-| **Kind** | Agent | Team | Pipeline | Compose | Agent (tool) | Agent (tool) |
-| **Config** | `spec.reasoning` | `spec.personas` | `spec.stages` | `spec.services` | `spec.tools` | `spec.tools` |
-| **Who decides** | You + LLM | You (YAML) | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
-| **Execution** | Iterative loop | Sequential/parallel | Sequential stages | Trigger-driven | Non-blocking | Blocking |
-| **Lifetime** | One run | One run | One run | Daemon | Within parent run | Within parent run |
-| **Triggers** | No | No | No | Yes | No | No |
-| **Shared memory** | N/A | Yes | Yes | Yes | Optional | Optional |
-| **Typical agents** | 1 | 2-5 | 2-10 | 2-20 | 1-5 | 1-3 |
-| **Best for** | Planning, research, writing | Code review, analysis | CI/CD, ETL | Monitoring, bots | Parallel research | Conditional routing |
+| | Single + Reasoning | Team | Compose | Spawn | Delegate |
+|--|-------------------|------|---------|-------|----------|
+| **Kind** | Agent | Team | Compose | Agent (tool) | Agent (tool) |
+| **Config** | `spec.reasoning` | `spec.personas` | `spec.services` | `spec.tools` | `spec.tools` |
+| **Who decides** | You + LLM | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
+| **Execution** | Iterative loop | Sequential/parallel | Trigger-driven | Non-blocking | Blocking |
+| **Lifetime** | One run | One run | Daemon | Within parent run | Within parent run |
+| **Triggers** | No | No | Yes | No | No |
+| **Shared memory** | N/A | Yes | Yes | Optional | Optional |
+| **Typical agents** | 1 | 2-5 | 2-20 | 1-5 | 1-3 |
+| **Best for** | Planning, research, writing | Code review, analysis, ETL | Monitoring, bots | Parallel research | Conditional routing |
 
 ## When to Use Each
 
@@ -100,30 +95,6 @@ initrunner run team.yaml -p "Pods are CrashLoopBackOff in staging"
 ```
 
 Use when: you want structured multi-perspective analysis with a fixed set of roles.
-
-### Pipeline
-
-A fixed DAG of stages, each running a different agent role. Stage outputs feed into the next stage. Stages can run in parallel when dependencies allow.
-
-```yaml
-kind: Pipeline
-spec:
-  stages:
-    lint:
-      role: ./agents/linter.yaml
-    test:
-      role: ./agents/tester.yaml
-      depends_on: [lint]
-    deploy:
-      role: ./agents/deployer.yaml
-      depends_on: [test]
-```
-
-```bash
-initrunner run pipeline.yaml -p "Deploy the latest changes to staging"
-```
-
-Use when: you have a repeatable sequence of distinct steps that should always run in the same order.
 
 ### Compose
 
@@ -241,7 +212,7 @@ spec:
     store_path: ./.initrunner/team_memory.db
 ```
 
-### Compose + Delegate Sinks (Event Pipeline with Routing)
+### Compose + Delegate Sinks (Event-Driven with Routing)
 
 Services trigger on events and route output to the best-fit downstream service.
 
@@ -267,6 +238,6 @@ spec:
 As your needs grow, patterns compose and upgrade naturally:
 
 - **Single agent** that needs parallel research? Add `type: spawn` to tools
-- **Spawn agent** that needs a fixed review pipeline? Wrap it in a Team
+- **Spawn agent** that needs a fixed review workflow? Wrap it in a Team
 - **Team** that needs to run on a schedule? Move to Compose with a cron trigger
 - **Compose** services that need dynamic sub-delegation? Add `type: delegate` tools to individual services

@@ -48,6 +48,7 @@ class ModelConfig(BaseModel):
     api_key_env: str | None = None
     temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.1
     max_tokens: Annotated[int, Field(ge=1, le=128000)] = 4096
+    context_window: Annotated[int, Field(gt=0)] | None = None
 
     @model_validator(mode="before")
     @classmethod

@@ -33,15 +33,6 @@ def compose_yaml(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def pipeline_yaml(tmp_path: Path) -> Path:
-    p = tmp_path / "pipeline.yaml"
-    p.write_text(
-        "apiVersion: initrunner/v1\nkind: Pipeline\nmetadata:\n  name: t\nspec:\n  steps: []\n"
-    )
-    return p
-
-
-@pytest.fixture
 def team_yaml(tmp_path: Path) -> Path:
     p = tmp_path / "team.yaml"
     p.write_text(
@@ -96,22 +87,6 @@ class TestKindFlagValidation:
         assert result.exit_code == 1
         assert "--serve" in result.output
 
-    def test_pipeline_rejects_interactive(self, pipeline_yaml):
-        result = runner.invoke(app, ["run", str(pipeline_yaml), "-i"])
-        assert result.exit_code == 1
-        assert "--interactive" in result.output
-
-    def test_pipeline_rejects_bot(self, pipeline_yaml):
-        result = runner.invoke(app, ["run", str(pipeline_yaml), "--bot", "telegram"])
-        assert result.exit_code == 1
-        assert "--bot" in result.output
-
-    def test_var_only_for_pipeline(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--var", "x=1"])
-        assert result.exit_code == 1
-        assert "--var" in result.output
-        assert "Pipeline" in result.output
-
     def test_daemon_only_for_agent(self, team_yaml):
         result = runner.invoke(app, ["run", str(team_yaml), "--daemon"])
         assert result.exit_code == 1
@@ -126,12 +101,27 @@ class TestComposeDispatch:
         assert result.exit_code == 0
         mock_dispatch.assert_called_once()
 
-    def test_pipeline_yaml_dispatches(self, pipeline_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_pipeline") as mock_dispatch:
-            result = runner.invoke(app, ["run", str(pipeline_yaml)])
 
-        assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
+class TestPipelineKindRejected:
+    def test_pipeline_kind_rejected_run(self, tmp_path):
+        p = tmp_path / "pipeline.yaml"
+        p.write_text(
+            "apiVersion: initrunner/v1\nkind: Pipeline\nmetadata:\n  name: t\nspec:\n  steps: []\n"
+        )
+        result = runner.invoke(app, ["run", str(p)])
+        assert result.exit_code == 1
+        assert "Pipeline has been removed" in result.output
+        assert "Team" in result.output
+
+    def test_pipeline_kind_rejected_validate(self, tmp_path):
+        p = tmp_path / "pipeline.yaml"
+        p.write_text(
+            "apiVersion: initrunner/v1\nkind: Pipeline\nmetadata:\n  name: t\nspec:\n  steps: []\n"
+        )
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 1
+        assert "Pipeline has been removed" in result.output
+        assert "Team" in result.output
 
 
 class TestDaemonFlag:

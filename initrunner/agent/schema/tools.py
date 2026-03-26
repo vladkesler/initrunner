@@ -382,6 +382,15 @@ class ThinkToolConfig(ToolConfigBase):
         return f"think{suffix}"
 
 
+class ClarifyToolConfig(ToolConfigBase):
+    type: Literal["clarify"] = "clarify"
+    max_clarifications: int = Field(default=3, ge=1, le=10)
+    timeout_seconds: int = Field(default=300, ge=30, le=3600)
+
+    def summary(self) -> str:
+        return f"clarify: max={self.max_clarifications}"
+
+
 class CalculatorToolConfig(ToolConfigBase):
     type: Literal["calculator"] = "calculator"
     max_expression_length: int = 1000

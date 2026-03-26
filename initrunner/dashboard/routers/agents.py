@@ -7,8 +7,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
-from initrunner.dashboard.deps import RoleCache, get_role_cache
-from initrunner.dashboard.schemas import AgentDetail, AgentSummary, DeleteResponse, ItemSummary
+from initrunner.dashboard.deps import RoleCache, SkillCache, get_role_cache, get_skill_cache
+from initrunner.dashboard.schemas import (
+    AgentDetail,
+    AgentSummary,
+    DeleteResponse,
+    ItemSummary,
+    SkillRef,
+    TriggerStatResponse,
+)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -101,7 +108,7 @@ def _check_provider(discovered) -> str | None:
     return None
 
 
-def _detail_from(role_id: str, discovered) -> AgentDetail:
+def _detail_from(role_id: str, discovered, skill_refs: list[SkillRef] | None = None) -> AgentDetail:
     """Build an AgentDetail from a DiscoveredRole."""
     if discovered.error or discovered.role is None:
         from initrunner.agent.schema.base import ModelConfig
@@ -146,6 +153,7 @@ def _detail_from(role_id: str, discovered) -> AgentDetail:
         sinks=[ItemSummary(type=t.type, summary=t.summary()) for t in spec.sinks],
         capabilities=_capability_summaries(spec.capabilities),
         skills=list(spec.skills),
+        skill_refs=skill_refs or [SkillRef(name=s) for s in spec.skills],
         features=list(spec.features),
         provider_warning=_check_provider(discovered),
     )
@@ -155,11 +163,38 @@ def _detail_from(role_id: str, discovered) -> AgentDetail:
 async def get_agent_detail(
     agent_id: str,
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+    skill_cache: Annotated[SkillCache, Depends(get_skill_cache)],
 ) -> AgentDetail:
     dr = role_cache.get(agent_id)
     if dr is None:
         raise HTTPException(status_code=404, detail="Agent not found")
-    return _detail_from(agent_id, dr)
+
+    skill_refs = _resolve_skill_refs(dr, skill_cache)
+    return _detail_from(agent_id, dr, skill_refs=skill_refs)
+
+
+def _resolve_skill_refs(discovered, skill_cache: SkillCache) -> list[SkillRef]:
+    """Resolve agent skill refs to SkillRef objects with cache IDs."""
+    if discovered.role is None or not discovered.role.spec.skills:
+        return []
+
+    from initrunner.agent.skills import SkillLoadError, _resolve_skill_path
+
+    # Build a path -> cache ID lookup
+    path_to_id: dict[str, str] = {}
+    for sid, skill in skill_cache.all().items():
+        path_to_id[str(skill.path.resolve())] = sid
+
+    refs: list[SkillRef] = []
+    for raw_ref in discovered.role.spec.skills:
+        try:
+            path = _resolve_skill_path(raw_ref, discovered.path.parent, None)
+            cache_id = path_to_id.get(str(path))
+            refs.append(SkillRef(name=raw_ref, skill_id=cache_id))
+        except SkillLoadError:
+            refs.append(SkillRef(name=raw_ref, skill_id=None))
+
+    return refs
 
 
 @router.get("/{agent_id}/yaml")
@@ -192,3 +227,60 @@ async def delete_agent(
         raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
     role_cache.evict(agent_id)
     return DeleteResponse(id=agent_id, path=str(path))
+
+
+@router.get("/{agent_id}/trigger-stats")
+async def get_trigger_stats(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> list[TriggerStatResponse]:
+    from initrunner.agent.schema.triggers import CronTriggerConfig, HeartbeatTriggerConfig
+    from initrunner.config import get_audit_db_path
+    from initrunner.services.operations import (
+        next_cron_check,
+        next_heartbeat_check,
+        trigger_stats_sync,
+    )
+
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if dr.role is None:
+        return []
+
+    triggers = dr.role.spec.triggers
+    if not triggers:
+        return []
+
+    stats_list = await asyncio.to_thread(
+        trigger_stats_sync,
+        agent_name=dr.role.metadata.name,
+        audit_db=get_audit_db_path(),
+    )
+    stats_by_type = {s.trigger_type: s for s in stats_list}
+
+    results: list[TriggerStatResponse] = []
+    for cfg in triggers:
+        s = stats_by_type.get(cfg.type)
+
+        check_time: str | None = None
+        if isinstance(cfg, CronTriggerConfig):
+            check_time = next_cron_check(cfg.schedule)
+        elif isinstance(cfg, HeartbeatTriggerConfig):
+            last = s.last_fire_time if s else None
+            check_time = next_heartbeat_check(last, cfg.interval_seconds)
+
+        results.append(
+            TriggerStatResponse(
+                trigger_type=cfg.type,
+                summary=cfg.summary(),
+                fire_count=s.fire_count if s else 0,
+                success_count=s.success_count if s else 0,
+                fail_count=s.fail_count if s else 0,
+                last_fire_time=s.last_fire_time if s else None,
+                avg_duration_ms=s.avg_duration_ms if s else 0,
+                last_error=s.last_error if s else None,
+                next_check_time=check_time,
+            )
+        )
+    return results

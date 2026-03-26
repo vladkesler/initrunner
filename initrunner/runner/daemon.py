@@ -6,9 +6,14 @@ import json
 import logging
 import sys
 import threading
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic_ai import Agent
+
+if TYPE_CHECKING:
+    from initrunner.agent.clarify import ClarifyCallback
 
 from initrunner.agent.executor import RunResult, execute_run, execute_run_stream
 from initrunner.agent.schema.role import RoleDefinition
@@ -27,6 +32,14 @@ from initrunner.stores.base import MemoryStoreBase
 from initrunner.triggers.base import CONVERSATIONAL_TRIGGER_TYPES, TriggerEvent
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PendingClarification:
+    """A mid-run clarification waiting for a user reply."""
+
+    event: threading.Event = field(default_factory=threading.Event)
+    answer: str = ""
 
 
 class DaemonRunner:
@@ -71,6 +84,10 @@ class DaemonRunner:
         self._conversations = ConversationStore()
         self._reloader = None
         self._dispatcher = None
+
+        # Clarification state: conv_key -> pending clarification
+        self._pending_clarifications: dict[str, PendingClarification] = {}
+        self._pending_lock = threading.Lock()
 
     def run(self) -> None:
         """Start the daemon: set up triggers, handle events, block until stopped."""
@@ -137,6 +154,16 @@ class DaemonRunner:
 
     def _on_trigger(self, event: TriggerEvent) -> None:
         """Handle a trigger event with concurrency limiting."""
+        # Fast path: deliver clarification answer (bypass semaphore + budget)
+        conv_key = event.conversation_key
+        if conv_key is not None:
+            with self._pending_lock:
+                pending = self._pending_clarifications.get(conv_key)
+                if pending is not None:
+                    pending.answer = event.prompt
+                    pending.event.set()
+                    return
+
         if not self._concurrency_semaphore.acquire(blocking=False):
             console.print(
                 f"\n[yellow]Max concurrent triggers ({self._MAX_CONCURRENT}) reached — "
@@ -183,6 +210,21 @@ class DaemonRunner:
         prior_history = self._conversations.get(conv_key) if conv_key else None
 
         autonomy_config = role.spec.autonomy or AutonomyConfig()
+
+        # Set up clarify callback for conversational triggers
+        from initrunner.agent.clarify import reset_clarify_callback, set_clarify_callback
+        from initrunner.agent.schema.tools import ClarifyToolConfig
+
+        clarify_timeout = next(
+            (float(t.timeout_seconds) for t in role.spec.tools if isinstance(t, ClarifyToolConfig)),
+            None,
+        )
+        clarify_cb = (
+            self._make_daemon_clarify_callback(conv_key, event.reply_fn, clarify_timeout)
+            if clarify_timeout is not None
+            else None
+        )
+        clarify_token = set_clarify_callback(clarify_cb) if clarify_cb is not None else None
 
         with self._in_flight_cond:
             self._in_flight_count += 1
@@ -308,9 +350,40 @@ class DaemonRunner:
 
             self._maybe_prune_sessions()
         finally:
+            if clarify_token is not None:
+                reset_clarify_callback(clarify_token)
             with self._in_flight_cond:
                 self._in_flight_count -= 1
                 self._in_flight_cond.notify_all()
+
+    def _make_daemon_clarify_callback(
+        self,
+        conv_key: str | None,
+        reply_fn: object | None,
+        timeout: float,
+    ) -> ClarifyCallback | None:
+        """Build a ClarifyCallback for daemon mode, or ``None`` if not possible."""
+        if conv_key is None or reply_fn is None:
+            return None
+
+        from collections.abc import Callable
+
+        reply: Callable[[str], None] = reply_fn  # type: ignore[assignment]
+
+        def _daemon_clarify(question: str) -> str:
+            pending = PendingClarification()
+            with self._pending_lock:
+                self._pending_clarifications[conv_key] = pending
+            try:
+                reply(f"[Clarification needed]\n{question}")
+                if not pending.event.wait(timeout=timeout):
+                    raise TimeoutError(f"No response within {int(timeout)}s")
+                return pending.answer
+            finally:
+                with self._pending_lock:
+                    self._pending_clarifications.pop(conv_key, None)
+
+        return _daemon_clarify
 
     def _capture_episode(self, result: RunResult, event: TriggerEvent) -> None:
         """Capture a daemon run result as an episodic memory."""

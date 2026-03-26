@@ -6,6 +6,7 @@
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Workflow, Plus, ExternalLink, Trash2 } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let composes = $state<ComposeSummary[]>([]);
 	let loading = $state(true);
@@ -35,7 +36,7 @@
 		try {
 			composes = await fetchComposeList();
 		} catch {
-			// API not available
+			toast.error('Failed to load compositions');
 		} finally {
 			loading = false;
 		}
@@ -178,7 +179,7 @@
 	{#if pendingDelete}
 		<ConfirmDeleteDialog
 			entityName={pendingDelete.name}
-			entityType="compose pipeline"
+			entityType="compose"
 			open={true}
 			onConfirm={async () => {
 				const id = pendingDelete!.id;

@@ -252,7 +252,12 @@ def build_run_scoped_toolsets(
     toolsets with the provided state. Also builds a minimal finish_task
     toolset when no todo tool is configured.
     """
-    from initrunner.agent.schema.tools import SpawnToolConfig, ThinkToolConfig, TodoToolConfig
+    from initrunner.agent.schema.tools import (
+        ClarifyToolConfig,
+        SpawnToolConfig,
+        ThinkToolConfig,
+        TodoToolConfig,
+    )
     from initrunner.agent.tools._registry import ToolBuildContext, get_builder
 
     ctx = ToolBuildContext(role=role, role_dir=None)
@@ -273,6 +278,11 @@ def build_run_scoped_toolsets(
 
         elif isinstance(tool_config, SpawnToolConfig):
             builder = get_builder("spawn")
+            if builder:
+                toolsets.append(builder(tool_config, ctx))
+
+        elif isinstance(tool_config, ClarifyToolConfig):
+            builder = get_builder("clarify")
             if builder:
                 toolsets.append(builder(tool_config, ctx))
 

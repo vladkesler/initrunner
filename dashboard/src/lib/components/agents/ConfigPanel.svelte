@@ -171,11 +171,39 @@
 	{/if}
 
 	<!-- Skills -->
-	{#if detail.skills.length > 0}
+	{#if detail.skill_refs && detail.skill_refs.length > 0}
+		<ConfigSection title="Skills" count={detail.skill_refs.length}>
+			<div class="flex flex-wrap gap-1.5">
+				{#each detail.skill_refs as ref}
+					{#if ref.skill_id}
+						<a
+							href="/skills/{ref.skill_id}"
+							class="font-mono text-[13px] text-accent-primary transition-[color] duration-150 hover:underline"
+						>
+							{ref.name}
+						</a>
+					{:else}
+						<a
+							href="/skills?search={encodeURIComponent(ref.name)}"
+							class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 hover:text-accent-primary hover:underline"
+							title="Could not resolve to a specific skill"
+						>
+							{ref.name}
+						</a>
+					{/if}
+				{/each}
+			</div>
+		</ConfigSection>
+	{:else if detail.skills.length > 0}
 		<ConfigSection title="Skills" count={detail.skills.length}>
 			<div class="flex flex-wrap gap-1.5">
 				{#each detail.skills as skill}
-					<span class="font-mono text-[13px] text-fg-muted">{skill}</span>
+					<a
+						href="/skills?search={encodeURIComponent(skill)}"
+						class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 hover:text-accent-primary hover:underline"
+					>
+						{skill}
+					</a>
 				{/each}
 			</div>
 		</ConfigSection>

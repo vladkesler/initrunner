@@ -21,6 +21,7 @@
 		Upload,
 		Link
 	} from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let { agentId, hasIngest }: { agentId: string; hasIngest: boolean } = $props();
 
@@ -48,7 +49,7 @@
 			documents = docs;
 			summary = sum;
 		} catch {
-			// unavailable
+			toast.error('Failed to load documents');
 		} finally {
 			loading = false;
 		}
@@ -69,6 +70,7 @@
 			onError() {
 				ingesting = false;
 				ingestController = null;
+				toast.error('Ingestion failed');
 				loadData();
 			}
 		});
@@ -82,7 +84,7 @@
 			await uploadIngestFiles(agentId, input.files);
 			await loadData();
 		} catch {
-			// failed
+			toast.error('File upload failed');
 		} finally {
 			uploading = false;
 			input.value = '';
@@ -99,7 +101,7 @@
 			showUrlInput = false;
 			await loadData();
 		} catch {
-			// failed
+			toast.error('Failed to add URL');
 		} finally {
 			addingUrl = false;
 		}
@@ -111,7 +113,7 @@
 			if (confirmTimer) clearTimeout(confirmTimer);
 			confirmDeleteSource = null;
 			documents = documents.filter((d) => d.source !== source);
-			deleteIngestDocument(agentId, source).catch(() => loadData());
+			deleteIngestDocument(agentId, source).catch(() => { toast.error('Failed to delete document'); loadData(); });
 		} else {
 			// First click
 			if (confirmTimer) clearTimeout(confirmTimer);
