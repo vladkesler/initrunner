@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Removed
+- **`kind: Pipeline` orchestration** -- removed in favor of Team for one-shot multi-agent workflows and Compose for long-running services. For complex DAG workflows, use pydantic-graph directly. Running a Pipeline YAML now shows a migration message.
+- **`--var` flag** from `initrunner run` (was Pipeline-only)
+
+### Changed
+- **Compose scaffold pattern renamed** -- `--pattern pipeline` is now `--pattern chain`. Default for `initrunner compose new` updated accordingly.
+- Dashboard compose UI no longer labels runs or deletions as "pipeline"
+
 ## [1.43.0] - 2026-03-25
 
 ### Added

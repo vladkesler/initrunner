@@ -261,7 +261,7 @@ class TestComposeNewCLI:
     def test_list_patterns(self) -> None:
         result = runner.invoke(app, ["compose", "new", "x", "--list-patterns"])
         assert result.exit_code == 0
-        assert "pipeline" in result.output
+        assert "chain" in result.output
         assert "fan-out" in result.output
         assert "route" in result.output
 

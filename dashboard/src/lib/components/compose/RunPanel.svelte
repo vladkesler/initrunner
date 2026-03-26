@@ -2,7 +2,7 @@
 	import { streamComposeRun } from '$lib/api/compose';
 	import type { ComposeRunResponse, ComposeThreadMessage, ServiceStepResponse, ThreadMessage } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
-	import PipelineTrace from './PipelineTrace.svelte';
+	import ServiceTrace from './ServiceTrace.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let { composeId, onRunCompleted }: { composeId: string; onRunCompleted?: () => void } = $props();
@@ -151,20 +151,20 @@
 	{:else if running}
 		<div class="flex items-center gap-2 text-[12px] text-fg-faint">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-fg-faint"></span>
-			Starting pipeline...
+			Starting compose...
 		</div>
 	{/if}
 
 	<!-- Thread -->
 	<ConversationThread
 		messages={threadMessages}
-		emptyText="Send a prompt to run it through the pipeline"
-		assistantLabel="Pipeline"
+		emptyText="Send a prompt to run it through the composition"
+		assistantLabel="Compose"
 	>
 		{#snippet messageFooter({ msg, index })}
 			{@const composeMsg = messages[index]}
 			{#if composeMsg?.role === 'assistant' && composeMsg.result?.steps}
-				<PipelineTrace steps={composeMsg.result.steps} />
+				<ServiceTrace steps={composeMsg.result.steps} />
 			{/if}
 		{/snippet}
 	</ConversationThread>

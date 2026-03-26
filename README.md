@@ -23,7 +23,7 @@
 
 **Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 25+ built-in tools, policy-based authorization. Any model.**
 
-One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, pipelines, and API servers without rewriting anything.
+One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, compose orchestration, and API servers without rewriting anything.
 
 > **v1.43.0** -- PydanticAI capabilities in role YAML: Thinking, WebSearch, WebFetch, ImageGeneration, MCP. Capability/tool conflict validation, InputGuardCapability, OpenAI Responses API auto-switch, dashboard provider warnings. See the [Changelog](CHANGELOG.md).
 
@@ -189,12 +189,12 @@ See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegra
 
 ### Compose agents
 
-Orchestrate multiple agents into a pipeline - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
+Orchestrate multiple agents into a chain - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
 
 ```yaml
 apiVersion: initrunner/v1
 kind: Compose
-metadata: { name: email-pipeline }
+metadata: { name: email-chain }
 spec:
   services:
     inbox-watcher:
@@ -207,7 +207,7 @@ spec:
     responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up pipeline.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
+Run with `initrunner compose up compose.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
 ## User Interfaces
 
@@ -249,7 +249,7 @@ If a dashboard is already running on the port, the desktop window connects to it
 
 - **Agent management** -- browse, create, delete, and inspect agents in a flow canvas or list view
 - **Run panel** -- send prompts and stream responses in real time
-- **Compose and Team builders** -- visual pipeline editors for multi-agent orchestration
+- **Compose and Team builders** -- visual editors for multi-agent orchestration
 - **Audit log** -- filterable run history with token usage and durations
 - **System health** -- detected providers, doctor checks, and tool registry
 
@@ -257,7 +257,7 @@ See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](
 
 ## Security & Authorization
 
-Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, API, and pipeline:
+Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, and API:
 
 ```bash
 pip install initrunner[authz]
@@ -344,7 +344,7 @@ initrunner examples list               # see all available examples
 initrunner examples copy code-reviewer # copy to current directory
 ```
 
-The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose pipelines.
+The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose projects.
 
 ## Upgrading & Deprecations
 

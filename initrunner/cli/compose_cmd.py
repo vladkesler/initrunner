@@ -18,7 +18,7 @@ app = typer.Typer(help="Multi-agent compose orchestration.")
 @app.command("new")
 def compose_new(
     name: Annotated[str, typer.Argument(help="Project name (becomes directory name)")],
-    pattern: Annotated[str, typer.Option("--pattern", help="Compose pattern")] = "pipeline",
+    pattern: Annotated[str, typer.Option("--pattern", help="Compose pattern")] = "chain",
     services: Annotated[int, typer.Option("--services", help="Number of services")] = 3,
     shared_memory: Annotated[
         bool, typer.Option("--shared-memory", help="Enable shared memory store")

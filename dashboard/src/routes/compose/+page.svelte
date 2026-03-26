@@ -179,7 +179,7 @@
 	{#if pendingDelete}
 		<ConfirmDeleteDialog
 			entityName={pendingDelete.name}
-			entityType="compose pipeline"
+			entityType="compose"
 			open={true}
 			onConfirm={async () => {
 				const id = pendingDelete!.id;

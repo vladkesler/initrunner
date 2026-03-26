@@ -95,7 +95,7 @@ def test_builder_options(client):
     # Patterns
     assert len(data["patterns"]) == 3
     names = {p["name"] for p in data["patterns"]}
-    assert names == {"pipeline", "fan-out", "route"}
+    assert names == {"chain", "fan-out", "route"}
 
     # Route is fixed topology
     route = next(p for p in data["patterns"] if p["name"] == "route")
@@ -131,7 +131,7 @@ def test_seed_pipeline_placeholders(client):
     resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "test-pipe",
             "services": [
                 {"slot": "step-1", "agent_id": None},
@@ -166,7 +166,7 @@ def test_seed_pipeline_with_existing_agent(client):
     resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "test-mixed",
             "services": [
                 {"slot": "step-1", "agent_id": agent_id},
@@ -231,7 +231,7 @@ def test_seed_shared_memory(client):
     resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "test-sm",
             "services": [
                 {"slot": "step-1", "agent_id": None},
@@ -255,7 +255,7 @@ def test_validate_valid_yaml(client):
     seed_resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "v",
             "services": [{"slot": "step-1"}, {"slot": "step-2"}],
             "service_count": 2,
@@ -300,7 +300,7 @@ def test_save_compose(client, tmp_path):
     seed_resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "saved",
             "services": [{"slot": "step-1"}, {"slot": "step-2"}],
             "service_count": 2,
@@ -332,7 +332,7 @@ def test_save_conflict(client, tmp_path):
     seed_resp = tc.post(
         "/api/compose-builder/seed",
         json={
-            "pattern": "pipeline",
+            "pattern": "chain",
             "name": "dup",
             "services": [{"slot": "step-1"}, {"slot": "step-2"}],
             "service_count": 2,

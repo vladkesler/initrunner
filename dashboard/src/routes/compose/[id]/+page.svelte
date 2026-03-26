@@ -321,7 +321,7 @@
 
 		<ConfirmDeleteDialog
 			entityName={detail.name}
-			entityType="compose pipeline"
+			entityType="compose"
 			bind:open={deleteDialogOpen}
 			onConfirm={async () => {
 				await deleteCompose(composeId);

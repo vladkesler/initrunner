@@ -94,7 +94,7 @@
 		let names: string[];
 		if (selectedPattern.fixed_topology) {
 			names = [...selectedPattern.slot_names];
-		} else if (selectedPattern.name === 'pipeline') {
+		} else if (selectedPattern.name === 'chain') {
 			names = Array.from({ length: serviceCount }, (_, i) => `step-${i + 1}`);
 		} else {
 			// fan-out

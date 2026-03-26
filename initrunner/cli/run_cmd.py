@@ -1,4 +1,4 @@
-"""Run command: unified dispatcher for agent, team, compose, pipeline modes."""
+"""Run command: unified dispatcher for agent, team, and compose modes."""
 
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ from initrunner.cli._helpers import (
 )
 from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
 from initrunner.cli._run_agent import _run_agent
-from initrunner.cli._run_pipeline import _dispatch_pipeline
 from initrunner.cli._run_team import _run_team
 
 
@@ -256,9 +255,7 @@ def _dispatch_bot(
 def run(
     role_file: Annotated[
         Path | None,
-        typer.Argument(
-            help="Agent/Team/Compose/Pipeline YAML, directory, or name. Omit with --sense."
-        ),
+        typer.Argument(help="Agent/Team/Compose YAML, directory, or name. Omit with --sense."),
     ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
     interactive: Annotated[
@@ -343,13 +340,6 @@ def run(
             "--cors-origin", help="CORS origin (repeatable)", rich_help_panel="Serve Options"
         ),
     ] = None,
-    # --- Pipeline options ---
-    var: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--var", help="Pipeline variable key=value", rich_help_panel="Pipeline Options"
-        ),
-    ] = None,
     # --- Bot options ---
     allowed_users: Annotated[
         list[str] | None,
@@ -364,7 +354,7 @@ def run(
         ),
     ] = None,
 ) -> None:
-    """Run an agent, team, compose, or pipeline from a YAML file.
+    """Run an agent, team, or compose from a YAML file.
 
     Use -i for interactive REPL, -a for autonomous mode.
     For quick chat without a role file, use 'initrunner chat'.
@@ -399,8 +389,16 @@ def run(
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
 
+    # --- Removed kind rejection ---
+    if kind == "Pipeline":
+        console.print(
+            "[red]Error:[/red] kind: Pipeline has been removed.\n"
+            "Use Team for one-shot multi-agent workflows, or Compose for long-running services."
+        )
+        raise typer.Exit(1)
+
     # --- Kind-specific flag validation ---
-    if kind in ("Compose", "Pipeline"):
+    if kind == "Compose":
         invalid = []
         if prompt:
             invalid.append("--prompt")
@@ -424,13 +422,9 @@ def run(
             invalid.append("--bot")
         if invalid:
             console.print(
-                f"[red]Error:[/red] {', '.join(invalid)} not supported for {kind} targets."
+                f"[red]Error:[/red] {', '.join(invalid)} not supported for Compose targets."
             )
             raise typer.Exit(1)
-
-    if kind != "Pipeline" and var:
-        console.print("[red]Error:[/red] --var is only supported for Pipeline targets.")
-        raise typer.Exit(1)
 
     if kind not in ("Agent",) and (daemon_mode or serve_mode or bot):
         console.print(
@@ -445,10 +439,6 @@ def run(
 
     if kind == "Compose":
         _dispatch_compose(role_file, audit_db, no_audit)
-        return
-
-    if kind == "Pipeline":
-        _dispatch_pipeline(role_file, var, dry_run, audit_db, no_audit)
         return
 
     # --- Agent mode: flag-based dispatch ---

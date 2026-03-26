@@ -46,7 +46,7 @@ def _pattern_infos() -> list[PatternInfo]:
 
     return [
         PatternInfo(
-            name="pipeline",
+            name="chain",
             description="Linear A -> B -> C chain",
             fixed_topology=False,
             slot_names=["step-1", "step-2", "step-3"],

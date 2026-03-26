@@ -42,7 +42,7 @@ def run_compose_once_sync(
     on_service_start: Callable[[str], None] | None = None,
     on_service_complete: Callable | None = None,
 ) -> ComposeRunResult:
-    """Run a single prompt through a compose pipeline (sync).
+    """Run a single prompt through a compose chain (sync).
 
     Builds services in one_shot mode (no triggers, no role sinks), wires
     delegates, walks the delegation chain via synchronous BFS, and returns
@@ -87,7 +87,7 @@ class ScaffoldResult:
 def build_compose(
     name: str,
     *,
-    pattern: str = "pipeline",
+    pattern: str = "chain",
     slot_assignments: dict[str, Path | None] | None = None,
     service_count: int = 3,
     shared_memory: bool = False,
@@ -113,11 +113,11 @@ def build_compose(
 
     if pattern == "fan-out" and service_count < 3:
         raise ValueError("fan-out requires at least 3 services (1 dispatcher + 2 workers).")
-    if pattern == "pipeline" and service_count < 2:
-        raise ValueError("pipeline requires at least 2 services.")
+    if pattern == "chain" and service_count < 2:
+        raise ValueError("chain requires at least 2 services.")
 
     builders = {
-        "pipeline": _build_pipeline,
+        "chain": _build_chain,
         "fan-out": _build_fan_out,
         "route": _build_route,
     }
@@ -145,7 +145,7 @@ def build_compose(
 def scaffold_compose_project(
     name: str,
     *,
-    pattern: str = "pipeline",
+    pattern: str = "chain",
     services: int = 3,
     shared_memory: bool = False,
     provider: str = "openai",
@@ -225,7 +225,7 @@ def _make_compose_dict(name: str, description: str, services_dict: dict) -> dict
     }
 
 
-def _build_pipeline(
+def _build_chain(
     *,
     name: str,
     service_count: int,
@@ -260,17 +260,17 @@ def _build_pipeline(
                 position = f"stage {idx + 1}"
             roles[f"{svc_name}.yaml"] = build_role_yaml(
                 name=svc_name,
-                description=f"Stage {idx + 1} of the {name} pipeline",
+                description=f"Stage {idx + 1} of the {name} chain",
                 provider=provider,
                 model_name=model_name,
                 system_prompt=(
-                    f"You are the {position} stage in a processing pipeline.\n"
+                    f"You are the {position} stage in a processing chain.\n"
                     "Analyze the input and produce structured output for the next stage."
                 ),
             )
 
     return (
-        _make_compose_dict(name, f"A {service_count}-service pipeline.", services_dict),
+        _make_compose_dict(name, f"A {service_count}-service chain.", services_dict),
         roles,
     )
 
