@@ -197,6 +197,35 @@ Tabbed detail page with four tabs. A **Delete** button in the header opens a con
 | **Config** | Collapsible sections: model, strategy (with handoff_max_chars), guardrails, shared memory, shared documents, tools, observability. |
 | **Editor** | YAML editor with live validation, in-place save, and copy. Warns when name changes (affects team ID). |
 
+### Skills (`/skills`)
+
+Browse all discovered skill files (both directory-form `skills/name/SKILL.md` and flat-form `skills/name.md`). Skills are inventoried by physical path -- duplicate names across scopes are all shown, not deduplicated.
+
+- **Filter bar**: scope pills (All, Role-local, Project, Extra, User) and type pills (All, Tool-providing, Methodology). Filter state syncs to URL query params for shareability.
+- **Search**: substring match against name and description.
+- **Skill cards**: show name, scope badge, description, tool count or "methodology" label, and requirement status. Cards with 3+ tools get a subtle lime glow.
+
+Click a card to open the detail view. A "New Skill" button opens the creation page.
+
+### New Skill (`/skills/new`)
+
+Scaffold a new skill in directory format. Form fields: name (kebab-case validated), directory (populated from skill root directories), and provider (for template defaults). On success, redirects to the new skill's detail page.
+
+### Skill Detail (`/skills/{id}`)
+
+Header with skill name, scope badge, requirement status dot, and a Delete button.
+
+Two tabs:
+
+| Tab | Contents |
+|-----|----------|
+| **Overview** (default) | Collapsible sections: description, tools (type + summary, hidden for methodology-only), requirements (checklist with green/red indicators), prompt (expandable preview), metadata (license, compatibility, author, version), and "Used by" (agents that reference this skill, clickable links to agent detail). |
+| **Editor** | Full SKILL.md content editor (YAML frontmatter + markdown body). Validate-before-save: invalid content returns errors without writing to disk. Name change warning. |
+
+**Delete behavior**: flat `.md` files delete directly. Directory-form skills block deletion when sibling resource files exist (shows the blocking file list). Resource-bearing skill directories must be cleaned up manually or via CLI.
+
+**Cross-linking**: agent detail pages show resolved skill refs as clickable links to `/skills/{id}`. Skill detail pages show which agents use the skill via "Used by" section.
+
 ### Audit Log (`/audit`)
 
 Filterable table of all agent runs with analytics.
@@ -221,8 +250,8 @@ Three sections:
 Press `Cmd+K` (or `Ctrl+K`) anywhere to open the command palette. Provides:
 
 - Fuzzy search across all agents, compositions, and teams by name and description
-- Quick navigation to any page (Launchpad, Agents, Compose, Teams, Audit, System)
-- Quick actions: "New Agent", "New Compose", "New Team"
+- Quick navigation to any page (Launchpad, Agents, Skills, Compose, Teams, Audit, System)
+- Quick actions: "New Agent", "New Skill", "New Compose", "New Team"
 - Keyboard navigation with arrow keys and Enter
 
 Results are grouped: Pages, Actions, Agents, Compositions, Teams.
@@ -271,6 +300,14 @@ initrunner dashboard
   |      /api/team-builder/seed POST generate team YAML
   |      /api/team-builder/validate POST schema validation
   |      /api/team-builder/save POST write team YAML to disk
+  |      /api/skills           GET   list discovered skills (path-based, no name dedup)
+  |      /api/skills           POST  create new skill (directory format)
+  |      /api/skills/refresh   POST  re-scan all skill directories
+  |      /api/skills/directories GET  valid create target directories
+  |      /api/skills/{id}      GET   skill detail with used_by_agents cross-refs
+  |      /api/skills/{id}      DELETE delete skill (blocks if resource files exist)
+  |      /api/skills/{id}/content GET raw SKILL.md content for editor
+  |      /api/skills/{id}/content PUT validate-then-save skill content
   |      /api/runs             POST  execute single run
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records

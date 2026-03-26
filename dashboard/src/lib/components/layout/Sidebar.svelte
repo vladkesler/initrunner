@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { Compass, Blocks, Workflow, Users, ScanEye, Cpu, Network, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { Compass, Blocks, Sparkles, Workflow, Users, ScanEye, Cpu, Network, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let { collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void } = $props();
@@ -18,6 +18,9 @@
 	const orchChildren = [
 		{ href: '/compose', label: 'Compose', icon: Workflow },
 		{ href: '/teams', label: 'Teams', icon: Users }
+	];
+	const midItems = [
+		{ href: '/skills', label: 'Skills', icon: Sparkles }
 	];
 	const bottomItems = [
 		{ href: '/audit', label: 'Audit', icon: ScanEye },
@@ -156,6 +159,21 @@
 				</div>
 			{/if}
 		{/if}
+
+		<!-- Skills (below Orchestration) -->
+		{#each midItems as item}
+			{@const active = isActive(item.href)}
+			<a
+				href={item.href}
+				class="group flex items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
+				title={collapsed ? item.label : undefined}
+			>
+				<item.icon size={15} strokeWidth={1.5} />
+				{#if !collapsed}
+					<span class="font-mono">{item.label}</span>
+				{/if}
+			</a>
+		{/each}
 
 		<!-- Bottom items: Audit, System -->
 		{#each bottomItems as item}

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         DiscoveredRole,
         DiscoveredTeam,
     )
+    from initrunner.services.skill_service import DiscoveredSkillFull
 
 _logger = logging.getLogger(__name__)
 
@@ -111,11 +112,40 @@ class TeamCache(_YamlFileCache["DiscoveredTeam"]):
             self._cache[team_id] = DiscoveredTeam(path=path, error=str(exc))
 
 
+class SkillCache(_YamlFileCache["DiscoveredSkillFull"]):
+    """In-memory cache mapping opaque IDs to discovered skills.
+
+    Overrides ``refresh()`` because skill discovery uses different search
+    paths than ``get_role_dirs()`` alone.
+    """
+
+    def __init__(self, settings: DashboardSettings) -> None:
+        super().__init__(settings, lambda dirs: [], path_attr="path")
+
+    def refresh(self) -> dict[str, DiscoveredSkillFull]:
+        from initrunner.services.skill_service import discover_skills_full
+
+        items = discover_skills_full(self._settings.get_role_dirs())
+        self._cache = {_file_id(item.path): item for item in items}
+        _logger.debug("SkillCache refreshed: %d items", len(self._cache))
+        return self._cache
+
+    def refresh_one(self, skill_id: str, path: Path) -> None:
+        """Re-load a single skill file from disk into the cache."""
+        from initrunner.services.skill_service import load_skill_full
+
+        try:
+            self._cache[skill_id] = load_skill_full(path)
+        except Exception as exc:
+            _logger.warning("Failed to reload skill %s: %s", skill_id, exc)
+
+
 # -- Convenience aliases used by routers ---------------------------------------
 
 _role_id = _file_id
 _compose_id = _file_id
 _team_id = _file_id
+_skill_id = _file_id
 
 
 # -- Dependency placeholders (overridden in app factory) -----------------------
@@ -134,3 +164,8 @@ def get_compose_cache() -> ComposeCache:
 def get_team_cache() -> TeamCache:
     """Dependency placeholder -- overridden in app factory."""
     raise RuntimeError("TeamCache not initialized")
+
+
+def get_skill_cache() -> SkillCache:
+    """Dependency placeholder -- overridden in app factory."""
+    raise RuntimeError("SkillCache not initialized")
