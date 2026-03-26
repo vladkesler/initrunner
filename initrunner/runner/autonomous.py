@@ -109,10 +109,27 @@ def run_autonomous(
     error_msg: str | None = None
     loop_start = time.monotonic()
 
+    from initrunner.agent.clarify import (
+        make_cli_clarify_callback,
+        reset_clarify_callback,
+        set_clarify_callback,
+    )
     from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
     from initrunner.runner.display import _make_tool_event_printer
 
     cb_token = set_tool_event_callback(_make_tool_event_printer())
+
+    from initrunner.agent.schema.tools import ClarifyToolConfig
+
+    clarify_timeout = next(
+        (float(t.timeout_seconds) for t in role.spec.tools if isinstance(t, ClarifyToolConfig)),
+        None,
+    )
+    clarify_token = (
+        set_clarify_callback(make_cli_clarify_callback(timeout=clarify_timeout))
+        if clarify_timeout is not None
+        else None
+    )
 
     _display_autonomous_header(role, max_iterations, token_budget)
 
@@ -223,6 +240,8 @@ def run_autonomous(
     else:
         final_status = "max_iterations"
 
+    if clarify_token is not None:
+        reset_clarify_callback(clarify_token)
     reset_tool_event_callback(cb_token)
 
     total_duration = int((time.monotonic() - loop_start) * 1000)

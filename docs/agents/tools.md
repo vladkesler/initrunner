@@ -26,6 +26,7 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 | `audio` | Fetch YouTube transcripts and transcribe local audio files |
 | `csv_analysis` | Inspect, summarize, and query CSV files within a sandboxed directory |
 | `think` | Internal reasoning scratchpad — agent thinks step-by-step without user-visible output |
+| `clarify` | Agent-initiated mid-run clarification — pauses execution to ask the user a question |
 | `script` | Inline shell scripts defined in YAML as named, parameterized tools |
 | `calculator` | Safe mathematical expression evaluator (AST-based, no eval) |
 | `pdf_extract` | Extract text and metadata from PDF files inline |
@@ -1078,6 +1079,71 @@ spec:
   tools:
     - type: think
     - type: datetime
+```
+
+## Clarify Tool
+
+Lets the agent pause mid-execution, ask the user a clarifying question, and resume with the answer. This is a human-in-the-loop pattern that works across all runner modes.
+
+```yaml
+tools:
+  - type: clarify
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_clarifications` | `int` | `3` | Maximum questions per run (1-10) |
+| `timeout_seconds` | `int` | `300` | Seconds to wait for user reply (30-3600) |
+
+`timeout_seconds` applies to all modes. Must be less than or equal to `guardrails.timeout_seconds` to avoid the run-level timeout firing first.
+
+### Registered Functions
+
+- **`clarify(question: str) -> str`** -- Ask the user a clarifying question and wait for their response. Returns `"User response: <answer>"` on success, or a graceful fallback message if the callback is unavailable, times out, or the limit is reached.
+
+### How It Works
+
+When the agent calls `clarify()`, execution blocks while waiting for user input:
+
+- **CLI (single-shot, interactive, autonomous)**: A Rich panel displays the question and the user types their answer in the terminal. The agent resumes seamlessly.
+- **Daemon/Bot (Telegram, Discord)**: The question is sent to the user via the platform's reply function. The next inbound message on the same conversation is consumed as the answer. While a clarification is pending, the answer bypasses concurrency and budget gates.
+- **Non-conversational triggers** (cron, webhook, file watcher): Clarification is not available. The tool returns a fallback message telling the agent to proceed with its best judgment.
+
+### When to Use
+
+Add the clarify tool when your agent handles ambiguous or underspecified tasks where guessing would waste a run. It is especially useful for:
+
+- **Research assistants** -- "Which aspect of X should I focus on?"
+- **Code generation** -- "Should I use async or sync for this handler?"
+- **Data analysis** -- "Which date range should I analyze?"
+
+The tool's docstring instructs the agent to batch questions and avoid using it for simple confirmations.
+
+### Example
+
+```yaml
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: research-assistant
+  description: Research assistant that clarifies before diving in
+spec:
+  role: >
+    You are a research assistant. When the user's request is ambiguous
+    or underspecified, use the clarify tool to ask for more details
+    before proceeding. Do not guess -- ask.
+  model:
+    provider: openai
+    name: gpt-4o
+  tools:
+    - type: clarify
+      max_clarifications: 3
+      timeout_seconds: 300
+    - type: web_reader
+    - type: search
+    - type: think
 ```
 
 ## Script Tool
