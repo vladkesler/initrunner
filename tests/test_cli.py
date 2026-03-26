@@ -114,11 +114,11 @@ class TestRun:
         assert result.exit_code == 0
         mock_run_single.assert_called_once()
 
-    def test_no_role_no_sense_errors(self):
-        """Running without a role file and without --sense should error."""
-        result = runner.invoke(app, ["run", "-p", "hello"])
+    def test_no_role_ephemeral_rejects_daemon(self):
+        """Ephemeral mode should reject --daemon."""
+        result = runner.invoke(app, ["run", "--daemon"])
         assert result.exit_code == 1
-        assert "--sense" in result.output
+        assert "--daemon" in result.output
 
     def test_role_and_sense_mutually_exclusive(self, tmp_path):
         """Providing both a role file and --sense should error."""

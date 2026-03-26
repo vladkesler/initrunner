@@ -17,8 +17,8 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 
 | Command | Description |
 |---------|-------------|
-| `initrunner chat` | Start an ephemeral chat REPL or launch a bot |
-| `initrunner run <PATH>` | Run an agent, team, compose, or pipeline (auto-detected from YAML kind) |
+| `initrunner run` | Run an agent (ephemeral or from role file), team, compose, or pipeline |
+| `initrunner run <PATH>` | Run an agent from a role file, team, compose, or pipeline (auto-detected from YAML kind) |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
@@ -69,32 +69,6 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 
 > **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a compose file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
 
-## Chat options
-
-Synopsis: `initrunner chat [OPTIONS]`
-
-Start an ephemeral chat REPL or launch a one-command bot. See [Chat & Quick Start](chat.md) for the full guide. To run a role file interactively, use `initrunner run <PATH> -i` instead.
-
-Running `initrunner` with no subcommand in a TTY starts chat automatically (or shows a setup hint if unconfigured). A tip about `initrunner new` is shown on each chat start.
-
-| Flag | Description |
-|------|-------------|
-| `--provider TEXT` | Model provider (overrides auto-detection) |
-| `--model TEXT` | Model alias or provider:model (overrides auto-detection). Supports [aliases](../configuration/model-aliases.md). |
-| `-p, --prompt TEXT` | Send prompt then enter REPL |
-| `--telegram` | Launch as Telegram bot |
-| `--discord` | Launch as Discord bot |
-| `--allowed-users TEXT` | Restrict bot to these usernames (repeatable). Requires `--telegram` or `--discord`. |
-| `--allowed-user-ids TEXT` | Restrict bot to these user IDs (repeatable). Requires `--telegram` or `--discord`. |
-| `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default), `all` |
-| `--tools TEXT` | Extra tool types to enable (repeatable). See [Extra Tools](chat.md#extra-tools). |
-| `--memory / --no-memory` | Enable or disable persistent memory (default: enabled) |
-| `--resume` | Resume the previous session (loads history + recalls relevant memories) |
-| `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable) |
-| `--list-tools` | List available extra tool types and exit |
-| `--audit-db PATH` | Custom audit database path |
-| `--no-audit` | Disable audit logging |
-
 ## Run options
 
 Synopsis: `initrunner run [PATH] [OPTIONS]`
@@ -130,7 +104,13 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `-f, --format TEXT` | Output format: `auto` (default), `json`, `text`, `rich`. See [Output Formats](#output-formats). |
 | `--no-stream` | **Deprecated.** Use `--format rich`. Hidden from `--help`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
-| `--model TEXT` | Model alias or provider:model (overrides role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
+| `--provider TEXT` | Model provider (overrides auto-detection or role config) |
+| `--model TEXT` | Model alias or provider:model (overrides auto-detection or role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
+| `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default for ephemeral), `all` |
+| `--tools TEXT` | Extra tool types to enable (repeatable) |
+| `--memory / --no-memory` | Enable or disable persistent memory (default: enabled for ephemeral) |
+| `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable) |
+| `--list-tools` | List available extra tool types and exit |
 
 ### Intent Sensing examples
 

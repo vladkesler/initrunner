@@ -473,7 +473,7 @@ print_summary() {
     printf "\n"
     printf "  %bGet started:%b\n" "$BOLD" "$RESET"
     printf "    initrunner setup                     %b# configure provider & API key%b\n" "$DIM" "$RESET"
-    printf "    initrunner chat                      %b# quick chat, no setup needed%b\n" "$DIM" "$RESET"
+    printf "    initrunner run                       %b# quick chat, no setup needed%b\n" "$DIM" "$RESET"
     printf "    initrunner new                       %b# create an agent role%b\n" "$DIM" "$RESET"
     printf "    initrunner dashboard                 %b# web UI%b\n" "$DIM" "$RESET"
     printf "\n"

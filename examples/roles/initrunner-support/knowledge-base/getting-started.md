@@ -57,10 +57,10 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ```bash
 # One-shot prompt
-initrunner chat -p "Explain Python decorators in 3 sentences"
+initrunner run -p "Explain Python decorators in 3 sentences"
 
 # Interactive REPL
-initrunner chat
+initrunner run
 ```
 
 The `chat` command auto-detects your provider from available API keys. It checks in order: Anthropic, OpenAI, Google, Groq, Mistral, Cohere, Ollama.

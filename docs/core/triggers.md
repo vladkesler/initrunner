@@ -294,7 +294,7 @@ spec:
 
 **Thread safety**: in-flight trigger runs use a snapshot of the old agent/role. New runs after a reload use the updated config. Trigger dispatchers are restarted only if the trigger config actually changed.
 
-Hot-reload requires a `role_path` -- it is automatically enabled when running `initrunner run role.yaml --daemon`. Ephemeral roles (e.g. from `initrunner chat`) do not support hot-reload.
+Hot-reload requires a `role_path` -- it is automatically enabled when running `initrunner run role.yaml --daemon`. Ephemeral roles (e.g. from `initrunner run`) do not support hot-reload.
 
 ### Signal Handling
 

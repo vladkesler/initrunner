@@ -787,7 +787,7 @@ class TestIntentSetup:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -815,7 +815,7 @@ class TestIntentSetup:
                 "--intent",
                 "knowledge",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -848,7 +848,7 @@ class TestIntentSetup:
                     "--intent",
                     "knowledge",
                     "--skip-test",
-                    "--skip-chat-yaml",
+                    "--skip-run-yaml",
                     "--output",
                     str(output),
                 ],
@@ -880,7 +880,7 @@ class TestIntentSetup:
                 "--intent",
                 "telegram-bot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -892,9 +892,9 @@ class TestIntentSetup:
         assert "telegram" in content.lower()
 
 
-class TestSkipChatYaml:
-    def test_skip_chat_yaml(self, clean_env, monkeypatch):
-        """--skip-chat-yaml should not create chat.yaml."""
+class TestSkipRunYaml:
+    def test_skip_run_yaml(self, clean_env, monkeypatch):
+        """--skip-run-yaml should not create run.yaml."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         tmp_path = clean_env
         output = tmp_path / "role.yaml"
@@ -911,12 +911,12 @@ class TestSkipChatYaml:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
             input="\n",  # accept default tools
         )
         assert result.exit_code == 0
-        chat_yaml = tmp_path / "home" / "chat.yaml"
-        assert not chat_yaml.exists()
+        run_yaml = tmp_path / "home" / "run.yaml"
+        assert not run_yaml.exists()

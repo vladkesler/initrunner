@@ -91,28 +91,28 @@ You should see `Discord bot connected` in the logs.
 To test without creating a role file:
 
 ```bash
-initrunner chat --discord
+initrunner run --bot discord
 ```
 
 Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
 
 ```bash
 # Enable every available tool
-SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner chat --discord --tool-profile all
+SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner run --bot discord --tool-profile all
 
 # Or add specific extras
-initrunner chat --discord --tools git --tools shell
+initrunner run --bot discord --tools git --tools shell
 
 # Restrict to specific users by ID (works in DMs and guild channels)
-initrunner chat --discord --allowed-user-ids 111222333444555666
+initrunner run --bot discord --allowed-user-ids 111222333444555666
 
 # Disable memory if not needed
-initrunner chat --discord --no-memory
+initrunner run --bot discord --no-memory
 ```
 
-Run `initrunner chat --list-tools` to see all available tool types.
+Run `initrunner run --list-tools` to see all available tool types.
 
-For production, use the `role.yaml` approach with `initrunner run role.yaml --bot discord` or `--daemon` for access control and budgets. See [Chat & Quick Start](chat.md).
+For production, use the `role.yaml` approach with `initrunner run role.yaml --bot discord` or `--daemon` for access control and budgets.
 
 ## Testing
 
@@ -185,7 +185,6 @@ Set `channel_ids` to a list of channel ID strings. To get a channel ID, enable D
 
 ## What's Next
 
-- [Chat & Quick Start](chat.md) — zero-config chat and one-command bot shortcuts
 - [Triggers Reference](../core/triggers.md) — full reference for all trigger types
 - [Guardrails](../configuration/guardrails.md) — token budgets, timeouts, and request limits
 - [Telegram Quickstart](telegram.md) — similar setup for Telegram bots

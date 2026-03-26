@@ -70,29 +70,29 @@ You should see `Telegram bot started polling` in the logs.
 To test without creating a role file:
 
 ```bash
-initrunner chat --telegram
+initrunner run --bot telegram
 ```
 
 Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
 
 ```bash
 # Enable every available tool
-SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner chat --telegram --tool-profile all
+SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner run --bot telegram --tool-profile all
 
 # Or add specific extras
-initrunner chat --telegram --tools git --tools shell
+initrunner run --bot telegram --tools git --tools shell
 
 # Restrict to specific users by ID (recommended) or username
-initrunner chat --telegram --allowed-user-ids 123456789
-initrunner chat --telegram --allowed-users alice --allowed-users bob
+initrunner run --bot telegram --allowed-user-ids 123456789
+initrunner run --bot telegram --allowed-users alice --allowed-users bob
 
 # Disable memory if not needed
-initrunner chat --telegram --no-memory
+initrunner run --bot telegram --no-memory
 ```
 
-Run `initrunner chat --list-tools` to see all available tool types.
+Run `initrunner run --list-tools` to see all available tool types.
 
-For production, use the `role.yaml` approach with `initrunner run role.yaml --bot telegram` or `--daemon` for access control and budgets. See [Chat & Quick Start](chat.md).
+For production, use the `role.yaml` approach with `initrunner run role.yaml --bot telegram` or `--daemon` for access control and budgets.
 
 ## Testing
 
@@ -159,7 +159,6 @@ Only plain text messages are processed. `/start`, `/help`, and other slash comma
 
 ## What's Next
 
-- [Chat & Quick Start](chat.md) — zero-config chat and one-command bot shortcuts
 - [Triggers Reference](../core/triggers.md) — full reference for all trigger types
 - [Guardrails](../configuration/guardrails.md) — token budgets, timeouts, and request limits
 - [Discord Quickstart](discord.md) — similar setup for Discord bots

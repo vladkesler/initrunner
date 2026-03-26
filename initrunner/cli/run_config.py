@@ -1,4 +1,4 @@
-"""Chat configuration: ~/.initrunner/chat.yaml schema and loader."""
+"""Run configuration: ~/.initrunner/run.yaml schema and loader."""
 
 from __future__ import annotations
 
@@ -11,11 +11,12 @@ from initrunner.config import get_home_dir
 
 _logger = logging.getLogger(__name__)
 
-_CHAT_CONFIG_FILENAME = "chat.yaml"
+_RUN_CONFIG_FILENAME = "run.yaml"
+_LEGACY_CONFIG_FILENAME = "chat.yaml"
 
 
-class ChatConfig(BaseModel):
-    """Configuration for ``initrunner chat`` loaded from chat.yaml."""
+class RunConfig(BaseModel):
+    """Configuration for ephemeral mode loaded from run.yaml."""
 
     provider: str | None = None
     model: str | None = None
@@ -24,32 +25,48 @@ class ChatConfig(BaseModel):
     memory: bool = True
     ingest: list[str] = []
     personality: str | None = None
-    name: str = "ephemeral-chat"
+    name: str = "ephemeral"
 
 
-def _get_chat_config_path() -> Path:
-    return get_home_dir() / _CHAT_CONFIG_FILENAME
+def _get_run_config_path() -> Path:
+    return get_home_dir() / _RUN_CONFIG_FILENAME
 
 
-def load_chat_config() -> ChatConfig:
-    """Load chat config from ``~/.initrunner/chat.yaml``.
+def load_run_config() -> RunConfig:
+    """Load run config from ``~/.initrunner/run.yaml``.
 
-    Returns defaults if the file is missing or unparseable.
+    Falls back to ``chat.yaml`` with a migration warning if ``run.yaml``
+    doesn't exist yet.  Returns defaults if neither file is present.
     """
-    path = _get_chat_config_path()
+    path = _get_run_config_path()
+    legacy = get_home_dir() / _LEGACY_CONFIG_FILENAME
+
+    if not path.is_file() and legacy.is_file():
+        _logger.warning(
+            "Note: Rename %s to %s to preserve your settings.", legacy, path
+        )
+        # Print to stderr so it's visible even when stdout is piped
+        import sys
+
+        print(
+            f"Note: Rename {legacy} to {path} to preserve your settings.",
+            file=sys.stderr,
+        )
+        path = legacy
+
     if not path.is_file():
-        return ChatConfig()
+        return RunConfig()
 
     try:
         import yaml
 
         data = yaml.safe_load(path.read_text())
         if not isinstance(data, dict):
-            return ChatConfig()
-        return ChatConfig.model_validate(data)
+            return RunConfig()
+        return RunConfig.model_validate(data)
     except Exception:
         _logger.warning("Failed to load %s, using defaults", path, exc_info=True)
-        return ChatConfig()
+        return RunConfig()
 
 
 def resolve_ingest_paths(paths: list[str], config_dir: Path | None = None) -> list[str]:

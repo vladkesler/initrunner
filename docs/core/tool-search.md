@@ -48,9 +48,9 @@ Model sees and calls the actual tool (e.g. send_slack_message)
 - **Discovered tools persist** across turns — once found, a tool stays available for the session
 - **Runtime tools pass through** — tools added dynamically (e.g. reflection, scheduling) are always visible
 
-## Ephemeral Chat
+## Ephemeral Mode
 
-Tool search is **automatically enabled** in ephemeral chat mode (`initrunner chat`). You don't need a `role.yaml` — the CLI wires it up for you.
+Tool search is **automatically enabled** in ephemeral mode (`initrunner run` without a role file). You don't need a `role.yaml` -- the CLI wires it up for you.
 
 ### How it works
 
@@ -65,7 +65,7 @@ All tools from the built-in extras (`datetime`, `web_reader`, `search`, `python`
 ### Example
 
 ```bash
-initrunner chat --tool-profile minimal
+initrunner run --tool-profile minimal
 ```
 
 The agent sees `current_time`, `parse_date`, `fetch_page`, and `search_tools`. When the user asks "search the web for Python 3.13 release notes", the agent calls `search_tools("web search")`, discovers `web_search`, and then calls it — all in the same turn.

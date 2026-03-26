@@ -26,7 +26,7 @@ from initrunner.services.setup import (
     needs_setup,
     provider_needs_embeddings_warning,
     run_connectivity_test,
-    save_chat_yaml,
+    save_run_yaml,
 )
 from initrunner.services.setup import (
     validate_api_key as _validate_api_key,
@@ -109,7 +109,7 @@ def run_setup(
     output: Path,
     accept_risks: bool = False,
     model: str | None = None,
-    skip_chat_yaml: bool = False,
+    skip_run_yaml: bool = False,
 ) -> None:
     """Execute the guided setup wizard."""
     # ---------------------------------------------------------------
@@ -491,7 +491,7 @@ def run_setup(
             ]
 
     # ---------------------------------------------------------------
-    # Step 10: Generate role.yaml + chat.yaml
+    # Step 10: Generate role.yaml + run.yaml
     # ---------------------------------------------------------------
     config = SetupConfig(
         intent=intent,
@@ -514,14 +514,14 @@ def run_setup(
         output.write_text(content)
         console.print(f"[green]Created[/green] {output}")
 
-    # chat.yaml
-    chat_yaml_path = None
-    if not skip_chat_yaml:
+    # run.yaml
+    run_yaml_path = None
+    if not skip_run_yaml:
         try:
-            chat_yaml_path = save_chat_yaml(config)
-            console.print(f"[green]Created[/green] {chat_yaml_path}")
+            run_yaml_path = save_run_yaml(config)
+            console.print(f"[green]Created[/green] {run_yaml_path}")
         except Exception as exc:
-            console.print(f"[dim]Could not create chat.yaml: {exc}[/dim]")
+            console.print(f"[dim]Could not create run.yaml: {exc}[/dim]")
 
     # ---------------------------------------------------------------
     # Step 12: Post-generation actions
@@ -562,8 +562,8 @@ def run_setup(
     if env_var and provider not in ("ollama", "bedrock"):
         summary_lines.append(f"[bold]Config:[/bold]   {env_path}")
     summary_lines.append(f"[bold]Role:[/bold]     {output}")
-    if chat_yaml_path:
-        summary_lines.append(f"[bold]Chat:[/bold]     {chat_yaml_path}")
+    if run_yaml_path:
+        summary_lines.append(f"[bold]Run:[/bold]      {run_yaml_path}")
 
     console.print()
     console.print(
