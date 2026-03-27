@@ -406,7 +406,7 @@ initrunner ingest role.yaml --force
 |------|-------------|
 | `--force` | Force re-ingestion of all files. Also wipes the store when the embedding model has changed. |
 
-The command displays the agent name, a spinner during processing, and the total number of chunks stored on completion.
+The command displays the agent name, a progress bar with per-file status, and the total number of chunks stored on completion. Auto-ingest on first run (`ingest.auto: true`) also shows the same progress bar.
 
 ## Managed Sources (Dashboard)
 

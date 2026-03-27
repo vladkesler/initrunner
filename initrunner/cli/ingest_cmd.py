@@ -7,18 +7,7 @@ from typing import Annotated
 
 import typer
 
-from initrunner.cli._helpers import console, load_role_or_exit, suggest_next
-
-
-def _status_color(status: object) -> str:
-    from initrunner.ingestion.pipeline import FileStatus
-
-    return {  # type: ignore[no-matching-overload]
-        FileStatus.NEW: "green",
-        FileStatus.UPDATED: "yellow",
-        FileStatus.SKIPPED: "dim",
-        FileStatus.ERROR: "red",
-    }.get(status, "white")
+from initrunner.cli._helpers import console, ingest_status_color, load_role_or_exit, suggest_next
 
 
 def ingest(
@@ -31,7 +20,7 @@ def ingest(
     from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
     from initrunner.cli._helpers import resolve_role_path
-    from initrunner.ingestion.pipeline import FileStatus, resolve_sources, run_ingest
+    from initrunner.ingestion.pipeline import FileStatus, resolve_full_sources, run_ingest
 
     role_file = resolve_role_path(role_file)
     role = load_role_or_exit(role_file)
@@ -50,7 +39,7 @@ def ingest(
         )
         raise typer.Exit(1)
 
-    files, urls = resolve_sources(role.spec.ingest.sources, base_dir=base_dir)
+    files, urls = resolve_full_sources(role.spec.ingest, role.metadata.name, base_dir=base_dir)
     total = len(files) + len(urls)
 
     console.print(
@@ -70,7 +59,8 @@ def ingest(
         task = progress.add_task("Ingesting", total=total)
 
         def on_progress(path: Path, status: FileStatus) -> None:
-            progress.update(task, advance=1, description=f"[{_status_color(status)}]{path.name}")
+            color = ingest_status_color(status)
+            progress.update(task, advance=1, description=f"[{color}]{path.name}")
 
         resource_limits = role.spec.security.resources
         try:

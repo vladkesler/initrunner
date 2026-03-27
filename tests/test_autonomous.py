@@ -117,12 +117,18 @@ class TestAutonomousWallClockTimeout:
                 [],
             )
 
+        import io
+
+        from rich.console import Console as _Console
+
+        quiet_console = _Console(file=io.StringIO())
+
         with (
             patch("initrunner.runner.autonomous.execute_run", side_effect=slow_execute_run),
             patch("initrunner.runner.autonomous._display_autonomous_header"),
             patch("initrunner.runner.autonomous._display_iteration_result"),
             patch("initrunner.runner.autonomous._display_autonomous_summary"),
-            patch("initrunner.runner.autonomous.console"),
+            patch("initrunner.runner.autonomous.console", quiet_console),
         ):
             from initrunner.runner.autonomous import run_autonomous
 

@@ -21,6 +21,19 @@ if TYPE_CHECKING:
 
 console = Console()
 
+
+def ingest_status_color(status: object) -> str:
+    """Map a :class:`~initrunner.ingestion.pipeline.FileStatus` to a Rich color."""
+    from initrunner.ingestion.pipeline import FileStatus
+
+    return {  # type: ignore[no-matching-overload]
+        FileStatus.NEW: "green",
+        FileStatus.UPDATED: "yellow",
+        FileStatus.SKIPPED: "dim",
+        FileStatus.ERROR: "red",
+    }.get(status, "white")
+
+
 _INITRUNNER_API_VERSIONS = {"initrunner/v1"}
 _INITRUNNER_KINDS = {"Agent", "Team"}
 

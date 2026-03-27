@@ -62,6 +62,29 @@ def is_store_populated(agent_name: str, store_path: str | None = None) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def resolve_auto_ingest_total(
+    role: RoleDefinition,
+    role_file: Path,
+) -> int | None:
+    """Return the source count if auto-ingest will run, else ``None``.
+
+    Checks the same preconditions as :func:`auto_ingest_if_needed` (config
+    present, ``auto`` flag set, store empty) and resolves the full source set
+    including managed sources to return an accurate total.
+    """
+    ingest = role.spec.ingest
+    if ingest is None or not ingest.auto or not ingest.sources:
+        return None
+    if is_store_populated(role.metadata.name, ingest.store_path):
+        return None
+
+    from initrunner.ingestion.pipeline import resolve_full_sources
+
+    base_dir = effective_ingest_base_dir(role_file)
+    all_files, all_urls = resolve_full_sources(ingest, role.metadata.name, base_dir=base_dir)
+    return len(all_files) + len(all_urls)
+
+
 def auto_ingest_if_needed(
     role: RoleDefinition,
     role_file: Path,

@@ -11,6 +11,7 @@ import typer
 from initrunner.cli._helpers import (
     command_context,
     console,
+    ingest_status_color,
     resolve_model_override,
     resolve_skill_dirs,
     suggest_next,
@@ -204,22 +205,45 @@ def _run_agent(
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         # Auto-ingest on first run (opt-in via ingest.auto: true)
         if role.spec.ingest is not None and role.spec.ingest.auto and not dry_run:
-            from initrunner.services.ingest import auto_ingest_if_needed
+            from initrunner.services.ingest import auto_ingest_if_needed, resolve_auto_ingest_total
 
-            try:
-                stats = auto_ingest_if_needed(role, role_file)
+            ingest_total = resolve_auto_ingest_total(role, role_file)
+            if ingest_total is not None:
+                from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+                with Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    console=console,
+                ) as progress:
+                    ptask = progress.add_task("Auto-ingesting", total=ingest_total)
+
+                    def _on_ingest_progress(path: Path, status: object) -> None:
+                        progress.update(
+                            ptask,
+                            advance=1,
+                            description=f"[{ingest_status_color(status)}]{path.name}",
+                        )
+
+                    try:
+                        stats = auto_ingest_if_needed(
+                            role, role_file, progress_callback=_on_ingest_progress
+                        )
+                    except Exception as exc:
+                        from initrunner.stores.base import EmbeddingModelChangedError
+
+                        if isinstance(exc, EmbeddingModelChangedError):
+                            console.print(f"[red]Error:[/red] {exc}")
+                            console.print("[dim]Run: initrunner ingest <role> --force[/dim]")
+                            raise typer.Exit(1) from None
+                        raise
+
                 if stats is not None:
                     console.print(
-                        f"Indexed [cyan]{stats.total_chunks}[/cyan] chunks ({stats.new} files)."
+                        f"Indexed [cyan]{stats.total_chunks}[/cyan] chunks "
+                        f"({stats.new} new, {stats.updated} updated)."
                     )
-            except Exception as exc:
-                from initrunner.stores.base import EmbeddingModelChangedError
-
-                if isinstance(exc, EmbeddingModelChangedError):
-                    console.print(f"[red]Error:[/red] {exc}")
-                    console.print("[dim]Run: initrunner ingest <role> --force[/dim]")
-                    raise typer.Exit(1) from None
-                raise
 
         if not prompt and not autonomous and role.spec.triggers:
             console.print(
