@@ -5,6 +5,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from initrunner.triggers.base import ChannelAdapter
 
 
 @dataclass
@@ -74,7 +78,7 @@ class SinkBase(ABC):
 class ChannelSinkBridge(SinkBase):
     """Wraps a :class:`~initrunner.triggers.base.ChannelAdapter` as a sink."""
 
-    def __init__(self, adapter: object) -> None:
+    def __init__(self, adapter: ChannelAdapter) -> None:
         self._adapter = adapter
 
     def send(self, payload: SinkPayload) -> None:

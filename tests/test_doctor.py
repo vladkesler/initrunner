@@ -572,13 +572,7 @@ class TestBumpSpecVersionText:
         """Inserts spec_version when missing from metadata block."""
         from initrunner.services.doctor import bump_spec_version_text
 
-        text = (
-            "apiVersion: initrunner/v1\n"
-            "metadata:\n"
-            "  name: test\n"
-            "spec:\n"
-            "  role: test\n"
-        )
+        text = "apiVersion: initrunner/v1\nmetadata:\n  name: test\nspec:\n  role: test\n"
         result = bump_spec_version_text(text, 2)
         assert "  spec_version: 2\n" in result
         # Inserted before spec:
@@ -615,12 +609,7 @@ class TestBumpSpecVersionText:
         """Uses the file's own indent style (4 spaces)."""
         from initrunner.services.doctor import bump_spec_version_text
 
-        text = (
-            "metadata:\n"
-            "    name: test\n"
-            "spec:\n"
-            "    role: test\n"
-        )
+        text = "metadata:\n    name: test\nspec:\n    role: test\n"
         result = bump_spec_version_text(text, 2)
         assert "    spec_version: 2\n" in result
 
@@ -637,12 +626,7 @@ class TestBumpSpecVersionText:
         """Preserves trailing inline comment on spec_version line."""
         from initrunner.services.doctor import bump_spec_version_text
 
-        text = (
-            "metadata:\n"
-            "  name: test\n"
-            "  spec_version: 1  # keep current\n"
-            "spec:\n"
-        )
+        text = "metadata:\n  name: test\n  spec_version: 1  # keep current\nspec:\n"
         result = bump_spec_version_text(text, 2)
         assert "  spec_version: 2  # keep current\n" in result
 

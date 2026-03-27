@@ -1,7 +1,7 @@
 """Tests for the trigger system."""
 
 import time
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
@@ -14,7 +14,6 @@ from initrunner.triggers.base import (
     ChannelAdapter,
     ChannelTriggerBridge,
     TriggerEvent,
-    _chunk_text,
     register_conversational_trigger_type,
 )
 from initrunner.triggers.cron import CronTrigger
@@ -139,7 +138,8 @@ class TestTelegramAdapterSend:
         adapter._bot = mock_bot
         adapter._loop = mock_loop
 
-        with patch("initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe", return_value=mock_future) as mock_rcts:
+        tg_rcts = "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe"
+        with patch(tg_rcts, return_value=mock_future) as mock_rcts:
             adapter.send("12345", "hello")
 
         mock_rcts.assert_called_once()
@@ -158,7 +158,8 @@ class TestTelegramAdapterSend:
 
         long_text = "x" * 5000  # exceeds 4096 limit
 
-        with patch("initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe", return_value=mock_future) as mock_rcts:
+        tg_rcts = "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe"
+        with patch(tg_rcts, return_value=mock_future) as mock_rcts:
             adapter.send("12345", long_text)
 
         assert mock_rcts.call_count == 2  # chunked into 2
@@ -199,7 +200,8 @@ class TestDiscordAdapterSend:
         adapter._client = mock_client
         adapter._loop = mock_loop
 
-        with patch("initrunner.triggers.discord.asyncio.run_coroutine_threadsafe", return_value=mock_future) as mock_rcts:
+        dc_rcts = "initrunner.triggers.discord.asyncio.run_coroutine_threadsafe"
+        with patch(dc_rcts, return_value=mock_future) as mock_rcts:
             adapter.send("67890", "hello")
 
         mock_rcts.assert_called_once()

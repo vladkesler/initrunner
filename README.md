@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.45.0-%2334D058" alt="v1.45.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.46.0-%2334D058" alt="v1.46.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -37,7 +37,7 @@ initrunner run discord-assistant --daemon                      # Discord bot wit
 
 Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v1.45.1** -- Streamlined setup wizard (provider + model only, dashboard handoff), starters use your configured provider. See the [Changelog](CHANGELOG.md).
+> **v1.46.0** -- ChannelAdapter protocol for bidirectional Telegram/Discord, doctor --fix auto-repair, validate --explain, Rich progress bars, 4 new starters, post-command suggestions. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -66,7 +66,7 @@ Or install with a package manager: `uv pip install "initrunner[recommended]"` / 
 
 ### Try a starter agent
 
-Run `initrunner run` to see all available starters. The model is auto-detected from your API key.
+Run `initrunner run --list` to see all available starters. The model is auto-detected from your API key.
 
 | Starter | What it does | Kind |
 |---------|-------------|------|
@@ -79,6 +79,11 @@ Run `initrunner run` to see all available starters. The model is auto-detected f
 | `project-monitor` | Heartbeat-driven health checks, learns baselines over time | Agent (Daemon) |
 | `telegram-assistant` | Telegram bot with memory and web search | Agent (Daemon) |
 | `discord-assistant` | Discord bot with memory and web search | Agent (Daemon) |
+| `rag-agent` | Document Q&A agent with ingestion and citations | Agent (RAG) |
+| `memory-assistant` | Personal assistant that learns and remembers across sessions | Agent |
+| `email-agent` | Monitors inbox, triages messages, drafts replies, alerts Slack on urgent mail | Agent (Daemon) |
+| `ci-pipeline` | Webhook receiver, build analyzer, Slack notifier for CI events | Compose |
+| `support-desk` | Sense-routed intake, researcher, responder, and escalator | Compose |
 
 RAG starters auto-ingest on first run -- just `cd` into your project and go:
 
@@ -453,4 +458,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.45.0</sub></p>
+<p align="center"><sub>v1.46.0</sub></p>

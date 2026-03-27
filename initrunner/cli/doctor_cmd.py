@@ -275,9 +275,7 @@ def _fix_providers(role_file: Path | None, yes: bool) -> list[str]:
         if not os.environ.get(env_var):
             if yes:
                 # API keys require interactive input; can't auto-confirm.
-                console.print(
-                    f"[dim]Set {env_var} manually or re-run without --yes.[/dim]"
-                )
+                console.print(f"[dim]Set {env_var} manually or re-run without --yes.[/dim]")
             elif typer.confirm(f"Set API key for {provider} ({env_var})?", default=True):
                 validate_prov = provider if provider in ("openai", "anthropic") else None
                 handle_api_key(env_var, get_global_env_path(), validate_provider=validate_prov)
