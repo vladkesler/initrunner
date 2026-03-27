@@ -514,6 +514,9 @@ class TestConversationalTriggerEarlyExit:
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("telegram")
 
         result_with_tools = RunResult(run_id="r1", output="Here's your answer", tool_calls=2)
 
@@ -545,6 +548,9 @@ class TestConversationalTriggerEarlyExit:
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("discord")
 
         result_no_tools = RunResult(run_id="r1", output="Done", tool_calls=0)
 

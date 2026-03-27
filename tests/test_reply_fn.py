@@ -163,6 +163,9 @@ class TestReplyFnInDaemon:
         """Conversational triggers (telegram) skip autonomous and use execute_run."""
         from initrunner.agent.schema.autonomy import AutonomyConfig
         from initrunner.runner.daemon import DaemonRunner
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("telegram")
 
         mock_result = MagicMock(spec=RunResult)
         mock_result.output = "Here is the detailed answer."
@@ -237,6 +240,9 @@ class TestReplyFnInDaemon:
         """Don't call reply_fn when output is empty."""
         from initrunner.agent.schema.autonomy import AutonomyConfig
         from initrunner.runner.daemon import DaemonRunner
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("telegram")
 
         mock_result = MagicMock(spec=RunResult)
         mock_result.output = ""
