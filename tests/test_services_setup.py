@@ -32,6 +32,7 @@ def clean_env(monkeypatch, tmp_path):
         "MISTRAL_API_KEY",
         "CO_API_KEY",
         "XAI_API_KEY",
+        "OPENROUTER_API_KEY",
         "TELEGRAM_BOT_TOKEN",
         "DISCORD_BOT_TOKEN",
     ):

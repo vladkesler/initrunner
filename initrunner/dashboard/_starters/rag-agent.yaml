@@ -29,6 +29,7 @@ spec:
     temperature: 0.1
     max_tokens: 4096
   ingest:
+    auto: true
     sources:
       - ./docs/**/*.md
     chunking:

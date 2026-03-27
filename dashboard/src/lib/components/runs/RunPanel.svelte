@@ -4,7 +4,7 @@
 	import ConversationThread from './ConversationThread.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { agentId, onRunCompleted, blockedReason = null }: { agentId: string; onRunCompleted?: () => void; blockedReason?: string | null } = $props();
+	let { agentId, agentName = 'Agent', onRunCompleted, blockedReason = null }: { agentId: string; agentName?: string; onRunCompleted?: () => void; blockedReason?: string | null } = $props();
 
 	let prompt = $state('');
 	let messages: ThreadMessage[] = $state([]);
@@ -23,8 +23,8 @@
 		// Append user turn and empty assistant turn
 		messages = [
 			...messages,
-			{ role: 'user', content: userPrompt, status: 'complete' },
-			{ role: 'assistant', content: '', status: 'streaming' }
+			{ role: 'user', content: userPrompt, status: 'complete', identityLabel: 'You' },
+			{ role: 'assistant', content: '', status: 'streaming', identityLabel: agentName }
 		];
 
 		running = true;

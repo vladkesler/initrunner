@@ -1,0 +1,58 @@
+# Content Pipeline
+#
+# Multi-agent content creation pipeline. A researcher receives topics via
+# webhook (or on a daily cron schedule), searches for supporting material,
+# then hands off to a writer who drafts a polished article, and finally an
+# editor who fact-checks and produces the finished markdown.
+#
+# Prerequisites:
+#   uv pip install initrunner[search]
+#
+# Usage:
+#   initrunner compose content-pipeline/         # start the pipeline
+#   curl -X POST http://localhost:8080/topic \
+#     -H "Content-Type: application/json" \
+#     -d '{"prompt": "Write about the rise of edge computing"}'
+
+apiVersion: initrunner/v1
+kind: Compose
+metadata:
+  name: content-pipeline
+  description: >
+    Topic researcher, content writer, and editor/fact-checker pipeline.
+    Submit topics via webhook or let the daily cron pick from a topic queue.
+    Outputs polished markdown articles with verified citations.
+  version: "1.0.0"
+  author: InitRunner Team
+  tags: [content, compose, memory, triggers, starter]
+spec:
+  shared_memory:
+    enabled: true
+    max_memories: 1000
+  services:
+    researcher:
+      role: roles/researcher.yaml
+      sink:
+        type: delegate
+        target: writer
+
+    writer:
+      role: roles/writer.yaml
+      depends_on:
+        - researcher
+      sink:
+        type: delegate
+        target: editor
+      restart:
+        condition: on-failure
+        max_retries: 3
+        delay_seconds: 5
+
+    editor:
+      role: roles/editor.yaml
+      depends_on:
+        - writer
+      restart:
+        condition: on-failure
+        max_retries: 2
+        delay_seconds: 5

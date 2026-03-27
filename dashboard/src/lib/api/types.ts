@@ -83,6 +83,7 @@ export interface ThreadMessage {
 	status: 'complete' | 'streaming' | 'interrupted' | 'error';
 	result?: ThreadResultMeta | null;
 	error?: string | null;
+	identityLabel?: string | null;
 }
 
 export interface AuditRecord {

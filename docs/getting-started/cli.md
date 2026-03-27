@@ -20,6 +20,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner run` | Run an agent (ephemeral or from role file), team, compose, or pipeline |
 | `initrunner run <PATH>` | Run an agent from a role file, team, compose, or pipeline (auto-detected from YAML kind) |
 | `initrunner validate <PATH>` | Validate a role definition |
+| `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <PATH>` | Ingest documents into vector store |
@@ -68,6 +69,26 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner --version` | Print version |
 
 > **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a compose file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
+
+## No-subcommand behavior
+
+Running `initrunner` with no subcommand in a TTY shows an action menu:
+
+```
+  1. Dashboard (web UI)
+  2. Quick chat (REPL)
+  3. Create an agent
+
+What would you like to do? [1/2/3] (1):
+```
+
+- **Dashboard** launches the web UI at `http://localhost:8100` (only shown when dashboard extras are installed).
+- **Quick chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`.
+- **Create an agent** enters the interactive agent builder (`initrunner new`).
+
+The default is Dashboard when available, otherwise Quick chat. If no provider is configured, a "Setup Required" panel is shown instead.
+
+In non-TTY contexts (piped input), the help text is printed.
 
 ## Run options
 
@@ -169,6 +190,48 @@ initrunner run role.yaml -p "summarize this" --format text > summary.txt
 
 # Force Rich panel on a TTY
 initrunner run role.yaml -p "hello" --format rich
+```
+
+## Post-command suggestions
+
+After a successful `run`, `validate`, or `ingest`, the CLI prints 2-3
+contextual next-step commands you can copy-paste. Suggestions adapt to the
+role's configuration (e.g. ingest and memory commands only appear when those
+sections are defined).
+
+Suggestions are suppressed when stdout is not a TTY (piped output) and when
+using `--format json` or `--format text`, so machine-readable output stays
+clean.
+
+## Error hints
+
+Most CLI error messages include a `Hint:` line with the likely fix -- for
+example, the correct command to run, a missing YAML section to add, or a
+doc page to check. These appear automatically after `Error:` output.
+
+## Validate options
+
+Synopsis: `initrunner validate <PATH> [OPTIONS]`
+
+| Flag | Description |
+|------|-------------|
+| `--explain` | Print a plain-language explanation of each configured section |
+
+`--explain` walks through the role and prints one panel per section (Role,
+Model, Output, Tools, Skills, Capabilities, Triggers, Sinks, Ingest, Memory,
+Autonomy, Reasoning, Guardrails, Security, Observability, Tool Search, Daemon).
+Sections that use only default values are omitted.
+
+```console
+$ initrunner validate examples/roles/memory-assistant.yaml --explain
+Role Explanation: memory-assistant
+
+ Role   The system prompt (1349 chars) instructs the agent: "You are a personal assistant..."
+ Model  Uses openai:gpt-5-mini with temperature 0.1 and up to 2,048 output tokens.
+ Tools  1 tool(s) give the agent the ability to take actions beyond generating text: ...
+ Memory Gives the agent persistent memory across up to 10 sessions. ...
+ ...
+Valid
 ```
 
 ## Ingest options

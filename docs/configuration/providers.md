@@ -161,7 +161,30 @@ See [ollama.md](ollama.md) for a full Ollama setup guide.
 
 ## OpenRouter / custom endpoints
 
-Any OpenAI-compatible API works. Set `provider: openai`, point `base_url` at the endpoint, and tell the runner which env var holds the API key:
+### Quick setup via wizard
+
+If `OPENROUTER_API_KEY` is set in your environment or `~/.initrunner/.env`, the setup wizard auto-detects it:
+
+```bash
+export OPENROUTER_API_KEY="sk-or-..."
+initrunner setup
+# -> Detected OpenRouter (OPENROUTER_API_KEY). Use this provider? [Y/n]
+```
+
+Confirming writes canonical runtime config to `~/.initrunner/run.yaml`:
+
+```yaml
+provider: openai
+model: anthropic/claude-sonnet-4
+base_url: https://openrouter.ai/api/v1
+api_key_env: OPENROUTER_API_KEY
+```
+
+The ephemeral REPL (`initrunner run -i` or the no-subcommand Quick chat) automatically picks up these fields.
+
+### Manual role configuration
+
+Any OpenAI-compatible API works in role YAML. Set `provider: openai`, point `base_url` at the endpoint, and tell the runner which env var holds the API key:
 
 ```yaml
 spec:

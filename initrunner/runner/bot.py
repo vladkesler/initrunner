@@ -201,25 +201,27 @@ def run_bot(
             conversations.put(conv_key, reduce_history(new_messages, autonomy_config, role))
 
     # Create trigger with platform-specific config
+    from initrunner.triggers.base import ChannelTriggerBridge
+
     if platform == "telegram":
         from initrunner.agent.schema.triggers import TelegramTriggerConfig
-        from initrunner.triggers.telegram import TelegramTrigger
+        from initrunner.triggers.telegram import TelegramAdapter
 
         telegram_cfg = TelegramTriggerConfig(
             autonomous=True,
             allowed_users=allowed_users or [],
             allowed_user_ids=[int(uid) for uid in (allowed_user_ids or [])],
         )
-        trigger = TelegramTrigger(telegram_cfg, on_trigger)
+        trigger = ChannelTriggerBridge(TelegramAdapter(telegram_cfg), on_trigger)
     else:
         from initrunner.agent.schema.triggers import DiscordTriggerConfig
-        from initrunner.triggers.discord import DiscordTrigger
+        from initrunner.triggers.discord import DiscordAdapter
 
         discord_cfg = DiscordTriggerConfig(
             autonomous=True,
             allowed_user_ids=allowed_user_ids or [],
         )
-        trigger = DiscordTrigger(discord_cfg, on_trigger)
+        trigger = ChannelTriggerBridge(DiscordAdapter(discord_cfg), on_trigger)
 
     # Display header
     console.print(f"\n[bold]Bot mode[/bold] ({platform})")

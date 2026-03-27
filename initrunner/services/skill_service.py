@@ -12,6 +12,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from initrunner._constants import SKIP_DIRS as _SKIP_DIRS
 from initrunner.agent.skills import (
     RequirementStatus,
     SkillLoadError,
@@ -22,22 +23,6 @@ from initrunner.agent.skills import (
 )
 
 logger = logging.getLogger(__name__)
-
-_SKIP_DIRS = frozenset(
-    {
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        "dist",
-        "build",
-        ".eggs",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".pytest_cache",
-    }
-)
 
 
 @dataclass

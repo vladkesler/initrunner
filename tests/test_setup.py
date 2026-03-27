@@ -10,13 +10,16 @@ import pytest
 from typer.testing import CliRunner
 
 from initrunner.cli.main import app
-from initrunner.cli.setup_cmd import needs_setup
+from initrunner.services.setup import needs_setup
 
 runner = CliRunner()
 
 # All tests that enter an API key mock _validate_api_key to avoid network calls
 # and the "Re-enter?" prompt that follows validation failures.
-_MOCK_VALIDATE = patch("initrunner.cli.setup_cmd._validate_api_key", return_value=True)
+_MOCK_VALIDATE = patch("initrunner.services.setup.validate_api_key", return_value=True)
+
+# Common mock for list_detected_providers (patched at the import location)
+_PATCH_DETECTED = "initrunner.cli.setup_cmd.list_detected_providers"
 
 
 @pytest.fixture()
@@ -30,6 +33,7 @@ def clean_env(monkeypatch, tmp_path):
         "MISTRAL_API_KEY",
         "CO_API_KEY",
         "XAI_API_KEY",
+        "OPENROUTER_API_KEY",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path / "home"))
@@ -430,7 +434,7 @@ class TestWriteFailure:
 
         with (
             patch(
-                "initrunner.cli.setup_cmd.set_key",
+                "dotenv.set_key",
                 side_effect=PermissionError("permission denied"),
             ),
             _MOCK_VALIDATE,
@@ -625,3 +629,164 @@ class TestNextStepsStarters:
         assert "initrunner run helpdesk" in result.output
         assert "initrunner run code-review-team" in result.output
         assert "initrunner run web-researcher" in result.output
+
+
+class TestAutoDetectProvider:
+    """Tests for the three-branch auto-detect logic in run_setup()."""
+
+    def test_single_provider_auto_confirmed(self, clean_env, monkeypatch):
+        """One key detected -> confirm yes -> auto-selects that provider."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+        with (
+            patch(_PATCH_DETECTED, return_value=[("anthropic", "ANTHROPIC_API_KEY")]),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+            _MOCK_VALIDATE,
+        ):
+            result = runner.invoke(
+                app,
+                ["setup", "-y", "--model", "test-model", "--skip-test"],
+                input="y\n",  # confirm auto-detect
+            )
+        assert result.exit_code == 0
+        assert "Detected anthropic" in result.output
+        assert "Setup Complete" in result.output
+
+    def test_single_provider_declined_shows_detected_chooser(self, clean_env, monkeypatch):
+        """One key detected -> decline -> shows detected chooser."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+        with (
+            patch(
+                _PATCH_DETECTED,
+                return_value=[("anthropic", "ANTHROPIC_API_KEY")],
+            ),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+            _MOCK_VALIDATE,
+        ):
+            result = runner.invoke(
+                app,
+                ["setup", "-y", "--model", "test-model", "--skip-test"],
+                input="n\n1\n",  # decline auto, pick first from chooser
+            )
+        assert result.exit_code == 0
+        assert "Detected providers" in result.output
+
+    def test_multiple_providers_filtered_menu(self, clean_env, monkeypatch):
+        """Two keys detected -> shows only those two in the menu."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+        with (
+            patch(
+                _PATCH_DETECTED,
+                return_value=[
+                    ("anthropic", "ANTHROPIC_API_KEY"),
+                    ("openai", "OPENAI_API_KEY"),
+                ],
+            ),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+            _MOCK_VALIDATE,
+        ):
+            result = runner.invoke(
+                app,
+                ["setup", "-y", "--model", "test-model", "--skip-test"],
+                input="1\n",  # pick first (anthropic)
+            )
+        assert result.exit_code == 0
+        assert "Detected providers" in result.output
+        assert "anthropic" in result.output
+        assert "openai" in result.output
+        # Should NOT show the full provider list (e.g. groq, cohere)
+        assert "groq" not in result.output.lower().split("setup complete")[0]
+
+    def test_zero_providers_full_menu(self, clean_env):
+        """No keys detected -> shows full 9-provider menu."""
+        with (
+            patch(_PATCH_DETECTED, return_value=[]),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+            _MOCK_VALIDATE,
+        ):
+            result = runner.invoke(
+                app,
+                ["setup", "-y", "--model", "test-model", "--skip-test"],
+                input="1\nsk-test-key\n",  # pick openai, enter key
+            )
+        assert result.exit_code == 0
+        assert "Cloud providers" in result.output
+
+    def test_ollama_only_auto_confirm(self, clean_env):
+        """Ollama running, no keys -> confirms 'Ollama (running locally)'."""
+        with (
+            patch(_PATCH_DETECTED, return_value=[("ollama", "")]),
+            patch("initrunner.cli.setup_cmd.check_ollama_running"),
+            patch("initrunner.cli.setup_cmd.check_ollama_models", return_value=["llama3.2"]),
+        ):
+            result = runner.invoke(
+                app,
+                ["setup", "-y", "--model", "llama3.2", "--skip-test"],
+                input="y\n",
+            )
+        assert result.exit_code == 0
+        assert "Ollama (running locally)" in result.output
+
+    def test_openrouter_detected_and_confirmed(self, clean_env, monkeypatch):
+        """OPENROUTER_API_KEY set -> detects OpenRouter preset."""
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+
+        with (
+            patch(
+                _PATCH_DETECTED,
+                return_value=[("openrouter", "OPENROUTER_API_KEY")],
+            ),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--model",
+                    "anthropic/claude-sonnet-4",
+                    "--skip-test",
+                ],
+                input="y\n",  # confirm auto-detect
+            )
+        assert result.exit_code == 0
+        assert "OpenRouter" in result.output
+
+    def test_openrouter_writes_canonical_run_yaml(self, clean_env, monkeypatch):
+        """OpenRouter selection writes run.yaml with canonical runtime config."""
+        tmp_path = clean_env
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+
+        with (
+            patch(
+                _PATCH_DETECTED,
+                return_value=[("openrouter", "OPENROUTER_API_KEY")],
+            ),
+            patch("initrunner.cli.setup_cmd.require_provider"),
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--model",
+                    "anthropic/claude-sonnet-4",
+                    "--skip-test",
+                ],
+                input="y\n",
+            )
+        assert result.exit_code == 0
+        run_yaml = tmp_path / "home" / "run.yaml"
+        assert run_yaml.exists()
+        content = run_yaml.read_text()
+        assert "provider: openai" in content
+        assert "base_url: https://openrouter.ai/api/v1" in content
+        assert "api_key_env: OPENROUTER_API_KEY" in content
+
+    def test_needs_setup_false_with_openrouter(self, clean_env, monkeypatch):
+        """needs_setup() returns False when only OPENROUTER_API_KEY is set."""
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+        assert needs_setup() is False

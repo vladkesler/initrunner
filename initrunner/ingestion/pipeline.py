@@ -94,13 +94,22 @@ def _is_url(source: str) -> bool:
 
 
 def _resolve_file_sources(sources: list[str], base_dir: Path | None = None) -> list[Path]:
-    """Expand glob patterns into concrete file paths."""
+    """Expand glob patterns into concrete file paths.
+
+    Automatically excludes common non-source directories (node_modules,
+    .venv, __pycache__, .git, etc.) so broad patterns like ``./**/*.py``
+    work without picking up dependency trees.
+    """
+    from initrunner._constants import SKIP_DIRS
+
     files: list[Path] = []
     for pattern in sources:
         if base_dir:
             pattern = str(base_dir / pattern)
         matches = globmod.glob(pattern, recursive=True)
-        files.extend(Path(m) for m in matches if Path(m).is_file())
+        files.extend(
+            Path(m) for m in matches if Path(m).is_file() and not (SKIP_DIRS & set(Path(m).parts))
+        )
     return sorted(set(files))
 
 
@@ -772,6 +781,22 @@ def _merge_managed_sources(config: IngestConfig, agent_name: str) -> tuple[list[
     return files, urls
 
 
+def resolve_full_sources(
+    config: IngestConfig,
+    agent_name: str,
+    base_dir: Path | None = None,
+) -> tuple[list[Path], list[str]]:
+    """Resolve all ingest sources including managed (dashboard uploads/URLs).
+
+    Returns the exact ``(files, urls)`` set that :func:`run_ingest` will process.
+    """
+    files, urls = resolve_sources(config.sources, base_dir=base_dir)
+    managed_files, managed_urls = _merge_managed_sources(config, agent_name)
+    all_files = files + managed_files
+    all_urls = list(dict.fromkeys(urls + managed_urls))  # deduplicate, preserve order
+    return all_files, all_urls
+
+
 def run_ingest(
     config: IngestConfig,
     agent_name: str,
@@ -784,12 +809,7 @@ def run_ingest(
     max_total_ingest_mb: float = 0,
 ) -> IngestStats:
     """Run the full ingestion pipeline synchronously. Returns IngestStats."""
-    files, urls = resolve_sources(config.sources, base_dir=base_dir)
-
-    # Merge managed sources (dashboard uploads/URLs)
-    managed_files, managed_urls = _merge_managed_sources(config, agent_name)
-    all_files = files + managed_files
-    all_urls = list(dict.fromkeys(urls + managed_urls))  # deduplicate, preserve order
+    all_files, all_urls = resolve_full_sources(config, agent_name, base_dir=base_dir)
     all_resolved = {str(p) for p in all_files}
 
     return _execute_ingest_core(

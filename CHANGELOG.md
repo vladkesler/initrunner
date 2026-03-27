@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.46.0] - 2026-03-27
+
+### Added
+- **ChannelAdapter protocol** -- `ChannelAdapter` ABC unifies inbound and outbound messaging for Telegram and Discord with `channel_target` per-conversation routing
+- **`doctor --fix` auto-repair** -- auto-installs missing pip extras, offers API key setup, repairs config, bumps spec_version with surgical text edits. `--fix --yes` for non-interactive CI
+- **`validate --explain`** -- prints plain-language explanations of each role config section (role, model, tools, memory, autonomy, triggers, sinks, output, security) without LLM calls
+- **Rich progress bars** -- auto-ingest and autonomous runs show real-time progress with spinners and file/chunk counts
+- **4 new starters** -- `rag-agent` (document Q&A), `email-agent` (inbox monitoring + triage), `ci-pipeline` (webhook receiver + build analyzer + Slack notifier), `support-desk` (sense-routed intake/researcher/responder/escalator)
+- **Source code extraction** -- ingestion handles 25+ file extensions (.py, .js, .ts, .go, .rs, etc.) with shared SKIP_DIRS filtering
+- **DiceBear avatars** -- deterministic identity avatars (Rings style) in dashboard conversation threads with spinning indicator during streaming
+- **Auto-detect provider in setup** -- setup wizard detects provider from existing API key environment variables
+- **No-arg CLI menu** -- `initrunner` with no arguments shows an interactive menu of common starters
+- **OpenRouter preset** -- preset provider configuration for OpenRouter
+- **Post-command suggestions** -- CLI prints 2-3 copy-paste next-steps after successful commands, actionable error hints with `Hint:` lines (suppressed in non-TTY/JSON)
+- **Orchestration Patterns guide** -- comprehensive documentation with decision tree, YAML examples, and competitive comparison
+
+### Changed
+- **Non-destructive spec_version bump** -- replaces YAML round-trip with regex-based in-place editing that preserves comments, block scalars, and flow-style lists
+
 ## [1.45.1] - 2026-03-27
 
 ### Changed

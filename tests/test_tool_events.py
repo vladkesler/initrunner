@@ -219,11 +219,16 @@ class TestWrapObservable:
 class TestContextVarPlumbing:
     def test_set_and_reset(self):
         """set/reset round-trip restores the previous value."""
-        assert _tool_event_callback.get() is None
-        token = set_tool_event_callback(lambda e: None)
-        assert _tool_event_callback.get() is not None
-        reset_tool_event_callback(token)
-        assert _tool_event_callback.get() is None
+        # Reset to clean state in case of test pollution from prior tests
+        cleanup_token = _tool_event_callback.set(None)
+        try:
+            assert _tool_event_callback.get() is None
+            token = set_tool_event_callback(lambda e: None)
+            assert _tool_event_callback.get() is not None
+            reset_tool_event_callback(token)
+            assert _tool_event_callback.get() is None
+        finally:
+            _tool_event_callback.reset(cleanup_token)
 
 
 # ---------------------------------------------------------------------------

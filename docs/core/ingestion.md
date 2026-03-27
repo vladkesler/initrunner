@@ -332,6 +332,35 @@ search_documents("error handling", source="./docs/api-reference.md")
 
 If no documents have been ingested, the tool returns a message directing the user to run `initrunner ingest`.
 
+## Auto-Ingest on First Run
+
+Roles with `ingest.auto: true` automatically index documents the first time you run them. No separate `initrunner ingest` step needed:
+
+```yaml
+spec:
+  ingest:
+    auto: true
+    sources: ["./**/*.py", "./**/*.md"]
+```
+
+```bash
+cd ~/myproject
+initrunner run my-agent.yaml -i
+# First run: "Indexed 1842 chunks (127 files)."
+# Second run: skips ingestion, store already populated
+```
+
+**How it works:**
+- Auto-ingest fires only when the document store has zero indexed chunks.
+- Subsequent runs skip ingestion entirely (instant startup).
+- Common junk directories (`node_modules`, `.venv`, `__pycache__`, `.git`, `dist`, `build`) are auto-excluded from glob results.
+- Bundled starters resolve glob patterns from your current working directory, not the starter's install location.
+- If the embedding model changed since the last ingest, the run aborts with guidance to run `initrunner ingest <role> --force`.
+
+**Bundled starters with auto-ingest:** `codebase-analyst`, `rag-agent`, `helpdesk`.
+
+To force a re-index after code changes: `initrunner ingest <role> --force`.
+
 ## Zero-Config Ingestion with `run --ingest`
 
 Ingest documents directly from the command line without writing a role file:
@@ -377,7 +406,7 @@ initrunner ingest role.yaml --force
 |------|-------------|
 | `--force` | Force re-ingestion of all files. Also wipes the store when the embedding model has changed. |
 
-The command displays the agent name, a spinner during processing, and the total number of chunks stored on completion.
+The command displays the agent name, a progress bar with per-file status, and the total number of chunks stored on completion. Auto-ingest on first run (`ingest.auto: true`) also shows the same progress bar.
 
 ## Managed Sources (Dashboard)
 

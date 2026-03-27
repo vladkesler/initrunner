@@ -58,14 +58,16 @@ initrunner setup --skip-test
 
 ## How It Works
 
-### 1. Already-Configured Detection
+### 1. Provider Auto-Detection
 
-The wizard checks whether any known provider API key is already set, looking in two places:
+Before showing any menu, the wizard scans for existing API keys in two places:
 
-1. **Environment variables** -- checks each provider's env var (e.g. `OPENAI_API_KEY`).
-2. **Global `.env` file** -- reads `~/.initrunner/.env` via `dotenv_values()`.
+1. **Environment variables** -- checks each provider's env var (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+2. **Global `.env` file** -- reads `~/.initrunner/.env` via `dotenv_values()` (without loading into the process environment).
 
-If a key is found, the wizard reports which variable was detected and uses that provider as the default.
+Detection covers all standard cloud providers (in priority order: Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI), custom presets like OpenRouter (`OPENROUTER_API_KEY`), and Ollama (checks if the server is running locally).
+
+The result determines which provider selection experience the user sees in step 3.
 
 ### 2. Intent Selection
 
@@ -86,7 +88,15 @@ The intent determines which subsequent steps are shown, which tools are pre-sele
 
 ### 3. Provider Selection
 
-When `--provider` is not passed, an interactive prompt lists all 9 supported providers. When `--provider` is passed, the value is validated against the supported list. Unknown providers cause an immediate error.
+When `--provider` is passed, the value is validated against the supported list (including preset names like `openrouter`). Unknown providers cause an immediate error.
+
+When `--provider` is not passed, the wizard uses the auto-detection results from step 1:
+
+- **One provider detected** -- asks for confirmation: `Detected anthropic (ANTHROPIC_API_KEY). Use this provider? [Y/n]`. If declined, shows a chooser with the detected provider(s) plus manual override.
+- **Multiple providers detected** -- shows only the detected providers in a numbered menu, defaulting to the highest-priority one. Any standard provider name can be typed as a manual override.
+- **No providers detected** -- falls back to the full 9-provider menu listing all cloud providers and Ollama.
+
+OpenRouter is included in auto-detection when `OPENROUTER_API_KEY` is set. When selected, the wizard stores canonical runtime config (`provider: openai`, `base_url: https://openrouter.ai/api/v1`, `api_key_env: OPENROUTER_API_KEY`) in `run.yaml`.
 
 ### 4. SDK Check + Auto-Install
 
@@ -221,7 +231,29 @@ memory: true
 name: ephemeral
 ```
 
-This file is loaded by `initrunner run` to pre-configure the ephemeral session. See `cli/chat_config.py` for the full schema.
+For custom endpoints (e.g. OpenRouter), additional fields are included:
+
+```yaml
+provider: openai
+model: anthropic/claude-sonnet-4
+base_url: https://openrouter.ai/api/v1
+api_key_env: OPENROUTER_API_KEY
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | string | *null* | Provider name |
+| `model` | string | *null* | Model identifier |
+| `base_url` | string | *null* | Custom endpoint URL (triggers OpenAI-compatible mode) |
+| `api_key_env` | string | *null* | Environment variable containing the API key |
+| `tool_profile` | string | `minimal` | Tool profile: `none`, `minimal`, or `all` |
+| `memory` | bool | `true` | Enable long-term memory |
+| `tools` | list | `[]` | Extra tool types to enable |
+| `ingest` | list | `[]` | Paths to ingest for RAG |
+| `personality` | string | *null* | Custom system prompt |
+| `name` | string | `ephemeral` | Agent name |
+
+This file is loaded by `initrunner run` to pre-configure the ephemeral session.
 
 ### Generated Role
 

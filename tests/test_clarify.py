@@ -336,8 +336,12 @@ class TestDaemonClarifyRouting:
     def test_answer_bypasses_semaphore(self):
         """When a clarification is pending, the answer does not acquire the semaphore."""
         from initrunner.runner.daemon import PendingClarification
-        from initrunner.triggers.base import TriggerEvent
+        from initrunner.triggers.base import (
+            TriggerEvent,
+            register_conversational_trigger_type,
+        )
 
+        register_conversational_trigger_type("telegram")
         runner = self._make_runner()
         # TriggerEvent.conversation_key is derived from metadata
         conv_key = "telegram:12345"
@@ -355,7 +359,7 @@ class TestDaemonClarifyRouting:
         event = TriggerEvent(
             prompt="The answer is 42",
             trigger_type="telegram",
-            metadata={"chat_id": "12345"},
+            metadata={"channel_target": "12345"},
         )
         assert event.conversation_key == conv_key
         runner._on_trigger(event)
@@ -370,8 +374,12 @@ class TestDaemonClarifyRouting:
     def test_answer_does_not_start_new_run(self):
         """A clarification answer should not trigger a new agent run."""
         from initrunner.runner.daemon import PendingClarification
-        from initrunner.triggers.base import TriggerEvent
+        from initrunner.triggers.base import (
+            TriggerEvent,
+            register_conversational_trigger_type,
+        )
 
+        register_conversational_trigger_type("telegram")
         runner = self._make_runner()
         conv_key = "telegram:67890"
 
@@ -382,7 +390,7 @@ class TestDaemonClarifyRouting:
         event = TriggerEvent(
             prompt="my answer",
             trigger_type="telegram",
-            metadata={"chat_id": "67890"},
+            metadata={"channel_target": "67890"},
         )
         runner._on_trigger(event)
 

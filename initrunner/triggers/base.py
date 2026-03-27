@@ -11,7 +11,12 @@ from datetime import UTC, datetime
 
 _logger = logging.getLogger(__name__)
 
-CONVERSATIONAL_TRIGGER_TYPES: frozenset[str] = frozenset({"telegram", "discord"})
+CONVERSATIONAL_TRIGGER_TYPES: set[str] = set()
+
+
+def register_conversational_trigger_type(platform: str) -> None:
+    """Register a platform as conversational (has reply_fn, conversation history)."""
+    CONVERSATIONAL_TRIGGER_TYPES.add(platform)
 
 
 @dataclass
@@ -27,12 +32,9 @@ class TriggerEvent:
     @property
     def conversation_key(self) -> str | None:
         """Unique key for conversational triggers, None for stateless ones."""
-        if self.trigger_type == "telegram":
-            chat_id = self.metadata.get("chat_id")
-            return f"telegram:{chat_id}" if chat_id else None
-        if self.trigger_type == "discord":
-            channel_id = self.metadata.get("channel_id")
-            return f"discord:{channel_id}" if channel_id else None
+        target = self.metadata.get("channel_target")
+        if target and self.trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+            return f"{self.trigger_type}:{target}"
         return None
 
 
@@ -77,3 +79,50 @@ class TriggerBase(ABC):
     @abstractmethod
     def _run(self) -> None:
         """Main loop — must check self._stop_event regularly."""
+
+
+class ChannelAdapter(ABC):
+    """Bidirectional adapter for a messaging platform.
+
+    Unifies inbound (listen) and outbound (send) into a single per-platform
+    class. Implementations handle their own async event loop internally.
+    """
+
+    @property
+    @abstractmethod
+    def platform(self) -> str:
+        """Platform identifier (e.g. 'telegram', 'discord')."""
+
+    @abstractmethod
+    def start(self, callback: Callable[[TriggerEvent], None]) -> None:
+        """Block and listen for inbound messages, calling *callback* for each.
+
+        Only returns when :meth:`stop` is called from another thread.
+        """
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Signal shutdown. :meth:`start` must return promptly after this."""
+
+    @abstractmethod
+    def send(self, target: str, text: str) -> None:
+        """Send a message to an opaque adapter-defined route token.
+
+        Thread-safe. Best-effort: must never raise.
+        """
+
+
+class ChannelTriggerBridge(TriggerBase):
+    """Wraps a :class:`ChannelAdapter` so it satisfies :class:`TriggerBase`."""
+
+    def __init__(self, adapter: ChannelAdapter, callback: Callable[[TriggerEvent], None]) -> None:
+        super().__init__(callback)
+        self._adapter = adapter
+        register_conversational_trigger_type(adapter.platform)
+
+    def _run(self) -> None:
+        self._adapter.start(self._callback)
+
+    def stop(self) -> None:
+        self._adapter.stop()
+        super().stop()

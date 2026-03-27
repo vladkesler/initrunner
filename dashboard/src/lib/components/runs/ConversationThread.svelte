@@ -2,6 +2,7 @@
 	import type { ThreadMessage } from '$lib/api/types';
 	import type { Snippet } from 'svelte';
 	import { OctagonX, CircleStop, Play } from 'lucide-svelte';
+	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 
 	let {
 		messages = [],
@@ -43,7 +44,10 @@
 				{#if msg.role === 'user'}
 					<!-- User turn -->
 					<div class="flex flex-col gap-1.5">
-						<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">You</span>
+						<div class="flex items-center gap-2">
+							<SeedAvatar seed={msg.identityLabel ?? 'You'} />
+							<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? 'You'}</span>
+						</div>
 						<div class="border-l-2 border-accent-primary/30 bg-accent-primary/[0.03] px-4 py-2.5">
 							<pre class="select-text cursor-text whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-fg">{msg.content}</pre>
 						</div>
@@ -51,7 +55,10 @@
 				{:else}
 					<!-- Agent turn -->
 					<div class="flex flex-col gap-1.5">
-						<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{assistantLabel}</span>
+						<div class="flex items-center gap-2">
+							<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
+							<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? assistantLabel}</span>
+						</div>
 						<div
 							class="bg-surface-1 px-4 py-3 transition-[border-color,box-shadow] duration-200"
 							class:border-l-2={msg.status === 'streaming'}

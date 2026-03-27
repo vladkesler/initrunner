@@ -9,8 +9,8 @@
   <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.45.0-%2334D058" alt="v1.45.0">
+  <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/latest-v1.46.0-%2334D058" alt="v1.46.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -21,12 +21,14 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A Telegram bot that supports your users 24/7 with persistent memory.
+**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A research team that plans queries, searches the web, and writes cited reports. A monitoring daemon that learns what "normal" looks like over time.
 
 Each one is a single command:
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
+initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research team
+initrunner run codebase-analyst -i                            # index & chat with your code
 initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
 initrunner run web-researcher -p "Compare React vs Svelte"    # web research with citations
 initrunner run telegram-assistant --daemon                     # Telegram bot with memory
@@ -35,7 +37,7 @@ initrunner run discord-assistant --daemon                      # Discord bot wit
 
 Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v1.45.1** -- Streamlined setup wizard (provider + model only, dashboard handoff), starters use your configured provider. See the [Changelog](CHANGELOG.md).
+> **v1.46.0** -- ChannelAdapter protocol for bidirectional Telegram/Discord, doctor --fix auto-repair, validate --explain, Rich progress bars, 4 new starters, post-command suggestions. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -64,9 +66,33 @@ Or install with a package manager: `uv pip install "initrunner[recommended]"` / 
 
 ### Try a starter agent
 
-Run `initrunner run` to see all available starters, or try any of the examples above. The model is auto-detected from your API key. Override with `--model anthropic:claude-sonnet-4-5-20250929`.
+Run `initrunner run --list` to see all available starters. The model is auto-detected from your API key.
 
-Want to customize a starter? Copy it locally and edit:
+| Starter | What it does | Kind |
+|---------|-------------|------|
+| `helpdesk` | Drop your docs in, get an AI helpdesk with citations and memory | Agent (RAG) |
+| `code-review-team` | Multi-perspective review: architect, security, maintainer | Team |
+| `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer with shared memory | Team |
+| `codebase-analyst` | Index your repo, chat about architecture, learns patterns across sessions | Agent (RAG) |
+| `web-researcher` | Search the web and produce structured briefings with citations | Agent |
+| `content-pipeline` | Topic researcher, writer, editor/fact-checker via webhook or cron | Compose |
+| `project-monitor` | Heartbeat-driven health checks, learns baselines over time | Agent (Daemon) |
+| `telegram-assistant` | Telegram bot with memory and web search | Agent (Daemon) |
+| `discord-assistant` | Discord bot with memory and web search | Agent (Daemon) |
+| `rag-agent` | Document Q&A agent with ingestion and citations | Agent (RAG) |
+| `memory-assistant` | Personal assistant that learns and remembers across sessions | Agent |
+| `email-agent` | Monitors inbox, triages messages, drafts replies, alerts Slack on urgent mail | Agent (Daemon) |
+| `ci-pipeline` | Webhook receiver, build analyzer, Slack notifier for CI events | Compose |
+| `support-desk` | Sense-routed intake, researcher, responder, and escalator | Compose |
+
+RAG starters auto-ingest on first run -- just `cd` into your project and go:
+
+```bash
+cd ~/myproject
+initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
+```
+
+Want to customize? Copy locally and edit:
 
 ```bash
 initrunner run helpdesk --save ./my-helpdesk/
@@ -169,22 +195,23 @@ Start with the code-reviewer above. Each step adds one capability - no rewrites,
 
 ### Knowledge & memory
 
-Point at your docs for RAG - a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
+Point at your docs for RAG - a `search_documents` tool is auto-registered. Set `auto: true` and it indexes on first run, no extra step:
 
 ```yaml
 spec:
   ingest:
+    auto: true
     sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
   memory:
-    store_path: ./memory.db
     semantic:
       max_memories: 1000
 ```
 
 ```bash
-initrunner ingest role.yaml   # extract | chunk | embed | store
-initrunner run role.yaml -i --resume   # search_documents + memory ready
+initrunner run role.yaml -i   # auto-ingests on first run, then search_documents + memory ready
 ```
+
+Common junk directories (`node_modules`, `.venv`, `__pycache__`, `.git`) are auto-excluded from glob patterns. Or ingest manually: `initrunner ingest role.yaml`.
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
@@ -272,7 +299,7 @@ spec:
     responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up compose.yaml`. See [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
+Run with `initrunner compose up compose.yaml`. See [Orchestration Patterns](docs/orchestration/patterns-guide.md) for all five patterns side-by-side, or dive into [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
 ## User Interfaces
 
@@ -395,7 +422,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
+| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Deprecations](docs/operations/deprecations.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
@@ -415,7 +442,7 @@ The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills,
 
 Role YAML files now include `metadata.spec_version` to track schema compatibility. When InitRunner removes or renames a config field, the deprecation system gives a clear error message pointing to the fix instead of a cryptic validation failure.
 
-Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
+Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. Add `--fix` to auto-install missing SDKs, install required extras for your role's tools/triggers, and bump `spec_version` -- or `--fix --yes` for non-interactive CI. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
 
 ## Community & Contributing
 
@@ -431,4 +458,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.45.0</sub></p>
+<p align="center"><sub>v1.46.0</sub></p>

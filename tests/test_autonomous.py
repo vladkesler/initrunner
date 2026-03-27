@@ -117,12 +117,18 @@ class TestAutonomousWallClockTimeout:
                 [],
             )
 
+        import io
+
+        from rich.console import Console as _Console
+
+        quiet_console = _Console(file=io.StringIO())
+
         with (
             patch("initrunner.runner.autonomous.execute_run", side_effect=slow_execute_run),
             patch("initrunner.runner.autonomous._display_autonomous_header"),
             patch("initrunner.runner.autonomous._display_iteration_result"),
             patch("initrunner.runner.autonomous._display_autonomous_summary"),
-            patch("initrunner.runner.autonomous.console"),
+            patch("initrunner.runner.autonomous.console", quiet_console),
         ):
             from initrunner.runner.autonomous import run_autonomous
 
@@ -508,6 +514,9 @@ class TestConversationalTriggerEarlyExit:
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("telegram")
 
         result_with_tools = RunResult(run_id="r1", output="Here's your answer", tool_calls=2)
 
@@ -539,6 +548,9 @@ class TestConversationalTriggerEarlyExit:
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
+        from initrunner.triggers.base import register_conversational_trigger_type
+
+        register_conversational_trigger_type("discord")
 
         result_no_tools = RunResult(run_id="r1", output="Done", tool_calls=0)
 

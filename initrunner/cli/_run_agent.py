@@ -11,8 +11,10 @@ import typer
 from initrunner.cli._helpers import (
     command_context,
     console,
+    ingest_status_color,
     resolve_model_override,
     resolve_skill_dirs,
+    suggest_next,
 )
 
 if TYPE_CHECKING:
@@ -201,6 +203,48 @@ def _run_agent(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        # Auto-ingest on first run (opt-in via ingest.auto: true)
+        if role.spec.ingest is not None and role.spec.ingest.auto and not dry_run:
+            from initrunner.services.ingest import auto_ingest_if_needed, resolve_auto_ingest_total
+
+            ingest_total = resolve_auto_ingest_total(role, role_file)
+            if ingest_total is not None:
+                from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+                with Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    console=console,
+                ) as progress:
+                    ptask = progress.add_task("Auto-ingesting", total=ingest_total)
+
+                    def _on_ingest_progress(path: Path, status: object) -> None:
+                        progress.update(
+                            ptask,
+                            advance=1,
+                            description=f"[{ingest_status_color(status)}]{path.name}",
+                        )
+
+                    try:
+                        stats = auto_ingest_if_needed(
+                            role, role_file, progress_callback=_on_ingest_progress
+                        )
+                    except Exception as exc:
+                        from initrunner.stores.base import EmbeddingModelChangedError
+
+                        if isinstance(exc, EmbeddingModelChangedError):
+                            console.print(f"[red]Error:[/red] {exc}")
+                            console.print("[dim]Run: initrunner ingest <role> --force[/dim]")
+                            raise typer.Exit(1) from None
+                        raise
+
+                if stats is not None:
+                    console.print(
+                        f"Indexed [cyan]{stats.total_chunks}[/cyan] chunks "
+                        f"({stats.new} new, {stats.updated} updated)."
+                    )
+
         if not prompt and not autonomous and role.spec.triggers:
             console.print(
                 "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"
@@ -275,6 +319,7 @@ def _run_agent(
                 model_override=model_override,
                 stream=use_stream,
             )
+            suggest_next("run_repl_exit", role, role_file)
         else:
             run_interactive(
                 agent,
@@ -286,7 +331,13 @@ def _run_agent(
                 model_override=model_override,
                 stream=use_stream,
             )
+            suggest_next("run_repl_exit", role, role_file)
 
         # Export for non-interactive branches (after run completes)
         if report is not None and run_result is not None and not (user_prompt and interactive):
             _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+
+        # Suggest next steps for non-interactive rich/stream runs (after report export)
+        if run_result is not None and effective not in ("text", "json") and not interactive:
+            ctx = "run_autonomous" if autonomous else "run_single"
+            suggest_next(ctx, role, role_file)

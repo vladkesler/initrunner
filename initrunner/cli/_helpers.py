@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import typer
 from rich.console import Console
@@ -19,6 +20,19 @@ if TYPE_CHECKING:
     from initrunner.services.role_selector import SelectionResult
 
 console = Console()
+
+
+def ingest_status_color(status: object) -> str:
+    """Map a :class:`~initrunner.ingestion.pipeline.FileStatus` to a Rich color."""
+    from initrunner.ingestion.pipeline import FileStatus
+
+    return {  # type: ignore[no-matching-overload]
+        FileStatus.NEW: "green",
+        FileStatus.UPDATED: "yellow",
+        FileStatus.SKIPPED: "dim",
+        FileStatus.ERROR: "red",
+    }.get(status, "white")
+
 
 _INITRUNNER_API_VERSIONS = {"initrunner/v1"}
 _INITRUNNER_KINDS = {"Agent", "Team"}
@@ -72,6 +86,10 @@ def resolve_role_path(path: Path) -> Path:
 
         if len(candidates) == 0:
             console.print(f"[red]Error:[/red] No role YAML found in {path}")
+            console.print(
+                "[dim]Hint:[/dim] Create one with [bold]initrunner new[/bold],"
+                " or run [bold]initrunner examples[/bold]."
+            )
             raise typer.Exit(1)
 
         names = ", ".join(sorted(c.name for c in candidates))
@@ -87,6 +105,9 @@ def resolve_role_path(path: Path) -> Path:
         resolved = resolve_installed_path(str(path))
     except RegistryError as exc:
         console.print(f"[red]Error:[/red] {exc}")
+        console.print(
+            "[dim]Hint:[/dim] Run [bold]initrunner examples[/bold] to see available starters."
+        )
         raise typer.Exit(1) from None
 
     if resolved is not None:
@@ -100,6 +121,9 @@ def resolve_role_path(path: Path) -> Path:
         return starter_path
 
     console.print(f"[red]Error:[/red] Path not found: {path}")
+    console.print(
+        "[dim]Hint:[/dim] Check the path, or run [bold]initrunner examples[/bold] to see starters."
+    )
     raise typer.Exit(1)
 
 
@@ -209,6 +233,83 @@ def display_sense_result(result: SelectionResult) -> None:
         table.add_row("Reason", escape(c.reason))
 
     console.print(Panel(table, title="[bold]Intent Sensing[/bold]", border_style="dim"))
+
+
+def handle_api_key(
+    env_var: str,
+    env_path: os.PathLike,
+    *,
+    validate_provider: str | None,
+) -> None:
+    """Prompt for, validate, and persist an API key.
+
+    Shared between ``setup`` and ``doctor --fix`` to avoid duplicating the
+    env vs dotenv detection logic.
+    """
+    from dotenv import dotenv_values, set_key
+    from rich.prompt import Prompt
+
+    from initrunner.config import get_global_env_path, get_home_dir
+    from initrunner.services.setup import validate_api_key as _validate_api_key
+
+    env_path = Path(env_path)
+
+    has_provider_key = bool(os.environ.get(env_var))
+    if not has_provider_key and env_path.is_file():
+        has_provider_key = bool(dotenv_values(env_path).get(env_var))
+
+    if has_provider_key:
+        console.print(
+            f"[green]Using existing {env_var}.[/green] "
+            f"[dim]Edit {get_global_env_path()} to change it.[/dim]"
+        )
+        return
+
+    existing_in_env = os.environ.get(env_var)
+    existing_in_dotenv = None
+    if env_path.is_file():
+        existing_in_dotenv = dotenv_values(env_path).get(env_var)
+
+    if existing_in_env:
+        console.print(f"[green]Found {env_var} in environment.[/green]")
+        if not typer.confirm("Keep this key?", default=True):
+            existing_in_env = None
+
+    if existing_in_env:
+        api_key = existing_in_env
+    elif existing_in_dotenv:
+        console.print(f"[green]Found {env_var} in {env_path}[/green]")
+        if typer.confirm("Keep this key?", default=True):
+            api_key = existing_in_dotenv
+        else:
+            api_key = Prompt.ask(f"Enter your {env_var}", password=True)
+    else:
+        api_key = Prompt.ask(f"Enter your {env_var}", password=True)
+
+    # Validate the key
+    if validate_provider is not None:
+        with console.status("Validating API key..."):
+            valid = _validate_api_key(validate_provider, api_key)
+        if valid:
+            console.print("[green]API key is valid.[/green]")
+        else:
+            console.print("[yellow]Warning:[/yellow] API key validation failed.")
+            if typer.confirm("Re-enter the key?", default=True):
+                api_key = Prompt.ask(f"Enter your {env_var}", password=True)
+
+    # Write to .env if key is not already in the env
+    if not os.environ.get(env_var):
+        try:
+            home_dir = get_home_dir()
+            home_dir.mkdir(parents=True, exist_ok=True)
+            set_key(str(env_path), env_var, api_key)
+            env_path.chmod(0o600)
+            console.print(f"Saved to [cyan]{env_path}[/cyan]")
+        except (PermissionError, OSError) as exc:
+            console.print(
+                f"[yellow]Warning:[/yellow] Could not write {env_path}: {exc}\n"
+                f"Set it manually: [bold]export {env_var}={api_key}[/bold]"
+            )
 
 
 def install_extra(extra: str) -> bool:
@@ -330,6 +431,9 @@ def load_role_or_exit(role_file: Path) -> RoleDefinition:
         return load_role_sync(role_file)
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+        )
         raise typer.Exit(1) from None
 
 
@@ -360,6 +464,9 @@ def load_and_build_or_exit(
         )
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+        )
         raise typer.Exit(1) from None
 
 
@@ -503,3 +610,68 @@ def command_context(
                 from initrunner.observability import shutdown_tracing
 
                 shutdown_tracing()
+
+
+_NextContext = Literal["run_single", "run_autonomous", "run_repl_exit", "ingest", "validate"]
+
+
+def suggest_next(context: _NextContext, role: RoleDefinition, role_path: Path) -> None:
+    """Print 2-3 contextual next-step suggestions after a command."""
+    if not sys.stdout.isatty():
+        return
+
+    try:
+        role_ref = str(role_path.relative_to(Path.cwd()))
+    except ValueError:
+        role_ref = str(role_path)
+
+    suggestions: list[tuple[str, str]] = []
+
+    if context == "run_single":
+        suggestions.append((f"initrunner run {role_ref} -i", "interactive REPL"))
+        if role.spec.autonomy:
+            suggestions.append((f'initrunner run {role_ref} -a -p "..."', "autonomous mode"))
+        else:
+            suggestions.append(
+                (
+                    f'initrunner run {role_ref} --report report.md -p "..."',
+                    "export a report",
+                )
+            )
+
+    elif context == "run_repl_exit":
+        if role.spec.ingest:
+            suggestions.append((f"initrunner ingest {role_ref}", "re-ingest documents"))
+        if role.spec.memory:
+            suggestions.append((f"initrunner memory list {role_ref}", "view stored memories"))
+        if role.spec.autonomy:
+            suggestions.append((f'initrunner run {role_ref} -a -p "..."', "autonomous mode"))
+
+    elif context == "run_autonomous":
+        suggestions.append((f"initrunner run {role_ref} -i", "continue interactively"))
+        if role.spec.memory:
+            suggestions.append((f"initrunner memory list {role_ref}", "view stored memories"))
+        suggestions.append(
+            (
+                f'initrunner run {role_ref} --report report.md -a -p "..."',
+                "export a report",
+            )
+        )
+
+    elif context == "ingest":
+        suggestions.append((f'initrunner run {role_ref} -p "..."', "run the agent"))
+        suggestions.append((f"initrunner validate {role_ref}", "re-validate role"))
+
+    elif context == "validate":
+        suggestions.append((f'initrunner run {role_ref} -p "..."', "run the agent"))
+        if role.spec.ingest:
+            suggestions.append((f"initrunner ingest {role_ref}", "ingest documents"))
+        suggestions.append((f"initrunner doctor --role {role_ref}", "smoke-test provider"))
+
+    if not suggestions:
+        return
+
+    console.print()
+    console.print("[dim]Next steps:[/dim]")
+    for cmd, desc in suggestions[:3]:
+        console.print(f"  [bold]{cmd}[/bold]  [dim]# {desc}[/dim]")

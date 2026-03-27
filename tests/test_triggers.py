@@ -1,6 +1,7 @@
 """Tests for the trigger system."""
 
 import time
+from unittest.mock import MagicMock, patch
 
 from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
@@ -8,7 +9,13 @@ from initrunner.agent.schema.triggers import (
     FileWatchTriggerConfig,
     TelegramTriggerConfig,
 )
-from initrunner.triggers.base import TriggerEvent
+from initrunner.triggers.base import (
+    CONVERSATIONAL_TRIGGER_TYPES,
+    ChannelAdapter,
+    ChannelTriggerBridge,
+    TriggerEvent,
+    register_conversational_trigger_type,
+)
 from initrunner.triggers.cron import CronTrigger
 from initrunner.triggers.dispatcher import TriggerDispatcher
 from initrunner.triggers.file_watcher import FileWatchTrigger
@@ -40,19 +47,21 @@ class TestTriggerEvent:
         )
         assert event.reply_fn is None
 
-    def test_conversation_key_telegram(self):
+    def test_conversation_key_via_channel_target(self):
+        register_conversational_trigger_type("telegram")
         event = TriggerEvent(
             trigger_type="telegram",
             prompt="hi",
-            metadata={"chat_id": "12345"},
+            metadata={"channel_target": "12345"},
         )
         assert event.conversation_key == "telegram:12345"
 
-    def test_conversation_key_discord(self):
+    def test_conversation_key_discord_via_channel_target(self):
+        register_conversational_trigger_type("discord")
         event = TriggerEvent(
             trigger_type="discord",
             prompt="hi",
-            metadata={"channel_id": "67890"},
+            metadata={"channel_target": "67890"},
         )
         assert event.conversation_key == "discord:67890"
 
@@ -60,12 +69,157 @@ class TestTriggerEvent:
         event = TriggerEvent(trigger_type="cron", prompt="test")
         assert event.conversation_key is None
 
-    def test_conversation_key_missing_metadata_returns_none(self):
+    def test_conversation_key_missing_channel_target_returns_none(self):
+        register_conversational_trigger_type("telegram")
         event = TriggerEvent(trigger_type="telegram", prompt="hi")
         assert event.conversation_key is None
 
-        event2 = TriggerEvent(trigger_type="discord", prompt="hi")
-        assert event2.conversation_key is None
+    def test_conversation_key_non_conversational_returns_none(self):
+        event = TriggerEvent(
+            trigger_type="webhook",
+            prompt="hi",
+            metadata={"channel_target": "12345"},
+        )
+        assert event.conversation_key is None
+
+
+class TestChannelTriggerBridge:
+    """Tests for the ChannelTriggerBridge wrapping a ChannelAdapter."""
+
+    @staticmethod
+    def _make_mock_adapter(platform: str = "test_platform") -> MagicMock:
+        adapter = MagicMock(spec=ChannelAdapter)
+        adapter.platform = platform
+        return adapter
+
+    def test_registers_platform_on_construction(self):
+        adapter = self._make_mock_adapter("myplatform")
+        ChannelTriggerBridge(adapter, lambda e: None)
+        assert "myplatform" in CONVERSATIONAL_TRIGGER_TYPES
+
+    def test_run_delegates_to_adapter_start(self):
+        adapter = self._make_mock_adapter()
+        cb = lambda e: None  # noqa: E731
+        bridge = ChannelTriggerBridge(adapter, cb)
+        bridge._run()
+        adapter.start.assert_called_once_with(cb)
+
+    def test_stop_delegates_to_adapter_stop(self):
+        adapter = self._make_mock_adapter()
+        bridge = ChannelTriggerBridge(adapter, lambda e: None)
+        bridge._thread = None  # no thread to join
+        bridge.stop()
+        adapter.stop.assert_called_once()
+
+    def test_adapter_accessible(self):
+        adapter = self._make_mock_adapter()
+        bridge = ChannelTriggerBridge(adapter, lambda e: None)
+        assert bridge._adapter is adapter
+
+
+class TestTelegramAdapterSend:
+    """Tests for TelegramAdapter.send() method."""
+
+    def test_send_noop_before_start(self):
+        from initrunner.triggers.telegram import TelegramAdapter
+
+        adapter = TelegramAdapter(TelegramTriggerConfig())
+        # Should not raise
+        adapter.send("12345", "hello")
+
+    def test_send_delegates_to_bot(self):
+        from initrunner.triggers.telegram import TelegramAdapter
+
+        adapter = TelegramAdapter(TelegramTriggerConfig())
+        mock_bot = MagicMock()
+        mock_loop = MagicMock()
+        mock_future = MagicMock()
+
+        adapter._bot = mock_bot
+        adapter._loop = mock_loop
+
+        tg_rcts = "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe"
+        with patch(tg_rcts, return_value=mock_future) as mock_rcts:
+            adapter.send("12345", "hello")
+
+        mock_rcts.assert_called_once()
+        mock_future.add_done_callback.assert_called_once()
+
+    def test_send_chunks_long_messages(self):
+        from initrunner.triggers.telegram import TelegramAdapter
+
+        adapter = TelegramAdapter(TelegramTriggerConfig())
+        mock_bot = MagicMock()
+        mock_loop = MagicMock()
+        mock_future = MagicMock()
+
+        adapter._bot = mock_bot
+        adapter._loop = mock_loop
+
+        long_text = "x" * 5000  # exceeds 4096 limit
+
+        tg_rcts = "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe"
+        with patch(tg_rcts, return_value=mock_future) as mock_rcts:
+            adapter.send("12345", long_text)
+
+        assert mock_rcts.call_count == 2  # chunked into 2
+
+    def test_send_never_raises(self):
+        from initrunner.triggers.telegram import TelegramAdapter
+
+        adapter = TelegramAdapter(TelegramTriggerConfig())
+        adapter._bot = MagicMock()
+        adapter._loop = MagicMock()
+
+        with patch(
+            "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe",
+            side_effect=RuntimeError("boom"),
+        ):
+            # Should not raise
+            adapter.send("12345", "hello")
+
+
+class TestDiscordAdapterSend:
+    """Tests for DiscordAdapter.send() method."""
+
+    def test_send_noop_before_start(self):
+        from initrunner.triggers.discord import DiscordAdapter
+
+        adapter = DiscordAdapter(DiscordTriggerConfig())
+        # Should not raise
+        adapter.send("67890", "hello")
+
+    def test_send_delegates_to_client(self):
+        from initrunner.triggers.discord import DiscordAdapter
+
+        adapter = DiscordAdapter(DiscordTriggerConfig())
+        mock_client = MagicMock()
+        mock_loop = MagicMock()
+        mock_future = MagicMock()
+
+        adapter._client = mock_client
+        adapter._loop = mock_loop
+
+        dc_rcts = "initrunner.triggers.discord.asyncio.run_coroutine_threadsafe"
+        with patch(dc_rcts, return_value=mock_future) as mock_rcts:
+            adapter.send("67890", "hello")
+
+        mock_rcts.assert_called_once()
+        mock_future.add_done_callback.assert_called_once()
+
+    def test_send_never_raises(self):
+        from initrunner.triggers.discord import DiscordAdapter
+
+        adapter = DiscordAdapter(DiscordTriggerConfig())
+        adapter._client = MagicMock()
+        adapter._loop = MagicMock()
+
+        with patch(
+            "initrunner.triggers.discord.asyncio.run_coroutine_threadsafe",
+            side_effect=RuntimeError("boom"),
+        ):
+            # Should not raise
+            adapter.send("67890", "hello")
 
 
 class TestCronTrigger:
@@ -212,6 +366,22 @@ class TestTriggerDispatcher:
         configs = [DiscordTriggerConfig(allowed_user_ids=["111222333"])]
         dispatcher = TriggerDispatcher(configs, lambda e: None)
         assert dispatcher.count == 1
+
+    def test_telegram_builder_returns_channel_bridge(self, monkeypatch):
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+        configs = [TelegramTriggerConfig()]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        trigger = dispatcher._triggers[0]
+        assert isinstance(trigger, ChannelTriggerBridge)
+        assert "telegram" in CONVERSATIONAL_TRIGGER_TYPES
+
+    def test_discord_builder_returns_channel_bridge(self, monkeypatch):
+        monkeypatch.setenv("DISCORD_BOT_TOKEN", "fake-token")
+        configs = [DiscordTriggerConfig()]
+        dispatcher = TriggerDispatcher(configs, lambda e: None)
+        trigger = dispatcher._triggers[0]
+        assert isinstance(trigger, ChannelTriggerBridge)
+        assert "discord" in CONVERSATIONAL_TRIGGER_TYPES
 
 
 class TestTelegramFiltering:

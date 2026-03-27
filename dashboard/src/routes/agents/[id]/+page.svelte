@@ -325,7 +325,7 @@
 			</TabsList>
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
-				<RunPanel agentId={agentId} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }} />
+				<RunPanel agentId={agentId} agentName={detail.name} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }} />
 			</TabsContent>
 
 			<TabsContent value="history" class="min-h-0 flex-1 pt-4">

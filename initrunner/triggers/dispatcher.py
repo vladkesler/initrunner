@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from initrunner.triggers.base import TriggerBase, TriggerEvent
+from initrunner.triggers.base import ChannelTriggerBridge, TriggerBase, TriggerEvent
 
 # ---------------------------------------------------------------------------
 # Trigger builder registry
@@ -66,15 +66,15 @@ def _register_builtins() -> None:
 
     @register_trigger_builder(TelegramTriggerConfig)
     def _build_telegram(config, callback):
-        from initrunner.triggers.telegram import TelegramTrigger
+        from initrunner.triggers.telegram import TelegramAdapter
 
-        return TelegramTrigger(config, callback)
+        return ChannelTriggerBridge(TelegramAdapter(config), callback)
 
     @register_trigger_builder(DiscordTriggerConfig)
     def _build_discord(config, callback):
-        from initrunner.triggers.discord import DiscordTrigger
+        from initrunner.triggers.discord import DiscordAdapter
 
-        return DiscordTrigger(config, callback)
+        return ChannelTriggerBridge(DiscordAdapter(config), callback)
 
     @register_trigger_builder(HeartbeatTriggerConfig)
     def _build_heartbeat(config, callback):

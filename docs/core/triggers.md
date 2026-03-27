@@ -243,6 +243,43 @@ When `active_hours` is set, the trigger only fires during the specified window:
 
 No new dependencies — uses stdlib `zoneinfo` (Python 3.9+).
 
+## Channel Adapter Protocol
+
+Telegram and Discord are implemented as **channel adapters** -- bidirectional adapters that handle both inbound (listening) and outbound (sending) in a single class. The `ChannelAdapter` ABC in `initrunner/triggers/base.py` defines the protocol:
+
+```python
+class ChannelAdapter(ABC):
+    @property
+    def platform(self) -> str: ...       # e.g. "telegram", "discord"
+    def start(self, callback) -> None: ...  # block and listen for inbound
+    def stop(self) -> None: ...             # signal shutdown
+    def send(self, target, text) -> None: ...  # send to a route token
+```
+
+### Adding a New Channel
+
+To add a new messaging platform (e.g. Slack, WhatsApp), implement `ChannelAdapter`:
+
+1. Create `initrunner/triggers/myplatform.py` with a class implementing `ChannelAdapter`.
+2. `start(callback)` must block and call `callback(TriggerEvent(...))` for each inbound message. Set `metadata["channel_target"]` to an opaque route token identifying the conversation.
+3. `send(target, text)` sends a message to the given route token. Must be thread-safe and never raise.
+4. Register a builder in `initrunner/triggers/dispatcher.py`:
+   ```python
+   @register_trigger_builder(MyPlatformTriggerConfig)
+   def _build_myplatform(config, callback):
+       from initrunner.triggers.myplatform import MyPlatformAdapter
+       return ChannelTriggerBridge(MyPlatformAdapter(config), callback)
+   ```
+5. `ChannelTriggerBridge` handles threading and auto-registers the platform as conversational.
+
+### Shared Metadata
+
+Channel adapters set `channel_target` in trigger event metadata. This is used by:
+- `TriggerEvent.conversation_key` for conversation history routing
+- `ChannelSinkBridge` (in `initrunner/sinks/base.py`) for outbound sink delivery
+
+The `channel_target` value is opaque to the framework -- adapters can encode chat IDs, thread IDs, DM channels, or any platform-specific route.
+
 ## Daemon Mode
 
 The `initrunner run <role> --daemon` command starts all configured triggers and waits for events:
@@ -314,7 +351,7 @@ Every trigger fires a `TriggerEvent` containing:
 | `trigger_type` | `str` | `"cron"`, `"file_watch"`, `"webhook"`, `"heartbeat"`, `"telegram"`, or `"discord"` |
 | `prompt` | `str` | The prompt to send to the agent |
 | `timestamp` | `str` | ISO 8601 timestamp of when the event was created |
-| `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, user, etc.) |
+| `metadata` | `dict[str, str]` | Type-specific metadata (schedule, path, user, etc.). Channel adapters always include `channel_target`. |
 | `reply_fn` | `Callable \| None` | Optional callback to send the agent's response back to the originating channel |
 
 ## Dashboard Monitoring
@@ -372,12 +409,12 @@ triggers:
 - When `allowed_users` or `allowed_user_ids` is set, messages from unmatched users are silently dropped. Access is granted if the user matches **either** field (union semantics).
 - The agent's response is sent back to the originating chat, automatically chunked to Telegram's 4096-character message limit.
 - Chunks are split at newline boundaries when possible for cleaner output.
-- The trigger event includes `metadata: {"user": "...", "chat_id": "...", "user_id": "..."}`.
+- The trigger event includes `metadata: {"channel_target": "...", "user": "...", "chat_id": "...", "user_id": "..."}`.
 
 ### Security
 
-- **Store the bot token securely** — use environment variables or a secrets manager, never commit it to version control.
-- **Prefer `allowed_user_ids`** over `allowed_users` — user IDs are immutable. Use `allowed_users` as a convenience alongside IDs.
+- **Store the bot token securely** -- use environment variables or a secrets manager, never commit it to version control.
+- **Prefer `allowed_user_ids`** over `allowed_users` -- user IDs are immutable. Use `allowed_users` as a convenience alongside IDs.
 - **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.
 
 ## Discord Trigger
@@ -421,11 +458,11 @@ triggers:
 - When both `allowed_roles` and `allowed_user_ids` are set, access is granted if either matches (union semantics for guild messages; user ID only for DMs).
 - Bot @mention is stripped from the message content using the mention ID pattern for robustness.
 - The agent's response is sent back to the originating channel, automatically chunked to Discord's 2000-character message limit.
-- The trigger event includes `metadata: {"user": "...", "channel_id": "...", "user_id": "..."}`.
+- The trigger event includes `metadata: {"channel_target": "...", "user": "...", "channel_id": "...", "user_id": "..."}`.
 
 ### Security
 
-- **Store the bot token securely** — never commit it to version control.
+- **Store the bot token securely** -- never commit it to version control.
 - **Use `allowed_user_ids`** for reliable per-user access control that works in both guild channels and DMs.
 - **Use `channel_ids`** to restrict the bot to specific guild channels.
 - **Use `allowed_roles`** to restrict access to specific server roles. Note that DMs are automatically denied when only roles are configured.

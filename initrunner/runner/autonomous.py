@@ -135,46 +135,63 @@ def run_autonomous(
 
     autonomous_timeout = guardrails.autonomous_timeout_seconds
 
-    for iteration in range(1, max_iterations + 1):
-        # Check wall-clock timeout
-        if autonomous_timeout is not None:
-            elapsed = time.monotonic() - loop_start
-            if elapsed >= autonomous_timeout:
-                final_status = "timeout"
-                console.print("[yellow]Autonomous wall-clock timeout reached.[/yellow]")
-                break
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
 
-        # Check token budget
-        if token_budget is not None:
-            budget_status = check_token_budget(cumulative_tokens, token_budget)
-            if budget_status.exceeded:
-                final_status = "budget_exceeded"
-                console.print("[yellow]Autonomous token budget exhausted.[/yellow]")
-                break
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        ptask = progress.add_task("Autonomous run", total=max_iterations)
 
-        # Build prompt via strategy
-        if iteration == 1:
-            iter_prompt = strategy.wrap_initial_prompt(prompt)
-        else:
-            iter_prompt = strategy.build_continuation_prompt(reflection_state)
+        for iteration in range(1, max_iterations + 1):
+            # Check wall-clock timeout
+            if autonomous_timeout is not None:
+                elapsed = time.monotonic() - loop_start
+                if elapsed >= autonomous_timeout:
+                    final_status = "timeout"
+                    console.print("[yellow]Autonomous wall-clock timeout reached.[/yellow]")
+                    break
 
-            # Stronger nudge for messaging triggers when agent didn't use tools
-            if consecutive_no_tool_calls > 0 and trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
-                iter_prompt += (
-                    "\n\nIMPORTANT: You did not use any tools in your last response. "
-                    "If you cannot proceed without additional user input, call "
-                    "finish_task(summary='...', status='blocked') immediately. "
-                    "Do NOT repeat your question -- the user will send a new message."
-                )
+            # Check token budget
+            if token_budget is not None:
+                budget_status = check_token_budget(cumulative_tokens, token_budget)
+                if budget_status.exceeded:
+                    final_status = "budget_exceeded"
+                    console.print("[yellow]Autonomous token budget exhausted.[/yellow]")
+                    break
 
-        # Execute iteration
-        t_meta = dict(trigger_metadata or {})
-        t_meta["autonomous_run_id"] = autonomous_run_id
-        t_meta["iteration"] = str(iteration)
+            # Build prompt via strategy
+            if iteration == 1:
+                iter_prompt = strategy.wrap_initial_prompt(prompt)
+            else:
+                iter_prompt = strategy.build_continuation_prompt(reflection_state)
 
-        with console.status(
-            f"Thinking (iteration {iteration}/{max_iterations})...", spinner="dots"
-        ):
+                # Stronger nudge for messaging triggers when agent didn't use tools
+                if consecutive_no_tool_calls > 0 and trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+                    iter_prompt += (
+                        "\n\nIMPORTANT: You did not use any tools in your last response. "
+                        "If you cannot proceed without additional user input, call "
+                        "finish_task(summary='...', status='blocked') immediately. "
+                        "Do NOT repeat your question -- the user will send a new message."
+                    )
+
+            # Execute iteration
+            t_meta = dict(trigger_metadata or {})
+            t_meta["autonomous_run_id"] = autonomous_run_id
+            t_meta["iteration"] = str(iteration)
+
+            progress.update(ptask, description=f"Iteration {iteration}/{max_iterations}")
             result, new_messages = execute_run(
                 agent,
                 role,
@@ -186,59 +203,60 @@ def run_autonomous(
                 trigger_metadata=t_meta,
                 extra_toolsets=all_extra,
             )
+            progress.update(ptask, advance=1)
 
-        iterations.append(result)
-        cumulative_tokens += result.total_tokens
-        message_history = new_messages
+            iterations.append(result)
+            cumulative_tokens += result.total_tokens
+            message_history = new_messages
 
-        _display_iteration_result(
-            result, iteration, max_iterations, cumulative_tokens, token_budget
-        )
-
-        # Compact then trim history
-        if message_history:
-            from initrunner.agent.history import reduce_history
-
-            message_history = reduce_history(
-                message_history, autonomy_config, role, preserve_first=True
+            _display_iteration_result(
+                result, iteration, max_iterations, cumulative_tokens, token_budget
             )
 
-        # Check strategy-driven completion
-        if not strategy.should_continue(reflection_state, iteration):
-            final_status = reflection_state.status
-            break
+            # Compact then trim history
+            if message_history:
+                from initrunner.agent.history import reduce_history
 
-        # Check for errors
-        if not result.success:
-            final_status = "error"
-            error_msg = result.error
-            break
-
-        # Conversational triggers: single iteration is sufficient
-        if trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
-            final_status = "completed"
-            break
-
-        # Spin guard: stop if no tool calls for N consecutive iterations
-        if result.tool_calls == 0:
-            consecutive_no_tool_calls += 1
-            if consecutive_no_tool_calls >= autonomy_config.max_no_tool_call_iterations:
-                reflection_state.completed = True
-                reflection_state.status = "blocked"
-                reflection_state.summary = (
-                    "Stopped: no tool calls for "
-                    f"{consecutive_no_tool_calls} consecutive iterations."
+                message_history = reduce_history(
+                    message_history, autonomy_config, role, preserve_first=True
                 )
-                final_status = "blocked"
-                break
-        else:
-            consecutive_no_tool_calls = 0
 
-        # Rate limiting
-        if autonomy_config.iteration_delay_seconds > 0 and iteration < max_iterations:
-            time.sleep(autonomy_config.iteration_delay_seconds)
-    else:
-        final_status = "max_iterations"
+            # Check strategy-driven completion
+            if not strategy.should_continue(reflection_state, iteration):
+                final_status = reflection_state.status
+                break
+
+            # Check for errors
+            if not result.success:
+                final_status = "error"
+                error_msg = result.error
+                break
+
+            # Conversational triggers: single iteration is sufficient
+            if trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
+                final_status = "completed"
+                break
+
+            # Spin guard: stop if no tool calls for N consecutive iterations
+            if result.tool_calls == 0:
+                consecutive_no_tool_calls += 1
+                if consecutive_no_tool_calls >= autonomy_config.max_no_tool_call_iterations:
+                    reflection_state.completed = True
+                    reflection_state.status = "blocked"
+                    reflection_state.summary = (
+                        "Stopped: no tool calls for "
+                        f"{consecutive_no_tool_calls} consecutive iterations."
+                    )
+                    final_status = "blocked"
+                    break
+            else:
+                consecutive_no_tool_calls = 0
+
+            # Rate limiting
+            if autonomy_config.iteration_delay_seconds > 0 and iteration < max_iterations:
+                time.sleep(autonomy_config.iteration_delay_seconds)
+        else:
+            final_status = "max_iterations"
 
     if clarify_token is not None:
         reset_clarify_callback(clarify_token)

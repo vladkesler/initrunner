@@ -102,6 +102,8 @@ class SetupConfig:
 
     provider: str
     model: str
+    base_url: str | None = None
+    api_key_env: str | None = None
     intent: str | None = None
     name: str = "my-agent"
     tools: list[dict] = field(default_factory=list)
@@ -123,15 +125,18 @@ def needs_setup() -> bool:
 
     from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
     from initrunner.config import get_global_env_path
+    from initrunner.services.presets import CUSTOM_PRESETS
 
-    for env_var in _PROVIDER_API_KEY_ENVS.values():
+    all_env_vars = list(_PROVIDER_API_KEY_ENVS.values()) + [p.api_key_env for p in CUSTOM_PRESETS]
+
+    for env_var in all_env_vars:
         if os.environ.get(env_var):
             return False
 
     env_path = get_global_env_path()
     if env_path.is_file():
         values = dotenv_values(env_path)
-        for env_var in _PROVIDER_API_KEY_ENVS.values():
+        for env_var in all_env_vars:
             if values.get(env_var):
                 return False
 
@@ -163,6 +168,42 @@ def detect_existing_provider() -> tuple[str, str] | None:
                 return prov, env_var
 
     return None
+
+
+def list_detected_providers() -> list[tuple[str, str]]:
+    """All providers with configured keys, in priority order.
+
+    Side-effect-free: reads ``os.environ`` and ``dotenv_values()`` without
+    loading into the process environment.  Safe to call before the
+    key-handling section of ``run_setup()``.
+
+    Returns ``(provider_or_preset_name, env_var)`` pairs.
+    """
+    from dotenv import dotenv_values
+
+    from initrunner.config import get_global_env_path
+    from initrunner.services.presets import CUSTOM_PRESETS
+    from initrunner.services.providers import _PROVIDER_PRIORITY, _is_ollama_running
+
+    found: list[tuple[str, str]] = []
+    env_path = get_global_env_path()
+    dotenv = dotenv_values(env_path) if env_path.is_file() else {}
+
+    # Standard cloud providers (priority order)
+    for provider, env_var in _PROVIDER_PRIORITY:
+        if os.environ.get(env_var) or dotenv.get(env_var):
+            found.append((provider, env_var))
+
+    # Custom presets (OpenRouter)
+    for preset in CUSTOM_PRESETS:
+        if os.environ.get(preset.api_key_env) or dotenv.get(preset.api_key_env):
+            found.append((preset.name, preset.api_key_env))
+
+    # Ollama (running locally, no key)
+    if _is_ollama_running():
+        found.append(("ollama", ""))
+
+    return found
 
 
 # ---------------------------------------------------------------------------
@@ -334,6 +375,8 @@ def generate_run_yaml(config: SetupConfig) -> str:
     run_cfg = RunConfig(
         provider=config.provider,
         model=config.model,
+        base_url=config.base_url,
+        api_key_env=config.api_key_env,
         personality=config.personality,
     )
     data = run_cfg.model_dump(exclude_none=True)

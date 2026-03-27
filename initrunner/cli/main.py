@@ -66,7 +66,7 @@ def main(
         console.print(ctx.get_help())
         raise typer.Exit()
 
-    from initrunner.cli.setup_cmd import needs_setup
+    from initrunner.services.setup import needs_setup
 
     if needs_setup():
         # TTY + no config: hint to run setup
@@ -83,21 +83,57 @@ def main(
         )
         raise typer.Exit(1)
     else:
-        # TTY + configured: start ephemeral REPL
-        console.print("[dim]Tip: use 'initrunner new' to create an agent[/dim]")
-        from initrunner.services.providers import detect_bot_tokens
+        # TTY + configured: offer action menu
+        from rich.prompt import Prompt
 
-        tokens = detect_bot_tokens()
-        if tokens:
-            platforms = ", ".join(tokens)
-            console.print(
-                f"[dim]Hint: bot tokens detected ({platforms}). "
-                f"Use 'initrunner run --bot telegram' or '--bot discord' to launch a bot.[/dim]"
+        from initrunner._compat import is_dashboard_available
+
+        options: list[tuple[str, str]] = []
+        if is_dashboard_available():
+            options.append(("Dashboard (web UI)", "dashboard"))
+        options.append(("Quick chat (REPL)", "repl"))
+        options.append(("Create an agent", "new"))
+
+        # Default: Dashboard when available, otherwise Quick chat
+        default_idx = "1"
+
+        console.print()
+        for i, (label, _key) in enumerate(options, 1):
+            console.print(f"  [bold]{i}[/bold]. {label}")
+
+        try:
+            choice = Prompt.ask(
+                "\nWhat would you like to do?",
+                choices=[str(i) for i in range(1, len(options) + 1)],
+                default=default_idx,
             )
+        except (KeyboardInterrupt, EOFError):
+            raise typer.Exit() from None
 
-        from initrunner.cli._ephemeral import dispatch_ephemeral
+        selected = options[int(choice) - 1][1]
 
-        dispatch_ephemeral()
+        if selected == "dashboard":
+            from initrunner.cli.dashboard_cmd import launch_dashboard
+
+            launch_dashboard()
+        elif selected == "repl":
+            from initrunner.services.providers import detect_bot_tokens
+
+            tokens = detect_bot_tokens()
+            if tokens:
+                platforms = ", ".join(tokens)
+                console.print(
+                    f"[dim]Hint: bot tokens detected ({platforms}). "
+                    f"Use 'initrunner run --bot telegram' or '--bot discord' to launch a bot.[/dim]"
+                )
+
+            from initrunner.cli._ephemeral import dispatch_ephemeral
+
+            dispatch_ephemeral()
+        elif selected == "new":
+            from initrunner.cli.new_cmd import new
+
+            new()
 
 
 # ---------------------------------------------------------------------------

@@ -43,7 +43,37 @@ def extract_text(path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-@register_extractor(".txt", ".md", ".rst")
+@register_extractor(
+    ".txt",
+    ".md",
+    ".rst",
+    # Source code — plain UTF-8 text, commonly ingested by codebase-analyst.
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".rb",
+    ".sh",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".sql",
+    ".r",
+    ".lua",
+    ".swift",
+    ".kt",
+    ".scala",
+    ".zig",
+)
 def _extract_plain(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 

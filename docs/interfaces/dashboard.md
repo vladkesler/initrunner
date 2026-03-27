@@ -97,7 +97,7 @@ Six tabs below the trigger panel:
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Prompt input with SSE streaming output. Token breakdown, tool call names, and duration after completion. Multi-turn message history. |
+| **Run** (default) | Prompt input with SSE streaming output. Deterministic Rings avatars (seeded from agent name) identify each turn. Token breakdown, tool call names, and duration after completion. Multi-turn message history. |
 | **History** | Audit log filtered to this agent. |
 | **Memory** | Memory items and conversation sessions (shown when agent has `memory` config). Filter by type, consolidate memories. |
 | **Ingest** | Document management for RAG agents (shown when agent has `ingest` config). See below. |
@@ -149,7 +149,7 @@ Tabbed detail page with a stats bar and five tabs. A **Delete** button in the he
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Chat interface for running prompts through the pipeline. The entry service (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Service-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal service shows output directly, fan-out shows per-service trace expanded. Collapsible pipeline trace under each response shows per-service name, duration, tokens, and output preview. Message history scoped to entry service for multi-turn conversations. |
+| **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active service name identify each turn (avatar swaps during streaming as services execute). The entry service (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Service-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal service shows output directly, fan-out shows per-service trace expanded. Collapsible pipeline trace under each response shows per-service name, duration, tokens, and output preview. Message history scoped to entry service for multi-turn conversations. |
 | **Graph** | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
 | **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
 | **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. Shared memory/documents badges. |
@@ -193,7 +193,7 @@ Tabbed detail page with four tabs. A **Delete** button in the header opens a con
 | Tab | Contents |
 |-----|----------|
 | **Pipeline** (default) | Strategy-aware visualization. Sequential shows a vertical chain of persona cards with handoff arrows; parallel shows a fan-out/fan-in layout. Cards display persona name, model override badge, tool count, duration, and token counts. Cards animate through states: idle, active (pulsing dot), pending, complete (checkmark), error (X). |
-| **Run** | Chat interface for running prompts through the team. Active persona indicator matches the pipeline visualization. Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
+| **Run** | Chat interface for running prompts through the team. Deterministic Rings avatars seeded from the active persona name identify each turn. Active persona indicator matches the pipeline visualization. Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
 | **Config** | Collapsible sections: model, strategy (with handoff_max_chars), guardrails, shared memory, shared documents, tools, observability. |
 | **Editor** | YAML editor with live validation, in-place save, and copy. Warns when name changes (affects team ID). |
 

@@ -56,6 +56,7 @@ def desktop(
         sock.bind(("127.0.0.1", port))
     except OSError:
         console.print(f"[red]Port {port} is in use by another process.[/red]")
+        console.print("[dim]Hint:[/dim] Use [bold]--port <number>[/bold] to pick a different port.")
         raise SystemExit(1) from None
 
     # Start the embedded backend, passing the pre-bound socket to uvicorn.
@@ -95,6 +96,9 @@ def desktop(
         time.sleep(_HEALTH_INTERVAL)
     else:
         console.print("[red]Backend did not become healthy within 30 seconds.[/red]")
+        console.print(
+            "[dim]Hint:[/dim] Check for port conflicts or run [bold]initrunner doctor[/bold]."
+        )
         server.should_exit = True
         raise SystemExit(1)
 

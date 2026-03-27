@@ -11,23 +11,24 @@ from initrunner.dashboard.config import DashboardSettings
 from initrunner.dashboard.schemas import (
     ModelOption,
     ProviderModels,
-    ProviderPreset,
     ProviderStatus,
+)
+from initrunner.dashboard.schemas import (
+    ProviderPreset as ProviderPresetSchema,
+)
+from initrunner.services.presets import (
+    CUSTOM_PRESETS as _SHARED_PRESETS,
+)
+from initrunner.services.presets import (
+    resolve_preset,
 )
 
 _logger = logging.getLogger(__name__)
 
 
-# Custom provider presets (OpenRouter, custom endpoint).
-CUSTOM_PRESETS = [
-    ProviderPreset(
-        name="openrouter",
-        label="OpenRouter",
-        base_url="https://openrouter.ai/api/v1",
-        api_key_env="OPENROUTER_API_KEY",
-        placeholder="anthropic/claude-sonnet-4",
-    ),
-    ProviderPreset(
+# Dashboard-only presets (custom endpoint has no shared representation).
+_DASHBOARD_ONLY_PRESETS = [
+    ProviderPresetSchema(
         name="custom",
         label="Custom endpoint",
         base_url="",
@@ -35,6 +36,18 @@ CUSTOM_PRESETS = [
         placeholder="model-name",
     ),
 ]
+
+# Combined presets for dashboard API responses.
+CUSTOM_PRESETS: list[ProviderPresetSchema] = [
+    ProviderPresetSchema(
+        name=p.name,
+        label=p.label,
+        base_url=p.base_url,
+        api_key_env=p.api_key_env,
+        placeholder=p.default_model,
+    )
+    for p in _SHARED_PRESETS
+] + _DASHBOARD_ONLY_PRESETS
 
 CUSTOM_PROVIDER_NAMES = {p.name for p in CUSTOM_PRESETS}
 
@@ -54,14 +67,17 @@ def resolve_custom_provider(
     if provider not in CUSTOM_PROVIDER_NAMES:
         return provider, base_url, api_key_env
 
-    runtime_provider = "openai"
-    if base_url is None:
-        preset = next((p for p in CUSTOM_PRESETS if p.name == provider), None)
-        if preset and preset.base_url:
-            base_url = preset.base_url
-            api_key_env = api_key_env or preset.api_key_env
+    # Check shared presets first
+    shared = resolve_preset(provider)
+    if shared is not None:
+        runtime_provider = shared.runtime_provider
+        if base_url is None and shared.base_url:
+            base_url = shared.base_url
+            api_key_env = api_key_env or shared.api_key_env
+        return runtime_provider, base_url, api_key_env
 
-    return runtime_provider, base_url, api_key_env
+    # Fallback for dashboard-only presets (custom endpoint)
+    return "openai", base_url, api_key_env
 
 
 @dataclasses.dataclass
@@ -71,7 +87,7 @@ class ProviderOptions:
     providers: list[ProviderModels]
     detected_provider: str | None
     detected_model: str | None
-    custom_presets: list[ProviderPreset]
+    custom_presets: list[ProviderPresetSchema]
     ollama_models: list[str]
     ollama_base_url: str
     save_dirs: list[str]
@@ -125,7 +141,7 @@ async def gather_provider_options(settings: DashboardSettings) -> ProviderOption
     for p in CUSTOM_PRESETS:
         configured = bool(p.api_key_env and os.environ.get(p.api_key_env))
         presets.append(
-            ProviderPreset(
+            ProviderPresetSchema(
                 name=p.name,
                 label=p.label,
                 base_url=p.base_url,

@@ -277,6 +277,29 @@ Pill badge (`rounded-full`) for skill scope classification (`ScopeBadge.svelte`)
 
 Always includes a text label (never color alone).
 
+### Seed Avatar
+
+Deterministic identity avatar for conversation thread turns (`SeedAvatar.svelte`). Uses DiceBear Rings style (`@dicebear/core` + `@dicebear/rings`) to generate concentric ring patterns from a seed string. The same seed always produces the same avatar.
+
+**Container**: `rounded-full overflow-hidden shrink-0`, 24px default, `aria-hidden="true"` (adjacent label conveys identity).
+
+**Color palette**: Constrained to 6 colors drawn from the design system:
+
+| Color | Hex | Source |
+|-------|-----|--------|
+| Electric lime | `c8ff00` | accent-primary |
+| Muted teal | `6ec8b1` | desaturated accent-secondary |
+| Warm mid-gray | `8b8b99` | fg-muted range |
+| Cool charcoal | `5a5a6a` | surface-3 range |
+| Desaturated blue | `a0c4ff` | info hue family |
+| Warm amber | `d4a574` | warn hue family |
+
+**Background**: `161618` (surface-1) so ring patterns sit on matching ground.
+
+**Seeding**: User turns seed from `"You"`. Agent turns seed from the agent name (regular runs), active service name (compose), or active persona name (team). In compose/team streaming, the avatar swaps to reflect the currently active sub-agent.
+
+**Scope**: Only used in `ConversationThread`. Not used in nav, launchpad, agent cards, or other surfaces.
+
 ### Requirement Indicator
 
 Compact status dot with tooltip (`RequirementIndicator.svelte`). Green (`bg-ok`) dot with `box-shadow: 0 0 4px var(--color-ok)` when all requirements are met; amber (`bg-warn`) when some are unmet. Accompanied by mono `text-[12px] text-fg-faint` count text (e.g. "2/3 met"). Tooltip lists each requirement with check/cross marks. Hidden when no requirements exist.
