@@ -11,8 +11,8 @@ from initrunner.services.setup import (
     INTENT_TEMPLATE_MAP,
     SetupConfig,
     detect_existing_provider,
-    generate_chat_yaml,
     generate_role_yaml,
+    generate_run_yaml,
     needs_setup,
     provider_needs_embeddings_warning,
     save_env_key,
@@ -190,9 +190,9 @@ class TestGenerateRoleYaml:
 
 
 class TestGenerateChatYaml:
-    def test_uses_chat_config_schema(self):
+    def test_uses_run_config_schema(self):
         config = SetupConfig(intent="chatbot", provider="openai", model="gpt-5-mini")
-        content = generate_chat_yaml(config)
+        content = generate_run_yaml(config)
         data = yaml.safe_load(content)
         assert data["provider"] == "openai"
         assert data["model"] == "gpt-5-mini"
@@ -201,7 +201,7 @@ class TestGenerateChatYaml:
         config = SetupConfig(
             intent="chatbot", provider="anthropic", model="claude-sonnet-4-5-20250929"
         )
-        content = generate_chat_yaml(config)
+        content = generate_run_yaml(config)
         data = yaml.safe_load(content)
         assert data["provider"] == "anthropic"
         assert data["model"] == "claude-sonnet-4-5-20250929"
@@ -213,7 +213,7 @@ class TestGenerateChatYaml:
             model="gpt-5-mini",
             personality="You are a pirate.",
         )
-        content = generate_chat_yaml(config)
+        content = generate_run_yaml(config)
         data = yaml.safe_load(content)
         assert data["personality"] == "You are a pirate."
 

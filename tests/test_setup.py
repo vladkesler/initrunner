@@ -787,7 +787,7 @@ class TestIntentSetup:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -815,7 +815,7 @@ class TestIntentSetup:
                 "--intent",
                 "knowledge",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -848,7 +848,7 @@ class TestIntentSetup:
                     "--intent",
                     "knowledge",
                     "--skip-test",
-                    "--skip-chat-yaml",
+                    "--skip-run-yaml",
                     "--output",
                     str(output),
                 ],
@@ -880,7 +880,7 @@ class TestIntentSetup:
                 "--intent",
                 "telegram-bot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
@@ -892,9 +892,147 @@ class TestIntentSetup:
         assert "telegram" in content.lower()
 
 
-class TestSkipChatYaml:
-    def test_skip_chat_yaml(self, clean_env, monkeypatch):
-        """--skip-chat-yaml should not create chat.yaml."""
+class TestDashboardPrompt:
+    """Tests for the dashboard prompt at the end of setup."""
+
+    def test_dashboard_prompt_accepted(self, clean_env, monkeypatch):
+        """Dashboard installed + TTY + user accepts -> launches dashboard, skips next steps."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        import io
+
+        class _FakeTTY(io.BytesIO):
+            def isatty(self):
+                return True
+
+        with (
+            patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=True),
+            patch("initrunner.cli.dashboard_cmd.launch_dashboard") as mock_launch,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "openai",
+                    "--model",
+                    "gpt-5-mini",
+                    "--intent",
+                    "chatbot",
+                    "--skip-test",
+                    "--output",
+                    str(output),
+                ],
+                input=_FakeTTY(b"\ny\n"),  # accept default tools + accept dashboard
+            )
+        assert result.exit_code == 0
+        mock_launch.assert_called_once()
+        assert "Next steps" not in result.output
+
+    def test_dashboard_prompt_declined(self, clean_env, monkeypatch):
+        """Dashboard installed + TTY + user declines -> no launch, shows next steps."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        import io
+
+        class _FakeTTY(io.BytesIO):
+            def isatty(self):
+                return True
+
+        with (
+            patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=True),
+            patch("initrunner.cli.dashboard_cmd.launch_dashboard") as mock_launch,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "openai",
+                    "--model",
+                    "gpt-5-mini",
+                    "--intent",
+                    "chatbot",
+                    "--skip-test",
+                    "--output",
+                    str(output),
+                ],
+                input=_FakeTTY(b"\nn\n"),  # accept default tools + decline dashboard
+            )
+        assert result.exit_code == 0
+        mock_launch.assert_not_called()
+        assert "Next steps" in result.output
+
+    def test_dashboard_prompt_skipped_non_tty(self, clean_env, monkeypatch):
+        """Non-TTY stdin -> no dashboard prompt, shows next steps."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        with (
+            patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=True),
+            patch("initrunner.cli.dashboard_cmd.launch_dashboard") as mock_launch,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "openai",
+                    "--model",
+                    "gpt-5-mini",
+                    "--intent",
+                    "chatbot",
+                    "--skip-test",
+                    "--output",
+                    str(output),
+                ],
+                input="\n",  # accept default tools; default CliRunner stdin is non-TTY
+            )
+        assert result.exit_code == 0
+        mock_launch.assert_not_called()
+        assert "Open the dashboard" not in result.output
+        assert "Next steps" in result.output
+
+    def test_dashboard_not_installed_shows_tip(self, clean_env, monkeypatch):
+        """Dashboard not installed -> install tip shown, next steps shown."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        tmp_path = clean_env
+        output = tmp_path / "role.yaml"
+
+        with patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=False):
+            result = runner.invoke(
+                app,
+                [
+                    "setup",
+                    "-y",
+                    "--provider",
+                    "openai",
+                    "--model",
+                    "gpt-5-mini",
+                    "--intent",
+                    "chatbot",
+                    "--skip-test",
+                    "--output",
+                    str(output),
+                ],
+                input="\n",  # accept default tools
+            )
+        assert result.exit_code == 0
+        assert "initrunner[dashboard]" in result.output
+        assert "Next steps" in result.output
+
+
+class TestSkipRunYaml:
+    def test_skip_run_yaml(self, clean_env, monkeypatch):
+        """--skip-run-yaml should not create run.yaml."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         tmp_path = clean_env
         output = tmp_path / "role.yaml"
@@ -911,12 +1049,12 @@ class TestSkipChatYaml:
                 "--intent",
                 "chatbot",
                 "--skip-test",
-                "--skip-chat-yaml",
+                "--skip-run-yaml",
                 "--output",
                 str(output),
             ],
             input="\n",  # accept default tools
         )
         assert result.exit_code == 0
-        chat_yaml = tmp_path / "home" / "chat.yaml"
-        assert not chat_yaml.exists()
+        run_yaml = tmp_path / "home" / "run.yaml"
+        assert not run_yaml.exists()

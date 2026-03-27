@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.44.0-%2334D058" alt="v1.44.0">
+  <img src="https://img.shields.io/badge/latest-v1.45.0-%2334D058" alt="v1.45.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -21,11 +21,21 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**Define AI agents in YAML. Run them as CLI tools, Telegram bots, Discord bots, API servers, or autonomous daemons. Built-in RAG, persistent memory, 25+ built-in tools, policy-based authorization. Any model.**
+**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A Telegram bot that supports your users 24/7 with persistent memory.
 
-One YAML file is all it takes to go from idea to running agent - with document search, persistent memory, and tools wired in automatically. Start with `initrunner chat` for a zero-config assistant, then scale to bots, compose orchestration, and API servers without rewriting anything.
+Each one is a single command:
 
-> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard, skills management dashboard, trigger visibility, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
+```bash
+initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
+initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
+initrunner run web-researcher -p "Compare React vs Svelte"    # web research with citations
+initrunner run telegram-assistant --daemon                     # Telegram bot with memory
+initrunner run discord-assistant --daemon                      # Discord bot with memory
+```
+
+Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
+
+> **v1.45.0** -- Unified `run` command (chat merged in), built-in starter agents, `[recommended]` install bundle, dashboard prompt after setup. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -44,13 +54,33 @@ One YAML file is all it takes to go from idea to running agent - with document s
 **Install and configure:**
 
 ```bash
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+curl -fsSL https://initrunner.ai/install.sh | sh
 initrunner setup        # wizard: pick provider, model, API key
 ```
 
-Or install with a package manager: `uv tool install "initrunner[all]"` / `pipx install "initrunner[all]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
+Or install with a package manager: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
 
 **Upgrade:** re-run the install command, or: `uv tool upgrade initrunner` / `pipx upgrade initrunner`.
+
+### Try a starter agent
+
+Run `initrunner run` to see all available starters, or jump right in:
+
+```bash
+initrunner run helpdesk -i                                    # RAG over your docs folder
+initrunner run code-review-team -p "Review the latest commit" # team of 3 reviewers
+initrunner run memory-assistant                                # assistant that remembers
+```
+
+The model is auto-detected from your API key. Override with `--model anthropic:claude-sonnet-4-5-20250929`.
+
+Want to customize a starter? Copy it locally and edit:
+
+```bash
+initrunner run helpdesk --save ./my-helpdesk/
+# add your docs to ./my-helpdesk/knowledge-base/, then:
+initrunner run ./my-helpdesk/ -i
+```
 
 ### Use a premade agent from InitHub
 
@@ -68,16 +98,16 @@ See [Registry docs](docs/agents/registry.md) for version pinning, updates, and O
 
 ```bash
 initrunner new "a research assistant that summarizes papers"  # AI-generates a role.yaml
-initrunner chat --ingest ./docs/   # or skip YAML entirely -- chat with your docs, memory on by default
+initrunner run --ingest ./docs/    # or skip YAML entirely -- chat with your docs, memory on by default
 ```
 
-Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-reviewer`. See [Chat](docs/getting-started/chat.md) and [Tutorial](docs/getting-started/tutorial.md).
+Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-reviewer`. See [Tutorial](docs/getting-started/tutorial.md).
 
 **Or run with Docker**, no install needed:
 
 ```bash
 docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest chat
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run
 ```
 
 See the [Docker guide](docs/getting-started/docker.md) for RAG, Telegram, API server, and more examples.
@@ -113,7 +143,7 @@ That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[an
 
 ## Why InitRunner
 
-**Zero config to start.** `initrunner chat` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
+**Zero config to start.** `initrunner run` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
 
 **Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 25+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
 
@@ -370,7 +400,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 
 | Area | Key docs |
 |------|----------|
-| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Chat](docs/getting-started/chat.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
+| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
@@ -409,4 +439,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.44.0</sub></p>
+<p align="center"><sub>v1.45.0</sub></p>

@@ -75,6 +75,7 @@ Detailed docs live in `docs/`. Key references:
 | Topic | File |
 |---|---|
 | CLI commands & usage | `docs/getting-started/cli.md` |
+| Choosing features (goal-to-config) | `docs/getting-started/choosing-features.md` |
 | Creating new tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Security model | `docs/security/security.md` |
@@ -89,7 +90,6 @@ Detailed docs live in `docs/`. Key references:
 | OCI distribution & bundles | `docs/core/oci-distribution.md` |
 | Discord bot quickstart | `docs/getting-started/discord.md` |
 | Telegram bot quickstart | `docs/getting-started/telegram.md` |
-| Chat & quick start | `docs/getting-started/chat.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |

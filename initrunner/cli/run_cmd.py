@@ -1,4 +1,4 @@
-"""Run command: unified dispatcher for agent, team, and compose modes."""
+"""Run command: unified dispatcher for agent, team, compose, and ephemeral modes."""
 
 from __future__ import annotations
 
@@ -68,18 +68,83 @@ def _validate_flags(
     if role_file is not None and sense:
         console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
         raise typer.Exit(1)
-    if role_file is None and not sense:
-        console.print(
-            "[red]Error:[/red] Provide a role file, installed role name, or use --sense.\n"
-            "[dim]Hint: for quick ephemeral chat, use 'initrunner chat'.\n"
-            "      To create a new agent, use 'initrunner new'.[/dim]"
-        )
-        raise typer.Exit(1)
     if sense and not prompt:
         console.print("[red]Error:[/red] --sense requires --prompt (-p).")
         raise typer.Exit(1)
+    if sense and (daemon_mode or serve_mode or bot):
+        console.print(
+            "[red]Error:[/red] --daemon, --serve, and --bot are not supported with --sense."
+        )
+        raise typer.Exit(1)
 
     return output_format
+
+
+def _validate_ephemeral_flags(
+    *,
+    daemon_mode: bool,
+    serve_mode: bool,
+    autonomous: bool,
+    dry_run: bool,
+    save: Path | None,
+    skill_dir: Path | None,
+    report: Path | None,
+    report_template: str,
+    resume: bool,
+    prompt: str | None,
+    interactive: bool,
+) -> None:
+    """Reject flags that don't apply to ephemeral mode."""
+    invalid = []
+    if daemon_mode:
+        invalid.append("--daemon")
+    if serve_mode:
+        invalid.append("--serve")
+    if autonomous:
+        invalid.append("--autonomous")
+    if dry_run:
+        invalid.append("--dry-run")
+    if save is not None:
+        invalid.append("--save")
+    if skill_dir is not None:
+        invalid.append("--skill-dir")
+    if report is not None:
+        invalid.append("--report")
+    if report_template != "default":
+        invalid.append("--report-template")
+    if invalid:
+        console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported without a role file.")
+        raise typer.Exit(1)
+
+    # --resume only valid for REPL (no -p, or -p with -i)
+    if resume and prompt and not interactive:
+        console.print("[red]Error:[/red] --resume requires -i when used with -p.")
+        raise typer.Exit(1)
+
+
+def _validate_role_only_flags(
+    *,
+    tool_profile: str | None,
+    extra_tools: list[str] | None,
+    provider: str | None,
+    ingest: list[str] | None,
+    list_tools: bool,
+) -> None:
+    """Reject ephemeral-only flags when a role file is provided."""
+    invalid = []
+    if tool_profile is not None:
+        invalid.append("--tool-profile")
+    if extra_tools:
+        invalid.append("--tools")
+    if provider is not None:
+        invalid.append("--provider")
+    if ingest:
+        invalid.append("--ingest")
+    if list_tools:
+        invalid.append("--list-tools")
+    if invalid:
+        console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported with a role file.")
+        raise typer.Exit(1)
 
 
 def _resolve_via_sensing(
@@ -111,6 +176,99 @@ def _resolve_via_sensing(
         if not typer.confirm("Use this role?", default=True):
             raise typer.Exit()
     return selection.candidate.path
+
+
+# ---------------------------------------------------------------------------
+# Starter listing & save
+# ---------------------------------------------------------------------------
+
+
+def _show_starter_listing() -> None:
+    """Render a Rich table of available starter agents."""
+    from rich.table import Table
+
+    from initrunner.services.starters import check_prerequisites, list_starters
+
+    starters = list_starters()
+    if not starters:
+        console.print("[dim]No starter agents found.[/dim]")
+        return
+
+    table = Table(title="Starter Agents", show_lines=False, pad_edge=False)
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Kind", style="dim")
+    table.add_column("Description")
+    table.add_column("Features", style="green")
+    table.add_column("Status")
+
+    for entry in starters:
+        errors, _warnings = check_prerequisites(entry)
+        if errors:
+            status = f"[yellow]{errors[0]}[/yellow]"
+        else:
+            status = "[green]Ready[/green]"
+
+        desc = entry.description
+        if len(desc) > 50:
+            desc = desc[:47] + "..."
+
+        table.add_row(
+            entry.slug,
+            entry.kind,
+            desc,
+            " ".join(entry.features),
+            status,
+        )
+
+    console.print()
+    console.print(table)
+    console.print()
+    console.print("[dim]Usage:[/dim]")
+    console.print("  initrunner run <name>              Run interactively")
+    console.print('  initrunner run <name> -p "..."      Single-shot with prompt')
+    console.print("  initrunner run <name> --save .      Copy to local directory for customization")
+    console.print()
+
+
+def _handle_save(role_file: Path, save_dir: Path) -> None:
+    """Copy a starter to a local directory."""
+    import shutil
+
+    from initrunner.services.starters import STARTERS_DIR
+
+    try:
+        if not role_file.resolve().is_relative_to(STARTERS_DIR.resolve()):
+            console.print("[red]Error:[/red] --save only works with bundled starters.")
+            raise typer.Exit(1)
+    except ValueError:
+        console.print("[red]Error:[/red] --save only works with bundled starters.")
+        raise typer.Exit(1) from None
+
+    starter_dir = role_file.parent
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    if starter_dir.resolve() == STARTERS_DIR.resolve():
+        # Single-file starter
+        dest = save_dir / "role.yaml"
+        shutil.copy2(role_file, dest)
+        console.print(f"[green]Copied[/green] {role_file.name} to {dest}")
+    else:
+        # Composite starter (subdirectory)
+        for item in starter_dir.iterdir():
+            src = starter_dir / item.name
+            dst = save_dir / item.name
+            if src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst)
+        console.print(f"[green]Copied[/green] {starter_dir.name}/ to {save_dir}")
+
+    console.print()
+    console.print("[dim]Next steps:[/dim]")
+    edit_target = save_dir / "role.yaml" if (save_dir / "role.yaml").exists() else save_dir
+    console.print(f"  1. Edit {edit_target}")
+    console.print(f"  2. initrunner run {save_dir} -i")
+    console.print()
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +413,7 @@ def _dispatch_bot(
 def run(
     role_file: Annotated[
         Path | None,
-        typer.Argument(help="Agent/Team/Compose YAML, directory, or name. Omit with --sense."),
+        typer.Argument(help="YAML file, directory, or name. Omit for ephemeral mode."),
     ] = None,
     prompt: Annotated[str | None, typer.Option("-p", "--prompt", help="Prompt to send")] = None,
     interactive: Annotated[
@@ -313,6 +471,10 @@ def run(
         typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
     ] = False,
     model: ModelOption = None,
+    save: Annotated[
+        Path | None,
+        typer.Option("--save", help="Copy starter to local directory for customization"),
+    ] = None,
     # --- Mode flags ---
     daemon_mode: Annotated[
         bool, typer.Option("--daemon", help="Run in daemon mode with triggers")
@@ -353,12 +515,122 @@ def run(
             rich_help_panel="Bot Options",
         ),
     ] = None,
+    # --- Ephemeral mode options ---
+    provider: Annotated[
+        str | None,
+        typer.Option(
+            "--provider",
+            help="Model provider (ephemeral mode)",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = None,
+    tool_profile: Annotated[
+        str | None,
+        typer.Option(
+            "--tool-profile",
+            help="Tool profile: minimal, all, none",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = None,
+    extra_tools: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tools",
+            help="Extra tool types (repeatable)",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = None,
+    list_tools: Annotated[
+        bool,
+        typer.Option(
+            "--list-tools",
+            help="List available extra tool types and exit",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = False,
+    memory: Annotated[
+        bool | None,
+        typer.Option(
+            "--memory/--no-memory",
+            help="Enable/disable persistent memory",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = None,
+    ingest: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--ingest",
+            help="Paths/globs to ingest for RAG (repeatable)",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = None,
+    list_starters: Annotated[
+        bool,
+        typer.Option("--list", help="List available starter agents"),
+    ] = False,
 ) -> None:
-    """Run an agent, team, or compose from a YAML file.
+    """Run an agent from a YAML file, starter name, or ephemeral mode.
 
-    Use -i for interactive REPL, -a for autonomous mode.
-    For quick chat without a role file, use 'initrunner chat'.
+    Without a role file, starts an ephemeral REPL with auto-detected provider.
+    Use --list to see available starter agents.
     """
+    # --- --list: show starters ---
+    if list_starters:
+        _show_starter_listing()
+        raise typer.Exit(0)
+
+    # --- --list-tools: show ephemeral tool types ---
+    if list_tools:
+        from initrunner.cli._ephemeral import print_list_tools
+
+        print_list_tools()
+        raise typer.Exit(0)
+
+    # --- No role file + no --sense: ephemeral mode ---
+    if role_file is None and not sense:
+        _validate_ephemeral_flags(
+            daemon_mode=daemon_mode,
+            serve_mode=serve_mode,
+            autonomous=autonomous,
+            dry_run=dry_run,
+            save=save,
+            skill_dir=skill_dir,
+            report=report,
+            report_template=report_template,
+            resume=resume,
+            prompt=prompt,
+            interactive=interactive,
+        )
+        from initrunner.cli._ephemeral import dispatch_ephemeral
+
+        dispatch_ephemeral(
+            provider=provider,
+            model=model,
+            prompt=prompt,
+            interactive=interactive,
+            tool_profile=tool_profile,
+            extra_tools=extra_tools,
+            memory=memory,
+            resume=resume,
+            ingest=ingest,
+            bot=bot,
+            attach=attach,
+            allowed_users=allowed_users,
+            allowed_user_ids=allowed_user_ids,
+            audit_db=audit_db,
+            no_audit=no_audit,
+        )
+        return
+
+    # --- Role-incompatible flags ---
+    _validate_role_only_flags(
+        tool_profile=tool_profile,
+        extra_tools=extra_tools,
+        provider=provider,
+        ingest=ingest,
+        list_tools=list_tools,
+    )
+
     # --- Validate flags ---
     output_format = _validate_flags(
         daemon_mode=daemon_mode,
@@ -388,6 +660,16 @@ def run(
 
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
+
+    # --- --save: copy starter to local directory (no prerequisites needed) ---
+    if save is not None:
+        _handle_save(role_file, save)
+        return
+
+    # --- Starter: prerequisites + model auto-detect ---
+    from initrunner.cli._helpers import prepare_starter
+
+    effective_model = prepare_starter(role_file, model) or model
 
     # --- Removed kind rejection ---
     if kind == "Pipeline":
@@ -444,18 +726,33 @@ def run(
     # --- Agent mode: flag-based dispatch ---
     if serve_mode:
         _dispatch_serve(
-            role_file, host, port, api_key, cors_origin, audit_db, no_audit, skill_dir, model
+            role_file,
+            host,
+            port,
+            api_key,
+            cors_origin,
+            audit_db,
+            no_audit,
+            skill_dir,
+            effective_model,
         )
         return
 
     if bot:
         _dispatch_bot(
-            role_file, bot, allowed_users, allowed_user_ids, audit_db, no_audit, skill_dir, model
+            role_file,
+            bot,
+            allowed_users,
+            allowed_user_ids,
+            audit_db,
+            no_audit,
+            skill_dir,
+            effective_model,
         )
         return
 
     if daemon_mode:
-        _dispatch_daemon(role_file, audit_db, no_audit, skill_dir, model)
+        _dispatch_daemon(role_file, audit_db, no_audit, skill_dir, effective_model)
         return
 
     # --- Standard agent execution ---
@@ -475,5 +772,5 @@ def run(
         report_template=report_template,
         output_format=output_format,
         no_stream=no_stream,
-        model=model,
+        model=effective_model,
     )

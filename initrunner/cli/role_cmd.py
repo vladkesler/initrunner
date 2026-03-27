@@ -157,9 +157,9 @@ def setup(
         bool,
         typer.Option("--accept-risks", "-y", help="Accept security disclaimer without prompting"),
     ] = False,
-    skip_chat_yaml: Annotated[
+    skip_run_yaml: Annotated[
         bool,
-        typer.Option("--skip-chat-yaml", help="Skip chat.yaml generation"),
+        typer.Option("--skip-run-yaml", help="Skip run.yaml generation"),
     ] = False,
 ) -> None:
     """Guided setup wizard for first-time configuration."""
@@ -173,7 +173,7 @@ def setup(
         output=output,
         accept_risks=accept_risks,
         model=model,
-        skip_chat_yaml=skip_chat_yaml,
+        skip_run_yaml=skip_run_yaml,
     )
 
 

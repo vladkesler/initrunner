@@ -65,3 +65,13 @@ def require_ingest(package: str) -> None:
         raise RuntimeError(
             f"'{pip_name}' is required for this file type: uv pip install initrunner[ingest]"
         ) from None
+
+
+def is_dashboard_available() -> bool:
+    """Return True when the dashboard extras (fastapi + uvicorn) are importable."""
+    try:
+        importlib.import_module("fastapi")
+        importlib.import_module("uvicorn")
+    except ImportError:
+        return False
+    return True

@@ -2,17 +2,13 @@
 
 ## Quick install
 
-The install script auto-detects `uv`, `pipx`, or `pip` (and installs `uv` if none are found):
+The install script auto-detects `uv`, `pipx`, or `pip` (and installs `uv` if none are found). It includes web search, document ingestion, and the dashboard by default:
 
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh
 ```
 
-### Install with extras
-
-```bash
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest
-```
+Your LLM provider SDK is installed automatically during [`initrunner setup`](setup.md). OpenAI and Ollama are built-in.
 
 ### Pin a specific version
 
@@ -23,80 +19,80 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --version 0.2.0
 ## Package managers
 
 ```bash
-pip install initrunner
-uv tool install initrunner
-pipx install initrunner
-```
+# uv (recommended)
+uv pip install "initrunner[recommended]"
 
-## Extras
-
-> **Tip:** Not sure which extras you need? Install `[all]` — it includes every provider, feature, and interface so everything just works out of the box.
-
-### Install all extras (recommended)
-
-```bash
-# pip
-pip install "initrunner[all]"
-
-# uv
-uv tool install "initrunner[all]"
-# or in a venv:
-uv pip install "initrunner[all]"
+# uv global tool
+uv tool install "initrunner[recommended]"
 
 # pipx
-pipx install "initrunner[all]"
+pipx install "initrunner[recommended]"
 
+# pip
+pip install "initrunner[recommended]"
+```
+
+## Minimal install
+
+If you only need the core agent runtime (OpenAI + Ollama, text ingestion, vector search):
+
+```bash
+# shell installer
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras none
+
+# uv
+uv pip install initrunner
+
+# pip
+pip install initrunner
+```
+
+## Install everything
+
+Install all providers, features, and interfaces:
+
+```bash
 # shell installer
 curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
-```
-
-### Pick and choose
-
-You can combine specific extras with commas:
-
-```bash
-# pip
-pip install "initrunner[ingest,search]"
 
 # uv
-uv tool install "initrunner[ingest,search]"
+uv pip install "initrunner[all]"
 
-# pipx
-pipx install "initrunner[ingest,search]"
-
-# shell installer (comma-separated)
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest,search
+# pip
+pip install "initrunner[all]"
 ```
 
-### Available extras
+## Available extras
 
-#### LLM Providers
+The `[recommended]` bundle includes `search`, `ingest`, and `dashboard`. The `[all]` bundle includes everything below.
 
 | Extra | What it adds |
 |-------|--------------|
+| **Bundles** | |
+| `recommended` | Search + document ingestion + dashboard |
+| `all` | Every extra below |
+| **LLM Providers** | |
 | `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
 | `anthropic` | Anthropic provider (Claude) |
 | `google` | Google provider (Gemini) |
 | `groq` | Groq provider |
 | `mistral` | Mistral provider |
-
-#### Features
-
-| Extra | What it adds |
-|-------|--------------|
+| **Features** | |
 | `ingest` | PDF, DOCX, XLSX ingestion (base text ingestion is built-in) |
 | `search` | Web search via DuckDuckGo (free, no API key) |
 | `audio` | YouTube transcript extraction |
 | `safety` | Profanity filter for content policy |
 | `observability` | OpenTelemetry tracing and metrics export |
-
-#### Messaging Triggers
-
-| Extra | What it adds |
-|-------|--------------|
+| **Messaging Triggers** | |
 | `telegram` | Telegram bot trigger |
 | `discord` | Discord bot trigger |
 | `channels` | Both Telegram and Discord |
+| **Interfaces** | |
+| `dashboard` | Web UI (FastAPI + Uvicorn) |
+| `desktop` | Desktop app (dashboard + PyWebView) |
+| `authz` | Cerbos agent policy enforcement |
+
+Combine specific extras with commas: `uv pip install "initrunner[ingest,search,anthropic]"`.
 
 > **Note:** `local-embeddings` (fastembed) is defined but **not yet implemented**. Use [Ollama](../configuration/ollama.md) for local embeddings instead.
 

@@ -83,51 +83,27 @@ def main(
         )
         raise typer.Exit(1)
     else:
-        # TTY + configured: start ephemeral chat
+        # TTY + configured: start ephemeral REPL
         console.print("[dim]Tip: use 'initrunner new' to create an agent[/dim]")
-        from initrunner.cli.chat_cmd import (
-            _EPHEMERAL_EXTRA_TOOL_DEFAULTS,
-            _TOOL_PROFILES,
-            _chat_auto_detect,
-            _check_profile_envs,
-        )
-        from initrunner.services.providers import _load_env, detect_bot_tokens
+        from initrunner.services.providers import detect_bot_tokens
 
         tokens = detect_bot_tokens()
         if tokens:
             platforms = ", ".join(tokens)
             console.print(
                 f"[dim]Hint: bot tokens detected ({platforms}). "
-                f"Use 'initrunner chat --telegram' or '--discord' to launch a bot.[/dim]"
+                f"Use 'initrunner run --bot telegram' or '--bot discord' to launch a bot.[/dim]"
             )
 
-        _load_env()
-        skip = _check_profile_envs()
-        profile_tools = list(_TOOL_PROFILES["minimal"])
-        all_tools = [t for t in _EPHEMERAL_EXTRA_TOOL_DEFAULTS.values() if t["type"] not in skip]
+        from initrunner.cli._ephemeral import dispatch_ephemeral
 
-        from initrunner.agent.tools.registry import resolve_func_names
-
-        always_available = resolve_func_names(profile_tools)
-
-        _chat_auto_detect(
-            provider=None,
-            model=None,
-            prompt=None,
-            profile_tools=profile_tools,
-            extra_tools=[],
-            all_tools=all_tools,
-            always_available=always_available,
-            audit_db=None,
-            no_audit=False,
-        )
+        dispatch_ephemeral()
 
 
 # ---------------------------------------------------------------------------
 # Command registrations — plain functions from *_cmd modules
 # ---------------------------------------------------------------------------
 
-from initrunner.cli.chat_cmd import chat  # noqa: E402
 from initrunner.cli.dashboard_cmd import dashboard  # noqa: E402
 from initrunner.cli.desktop_cmd import desktop  # noqa: E402
 from initrunner.cli.doctor_cmd import doctor  # noqa: E402
@@ -152,14 +128,13 @@ from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import run  # noqa: E402
 
 # --- Getting Started ---
-app.command(rich_help_panel="Getting Started")(chat)
+app.command(rich_help_panel="Getting Started")(run)
 app.command(rich_help_panel="Getting Started")(new)
 app.command(rich_help_panel="Getting Started")(setup)
 app.command(rich_help_panel="Getting Started")(doctor)
 app.add_typer(examples_app, name="examples", rich_help_panel="Getting Started")
 
 # --- Run & Test ---
-app.command(rich_help_panel="Run & Test")(run)
 app.command(rich_help_panel="Run & Test")(test)
 app.command(rich_help_panel="Run & Test")(ingest)
 app.command(rich_help_panel="Run & Test")(validate)

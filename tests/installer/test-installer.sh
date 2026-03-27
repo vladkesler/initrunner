@@ -91,6 +91,20 @@ if should_run "$FILTER" "extras"; then
         "--unmanaged --extras anthropic"
 fi
 
+if should_run "$FILTER" "default-recommended"; then
+    run_test "default-recommended" \
+        "python:3.12-slim" \
+        "--unmanaged" \
+        "" \
+        "python3 -c 'import ddgs; import pymupdf4llm; import fastapi' && initrunner --version"
+fi
+
+if should_run "$FILTER" "extras-none"; then
+    run_test "extras-none" \
+        "python:3.12-slim" \
+        "--unmanaged --extras none"
+fi
+
 if should_run "$FILTER" "uninstall"; then
     run_test "uninstall" \
         "python:3.12-slim" \

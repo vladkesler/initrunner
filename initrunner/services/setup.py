@@ -308,32 +308,32 @@ def generate_role_yaml(config: SetupConfig) -> str:
     )
 
 
-def generate_chat_yaml(config: SetupConfig) -> str:
-    """Generate chat.yaml content from SetupConfig.
+def generate_run_yaml(config: SetupConfig) -> str:
+    """Generate run.yaml content from SetupConfig.
 
-    Uses ChatConfig schema to avoid drift.
+    Uses RunConfig schema to avoid drift.
     """
     import yaml
 
-    from initrunner.cli.chat_config import ChatConfig
+    from initrunner.cli.run_config import RunConfig
 
-    chat = ChatConfig(
+    run_cfg = RunConfig(
         provider=config.provider,
         model=config.model,
         personality=config.personality,
     )
-    data = chat.model_dump(exclude_none=True)
+    data = run_cfg.model_dump(exclude_none=True)
     return yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
 
-def save_chat_yaml(config: SetupConfig) -> Path:
-    """Write chat.yaml to the standard config path."""
-    from initrunner.cli.chat_config import _get_chat_config_path
+def save_run_yaml(config: SetupConfig) -> Path:
+    """Write run.yaml to the standard config path."""
+    from initrunner.cli.run_config import _get_run_config_path
     from initrunner.config import get_home_dir
 
-    path = _get_chat_config_path()
+    path = _get_run_config_path()
     get_home_dir().mkdir(parents=True, exist_ok=True)
-    path.write_text(generate_chat_yaml(config))
+    path.write_text(generate_run_yaml(config))
     return path
 
 

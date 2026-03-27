@@ -332,19 +332,19 @@ search_documents("error handling", source="./docs/api-reference.md")
 
 If no documents have been ingested, the tool returns a message directing the user to run `initrunner ingest`.
 
-## Zero-Config Ingestion with `chat --ingest`
+## Zero-Config Ingestion with `run --ingest`
 
 Ingest documents directly from the command line without writing a role file:
 
 ```bash
 # Chat with your docs
-initrunner chat --ingest "./docs/**/*.md"
+initrunner run --ingest "./docs/**/*.md"
 
 # Multiple sources
-initrunner chat --ingest ./notes/ --ingest ./data/*.csv
+initrunner run --ingest ./notes/ --ingest ./data/*.csv
 
 # Combine with tools
-initrunner chat --ingest ./docs/ --tool-profile all
+initrunner run --ingest ./docs/ --tool-profile all
 ```
 
 The `--ingest` flag:
@@ -353,15 +353,15 @@ The `--ingest` flag:
 3. Auto-registers the `search_documents` tool on the agent.
 4. Auto-forces re-ingestion if the embedding model has changed (no interactive prompt).
 
-Paths are resolved relative to the current working directory. You can also set default ingest paths in `~/.initrunner/chat.yaml`:
+Paths are resolved relative to the current working directory. You can also set default ingest paths in `~/.initrunner/run.yaml`:
 
 ```yaml
-# ~/.initrunner/chat.yaml
+# ~/.initrunner/run.yaml
 ingest:
   - "./my-docs/**/*.md"
 ```
 
-Relative paths in `chat.yaml` are resolved from `~/.initrunner/`, not the current directory. See [Chat & Quick Start](../getting-started/chat.md#chat-configuration-file).
+Relative paths in `run.yaml` are resolved from `~/.initrunner/`, not the current directory.
 
 ## CLI
 

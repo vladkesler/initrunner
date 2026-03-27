@@ -30,6 +30,23 @@ TEMPLATE_SETUP: dict[str, dict[str, Any]] = {
         "extras": ["telegram"],
         "docs_url": "https://www.initrunner.ai/docs/telegram",
     },
+    "email": {
+        "steps": [
+            "Get your IMAP/SMTP server details (Gmail: imap.gmail.com / smtp.gmail.com)",
+            "For Gmail: enable 2FA, then create an App Password at myaccount.google.com",
+            "For Outlook: use outlook.office365.com for both IMAP and SMTP",
+            "Set the four email env vars (see below)",
+            "(Optional) Create a Slack incoming webhook for urgent alerts",
+        ],
+        "env_vars": [
+            "EMAIL_IMAP_HOST",
+            "EMAIL_SMTP_HOST",
+            "EMAIL_USER",
+            "EMAIL_PASS",
+        ],
+        "extras": [],
+        "docs_url": "",
+    },
 }
 
 # Curated popular models per provider. First entry is the default.

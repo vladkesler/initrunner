@@ -29,9 +29,9 @@ spec:
 For chat mode, memory is enabled by default with no configuration needed:
 
 ```bash
-initrunner chat              # memory on by default
-initrunner chat --resume     # resume with recalled memories
-initrunner chat --no-memory  # disable memory
+initrunner run              # memory on by default
+initrunner run --resume     # resume with recalled memories
+initrunner run --no-memory  # disable memory
 ```
 
 

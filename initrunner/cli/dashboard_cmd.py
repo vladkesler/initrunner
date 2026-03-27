@@ -10,23 +10,21 @@ import typer
 from initrunner.cli._helpers import console
 
 
-def dashboard(
-    port: Annotated[int, typer.Option(help="Port to listen on")] = 8100,
-    no_open: Annotated[bool, typer.Option("--no-open", help="Don't open browser")] = False,
-    expose: Annotated[bool, typer.Option("--expose", help="Bind to 0.0.0.0 (no auth)")] = False,
-    roles_dir: Annotated[
-        list[Path] | None,
-        typer.Option("--roles-dir", help="Extra directories to scan for roles"),
-    ] = None,
+def launch_dashboard(
+    *,
+    port: int = 8100,
+    no_open: bool = False,
+    expose: bool = False,
+    extra_role_dirs: list[Path] | None = None,
 ) -> None:
-    """Launch the dashboard web UI."""
-    from initrunner.dashboard.app import create_app
-    from initrunner.dashboard.config import DashboardSettings
+    """Start the dashboard server (blocking)."""
+    from initrunner.dashboard.app import create_app  # type: ignore[import-not-found]
+    from initrunner.dashboard.config import DashboardSettings  # type: ignore[import-not-found]
 
     settings = DashboardSettings(
         port=port,
         expose=expose,
-        extra_role_dirs=roles_dir or [],
+        extra_role_dirs=extra_role_dirs or [],
     )
 
     if expose:
@@ -65,3 +63,16 @@ def dashboard(
     import uvicorn  # type: ignore[import-not-found]
 
     uvicorn.run(app, host=settings.host, port=port, log_level="warning")
+
+
+def dashboard(
+    port: Annotated[int, typer.Option(help="Port to listen on")] = 8100,
+    no_open: Annotated[bool, typer.Option("--no-open", help="Don't open browser")] = False,
+    expose: Annotated[bool, typer.Option("--expose", help="Bind to 0.0.0.0 (no auth)")] = False,
+    roles_dir: Annotated[
+        list[Path] | None,
+        typer.Option("--roles-dir", help="Extra directories to scan for roles"),
+    ] = None,
+) -> None:
+    """Launch the dashboard web UI."""
+    launch_dashboard(port=port, no_open=no_open, expose=expose, extra_role_dirs=roles_dir)

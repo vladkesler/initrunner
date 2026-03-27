@@ -5,11 +5,14 @@ InitRunner ships a portable shell installer that works on Linux and macOS. A sin
 ## Quick Start
 
 ```bash
-# Install latest version
+# Install with recommended extras (search, ingestion, dashboard)
 curl -fsSL https://initrunner.ai/install.sh | sh
 
-# Install with extras (ingestion, Anthropic provider)
-curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras ingest
+# Install everything (all providers + all features)
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras all
+
+# Bare install (core only, no extras)
+curl -fsSL https://initrunner.ai/install.sh | sh -s -- --extras none
 
 # Pin to a specific version
 curl -fsSL https://initrunner.ai/install.sh | sh -s -- --version 0.2.0
@@ -35,7 +38,7 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 | Flag | Argument | Description |
 |------|----------|-------------|
 | `--method` | `uv`, `pipx`, or `pip` | Force a specific package installer instead of auto-detection. |
-| `--extras` | comma-separated list | Install optional extras (e.g. `ingest,anthropic`). |
+| `--extras` | comma-separated list | Install optional extras. Default: `recommended`. Use `none` for bare install. |
 | `--version` | version string | Pin to a specific PyPI version (e.g. `0.2.0`). Default: `latest`. |
 | `--unmanaged` | *(none)* | Skip all shell profile / PATH modifications. Implies `INITRUNNER_NO_MODIFY_PATH`. |
 | `--uninstall` | *(none)* | Remove initrunner and clean up PATH entries from shell profiles. |
@@ -48,7 +51,7 @@ All flags can be set via environment variables. Flags take precedence when both 
 | Variable | Equivalent Flag | Description |
 |----------|----------------|-------------|
 | `INITRUNNER_INSTALL_METHOD` | `--method` | Force installer (`uv`, `pipx`, or `pip`). Default: `auto`. |
-| `INITRUNNER_EXTRAS` | `--extras` | Comma-separated extras to install. |
+| `INITRUNNER_EXTRAS` | `--extras` | Comma-separated extras to install. Default: `recommended`. |
 | `INITRUNNER_VERSION` | `--version` | Pin to a specific version. Default: `latest`. |
 | `INITRUNNER_NO_MODIFY_PATH` | `--unmanaged` | Set to any non-empty value to skip shell profile edits. |
 
@@ -87,7 +90,7 @@ On systems with an `EXTERNALLY-MANAGED` marker (common on Debian 12+, Ubuntu 23.
 
 ### 5. Package Installation
 
-Builds a package spec from the name, extras, and version (e.g. `initrunner[ingest]==0.2.0`) and installs it:
+Builds a package spec from the name, extras, and version (e.g. `initrunner[recommended]==0.2.0`) and installs it:
 
 | Installer | Command |
 |-----------|---------|
@@ -229,6 +232,8 @@ The installer has a Docker-based test harness in `tests/installer/`. Each scenar
 | `method-pip` | `python:3.12-slim` | Explicit `--method pip` |
 | `method-pipx` | `python:3.12-slim` | Explicit `--method pipx` (pre-installs pipx) |
 | `extras` | `python:3.12-slim` | `--extras anthropic` installs optional dependencies |
+| `default-recommended` | `python:3.12-slim` | Default install includes recommended extras (search, ingest, dashboard) |
+| `extras-none` | `python:3.12-slim` | `--extras none` installs bare base only |
 | `uninstall` | `python:3.12-slim` | Install then `--uninstall`, verifies binary is removed |
 | `e2e-hello` | `ubuntu:24.04` | Full end-to-end: installs, then runs a role with `initrunner run` |
 

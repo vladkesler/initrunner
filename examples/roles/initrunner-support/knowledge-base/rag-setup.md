@@ -150,7 +150,7 @@ URLs are fetched, converted to Markdown, and chunked like local files.
 For quick experiments, use the `--ingest` flag with `chat`:
 
 ```bash
-initrunner chat --ingest ./docs/
+initrunner run --ingest ./docs/
 ```
 
 This ingests the specified path and enables `search_documents` in an ephemeral chat session, without needing a role.yaml.

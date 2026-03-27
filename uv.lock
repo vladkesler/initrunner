@@ -1668,6 +1668,14 @@ observability = [
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-sdk" },
 ]
+recommended = [
+    { name = "ddgs" },
+    { name = "fastapi" },
+    { name = "openpyxl" },
+    { name = "pymupdf4llm" },
+    { name = "python-docx" },
+    { name = "uvicorn" },
+]
 safety = [
     { name = "better-profanity" },
 ]
@@ -1697,6 +1705,7 @@ requires-dist = [
     { name = "cerbos", marker = "extra == 'authz'", specifier = ">=0.15.1" },
     { name = "croniter", specifier = ">=6.0.0" },
     { name = "ddgs", marker = "extra == 'all'", specifier = ">=9.10.0" },
+    { name = "ddgs", marker = "extra == 'recommended'", specifier = ">=9.10.0" },
     { name = "ddgs", marker = "extra == 'search'", specifier = ">=9.10.0" },
     { name = "discord-py", marker = "extra == 'all'", specifier = ">=2.3" },
     { name = "discord-py", marker = "extra == 'channels'", specifier = ">=2.3" },
@@ -1704,12 +1713,14 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'all'", specifier = ">=0.135.2" },
     { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.135.2" },
     { name = "fastapi", marker = "extra == 'desktop'", specifier = ">=0.135.2" },
+    { name = "fastapi", marker = "extra == 'recommended'", specifier = ">=0.135.2" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "lancedb", specifier = ">=0.29.2" },
     { name = "markdownify", specifier = ">=1.2.2" },
     { name = "openpyxl", marker = "extra == 'all'", specifier = ">=3.1.5" },
     { name = "openpyxl", marker = "extra == 'ingest'", specifier = ">=3.1.5" },
+    { name = "openpyxl", marker = "extra == 'recommended'", specifier = ">=3.1.5" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'all'", specifier = ">=1.20.0" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'observability'", specifier = ">=1.20.0" },
     { name = "opentelemetry-instrumentation-logging", marker = "extra == 'all'", specifier = ">=0.41b0" },
@@ -1726,8 +1737,10 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=1.71.0" },
     { name = "pymupdf4llm", marker = "extra == 'all'", specifier = ">=0.2.9" },
     { name = "pymupdf4llm", marker = "extra == 'ingest'", specifier = ">=0.2.9" },
+    { name = "pymupdf4llm", marker = "extra == 'recommended'", specifier = ">=0.2.9" },
     { name = "python-docx", marker = "extra == 'all'", specifier = ">=1.2.0" },
     { name = "python-docx", marker = "extra == 'ingest'", specifier = ">=1.2.0" },
+    { name = "python-docx", marker = "extra == 'recommended'", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "python-telegram-bot", marker = "extra == 'all'", specifier = ">=21.0" },
     { name = "python-telegram-bot", marker = "extra == 'channels'", specifier = ">=21.0" },
@@ -1739,11 +1752,12 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'dashboard'", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'desktop'", specifier = ">=0.42.0" },
+    { name = "uvicorn", marker = "extra == 'recommended'", specifier = ">=0.42.0" },
     { name = "watchfiles", specifier = ">=1.1.1" },
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["all", "all-models", "anthropic", "audio", "authz", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "safety", "search", "telegram"]
+provides-extras = ["all", "all-models", "anthropic", "audio", "authz", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "recommended", "safety", "search", "telegram"]
 
 [package.metadata.requires-dev]
 dev = [

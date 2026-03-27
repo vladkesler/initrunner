@@ -92,6 +92,13 @@ def resolve_role_path(path: Path) -> Path:
     if resolved is not None:
         return resolve_role_path(resolved)
 
+    # Fallback: try bundled starters (lowest priority)
+    from initrunner.services.starters import resolve_starter_path
+
+    starter_path = resolve_starter_path(str(path))
+    if starter_path is not None:
+        return starter_path
+
     console.print(f"[red]Error:[/red] Path not found: {path}")
     raise typer.Exit(1)
 
@@ -99,6 +106,61 @@ def resolve_role_path(path: Path) -> Path:
 def resolve_role_paths(paths: list[Path]) -> list[Path]:
     """Resolve a list of paths, applying :func:`resolve_role_path` to each."""
     return [resolve_role_path(p) for p in paths]
+
+
+def prepare_starter(role_file: Path, model: str | None) -> str | None:
+    """If *role_file* is a bundled starter, check prerequisites and auto-detect model.
+
+    Returns the effective model string:
+
+    * The original *model* if already provided (prerequisites are still checked).
+    * Auto-detected ``"provider:name"`` when *model* is ``None``.
+    * ``None`` when *role_file* is not a starter (caller proceeds normally).
+
+    Prints warnings for missing user data.
+    Raises ``typer.Exit(1)`` on hard prerequisite failures.
+    """
+    from initrunner.services.starters import STARTERS_DIR, check_prerequisites, get_starter
+
+    try:
+        if not role_file.resolve().is_relative_to(STARTERS_DIR.resolve()):
+            return None
+    except ValueError:
+        return None
+
+    entry = get_starter(role_file.stem)
+    if entry is None:
+        return None
+
+    errors, warnings = check_prerequisites(entry)
+    if errors:
+        for e in errors:
+            if e.startswith(" "):
+                console.print(e)
+            else:
+                console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+    for w in warnings:
+        console.print(f"[yellow]Note:[/yellow] {w}")
+
+    if model is not None:
+        return model
+
+    from initrunner._compat import require_provider
+    from initrunner.services.providers import list_available_providers
+
+    for detected in list_available_providers():
+        try:
+            require_provider(detected.provider)
+        except RuntimeError:
+            continue
+        return f"{detected.provider}:{detected.model}"
+
+    console.print(
+        "[red]Error:[/red] No usable provider found. "
+        "Run `initrunner setup` or set an API key environment variable."
+    )
+    raise typer.Exit(1)
 
 
 def display_sense_result(result: SelectionResult) -> None:

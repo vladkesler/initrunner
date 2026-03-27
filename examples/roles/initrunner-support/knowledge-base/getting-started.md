@@ -5,30 +5,27 @@ InitRunner is a YAML-first AI agent platform. You define agents as declarative `
 
 ## Installation
 
-Install with pip, uv, or pipx:
+The recommended install includes web search, document ingestion, and the dashboard:
 
 ```bash
-# pip
-pip install initrunner
+# shell installer (installs [recommended] by default)
+curl -fsSL https://initrunner.ai/install.sh | sh
 
 # uv (recommended)
-uv pip install initrunner
+uv pip install "initrunner[recommended]"
 
 # pipx (isolated global install)
-pipx install initrunner
+pipx install "initrunner[recommended]"
 ```
 
-For optional features, install extras:
+For all providers and features, or a bare minimum install:
 
 ```bash
-# All model providers
-pip install initrunner[anthropic,google,groq,mistral]
+# Everything (all providers + all features)
+uv pip install "initrunner[all]"
 
-# Document ingestion (PDF, DOCX, XLSX support)
-pip install initrunner[ingest]
-
-# Everything
-pip install initrunner[all-models,ingest]
+# Bare base (core only)
+uv pip install initrunner
 ```
 
 
@@ -57,10 +54,10 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ```bash
 # One-shot prompt
-initrunner chat -p "Explain Python decorators in 3 sentences"
+initrunner run -p "Explain Python decorators in 3 sentences"
 
 # Interactive REPL
-initrunner chat
+initrunner run
 ```
 
 The `chat` command auto-detects your provider from available API keys. It checks in order: Anthropic, OpenAI, Google, Groq, Mistral, Cohere, Ollama.

@@ -1,6 +1,6 @@
 # Setup Wizard
 
-The `initrunner setup` command is a guided, intent-driven wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml` plus a `~/.initrunner/chat.yaml` for `initrunner chat`.
+The `initrunner setup` command is a guided, intent-driven wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml` plus a `~/.initrunner/run.yaml` for `initrunner run`.
 
 > **Prefer a browser?** Run `initrunner dashboard` to configure providers, add API keys, and create agents from the web UI. The dashboard's System page provides full provider management, and the launchpad offers inline key setup for first-time users.
 
@@ -40,7 +40,7 @@ initrunner setup --skip-test
 | `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
 | `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
 | `-y, --accept-risks` | `bool` | `false` | Accept security disclaimer without prompting. |
-| `--skip-chat-yaml` | `bool` | `false` | Skip `chat.yaml` generation. |
+| `--skip-run-yaml` | `bool` | `false` | Skip `run.yaml` generation. |
 
 ## Supported Providers
 
@@ -124,9 +124,9 @@ A numbered tool menu is shown with intent-specific defaults pre-marked with `*`.
 - **discord-bot**: Prompts for `DISCORD_BOT_TOKEN`
 - **daemon**: Prompts for trigger type (file_watch or cron) and schedule/paths
 
-### 10. Role + Chat YAML Generation
+### 10. Role + Run YAML Generation
 
-Generates `role.yaml` at the `--output` path and `~/.initrunner/chat.yaml` for `initrunner chat`. Use `--skip-chat-yaml` to skip chat.yaml generation.
+Generates `role.yaml` at the `--output` path and `~/.initrunner/run.yaml` for `initrunner run`. Use `--skip-run-yaml` to skip run.yaml generation.
 
 ### 11. Post-Generation Actions
 
@@ -136,6 +136,19 @@ Generates `role.yaml` at the `--output` path and `~/.initrunner/chat.yaml` for `
 ### 12. Summary + Next Steps
 
 A summary panel shows the configured intent, provider, model, and file paths. Next-step commands are tailored to the chosen intent.
+
+### 13. Dashboard Prompt
+
+If the `dashboard` extras are installed and stdin is a terminal, the wizard
+offers to open the web UI:
+
+    Open the dashboard in your browser? [Y/n]
+
+Accepting launches the dashboard at `http://localhost:8100` and opens your
+browser. The role you just created is immediately visible. The CLI "Next steps"
+panel is skipped since the dashboard provides the same functionality visually.
+
+If the dashboard is not installed, a tip to install it is shown instead.
 
 ## "from-example" Flow
 
@@ -174,8 +187,8 @@ initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-age
 # Knowledge agent with Ollama
 initrunner setup --provider ollama --model llama3.2 --intent knowledge --skip-test -y
 
-# Skip chat.yaml generation
-initrunner setup --provider openai --intent chatbot --skip-test --skip-chat-yaml -y
+# Skip run.yaml generation
+initrunner setup --provider openai --intent chatbot --skip-test --skip-run-yaml -y
 ```
 
 The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.
@@ -196,19 +209,19 @@ The file is created with `0600` permissions (owner read/write only). The path is
 2. `XDG_DATA_HOME/initrunner` (if `XDG_DATA_HOME` is set).
 3. `~/.initrunner` (default fallback).
 
-### Chat Config
+### Run Config
 
-`~/.initrunner/chat.yaml` is generated during setup:
+`~/.initrunner/run.yaml` is generated during setup:
 
 ```yaml
 provider: openai
 model: gpt-5-mini
 tool_profile: minimal
 memory: true
-name: ephemeral-chat
+name: ephemeral
 ```
 
-This file is loaded by `initrunner chat` to pre-configure the ephemeral chat session. See `cli/chat_config.py` for the full schema.
+This file is loaded by `initrunner run` to pre-configure the ephemeral session. See `cli/chat_config.py` for the full schema.
 
 ### Generated Role
 
@@ -260,3 +273,8 @@ Setup is still complete -- check your configuration and try again.
 ```
 
 The connectivity test failed but setup is still considered complete. Run `initrunner run role.yaml -p "hello"` manually to debug.
+
+## What's Next
+
+- **Choosing features**: Not sure which fields to add? See [What Do I Need?](choosing-features.md)
+- **Hands-on tutorial**: Build a complete agent step by step -- see [Tutorial](tutorial.md)

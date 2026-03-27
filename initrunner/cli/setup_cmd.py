@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-from initrunner._compat import _PROVIDER_EXTRAS, require_provider
+from initrunner._compat import _PROVIDER_EXTRAS, is_dashboard_available, require_provider
 from initrunner.cli._helpers import check_ollama_running, console, install_extra
 from initrunner.config import get_global_env_path, get_home_dir
 from initrunner.services.setup import (
@@ -26,7 +26,7 @@ from initrunner.services.setup import (
     needs_setup,
     provider_needs_embeddings_warning,
     run_connectivity_test,
-    save_chat_yaml,
+    save_run_yaml,
 )
 from initrunner.services.setup import (
     validate_api_key as _validate_api_key,
@@ -109,7 +109,7 @@ def run_setup(
     output: Path,
     accept_risks: bool = False,
     model: str | None = None,
-    skip_chat_yaml: bool = False,
+    skip_run_yaml: bool = False,
 ) -> None:
     """Execute the guided setup wizard."""
     # ---------------------------------------------------------------
@@ -491,7 +491,7 @@ def run_setup(
             ]
 
     # ---------------------------------------------------------------
-    # Step 10: Generate role.yaml + chat.yaml
+    # Step 10: Generate role.yaml + run.yaml
     # ---------------------------------------------------------------
     config = SetupConfig(
         intent=intent,
@@ -514,14 +514,14 @@ def run_setup(
         output.write_text(content)
         console.print(f"[green]Created[/green] {output}")
 
-    # chat.yaml
-    chat_yaml_path = None
-    if not skip_chat_yaml:
+    # run.yaml
+    run_yaml_path = None
+    if not skip_run_yaml:
         try:
-            chat_yaml_path = save_chat_yaml(config)
-            console.print(f"[green]Created[/green] {chat_yaml_path}")
+            run_yaml_path = save_run_yaml(config)
+            console.print(f"[green]Created[/green] {run_yaml_path}")
         except Exception as exc:
-            console.print(f"[dim]Could not create chat.yaml: {exc}[/dim]")
+            console.print(f"[dim]Could not create run.yaml: {exc}[/dim]")
 
     # ---------------------------------------------------------------
     # Step 12: Post-generation actions
@@ -562,8 +562,8 @@ def run_setup(
     if env_var and provider not in ("ollama", "bedrock"):
         summary_lines.append(f"[bold]Config:[/bold]   {env_path}")
     summary_lines.append(f"[bold]Role:[/bold]     {output}")
-    if chat_yaml_path:
-        summary_lines.append(f"[bold]Chat:[/bold]     {chat_yaml_path}")
+    if run_yaml_path:
+        summary_lines.append(f"[bold]Run:[/bold]      {run_yaml_path}")
 
     console.print()
     console.print(
@@ -574,44 +574,65 @@ def run_setup(
         )
     )
 
-    _role = str(output)
-    _next: list[str] = []
+    # ---------------------------------------------------------------
+    # Step 14: Offer to launch the dashboard
+    # ---------------------------------------------------------------
+    import sys
 
-    if template_key == "rag":
+    _launched_dashboard = False
+    if is_dashboard_available() and sys.stdin.isatty():
+        console.print()
+        if typer.confirm("Open the dashboard in your browser?", default=True):
+            from initrunner.cli.dashboard_cmd import launch_dashboard
+
+            launch_dashboard(extra_role_dirs=[output.parent.resolve()])
+            _launched_dashboard = True
+
+    if not _launched_dashboard:
+        if not is_dashboard_available():
+            console.print(
+                "\n[dim]Tip: install the dashboard for a visual agent builder: "
+                "[bold]uv pip install initrunner\\[dashboard][/bold][/dim]"
+            )
+
+        _role = str(output)
+        _next: list[str] = []
+
+        if template_key == "rag":
+            _next += [
+                "  [dim]Index your documents first:[/dim]",
+                f"  [bold]initrunner ingest {_role}[/bold]",
+                "",
+            ]
+
+        if intent in ("telegram-bot", "discord-bot"):
+            _next += [
+                f"  [dim]Start the {intent.replace('-bot', '')} bot:[/dim]",
+                f"  [bold]initrunner run {_role} --daemon[/bold]",
+                "",
+            ]
+        elif intent == "daemon":
+            _next += [
+                "  [dim]Start the daemon:[/dim]",
+                f"  [bold]initrunner run {_role} --daemon[/bold]",
+                "",
+            ]
+
         _next += [
-            "  [dim]Index your documents first:[/dim]",
-            f"  [bold]initrunner ingest {_role}[/bold]",
+            "  [dim]Create your agent:[/dim]",
+            "  [bold]initrunner examples list[/bold]         [dim]# 1. browse agents[/dim]",
+            "  [bold]initrunner examples copy <name>[/bold]  [dim]# 2. copy one locally[/dim]",
+            "  [bold]initrunner run <name>/role.yaml[/bold]  [dim]# 3. run it[/dim]",
             "",
+            "  [dim]Or run the role setup just created:[/dim]",
+            f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
+            f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
         ]
 
-    if intent in ("telegram-bot", "discord-bot"):
-        _next += [
-            f"  [dim]Start the {intent.replace('-bot', '')} bot:[/dim]",
-            f"  [bold]initrunner run {_role} --daemon[/bold]",
-            "",
-        ]
-    elif intent == "daemon":
-        _next += [
-            "  [dim]Start the daemon:[/dim]",
-            f"  [bold]initrunner run {_role} --daemon[/bold]",
-            "",
-        ]
-
-    _next += [
-        "  [dim]Create your agent:[/dim]",
-        "  [bold]initrunner examples list[/bold]         [dim]# 1. browse agents[/dim]",
-        "  [bold]initrunner examples copy <name>[/bold]  [dim]# 2. copy one locally[/dim]",
-        "  [bold]initrunner run <name>/role.yaml[/bold]  [dim]# 3. run it[/dim]",
-        "",
-        "  [dim]Or run the role setup just created:[/dim]",
-        f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
-        f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
-    ]
-
-    console.print(
-        Panel(
-            "\n".join(_next),
-            title="Next steps",
-            border_style="cyan",
+        console.print(
+            Panel(
+                "\n".join(_next),
+                title="Next steps",
+                border_style="cyan",
+            )
         )
-    )

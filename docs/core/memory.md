@@ -39,29 +39,27 @@ spec:
       interval: after_session
 ```
 
-### Zero-config chat memory
+### Zero-config memory
 
-`initrunner chat` enables memory by default — no YAML needed:
+`initrunner run` enables memory by default when no role file is given -- no YAML needed:
 
 ```bash
 # Memory is on automatically
-initrunner chat
+initrunner run
 
 # Resume with auto-recall of relevant memories
-initrunner chat --resume
+initrunner run --resume
 
 # Disable memory
-initrunner chat --no-memory
+initrunner run --no-memory
 ```
 
-The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools. Memories are stored at `~/.initrunner/memory/ephemeral-chat.lance`. Customize the agent name (and thus the memory path) via `~/.initrunner/chat.yaml`:
+The agent gets `remember()`, `recall()`, `learn_procedure()`, `record_episode()`, and `list_memories()` tools. Memories are stored at `~/.initrunner/memory/ephemeral.lance`. Customize the agent name (and thus the memory path) via `~/.initrunner/run.yaml`:
 
 ```yaml
-# ~/.initrunner/chat.yaml
+# ~/.initrunner/run.yaml
 name: my-assistant   # stored at ~/.initrunner/memory/my-assistant.lance
 ```
-
-See [Chat & Quick Start](../getting-started/chat.md) for all chat options.
 
 ### Role-based config
 
