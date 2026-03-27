@@ -1478,6 +1478,64 @@ class TestSuggestNext:
         assert "Ingest" not in result.output
         assert "Triggers" not in result.output
 
+    def test_validate_explain_json_schema_output(self, tmp_path):
+        """--explain should describe structured output when json_schema is configured."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: structured-agent
+            spec:
+              role: You extract entities.
+              model:
+                provider: openai
+                name: gpt-5-mini
+              output:
+                type: json_schema
+                schema:
+                  type: object
+                  properties:
+                    entities:
+                      type: array
+        """)
+        )
+        result = runner.invoke(app, ["validate", str(role_file), "--explain"])
+        assert result.exit_code == 0
+        assert "Structured output" in result.output
+        assert "json_schema" in result.output
+        assert "inline schema" in result.output
+
+    def test_validate_explain_security_subpolicies(self, tmp_path):
+        """--explain should surface security sub-policies beyond docker/content/tools."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: secure-agent
+            spec:
+              role: You are secure.
+              model:
+                provider: openai
+                name: gpt-5-mini
+              security:
+                rate_limit:
+                  requests_per_minute: 30
+                  burst_size: 5
+                audit:
+                  retention_days: 30
+        """)
+        )
+        result = runner.invoke(app, ["validate", str(role_file), "--explain"])
+        assert result.exit_code == 0
+        assert "Security" in result.output
+        assert "30 req/min" in result.output
+        assert "burst 5" in result.output
+        assert "30-day retention" in result.output
+
     def test_ingest_no_config_shows_hint(self, tmp_path):
         """Missing ingest config should show a hint."""
         role_file = tmp_path / "role.yaml"

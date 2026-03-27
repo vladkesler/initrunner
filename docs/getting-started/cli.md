@@ -209,6 +209,31 @@ Most CLI error messages include a `Hint:` line with the likely fix -- for
 example, the correct command to run, a missing YAML section to add, or a
 doc page to check. These appear automatically after `Error:` output.
 
+## Validate options
+
+Synopsis: `initrunner validate <PATH> [OPTIONS]`
+
+| Flag | Description |
+|------|-------------|
+| `--explain` | Print a plain-language explanation of each configured section |
+
+`--explain` walks through the role and prints one panel per section (Role,
+Model, Output, Tools, Skills, Capabilities, Triggers, Sinks, Ingest, Memory,
+Autonomy, Reasoning, Guardrails, Security, Observability, Tool Search, Daemon).
+Sections that use only default values are omitted.
+
+```console
+$ initrunner validate examples/roles/memory-assistant.yaml --explain
+Role Explanation: memory-assistant
+
+ Role   The system prompt (1349 chars) instructs the agent: "You are a personal assistant..."
+ Model  Uses openai:gpt-5-mini with temperature 0.1 and up to 2,048 output tokens.
+ Tools  1 tool(s) give the agent the ability to take actions beyond generating text: ...
+ Memory Gives the agent persistent memory across up to 10 sessions. ...
+ ...
+Valid
+```
+
 ## Ingest options
 
 | Flag | Description |

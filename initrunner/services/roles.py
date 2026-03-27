@@ -207,6 +207,17 @@ def _explain_model(role: RoleDefinition) -> str:
     )
 
 
+def _explain_output(role: RoleDefinition) -> str | None:
+    out = role.spec.output
+    if out.type == "text":
+        return None
+    source = "inline schema" if out.schema_ else f"schema file: {out.schema_file}"
+    return (
+        f"Structured output mode: the agent returns JSON conforming to a "
+        f"json_schema definition ({source})."
+    )
+
+
 def _explain_tools(role: RoleDefinition) -> str | None:
     if not role.spec.tools:
         return None
@@ -372,6 +383,37 @@ def _explain_security(role: RoleDefinition) -> str | None:
             details.append("subprocess allowed")
         if details:
             parts.append(f"Tool sandbox: {', '.join(details)}.")
+    server_custom = sec.server.model_dump(exclude_defaults=True)
+    if server_custom:
+        details = []
+        if sec.server.cors_origins:
+            details.append(f"CORS: {len(sec.server.cors_origins)} origin(s)")
+        if sec.server.require_https:
+            details.append("HTTPS required")
+        if details:
+            parts.append(f"Server: {', '.join(details)}.")
+
+    rl_custom = sec.rate_limit.model_dump(exclude_defaults=True)
+    if rl_custom:
+        parts.append(
+            f"Rate limit: {sec.rate_limit.requests_per_minute} req/min, "
+            f"burst {sec.rate_limit.burst_size}."
+        )
+
+    res_custom = sec.resources.model_dump(exclude_defaults=True)
+    if res_custom:
+        parts.append(
+            f"Resource limits: {sec.resources.max_file_size_mb}MB max file, "
+            f"{sec.resources.max_total_ingest_mb}MB max ingest."
+        )
+
+    audit_custom = sec.audit.model_dump(exclude_defaults=True)
+    if audit_custom:
+        parts.append(
+            f"Audit: {sec.audit.max_records:,} max records, "
+            f"{sec.audit.retention_days}-day retention."
+        )
+
     if not parts:
         return None
     return "\n".join(parts)
@@ -414,6 +456,7 @@ def _explain_daemon(role: RoleDefinition) -> str | None:
 _SECTION_EXPLAINERS: dict[str, _ExplainerFn] = {
     "Role": _explain_role_prompt,
     "Model": _explain_model,
+    "Output": _explain_output,
     "Tools": _explain_tools,
     "Skills": _explain_skills,
     "Capabilities": _explain_capabilities,
