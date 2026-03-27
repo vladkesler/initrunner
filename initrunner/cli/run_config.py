@@ -20,6 +20,8 @@ class RunConfig(BaseModel):
 
     provider: str | None = None
     model: str | None = None
+    base_url: str | None = None
+    api_key_env: str | None = None
     tool_profile: str = "minimal"
     tools: list[str] = []
     memory: bool = True

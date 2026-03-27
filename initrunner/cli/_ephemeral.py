@@ -216,6 +216,8 @@ def dispatch_ephemeral_repl(
     ingest_paths: list[str] | None = None,
     name: str = "ephemeral",
     personality: str | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> None:
     """Build ephemeral role and run as REPL or one-shot."""
     from initrunner.agent.loader import build_agent
@@ -231,6 +233,8 @@ def dispatch_ephemeral_repl(
             with_memory=with_memory,
             personality=personality,
             name=name,
+            base_url=base_url,
+            api_key_env=api_key_env,
         )
     except RuntimeError as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -248,6 +252,8 @@ def dispatch_ephemeral_repl(
             "memory": role.spec.memory,
             "ingest": ingest_config,
             "tool_search": role.spec.tool_search,
+            "base_url": base_url,
+            "api_key_env": api_key_env,
         }
         if personality:
             build_kwargs["system_prompt"] = (
@@ -321,6 +327,8 @@ def dispatch_ephemeral_bot(
     personality: str | None = None,
     allowed_users: list[str] | None = None,
     allowed_user_ids: list[str] | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> None:
     """Launch an ephemeral Telegram or Discord bot daemon."""
     from initrunner.services.providers import (
@@ -409,6 +417,8 @@ def dispatch_ephemeral_bot(
         "memory": memory_config,
         "ingest": ingest_config,
         "tool_search": tool_search,
+        "base_url": base_url,
+        "api_key_env": api_key_env,
     }
 
     role = build_ephemeral_role(prov, mod, **build_kwargs)
@@ -469,6 +479,8 @@ def dispatch_ephemeral(
         provider = run_cfg.provider
     if model is None and run_cfg.model:
         model = run_cfg.model
+    base_url = run_cfg.base_url
+    api_key_env_val = run_cfg.api_key_env
     if extra_tools is None and run_cfg.tools:
         extra_tools = run_cfg.tools
     if ingest is None and run_cfg.ingest:
@@ -540,6 +552,8 @@ def dispatch_ephemeral(
             personality=personality,
             allowed_users=allowed_users,
             allowed_user_ids=allowed_user_ids,
+            base_url=base_url,
+            api_key_env=api_key_env_val,
         )
     else:
         dispatch_ephemeral_repl(
@@ -558,4 +572,6 @@ def dispatch_ephemeral(
             ingest_paths=ingest,
             name=ephemeral_name,
             personality=personality,
+            base_url=base_url,
+            api_key_env=api_key_env_val,
         )

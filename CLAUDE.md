@@ -32,6 +32,7 @@ initrunner/              # main package (flat layout)
 ├── stores/              # DocumentStore + MemoryStore ABCs and zvec impls
 ├── triggers/            # cron, file watcher, webhook triggers
 ├── services/            # shared sync business logic (CLI uses this)
+│   └── presets.py       # custom-provider preset definitions (OpenRouter etc.)
 ├── _compat.py           # optional dependency helpers
 └── _html.py             # HTML fetch + markdown conversion
 tests/                   # pytest test suite

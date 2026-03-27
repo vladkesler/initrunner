@@ -69,6 +69,26 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 
 > **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a compose file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
 
+## No-subcommand behavior
+
+Running `initrunner` with no subcommand in a TTY shows an action menu:
+
+```
+  1. Dashboard (web UI)
+  2. Quick chat (REPL)
+  3. Create an agent
+
+What would you like to do? [1/2/3] (1):
+```
+
+- **Dashboard** launches the web UI at `http://localhost:8100` (only shown when dashboard extras are installed).
+- **Quick chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`.
+- **Create an agent** enters the interactive agent builder (`initrunner new`).
+
+The default is Dashboard when available, otherwise Quick chat. If no provider is configured, a "Setup Required" panel is shown instead.
+
+In non-TTY contexts (piped input), the help text is printed.
+
 ## Run options
 
 Synopsis: `initrunner run [PATH] [OPTIONS]`

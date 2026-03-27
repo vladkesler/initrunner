@@ -323,6 +323,8 @@ def build_quick_chat_role_sync(
     with_memory: bool = True,
     personality: str | None = None,
     name: str = "ephemeral-chat",
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> tuple[RoleDefinition, str, str]:
     """Detect provider, filter tools for missing env, build ephemeral role.
 
@@ -361,6 +363,8 @@ def build_quick_chat_role_sync(
         "tools": all_tools if all_tools else None,
         "memory": memory_config,
         "tool_search": tool_search,
+        "base_url": base_url,
+        "api_key_env": api_key_env,
     }
     if personality:
         build_kwargs["system_prompt"] = (
@@ -406,6 +410,8 @@ def build_ephemeral_role(
     memory: MemoryConfig | None = None,
     ingest: IngestConfig | None = None,
     tool_search: ToolSearchConfig | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> RoleDefinition:
     """Create an in-memory RoleDefinition without writing YAML."""
     from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
@@ -421,7 +427,12 @@ def build_ephemeral_role(
 
     spec_kwargs: dict = {
         "role": system_prompt,
-        "model": ModelConfig(provider=provider, name=model),
+        "model": ModelConfig(
+            provider=provider,
+            name=model,
+            base_url=base_url,
+            api_key_env=api_key_env,
+        ),
         "guardrails": Guardrails(**(guardrails or {})),
     }
 
