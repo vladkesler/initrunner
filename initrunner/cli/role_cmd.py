@@ -17,6 +17,10 @@ def validate(
         Path, typer.Argument(help="Agent directory, role YAML, or installed role name")
     ],
     skill_dir: SkillDirOption = None,
+    explain: Annotated[
+        bool,
+        typer.Option("--explain", help="Explain what each section does in plain language"),
+    ] = False,
 ) -> None:
     """Validate a role definition file."""
     from initrunner.cli._helpers import detect_yaml_kind, resolve_role_path
@@ -45,6 +49,19 @@ def validate(
             " See [bold]docs/getting-started/choosing-features.md[/bold]."
         )
         raise typer.Exit(1) from None
+
+    if explain:
+        from rich.panel import Panel
+
+        from initrunner.services.roles import explain_role
+
+        sections = explain_role(role)
+        console.print(f"\n[bold]Role Explanation:[/bold] {role.metadata.name}\n")
+        for title, body in sections:
+            console.print(Panel(body, title=title, border_style="dim"))
+        console.print("[green]Valid[/green]")
+        suggest_next("validate", role, role_file)
+        return
 
     table = Table(title=f"Role: {role.metadata.name}")
     table.add_column("Field", style="cyan")

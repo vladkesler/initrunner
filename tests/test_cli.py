@@ -1418,6 +1418,66 @@ class TestSuggestNext:
         # Non-TTY: no footer expected
         assert "Next steps" not in result.output
 
+    def test_validate_explain_full_role(self, tmp_path):
+        """--explain should describe each present section in plain language."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: explainer-test
+            spec:
+              role: You are a knowledge assistant that answers questions.
+              model:
+                provider: openai
+                name: gpt-5-mini
+              tools:
+                - type: datetime
+              ingest:
+                sources:
+                  - ./docs/**/*.md
+              memory:
+                max_sessions: 5
+              guardrails:
+                max_tool_calls: 10
+                timeout_seconds: 120
+        """)
+        )
+        result = runner.invoke(app, ["validate", str(role_file), "--explain"])
+        assert result.exit_code == 0
+        assert "Valid" in result.output
+        assert "system prompt" in result.output
+        assert "gpt-5-mini" in result.output
+        assert "tool" in result.output.lower()
+        assert "knowledge base" in result.output
+        assert "memory" in result.output.lower()
+
+    def test_validate_explain_minimal_role(self, tmp_path):
+        """--explain on a minimal role should only show Role and Model."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: minimal-agent
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+        result = runner.invoke(app, ["validate", str(role_file), "--explain"])
+        assert result.exit_code == 0
+        assert "Valid" in result.output
+        assert "gpt-5-mini" in result.output
+        # Optional sections should not appear
+        assert "Memory" not in result.output
+        assert "Ingest" not in result.output
+        assert "Triggers" not in result.output
+
     def test_ingest_no_config_shows_hint(self, tmp_path):
         """Missing ingest config should show a hint."""
         role_file = tmp_path / "role.yaml"

@@ -20,6 +20,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner run` | Run an agent (ephemeral or from role file), team, compose, or pipeline |
 | `initrunner run <PATH>` | Run an agent from a role file, team, compose, or pipeline (auto-detected from YAML kind) |
 | `initrunner validate <PATH>` | Validate a role definition |
+| `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <PATH>` | Ingest documents into vector store |
