@@ -313,9 +313,7 @@ def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
                 errors.append(f"  Setup {setup_name}:")
                 for i, step in enumerate(setup["steps"], 1):
                     errors.append(f"    {i}. {step}")
-                env_list = " ".join(
-                    f"{v}=..." for v in setup["env_vars"] if v in missing_set
-                )
+                env_list = " ".join(f"{v}=..." for v in setup["env_vars"] if v in missing_set)
                 if env_list:
                     errors.append(f"  Then: export {env_list}")
                 if setup.get("docs_url"):
@@ -325,9 +323,7 @@ def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
     missing_extras = [e for e in entry.requires_extras if not _is_extra_installed(e)]
     if missing_extras:
         extras_str = ",".join(missing_extras)
-        errors.append(
-            f"Missing dependencies: uv pip install \"initrunner\\[{extras_str}]\""
-        )
+        errors.append(f'Missing dependencies: uv pip install "initrunner\\[{extras_str}]"')
 
     # Missing user data
     for data_path in entry.requires_user_data:

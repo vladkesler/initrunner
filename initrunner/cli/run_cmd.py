@@ -113,9 +113,7 @@ def _validate_ephemeral_flags(
     if report_template != "default":
         invalid.append("--report-template")
     if invalid:
-        console.print(
-            f"[red]Error:[/red] {', '.join(invalid)} not supported without a role file."
-        )
+        console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported without a role file.")
         raise typer.Exit(1)
 
     # --resume only valid for REPL (no -p, or -p with -i)
@@ -145,9 +143,7 @@ def _validate_role_only_flags(
     if list_tools:
         invalid.append("--list-tools")
     if invalid:
-        console.print(
-            f"[red]Error:[/red] {', '.join(invalid)} not supported with a role file."
-        )
+        console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported with a role file.")
         raise typer.Exit(1)
 
 

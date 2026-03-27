@@ -42,9 +42,7 @@ def load_run_config() -> RunConfig:
     legacy = get_home_dir() / _LEGACY_CONFIG_FILENAME
 
     if not path.is_file() and legacy.is_file():
-        _logger.warning(
-            "Note: Rename %s to %s to preserve your settings.", legacy, path
-        )
+        _logger.warning("Note: Rename %s to %s to preserve your settings.", legacy, path)
         # Print to stderr so it's visible even when stdout is piped
         import sys
 
