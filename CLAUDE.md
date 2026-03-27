@@ -94,6 +94,7 @@ Detailed docs live in `docs/`. Key references:
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
+| Orchestration patterns (all 5, side-by-side) | `docs/orchestration/patterns-guide.md` |
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
 | Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Dashboard (web UI) | `docs/interfaces/dashboard.md` |
