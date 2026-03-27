@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+- **Unified `run` command** -- `chat` merged into `run` as ephemeral mode. `run` with no args starts an ephemeral REPL; `--list` shows starter agents. New flags: `--provider`, `--tool-profile`, `--tools`, `--memory`, `--ingest`, `--save`
+- **Starter agents** -- `helpdesk`, `code-review-team`, `memory-assistant`, `web-researcher` ship built-in. Prerequisite checks auto-detect provider/model and guide setup. `--save` copies a starter locally for customization
+- **`[recommended]` extras bundle** -- `pip install "initrunner[recommended]"` installs dashboard, common providers, and ingestion. Install script defaults to `[recommended]`
+- **Dashboard prompt after setup** -- `initrunner setup` offers to open the dashboard in your browser after configuration. Shown when dashboard extras are installed and stdin is a TTY
+- **Choosing Features guide** -- new `docs/getting-started/choosing-features.md` maps goals to YAML config fields
+
+### Removed
+- **`chat` command** -- merged into `run`. Running `initrunner chat` shows a migration message
+
+### Changed
+- `install.sh` defaults to `initrunner[recommended]` instead of bare `initrunner`
+- Setup wizard `run.yaml` renamed from `chat_config` to `run_config`
+- Dashboard builder uses starter service layer instead of inline templates
+
 ## [1.44.0] - 2026-03-26
 
 ### Added

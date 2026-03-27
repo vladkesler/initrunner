@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-from initrunner._compat import _PROVIDER_EXTRAS, require_provider
+from initrunner._compat import _PROVIDER_EXTRAS, is_dashboard_available, require_provider
 from initrunner.cli._helpers import check_ollama_running, console, install_extra
 from initrunner.config import get_global_env_path, get_home_dir
 from initrunner.services.setup import (
@@ -574,44 +574,65 @@ def run_setup(
         )
     )
 
-    _role = str(output)
-    _next: list[str] = []
+    # ---------------------------------------------------------------
+    # Step 14: Offer to launch the dashboard
+    # ---------------------------------------------------------------
+    import sys
 
-    if template_key == "rag":
+    _launched_dashboard = False
+    if is_dashboard_available() and sys.stdin.isatty():
+        console.print()
+        if typer.confirm("Open the dashboard in your browser?", default=True):
+            from initrunner.cli.dashboard_cmd import launch_dashboard
+
+            launch_dashboard(extra_role_dirs=[output.parent.resolve()])
+            _launched_dashboard = True
+
+    if not _launched_dashboard:
+        if not is_dashboard_available():
+            console.print(
+                "\n[dim]Tip: install the dashboard for a visual agent builder: "
+                "[bold]uv pip install initrunner\\[dashboard][/bold][/dim]"
+            )
+
+        _role = str(output)
+        _next: list[str] = []
+
+        if template_key == "rag":
+            _next += [
+                "  [dim]Index your documents first:[/dim]",
+                f"  [bold]initrunner ingest {_role}[/bold]",
+                "",
+            ]
+
+        if intent in ("telegram-bot", "discord-bot"):
+            _next += [
+                f"  [dim]Start the {intent.replace('-bot', '')} bot:[/dim]",
+                f"  [bold]initrunner run {_role} --daemon[/bold]",
+                "",
+            ]
+        elif intent == "daemon":
+            _next += [
+                "  [dim]Start the daemon:[/dim]",
+                f"  [bold]initrunner run {_role} --daemon[/bold]",
+                "",
+            ]
+
         _next += [
-            "  [dim]Index your documents first:[/dim]",
-            f"  [bold]initrunner ingest {_role}[/bold]",
+            "  [dim]Create your agent:[/dim]",
+            "  [bold]initrunner examples list[/bold]         [dim]# 1. browse agents[/dim]",
+            "  [bold]initrunner examples copy <name>[/bold]  [dim]# 2. copy one locally[/dim]",
+            "  [bold]initrunner run <name>/role.yaml[/bold]  [dim]# 3. run it[/dim]",
             "",
+            "  [dim]Or run the role setup just created:[/dim]",
+            f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
+            f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
         ]
 
-    if intent in ("telegram-bot", "discord-bot"):
-        _next += [
-            f"  [dim]Start the {intent.replace('-bot', '')} bot:[/dim]",
-            f"  [bold]initrunner run {_role} --daemon[/bold]",
-            "",
-        ]
-    elif intent == "daemon":
-        _next += [
-            "  [dim]Start the daemon:[/dim]",
-            f"  [bold]initrunner run {_role} --daemon[/bold]",
-            "",
-        ]
-
-    _next += [
-        "  [dim]Create your agent:[/dim]",
-        "  [bold]initrunner examples list[/bold]         [dim]# 1. browse agents[/dim]",
-        "  [bold]initrunner examples copy <name>[/bold]  [dim]# 2. copy one locally[/dim]",
-        "  [bold]initrunner run <name>/role.yaml[/bold]  [dim]# 3. run it[/dim]",
-        "",
-        "  [dim]Or run the role setup just created:[/dim]",
-        f'  [bold]initrunner run {_role}[/bold] [dim]-p "Ask me anything"[/dim]',
-        f"  [bold]initrunner run {_role} -i[/bold]  [dim]# interactive REPL[/dim]",
-    ]
-
-    console.print(
-        Panel(
-            "\n".join(_next),
-            title="Next steps",
-            border_style="cyan",
+        console.print(
+            Panel(
+                "\n".join(_next),
+                title="Next steps",
+                border_style="cyan",
+            )
         )
-    )

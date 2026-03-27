@@ -137,6 +137,19 @@ Generates `role.yaml` at the `--output` path and `~/.initrunner/run.yaml` for `i
 
 A summary panel shows the configured intent, provider, model, and file paths. Next-step commands are tailored to the chosen intent.
 
+### 13. Dashboard Prompt
+
+If the `dashboard` extras are installed and stdin is a terminal, the wizard
+offers to open the web UI:
+
+    Open the dashboard in your browser? [Y/n]
+
+Accepting launches the dashboard at `http://localhost:8100` and opens your
+browser. The role you just created is immediately visible. The CLI "Next steps"
+panel is skipped since the dashboard provides the same functionality visually.
+
+If the dashboard is not installed, a tip to install it is shown instead.
+
 ## "from-example" Flow
 
 When selecting intent 8 (`from-example`), the wizard enters a separate flow:
@@ -260,3 +273,8 @@ Setup is still complete -- check your configuration and try again.
 ```
 
 The connectivity test failed but setup is still considered complete. Run `initrunner run role.yaml -p "hello"` manually to debug.
+
+## What's Next
+
+- **Choosing features**: Not sure which fields to add? See [What Do I Need?](choosing-features.md)
+- **Hands-on tutorial**: Build a complete agent step by step -- see [Tutorial](tutorial.md)

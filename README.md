@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-3817+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v1.44.0-%2334D058" alt="v1.44.0">
+  <img src="https://img.shields.io/badge/latest-v1.45.0-%2334D058" alt="v1.45.0">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -35,7 +35,7 @@ initrunner run discord-assistant --daemon                      # Discord bot wit
 
 Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v1.44.0** -- Clarify tool for mid-run user input, context budget guard, skills management dashboard, trigger visibility, Pipeline orchestration removed (use Team or Compose). See the [Changelog](CHANGELOG.md).
+> **v1.45.0** -- Unified `run` command (chat merged in), built-in starter agents, `[recommended]` install bundle, dashboard prompt after setup. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -439,4 +439,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v1.44.0</sub></p>
+<p align="center"><sub>v1.45.0</sub></p>

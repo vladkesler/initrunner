@@ -75,6 +75,7 @@ Detailed docs live in `docs/`. Key references:
 | Topic | File |
 |---|---|
 | CLI commands & usage | `docs/getting-started/cli.md` |
+| Choosing features (goal-to-config) | `docs/getting-started/choosing-features.md` |
 | Creating new tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Security model | `docs/security/security.md` |
