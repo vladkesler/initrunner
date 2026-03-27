@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner._constants import SKIP_DIRS
+
 _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -44,24 +46,8 @@ class DiscoveredTeam:
     error: str | None = None
 
 
-_SKIP_DIRS = frozenset(
-    {
-        "node_modules",
-        ".venv",
-        "venv",
-        "__pycache__",
-        ".git",
-        ".tox",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".pytest_cache",
-        "dist",
-        "build",
-        ".eggs",
-        ".hg",
-        ".svn",
-    }
-)
+# Backwards-compatible alias for external importers (auto_skills.py).
+_SKIP_DIRS = SKIP_DIRS
 
 
 def _scan_yaml_kind(dirs: list[Path], kind: str) -> Iterator[Path]:

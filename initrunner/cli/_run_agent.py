@@ -202,6 +202,25 @@ def _run_agent(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        # Auto-ingest on first run (opt-in via ingest.auto: true)
+        if role.spec.ingest is not None and role.spec.ingest.auto and not dry_run:
+            from initrunner.services.ingest import auto_ingest_if_needed
+
+            try:
+                stats = auto_ingest_if_needed(role, role_file)
+                if stats is not None:
+                    console.print(
+                        f"Indexed [cyan]{stats.total_chunks}[/cyan] chunks ({stats.new} files)."
+                    )
+            except Exception as exc:
+                from initrunner.stores.base import EmbeddingModelChangedError
+
+                if isinstance(exc, EmbeddingModelChangedError):
+                    console.print(f"[red]Error:[/red] {exc}")
+                    console.print("[dim]Run: initrunner ingest <role> --force[/dim]")
+                    raise typer.Exit(1) from None
+                raise
+
         if not prompt and not autonomous and role.spec.triggers:
             console.print(
                 "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"

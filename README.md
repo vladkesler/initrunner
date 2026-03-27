@@ -21,12 +21,14 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A Telegram bot that supports your users 24/7 with persistent memory.
+**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A research team that plans queries, searches the web, and writes cited reports. A monitoring daemon that learns what "normal" looks like over time.
 
 Each one is a single command:
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
+initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research team
+initrunner run codebase-analyst -i                            # index & chat with your code
 initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
 initrunner run web-researcher -p "Compare React vs Svelte"    # web research with citations
 initrunner run telegram-assistant --daemon                     # Telegram bot with memory
@@ -64,9 +66,28 @@ Or install with a package manager: `uv pip install "initrunner[recommended]"` / 
 
 ### Try a starter agent
 
-Run `initrunner run` to see all available starters, or try any of the examples above. The model is auto-detected from your API key. Override with `--model anthropic:claude-sonnet-4-5-20250929`.
+Run `initrunner run` to see all available starters. The model is auto-detected from your API key.
 
-Want to customize a starter? Copy it locally and edit:
+| Starter | What it does | Kind |
+|---------|-------------|------|
+| `helpdesk` | Drop your docs in, get an AI helpdesk with citations and memory | Agent (RAG) |
+| `code-review-team` | Multi-perspective review: architect, security, maintainer | Team |
+| `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer with shared memory | Team |
+| `codebase-analyst` | Index your repo, chat about architecture, learns patterns across sessions | Agent (RAG) |
+| `web-researcher` | Search the web and produce structured briefings with citations | Agent |
+| `content-pipeline` | Topic researcher, writer, editor/fact-checker via webhook or cron | Compose |
+| `project-monitor` | Heartbeat-driven health checks, learns baselines over time | Agent (Daemon) |
+| `telegram-assistant` | Telegram bot with memory and web search | Agent (Daemon) |
+| `discord-assistant` | Discord bot with memory and web search | Agent (Daemon) |
+
+RAG starters auto-ingest on first run -- just `cd` into your project and go:
+
+```bash
+cd ~/myproject
+initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
+```
+
+Want to customize? Copy locally and edit:
 
 ```bash
 initrunner run helpdesk --save ./my-helpdesk/
@@ -169,22 +190,23 @@ Start with the code-reviewer above. Each step adds one capability - no rewrites,
 
 ### Knowledge & memory
 
-Point at your docs for RAG - a `search_documents` tool is auto-registered. Add `memory` for persistent recall across sessions:
+Point at your docs for RAG - a `search_documents` tool is auto-registered. Set `auto: true` and it indexes on first run, no extra step:
 
 ```yaml
 spec:
   ingest:
+    auto: true
     sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
   memory:
-    store_path: ./memory.db
     semantic:
       max_memories: 1000
 ```
 
 ```bash
-initrunner ingest role.yaml   # extract | chunk | embed | store
-initrunner run role.yaml -i --resume   # search_documents + memory ready
+initrunner run role.yaml -i   # auto-ingests on first run, then search_documents + memory ready
 ```
+
+Common junk directories (`node_modules`, `.venv`, `__pycache__`, `.git`) are auto-excluded from glob patterns. Or ingest manually: `initrunner ingest role.yaml`.
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 

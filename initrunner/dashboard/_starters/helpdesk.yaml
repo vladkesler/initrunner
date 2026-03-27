@@ -98,6 +98,7 @@ spec:
       read_only: true
       allowed_extensions: [.md, .txt]
   ingest:
+    auto: true
     sources:
       - "./knowledge-base/**/*.md"
       - "./knowledge-base/**/*.txt"

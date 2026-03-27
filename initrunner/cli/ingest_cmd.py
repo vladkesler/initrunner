@@ -37,8 +37,10 @@ def ingest(
     role = load_role_or_exit(role_file)
 
     from initrunner.agent.loader import _load_dotenv
+    from initrunner.services.ingest import effective_ingest_base_dir
 
-    _load_dotenv(role_file.parent)
+    base_dir = effective_ingest_base_dir(role_file)
+    _load_dotenv(base_dir)
 
     if role.spec.ingest is None:
         console.print("[red]Error:[/red] No ingest config in role definition.")
@@ -48,7 +50,7 @@ def ingest(
         )
         raise typer.Exit(1)
 
-    files, urls = resolve_sources(role.spec.ingest.sources, base_dir=role_file.parent)
+    files, urls = resolve_sources(role.spec.ingest.sources, base_dir=base_dir)
     total = len(files) + len(urls)
 
     console.print(
@@ -76,7 +78,7 @@ def ingest(
                 role.spec.ingest,
                 role.metadata.name,
                 provider=role.spec.model.provider,
-                base_dir=role_file.parent,
+                base_dir=base_dir,
                 force=force,
                 progress_callback=on_progress,
                 max_file_size_mb=resource_limits.max_file_size_mb,
@@ -96,7 +98,7 @@ def ingest(
                     role.spec.ingest,
                     role.metadata.name,
                     provider=role.spec.model.provider,
-                    base_dir=role_file.parent,
+                    base_dir=base_dir,
                     force=True,
                     progress_callback=on_progress,
                     max_file_size_mb=resource_limits.max_file_size_mb,

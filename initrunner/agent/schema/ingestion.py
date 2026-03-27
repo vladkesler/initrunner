@@ -32,6 +32,7 @@ class EmbeddingConfig(BaseModel):
 
 
 class IngestConfig(BaseModel):
+    auto: bool = False
     sources: list[str]
     watch: bool = False
     chunking: ChunkingConfig = ChunkingConfig()

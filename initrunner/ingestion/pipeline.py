@@ -94,13 +94,22 @@ def _is_url(source: str) -> bool:
 
 
 def _resolve_file_sources(sources: list[str], base_dir: Path | None = None) -> list[Path]:
-    """Expand glob patterns into concrete file paths."""
+    """Expand glob patterns into concrete file paths.
+
+    Automatically excludes common non-source directories (node_modules,
+    .venv, __pycache__, .git, etc.) so broad patterns like ``./**/*.py``
+    work without picking up dependency trees.
+    """
+    from initrunner._constants import SKIP_DIRS
+
     files: list[Path] = []
     for pattern in sources:
         if base_dir:
             pattern = str(base_dir / pattern)
         matches = globmod.glob(pattern, recursive=True)
-        files.extend(Path(m) for m in matches if Path(m).is_file())
+        files.extend(
+            Path(m) for m in matches if Path(m).is_file() and not (SKIP_DIRS & set(Path(m).parts))
+        )
     return sorted(set(files))
 
 
