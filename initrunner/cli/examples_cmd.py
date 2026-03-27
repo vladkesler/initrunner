@@ -102,6 +102,7 @@ def examples_copy(
         ExampleDownloadError,
         ExampleNotFoundError,
         copy_example,
+        get_example,
     )
 
     try:
@@ -123,9 +124,10 @@ def examples_copy(
     for path in written:
         console.print(f"  {path}")
 
-    # Print next-step hints
-    primary = written[0] if written else None
-    if primary and primary.suffix in (".yaml", ".yml"):
+    # Print next-step hints using the example's primary role file
+    entry = get_example(name)
+    primary = entry.primary_file
+    if primary:
         console.print("\n[dim]Next steps:[/dim]")
         console.print(f"  [bold]initrunner validate {primary}[/bold]")
         console.print(f"  [bold]initrunner run {primary}[/bold]")

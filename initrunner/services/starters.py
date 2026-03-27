@@ -316,6 +316,7 @@ def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
                 env_list = " ".join(f"{v}=..." for v in setup["env_vars"] if v in missing_set)
                 if env_list:
                     errors.append(f"  Then: export {env_list}")
+                    errors.append("  Or add it to ~/.initrunner/.env")
                 if setup.get("docs_url"):
                     errors.append(f"  Docs: {setup['docs_url']}")
 

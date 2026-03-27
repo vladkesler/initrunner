@@ -35,7 +35,7 @@ initrunner run discord-assistant --daemon                      # Discord bot wit
 
 Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v1.45.0** -- Unified `run` command (chat merged in), built-in starter agents, `[recommended]` install bundle, dashboard prompt after setup. See the [Changelog](CHANGELOG.md).
+> **v1.45.1** -- Streamlined setup wizard (provider + model only, dashboard handoff), starters use your configured provider. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 

@@ -65,16 +65,33 @@ class TestPrepareStarter:
         assert result == "anthropic:claude-sonnet-4-5-20250929"
 
     def test_starter_auto_detects_model(self):
+        from initrunner.cli.run_config import RunConfig
         from initrunner.services.providers import DetectedProvider
 
         starter_path = STARTERS_DIR / "memory-assistant.yaml"
         fake_providers = [DetectedProvider(provider="openai", model="gpt-5-mini")]
-        with patch(
-            "initrunner.services.providers.list_available_providers",
-            return_value=fake_providers,
+        with (
+            patch(
+                "initrunner.cli.run_config.load_run_config",
+                return_value=RunConfig(),
+            ),
+            patch(
+                "initrunner.services.providers.list_available_providers",
+                return_value=fake_providers,
+            ),
         ):
             result = prepare_starter(starter_path, None)
             assert result == "openai:gpt-5-mini"
+
+    def test_starter_uses_run_yaml_model(self):
+        """Starters should prefer the user's run.yaml config over auto-detect."""
+        from initrunner.cli.run_config import RunConfig
+
+        starter_path = STARTERS_DIR / "memory-assistant.yaml"
+        cfg = RunConfig(provider="anthropic", model="claude-sonnet-4-6")
+        with patch("initrunner.cli.run_config.load_run_config", return_value=cfg):
+            result = prepare_starter(starter_path, None)
+            assert result == "anthropic:claude-sonnet-4-6"
 
     def test_starter_with_missing_prerequisites_exits(self):
         starter_path = STARTERS_DIR / "telegram-assistant.yaml"
