@@ -5,13 +5,12 @@ from __future__ import annotations
 import os
 
 import typer
-from dotenv import dotenv_values, set_key
 from rich.panel import Panel
 from rich.prompt import Prompt
 
 from initrunner._compat import _PROVIDER_EXTRAS, is_dashboard_available, require_provider
-from initrunner.cli._helpers import check_ollama_running, console, install_extra
-from initrunner.config import get_global_env_path, get_home_dir
+from initrunner.cli._helpers import check_ollama_running, console, handle_api_key, install_extra
+from initrunner.config import get_global_env_path
 from initrunner.services.setup import (
     ALL_PROVIDERS,
     PROVIDER_DESCRIPTIONS,
@@ -19,9 +18,6 @@ from initrunner.services.setup import (
     check_ollama_models,
     list_detected_providers,
     save_run_yaml,
-)
-from initrunner.services.setup import (
-    validate_api_key as _validate_api_key,
 )
 
 _TOTAL_STEPS = 3
@@ -392,78 +388,7 @@ def run_setup(
 
 
 # ---------------------------------------------------------------------------
-# Key handling helper
+# Key handling helper (delegated to shared _helpers module)
 # ---------------------------------------------------------------------------
 
-
-def _handle_api_key(
-    env_var: str,
-    env_path: os.PathLike,
-    *,
-    validate_provider: str | None,
-) -> None:
-    """Prompt for, validate, and persist an API key.
-
-    Shared between standard providers and presets to avoid duplicating the
-    env vs dotenv detection logic.
-    """
-    from pathlib import Path
-
-    env_path = Path(env_path)
-
-    has_provider_key = bool(os.environ.get(env_var))
-    if not has_provider_key and env_path.is_file():
-        has_provider_key = bool(dotenv_values(env_path).get(env_var))
-
-    if has_provider_key:
-        console.print(
-            f"[green]Using existing {env_var}.[/green] "
-            f"[dim]Edit {get_global_env_path()} to change it.[/dim]"
-        )
-        return
-
-    existing_in_env = os.environ.get(env_var)
-    existing_in_dotenv = None
-    if env_path.is_file():
-        existing_in_dotenv = dotenv_values(env_path).get(env_var)
-
-    if existing_in_env:
-        console.print(f"[green]Found {env_var} in environment.[/green]")
-        if not typer.confirm("Keep this key?", default=True):
-            existing_in_env = None
-
-    if existing_in_env:
-        api_key = existing_in_env
-    elif existing_in_dotenv:
-        console.print(f"[green]Found {env_var} in {env_path}[/green]")
-        if typer.confirm("Keep this key?", default=True):
-            api_key = existing_in_dotenv
-        else:
-            api_key = Prompt.ask(f"Enter your {env_var}", password=True)
-    else:
-        api_key = Prompt.ask(f"Enter your {env_var}", password=True)
-
-    # Validate the key
-    if validate_provider is not None:
-        with console.status("Validating API key..."):
-            valid = _validate_api_key(validate_provider, api_key)
-        if valid:
-            console.print("[green]API key is valid.[/green]")
-        else:
-            console.print("[yellow]Warning:[/yellow] API key validation failed.")
-            if typer.confirm("Re-enter the key?", default=True):
-                api_key = Prompt.ask(f"Enter your {env_var}", password=True)
-
-    # Write to .env if key is not already in the env
-    if not os.environ.get(env_var):
-        try:
-            home_dir = get_home_dir()
-            home_dir.mkdir(parents=True, exist_ok=True)
-            set_key(str(env_path), env_var, api_key)
-            env_path.chmod(0o600)
-            console.print(f"Saved to [cyan]{env_path}[/cyan]")
-        except (PermissionError, OSError) as exc:
-            console.print(
-                f"[yellow]Warning:[/yellow] Could not write {env_path}: {exc}\n"
-                f"Set it manually: [bold]export {env_var}={api_key}[/bold]"
-            )
+_handle_api_key = handle_api_key

@@ -13,6 +13,12 @@ initrunner doctor --quickstart
 
 # Test a specific role file
 initrunner doctor --quickstart --role role.yaml
+
+# Auto-fix: install missing SDKs, missing role extras, bump spec_version
+initrunner doctor --fix --role role.yaml
+
+# Non-interactive (CI) -- auto-confirm all fix prompts
+initrunner doctor --fix --yes --role role.yaml
 ```
 
 ## CLI Options
@@ -20,7 +26,9 @@ initrunner doctor --quickstart --role role.yaml
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `--quickstart` | `bool` | `false` | Run a smoke prompt to verify end-to-end connectivity. |
-| `--role` | `Path` | — | Role file to test. Used for `.env` loading and as the agent for `--quickstart`. |
+| `--role` | `Path` | -- | Role file to test. Used for `.env` loading and as the agent for `--quickstart`. |
+| `--fix` | `bool` | `false` | Interactively repair detected issues (missing SDKs, extras, stale spec_version). |
+| `--yes` / `-y` | `bool` | `false` | Auto-confirm all fix prompts. Required with `--fix` in non-interactive (piped) mode. |
 
 ## Config Scan
 
@@ -151,10 +159,51 @@ initrunner doctor --quickstart --role examples/roles/code-reviewer.yaml
 
 This is useful for verifying that a role's provider, model, and SDK configuration work before deploying it.
 
+## Auto-Fix (`--fix`)
+
+With `--fix`, doctor offers to repair the issues it finds. Each fix is prompted interactively (or auto-confirmed with `--yes`).
+
+### What `--fix` repairs
+
+| Issue | Fix | Requires `--role`? |
+|-------|-----|--------------------|
+| Provider SDK missing (key is set) | `install_extra()` installs the pip extra | No |
+| Missing API key | Prompts to enter and persist to `~/.initrunner/.env` | Interactive only (skipped with `--yes`) |
+| Role tools/triggers need uninstalled extras | Installs the matching extras (e.g. `initrunner[search]`) | Yes |
+| `spec_version` behind current | Bumps and writes the YAML file | Yes |
+
+### What `--fix` does NOT repair
+
+- **Deprecated fields** (e.g. `store_backend: zvec`): these remain diagnostic-only until explicit migration rules exist.
+- **Schema errors**: structural issues in the role YAML require manual editing.
+
+### Targeted API key repair
+
+When `--fix` runs interactively (no `--yes`):
+
+- With `--role`: derives the target provider from `spec.model.provider` and prompts for that key only.
+- Without `--role`: if exactly one provider needs a key, targets it automatically. If multiple need keys, asks you to choose.
+
+With `--yes`, API key repair is skipped (keys require interactive secret input).
+
+### Example
+
+```bash
+$ initrunner doctor --fix --yes --role role.yaml
+
+# Output:
+# Installed initrunner[anthropic]
+# ...
+# ╭──── Fixed ────╮
+# │  Installed initrunner[anthropic]  │
+# │  Bumped spec_version to 2         │
+# ╰──────────────╯
+```
+
 ## Use Cases
 
 - **First-time setup**: Run `initrunner doctor` after `initrunner setup` to verify everything is configured.
-- **CI/CD validation**: Add `initrunner doctor --quickstart` to your CI pipeline to catch provider configuration issues early.
+- **CI/CD validation**: Add `initrunner doctor --fix --yes --role role.yaml` to your CI pipeline to auto-install missing extras.
 - **Debugging**: When a role isn't working, `doctor` quickly shows whether the issue is a missing API key, missing SDK, or unreachable service.
 - **Multi-provider environments**: See at a glance which providers are configured and ready.
 
@@ -163,4 +212,4 @@ This is useful for verifying that a role's provider, model, and SDK configuratio
 | Code | Meaning |
 |------|---------|
 | `0` | Config scan passed (without `--quickstart`), or smoke test passed |
-| `1` | Smoke test failed or encountered an error |
+| `1` | Smoke test failed, error-level role issues found, or `--fix` without `--yes` in non-interactive mode |

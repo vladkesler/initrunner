@@ -1,7 +1,8 @@
-"""Doctor command: provider configuration check and quickstart smoke test."""
+"""Doctor command: provider configuration check, quickstart smoke test, and --fix."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -19,12 +20,20 @@ def doctor(
     role_file: Annotated[
         Path | None, typer.Option("--role", help="Agent directory or role YAML file to test")
     ] = None,
+    fix: Annotated[
+        bool, typer.Option("--fix", help="Interactively repair detected issues")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Auto-confirm all fix prompts")] = False,
 ) -> None:
     """Check provider configuration, API keys, and connectivity."""
     import os
 
     from initrunner._compat import require_provider
     from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
+
+    if fix and not yes and not sys.stdin.isatty():
+        console.print("[red]Error:[/red] --fix requires --yes in non-interactive mode.")
+        raise typer.Exit(1)
 
     if role_file is not None:
         from initrunner.cli._helpers import resolve_role_path
@@ -104,10 +113,27 @@ def doctor(
         "[dim]Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.[/dim]"
     )
 
+    # ----- Fix: providers (when --fix) -----
+    fixed: list[str] = []
+    if fix:
+        fixed.extend(_fix_providers(role_file, yes))
+
     # ----- Role Validation (when --role provided) -----
     has_role_errors = False
     if role_file is not None:
-        has_role_errors = _check_role_health(role_file)
+        has_role_errors, role_fixed = _check_and_fix_role_health(role_file, fix=fix, yes=yes)
+        fixed.extend(role_fixed)
+
+    # ----- Fix summary -----
+    if fixed:
+        console.print()
+        console.print(
+            Panel(
+                "\n".join(f"  {item}" for item in fixed),
+                title="Fixed",
+                border_style="green",
+            )
+        )
 
     if not quickstart or has_role_errors:
         if has_role_errors:
@@ -185,12 +211,96 @@ def doctor(
         raise typer.Exit(1) from None
 
 
-def _check_role_health(path: Path) -> bool:
-    """Validate a role file and display results. Returns True if errors found."""
+# ---------------------------------------------------------------------------
+# --fix: provider SDK + API key repair
+# ---------------------------------------------------------------------------
+
+
+def _fix_providers(role_file: Path | None, yes: bool) -> list[str]:
+    """Offer to install missing SDKs and set a targeted API key. Returns fix descriptions."""
+    from initrunner.cli._helpers import handle_api_key, install_extra
+    from initrunner.config import get_global_env_path
+    from initrunner.services.doctor import derive_role_provider, diagnose_providers
+
+    diagnoses = diagnose_providers()
+    fixed: list[str] = []
+
+    # --- SDK installs ---
+    for d in diagnoses:
+        if not d.fixable_sdk:
+            continue
+        if yes or typer.confirm(f"Install SDK for {d.provider}?", default=True):
+            if install_extra(d.extras_name):  # type: ignore[arg-type]
+                fixed.append(f"Installed initrunner[{d.extras_name}]")
+
+    # --- Targeted API key ---
+    target: tuple[str, str] | None = None
+
+    if role_file is not None:
+        from initrunner._yaml import load_raw_yaml
+
+        try:
+            raw = load_raw_yaml(role_file, ValueError)
+            target = derive_role_provider(raw)
+        except Exception:
+            pass
+    else:
+        key_fixable = [d for d in diagnoses if d.fixable_key]
+        if len(key_fixable) == 1:
+            target = (key_fixable[0].provider, key_fixable[0].env_var)
+        elif len(key_fixable) > 1:
+            if yes:
+                console.print(
+                    "[dim]Multiple providers need API keys; "
+                    "pass --role to target one, or run interactively.[/dim]"
+                )
+            else:
+                console.print()
+                console.print("[bold]Multiple providers need an API key:[/bold]")
+                for i, d in enumerate(key_fixable, 1):
+                    console.print(f"  {i}. {d.provider} ({d.env_var})")
+                from rich.prompt import Prompt
+
+                choice = Prompt.ask(
+                    "Which provider?",
+                    choices=[str(i) for i in range(1, len(key_fixable) + 1)],
+                )
+                picked = key_fixable[int(choice) - 1]
+                target = (picked.provider, picked.env_var)
+
+    if target is not None:
+        provider, env_var = target
+        import os
+
+        if not os.environ.get(env_var):
+            if yes:
+                # API keys require interactive input; can't auto-confirm.
+                console.print(
+                    f"[dim]Set {env_var} manually or re-run without --yes.[/dim]"
+                )
+            elif typer.confirm(f"Set API key for {provider} ({env_var})?", default=True):
+                validate_prov = provider if provider in ("openai", "anthropic") else None
+                handle_api_key(env_var, get_global_env_path(), validate_provider=validate_prov)
+                fixed.append(f"Set {env_var}")
+
+    return fixed
+
+
+# ---------------------------------------------------------------------------
+# Role health check + fix
+# ---------------------------------------------------------------------------
+
+
+def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[bool, list[str]]:
+    """Validate a role file, optionally fix issues.
+
+    Returns ``(has_errors, list_of_fix_descriptions)``.
+    """
     from initrunner._yaml import load_raw_yaml
     from initrunner.deprecations import CURRENT_ROLE_SPEC_VERSION, inspect_role_data
 
     console.print()
+    fixed: list[str] = []
 
     # Stage 1: parse YAML
     try:
@@ -203,7 +313,7 @@ def _check_role_health(path: Path) -> bool:
                 border_style="red",
             )
         )
-        return True
+        return True, fixed
 
     # Stage 2: inspect (non-raising except future version)
     try:
@@ -216,7 +326,7 @@ def _check_role_health(path: Path) -> bool:
                 border_style="red",
             )
         )
-        return True
+        return True, fixed
 
     role_name = raw.get("metadata", {}).get("name", path.stem)
     has_errors = False
@@ -268,4 +378,39 @@ def _check_role_health(path: Path) -> bool:
         else:
             console.print("[green]Role is valid and up to date.[/green]")
 
-    return has_errors
+    # ----- Fix: role extras + spec_version -----
+    if fix:
+        fixed.extend(_fix_role(path, raw, yes))
+
+    return has_errors, fixed
+
+
+def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
+    """Apply role-level fixes: missing extras and spec_version bump."""
+    import yaml
+
+    from initrunner.cli._helpers import install_extra
+    from initrunner.services.doctor import build_role_fix_plan, bump_spec_version
+
+    plan = build_role_fix_plan(raw)
+    fixed: list[str] = []
+
+    # --- Missing extras ---
+    for gap in plan.missing_extras:
+        if yes or typer.confirm(
+            f"Install initrunner[{gap.extras_name}] (needed by {gap.feature})?", default=True
+        ):
+            if install_extra(gap.extras_name):
+                fixed.append(f"Installed initrunner[{gap.extras_name}]")
+
+    # --- Spec version bump ---
+    if plan.can_bump_spec_version:
+        if yes or typer.confirm(f"Bump spec_version to {plan.latest_spec_version}?", default=True):
+            bumped = bump_spec_version(raw, plan.latest_spec_version)
+            yaml_str = yaml.dump(
+                bumped, default_flow_style=False, sort_keys=False, allow_unicode=True
+            )
+            path.write_text(yaml_str, encoding="utf-8")
+            fixed.append(f"Bumped spec_version to {plan.latest_spec_version}")
+
+    return fixed

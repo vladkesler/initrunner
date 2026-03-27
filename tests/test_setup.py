@@ -16,7 +16,7 @@ runner = CliRunner()
 
 # All tests that enter an API key mock _validate_api_key to avoid network calls
 # and the "Re-enter?" prompt that follows validation failures.
-_MOCK_VALIDATE = patch("initrunner.cli.setup_cmd._validate_api_key", return_value=True)
+_MOCK_VALIDATE = patch("initrunner.services.setup.validate_api_key", return_value=True)
 
 # Common mock for list_detected_providers (patched at the import location)
 _PATCH_DETECTED = "initrunner.cli.setup_cmd.list_detected_providers"
@@ -434,7 +434,7 @@ class TestWriteFailure:
 
         with (
             patch(
-                "initrunner.cli.setup_cmd.set_key",
+                "dotenv.set_key",
                 side_effect=PermissionError("permission denied"),
             ),
             _MOCK_VALIDATE,

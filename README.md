@@ -437,7 +437,7 @@ The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills,
 
 Role YAML files now include `metadata.spec_version` to track schema compatibility. When InitRunner removes or renames a config field, the deprecation system gives a clear error message pointing to the fix instead of a cryptic validation failure.
 
-Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
+Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. Add `--fix` to auto-install missing SDKs, install required extras for your role's tools/triggers, and bump `spec_version` -- or `--fix --yes` for non-interactive CI. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
 
 ## Community & Contributing
 
