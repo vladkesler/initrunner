@@ -27,5 +27,11 @@
   "type": "module",
   "dependencies": {
     "@xyflow/svelte": "^1.5.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=4.0.4",
+      "cookie": ">=0.7.0"
+    }
   }
 }
