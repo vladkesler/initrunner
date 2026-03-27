@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 
@@ -68,3 +69,23 @@ class SinkBase(ABC):
 
     @abstractmethod
     def send(self, payload: SinkPayload) -> None: ...
+
+
+class ChannelSinkBridge(SinkBase):
+    """Wraps a :class:`~initrunner.triggers.base.ChannelAdapter` as a sink."""
+
+    def __init__(self, adapter: object) -> None:
+        self._adapter = adapter
+
+    def send(self, payload: SinkPayload) -> None:
+        target = payload.trigger_metadata.get("channel_target")
+        if not target or not payload.output:
+            return
+        try:
+            self._adapter.send(target, payload.output)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "ChannelSinkBridge send failed: %s",
+                exc,
+                exc_info=True,
+            )

@@ -1,33 +1,41 @@
-"""Telegram long-polling trigger — outbound HTTPS only, no ports opened."""
+"""Telegram channel adapter -- outbound HTTPS only, no ports opened."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import threading
+from collections.abc import Callable
 
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import TelegramTriggerConfig
-from initrunner.triggers.base import TriggerBase, TriggerEvent, _chunk_text
+from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
 
 _logger = logging.getLogger(__name__)
 
 _TELEGRAM_MAX_MESSAGE = 4096
 
 
-class TelegramTrigger(TriggerBase):
-    """Trigger that listens for Telegram messages via long-polling."""
+def _log_async_error(future: asyncio.Future, target: str) -> None:
+    if (exc := future.exception()) is not None:
+        _logger.warning("Async send to %s failed: %s", target, exc)
 
-    def __init__(
-        self,
-        config: TelegramTriggerConfig,
-        callback,
-    ) -> None:
-        super().__init__(callback)
+
+class TelegramAdapter(ChannelAdapter):
+    """Bidirectional Telegram adapter: long-polling inbound, Bot API outbound."""
+
+    def __init__(self, config: TelegramTriggerConfig) -> None:
         self._config = config
+        self._stop_event = threading.Event()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._bot: object | None = None  # telegram.Bot, set during start()
 
-    def _run(self) -> None:
-        import asyncio
+    @property
+    def platform(self) -> str:
+        return "telegram"
 
+    def start(self, callback: Callable[[TriggerEvent], None]) -> None:
         from telegram import Update  # type: ignore[unresolved-import]
         from telegram.ext import (  # type: ignore[unresolved-import]
             ApplicationBuilder,
@@ -38,13 +46,12 @@ class TelegramTrigger(TriggerBase):
         token = os.environ.get(self._config.token_env)
         if not token:
             _logger.error(
-                "Env var %s not set — Telegram trigger not started", self._config.token_env
+                "Env var %s not set -- Telegram adapter not started", self._config.token_env
             )
             return
 
         allowed_usernames = set(self._config.allowed_users)
         allowed_user_ids = set(self._config.allowed_user_ids)
-        loop: asyncio.AbstractEventLoop | None = None
 
         async def on_message(update: Update, context) -> None:
             if update.message is None or update.message.text is None:
@@ -53,7 +60,6 @@ class TelegramTrigger(TriggerBase):
             username = user.username if user else None
             user_id = user.id if user else None
 
-            # Union semantics: match either username OR user ID. Empty = allow all.
             if allowed_usernames or allowed_user_ids:
                 username_ok = bool(allowed_usernames and username in allowed_usernames)
                 user_id_ok = bool(allowed_user_ids and user_id in allowed_user_ids)
@@ -68,23 +74,17 @@ class TelegramTrigger(TriggerBase):
             if update.effective_chat is None:
                 raise RuntimeError("Telegram update missing chat")
             chat_id = update.effective_chat.id
-            bot = context.bot
+            channel_target = str(chat_id)
 
             def reply_fn(text: str) -> None:
-                if loop is None:
-                    _logger.error("Event loop not available — cannot send Telegram reply")
-                    return
-                for chunk in _chunk_text(text, _TELEGRAM_MAX_MESSAGE):
-                    asyncio.run_coroutine_threadsafe(
-                        bot.send_message(chat_id=chat_id, text=chunk),
-                        loop,
-                    )
+                self.send(channel_target, text)
 
             prompt = safe_substitute(self._config.prompt_template, {"message": update.message.text})
             event = TriggerEvent(
                 trigger_type="telegram",
                 prompt=prompt,
                 metadata={
+                    "channel_target": channel_target,
                     "user": username or "",
                     "chat_id": str(chat_id),
                     "user_id": str(user_id or ""),
@@ -92,12 +92,12 @@ class TelegramTrigger(TriggerBase):
                 reply_fn=reply_fn,
                 principal_id=f"telegram:{user_id}" if user_id else None,
             )
-            await asyncio.get_running_loop().run_in_executor(None, self._callback, event)
+            await asyncio.get_running_loop().run_in_executor(None, callback, event)
 
         async def run_bot() -> None:
-            nonlocal loop
-            loop = asyncio.get_running_loop()
+            self._loop = asyncio.get_running_loop()
             app = ApplicationBuilder().token(token).build()
+            self._bot = app.bot
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
             await app.initialize()
             await app.start()
@@ -105,7 +105,6 @@ class TelegramTrigger(TriggerBase):
                 raise RuntimeError("Telegram updater not initialized")
             await app.updater.start_polling()
             _logger.info("Telegram bot started polling")
-            # Block until stop signal
             while not self._stop_event.is_set():
                 await asyncio.sleep(1)
             if app.updater is None:
@@ -114,4 +113,21 @@ class TelegramTrigger(TriggerBase):
             await app.stop()
             await app.shutdown()
 
+        self._stop_event.clear()
         asyncio.run(run_bot())
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def send(self, target: str, text: str) -> None:
+        if self._loop is None or self._bot is None:
+            return
+        try:
+            for chunk in _chunk_text(text, _TELEGRAM_MAX_MESSAGE):
+                future = asyncio.run_coroutine_threadsafe(
+                    self._bot.send_message(chat_id=int(target), text=chunk),  # type: ignore[union-attr]
+                    self._loop,
+                )
+                future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
+        except Exception:
+            _logger.warning("Failed to send Telegram message to %s", target, exc_info=True)

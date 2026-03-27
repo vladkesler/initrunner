@@ -1,18 +1,26 @@
-"""Discord WebSocket client trigger — outbound only, no ports opened."""
+"""Discord WebSocket channel adapter -- outbound only, no ports opened."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
+import threading
+from collections.abc import Callable
 
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import DiscordTriggerConfig
-from initrunner.triggers.base import TriggerBase, TriggerEvent, _chunk_text
+from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
 
 _logger = logging.getLogger(__name__)
 
 _DISCORD_MAX_MESSAGE = 2000
+
+
+def _log_async_error(future: asyncio.Future, target: str) -> None:
+    if (exc := future.exception()) is not None:
+        _logger.warning("Async send to %s failed: %s", target, exc)
 
 
 def _check_discord_access(
@@ -35,7 +43,7 @@ def _check_discord_access(
     # DM handling: roles require guild context, user IDs work everywhere
     if is_dm:
         if allowed_roles and not allowed_user_ids:
-            # Only roles configured — DMs denied (no role context)
+            # Only roles configured -- DMs denied (no role context)
             return False
         if allowed_user_ids and not user_id_passed:
             # User IDs configured but sender not listed
@@ -43,10 +51,10 @@ def _check_discord_access(
         # If both configured: user_id match allows DM even without role check
         if allowed_roles and allowed_user_ids and not user_id_passed:
             return False
-        # No identity filters at all, or user_id matched — allow
+        # No identity filters at all, or user_id matched -- allow
         return True
 
-    # Channel filter — only applies to guild channels, not DMs
+    # Channel filter -- only applies to guild channels, not DMs
     if allowed_channels and channel_id not in allowed_channels:
         return False
 
@@ -59,26 +67,26 @@ def _check_discord_access(
     return True
 
 
-class DiscordTrigger(TriggerBase):
-    """Trigger that listens for Discord messages via WebSocket client."""
+class DiscordAdapter(ChannelAdapter):
+    """Bidirectional Discord adapter: WebSocket inbound, REST API outbound."""
 
-    def __init__(
-        self,
-        config: DiscordTriggerConfig,
-        callback,
-    ) -> None:
-        super().__init__(callback)
+    def __init__(self, config: DiscordTriggerConfig) -> None:
         self._config = config
+        self._stop_event = threading.Event()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._client: object | None = None  # discord.Client, set during start()
 
-    def _run(self) -> None:
-        import asyncio
+    @property
+    def platform(self) -> str:
+        return "discord"
 
+    def start(self, callback: Callable[[TriggerEvent], None]) -> None:
         import discord  # type: ignore[unresolved-import]
 
         token = os.environ.get(self._config.token_env)
         if not token:
             _logger.error(
-                "Env var %s not set — Discord trigger not started", self._config.token_env
+                "Env var %s not set -- Discord adapter not started", self._config.token_env
             )
             return
 
@@ -88,19 +96,18 @@ class DiscordTrigger(TriggerBase):
         intents = discord.Intents.default()
         intents.message_content = True
         client = discord.Client(intents=intents)
+        self._client = client
 
         @client.event
         async def on_message(message: discord.Message) -> None:
             if message.author == client.user:
                 return
 
-            # Respond to DMs or mentions only
             is_dm = isinstance(message.channel, discord.DMChannel)
             is_mentioned = client.user in message.mentions
             if not is_dm and not is_mentioned:
                 return
 
-            # Build role set for guild members
             author_roles: set[str] = set()
             if isinstance(message.author, discord.Member):
                 author_roles = {r.name for r in message.author.roles}
@@ -121,17 +128,13 @@ class DiscordTrigger(TriggerBase):
                 )
                 return
 
-            channel = message.channel
-            loop = asyncio.get_running_loop()
+            channel_target = str(message.channel.id)
 
             def reply_fn(text: str) -> None:
-                for chunk in _chunk_text(text, _DISCORD_MAX_MESSAGE):
-                    asyncio.run_coroutine_threadsafe(channel.send(chunk), loop)
+                self.send(channel_target, text)
 
-            # Strip bot mention using mention ID pattern, not display name
             content = message.content
             if client.user:
-                # Discord raw mentions are <@USER_ID> or <@!USER_ID>
                 content = re.sub(
                     rf"<@!?{client.user.id}>",
                     "",
@@ -143,6 +146,7 @@ class DiscordTrigger(TriggerBase):
                 trigger_type="discord",
                 prompt=prompt,
                 metadata={
+                    "channel_target": channel_target,
                     "user": str(message.author),
                     "channel_id": str(message.channel.id),
                     "user_id": str(message.author.id),
@@ -153,9 +157,10 @@ class DiscordTrigger(TriggerBase):
                 if isinstance(message.author, discord.Member)
                 else [],
             )
-            await asyncio.get_running_loop().run_in_executor(None, self._callback, event)
+            await asyncio.get_running_loop().run_in_executor(None, callback, event)
 
         async def run_bot() -> None:
+            self._loop = asyncio.get_running_loop()
             stop_event = self._stop_event
 
             async def wait_stop():
@@ -168,4 +173,26 @@ class DiscordTrigger(TriggerBase):
                 stop_task = asyncio.create_task(wait_stop())
                 await asyncio.gather(client.start(token), stop_task)
 
+        self._stop_event.clear()
         asyncio.run(run_bot())
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def send(self, target: str, text: str) -> None:
+        if self._loop is None or self._client is None:
+            return
+        try:
+            client = self._client
+
+            async def _send_to_channel() -> None:
+                ch = client.get_channel(int(target))  # type: ignore[union-attr]
+                if ch is None:
+                    ch = await client.fetch_channel(int(target))  # type: ignore[union-attr]
+                for chunk in _chunk_text(text, _DISCORD_MAX_MESSAGE):
+                    await ch.send(chunk)
+
+            future = asyncio.run_coroutine_threadsafe(_send_to_channel(), self._loop)
+            future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
+        except Exception:
+            _logger.warning("Failed to send Discord message to %s", target, exc_info=True)

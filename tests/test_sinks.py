@@ -357,6 +357,65 @@ class TestSinkDispatcher:
         assert dispatcher.count == 1
 
 
+class TestChannelSinkBridge:
+    def test_send_with_channel_target(self):
+        from initrunner.sinks.base import ChannelSinkBridge
+
+        mock_adapter = MagicMock()
+        mock_adapter.platform = "test"
+        bridge = ChannelSinkBridge(mock_adapter)
+
+        payload = _make_payload(
+            output="hello world",
+            trigger_metadata={"channel_target": "12345"},
+        )
+        bridge.send(payload)
+
+        mock_adapter.send.assert_called_once_with("12345", "hello world")
+
+    def test_skip_missing_target(self):
+        from initrunner.sinks.base import ChannelSinkBridge
+
+        mock_adapter = MagicMock()
+        mock_adapter.platform = "test"
+        bridge = ChannelSinkBridge(mock_adapter)
+
+        payload = _make_payload(output="hello", trigger_metadata={})
+        bridge.send(payload)
+
+        mock_adapter.send.assert_not_called()
+
+    def test_skip_empty_output(self):
+        from initrunner.sinks.base import ChannelSinkBridge
+
+        mock_adapter = MagicMock()
+        mock_adapter.platform = "test"
+        bridge = ChannelSinkBridge(mock_adapter)
+
+        payload = _make_payload(
+            output="",
+            trigger_metadata={"channel_target": "12345"},
+        )
+        bridge.send(payload)
+
+        mock_adapter.send.assert_not_called()
+
+    def test_swallows_adapter_exceptions(self):
+        from initrunner.sinks.base import ChannelSinkBridge
+
+        mock_adapter = MagicMock()
+        mock_adapter.platform = "test"
+        mock_adapter.send.side_effect = RuntimeError("adapter exploded")
+        bridge = ChannelSinkBridge(mock_adapter)
+
+        payload = _make_payload(
+            output="hello",
+            trigger_metadata={"channel_target": "12345"},
+        )
+        # Should not raise
+        bridge.send(payload)
+
+
 class TestEnvVarExpansion:
     def test_webhook_url_expansion(self, monkeypatch):
         from initrunner.sinks.webhook import WebhookSink

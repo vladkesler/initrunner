@@ -213,6 +213,23 @@ $ initrunner validate role.yaml
 └─────────────────┴────────────────────────────────┘
 ```
 
+## Channel Sink Bridge
+
+The `ChannelSinkBridge` in `initrunner/sinks/base.py` wraps a `ChannelAdapter` (see [Channel Adapter Protocol](../core/triggers.md#channel-adapter-protocol)) so it can be used as a `SinkBase`. This enables routing agent results back through messaging platforms (Telegram, Discord, etc.) as a formal sink.
+
+The bridge reads `channel_target` from `trigger_metadata` to determine where to send. If `channel_target` is missing or the output is empty, the send is skipped.
+
+```python
+from initrunner.sinks.base import ChannelSinkBridge
+from initrunner.triggers.telegram import TelegramAdapter
+
+adapter = TelegramAdapter(config)
+sink = ChannelSinkBridge(adapter)
+sink_dispatcher.add_sink(sink)
+```
+
+This is a building block for programmatic wiring. There is no YAML `type: telegram` sink config -- channel adapters handle replies via `reply_fn` in the standard trigger flow.
+
 ## Delegate Sink (Compose Only)
 
 The `delegate` sink type is used exclusively in [compose definitions](agent_composer.md) to route a service's output to other services via in-memory queues. It is not available in standalone role YAML files — it is configured via the `sink:` field on a compose service.
