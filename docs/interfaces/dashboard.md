@@ -18,6 +18,7 @@ The browser opens automatically. Use `--no-open` to skip.
 | `--port` | int | `8100` | Port to listen on |
 | `--no-open` | flag | off | Don't open the browser automatically |
 | `--expose` | flag | off | Bind to `0.0.0.0` instead of `127.0.0.1` (see [Security](#security)) |
+| `--api-key` | string | -- | Require this API key for all requests (see [Security](#security)) |
 | `--roles-dir` | path | -- | Extra directories to scan for role YAML files (repeatable) |
 
 ```bash
@@ -26,6 +27,9 @@ initrunner dashboard --port 9000 --roles-dir ~/agents
 
 # Don't open browser
 initrunner dashboard --no-open
+
+# Expose with authentication
+initrunner dashboard --expose --api-key my-secret-key
 ```
 
 ## Pages
@@ -412,9 +416,29 @@ See [Design System](design-system.md) for the full reference (colors, typography
 
 By default, the dashboard binds to `127.0.0.1` (localhost only). It is not accessible from other machines.
 
-The `--expose` flag binds to `0.0.0.0`, making it accessible on all network interfaces. **No authentication is provided.** Only use `--expose` on trusted networks. Authentication support is planned for a future release.
+The `--expose` flag binds to `0.0.0.0`, making it accessible on all network interfaces. When exposing the dashboard, use `--api-key` to require authentication.
 
 The dashboard can execute any discovered agent with any prompt. It has the same access as `initrunner run` on the command line.
+
+### Authentication
+
+Pass `--api-key <value>` to enable authentication:
+
+```bash
+initrunner dashboard --api-key my-secret-key
+initrunner dashboard --expose --api-key my-secret-key
+```
+
+When enabled:
+
+- **Browser sessions**: Unauthenticated HTML requests redirect to `/login`. After entering the API key, a session cookie (`initrunner_token`, HttpOnly, SameSite=Strict) is set. All subsequent requests use this cookie.
+- **API clients**: Pass the key as a Bearer token: `Authorization: Bearer <key>`.
+- **Public endpoints**: Only `/api/health` and `/login` are accessible without authentication. All other routes (including `/api/docs` and `/api/openapi.json`) require a valid key.
+- **Logout**: `POST /logout` clears the session cookie.
+
+Without `--api-key`, the dashboard runs with no authentication (suitable for localhost-only use).
+
+**Limitations**: Authentication mode supports the built-in same-origin UI and Bearer-token API clients. The cross-origin Vite dev server (`localhost:5173`) is not supported in authenticated mode. For development with auth, use the production build served by the backend.
 
 ## API Reference
 
