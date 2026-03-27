@@ -171,6 +171,74 @@ def bump_spec_version(data: dict, target: int) -> dict:
     return out
 
 
+def bump_spec_version_text(text: str, target: int) -> str:
+    """Surgically patch ``metadata.spec_version`` in raw YAML text.
+
+    Preserves comments, block scalars, flow-style lists, and all other
+    formatting.  Raises ``ValueError`` if the metadata block cannot be
+    located or patched.
+    """
+    import re
+
+    # Detect newline style
+    nl = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(nl)
+
+    # Find `metadata:` top-level key
+    meta_idx: int | None = None
+    for i, line in enumerate(lines):
+        if re.match(r"^metadata:\s*$", line) or re.match(r"^metadata:\s*#", line):
+            meta_idx = i
+            break
+
+    if meta_idx is None:
+        raise ValueError("Cannot patch spec_version: no metadata: block found")
+
+    # Detect child indentation from first indented child line
+    indent: str | None = None
+    for i in range(meta_idx + 1, len(lines)):
+        line = lines[i]
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        leading = line[: len(line) - len(stripped)]
+        if leading:
+            indent = leading
+            break
+        else:
+            # Hit a top-level key with no children in between
+            break
+
+    if indent is None:
+        raise ValueError("Cannot patch spec_version: no metadata fields found")
+
+    # Find the end of the metadata block (next top-level key or EOF)
+    meta_end = len(lines)
+    for i in range(meta_idx + 1, len(lines)):
+        line = lines[i]
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        # Top-level key: no leading whitespace and contains ':'
+        if line[0] not in (" ", "\t") and ":" in line:
+            meta_end = i
+            break
+
+    # Case A: spec_version exists in metadata block -- replace it
+    sv_pattern = re.compile(r"^(\s+)spec_version:\s*\d+(.*)")
+    for i in range(meta_idx + 1, meta_end):
+        m = sv_pattern.match(lines[i])
+        if m:
+            trailing = m.group(2)  # preserve inline comments
+            lines[i] = f"{indent}spec_version: {target}{trailing}"
+            return nl.join(lines)
+
+    # Case B: spec_version missing -- insert before the next top-level key
+    new_line = f"{indent}spec_version: {target}"
+    lines.insert(meta_end, new_line)
+    return nl.join(lines)
+
+
 def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
     """Extract ``(provider, env_var)`` from a role's model config.
 

@@ -387,10 +387,8 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
 
 def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
     """Apply role-level fixes: missing extras and spec_version bump."""
-    import yaml
-
     from initrunner.cli._helpers import install_extra
-    from initrunner.services.doctor import build_role_fix_plan, bump_spec_version
+    from initrunner.services.doctor import build_role_fix_plan, bump_spec_version_text
 
     plan = build_role_fix_plan(raw)
     fixed: list[str] = []
@@ -403,14 +401,15 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
             if install_extra(gap.extras_name):
                 fixed.append(f"Installed initrunner[{gap.extras_name}]")
 
-    # --- Spec version bump ---
+    # --- Spec version bump (surgical text edit, preserves formatting) ---
     if plan.can_bump_spec_version:
         if yes or typer.confirm(f"Bump spec_version to {plan.latest_spec_version}?", default=True):
-            bumped = bump_spec_version(raw, plan.latest_spec_version)
-            yaml_str = yaml.dump(
-                bumped, default_flow_style=False, sort_keys=False, allow_unicode=True
-            )
-            path.write_text(yaml_str, encoding="utf-8")
-            fixed.append(f"Bumped spec_version to {plan.latest_spec_version}")
+            try:
+                text = path.read_text(encoding="utf-8")
+                text = bump_spec_version_text(text, plan.latest_spec_version)
+                path.write_text(text, encoding="utf-8")
+                fixed.append(f"Bumped spec_version to {plan.latest_spec_version}")
+            except ValueError as exc:
+                console.print(f"[yellow]Warning:[/yellow] {exc}")
 
     return fixed

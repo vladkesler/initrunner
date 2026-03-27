@@ -551,6 +551,102 @@ class TestBumpSpecVersion:
         assert data["metadata"]["spec_version"] == 1
 
 
+class TestBumpSpecVersionText:
+    def test_replaces_existing(self):
+        """Replaces an existing spec_version line."""
+        from initrunner.services.doctor import bump_spec_version_text
+
+        text = (
+            "apiVersion: initrunner/v1\n"
+            "metadata:\n"
+            "  name: test\n"
+            "  spec_version: 1\n"
+            "spec:\n"
+            "  role: test\n"
+        )
+        result = bump_spec_version_text(text, 2)
+        assert "  spec_version: 2\n" in result
+        assert "spec_version: 1" not in result
+
+    def test_inserts_missing(self):
+        """Inserts spec_version when missing from metadata block."""
+        from initrunner.services.doctor import bump_spec_version_text
+
+        text = (
+            "apiVersion: initrunner/v1\n"
+            "metadata:\n"
+            "  name: test\n"
+            "spec:\n"
+            "  role: test\n"
+        )
+        result = bump_spec_version_text(text, 2)
+        assert "  spec_version: 2\n" in result
+        # Inserted before spec:
+        lines = result.split("\n")
+        sv_idx = next(i for i, line in enumerate(lines) if "spec_version:" in line)
+        spec_idx = next(i for i, line in enumerate(lines) if line.startswith("spec:"))
+        assert sv_idx < spec_idx
+
+    def test_preserves_formatting(self):
+        """Comments, block scalars, and flow-style lists survive the bump."""
+        from initrunner.services.doctor import bump_spec_version_text
+
+        text = (
+            "# Top-level comment\n"
+            "apiVersion: initrunner/v1\n"
+            "kind: Agent\n"
+            "metadata:\n"
+            "  name: test\n"
+            "  tags: [engineering, review]\n"
+            "spec:\n"
+            "  role: |\n"
+            "    You are a helpful assistant.\n"
+            "    Be concise.\n"
+            "  model:\n"
+            "    provider: openai\n"
+        )
+        result = bump_spec_version_text(text, 2)
+        assert "# Top-level comment" in result
+        assert "tags: [engineering, review]" in result
+        assert "  role: |" in result
+        assert "    You are a helpful assistant." in result
+
+    def test_preserves_four_space_indent(self):
+        """Uses the file's own indent style (4 spaces)."""
+        from initrunner.services.doctor import bump_spec_version_text
+
+        text = (
+            "metadata:\n"
+            "    name: test\n"
+            "spec:\n"
+            "    role: test\n"
+        )
+        result = bump_spec_version_text(text, 2)
+        assert "    spec_version: 2\n" in result
+
+    def test_raises_on_no_metadata(self):
+        """Raises ValueError when metadata: block is missing."""
+        import pytest
+
+        from initrunner.services.doctor import bump_spec_version_text
+
+        with pytest.raises(ValueError, match="no metadata"):
+            bump_spec_version_text("spec:\n  role: test\n", 2)
+
+    def test_preserves_inline_comment(self):
+        """Preserves trailing inline comment on spec_version line."""
+        from initrunner.services.doctor import bump_spec_version_text
+
+        text = (
+            "metadata:\n"
+            "  name: test\n"
+            "  spec_version: 1  # keep current\n"
+            "spec:\n"
+        )
+        result = bump_spec_version_text(text, 2)
+        assert "  spec_version: 2  # keep current\n" in result
+
+
 # ---------------------------------------------------------------------------
 # CLI: --fix integration tests
 # ---------------------------------------------------------------------------
@@ -721,11 +817,26 @@ class TestDoctorFixRole:
         assert "Installed" in result.output
 
     def test_fix_bumps_spec_version(self, monkeypatch, tmp_path):
-        """--fix --role bumps spec_version on clean role."""
+        """--fix --role bumps spec_version preserving comments, block scalars, flow lists."""
         _clear_provider_keys(monkeypatch)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
-        content = _valid_role_yaml().replace("spec_version: 2", "spec_version: 1")
+        content = textwrap.dedent("""\
+            # Role file with formatting to preserve
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-bump
+              tags: [engineering, review]
+              spec_version: 1
+            spec:
+              role: |
+                You are a helpful assistant.
+                Be concise.
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
         p = tmp_path / "role.yaml"
         p.write_text(content)
 
@@ -735,11 +846,18 @@ class TestDoctorFixRole:
 
         assert result.exit_code == 0
         assert "Bumped spec_version" in result.output
-        # Verify file was actually updated
+
+        raw = p.read_text()
+        # Parsed value is correct
         import yaml
 
-        updated = yaml.safe_load(p.read_text())
+        updated = yaml.safe_load(raw)
         assert updated["metadata"]["spec_version"] == 2
+        # Formatting preserved
+        assert "# Role file with formatting to preserve" in raw
+        assert "tags: [engineering, review]" in raw
+        assert "  role: |" in raw
+        assert "    You are a helpful assistant." in raw
 
     def test_fix_does_not_write_for_deprecation_hits(self, monkeypatch, tmp_path):
         """--fix --role does NOT write back for deprecated fields."""
