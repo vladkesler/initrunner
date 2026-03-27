@@ -33,6 +33,7 @@ def memory_clear(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        console.print("[dim]Hint:[/dim] Add a [bold]memory:[/bold] section to your role YAML.")
         raise typer.Exit(1)
 
     if what not in ("sessions", "memories", "all"):
@@ -86,6 +87,7 @@ def memory_export(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        console.print("[dim]Hint:[/dim] Add a [bold]memory:[/bold] section to your role YAML.")
         raise typer.Exit(1)
 
     data = export_memories_sync(role)
@@ -114,6 +116,7 @@ def memory_list(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        console.print("[dim]Hint:[/dim] Add a [bold]memory:[/bold] section to your role YAML.")
         raise typer.Exit(1)
 
     mt_filter = None
@@ -159,6 +162,7 @@ def memory_import(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        console.print("[dim]Hint:[/dim] Add a [bold]memory:[/bold] section to your role YAML.")
         raise typer.Exit(1)
 
     if not input_file.exists():
@@ -197,6 +201,7 @@ def memory_consolidate(
 
     if role.spec.memory is None:
         console.print("[red]Error:[/red] No memory config in role definition.")
+        console.print("[dim]Hint:[/dim] Add a [bold]memory:[/bold] section to your role YAML.")
         raise typer.Exit(1)
 
     from initrunner.services.memory import consolidate_memories_sync

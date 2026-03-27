@@ -91,6 +91,10 @@ def compose_validate(
         compose = load_compose_sync(compose_file)
     except ComposeLoadError as e:
         console.print(f"[red]Invalid:[/red] {e}")
+        console.print(
+            "[dim]Hint:[/dim] Run [bold]initrunner validate[/bold]"
+            " on each service role individually."
+        )
         raise typer.Exit(1) from None
 
     table = Table(title=f"Compose: {compose.metadata.name}")
@@ -115,6 +119,10 @@ def compose_validate(
         role_path = base_dir / svc.role
         if not role_path.exists():
             console.print(f"[red]Error:[/red] Role file not found for '{name}': {role_path}")
+            console.print(
+                "[dim]Hint:[/dim] Check that role paths in compose.yaml"
+                " are relative to the compose file directory."
+            )
             all_valid = False
 
     if all_valid:
@@ -137,6 +145,9 @@ def compose_up(
         compose = load_compose_sync(compose_file)
     except ComposeLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner compose validate {compose_file}[/bold] first."
+        )
         raise typer.Exit(1) from None
 
     audit_logger = create_audit_logger(audit_db, no_audit)
@@ -166,6 +177,9 @@ def compose_events(
     db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found: {db_path}")
+        console.print(
+            "[dim]Hint:[/dim] Run [bold]initrunner compose up[/bold] first to create audit data."
+        )
         raise typer.Exit(1)
 
     events = query_delegate_events_sync(
@@ -257,6 +271,9 @@ def compose_install(
         compose = load_compose(compose_file)
     except ComposeLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner compose validate {compose_file}[/bold] first."
+        )
         raise typer.Exit(1) from None
 
     try:
@@ -268,6 +285,10 @@ def compose_install(
         )
     except SystemdError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            "[dim]Hint:[/dim] Make sure systemd user services are"
+            " available: [bold]systemctl --user status[/bold]"
+        )
         raise typer.Exit(1) from None
 
     console.print(f"[green]Installed[/green] {info.unit_name}")
@@ -352,6 +373,7 @@ def _systemctl_wrapper(action: str, name_or_file: str) -> None:
         )
     except subprocess.CalledProcessError as e:
         console.print(f"[red]Error:[/red] systemctl {action} failed (exit {e.returncode}).")
+        console.print("[dim]Hint:[/dim] Check logs with [bold]initrunner compose logs[/bold].")
         raise typer.Exit(1) from None
     except subprocess.TimeoutExpired:
         console.print(f"[red]Error:[/red] systemctl {action} timed out.")

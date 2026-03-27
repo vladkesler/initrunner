@@ -50,6 +50,9 @@ def skill_validate(
         skill_def = load_skill(skill_path)
     except SkillLoadError as e:
         console.print(f"[red]Invalid:[/red] {e}")
+        console.print(
+            "[dim]Hint:[/dim] Check SKILL.md frontmatter syntax (YAML between --- delimiters)."
+        )
         raise typer.Exit(1) from None
 
     statuses = check_requirements(skill_def)

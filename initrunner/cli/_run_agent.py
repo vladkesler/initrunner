@@ -13,6 +13,7 @@ from initrunner.cli._helpers import (
     console,
     resolve_model_override,
     resolve_skill_dirs,
+    suggest_next,
 )
 
 if TYPE_CHECKING:
@@ -275,6 +276,7 @@ def _run_agent(
                 model_override=model_override,
                 stream=use_stream,
             )
+            suggest_next("run_repl_exit", role, role_file)
         else:
             run_interactive(
                 agent,
@@ -286,7 +288,13 @@ def _run_agent(
                 model_override=model_override,
                 stream=use_stream,
             )
+            suggest_next("run_repl_exit", role, role_file)
 
         # Export for non-interactive branches (after run completes)
         if report is not None and run_result is not None and not (user_prompt and interactive):
             _maybe_export_report(role, run_result, user_prompt, report, report_template, dry_run)
+
+        # Suggest next steps for non-interactive rich/stream runs (after report export)
+        if run_result is not None and effective not in ("text", "json") and not interactive:
+            ctx = "run_autonomous" if autonomous else "run_single"
+            suggest_next(ctx, role, role_file)

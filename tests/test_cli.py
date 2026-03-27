@@ -1327,3 +1327,166 @@ class TestHelpPanels:
         """hidden=True hides from help but the sub-app remains invocable."""
         result = runner.invoke(app, ["hub", "--help"])
         assert result.exit_code == 0
+
+
+class TestSuggestNext:
+    """Tests for the suggest_next() helper and its CLI integration."""
+
+    def test_suggest_next_tty_shows_footer(self):
+        """suggest_next prints suggestions when stdout is a TTY."""
+        from initrunner.cli._helpers import suggest_next
+
+        role = MagicMock()
+        role.spec.autonomy = None
+        role.spec.ingest = None
+        role.spec.memory = None
+
+        from io import StringIO
+
+        buf = StringIO()
+        with patch("sys.stdout", buf), patch("sys.stdout.isatty", return_value=True):
+            suggest_next("run_single", role, __import__("pathlib").Path("role.yaml"))
+
+        output = buf.getvalue()
+        assert "Next steps" in output
+        assert "initrunner run" in output
+
+    def test_suggest_next_non_tty_silent(self):
+        """suggest_next prints nothing when stdout is not a TTY."""
+        from initrunner.cli._helpers import suggest_next
+
+        role = MagicMock()
+        role.spec.autonomy = None
+
+        from io import StringIO
+
+        buf = StringIO()
+        with patch("sys.stdout", buf), patch("sys.stdout.isatty", return_value=False):
+            suggest_next("run_single", role, __import__("pathlib").Path("role.yaml"))
+
+        assert buf.getvalue() == ""
+
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
+    def test_run_format_json_no_footer(self, mock_load, mock_run_single, tmp_path):
+        """--format json must not append next-step text."""
+        from initrunner.agent.executor import RunResult
+        from initrunner.agent.schema.output import OutputConfig
+
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.output = OutputConfig(type="text")
+        agent = MagicMock()
+        mock_load.return_value = (role, agent)
+        mock_run_single.return_value = (
+            RunResult(run_id="test", output='{"result": "ok"}', success=True),
+            [],
+        )
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("dummy")
+
+        result = runner.invoke(
+            app, ["run", str(role_file), "-p", "hello", "--format", "json", "--no-audit"]
+        )
+        assert result.exit_code == 0
+        assert "Next steps" not in result.output
+
+    def test_validate_shows_next_steps(self, tmp_path):
+        """validate should show next-step suggestions for Agent roles."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+              description: test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+        # CliRunner is non-TTY, so suggest_next should be suppressed
+        result = runner.invoke(app, ["validate", str(role_file)])
+        assert result.exit_code == 0
+        assert "Valid" in result.output
+        # Non-TTY: no footer expected
+        assert "Next steps" not in result.output
+
+    def test_ingest_no_config_shows_hint(self, tmp_path):
+        """Missing ingest config should show a hint."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+            spec:
+              role: Test
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+        result = runner.invoke(app, ["ingest", str(role_file)])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+        assert "ingest:" in result.output
+
+
+class TestErrorHints:
+    """Tests for inline error hints across CLI commands."""
+
+    def test_missing_role_path_hint(self):
+        result = runner.invoke(app, ["validate", "/nonexistent/role.yaml"])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+
+    def test_role_load_failure_hint(self, tmp_path):
+        """Malformed role YAML should show a hint pointing to validate."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("not: valid: yaml: content")
+        result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+
+    def test_memory_no_config_hint(self, tmp_path):
+        """Missing memory config should show a hint."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+            spec:
+              role: Test
+              model:
+                provider: openai
+                name: gpt-5-mini
+        """)
+        )
+        result = runner.invoke(app, ["memory", "clear", str(role_file)])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+        assert "memory:" in result.output
+
+    def test_audit_db_not_found_hint(self, tmp_path):
+        """Missing audit DB should show a hint."""
+        result = runner.invoke(app, ["audit", "prune", "--audit-db", str(tmp_path / "missing.db")])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+        assert "audit" in result.output.lower()
+
+    def test_no_role_yaml_in_dir_hint(self, tmp_path):
+        """Empty directory should show a hint about creating a role."""
+        result = runner.invoke(app, ["validate", str(tmp_path)])
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+        assert "initrunner new" in result.output

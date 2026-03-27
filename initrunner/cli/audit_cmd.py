@@ -32,6 +32,10 @@ def audit_prune(
     db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
+        console.print(
+            "[dim]Hint:[/dim] Run an agent first to create the audit log,"
+            " or pass [bold]--audit-db[/bold]."
+        )
         raise typer.Exit(1)
 
     deleted = audit_prune_sync(
@@ -64,6 +68,10 @@ def audit_export(
     db_path = Path(audit_db or DEFAULT_DB_PATH)
     if not db_path.exists():
         console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
+        console.print(
+            "[dim]Hint:[/dim] Run an agent first to create the audit log,"
+            " or pass [bold]--audit-db[/bold]."
+        )
         raise typer.Exit(1)
 
     if format not in ("json", "csv"):

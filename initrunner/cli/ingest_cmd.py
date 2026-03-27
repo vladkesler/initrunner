@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from initrunner.cli._helpers import console, load_role_or_exit
+from initrunner.cli._helpers import console, load_role_or_exit, suggest_next
 
 
 def _status_color(status: object) -> str:
@@ -42,6 +42,10 @@ def ingest(
 
     if role.spec.ingest is None:
         console.print("[red]Error:[/red] No ingest config in role definition.")
+        console.print(
+            "[dim]Hint:[/dim] Add an [bold]ingest:[/bold] section to your role YAML."
+            " See [bold]initrunner examples[/bold] for templates."
+        )
         raise typer.Exit(1)
 
     files, urls = resolve_sources(role.spec.ingest.sources, base_dir=role_file.parent)
@@ -117,3 +121,5 @@ def ingest(
     for fr in stats.file_results:
         if fr.status == FileStatus.ERROR:
             console.print(f"  [red]Error:[/red] {fr.path}: {fr.error}")
+
+    suggest_next("ingest", role, role_file)

@@ -171,6 +171,23 @@ initrunner run role.yaml -p "summarize this" --format text > summary.txt
 initrunner run role.yaml -p "hello" --format rich
 ```
 
+## Post-command suggestions
+
+After a successful `run`, `validate`, or `ingest`, the CLI prints 2-3
+contextual next-step commands you can copy-paste. Suggestions adapt to the
+role's configuration (e.g. ingest and memory commands only appear when those
+sections are defined).
+
+Suggestions are suppressed when stdout is not a TTY (piped output) and when
+using `--format json` or `--format text`, so machine-readable output stays
+clean.
+
+## Error hints
+
+Most CLI error messages include a `Hint:` line with the likely fix -- for
+example, the correct command to run, a missing YAML section to add, or a
+doc page to check. These appear automatically after `Error:` output.
+
 ## Ingest options
 
 | Flag | Description |

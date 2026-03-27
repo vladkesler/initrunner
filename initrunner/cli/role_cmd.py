@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from initrunner.cli._helpers import console, resolve_skill_dirs
+from initrunner.cli._helpers import console, resolve_skill_dirs, suggest_next
 from initrunner.cli._options import SkillDirOption
 
 
@@ -40,6 +40,10 @@ def validate(
         role = load_role_sync(role_file)
     except RoleLoadError as e:
         console.print(f"[red]Invalid:[/red] {e}")
+        console.print(
+            "[dim]Hint:[/dim] Check YAML syntax and field names."
+            " See [bold]docs/getting-started/choosing-features.md[/bold]."
+        )
         raise typer.Exit(1) from None
 
     table = Table(title=f"Role: {role.metadata.name}")
@@ -133,6 +137,7 @@ def validate(
 
     console.print(table)
     console.print("[green]Valid[/green]")
+    suggest_next("validate", role, role_file)
 
 
 def setup(

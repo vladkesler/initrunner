@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import typer
 from rich.console import Console
@@ -72,6 +73,10 @@ def resolve_role_path(path: Path) -> Path:
 
         if len(candidates) == 0:
             console.print(f"[red]Error:[/red] No role YAML found in {path}")
+            console.print(
+                "[dim]Hint:[/dim] Create one with [bold]initrunner new[/bold],"
+                " or run [bold]initrunner examples[/bold]."
+            )
             raise typer.Exit(1)
 
         names = ", ".join(sorted(c.name for c in candidates))
@@ -87,6 +92,9 @@ def resolve_role_path(path: Path) -> Path:
         resolved = resolve_installed_path(str(path))
     except RegistryError as exc:
         console.print(f"[red]Error:[/red] {exc}")
+        console.print(
+            "[dim]Hint:[/dim] Run [bold]initrunner examples[/bold] to see available starters."
+        )
         raise typer.Exit(1) from None
 
     if resolved is not None:
@@ -100,6 +108,9 @@ def resolve_role_path(path: Path) -> Path:
         return starter_path
 
     console.print(f"[red]Error:[/red] Path not found: {path}")
+    console.print(
+        "[dim]Hint:[/dim] Check the path, or run [bold]initrunner examples[/bold] to see starters."
+    )
     raise typer.Exit(1)
 
 
@@ -330,6 +341,9 @@ def load_role_or_exit(role_file: Path) -> RoleDefinition:
         return load_role_sync(role_file)
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+        )
         raise typer.Exit(1) from None
 
 
@@ -360,6 +374,9 @@ def load_and_build_or_exit(
         )
     except RoleLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+        )
         raise typer.Exit(1) from None
 
 
@@ -503,3 +520,68 @@ def command_context(
                 from initrunner.observability import shutdown_tracing
 
                 shutdown_tracing()
+
+
+_NextContext = Literal["run_single", "run_autonomous", "run_repl_exit", "ingest", "validate"]
+
+
+def suggest_next(context: _NextContext, role: RoleDefinition, role_path: Path) -> None:
+    """Print 2-3 contextual next-step suggestions after a command."""
+    if not sys.stdout.isatty():
+        return
+
+    try:
+        role_ref = str(role_path.relative_to(Path.cwd()))
+    except ValueError:
+        role_ref = str(role_path)
+
+    suggestions: list[tuple[str, str]] = []
+
+    if context == "run_single":
+        suggestions.append((f"initrunner run {role_ref} -i", "interactive REPL"))
+        if role.spec.autonomy:
+            suggestions.append((f'initrunner run {role_ref} -a -p "..."', "autonomous mode"))
+        else:
+            suggestions.append(
+                (
+                    f'initrunner run {role_ref} --report report.md -p "..."',
+                    "export a report",
+                )
+            )
+
+    elif context == "run_repl_exit":
+        if role.spec.ingest:
+            suggestions.append((f"initrunner ingest {role_ref}", "re-ingest documents"))
+        if role.spec.memory:
+            suggestions.append((f"initrunner memory list {role_ref}", "view stored memories"))
+        if role.spec.autonomy:
+            suggestions.append((f'initrunner run {role_ref} -a -p "..."', "autonomous mode"))
+
+    elif context == "run_autonomous":
+        suggestions.append((f"initrunner run {role_ref} -i", "continue interactively"))
+        if role.spec.memory:
+            suggestions.append((f"initrunner memory list {role_ref}", "view stored memories"))
+        suggestions.append(
+            (
+                f'initrunner run {role_ref} --report report.md -a -p "..."',
+                "export a report",
+            )
+        )
+
+    elif context == "ingest":
+        suggestions.append((f'initrunner run {role_ref} -p "..."', "run the agent"))
+        suggestions.append((f"initrunner validate {role_ref}", "re-validate role"))
+
+    elif context == "validate":
+        suggestions.append((f'initrunner run {role_ref} -p "..."', "run the agent"))
+        if role.spec.ingest:
+            suggestions.append((f"initrunner ingest {role_ref}", "ingest documents"))
+        suggestions.append((f"initrunner doctor --role {role_ref}", "smoke-test provider"))
+
+    if not suggestions:
+        return
+
+    console.print()
+    console.print("[dim]Next steps:[/dim]")
+    for cmd, desc in suggestions[:3]:
+        console.print(f"  [bold]{cmd}[/bold]  [dim]# {desc}[/dim]")

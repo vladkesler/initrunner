@@ -166,6 +166,7 @@ def mcp_toolkit(
     if config is not None:
         if not config.exists():
             err_console.print(f"[red]Error:[/red] Config file not found: {config}")
+            err_console.print("[dim]Hint:[/dim] See the MCP gateway docs for toolkit.yaml format.")
             raise typer.Exit(1)
         try:
             tk_config = load_toolkit_config(config)
