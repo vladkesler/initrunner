@@ -65,9 +65,20 @@ Skills come in two flavors. **Tool-providing** skills (e.g. kube skill brings `s
 
 ## Versioning
 
-The package version is defined in one place: `initrunner/__init__.py` (`__version__ = "x.y.z"`). Hatchling reads it at build time via `[tool.hatch.version]` in `pyproject.toml` — do **not** add a static `version` field to `[project]`.
+The package uses Calendar Versioning: `YYYY.M.PATCH` (e.g. `2026.3.1`). The version is defined in one place: `initrunner/__init__.py` (`__version__ = "2026.3.1"`). Hatchling reads it at build time via `[tool.hatch.version]` in `pyproject.toml` -- do **not** add a static `version` field to `[project]`.
 
-To release a new version, run `scripts/release.sh <version>` (e.g. `scripts/release.sh 0.6.0`). The script updates `__init__.py`, adds a CHANGELOG header, commits, and tags. Then push with `git push origin main && git push origin v<version>`.
+PATCH resets to 1 on month change (`2026.3.5` -> `2026.4.1`). Pre-releases use PEP 440 suffixes: `2026.4.1rc1`, `2026.4.1.dev1`.
+
+### Releasing
+
+`scripts/release.sh <version>` bumps `__init__.py`, adds a CHANGELOG header, and commits locally. It also creates a local tag, but **do not push directly** -- main is branch-protected. The canonical stable-release flow is:
+
+1. Run `scripts/release.sh <version>` on local main (creates commit + local tag)
+2. Create a branch (`release/<version>`), push it, open a PR
+3. After CI passes and squash-merge: `git checkout main && git fetch origin && git reset --hard origin/main`
+4. Delete the stale local tag, re-tag the merge commit: `git tag v<version> && git push origin v<version>`
+
+The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 
 ## Documentation Index
 

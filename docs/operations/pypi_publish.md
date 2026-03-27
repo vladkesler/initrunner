@@ -15,11 +15,16 @@ Both workflows share the same lint and test gates before building or publishing.
 
 Run the release script to prepare a version bump:
 
-    scripts/release.sh 0.6.0
+    scripts/release.sh 2026.3.1
 
-This updates `initrunner/__init__.py`, adds a CHANGELOG section header, commits, and creates the `v0.6.0` tag. Then push to trigger the release pipeline:
+This updates `initrunner/__init__.py`, adds a CHANGELOG section header, commits, and creates a local `v2026.3.1` tag. **Do not push main directly** -- main is branch-protected. The canonical flow is:
 
-    git push origin main && git push origin v0.6.0
+    git checkout -b release/2026.3.1
+    git push -u origin release/2026.3.1
+    gh pr create --title "chore: release 2026.3.1"
+    # After CI passes and squash-merge:
+    git checkout main && git fetch origin && git reset --hard origin/main
+    git tag v2026.3.1 && git push origin v2026.3.1
 
 ## Production Publish (`release.yml`)
 
@@ -78,7 +83,7 @@ The package description shown on PyPI comes from `README.md`, embedded at build 
 
 ### Tag/version mismatch
 
-The build job fails with `Tag vX.Y.Z does not match package version ...`. This means the version in `initrunner/__init__.py` was not bumped before tagging. Use `scripts/release.sh <version>` to avoid this — it updates the version, commits, and tags in one step. To fix manually: delete the tag, bump the version in `initrunner/__init__.py`, commit, then re-tag.
+The build job fails with `Tag vX.Y.Z does not match package version ...`. This means the version in `initrunner/__init__.py` was not bumped before tagging. Use `scripts/release.sh <version>` to prepare the commit. If using PR-then-tag flow, ensure you re-tag the squash-merged commit on main, not the pre-merge commit on the branch.
 
 ### Broken images on PyPI
 
@@ -98,7 +103,7 @@ If the publish job fails with authentication errors:
 
 ### TestPyPI version conflicts
 
-TestPyPI rejects uploads of versions that already exist. Unlike production PyPI, you cannot re-upload the same version even after deletion. Bump the pre-release suffix (e.g., `0.3.0rc1` → `0.3.0rc2`) and try again.
+TestPyPI rejects uploads of versions that already exist. Unlike production PyPI, you cannot re-upload the same version even after deletion. Bump the pre-release suffix (e.g., `2026.3.1rc1` -> `2026.3.1rc2`) and try again.
 
 ### Pre-release version rejected
 
