@@ -7,6 +7,7 @@ from pathlib import Path
 
 import typer
 
+from initrunner.agent.prompt import UserPrompt
 from initrunner.cli._helpers import console
 from initrunner.services.providers import (
     EPHEMERAL_TOOL_DEFAULTS,
@@ -202,7 +203,7 @@ def dispatch_ephemeral_repl(
     *,
     provider: str | None,
     model: str | None,
-    prompt: str | None,
+    prompt: UserPrompt | None,
     interactive: bool,
     profile_tools: list[dict],
     extra_tools: list[dict],
