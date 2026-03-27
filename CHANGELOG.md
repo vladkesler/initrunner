@@ -1,8 +1,17 @@
 # Changelog
 
-## [1.45.0] - 2026-03-27
+## [1.45.1] - 2026-03-27
 
-## [Unreleased]
+### Changed
+- **Streamlined setup wizard** -- setup now configures provider, API key, and model only. Role/tool/intent configuration moved to the dashboard, which is offered at the end of setup
+- **Starters use configured provider** -- `initrunner run helpdesk -i` and other starters pick up the provider/model from `run.yaml` instead of hardcoding openai
+- **Better setup UX** -- provider list with descriptions and cloud/local grouping, numeric input for provider and intent, condensed security notice, step progress indicator `[1/3]...[3/3]`
+- **Model descriptions** -- model selection shows capability tier (Frontier/Balanced/Lightweight) instead of vague labels
+
+### Fixed
+- **`examples copy` shows correct next-steps** -- multi-file examples now reference the primary role file in next-steps commands, not the first file alphabetically
+
+## [1.45.0] - 2026-03-27
 
 ### Added
 - **Unified `run` command** -- `chat` merged into `run` as ephemeral mode. `run` with no args starts an ephemeral REPL; `--list` shows starter agents. New flags: `--provider`, `--tool-profile`, `--tools`, `--memory`, `--ingest`, `--save`

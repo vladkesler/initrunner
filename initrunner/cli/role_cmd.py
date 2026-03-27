@@ -140,19 +140,11 @@ def setup(
         str | None, typer.Option(help="Provider (skip interactive selection)")
     ] = None,
     name: Annotated[str, typer.Option(help="Agent name")] = "my-agent",
-    intent: Annotated[
-        str | None,
-        typer.Option(
-            help="Intent: chatbot, knowledge, memory, telegram-bot, discord-bot, "
-            "api-agent, daemon, from-example"
-        ),
-    ] = None,
     model: Annotated[
         str | None,
-        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-5-20250929)"),
+        typer.Option(help="Model name (e.g. gpt-5-mini, claude-sonnet-4-6)"),
     ] = None,
     skip_test: Annotated[bool, typer.Option("--skip-test", help="Skip connectivity test")] = False,
-    output: Annotated[Path, typer.Option(help="Role output path")] = Path("role.yaml"),
     accept_risks: Annotated[
         bool,
         typer.Option("--accept-risks", "-y", help="Accept security disclaimer without prompting"),
@@ -168,9 +160,7 @@ def setup(
     run_setup(
         provider=provider,
         name=name,
-        intent=intent,
         skip_test=skip_test,
-        output=output,
         accept_risks=accept_risks,
         model=model,
         skip_run_yaml=skip_run_yaml,

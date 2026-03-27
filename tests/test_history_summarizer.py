@@ -162,8 +162,8 @@ class TestEstimateTokens:
             kind = "image-url"
 
         msgs: list[ModelMessage] = [
-            ModelRequest(parts=[UserPromptPart(content=["text", FakeImageUrl()])])
-        ]  # type: ignore[arg-type]
+            ModelRequest(parts=[UserPromptPart(content=["text", FakeImageUrl()])])  # type: ignore[arg-type]
+        ]
         est = estimate_tokens(msgs)
         expected = _MSG_OVERHEAD + (len("text") // 4 + _MEDIA_TOKENS) + _PART_OVERHEAD
         assert est == expected
@@ -173,8 +173,8 @@ class TestEstimateTokens:
             kind = "cache-point"
 
         msgs: list[ModelMessage] = [
-            ModelRequest(parts=[UserPromptPart(content=["text", FakeCachePoint()])])
-        ]  # type: ignore[arg-type]
+            ModelRequest(parts=[UserPromptPart(content=["text", FakeCachePoint()])])  # type: ignore[arg-type]
+        ]
         est = estimate_tokens(msgs)
         # CachePoint contributes nothing
         expected = _MSG_OVERHEAD + len("text") // 4 + _PART_OVERHEAD

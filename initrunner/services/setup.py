@@ -31,6 +31,18 @@ ALL_PROVIDERS: list[str] = [
     "ollama",
 ]
 
+PROVIDER_DESCRIPTIONS: dict[str, str] = {
+    "openai": "GPT models (most popular)",
+    "anthropic": "Claude models",
+    "google": "Gemini models",
+    "groq": "Ultra-fast inference",
+    "mistral": "Mistral models",
+    "cohere": "Command models",
+    "bedrock": "AWS managed (multi-model)",
+    "xai": "Grok models",
+    "ollama": "Run models locally (free)",
+}
+
 INTENT_DESCRIPTIONS: dict[str, str] = {
     "chatbot": "Conversational AI assistant",
     "knowledge": "Answer questions from your documents (RAG)",
@@ -39,8 +51,10 @@ INTENT_DESCRIPTIONS: dict[str, str] = {
     "discord-bot": "Discord bot powered by AI",
     "api-agent": "Agent with REST API tool access",
     "daemon": "Runs on a schedule or watches for changes",
-    "from-example": "Browse and copy a bundled example",
 }
+
+# Kept separate so the intent list stays clean; "from-example" is a method, not a goal.
+VALID_INTENTS: set[str] = {*INTENT_DESCRIPTIONS, "from-example"}
 
 INTENT_TEMPLATE_MAP: dict[str, str] = {
     "chatbot": "basic",
@@ -86,9 +100,9 @@ BOT_TOKEN_ENVS: dict[str, str] = {
 class SetupConfig:
     """Collected setup wizard state."""
 
-    intent: str
     provider: str
     model: str
+    intent: str | None = None
     name: str = "my-agent"
     tools: list[dict] = field(default_factory=list)
     enable_memory: bool = False
@@ -245,7 +259,7 @@ def generate_role_yaml(config: SetupConfig) -> str:
     """
     from initrunner.templates import TEMPLATES, build_role_yaml
 
-    template_key = INTENT_TEMPLATE_MAP.get(config.intent)
+    template_key = INTENT_TEMPLATE_MAP.get(config.intent or "")
 
     # For telegram/discord/api intents, use the dedicated template function
     if template_key in ("telegram", "discord", "api"):

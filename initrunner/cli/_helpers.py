@@ -146,6 +146,13 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
     if model is not None:
         return model
 
+    # Prefer the user's explicit choice from setup (run.yaml)
+    from initrunner.cli.run_config import load_run_config
+
+    run_cfg = load_run_config()
+    if run_cfg.provider and run_cfg.model:
+        return f"{run_cfg.provider}:{run_cfg.model}"
+
     from initrunner._compat import require_provider
     from initrunner.services.providers import list_available_providers
 

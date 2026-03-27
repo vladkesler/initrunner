@@ -298,3 +298,18 @@ class TestExamplesCLI:
         assert result.exit_code == 0
         assert "initrunner validate" in result.output
         assert "initrunner run" in result.output
+
+    @patch("initrunner.examples._load_catalog", _mock_load_catalog)
+    @patch("initrunner.examples._download_file", return_value=b"# doc content\n")
+    def test_copy_multifile_next_steps_shows_primary(self, _dl, tmp_path: Path):
+        """Regression: next-steps must reference the primary role file."""
+        from typer.testing import CliRunner
+
+        from initrunner.cli.main import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["examples", "copy", "rag-agent", "--output", str(tmp_path)])
+        assert result.exit_code == 0
+        # Primary file is rag-agent/rag-agent.yaml, not rag-agent/docs/faq.md
+        assert "initrunner validate rag-agent/rag-agent.yaml" in result.output
+        assert "initrunner run rag-agent/rag-agent.yaml" in result.output
