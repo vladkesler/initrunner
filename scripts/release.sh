@@ -8,7 +8,7 @@ VERSION="${VERSION#v}"
 
 # Validate semver-ish format (X.Y.Z or X.Y.ZrcN etc.)
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(.*)$ ]]; then
-  echo "Error: '$VERSION' is not a valid version (expected X.Y.Z[suffix])" >&2
+  echo "Error: '$VERSION' is not a valid version (expected YYYY.M.PATCH or X.Y.Z, e.g. 2026.3.1)" >&2
   exit 1
 fi
 

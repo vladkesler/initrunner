@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.3.1] - 2026-03-27
+
+### Changed
+- **CalVer versioning** -- switched from SemVer (1.x.y) to CalVer (YYYY.M.PATCH). Version numbers now reflect release date, not feature cadence. PATCH resets each month. Prereleases use PEP 440 suffixes (rc, a, b, dev). v1.46.0 is the final SemVer release.
+
 ## [1.46.0] - 2026-03-27
 
 ### Added
