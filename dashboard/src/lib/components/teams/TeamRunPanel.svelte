@@ -20,7 +20,8 @@
 				role: m.role,
 				content: m.content,
 				status: m.status,
-				error: m.error
+				error: m.error,
+			identityLabel: m.role === 'user' ? 'You' : (m.activePersona ?? 'Team')
 			};
 			if (m.result) {
 				base.result = {
