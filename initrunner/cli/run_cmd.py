@@ -661,15 +661,15 @@ def run(
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
 
+    # --- --save: copy starter to local directory (no prerequisites needed) ---
+    if save is not None:
+        _handle_save(role_file, save)
+        return
+
     # --- Starter: prerequisites + model auto-detect ---
     from initrunner.cli._helpers import prepare_starter
 
     effective_model = prepare_starter(role_file, model) or model
-
-    # --- --save: copy starter to local directory ---
-    if save is not None:
-        _handle_save(role_file, save)
-        return
 
     # --- Removed kind rejection ---
     if kind == "Pipeline":
