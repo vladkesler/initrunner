@@ -64,15 +64,7 @@ Or install with a package manager: `uv pip install "initrunner[recommended]"` / 
 
 ### Try a starter agent
 
-Run `initrunner run` to see all available starters, or jump right in:
-
-```bash
-initrunner run helpdesk -i                                    # RAG over your docs folder
-initrunner run code-review-team -p "Review the latest commit" # team of 3 reviewers
-initrunner run memory-assistant                                # assistant that remembers
-```
-
-The model is auto-detected from your API key. Override with `--model anthropic:claude-sonnet-4-5-20250929`.
+Run `initrunner run` to see all available starters, or try any of the examples above. The model is auto-detected from your API key. Override with `--model anthropic:claude-sonnet-4-5-20250929`.
 
 Want to customize a starter? Copy it locally and edit:
 
