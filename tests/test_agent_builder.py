@@ -424,6 +424,8 @@ class TestBuilderSessionSeedTemplate:
         session = BuilderSession()
         turn = session.seed_template("memory", "openai")
         assert "memory" in turn.yaml_text
+        parsed = yaml.safe_load(turn.yaml_text)
+        assert "memory" in parsed["spec"], "memory YAML key missing after canonicalization"
 
     def test_seed_template_unknown_raises(self):
         session = BuilderSession()

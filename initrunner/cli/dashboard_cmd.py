@@ -15,6 +15,7 @@ def launch_dashboard(
     port: int = 8100,
     no_open: bool = False,
     expose: bool = False,
+    api_key: str | None = None,
     extra_role_dirs: list[Path] | None = None,
 ) -> None:
     """Start the dashboard server (blocking)."""
@@ -24,14 +25,21 @@ def launch_dashboard(
     settings = DashboardSettings(
         port=port,
         expose=expose,
+        api_key=api_key,
         extra_role_dirs=extra_role_dirs or [],
     )
 
     if expose:
-        console.print(
-            "[yellow]Warning: dashboard exposed on all interfaces "
-            "-- no authentication enabled[/yellow]"
-        )
+        if api_key:
+            console.print(
+                "[yellow]Warning: dashboard exposed on all interfaces "
+                "-- authentication enabled[/yellow]"
+            )
+        else:
+            console.print(
+                "[yellow]Warning: dashboard exposed on all interfaces "
+                "-- no authentication enabled[/yellow]"
+            )
 
     app = create_app(settings)
 
@@ -68,11 +76,21 @@ def launch_dashboard(
 def dashboard(
     port: Annotated[int, typer.Option(help="Port to listen on")] = 8100,
     no_open: Annotated[bool, typer.Option("--no-open", help="Don't open browser")] = False,
-    expose: Annotated[bool, typer.Option("--expose", help="Bind to 0.0.0.0 (no auth)")] = False,
+    expose: Annotated[bool, typer.Option("--expose", help="Bind to 0.0.0.0")] = False,
+    api_key: Annotated[
+        str | None,
+        typer.Option("--api-key", help="Require this API key for all requests"),
+    ] = None,
     roles_dir: Annotated[
         list[Path] | None,
         typer.Option("--roles-dir", help="Extra directories to scan for roles"),
     ] = None,
 ) -> None:
     """Launch the dashboard web UI."""
-    launch_dashboard(port=port, no_open=no_open, expose=expose, extra_role_dirs=roles_dir)
+    launch_dashboard(
+        port=port,
+        no_open=no_open,
+        expose=expose,
+        api_key=api_key,
+        extra_role_dirs=roles_dir,
+    )

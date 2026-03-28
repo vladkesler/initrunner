@@ -17,6 +17,7 @@ class DashboardSettings:
 
     port: int = 8100
     expose: bool = False
+    api_key: str | None = None
     extra_role_dirs: list[Path] = field(default_factory=list)
 
     @property

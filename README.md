@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.1-%2334D058" alt="v2026.3.1">
+  <img src="https://img.shields.io/badge/latest-v2026.3.2-%2334D058" alt="v2026.3.2">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -37,7 +37,7 @@ initrunner run discord-assistant --daemon                      # Discord bot wit
 
 Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.1** -- We've moved to Calendar Versioning (YYYY.M.PATCH). All existing `>=1.46.0` constraints remain valid; new versions are numerically higher under PEP 440. See the [Changelog](CHANGELOG.md).
+> **v2026.3.2** -- Dashboard now supports `--api-key` authentication. Memory template bug fixed -- agents built from the memory template retain their config. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -324,6 +324,7 @@ The browser opens automatically. Flags:
 | `--port` | Listen on a different port (default: `8100`) |
 | `--no-open` | Don't open the browser automatically |
 | `--expose` | Bind to `0.0.0.0` instead of localhost |
+| `--api-key` | Protect access with a login page and cookie-based session |
 | `--roles-dir` | Extra directories to scan for role YAML files (repeatable) |
 
 ### Desktop (native window)

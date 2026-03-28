@@ -107,6 +107,11 @@ def canonicalize_role_yaml(role: RoleDefinition) -> str:
     Uses Pydantic's ``exclude_defaults`` + ``exclude_none`` to strip fields that
     match their schema default.  ``metadata.spec_version`` is always re-injected.
     Multiline strings render as YAML block scalars for readability.
+
+    Optional spec sections whose default is ``None`` (e.g. ``memory``,
+    ``autonomy``) are preserved as empty mappings when explicitly present,
+    because their existence enables features even when all sub-fields are
+    defaults.
     """
     import yaml
 
@@ -134,6 +139,23 @@ def canonicalize_role_yaml(role: RoleDefinition) -> str:
         }
 
     data = _prune(data)
+
+    # Restore optional spec sections whose presence is semantically
+    # significant.  Fields that default to None but were explicitly set on
+    # the role may collapse to {} after exclude_defaults + _prune; re-inject
+    # them so the YAML round-trips with the same feature semantics.
+    from initrunner.agent.schema.role import AgentSpec
+
+    spec_data = data.get("spec", {})
+    for name, field_info in AgentSpec.model_fields.items():
+        if (
+            field_info.default is None
+            and getattr(role.spec, name, None) is not None
+            and name not in spec_data
+        ):
+            spec_data[name] = {}
+    if spec_data and "spec" not in data:
+        data["spec"] = spec_data
 
     # Always include these structural fields
     data.setdefault("apiVersion", "initrunner/v1")
