@@ -29,8 +29,10 @@
 		Minus,
 		Plus,
 		ChevronDown,
+		ChevronRight,
 		Copy,
-		Check
+		Check,
+		Info
 	} from 'lucide-svelte';
 
 	// -- State ----------------------------------------------------------------
@@ -47,6 +49,8 @@
 	let serviceCount = $state(3);
 	let slots = $state<{ name: string; agentId: string | null }[]>([]);
 	let sharedMemory = $state(false);
+	let routingStrategy = $state<'all' | 'keyword' | 'sense'>('all');
+	let routingDetailOpen = $state(false);
 	let selectedProvider = $state('');
 	let selectedModel = $state('');
 	let customModelName = $state('');
@@ -78,6 +82,17 @@
 	// -- Derived --------------------------------------------------------------
 
 	const canGenerate = $derived(selectedPattern !== null && projectName.trim().length > 0);
+	const isRoutePattern = $derived(selectedPattern?.name === 'route');
+
+	// Quality indicators for route specialist slots
+	function slotQuality(slot: { name: string; agentId: string | null }): 'good' | 'ok' | 'needs-tags' {
+		if (!slot.agentId || !options) return 'needs-tags';
+		const agent = options.agents.find((a) => a.id === slot.agentId);
+		if (!agent) return 'needs-tags';
+		if (agent.tags.length > 0 && agent.description) return 'good';
+		if (agent.description || agent.tags.length > 0) return 'ok';
+		return 'needs-tags';
+	}
 
 	const customPresetNames = $derived(
 		new Set((options?.custom_presets ?? []).map((p) => p.name))
@@ -89,6 +104,11 @@
 
 	// -- Slot management ------------------------------------------------------
 
+	const ROUTE_SPECIALISTS = [
+		'researcher', 'responder', 'escalator', 'analyst',
+		'summarizer', 'validator', 'coordinator', 'reviewer'
+	];
+
 	function updateSlots() {
 		if (!selectedPattern) return;
 		let names: string[];
@@ -96,6 +116,9 @@
 			names = [...selectedPattern.slot_names];
 		} else if (selectedPattern.name === 'chain') {
 			names = Array.from({ length: serviceCount }, (_, i) => `step-${i + 1}`);
+		} else if (selectedPattern.name === 'route') {
+			const specialistCount = serviceCount - 1;
+			names = ['intake', ...ROUTE_SPECIALISTS.slice(0, specialistCount)];
 		} else {
 			// fan-out
 			const workers = serviceCount - 1;
@@ -109,6 +132,13 @@
 	function selectPattern(p: PatternInfo) {
 		selectedPattern = p;
 		serviceCount = p.fixed_topology ? p.min_services : 3;
+		if (p.name === 'route') {
+			routingStrategy = 'sense';
+			routingDetailOpen = true;
+		} else {
+			routingStrategy = 'all';
+			routingDetailOpen = false;
+		}
 		updateSlots();
 	}
 
@@ -153,7 +183,8 @@
 				provider: selectedProvider || 'openai',
 				model: (isCustomEndpoint ? customModelName.trim() : selectedModel) || null,
 				base_url: customBaseUrl || null,
-				api_key_env: resolvedApiKeyEnv
+				api_key_env: resolvedApiKeyEnv,
+				routing_strategy: selectedPattern.name === 'route' ? routingStrategy : null
 			});
 			composeYaml = result.compose_yaml;
 			roleYamls = result.role_yamls;
@@ -297,7 +328,9 @@
 							>
 								<div class="flex items-center justify-between">
 									<span class="font-mono text-[13px] font-medium text-fg">{pattern.name}</span>
-									{#if pattern.fixed_topology}
+									{#if pattern.name === 'route'}
+										<span class="rounded-full border border-accent-primary/30 bg-accent-primary/10 px-1.5 py-0.5 font-mono text-[10px] text-accent-primary">sense</span>
+									{:else if pattern.fixed_topology}
 										<span class="rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">fixed</span>
 									{/if}
 								</div>
@@ -366,6 +399,95 @@
 						{/each}
 					</div>
 				</div>
+
+				<!-- Routing strategy (route pattern only) -->
+				{#if isRoutePattern}
+					<div class="space-y-3 border-t border-edge pt-4">
+						<span class="block font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Routing strategy</span>
+						<div class="flex gap-1">
+							{#each [
+								{ value: 'all', label: 'Broadcast', tip: 'Fastest. No intelligence.' },
+								{ value: 'keyword', label: 'Keyword', tip: 'Near-zero cost. Shines with good tags.' },
+								{ value: 'sense', label: 'Sense', tip: 'Highest accuracy. LLM only on ties.' }
+							] as strat}
+								<button
+									class="relative px-3 py-1.5 font-mono text-[12px] transition-[color,background-color,border-color] duration-150 border
+										{routingStrategy === strat.value
+											? 'border-accent-primary/30 bg-accent-primary/10 text-accent-primary'
+											: 'border-edge bg-surface-1 text-fg-faint hover:text-fg-muted hover:bg-surface-2'}"
+									title={strat.tip}
+									onclick={() => {
+										routingStrategy = strat.value as typeof routingStrategy;
+										routingDetailOpen = routingStrategy !== 'all';
+									}}
+								>
+									{strat.label}
+									{#if strat.value === 'sense'}
+										<span class="ml-1 rounded-full bg-accent-primary/20 px-1 py-0.5 text-[9px] text-accent-primary">Recommended</span>
+									{/if}
+								</button>
+							{/each}
+						</div>
+
+						<!-- Collapse-reveal scoring detail -->
+						{#if routingStrategy !== 'all'}
+							<button
+								class="flex items-center gap-1 font-mono text-[11px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
+								onclick={() => (routingDetailOpen = !routingDetailOpen)}
+							>
+								{#if routingDetailOpen}
+									<ChevronDown size={11} />
+								{:else}
+									<ChevronRight size={11} />
+								{/if}
+								Scoring detail
+							</button>
+
+							{#if routingDetailOpen}
+								<div class="space-y-3 pl-0.5">
+									<!-- Scoring weights -->
+									<div class="space-y-1">
+										<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">How scoring works</span>
+										{#each [
+											{ label: 'tags', weight: 3, pct: 100 },
+											{ label: 'name', weight: 2, pct: 67 },
+											{ label: 'description', weight: 1.5, pct: 50 }
+										] as w}
+											<div class="flex items-center gap-2">
+												<span class="w-20 text-right font-mono text-[11px] text-fg-faint">{w.label}</span>
+												<div class="h-1.5 w-24 bg-surface-2">
+													<div class="h-full bg-accent-primary/40" style="width: {w.pct}%"></div>
+												</div>
+												<span class="font-mono text-[10px] text-fg-faint/60">{w.weight}x</span>
+											</div>
+										{/each}
+									</div>
+
+									<!-- Target quality indicators -->
+									<div class="space-y-1">
+										<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">Target quality</span>
+										{#each slots.filter((_, i) => i > 0) as slot}
+											{@const q = slotQuality(slot)}
+											<div class="flex items-center gap-2">
+												<span class="w-20 text-right font-mono text-[11px] text-fg-faint">{slot.name}</span>
+												<div class="h-1.5 w-24 bg-surface-2">
+													<div class="h-full {q === 'good' ? 'bg-status-ok' : q === 'ok' ? 'bg-status-warn' : 'bg-fg-faint/20'}"
+														style="width: {q === 'good' ? '100' : q === 'ok' ? '60' : '10'}%"></div>
+												</div>
+												<span class="font-mono text-[10px] {q === 'good' ? 'text-status-ok' : q === 'ok' ? 'text-status-warn' : 'text-fg-faint'}">{q === 'needs-tags' ? 'needs tags' : q}</span>
+											</div>
+										{/each}
+									</div>
+
+									<div class="flex items-start gap-2 border-l-2 border-l-info pl-2.5 py-1">
+										<Info size={11} class="mt-0.5 shrink-0 text-info" />
+										<span class="font-mono text-[11px] text-fg-faint/70">Well-tagged roles route more accurately. Customize generated role files after saving.</span>
+									</div>
+								</div>
+							{/if}
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Options -->
 				<div class="flex flex-wrap items-center gap-4 border-t border-edge pt-4">

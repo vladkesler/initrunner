@@ -42,6 +42,12 @@ export interface AgentDetail {
 	skills: string[];
 	skill_refs: SkillRef[];
 	features: string[];
+	tool_search: {
+		enabled: boolean;
+		always_available: string[];
+		max_results: number;
+		threshold: number;
+	} | null;
 	provider_warning: string | null;
 }
 

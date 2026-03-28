@@ -155,6 +155,7 @@ def _detail_from(role_id: str, discovered, skill_refs: list[SkillRef] | None = N
         skills=list(spec.skills),
         skill_refs=skill_refs or [SkillRef(name=s) for s in spec.skills],
         features=list(spec.features),
+        tool_search=spec.tool_search.model_dump() if spec.tool_search.enabled else None,
         provider_warning=_check_provider(discovered),
     )
 

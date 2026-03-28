@@ -114,14 +114,25 @@ class TestFanOutPattern:
 class TestRoutePattern:
     def test_creates_directory_structure(self, tmp_path: Path) -> None:
         result = scaffold_compose_project(
-            "rt", pattern="route", output_dir=tmp_path, provider="openai"
+            "rt", pattern="route", services=4, output_dir=tmp_path, provider="openai"
         )
         assert result.compose_path.exists()
         assert len(result.role_paths) == 4
 
-    def test_fixed_topology(self, tmp_path: Path) -> None:
+    def test_default_three_services(self, tmp_path: Path) -> None:
         result = scaffold_compose_project(
             "rt", pattern="route", output_dir=tmp_path, provider="openai"
+        )
+        data = yaml.safe_load(result.compose_path.read_text())
+        assert set(data["spec"]["services"].keys()) == {
+            "intake",
+            "researcher",
+            "responder",
+        }
+
+    def test_four_services(self, tmp_path: Path) -> None:
+        result = scaffold_compose_project(
+            "rt", pattern="route", services=4, output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.compose_path.read_text())
         assert set(data["spec"]["services"].keys()) == {
@@ -149,19 +160,17 @@ class TestRoutePattern:
         researcher = load_role(roles_dir / "researcher.yaml")
         assert "research" in researcher.metadata.tags
 
-    def test_ignores_custom_service_count(self, tmp_path: Path) -> None:
-        """Route has a fixed 4-service topology; service_count is silently ignored."""
+    def test_variable_service_count(self, tmp_path: Path) -> None:
+        """Route supports variable specialist count (3-10 services)."""
         result = scaffold_compose_project(
             "rt", pattern="route", services=5, output_dir=tmp_path, provider="openai"
         )
-        assert len(result.role_paths) == 4
+        assert len(result.role_paths) == 5
         data = yaml.safe_load(result.compose_path.read_text())
-        assert set(data["spec"]["services"].keys()) == {
-            "intake",
-            "researcher",
-            "responder",
-            "escalator",
-        }
+        assert "intake" in data["spec"]["services"]
+        # 4 specialist targets
+        sink = data["spec"]["services"]["intake"]["sink"]
+        assert len(sink["target"]) == 4
 
     def test_compose_yaml_is_valid(self, tmp_path: Path) -> None:
         from initrunner.compose.loader import load_compose

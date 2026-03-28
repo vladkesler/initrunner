@@ -57,6 +57,7 @@ class AgentDetail(BaseModel):
     skills: list[str] = []
     skill_refs: list[SkillRef] = []
     features: list[str] = []
+    tool_search: dict | None = None  # ToolSearchConfig serialised (when enabled)
     # runtime readiness
     provider_warning: str | None = None
 
@@ -223,6 +224,7 @@ class BuilderOptionsResponse(BaseModel):
     ollama_base_url: str
     template_setups: dict[str, TemplateSetup] = {}
     provider_status: list[ProviderStatus] = []
+    tool_func_map: dict[str, list[str]] = {}  # tool type -> function names
 
 
 class StarterInfo(BaseModel):
@@ -501,6 +503,7 @@ class ComposeSeedRequest(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
+    routing_strategy: Literal["all", "keyword", "sense"] | None = None
 
 
 class ComposeSeedResponse(BaseModel):

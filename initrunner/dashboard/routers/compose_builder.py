@@ -42,12 +42,10 @@ router = APIRouter(prefix="/api/compose-builder", tags=["compose-builder"])
 
 def _pattern_infos() -> list[PatternInfo]:
     """Build pattern info list with slot names."""
-    from initrunner.services.compose import _ROUTE_SLOT_NAMES
-
     return [
         PatternInfo(
             name="chain",
-            description="Linear A -> B -> C chain",
+            description="Linear A -> B -> C pipeline",
             fixed_topology=False,
             slot_names=["step-1", "step-2", "step-3"],
             min_services=2,
@@ -55,7 +53,7 @@ def _pattern_infos() -> list[PatternInfo]:
         ),
         PatternInfo(
             name="fan-out",
-            description="One dispatcher fans out to multiple workers",
+            description="Dispatch to all workers simultaneously",
             fixed_topology=False,
             slot_names=["dispatcher", "worker-1", "worker-2"],
             min_services=3,
@@ -63,11 +61,11 @@ def _pattern_infos() -> list[PatternInfo]:
         ),
         PatternInfo(
             name="route",
-            description="Intake routes to specialists via intent sensing",
-            fixed_topology=True,
-            slot_names=list(_ROUTE_SLOT_NAMES),
-            min_services=4,
-            max_services=None,
+            description="Route to the best specialist automatically",
+            fixed_topology=False,
+            slot_names=["intake", "researcher", "responder"],
+            min_services=3,
+            max_services=10,
         ),
     ]
 
@@ -127,6 +125,7 @@ async def seed_compose(
             shared_memory=req.shared_memory,
             provider=req.provider,
             model_name=req.model,
+            routing_strategy=req.routing_strategy,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

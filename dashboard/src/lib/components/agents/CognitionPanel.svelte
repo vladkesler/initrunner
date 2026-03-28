@@ -4,10 +4,12 @@
 
 	let {
 		yamlText,
-		onUpdate
+		onUpdate,
+		toolFuncMap = {}
 	}: {
 		yamlText: string;
 		onUpdate: (newYaml: string) => void;
+		toolFuncMap?: Record<string, string[]>;
 	} = $props();
 
 	// ── Parse YAML to derive cognition state ─────────────────────────
@@ -45,10 +47,21 @@
 			max_iterations: number;
 			timeout_seconds: number;
 		};
+		toolSearch: {
+			enabled: boolean;
+			always_available: string[];
+			max_results: number;
+		};
 	}
 
 	const PATTERNS = ['react', 'todo_driven', 'plan_execute', 'reflexion'] as const;
 	const REQUIRES_TODO = new Set(['todo_driven', 'plan_execute']);
+	const PATTERN_TIPS: Record<string, string> = {
+		react: 'Simple tool loop. Agent reasons, picks a tool, observes, repeats.',
+		todo_driven: 'Agent maintains a todo list and works through items one by one.',
+		plan_execute: 'Agent creates a plan upfront, then executes each step.',
+		reflexion: 'Agent critiques its own output and retries to improve quality.',
+	};
 
 	function parseState(text: string): CognitionState {
 		try {
@@ -60,6 +73,7 @@
 			const r = spec.reasoning ?? {};
 			const a = spec.autonomy;
 			const g = spec.guardrails ?? {};
+			const ts = spec.tool_search ?? {};
 
 			return {
 				reasoning: {
@@ -94,6 +108,11 @@
 					max_iterations: g.max_iterations ?? 10,
 					timeout_seconds: g.timeout_seconds ?? 300,
 				},
+				toolSearch: {
+					enabled: ts.enabled ?? false,
+					always_available: ts.always_available ?? [],
+					max_results: ts.max_results ?? 5,
+				},
 			};
 		} catch {
 			return defaultState();
@@ -107,6 +126,7 @@
 			think: { enabled: false, critique: false, max_thoughts: 50 },
 			todo: { enabled: false, max_items: 30, shared: false, shared_path: '' },
 			guardrails: { max_iterations: 10, timeout_seconds: 300 },
+			toolSearch: { enabled: false, always_available: [], max_results: 5 },
 		};
 	}
 
@@ -207,10 +227,68 @@
 		toggleTool('todo', true, { max_items: 30 });
 	}
 
+	// ── Tool search helpers ─────────────────────────────────────────
+
+	const toolCount = $derived.by(() => {
+		try {
+			const doc = yaml.load(yamlText) as Record<string, any> | null;
+			return (doc?.spec?.tools ?? []).length;
+		} catch { return 0; }
+	});
+
+	const resolvedFuncs = $derived.by(() => {
+		try {
+			const doc = yaml.load(yamlText) as Record<string, any> | null;
+			const tools: any[] = doc?.spec?.tools ?? [];
+			const result: { func_name: string; tool_type: string }[] = [];
+			for (const t of tools) {
+				const type = t?.type;
+				if (type && toolFuncMap[type]) {
+					for (const fn of toolFuncMap[type]) {
+						result.push({ func_name: fn, tool_type: type });
+					}
+				}
+			}
+			return result;
+		} catch { return []; }
+	});
+
+	const showToolSearch = $derived(toolCount >= 10 || cog.toolSearch.enabled);
+
+	const AUTO_PIN_FUNCS = ['current_time', 'parse_date', 'think', 'search_documents'];
+
+	function toggleToolSearch(enabled: boolean) {
+		applyChange((doc) => {
+			if (enabled) {
+				const autoPin = resolvedFuncs
+					.filter((f) => AUTO_PIN_FUNCS.includes(f.func_name))
+					.map((f) => f.func_name);
+				doc.spec.tool_search = { enabled: true, always_available: autoPin, max_results: 5 };
+			} else {
+				delete doc.spec.tool_search;
+			}
+		});
+	}
+
+	function setToolSearchAlwaysAvailable(funcNames: string[]) {
+		applyChange((doc) => {
+			if (!doc.spec.tool_search) return;
+			doc.spec.tool_search.always_available = funcNames;
+		});
+	}
+
+	function setToolSearchMaxResults(value: number) {
+		applyChange((doc) => {
+			if (!doc.spec.tool_search) return;
+			doc.spec.tool_search.max_results = value;
+		});
+	}
+
 	// ── Sub-section expand state ─────────────────────────────────────
 
 	let autonomyOpen = $state(true);
 	let compactionOpen = $state(false);
+	let toolSearchTuningOpen = $state(false);
 
 	const needsTodo = $derived(REQUIRES_TODO.has(cog.reasoning.pattern) && !cog.todo.enabled);
 	const todoForced = $derived(REQUIRES_TODO.has(cog.reasoning.pattern));
@@ -236,7 +314,7 @@
 
 	<!-- Reasoning Pattern -->
 	<div class="space-y-2">
-		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint" title="Reasoning strategy the agent uses to solve problems. react: tool loop, todo_driven: maintains a task list, plan_execute: plans then acts, reflexion: self-critiques and retries.">
 			Pattern
 		</div>
 		<div class="grid grid-cols-2 gap-1">
@@ -247,6 +325,7 @@
 							? 'border-accent-primary/30 bg-accent-primary/10 text-accent-primary'
 							: 'border-edge bg-surface-1 text-fg-faint hover:text-fg-muted hover:bg-surface-2'}"
 					onclick={() => setPattern(p)}
+					title={PATTERN_TIPS[p]}
 				>
 					{p}
 				</button>
@@ -284,7 +363,7 @@
 		{/if}
 
 		{#if cog.reasoning.pattern === 'todo_driven' || cog.reasoning.pattern === 'plan_execute'}
-			<label class="flex items-center gap-2 pl-0.5 font-mono text-[12px] text-fg-faint">
+			<label class="flex items-center gap-2 pl-0.5 font-mono text-[12px] text-fg-faint" title="Automatically generate an initial plan before the first tool call.">
 				<input
 					type="checkbox"
 					checked={cog.reasoning.auto_plan}
@@ -295,7 +374,7 @@
 			</label>
 		{/if}
 
-		<label class="flex items-center gap-2 pl-0.5 font-mono text-[12px] text-fg-faint">
+		<label class="flex items-center gap-2 pl-0.5 font-mono text-[12px] text-fg-faint" title="Automatically detect which reasoning pattern to use based on the prompt.">
 			<input
 				type="checkbox"
 				checked={cog.reasoning.auto_detect}
@@ -308,29 +387,46 @@
 
 	<!-- Autonomy -->
 	<div class="space-y-2">
-		<button
-			class="flex w-full items-center gap-1.5"
-			onclick={() => (autonomyOpen = !autonomyOpen)}
-		>
-			<ChevronRight
-				size={11}
-				class="shrink-0 text-fg-faint transition-transform duration-150 {autonomyOpen ? 'rotate-90' : ''}"
-			/>
-			<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
-				Autonomy
-			</span>
-			<div class="flex-1"></div>
-			<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-			<span class="flex items-center" role="presentation" onclick={(e) => e.stopPropagation()}>
+		{#if cog.autonomy.enabled}
+			<button
+				class="flex w-full items-center gap-1.5"
+				onclick={() => (autonomyOpen = !autonomyOpen)}
+				title="Agent runs multiple iterations independently without waiting for user input."
+			>
+				<ChevronRight
+					size={11}
+					class="shrink-0 text-fg-faint transition-transform duration-150 {autonomyOpen ? 'rotate-90' : ''}"
+				/>
+				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					Autonomy
+				</span>
+				<div class="flex-1"></div>
+				<!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+				<span class="flex items-center" role="presentation" onclick={(e) => e.stopPropagation()}>
+					<input
+						type="checkbox"
+						checked={cog.autonomy.enabled}
+						onchange={(e) => toggleAutonomy(e.currentTarget.checked)}
+						class="accent-accent-primary"
+						aria-label="Enable autonomy"
+					/>
+				</span>
+			</button>
+		{:else}
+			<label class="flex items-center gap-1.5" title="Agent runs multiple iterations independently without waiting for user input.">
+				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					Autonomy
+				</span>
+				<div class="flex-1"></div>
 				<input
 					type="checkbox"
-					checked={cog.autonomy.enabled}
+					checked={false}
 					onchange={(e) => toggleAutonomy(e.currentTarget.checked)}
 					class="accent-accent-primary"
 					aria-label="Enable autonomy"
 				/>
-			</span>
-		</button>
+			</label>
+		{/if}
 
 		{#if cog.autonomy.enabled && !REQUIRES_TODO.has(cog.reasoning.pattern) && cog.reasoning.pattern === 'react'}
 			<div class="flex items-start gap-2 px-2.5 py-1.5">
@@ -436,7 +532,7 @@
 
 	<!-- Think Tool -->
 	<div class="space-y-2">
-		<label class="flex items-center gap-1.5">
+		<label class="flex items-center gap-1.5" title="Gives the agent a scratchpad for internal reasoning before acting. Critique mode adds self-evaluation.">
 			<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				Think
 			</span>
@@ -485,7 +581,7 @@
 
 	<!-- Todo Tool -->
 	<div class="space-y-2">
-		<label class="flex items-center gap-1.5">
+		<label class="flex items-center gap-1.5" title="Agent tracks tasks in a structured list. Required for todo_driven and plan_execute patterns.">
 			<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
 				Todo
 			</span>
@@ -555,9 +651,105 @@
 		{/if}
 	</div>
 
+	<!-- Tool Search -->
+	<div class="space-y-2 border-t border-edge pt-3">
+			<label class="flex items-center gap-1.5" title="Hides tools behind on-demand keyword discovery. The agent calls search_tools() to find what it needs. Reduces context and improves accuracy for agents with many tools.">
+				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+					Tool Search
+				</span>
+				<div class="flex-1"></div>
+				<input
+					type="checkbox"
+					checked={cog.toolSearch.enabled}
+					onchange={(e) => toggleToolSearch(e.currentTarget.checked)}
+					class="accent-accent-primary"
+				/>
+			</label>
+
+			{#if !cog.toolSearch.enabled && toolCount >= 10}
+				<div class="flex items-start gap-2 border-l-2 border-l-info bg-info/5 px-2.5 py-2">
+					<Info size={12} class="mt-0.5 shrink-0 text-info" />
+					<div class="flex-1">
+						<span class="font-mono text-[12px] text-fg-faint">
+							This agent has {toolCount} tools. Tool search hides tools behind on-demand discovery. Typically saves 60-80% context and improves accuracy.
+						</span>
+						<button
+							class="ml-2 font-mono text-[12px] text-accent-primary underline decoration-accent-primary/30 hover:decoration-accent-primary"
+							onclick={() => toggleToolSearch(true)}
+						>
+							Enable
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			{#if cog.toolSearch.enabled}
+				<div class="space-y-2 pl-0.5">
+					<div class="flex items-center justify-between">
+						<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">Always visible</span>
+						<span class="font-mono text-[10px] text-fg-faint/60">{cog.toolSearch.always_available.length} / {resolvedFuncs.length}</span>
+					</div>
+					<div class="max-h-40 space-y-0.5 overflow-y-auto">
+						{#each resolvedFuncs as func}
+							{@const checked = cog.toolSearch.always_available.includes(func.func_name)}
+							<label class="flex items-center gap-2 py-0.5">
+								<input
+									type="checkbox"
+									{checked}
+									onchange={() => {
+										const current = [...cog.toolSearch.always_available];
+										if (checked) {
+											setToolSearchAlwaysAvailable(current.filter((n) => n !== func.func_name));
+										} else {
+											setToolSearchAlwaysAvailable([...current, func.func_name]);
+										}
+									}}
+									class="accent-accent-primary"
+								/>
+								<span class="font-mono text-[12px] text-fg-muted">{func.func_name}</span>
+								<span class="font-mono text-[10px] text-fg-faint/40">({func.tool_type})</span>
+							</label>
+						{/each}
+					</div>
+					<div class="font-mono text-[11px] text-fg-faint/60">
+						Unchecked tools are discoverable via search_tools at runtime.
+					</div>
+
+					<!-- Tuning -->
+					<button
+						class="flex items-center gap-1 pt-1"
+						onclick={() => (toolSearchTuningOpen = !toolSearchTuningOpen)}
+					>
+						<ChevronRight
+							size={10}
+							class="shrink-0 text-fg-faint transition-transform duration-150 {toolSearchTuningOpen ? 'rotate-90' : ''}"
+						/>
+						<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">Tuning</span>
+					</button>
+
+					{#if toolSearchTuningOpen}
+						<div class="pl-4">
+							<label class="flex items-center gap-3">
+								<span class="w-24 font-mono text-[12px] text-fg-faint">max results</span>
+								<input
+									type="number"
+									min="1"
+									max="20"
+									value={cog.toolSearch.max_results}
+									onchange={(e) => setToolSearchMaxResults(parseInt(e.currentTarget.value) || 5)}
+									class="w-14 border border-edge bg-surface-1 px-2 py-1 font-mono text-[12px] text-fg-muted outline-none focus:border-accent-primary/40"
+									style="font-variant-numeric: tabular-nums"
+								/>
+							</label>
+						</div>
+					{/if}
+				</div>
+			{/if}
+		</div>
+
 	<!-- Guardrails readout -->
 	<div class="border-t border-edge pt-3">
-		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint" title="Safety limits. Max iterations caps tool call loops. Timeout kills runs that exceed the time limit.">
 			Guardrails
 		</div>
 		<div class="mt-1.5 flex gap-4 font-mono text-[12px]" style="font-variant-numeric: tabular-nums">

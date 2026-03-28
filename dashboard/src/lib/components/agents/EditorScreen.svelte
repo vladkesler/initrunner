@@ -22,7 +22,8 @@
 		showOverwrite,
 		onSave,
 		onSaveForce,
-		onBack
+		onBack,
+		toolFuncMap = {}
 	}: {
 		yamlText: string;
 		explanation: string;
@@ -36,6 +37,7 @@
 		onSave: () => void;
 		onSaveForce: () => void;
 		onBack: () => void;
+		toolFuncMap?: Record<string, string[]>;
 	} = $props();
 
 	let cognitionOpen = $state(false);
@@ -133,6 +135,7 @@
 					yamlText = newYaml;
 					handleYamlInput();
 				}}
+				{toolFuncMap}
 			/>
 		</div>
 	{/if}

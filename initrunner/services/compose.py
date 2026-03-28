@@ -63,8 +63,20 @@ def run_compose_once_sync(
 # Scaffold helpers
 # ---------------------------------------------------------------------------
 
-_ROUTE_SERVICES = 4  # intake + researcher + responder + escalator
+_ROUTE_SPECIALIST_POOL = [
+    "researcher",
+    "responder",
+    "escalator",
+    "analyst",
+    "summarizer",
+    "validator",
+    "coordinator",
+    "reviewer",
+]
+"""Semantic specialist names for the route pattern, ordered by priority."""
+
 _ROUTE_SLOT_NAMES = ["intake", "researcher", "responder", "escalator"]
+"""Default slot names (kept for backward compatibility with imports)."""
 
 
 @dataclasses.dataclass
@@ -93,6 +105,7 @@ def build_compose(
     shared_memory: bool = False,
     provider: str = "openai",
     model_name: str | None = None,
+    routing_strategy: str | None = None,
 ) -> ComposeBundle:
     """Generate compose YAML + placeholder role YAMLs (pure, writes nothing).
 
@@ -102,7 +115,8 @@ def build_compose(
     emitted.  If *slot_assignments* is ``None`` every slot gets a placeholder
     (backwards-compatible with the CLI).
 
-    Route pattern ignores *service_count* -- it always produces 4 services.
+    *routing_strategy* sets the delegate sink strategy for the route pattern.
+    Defaults to ``"sense"`` for route when ``None``.
     """
     import yaml
 
@@ -115,19 +129,26 @@ def build_compose(
         raise ValueError("fan-out requires at least 3 services (1 dispatcher + 2 workers).")
     if pattern == "chain" and service_count < 2:
         raise ValueError("chain requires at least 2 services.")
+    if pattern == "route" and service_count < 3:
+        raise ValueError("route requires at least 3 services (1 intake + 2 specialists).")
 
-    builders = {
+    builders: dict[str, Callable[..., tuple[dict, dict[str, str]]]] = {
         "chain": _build_chain,
         "fan-out": _build_fan_out,
         "route": _build_route,
     }
-    compose_dict, roles = builders[pattern](
+
+    kwargs: dict[str, object] = dict(
         name=name,
         service_count=service_count,
         slot_assignments=slot_assignments or {},
         provider=provider,
         model_name=model_name,
     )
+    if pattern == "route":
+        kwargs["routing_strategy"] = routing_strategy or "sense"
+
+    compose_dict, roles = builders[pattern](**kwargs)
 
     if shared_memory:
         compose_dict["spec"]["shared_memory"] = {
@@ -338,45 +359,89 @@ def _build_fan_out(
     )
 
 
+_SPECIALIST_TEMPLATES: list[tuple[str, str, list[str], str]] = [
+    (
+        "researcher",
+        "Investigates technical issues and gathers diagnostic information",
+        ["research", "analysis", "investigation", "technical", "diagnose"],
+        "You are a technical research agent. When you receive a triaged request "
+        "that requires investigation, research the issue thoroughly. Produce a "
+        "structured report with: root cause analysis, relevant references, and "
+        "recommended resolution steps.",
+    ),
+    (
+        "responder",
+        "Drafts direct replies to straightforward questions",
+        ["response", "reply", "answer", "chat", "help"],
+        "You are a response agent. When you receive a triaged request that can "
+        "be answered directly, draft a professional, friendly reply. Keep "
+        "responses concise and actionable.",
+    ),
+    (
+        "escalator",
+        "Escalates urgent or complex issues to human operators",
+        ["escalation", "urgent", "human", "complex", "manager"],
+        "You are an escalation agent. When you receive a triaged request that "
+        "requires human attention, prepare a structured escalation report with: "
+        "severity level, impact summary, recommended response team, and "
+        "suggested SLA timeline.",
+    ),
+    (
+        "analyst",
+        "Analyses data and produces structured insights",
+        ["analysis", "data", "metrics", "insight", "report"],
+        "You are an analysis agent. Examine the provided data or context and "
+        "produce a structured analysis with key findings, trends, and "
+        "actionable recommendations.",
+    ),
+    (
+        "summarizer",
+        "Condenses long content into concise summaries",
+        ["summary", "condense", "brief", "digest", "overview"],
+        "You are a summarization agent. Take the provided content and produce "
+        "a concise summary that captures the key points, decisions, and "
+        "action items.",
+    ),
+    (
+        "validator",
+        "Validates outputs for correctness and compliance",
+        ["validation", "check", "verify", "compliance", "quality"],
+        "You are a validation agent. Review the provided output for "
+        "correctness, completeness, and compliance with stated requirements. "
+        "Flag any issues with severity ratings.",
+    ),
+    (
+        "coordinator",
+        "Coordinates tasks across multiple teams or systems",
+        ["coordination", "schedule", "delegate", "workflow", "orchestrate"],
+        "You are a coordination agent. Organize and track multi-step workflows, "
+        "assign tasks to appropriate teams, and report on progress and blockers.",
+    ),
+    (
+        "reviewer",
+        "Reviews work products and provides structured feedback",
+        ["review", "feedback", "critique", "improve", "evaluate"],
+        "You are a review agent. Examine the provided work product and deliver "
+        "structured feedback with strengths, weaknesses, and specific "
+        "improvement suggestions.",
+    ),
+]
+
+
 def _build_route(
     *,
     name: str,
-    service_count: int,  # ignored -- fixed topology
+    service_count: int,
     slot_assignments: dict[str, Path | None],
     provider: str,
     model_name: str | None,
+    routing_strategy: str = "sense",
 ) -> tuple[dict, dict[str, str]]:
     from initrunner.templates import build_role_yaml
 
-    specialists = [
-        (
-            "researcher",
-            "Investigates technical issues and gathers diagnostic information",
-            ["research", "analysis", "investigation", "technical", "diagnose"],
-            "You are a technical research agent. When you receive a triaged request "
-            "that requires investigation, research the issue thoroughly. Produce a "
-            "structured report with: root cause analysis, relevant references, and "
-            "recommended resolution steps.",
-        ),
-        (
-            "responder",
-            "Drafts direct replies to straightforward questions",
-            ["response", "reply", "answer", "chat", "help"],
-            "You are a response agent. When you receive a triaged request that can "
-            "be answered directly, draft a professional, friendly reply. Keep "
-            "responses concise and actionable.",
-        ),
-        (
-            "escalator",
-            "Escalates urgent or complex issues to human operators",
-            ["escalation", "urgent", "human", "complex", "manager"],
-            "You are an escalation agent. When you receive a triaged request that "
-            "requires human attention, prepare a structured escalation report with: "
-            "severity level, impact summary, recommended response team, and "
-            "suggested SLA timeline.",
-        ),
-    ]
-
+    # Pick specialist templates for the requested count (intake is slot 0)
+    specialist_count = service_count - 1
+    specialists = _SPECIALIST_TEMPLATES[:specialist_count]
     specialist_names = [s[0] for s in specialists]
 
     intake_path, intake_existing = _slot_role_path("intake", slot_assignments)
@@ -385,7 +450,7 @@ def _build_route(
             "role": intake_path,
             "sink": {
                 "type": "delegate",
-                "strategy": "sense",
+                "strategy": routing_strategy,
                 "target": specialist_names,
             },
         },

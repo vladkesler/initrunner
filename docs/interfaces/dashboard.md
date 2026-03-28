@@ -83,7 +83,9 @@ All modes include a provider/model selector so the generated (or loaded) YAML us
 
 **Starter URL parameter**: navigating to `/agents/new?starter={slug}` (e.g. from a launchpad starter card) loads a starter template. When a provider is detected, it auto-loads the YAML into the editor with the detected provider/model rewritten in. When no provider is detected, it stays on the configure step with the starter intent preserved, so the user can pick a provider first.
 
-After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. A **Cognition** toggle (lime-tinted, always visible) in the toolbar opens a structured side panel for configuring reasoning patterns, autonomy, think, and todo tools without hand-editing YAML. The panel includes a link to the [reasoning docs](https://www.initrunner.ai/docs/reasoning). It reads from and writes to the YAML text using `js-yaml` (client-side parse/dump). Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
+After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. A **Cognition** toggle (lime-tinted, always visible) in the toolbar opens a structured side panel for configuring reasoning patterns, autonomy, think, todo, and tool search without hand-editing YAML. The panel includes a link to the [reasoning docs](https://www.initrunner.ai/docs/reasoning). It reads from and writes to the YAML text using `js-yaml` (client-side parse/dump). Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
+
+**Tool Search** (in Cognition panel): when an agent has 10 or more tools configured, a **Tool Search** section appears in the Cognition panel with an info banner showing the expected context savings. Enabling it writes `spec.tool_search` to the YAML with auto-pinned common functions (`current_time`, `parse_date`, etc.). A checklist shows all resolved function names (not tool type names) with their origin type, letting users pick which tools stay always-visible vs discoverable at runtime via `search_tools`. A collapsible **Tuning** section exposes `max_results` (1-20). The function name mapping is loaded from the builder options endpoint (`tool_func_map`) and resolved client-side with zero round-trips. See [Tool Search](../core/tool-search.md) for details on the underlying mechanism.
 
 Validation issues use three severity levels: **error** (blocks save), **warning** (advisory), and **info** (recommendations such as "Think tool with critique recommended for reflexion pattern").
 
@@ -135,11 +137,23 @@ Create a new multi-agent composition through a 3-step flow: **Configure -> Edito
 
 | Pattern | Description | Topology |
 |---------|-------------|----------|
-| **Pipeline** | Linear A -> B -> C chain | Adjustable service count (min 2) |
-| **Fan-out** | One dispatcher fans to multiple workers | Adjustable service count (min 3) |
-| **Route** | Intake routes to specialists via LLM intent sensing | Fixed 4 services (intake, researcher, responder, escalator) |
+| **Pipeline** | Linear A -> B -> C pipeline | Adjustable service count (min 2) |
+| **Fan-out** | Dispatch to all workers simultaneously | Adjustable service count (min 3) |
+| **Route** | Route to the best specialist automatically | Adjustable service count (min 3), semantic slot names |
+
+The **Route** pattern uses semantic specialist names from a curated pool (`researcher`, `responder`, `escalator`, `analyst`, `summarizer`, `validator`, `coordinator`, `reviewer`) instead of generic numbered slots. At 3 services: intake + researcher + responder. Additional specialists appear as the count increases. A lime `sense` badge on the pattern card distinguishes it from the other patterns.
 
 Each slot uses an **Agent Picker** -- a searchable inline dropdown that shows all discovered agents with their name, description, model badge, and feature pills. Search filters across name, description, tags, features, and path. Slots default to "Generate placeholder" (a generic role YAML is created at seed time). When an agent is selected, the trigger shows the agent name and model; clearing it reverts to the placeholder label. Provider/model selection and shared memory toggle are available for placeholder roles.
+
+**Routing strategy** (Route pattern only): three inline pill buttons appear below the slot picker:
+
+| Strategy | Label | Behavior |
+|----------|-------|----------|
+| `all` | Broadcast | Fan-out to every target. No filtering. |
+| `keyword` | Keyword | [Intent Sensing](../core/intent_sensing.md) keyword scoring. Near-zero cost. |
+| `sense` | Sense (Recommended) | Keyword scoring first, LLM tiebreaker on ties. Highest accuracy. |
+
+The Route pattern defaults to **Sense** (with a lime "Recommended" badge). When Keyword or Sense is selected, a collapsible detail section reveals scoring weights (tags 3x, name 2x, description 1.5x) and per-slot quality indicators showing whether each target agent has tags and descriptions for effective routing. The strategy is passed to the seed endpoint and written into the generated `compose.yaml` as the intake service's `sink.strategy`.
 
 **Editor** -- review and edit the generated `compose.yaml` with live schema validation. Placeholder role YAMLs are shown in a collapsible section. Pick a save directory and project name, then save.
 
@@ -155,8 +169,8 @@ Tabbed detail page with a stats bar and five tabs. A **Delete** button in the he
 |-----|----------|
 | **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active service name identify each turn (avatar swaps during streaming as services execute). The entry service (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Service-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal service shows output directly, fan-out shows per-service trace expanded. Collapsible pipeline trace under each response shows per-service name, duration, tokens, and output preview. Message history scoped to entry service for multi-turn conversations. |
 | **Graph** | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
-| **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
-| **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. Shared memory/documents badges. |
+| **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, routing (method + score from sense/keyword routing, lime for keyword matches, cyan for LLM tiebreaks), time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
+| **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. When sink strategy is `sense` or `keyword`, an inline explanation appears below the strategy field. Shared memory/documents badges. |
 | **Editor** | YAML editor with debounced schema validation, in-place save, reset, and copy. Warns when `metadata.name` changes (splits event history). |
 
 Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each. Tab selection persists to localStorage.

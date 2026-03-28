@@ -46,7 +46,10 @@
 		{#if hasError}
 			<AlertTriangle size={11} class="shrink-0 text-fail" />
 		{/if}
-		<div class="ml-auto shrink-0">
+		<div class="ml-auto flex shrink-0 items-center gap-1">
+			{#if agent.features.includes('tool_search')}
+				<span class="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-1 py-0.5 font-mono text-[9px] text-accent-secondary">search</span>
+			{/if}
 			<CapabilityGlyph features={agent.features} />
 		</div>
 	</div>

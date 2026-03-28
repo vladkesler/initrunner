@@ -55,6 +55,7 @@ export interface BuilderOptions {
 	ollama_base_url: string;
 	template_setups: Record<string, TemplateSetup>;
 	provider_status: ProviderStatus[];
+	tool_func_map: Record<string, string[]>;
 }
 
 export interface StarterInfo {

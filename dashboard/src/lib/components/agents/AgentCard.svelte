@@ -50,9 +50,14 @@
 			<p class="mt-2 line-clamp-2 text-[13px] text-fg-muted">{agent.description}</p>
 		{/if}
 
-		<!-- Bottom row: glyph + first tag -->
+		<!-- Bottom row: glyph + badges + first tag -->
 		<div class="mt-3 flex items-center justify-between">
-			<CapabilityGlyph features={agent.features} />
+			<div class="flex items-center gap-1.5">
+				<CapabilityGlyph features={agent.features} />
+				{#if agent.features.includes('tool_search')}
+					<span class="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-1.5 py-0.5 font-mono text-[10px] text-accent-secondary">search</span>
+				{/if}
+			</div>
 			{#if agent.tags.length > 0}
 				<span class="max-w-[120px] truncate font-mono text-[12px] text-fg-faint">
 					{agent.tags[0]}{#if agent.tags.length > 1}<span class="ml-1 text-fg-faint/50">+{agent.tags.length - 1}</span>{/if}

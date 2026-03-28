@@ -97,10 +97,11 @@ def test_builder_options(client):
     names = {p["name"] for p in data["patterns"]}
     assert names == {"chain", "fan-out", "route"}
 
-    # Route is fixed topology
+    # Route is flexible topology (variable specialist count)
     route = next(p for p in data["patterns"] if p["name"] == "route")
-    assert route["fixed_topology"] is True
-    assert len(route["slot_names"]) == 4
+    assert route["fixed_topology"] is False
+    assert route["min_services"] == 3
+    assert route["max_services"] == 10
 
     # Agents -- sorted by name, with enriched fields
     assert len(data["agents"]) == 2
@@ -245,6 +246,86 @@ def test_seed_shared_memory(client):
     assert resp.status_code == 200
     parsed = yaml.safe_load(resp.json()["compose_yaml"])
     assert parsed["spec"]["shared_memory"]["enabled"] is True
+
+
+def test_seed_route_with_routing_strategy(client):
+    """Route pattern respects the routing_strategy parameter."""
+    tc, _ = client
+    for strategy in ("all", "keyword", "sense"):
+        resp = tc.post(
+            "/api/compose-builder/seed",
+            json={
+                "pattern": "route",
+                "name": f"test-{strategy}",
+                "services": [
+                    {"slot": "intake", "agent_id": None},
+                    {"slot": "researcher", "agent_id": None},
+                    {"slot": "responder", "agent_id": None},
+                ],
+                "service_count": 3,
+                "shared_memory": False,
+                "provider": "openai",
+                "routing_strategy": strategy,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        parsed = yaml.safe_load(data["compose_yaml"])
+        sink = parsed["spec"]["services"]["intake"]["sink"]
+        assert sink["strategy"] == strategy
+
+
+def test_seed_route_variable_service_count(client):
+    """Route pattern supports variable specialist count (3-10)."""
+    tc, _ = client
+    resp = tc.post(
+        "/api/compose-builder/seed",
+        json={
+            "pattern": "route",
+            "name": "test-five",
+            "services": [
+                {"slot": "intake", "agent_id": None},
+                {"slot": "researcher", "agent_id": None},
+                {"slot": "responder", "agent_id": None},
+                {"slot": "escalator", "agent_id": None},
+                {"slot": "analyst", "agent_id": None},
+            ],
+            "service_count": 5,
+            "shared_memory": False,
+            "provider": "openai",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    parsed = yaml.safe_load(data["compose_yaml"])
+    services = parsed["spec"]["services"]
+    assert len(services) == 5
+    assert "intake" in services
+    sink = services["intake"]["sink"]
+    assert len(sink["target"]) == 4
+
+
+def test_seed_route_defaults_to_sense(client):
+    """Route pattern defaults to 'sense' strategy when routing_strategy is omitted."""
+    tc, _ = client
+    resp = tc.post(
+        "/api/compose-builder/seed",
+        json={
+            "pattern": "route",
+            "name": "test-default",
+            "services": [
+                {"slot": "intake", "agent_id": None},
+                {"slot": "researcher", "agent_id": None},
+                {"slot": "responder", "agent_id": None},
+            ],
+            "service_count": 3,
+            "shared_memory": False,
+            "provider": "openai",
+        },
+    )
+    assert resp.status_code == 200
+    parsed = yaml.safe_load(resp.json()["compose_yaml"])
+    assert parsed["spec"]["services"]["intake"]["sink"]["strategy"] == "sense"
 
 
 # -- POST /api/compose-builder/validate ----------------------------------------

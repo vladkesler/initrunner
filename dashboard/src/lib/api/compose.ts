@@ -77,6 +77,7 @@ export function seedCompose(req: {
 	model?: string | null;
 	base_url?: string | null;
 	api_key_env?: string | null;
+	routing_strategy?: 'all' | 'keyword' | 'sense' | null;
 }): Promise<ComposeSeedResponse> {
 	return request('/api/compose-builder/seed', {
 		method: 'POST',
