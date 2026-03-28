@@ -86,6 +86,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
 
     # -- Auth routes (always registered; no-ops when auth is disabled) ------
     if settings.api_key:
+        _expected_key: str = settings.api_key
         _COOKIE_NAME = "initrunner_token"
 
         def _safe_next(value: str) -> str:
@@ -108,7 +109,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             next: str = Form("/"),
         ) -> HTMLResponse | RedirectResponse:
             safe_next = _safe_next(next)
-            if not hmac.compare_digest(api_key, settings.api_key):
+            if not hmac.compare_digest(api_key, _expected_key):
                 return HTMLResponse(
                     render_login_page(error="Invalid API key.", next_path=safe_next),
                     status_code=401,
@@ -116,7 +117,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             resp = RedirectResponse(safe_next, status_code=303)
             resp.set_cookie(
                 key=_COOKIE_NAME,
-                value=settings.api_key,
+                value=_expected_key,
                 httponly=True,
                 samesite="strict",
             )
@@ -196,7 +197,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         )
 
     # -- Auth middleware (outermost -- added last so it runs first) ---------
-    if settings.api_key:
+    if _auth_key := settings.api_key:
         from initrunner.middleware import (
             all_paths_predicate,
             detail_error_response,
@@ -206,7 +207,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         app.add_middleware(
             BaseHTTPMiddleware,  # type: ignore[arg-type]
             dispatch=make_auth_dispatch(
-                api_key=settings.api_key,
+                api_key=_auth_key,
                 applies_to=all_paths_predicate(exclude={"/login", "/api/health"}),
                 error_response=detail_error_response,
                 error_message="Invalid API key",

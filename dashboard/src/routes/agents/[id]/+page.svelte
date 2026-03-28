@@ -333,7 +333,7 @@
 			</TabsContent>
 
 			<TabsContent value="memory" class="min-h-0 flex-1 pt-4">
-				<MemoryTab agentId={agentId} hasMemory={!!detail.memory} />
+				<MemoryTab agentId={agentId} hasMemory={!!detail.memory} refreshKey={runVersion} />
 			</TabsContent>
 
 			<TabsContent value="ingest" class="min-h-0 flex-1 pt-4">

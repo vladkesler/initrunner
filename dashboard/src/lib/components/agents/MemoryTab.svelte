@@ -11,7 +11,7 @@
 	import { RefreshCw, Sparkles, ChevronRight } from 'lucide-svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 
-	let { agentId, hasMemory }: { agentId: string; hasMemory: boolean } = $props();
+	let { agentId, hasMemory, refreshKey = 0 }: { agentId: string; hasMemory: boolean; refreshKey?: number } = $props();
 
 	// Sub-view toggle
 	let view = $state<'memories' | 'sessions'>('memories');
@@ -104,8 +104,20 @@
 		return text.length > len ? text.slice(0, len) + '\u2026' : text;
 	}
 
+	let mounted = $state(false);
+
 	onMount(() => {
 		if (hasMemory) {
+			loadMemories();
+			loadSessions();
+		}
+		mounted = true;
+	});
+
+	// Auto-refresh when refreshKey changes (after a run completes)
+	$effect(() => {
+		const _key = refreshKey;
+		if (mounted && _key > 0 && hasMemory) {
 			loadMemories();
 			loadSessions();
 		}
