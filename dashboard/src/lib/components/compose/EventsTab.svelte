@@ -119,6 +119,7 @@
 							<th class="px-3 py-2 font-medium">Status</th>
 							<th class="px-3 py-2 font-medium">Source</th>
 							<th class="px-3 py-2 font-medium">Target</th>
+							<th class="px-3 py-2 font-medium">Routing</th>
 							<th class="px-3 py-2 font-medium">Time</th>
 							<th class="px-3 py-2 font-medium">Run ID</th>
 						</tr>
@@ -137,6 +138,16 @@
 								</td>
 								<td class="px-3 py-2 font-mono text-fg-muted">{event.source_service}</td>
 								<td class="px-3 py-2 font-mono text-fg-muted">{event.target_service}</td>
+								<td class="px-3 py-2">
+									{#if event.reason}
+										{@const isLlm = event.reason.includes('llm')}
+										<span class="font-mono text-[11px] {isLlm ? 'text-accent-secondary' : 'text-accent-primary'}">
+											{event.reason}
+										</span>
+									{:else}
+										<span class="text-fg-faint/40">--</span>
+									{/if}
+								</td>
 								<td class="px-3 py-2 text-fg-faint" title={event.timestamp}>{timeAgo(event.timestamp)}</td>
 								<td class="px-3 py-2 font-mono text-fg-faint">{event.source_run_id.substring(0, 8)}</td>
 							</tr>

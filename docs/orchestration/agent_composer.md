@@ -245,9 +245,13 @@ metadata:
   tags: [escalation, support, human, complex]
 ```
 
+#### Dashboard configuration
+
+The [dashboard compose builder](../interfaces/dashboard.md) exposes routing strategy visually when creating a composition with the **Route** pattern. Three pill buttons (Broadcast / Keyword / Sense) appear below the slot picker with a "Recommended" badge on Sense. A collapsible detail section shows scoring weights (tags 3x, name 2x, description 1.5x) and per-slot quality indicators. The Route pattern supports variable service counts (3-10) with semantic specialist names that directly feed into name-match scoring. The selected strategy is written into the generated `compose.yaml`.
+
 #### Single target behavior
 
-When only one target is specified, `strategy` has no effect — the message always goes to that target regardless of the strategy setting.
+When only one target is specified, `strategy` has no effect -- the message always goes to that target regardless of the strategy setting.
 
 ### Backpressure Behavior
 

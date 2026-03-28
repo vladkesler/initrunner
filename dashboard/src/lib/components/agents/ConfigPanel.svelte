@@ -129,6 +129,32 @@
 		</div>
 	</ConfigSection>
 
+	<!-- Tool Search -->
+	{#if detail.tool_search}
+		<ConfigSection title="Tool Search">
+			<div class="space-y-1 font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
+				<div>
+					<span class="text-fg-faint">status</span>
+					<span class="ml-1 text-status-ok">active</span>
+				</div>
+				{#if detail.tool_search.always_available.length > 0}
+					<div>
+						<span class="text-fg-faint">always visible</span>
+						<span class="ml-1 text-fg-muted">{detail.tool_search.always_available.join(', ')}</span>
+					</div>
+				{/if}
+				<div>
+					<span class="text-fg-faint">discoverable</span>
+					<span class="ml-1 text-fg-muted">{detail.tools.length - detail.tool_search.always_available.length} tools via search</span>
+				</div>
+				<div>
+					<span class="text-fg-faint">max results</span>
+					<span class="ml-1 text-fg-muted">{detail.tool_search.max_results}</span>
+				</div>
+			</div>
+		</ConfigSection>
+	{/if}
+
 	<!-- Memory -->
 	{#if memory}
 		<ConfigSection title="Memory">

@@ -130,6 +130,27 @@ def _rewrite_model_block(
 
 
 # ---------------------------------------------------------------------------
+# Tool function map (for tool search UI)
+# ---------------------------------------------------------------------------
+
+
+def _build_tool_func_map() -> dict[str, list[str]]:
+    """Map each registered tool type to its function names."""
+    from initrunner.agent.tools._registry import get_tool_types
+    from initrunner.agent.tools.registry import resolve_func_names
+
+    result: dict[str, list[str]] = {}
+    for type_name in get_tool_types():
+        try:
+            funcs = resolve_func_names([{"type": type_name}])
+            if funcs:
+                result[type_name] = funcs
+        except Exception:
+            pass  # Builder may fail with dummy context -- skip gracefully
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -157,6 +178,9 @@ async def builder_options(
             docs_url=setup["docs_url"],
         )
 
+    # Build tool type -> function name mapping for tool search UI
+    tool_func_map = await asyncio.to_thread(_build_tool_func_map)
+
     return BuilderOptionsResponse(
         templates=templates,
         providers=opts.providers,
@@ -168,6 +192,7 @@ async def builder_options(
         ollama_base_url=opts.ollama_base_url,
         template_setups=template_setups,
         provider_status=opts.provider_status,
+        tool_func_map=tool_func_map,
     )
 
 

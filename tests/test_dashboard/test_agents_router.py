@@ -125,6 +125,7 @@ def _make_detail_role(path: str, name: str, provider: str = "openai", model: str
     dr.role.spec.capabilities = []
     dr.role.spec.skills = []
     dr.role.spec.features = []
+    dr.role.spec.tool_search = MagicMock(enabled=False)
     return dr
 
 
@@ -168,3 +169,51 @@ def test_agent_detail_provider_warning_none_when_ready(client, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["provider_warning"] is None
+
+
+def test_agent_detail_tool_search_exposed(client, monkeypatch):
+    """tool_search is included in detail when enabled."""
+    role = _make_detail_role("/tmp/roles/agent-ts.yaml", "agent-ts", provider="openai")
+    # Enable tool_search on the mock
+    role.role.spec.tool_search = MagicMock(
+        enabled=True,
+        model_dump=lambda: {
+            "enabled": True,
+            "always_available": ["current_time"],
+            "max_results": 5,
+            "threshold": 0.0,
+        },
+    )
+    role.role.spec.features = ["tools", "tool_search"]
+    cache = MockRoleCache([role])
+    client.app.dependency_overrides[get_role_cache] = lambda: cache
+    agent_id = _role_id(Path("/tmp/roles/agent-ts.yaml"))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    with patch("initrunner.agent.loader._load_dotenv"):
+        resp = client.get(f"/api/agents/{agent_id}/detail")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["tool_search"] is not None
+    assert data["tool_search"]["enabled"] is True
+    assert data["tool_search"]["always_available"] == ["current_time"]
+    assert "tool_search" in data["features"]
+
+
+def test_agent_detail_tool_search_null_when_disabled(client, monkeypatch):
+    """tool_search is null in detail when disabled."""
+    role = _make_detail_role("/tmp/roles/agent-nts.yaml", "agent-nts", provider="openai")
+    cache = MockRoleCache([role])
+    client.app.dependency_overrides[get_role_cache] = lambda: cache
+    agent_id = _role_id(Path("/tmp/roles/agent-nts.yaml"))
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    with patch("initrunner.agent.loader._load_dotenv"):
+        resp = client.get(f"/api/agents/{agent_id}/detail")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["tool_search"] is None

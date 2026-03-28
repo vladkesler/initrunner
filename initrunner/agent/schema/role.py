@@ -115,6 +115,8 @@ class AgentSpec(BaseModel):
             out.append("reasoning")
         if self.autonomy:
             out.append("autonomy")
+        if self.tool_search.enabled:
+            out.append("tool_search")
         return out
 
     @field_validator("tools", mode="before")

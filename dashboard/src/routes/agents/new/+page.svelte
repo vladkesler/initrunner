@@ -435,6 +435,7 @@
 			onSave={() => handleSave()}
 			onSaveForce={() => handleSave(true)}
 			onBack={goBack}
+			toolFuncMap={options?.tool_func_map ?? {}}
 		/>
 
 	{:else if step === 'success' && saveResult}

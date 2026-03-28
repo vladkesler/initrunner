@@ -38,6 +38,15 @@
 								<span class="tabular-nums">{svc.sink.circuit_breaker_threshold} failures</span>
 							{/if}
 						</div>
+					{#if svc.sink.strategy === 'sense'}
+						<div class="mt-1 border-l-2 border-l-accent-primary/20 pl-2.5 py-1 text-[11px] text-fg-faint">
+							Matches to the best target by scoring tags, names, descriptions. LLM breaks ties.
+						</div>
+					{:else if svc.sink.strategy === 'keyword'}
+						<div class="mt-1 border-l-2 border-l-accent-primary/20 pl-2.5 py-1 text-[11px] text-fg-faint">
+							Matches to the best target by scoring tags, names, descriptions. No API calls.
+						</div>
+					{/if}
 					</div>
 				{/if}
 

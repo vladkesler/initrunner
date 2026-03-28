@@ -76,6 +76,22 @@ Tools added with `--tools` are also set as always-visible. For example, `--tool-
 
 The `all` profile registers every tool as always-visible, so `search_tools` has nothing to discover. This is fine for local use, but the context overhead grows with the number of tools. For bots and resource-constrained models, `minimal` (the default) keeps context tight and relies on tool search for anything beyond the basics.
 
+## Dashboard Configuration
+
+Tool search can be configured visually in the [dashboard agent creation wizard](../interfaces/dashboard.md) without hand-editing YAML.
+
+In the **Editor** step, open the **Cognition** panel (lime toggle in the toolbar). The **Tool Search** section appears when the agent has 10 or more tools configured, or when `tool_search` is already enabled in the YAML.
+
+The panel provides:
+
+- **Enable/disable toggle** -- writes `spec.tool_search` to the YAML. On first enable, common functions (`current_time`, `parse_date`, `think`, `search_documents`) are auto-pinned as always-available.
+- **Always-visible picker** -- a checklist of all resolved function names (e.g. `current_time`, `fetch_page`, `read_file`) with their origin tool type in parentheses. One tool type can produce multiple functions (e.g. `datetime` produces `current_time` and `parse_date`). Checked functions go into `always_available`; unchecked functions are discoverable via `search_tools` at runtime.
+- **Tuning** (collapsed by default) -- `max_results` slider (1-20).
+
+The function name mapping is resolved at startup and served in the builder options response (`tool_func_map`), so the picker resolves locally with no round-trips.
+
+**Agent detail view**: when tool search is enabled, the Config tab shows a **Tool Search** section with the status, always-visible function list, discoverable tool count, and max results. Agent cards display a cyan `search` badge.
+
 ## Best Practices
 
 - **Enable when you have 10+ tools** — below that, the overhead isn't worth it

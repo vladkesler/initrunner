@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026.3.3] - 2026-03-28
+
+### Added
+- **Sense routing in compose builder** -- Route pattern now exposes routing strategy (Broadcast / Keyword / Sense) as inline controls in the dashboard compose builder. Variable service count (3-10) with semantic specialist names (researcher, responder, escalator, analyst, etc.). Collapsible scoring detail shows tag/name/description weights and per-slot quality indicators. Events tab gains a Routing column showing method and score for each delegation event
+- **Tool search in Cognition panel** -- Tool search is now configurable in the dashboard agent creation wizard via the Cognition panel. Function-name picker (resolved from `tool_func_map` in builder options), auto-pins common functions on first enable, collapsible tuning section. Always visible in the panel (previously gated behind 10+ tools). Info banner appears for agents with 10+ tools suggesting enablement
+- **Tool search in agent detail** -- `tool_search` exposed in agent detail API response and Config tab. Agent cards and flow nodes show a cyan `search` badge when tool search is enabled. `tool_search` added to the `features` property on `AgentSpec`
+- **Cognition panel tooltips** -- Every section in the Cognition panel (Pattern, Autonomy, Think, Todo, Tool Search, Guardrails) now has descriptive tooltips. Individual pattern buttons show what each reasoning strategy does
+- **README Intelligence section** -- New top-level section showcasing reasoning patterns, sense routing, and tool search with concrete YAML examples and dashboard references
+
+### Changed
+- **Route pattern flexible topology** -- Route pattern is no longer fixed at 4 services. Supports 3-10 services with semantic specialist names from a curated pool. Defaults to 3 (intake + researcher + responder). `routing_strategy` parameter added to `build_compose()` and `ComposeSeedRequest`
+- **Pattern card descriptions** -- Updated compose builder pattern descriptions: chain -> "Linear A -> B -> C pipeline", fan-out -> "Dispatch to all workers simultaneously", route -> "Route to the best specialist automatically" with lime `sense` badge
+- **README hero trimmed** -- Hero command block reduced from 7 to 3 examples to avoid duplication with the starter table below
+
+### Fixed
+- **Autonomy arrow UX** -- Autonomy section in Cognition panel no longer shows a misleading expand arrow when disabled. When unchecked, displays as a flat label + checkbox (matching Think/Todo pattern). Arrow appears only when enabled and sub-settings are expandable
+- **CognitionPanel toolFuncMap prop** -- `toolFuncMap` prop was declared in the type signature but not destructured in `EditorScreen.svelte`, causing the variable to be unbound. Added default value `{}` in the destructuring
+
 ## [2026.3.2] - 2026-03-28
 
 ### Added

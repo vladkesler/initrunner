@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.2-%2334D058" alt="v2026.3.2">
+  <img src="https://img.shields.io/badge/latest-v2026.3.3-%2334D058" alt="v2026.3.3">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -21,23 +21,17 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**AI agents that work.** A docs assistant that answers from your knowledge base with citations. A code review team that catches bugs before your human reviewers do. A research team that plans queries, searches the web, and writes cited reports. A monitoring daemon that learns what "normal" looks like over time.
-
-Each one is a single command:
+**AI agents that work.** A docs assistant that answers from your knowledge base. A research team that searches the web and writes cited reports. A code review team that catches bugs before your human reviewers do. Each one is a single command:
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
 initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research team
-initrunner run codebase-analyst -i                            # index & chat with your code
 initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
-initrunner run web-researcher -p "Compare React vs Svelte"    # web research with citations
-initrunner run telegram-assistant --daemon                     # Telegram bot with memory
-initrunner run discord-assistant --daemon                      # Discord bot with memory
 ```
 
-Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
+14 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.2** -- Dashboard now supports `--api-key` authentication. Memory template bug fixed -- agents built from the memory template retain their config. See the [Changelog](CHANGELOG.md).
+> **v2026.3.3** -- Dashboard Cognition panel now configures reasoning, tool search, and autonomy visually. Compose builder surfaces sense routing with strategy selection and quality indicators. New Intelligence section in README. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -45,6 +39,7 @@ Or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools,
 - [Define an Agent in YAML](#define-agent-roles-in-yaml)
 - [Why InitRunner](#why-initrunner)
 - [Features](#features)
+- [Intelligence](#intelligence)
 - [User Interfaces](#user-interfaces)
 - [Security & Authorization](#security--authorization)
 - [Distribution & Deployment](#distribution--deployment)
@@ -301,6 +296,90 @@ spec:
 
 Run with `initrunner compose up compose.yaml`. See [Orchestration Patterns](docs/orchestration/patterns-guide.md) for all five patterns side-by-side, or dive into [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
 
+## Intelligence
+
+### Reasoning patterns
+
+Control how your agent thinks, not just what it does:
+
+```yaml
+spec:
+  reasoning:
+    pattern: plan_execute    # plan upfront, then execute each step
+    auto_plan: true
+  tools:
+    - type: think            # internal scratchpad -- agent reasons before acting
+      critique: true         # self-evaluates each thought
+    - type: todo             # structured task list for multi-step work
+```
+
+Four patterns: `react` (simple tool loop), `todo_driven` (works through a task list), `plan_execute` (plans then acts), and `reflexion` (self-critiques and retries). The dashboard Cognition panel lets you switch patterns, toggle think/todo tools, and tune autonomy settings visually -- no YAML editing required.
+
+See [Reasoning](docs/core/reasoning.md) · [Autonomy](docs/orchestration/autonomy.md).
+
+### Sense routing
+
+When a compose pipeline has multiple targets, sense routing picks the right one automatically:
+
+```yaml
+triager:
+  role: roles/triager.yaml
+  sink:
+    type: delegate
+    strategy: sense
+    target: [researcher, responder, escalator]
+```
+
+Two-pass scoring: first, keyword matching against each target's tags, name, and description (zero API calls). If scores are close, a single LLM call breaks the tie. In practice, keyword scoring resolves 90%+ of routing decisions -- the LLM tiebreaker fires only on genuinely ambiguous messages.
+
+<details>
+<summary>Scoring weights and strategy comparison</summary>
+
+| Signal | Weight | Example |
+|--------|--------|---------|
+| Tags | 3x | `tags: [research, analysis, investigation]` |
+| Name | 2x | `name: researcher` |
+| Description | 1.5x | `description: Investigates technical issues` |
+
+| Strategy | Behavior | Cost |
+|----------|----------|------|
+| `all` | Fan-out to every target (default) | None |
+| `keyword` | Keyword scoring only | None |
+| `sense` | Keyword + LLM tiebreaker | 0-1 LLM call per message |
+
+</details>
+
+The dashboard compose builder exposes all three strategies as inline controls when you create a Route composition, with quality indicators showing how well each target's metadata is optimized for routing.
+
+See [Intent Sensing](docs/core/intent_sensing.md) · [Compose Routing](docs/orchestration/agent_composer.md#routing-strategy).
+
+### Tool search
+
+Agents with many tools waste context and pick worse. Tool search hides tools behind on-demand keyword discovery:
+
+```yaml
+spec:
+  tools:
+    - type: datetime
+    - type: web_reader
+    - type: search
+    - type: python
+    - type: slack
+    - type: filesystem
+    - type: git
+    - type: shell
+    # ... 10+ tools
+  tool_search:
+    enabled: true
+    always_available: [current_time, fetch_page]
+```
+
+The agent sees only `search_tools` and the pinned tools. When it needs something else, it calls `search_tools("send slack message")`, discovers `send_slack_message`, and calls it -- all in one turn. BM25 keyword search, no API calls, no embeddings. Typically saves 60-80% context on tool-heavy agents.
+
+The dashboard Cognition panel lets you toggle tool search and pick always-visible tools from a checklist when creating or editing an agent.
+
+See [Tool Search](docs/core/tool-search.md).
+
 ## User Interfaces
 
 <p align="center">
@@ -341,8 +420,9 @@ If a dashboard is already running on the port, the desktop window connects to it
 ### What's in the UI
 
 - **Agent management** -- browse, create, delete, and inspect agents in a flow canvas or list view
+- **Cognition panel** -- configure reasoning patterns, autonomy, think/todo tools, and tool search visually
 - **Run panel** -- send prompts and stream responses in real time
-- **Compose and Team builders** -- visual editors for multi-agent orchestration
+- **Compose and Team builders** -- visual editors with routing strategy selection and quality indicators
 - **Audit log** -- filterable run history with token usage and durations
 - **System health** -- detected providers, doctor checks, and tool registry
 
@@ -422,6 +502,7 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 |------|----------|
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
+| Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Tool Search](docs/core/tool-search.md) · [Autonomy](docs/orchestration/autonomy.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
@@ -459,4 +540,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.1</sub></p>
+<p align="center"><sub>v2026.3.3</sub></p>
