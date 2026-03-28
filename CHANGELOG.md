@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.3.2] - 2026-03-28
+
+### Added
+- **Dashboard API key auth** -- `--api-key` flag protects the dashboard with a login page and cookie-based session. Supports header, cookie, and form-based authentication
+
+### Fixed
+- **Memory template canonicalization** -- `canonicalize_role_yaml()` no longer drops explicitly present optional spec sections (`memory`, `autonomy`, `reasoning`, `observability`) when all sub-fields match defaults. Agents created from the memory template now correctly retain their `memory:` config and get memory tools wired at runtime
+- **Memory tab auto-refresh** -- dashboard memory tab now refreshes automatically when a run completes, matching the existing history tab behavior
+- **Dashboard type narrowing** -- fixed `ty` type errors for `hmac.compare_digest` and `set_cookie` calls in dashboard auth flow
+
 ## [2026.3.1] - 2026-03-27
 
 ### Changed
