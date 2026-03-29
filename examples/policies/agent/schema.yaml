@@ -1,0 +1,23 @@
+apiVersion: initguard/v1
+kind: Schema
+principals:
+  agent:
+    attrs:
+      team: string
+      author: string
+      tags: list
+      version: string
+resources:
+  tool:
+    attrs:
+      tool_type: string
+      agent: string
+      callable: string
+      instance: string
+    actions: [execute]
+  agent:
+    attrs:
+      team: string
+      author: string
+      tags: list
+    actions: [delegate]

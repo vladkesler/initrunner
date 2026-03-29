@@ -1,0 +1,21 @@
+apiVersion: initguard/v1
+kind: ResourcePolicy
+resource: agent
+importDerivedRoles: [agent_derived_roles]
+rules:
+  # Trusted agents can delegate to anyone
+  - actions: ["delegate"]
+    effect: allow
+    derivedRoles: ["trusted_agent"]
+
+  # Same-team agents can delegate to each other
+  - actions: ["delegate"]
+    effect: allow
+    derivedRoles: ["same_team"]
+
+  # Non-trusted agents cannot delegate to privileged agents
+  - actions: ["delegate"]
+    effect: deny
+    roles: ["agent"]
+    when: request.resource.attr.tags.exists(t, t == "privileged")
+    advice: "Delegation to privileged agents requires the 'trusted' tag."

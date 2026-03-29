@@ -29,47 +29,47 @@ from initrunner.audit.logger import AuditLogger, AuditRecord
 _logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Agent principal scoping (Cerbos agent-as-principal)
+# Agent principal scoping (policy engine)
 # ---------------------------------------------------------------------------
 
-_cached_authz: Any = None
+_cached_engine: Any = None
+_cached_config: Any = None
 _authz_resolved = False
 
 
 def _ensure_authz() -> None:
-    """One-time: load config, construct CerbosAuthz, set ContextVar."""
-    global _cached_authz, _authz_resolved
+    """One-time: load config, build policy engine, set ContextVar.
+
+    Fail-fast: when ``INITRUNNER_POLICY_DIR`` is set but policy loading
+    fails, the error propagates (operator explicitly opted in).
+    """
+    global _cached_engine, _cached_config, _authz_resolved
     if _authz_resolved:
         return
     _authz_resolved = True
 
-    from initrunner.authz import CerbosAuthz, load_authz_config, require_cerbos, set_current_authz
+    from initrunner.authz import load_authz_config, load_engine, set_current_engine
 
     config = load_authz_config()
     if config is None:
         return
 
-    try:
-        require_cerbos()
-    except RuntimeError:
-        _logger.warning("Cerbos SDK not installed; agent policy checks disabled")
-        return
-
-    authz = CerbosAuthz(config)
-    ok, msg = authz.health_check()
-    if not ok:
-        _logger.warning("Cerbos PDP unreachable; agent policy checks disabled: %s", msg)
-        return
-
-    _cached_authz = authz
-    set_current_authz(authz)
-    _logger.info("Cerbos agent policy engine enabled (PDP at %s:%d)", config.host, config.port)
+    engine = load_engine(config)
+    info = engine.info()
+    _cached_engine = engine
+    _cached_config = config
+    set_current_engine(engine)
+    _logger.info(
+        "Policy engine enabled: %d policies, %d rules",
+        info.policy_count,
+        info.rule_count,
+    )
 
 
 def _enter_agent_context(role: RoleDefinition) -> contextvars.Token | None:
     """Set the agent principal ContextVar for the current run."""
     _ensure_authz()
-    if _cached_authz is None:
+    if _cached_engine is None:
         return None
 
     from initrunner.authz import agent_principal_from_role, set_current_agent_principal
@@ -100,7 +100,7 @@ _T = TypeVar("_T")
 def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
     """Run *fn* in a thread pool with a hard timeout (seconds).
 
-    Uses ``copy_context()`` so that ContextVars (e.g. Cerbos principal/authz)
+    Uses ``copy_context()`` so that ContextVars (e.g. agent principal/engine)
     propagate to the pool thread where ``agent.run_sync()`` executes.
     """
     ctx = contextvars.copy_context()

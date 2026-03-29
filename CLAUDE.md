@@ -113,7 +113,7 @@ Detailed docs live in `docs/`. Key references:
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Docker sandbox | `docs/security/docker-sandbox.md` |
-| Agent policy (Cerbos) | `docs/security/agent-policy.md` |
+| Agent policy (initguard) | `docs/security/agent-policy.md` |
 | Auth & guardrails | `docs/security/auth.md`, `docs/configuration/guardrails.md` |
 | CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/pypi_publish.md` |
 | Role generation & wizards | `docs/agents/role_generation.md` |

@@ -1,18 +1,16 @@
-# Agent Policy Engine (Cerbos)
+# Agent Policy Engine
 
-InitRunner uses [Cerbos](https://cerbos.dev) as an **agent-as-principal** policy engine. Agents get their own Cerbos identity derived from role metadata, and Cerbos governs what tools an agent can use and which agents it can delegate to -- across all execution paths (CLI, compose, daemon, API, pipeline).
+InitRunner uses [initguard](https://github.com/initrunner/initguard) as an embedded **agent-as-principal** policy engine. Agents get their own identity derived from role metadata, and the engine governs what tools an agent can use and which agents it can delegate to -- across all execution paths (CLI, compose, daemon, API, pipeline).
+
+The engine runs in-process with no sidecar, no network round-trips, and sub-millisecond policy evaluation.
 
 ## Quick Start
 
 ```bash
-# Start Cerbos PDP with agent policies
-docker compose -f docker-compose.cerbos.yml up -d
+# Point to your policy directory
+export INITRUNNER_POLICY_DIR=./policies
 
-# Enable agent policy checks
-export INITRUNNER_CERBOS_ENABLED=true
-export INITRUNNER_CERBOS_AGENT_CHECKS=true
-
-# Run an agent -- Cerbos now enforces tool and delegation policies
+# Run an agent -- policies now enforce tool and delegation rules
 initrunner run my-agent.yaml "do something"
 ```
 
@@ -20,17 +18,14 @@ initrunner run my-agent.yaml "do something"
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `INITRUNNER_CERBOS_ENABLED` | `false` | Enable Cerbos integration |
-| `INITRUNNER_CERBOS_HOST` | `127.0.0.1` | PDP hostname |
-| `INITRUNNER_CERBOS_PORT` | `3592` | PDP HTTP port |
-| `INITRUNNER_CERBOS_TLS` | `false` | Use HTTPS for PDP connection |
-| `INITRUNNER_CERBOS_AGENT_CHECKS` | `false` | Enable agent-level policy enforcement |
+| `INITRUNNER_POLICY_DIR` | *(unset)* | Path to policy YAML directory. If unset, policy enforcement is disabled. |
+| `INITRUNNER_AGENT_CHECKS` | `true` | Enable per-agent tool and delegation checks. |
 
-Both `INITRUNNER_CERBOS_ENABLED` and `INITRUNNER_CERBOS_AGENT_CHECKS` must be `true` for policy checks to activate.
+When `INITRUNNER_POLICY_DIR` is set, policies **must** load successfully or the first run fails (fail-fast). There is no allow-all fallback when the operator has explicitly opted into policy enforcement.
 
 ## How Agent Principals Are Constructed
 
-Every agent run constructs a Cerbos principal from `role.yaml` metadata:
+Every agent run constructs a principal from `role.yaml` metadata:
 
 ```yaml
 # role.yaml
@@ -42,7 +37,7 @@ metadata:
   version: "1.0"
 ```
 
-Produces a Cerbos principal:
+Produces a principal:
 
 | Field | Value |
 |-------|-------|
@@ -50,7 +45,7 @@ Produces a Cerbos principal:
 | **Roles** | `["agent", "team:platform"]` |
 | **Attributes** | `{team: "platform", author: "alice", tags: ["trusted", "code"], version: "1.0"}` |
 
-The `team:<name>` role is only added when `metadata.team` is set. The `tags` attribute is a native list (not CSV), which allows Cerbos CEL expressions like `request.principal.attr.tags.exists(t, t == "trusted")`.
+The `team:<name>` role is only added when `metadata.team` is set. The `tags` attribute is a native list (not CSV), enabling CEL expressions like `request.principal.attr.tags.exists(t, t == "trusted")`.
 
 ## Agent Principal Scoping
 
@@ -60,7 +55,7 @@ The agent principal is set per-run via a ContextVar in the executor:
 - **Compose**: Each service's agent run goes through the executor, so the principal is automatically scoped.
 - **Pipeline**: Inline steps go through the executor. MCP steps construct a lightweight `Metadata` from the step name.
 
-The `CerbosAuthz` instance is cached once per process (the PDP connection is stable). Only the agent principal ContextVar changes per run.
+The `PolicyEngine` instance is loaded once per process (immutable, thread-safe). Only the agent principal ContextVar changes per run.
 
 ## Delegation Policy
 
@@ -86,74 +81,66 @@ This is an explicit limitation: remote delegation policy can only match on the t
 
 ### Compose Delegation
 
-`DelegateSink` routes agent output between compose services. The policy check uses **role metadata** (from loaded role YAML), not the compose service key. This matters when compose service keys differ from role names (e.g., compose service `code-reviewer` vs role name `reviewer`).
+`DelegateSink` routes agent output between compose services. The policy check uses **role metadata** (from loaded role YAML), not the compose service key.
 
 ## Agent Tool Policy
 
-The `CerbosToolset` wraps every toolset and checks whether the current agent principal is allowed to execute a given tool:
+The `PolicyToolset` wraps every toolset and checks whether the current agent principal is allowed to execute a given tool:
 
 - **Principal**: from `get_current_agent_principal()` ContextVar
 - **Resource**: `kind=tool`, `id=<tool_function_name>`, `attrs={tool_type, agent, callable, instance}`
 - **Action**: `execute`
 
-When `agent_checks_enabled` is `false` or no agent principal is set, the check is a no-op (allow-all).
+When `agent_checks` is disabled or no agent principal is set, the check is a no-op (allow-all).
+
+Policy denials return a `Decision` with `reason` and optional `advice`, which are surfaced in the tool's permission-denied message.
 
 ## Example Policies
 
 See `examples/policies/agent/` for a complete policy set:
+
+### Schema (`schema.yaml`)
+
+Defines expected attributes for principals and resources. Used for lint validation at load time.
 
 ### Derived Roles (`derived_roles.yaml`)
 
 ```yaml
 - name: trusted_agent
   parentRoles: ["agent"]
-  condition:
-    match:
-      expr: request.principal.attr.tags.exists(t, t == "trusted")
+  when: request.principal.attr.tags.exists(t, t == "trusted")
 
 - name: same_team
   parentRoles: ["agent"]
-  condition:
-    match:
-      all:
-        of:
-          - expr: request.principal.attr.team != ""
-          - expr: request.principal.attr.team == request.resource.attr.team
+  when: request.principal.attr.team != ""
+  unless: request.principal.attr.team != request.resource.attr.team
 ```
 
-### Delegation Policy (`agent_delegation_policy.yaml`)
+### Delegation Policy (`delegation_policy.yaml`)
 
 - **Trusted agents** can delegate to any agent
 - **Same-team agents** can delegate to each other
 - Delegation to **privileged-tagged** agents is denied (unless the source is trusted)
 
-### Tool Policy (`agent_tool_policy.yaml`)
+### Tool Policy (`tool_policy.yaml`)
 
 - All agents can use safe tool types (datetime, search, web_reader, http, etc.)
 - **Trusted agents** can use all tools including shell and python
 - Non-trusted agents are **denied** shell and python tools
 
-## PDP Health Check
-
-When Cerbos is enabled, the executor performs a one-time health check on first run. If the PDP is unreachable:
-
-- A warning is logged
-- Agent policy checks are disabled (allow-all fallback)
-- The process is **not** crashed (CLI/daemon should not abort at import time)
-
 ## Audit Integration
 
-The `principal_id` field in audit records tracks trigger source identity (e.g., `telegram:12345`, `webhook:github`). This is independent of Cerbos agent principals and is preserved across all execution paths.
+The `principal_id` field in audit records tracks trigger source identity (e.g., `telegram:12345`, `webhook:github`). This is independent of agent principals and is preserved across all execution paths.
 
 Delegation policy denials in compose are logged as `policy_denied` audit events via the `DelegateSink` audit buffer.
 
-## Docker Compose
+## Docker
 
-```bash
-docker compose -f docker-compose.cerbos.yml up
+Mount the policy directory into your container:
+
+```yaml
+volumes:
+  - ./policies:/data/policies
+environment:
+  - INITRUNNER_POLICY_DIR=/data/policies
 ```
-
-The compose file:
-- Mounts `examples/policies/agent/` into the Cerbos PDP
-- Sets `INITRUNNER_CERBOS_ENABLED=true` and `INITRUNNER_CERBOS_AGENT_CHECKS=true`
-- Waits for Cerbos health check before starting InitRunner

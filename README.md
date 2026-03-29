@@ -435,13 +435,11 @@ See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](
 
 ## Security & Authorization
 
-Built-in security with optional [Cerbos](https://github.com/cerbos/cerbos) agent-as-principal policy engine. Agents get Cerbos identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, and API:
+Built-in security with an embedded [initguard](https://github.com/initrunner/initguard) agent-as-principal policy engine. Agents get identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, and API:
 
 ```bash
-pip install initrunner[authz]
-export INITRUNNER_CERBOS_ENABLED=true
-export INITRUNNER_CERBOS_AGENT_CHECKS=true  # per-agent identity checks
-initrunner run role.yaml   # tool calls + delegation checked against Cerbos policies
+export INITRUNNER_POLICY_DIR=./policies   # point to your policy YAML directory
+initrunner run role.yaml                  # tool calls + delegation checked against policies
 ```
 
 Also includes content filtering, PEP 578 sandboxing, Docker isolation, token budgets, and rate limiting out of the box. See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).

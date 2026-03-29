@@ -22,8 +22,8 @@ def _matches(pattern: str, tool_args: dict[str, Any]) -> bool:
     """Return True if *pattern* matches any value in *tool_args*.
 
     Pattern format:
-    - ``arg_name=glob`` — match *glob* against ``tool_args[arg_name]``
-    - bare glob (no ``=``) — match against every string value in *tool_args*
+    - ``arg_name=glob`` -- match *glob* against ``tool_args[arg_name]``
+    - bare glob (no ``=``) -- match against every string value in *tool_args*
     """
     if "=" in pattern:
         arg_name, _, glob = pattern.partition("=")
@@ -49,7 +49,7 @@ def check_tool_permission(
         A ``(allowed, matched_pattern)`` tuple.  *matched_pattern* is the
         rule that decided the outcome (empty string when the default wins).
     """
-    # Deny rules checked first — deny wins
+    # Deny rules checked first -- deny wins
     for pattern in permissions.deny:
         if _matches(pattern, tool_args):
             return False, pattern
@@ -93,7 +93,7 @@ class PermissionToolset(AbstractToolset[Any]):
         allowed, matched = check_tool_permission(tool_args, self._permissions)
         if not allowed:
             rule_info = (
-                f" — blocked by rule: {matched}" if matched else " — blocked by default policy"
+                f" -- blocked by rule: {matched}" if matched else " -- blocked by default policy"
             )
             return f"Permission denied: {name}{rule_info}"
         return await self._inner.call_tool(name, tool_args, ctx, tool)
@@ -106,12 +106,12 @@ class PermissionToolset(AbstractToolset[Any]):
         return await self._inner.__aexit__(*args)
 
 
-class CerbosToolset(AbstractToolset[Any]):
-    """Checks Cerbos tool-level authorization per call using agent principals.
+class PolicyToolset(AbstractToolset[Any]):
+    """Checks policy-based tool-level authorization per call using agent principals.
 
-    Reads the agent principal and authz from ContextVars (set per-run by
-    the executor).  No-op when: authz is None (Cerbos disabled), agent
-    principal is None, or ``agent_checks_enabled`` is False.
+    Reads the agent principal and policy engine from ContextVars (set per-run
+    by the executor).  No-op when: engine is None (policies disabled), agent
+    principal is None, or ``agent_checks`` is False.
     """
 
     def __init__(
@@ -141,12 +141,14 @@ class CerbosToolset(AbstractToolset[Any]):
         ctx: Any,
         tool: ToolsetTool[Any],
     ) -> Any:
-        from initrunner.authz import EXECUTE, TOOL, get_current_agent_principal, get_current_authz
+        from initrunner.agent.executor import _cached_config
+        from initrunner.authz import EXECUTE, TOOL, get_current_agent_principal, get_current_engine
 
-        authz = get_current_authz()
+        engine = get_current_engine()
         principal = get_current_agent_principal()
+        agent_checks = getattr(_cached_config, "agent_checks", False)
 
-        if authz is not None and authz.agent_checks_enabled and principal is not None:
+        if engine is not None and agent_checks and principal is not None:
             resource_attrs: dict[str, Any] = {
                 "tool_type": self._tool_type,
                 "agent": self._agent_name,
@@ -155,19 +157,22 @@ class CerbosToolset(AbstractToolset[Any]):
             if self._instance_key:
                 resource_attrs["instance"] = self._instance_key
 
-            allowed = await authz.check_async(
+            decision = await engine.check_async(
                 principal,
                 TOOL,
                 EXECUTE,
                 resource_id=name,
                 resource_attrs=resource_attrs,
             )
-            if not allowed:
-                return f"Permission denied: {name} -- blocked by policy"
+            if not decision.allowed:
+                msg = f"Permission denied: {name} -- {decision.reason}"
+                if decision.advice:
+                    msg += f" ({decision.advice})"
+                return msg
 
         return await self._inner.call_tool(name, tool_args, ctx, tool)
 
-    async def __aenter__(self) -> CerbosToolset:
+    async def __aenter__(self) -> PolicyToolset:
         await self._inner.__aenter__()
         return self
 

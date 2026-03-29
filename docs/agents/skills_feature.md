@@ -337,7 +337,7 @@ Auto-discovered skills are ambient capabilities by design. Two machines with dif
 - The role's `SecurityPolicy` applies to **all** tools, including those contributed by skills. Skills cannot weaken or bypass security policies.
 - Skills cannot nest -- the `SkillFrontmatter` schema does not include a `skills` field, so a skill cannot reference other skills.
 - Tool sandbox restrictions (blocked modules, MCP command allowlists, sensitive env prefixes) apply uniformly regardless of whether a tool came from a skill or the role itself.
-- The `activate_skill` meta-tool is a privileged tool that bypasses Cerbos/permission wrapping. It only reads SKILL.md files from paths pre-discovered by the harness at build time (not user-controlled input). This is the same trust model as the `search_tools` meta-tool.
+- The `activate_skill` meta-tool is a privileged tool that bypasses policy/permission wrapping. It only reads SKILL.md files from paths pre-discovered by the harness at build time (not user-controlled input). This is the same trust model as the `search_tools` meta-tool.
 
 See [Security](../security/security.md) for the full security policy reference.
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from initrunner.agent.permissions import CerbosToolset
+from initrunner.agent.permissions import PolicyToolset
 from initrunner.agent.schema.tools import ToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, get_builder, is_run_scoped
 from initrunner.stores.base import make_store_config
@@ -106,8 +106,8 @@ def build_toolsets(
         builder = get_builder(tool.type)
         if builder:
             toolset = builder(tool, ctx)
-            # Inner layer: Cerbos identity-based check
-            toolset = CerbosToolset(
+            # Inner layer: policy identity-based check
+            toolset = PolicyToolset(
                 toolset,
                 tool.type,
                 agent_name,
@@ -126,7 +126,7 @@ def build_toolsets(
         from initrunner.agent.tools.retrieval import build_retrieval_toolset
 
         ts = build_retrieval_toolset(make_store_config(role), sandbox=role.spec.security.tools)
-        ts = CerbosToolset(ts, "retrieval", agent_name)
+        ts = PolicyToolset(ts, "retrieval", agent_name)
         toolsets.append(wrap_observable(ts))
 
     if role.spec.memory is not None:
@@ -138,7 +138,7 @@ def build_toolsets(
             role.spec.model.provider,  # type: ignore[union-attr]
             sandbox=role.spec.security.tools,
         )
-        ts = CerbosToolset(ts, "memory_store", agent_name)
+        ts = PolicyToolset(ts, "memory_store", agent_name)
         toolsets.append(wrap_observable(ts))
 
     return toolsets

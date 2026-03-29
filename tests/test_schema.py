@@ -539,6 +539,7 @@ class TestFullRoleDefinition:
 
         role = RoleDefinition.model_validate(data)
         assert role.metadata.tags == ["test", "ci"]
+        assert role.spec.model is not None
         assert role.spec.model.temperature == 0.5
         assert role.spec.guardrails.max_tokens_per_run == 10000
         assert len(role.spec.tools) == 1

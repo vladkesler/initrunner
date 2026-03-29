@@ -33,6 +33,7 @@ dependencies = [
     "markdownify>=1.2.2",
     "python-dotenv>=1.2.1",
     "jinja2>=3.1",
+    "initguard>=2026.3.3",
 ]
 
 [project.optional-dependencies]
@@ -54,7 +55,6 @@ observability = [
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
-authz = ["cerbos>=0.15.1"]
 dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
 desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
 recommended = [
@@ -70,7 +70,6 @@ all = [
     "initrunner[all-models]",
     "initrunner[observability]",
     "initrunner[channels]",
-    "initrunner[authz]",
     "initrunner[dashboard]",
 ]
 

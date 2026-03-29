@@ -10,7 +10,9 @@ import pytest
 from pydantic_ai._spec import NamedSpec  # type: ignore[import-not-found]
 
 from initrunner.agent.loader import RoleLoadError, build_agent, load_role
-from initrunner.dashboard.routers.agents import _capability_summaries
+
+fastapi = pytest.importorskip("fastapi", reason="dashboard extras not installed")
+from initrunner.dashboard.routers.agents import _capability_summaries  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures

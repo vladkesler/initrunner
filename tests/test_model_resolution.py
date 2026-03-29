@@ -110,6 +110,7 @@ class TestResolveRoleModel:
     def test_override_preserves_tuning(self, partial_model_yaml: Path):
         role = load_role(partial_model_yaml)
         resolved = resolve_role_model(role, partial_model_yaml, model_override="openai:gpt-5-mini")
+        assert resolved.spec.model is not None
         assert resolved.spec.model.name == "gpt-5-mini"
         assert resolved.spec.model.temperature == 0.3
         assert resolved.spec.model.max_tokens == 2048
@@ -135,6 +136,7 @@ class TestResolveRoleModel:
         monkeypatch.setenv("INITRUNNER_MODEL", "anthropic:claude-sonnet-4-5-20250929")
         role = load_role(no_model_yaml)
         resolved = resolve_role_model(role, no_model_yaml)
+        assert resolved.spec.model is not None
         assert resolved.spec.model.provider == "anthropic"
         assert resolved.spec.model.name == "claude-sonnet-4-5-20250929"
 
@@ -193,6 +195,7 @@ class TestResolveRoleModel:
 
         role = load_role(no_model_yaml)
         resolved = resolve_role_model(role, no_model_yaml)
+        assert resolved.spec.model is not None
         assert resolved.spec.model.provider == "openai"
         assert resolved.spec.model.name == "google/gemini-3-flash-preview"
         assert resolved.spec.model.base_url == "https://openrouter.ai/api/v1"
