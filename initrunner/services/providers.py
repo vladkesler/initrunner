@@ -264,11 +264,11 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     _load_env()
     role = resolve_role_model(load_role(role_path), role_path)
 
-    role_provider = role.spec.model.provider
-    role_model = role.spec.model.name
+    role_provider = role.spec.model.provider  # type: ignore[union-attr]
+    role_model = role.spec.model.name  # type: ignore[union-attr]
 
     # Check if user has the required LLM key
-    env_var = role.spec.model.api_key_env or _PROVIDER_API_KEY_ENVS.get(role_provider, "")
+    env_var = role.spec.model.api_key_env or _PROVIDER_API_KEY_ENVS.get(role_provider, "")  # type: ignore[union-attr]
     user_has_key = bool(os.environ.get(env_var)) if env_var else True
     # Ollama needs no key
     if role_provider == "ollama":

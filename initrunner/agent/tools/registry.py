@@ -135,7 +135,7 @@ def build_toolsets(
         ts = build_memory_toolset(
             role.spec.memory,
             role.metadata.name,
-            role.spec.model.provider,
+            role.spec.model.provider,  # type: ignore[union-attr]
             sandbox=role.spec.security.tools,
         )
         ts = CerbosToolset(ts, "memory_store", agent_name)

@@ -140,7 +140,7 @@ def _inject_local_fallbacks(caps: list) -> None:
 def _validate_provider(role: RoleDefinition) -> None:
     """Check the provider SDK is installed, raising RoleLoadError if not."""
     try:
-        require_provider(role.spec.model.provider)
+        require_provider(role.spec.model.provider)  # type: ignore[union-attr]
     except RuntimeError as e:
         raise RoleLoadError(str(e)) from None
 
@@ -216,9 +216,9 @@ def _create_agent(
     capabilities: list | None = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
-    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}
-    if not role.spec.model.is_reasoning_model():
-        model_settings_kwargs["temperature"] = role.spec.model.temperature
+    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}  # type: ignore[union-attr]
+    if not role.spec.model.is_reasoning_model():  # type: ignore[union-attr]
+        model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
         "system_prompt": system_prompt,
@@ -255,7 +255,7 @@ def build_agent(
             "Model must be resolved before building an agent. Call resolve_role_model() first."
         )
     if not isinstance(role.spec.model, ModelConfig):
-        role = _set_model(role, ModelConfig(**role.spec.model.model_dump()))
+        role = _set_model(role, ModelConfig(**role.spec.model.model_dump()))  # type: ignore[union-attr]
     _validate_provider(role)
     _validate_reasoning(role)
     system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(

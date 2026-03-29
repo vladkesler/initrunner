@@ -502,11 +502,11 @@ def _apply_model_override(role: RoleDefinition, model_string: str) -> RoleDefini
     old_model = role.spec.model
 
     update: dict = {"provider": new_provider, "name": new_name}
-    if new_provider != old_model.provider:
+    if new_provider != old_model.provider:  # type: ignore[union-attr]
         update["base_url"] = None
         update["api_key_env"] = None
 
-    new_model = old_model.model_copy(update=update)
+    new_model = old_model.model_copy(update=update)  # type: ignore[union-attr]
     new_spec = role.spec.model_copy(update={"model": new_model})
     return role.model_copy(update={"spec": new_spec})
 

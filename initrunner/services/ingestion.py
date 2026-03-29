@@ -158,6 +158,6 @@ def run_ingest_managed_sync(
         urls=urls or [],
         config=role.spec.ingest,
         agent_name=role.metadata.name,
-        provider=role.spec.model.provider,
+        provider=role.spec.model.provider,  # type: ignore[union-attr]
         progress_callback=progress_callback,
     )

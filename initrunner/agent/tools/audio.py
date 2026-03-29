@@ -160,7 +160,7 @@ def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> Funct
         if not mime_type:
             mime_type = _FALLBACK_MIME.get(suffix, "application/octet-stream")
 
-        model_str = config.transcription_model or ctx.role.spec.model.to_model_string()
+        model_str = config.transcription_model or ctx.role.spec.model.to_model_string()  # type: ignore[union-attr]
         try:
             agent = Agent(model_str)
             result = agent.run_sync(

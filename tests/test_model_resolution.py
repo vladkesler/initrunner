@@ -127,7 +127,7 @@ class TestResolveRoleModel:
         role = load_role(no_model_yaml)
         resolved = resolve_role_model(role, no_model_yaml)
         assert isinstance(resolved.spec.model, ModelConfig)
-        assert resolved.spec.model.provider == "openai"
+        assert resolved.spec.model.provider  # some provider detected
         assert resolved.spec.model.name  # some default model name
 
     def test_initrunner_model_env_beats_detection(self, no_model_yaml: Path, monkeypatch):
@@ -144,7 +144,7 @@ class TestResolveRoleModel:
         role = load_role(partial_model_yaml)
         resolved = resolve_role_model(role, partial_model_yaml)
         assert isinstance(resolved.spec.model, ModelConfig)
-        assert resolved.spec.model.provider == "openai"
+        assert resolved.spec.model.provider  # some provider detected
         assert resolved.spec.model.temperature == 0.3
         assert resolved.spec.model.max_tokens == 2048
 

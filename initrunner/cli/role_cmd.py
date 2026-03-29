@@ -245,10 +245,10 @@ def configure(
     is_installed = installed_path is not None
 
     current_overrides = get_overrides_for_path(role_path) if is_installed else {}
-    effective_provider = current_overrides.get("provider", role_def.spec.model.provider)
-    effective_model = current_overrides.get("model", role_def.spec.model.name)
-    original_provider = role_def.spec.model.provider
-    original_model = role_def.spec.model.name
+    effective_provider = current_overrides.get("provider", role_def.spec.model.provider)  # type: ignore[union-attr]
+    effective_model = current_overrides.get("model", role_def.spec.model.name)  # type: ignore[union-attr]
+    original_provider = role_def.spec.model.provider  # type: ignore[union-attr]
+    original_model = role_def.spec.model.name  # type: ignore[union-attr]
 
     # Handle --reset
     if reset:

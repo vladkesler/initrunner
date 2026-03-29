@@ -224,6 +224,8 @@ def _explain_role_prompt(role: RoleDefinition) -> str:
 
 def _explain_model(role: RoleDefinition) -> str:
     m = role.spec.model
+    if m is None or not m.name:
+        return "Model will be auto-detected at runtime."
     return (
         f"Uses {m.provider}:{m.name} with temperature {m.temperature} "
         f"and up to {m.max_tokens:,} output tokens."
