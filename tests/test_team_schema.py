@@ -188,9 +188,10 @@ class TestTeamSpec:
                 personas={"alpha-": "first", "bravo": "second"},  # type: ignore[invalid-argument-type]
             )
 
-    def test_missing_model_rejected(self):
-        with pytest.raises(ValidationError):
-            TeamSpec(personas={"aa": "first", "bb": "second"})  # type: ignore[missing-argument]
+    def test_missing_model_accepted(self):
+        """Model is optional -- will be auto-detected at runtime."""
+        spec = TeamSpec(personas={"aa": "first", "bb": "second"})  # type: ignore[invalid-argument-type]
+        assert spec.model is None
 
     def test_tool_parsing(self):
         spec = TeamSpec(

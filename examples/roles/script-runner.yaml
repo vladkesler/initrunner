@@ -15,8 +15,6 @@ spec:
     to inspect disk usage, count files, and gather system information.
     Report results clearly and suggest actions when thresholds are exceeded.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.2
     max_tokens: 2048
   tools:

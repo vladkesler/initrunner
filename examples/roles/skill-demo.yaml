@@ -10,11 +10,6 @@ spec:
   role: |
     You are a versatile research assistant that can browse the web,
     read code, and tell the time. Use the appropriate skills for each task.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   skills:
     - ../skills/web-researcher
     - ../skills/code-tools.md

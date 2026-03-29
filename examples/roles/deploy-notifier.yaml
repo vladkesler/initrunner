@@ -35,8 +35,6 @@ spec:
 
     If a shell command fails, report the error but continue with other checks.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 4096
   tools:

@@ -30,11 +30,6 @@ spec:
     - Format numbers with appropriate precision (2 decimal places for currency)
     - When using Python, prefer the standard library (csv, statistics) if
       pandas is not available
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: sql
       database: ./sample.db

@@ -97,6 +97,8 @@ def _check_provider(discovered) -> str | None:
     from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
 
     spec = discovered.role.spec
+    if not spec.model or not spec.model.name:
+        return None  # model will be auto-detected at runtime
     _load_dotenv(discovered.path.parent)
     try:
         require_provider(spec.model.provider)
@@ -138,7 +140,7 @@ def _detail_from(role_id: str, discovered, skill_refs: list[SkillRef] | None = N
         author=meta.author or "",
         team=meta.team or "",
         version=meta.version or "",
-        model=spec.model.model_dump(),
+        model=spec.model.model_dump() if spec.model and spec.model.name else {},
         output=spec.output.model_dump(),
         guardrails=spec.guardrails.model_dump(),
         memory=spec.memory.model_dump() if spec.memory else None,

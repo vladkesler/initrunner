@@ -23,11 +23,6 @@ spec:
       synthesize the information and cite all relevant sources
     - Use read_file to view a full document when the search snippet is not
       enough context
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   ingest:
     sources:
       - ./docs/**/*.md

@@ -62,6 +62,30 @@ docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
     dashboard --expose --no-open --roles-dir /roles
 ```
 
+## Using a different provider or model
+
+Starter agents no longer hardcode a model. They auto-detect from your API key. To use a specific model (e.g. OpenRouter), set `INITRUNNER_MODEL`:
+
+```bash
+docker run --rm -it \
+    -e OPENAI_API_KEY=sk-or-your-openrouter-key \
+    -e OPENAI_BASE_URL=https://openrouter.ai/api/v1 \
+    -e INITRUNNER_MODEL=openai:google/gemini-3-flash-preview \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+```
+
+Or use any supported provider directly:
+
+```bash
+# Anthropic
+docker run --rm -it -e ANTHROPIC_API_KEY \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+
+# Google
+docker run --rm -it -e GOOGLE_API_KEY \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+```
+
 ## Docker Compose
 
 Use `docker compose up` with the included [`docker-compose.yml`](../../docker-compose.yml) (copy [`examples/.env.example`](../../examples/.env.example) to `.env` first). Example roles are seeded automatically on first boot. To use your own roles, uncomment the `./roles:/data/roles` volume mount in the compose file.

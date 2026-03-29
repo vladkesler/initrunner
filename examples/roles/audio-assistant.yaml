@@ -17,9 +17,6 @@ spec:
 
     Always present transcripts clearly. When summarizing, highlight the key points.
     If a transcript is very long, provide a structured summary with sections.
-  model:
-    provider: openai
-    name: gpt-5-mini
   tools:
     - type: audio
       youtube_languages: ["en"]

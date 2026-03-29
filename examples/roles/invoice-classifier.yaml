@@ -16,8 +16,6 @@ spec:
     Amounts under 500 are auto-approved, over 10000 need review, otherwise approved
     unless something looks suspicious.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 512
   output:

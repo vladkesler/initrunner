@@ -6,7 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from initrunner.agent.schema.base import ApiVersion, Metadata, ModelConfig
+from initrunner.agent.schema.base import ApiVersion, Metadata, PartialModelConfig
 from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
 from initrunner.agent.schema.observability import ObservabilityConfig
 from initrunner.agent.schema.role import parse_tool_list
@@ -19,7 +19,7 @@ class PersonaConfig(BaseModel):
     """Extended persona definition with optional overrides."""
 
     role: str
-    model: ModelConfig | None = None
+    model: PartialModelConfig | None = None
     tools: list[ToolConfig] = []
     tools_mode: Literal["extend", "replace"] = "extend"
     environment: dict[str, str] = {}
@@ -64,7 +64,7 @@ class TeamGuardrails(BaseModel):
 
 
 class TeamSpec(BaseModel):
-    model: ModelConfig
+    model: PartialModelConfig | None = None
     personas: dict[str, PersonaConfig] = Field(min_length=2)
     tools: list[ToolConfig] = []
     guardrails: TeamGuardrails = TeamGuardrails()

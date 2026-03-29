@@ -108,11 +108,6 @@ spec:
     - Use datetime to include timestamps in episodes and reports.
     - When you detect a pattern change (e.g., response times consistently
       higher after a deploy), update the baseline and note the shift.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: shell
       allowed_commands:

@@ -67,7 +67,7 @@ def ingest(
             stats = run_ingest(
                 role.spec.ingest,
                 role.metadata.name,
-                provider=role.spec.model.provider,
+                provider=role.spec.model.provider,  # type: ignore[union-attr]
                 base_dir=base_dir,
                 force=force,
                 progress_callback=on_progress,
@@ -87,7 +87,7 @@ def ingest(
                 stats = run_ingest(
                     role.spec.ingest,
                     role.metadata.name,
-                    provider=role.spec.model.provider,
+                    provider=role.spec.model.provider,  # type: ignore[union-attr]
                     base_dir=base_dir,
                     force=True,
                     progress_callback=on_progress,

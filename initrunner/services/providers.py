@@ -247,7 +247,7 @@ def _effective_embedding_provider(role: object) -> tuple[str, str]:
             return prov, env
 
     # No explicit override -- use default based on LLM provider
-    llm_prov = spec.model.provider if hasattr(spec, "model") else ""
+    llm_prov = spec.model.provider if getattr(spec, "model", None) and spec.model.provider else ""
     default_emb = _DEFAULT_MODELS.get(llm_prov, "openai:text-embedding-3-small")
     emb_prov = default_emb.split(":")[0] if ":" in default_emb else "openai"
     return emb_prov, _default_embedding_key_env(emb_prov)
@@ -259,10 +259,10 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     Loads the role YAML and inspects ``spec.model``, ``spec.ingest.embeddings``,
     and ``spec.memory.embeddings``.
     """
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, load_role
+    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, load_role, resolve_role_model
 
     _load_env()
-    role = load_role(role_path)
+    role = resolve_role_model(load_role(role_path), role_path)
 
     role_provider = role.spec.model.provider
     role_model = role.spec.model.name

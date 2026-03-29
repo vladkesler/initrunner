@@ -89,7 +89,7 @@ class EmbeddingModelChangedError(Exception):
 def make_store_config(role: RoleDefinition) -> StoreConfig:
     """Build a :class:`StoreConfig` from a role definition."""
     ingest = role.spec.ingest
-    provider = role.spec.model.provider
+    provider = role.spec.model.provider  # type: ignore[union-attr]
     name = role.metadata.name
     if ingest is not None:
         return StoreConfig(

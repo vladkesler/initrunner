@@ -17,7 +17,13 @@ from rich.table import Table
 
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run
-from initrunner.agent.loader import _load_dotenv, build_agent, load_and_build, load_role
+from initrunner.agent.loader import (
+    _load_dotenv,
+    build_agent,
+    load_and_build,
+    load_role,
+    resolve_role_model,
+)
 from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
@@ -484,6 +490,7 @@ class ComposeOrchestrator:
                 if shared_mem_path or shared_doc_path:
                     _load_dotenv(role_path.parent)
                     role = load_role(role_path)
+                    role = resolve_role_model(role, role_path)
                     if shared_mem_path:
                         apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
                     if shared_doc_path:

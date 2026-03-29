@@ -255,11 +255,12 @@ Filterable table of all agent runs with analytics.
 
 ### System (`/system`)
 
-Three sections:
+Four sections:
 
 | Section | Contents |
 |---------|----------|
 | **Providers** | Full provider management. Shows configured providers as card-surface rows (name + env var + green status dot). Includes an inline form to add new provider API keys -- select a provider, enter the key, and save. For OpenAI and Anthropic, keys are validated against the provider API. Supports standard providers, OpenRouter, and custom endpoints. Keys are written to `~/.initrunner/.env`. |
+| **Default Model** | Pick the global default model for agents that don't specify one. Uses the same model selector as the agent builder (provider dropdown + searchable model list). Shows where the current default comes from: `INITRUNNER_MODEL` env var, `run.yaml`, auto-detected from API keys, or none. Save writes to `~/.initrunner/run.yaml`. Reset clears the saved model and returns to auto-detection. Preset names (e.g. OpenRouter) are normalized to canonical runtime fields. |
 | **Health Check** | "Run Doctor" button that checks API key validity, SDK availability, Ollama connectivity, and Docker status. Results shown as a checklist with green/amber/red indicators. |
 | **Tool Registry** | List of all registered tool types with descriptions. Useful when deciding what tools to add to an agent. |
 
@@ -335,6 +336,7 @@ initrunner dashboard
   |      /api/providers/save-key POST save API key to ~/.initrunner/.env
   |      /api/system/doctor    GET   provider health checks
   |      /api/system/tools     GET   registered tool types
+  |      /api/system/default-model GET/POST/DELETE  default model config
   |      /                     static SvelteKit build
   |
   +--> Browser (opens automatically)

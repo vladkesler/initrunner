@@ -33,8 +33,6 @@ spec:
     If shell commands fail (e.g., docker/kubectl not available), still provide
     your best analysis based on the event data alone.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 2048
   tools:

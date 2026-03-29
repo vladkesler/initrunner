@@ -81,6 +81,31 @@ def _build_parallel_prompt(task: str, persona_name: str) -> str:
     return "\n\n".join(parts)
 
 
+def _resolve_team_model(team: TeamDefinition) -> None:
+    """Resolve the team's model in-place if it's unresolved or None."""
+    from initrunner.agent.loader import _auto_detect_model
+    from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
+
+    model = team.spec.model
+    if model is not None and model.is_resolved():
+        # Convert to concrete ModelConfig if needed
+        if not isinstance(model, ModelConfig):
+            team.spec.model = ModelConfig(**model.model_dump())
+        return
+
+    prov, name, base_url, api_key_env = _auto_detect_model()
+    base = model or PartialModelConfig()
+    team.spec.model = ModelConfig(
+        provider=prov,
+        name=name,
+        base_url=base_url or base.base_url,
+        api_key_env=api_key_env or base.api_key_env,
+        temperature=base.temperature,
+        max_tokens=base.max_tokens,
+        context_window=base.context_window,
+    )
+
+
 def _persona_to_role(
     name: str,
     persona: PersonaConfig,
@@ -201,7 +226,7 @@ def _run_pre_ingestion(
     run_ingest(
         ingest_config,
         agent_name=team.metadata.name,
-        provider=team.spec.model.provider,
+        provider=team.spec.model.provider if team.spec.model else "",
         base_dir=team_dir,
     )
 
@@ -266,6 +291,7 @@ def run_team(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
+    _resolve_team_model(team)
 
     shared_mem_path, shared_doc_path = _resolve_shared_paths(team)
 
@@ -381,6 +407,7 @@ def run_team_parallel(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
+    _resolve_team_model(team)
 
     shared_mem_path, shared_doc_path = _resolve_shared_paths(team)
 

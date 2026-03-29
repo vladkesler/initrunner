@@ -42,8 +42,6 @@ spec:
     topic (lines starting with `- [ ]`). Research the first unchecked item.
     If all items are checked, report that the queue is empty.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.3
   tools:
     - type: search

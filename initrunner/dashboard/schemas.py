@@ -168,6 +168,23 @@ class ToolTypeResponse(BaseModel):
     description: str
 
 
+class DefaultModelResponse(BaseModel):
+    """Current default model with provenance."""
+
+    provider: str
+    model: str
+    base_url: str | None = None
+    api_key_env: str | None = None
+    source: str  # "initrunner_model_env" | "run_yaml" | "auto_detected" | "none"
+
+
+class SaveDefaultModelRequest(BaseModel):
+    provider: str
+    model: str
+    base_url: str | None = None
+    api_key_env: str | None = None
+
+
 # -- Builder -------------------------------------------------------------------
 
 

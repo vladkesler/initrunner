@@ -29,8 +29,6 @@ spec:
 
     Always delegate — do not research or write long-form content yourself.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.2
     max_tokens: 4096
   tools:

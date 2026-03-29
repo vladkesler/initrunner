@@ -58,7 +58,7 @@ def build_report_context(
     if isinstance(result, _AutonomousResult):
         return ReportContext(
             agent_name=role.metadata.name,
-            model=role.spec.model.to_model_string(),
+            model=role.spec.model.to_model_string(),  # type: ignore[union-attr]
             run_id=result.run_id,
             prompt=prompt_text,
             output=result.final_output,
@@ -93,7 +93,7 @@ def build_report_context(
     # RunResult (single-shot)
     return ReportContext(
         agent_name=role.metadata.name,
-        model=role.spec.model.to_model_string(),
+        model=role.spec.model.to_model_string(),  # type: ignore[union-attr]
         run_id=result.run_id,
         prompt=prompt_text,
         output=result.output,

@@ -32,7 +32,7 @@ def capture_episode(
         from initrunner.stores.base import MemoryType
 
         embed_provider = (
-            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"
+            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"  # type: ignore[union-attr]
         )
         embed_model = role.spec.memory.embeddings.model
         embed_base_url = role.spec.memory.embeddings.base_url

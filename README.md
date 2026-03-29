@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.4-%2334D058" alt="v2026.3.4">
+  <img src="https://img.shields.io/badge/latest-v2026.3.5-%2334D058" alt="v2026.3.5">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -31,7 +31,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 14 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.4** -- Docker container now boots the dashboard by default instead of printing help. Fixed all stale Docker command references. `INITRUNNER_DASHBOARD_API_KEY` env var now works. See the [Changelog](CHANGELOG.md).
+> **v2026.3.5** -- Model auto-detection: starters work with any provider, no more hardcoded `gpt-5-mini`. Dashboard System page lets you set the default model from the browser. Docker container boots the dashboard by default. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -157,7 +157,7 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate. Using Claude? `pipx install "initrunner[anthropic]"` and set `model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }`.
+That's it. No Python, no boilerplate. The `model:` section is optional -- omit it and InitRunner auto-detects from your API key. Or pin a specific model: `model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }`.
 
 ## Why InitRunner
 
@@ -545,4 +545,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.4</sub></p>
+<p align="center"><sub>v2026.3.5</sub></p>

@@ -86,8 +86,8 @@ class SinkDispatcher:
         payload = SinkPayload.from_run(
             result,
             agent_name=self._role.metadata.name,
-            model=self._role.spec.model.name,
-            provider=self._role.spec.model.provider,
+            model=self._role.spec.model.name,  # type: ignore[union-attr]
+            provider=self._role.spec.model.provider,  # type: ignore[union-attr]
             prompt=prompt,
             trigger_type=trigger_type,
             trigger_metadata=trigger_metadata,

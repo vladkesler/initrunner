@@ -95,7 +95,7 @@ def _compact_inner(
 
     # Serialize and summarise
     text = _serialize_messages_for_summary(compact_window)
-    model_str = config.model_override or role.spec.model.to_model_string()
+    model_str = config.model_override or role.spec.model.to_model_string()  # type: ignore[union-attr]
     summary = _run_compaction_llm(text, model_str)
 
     # Build summary message

@@ -33,11 +33,6 @@ spec:
     - Location (file/line if applicable)
     - Description of the issue
     - Suggested fix
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: git
       repo_path: .

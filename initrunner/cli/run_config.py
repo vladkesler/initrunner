@@ -69,6 +69,52 @@ def load_run_config() -> RunConfig:
         return RunConfig()
 
 
+def save_run_config(
+    provider: str,
+    model: str,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
+) -> Path:
+    """Write provider/model default to ``~/.initrunner/run.yaml``.
+
+    Preserves existing non-model fields (tool_profile, tools, memory, etc.)
+    by loading the current config, updating model fields, and writing back.
+    """
+    import yaml
+
+    current = load_run_config()
+    current.provider = provider
+    current.model = model
+    current.base_url = base_url
+    current.api_key_env = api_key_env
+
+    path = _get_run_config_path()
+    get_home_dir().mkdir(parents=True, exist_ok=True)
+    data = current.model_dump(exclude_none=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True))
+    return path
+
+
+def clear_run_config_model() -> Path:
+    """Clear only the model-related fields from ``~/.initrunner/run.yaml``.
+
+    Preserves tool_profile, tools, memory, ingest, personality, and name.
+    """
+    import yaml
+
+    current = load_run_config()
+    current.provider = None
+    current.model = None
+    current.base_url = None
+    current.api_key_env = None
+
+    path = _get_run_config_path()
+    get_home_dir().mkdir(parents=True, exist_ok=True)
+    data = current.model_dump(exclude_none=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True))
+    return path
+
+
 def resolve_ingest_paths(paths: list[str], config_dir: Path | None = None) -> list[str]:
     """Resolve relative ingest paths against the config directory.
 

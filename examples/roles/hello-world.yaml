@@ -15,8 +15,6 @@ spec:
 
     '
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.8
     max_tokens: 1024
   guardrails:

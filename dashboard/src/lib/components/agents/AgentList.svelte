@@ -50,7 +50,11 @@
 							{agent.description || '\u2014'}
 						</td>
 						<td class="px-3 py-2 font-mono text-[13px] text-fg-faint">
-							{agent.provider ? `${agent.provider}/${agent.model}` : '\u2014'}
+							{#if agent.provider}
+								{agent.provider}/{agent.model}
+							{:else}
+								<span class="rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">auto</span>
+							{/if}
 						</td>
 						<td class="w-20 px-3 py-2">
 							<div class="flex justify-end">

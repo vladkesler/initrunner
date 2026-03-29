@@ -34,11 +34,6 @@ spec:
     - Brief description (commit SHA short hash)
 
     Include an [Unreleased] section header with the current date.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: git
       repo_path: .

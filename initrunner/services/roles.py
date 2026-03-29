@@ -162,12 +162,13 @@ def canonicalize_role_yaml(role: RoleDefinition) -> str:
     data.setdefault("kind", "Agent")
     data.setdefault("metadata", {})["spec_version"] = 2
 
-    # spec.role and spec.model are always required even if they matched defaults
+    # spec.role is always required even if it matched defaults
     if "spec" in data:
         spec = data["spec"]
         spec.setdefault("role", role.spec.role)
-        model_data = role.spec.model.model_dump(mode="json", exclude_none=True)
-        spec.setdefault("model", model_data)
+        if role.spec.model and role.spec.model.name:
+            model_data = role.spec.model.model_dump(mode="json", exclude_none=True)
+            spec.setdefault("model", model_data)
 
         # Capabilities: serialize NamedSpec back to YAML-native form.
         # model_dump produces {"name": "Thinking", "arguments": ("high",)}

@@ -10,9 +10,6 @@ spec:
     individual emails, and list mail folders. When the user asks about
     their email, use the available tools to find and summarize messages.
     Always present results concisely.
-  model:
-    provider: openai
-    name: gpt-5-mini
   tools:
     - type: email
       imap_host: imap.gmail.com

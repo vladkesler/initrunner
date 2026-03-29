@@ -38,8 +38,6 @@ spec:
     goals, managing preferences, or just chatting. The key differentiator is that
     you get better the more the user interacts with you.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.1
     max_tokens: 2048
   tools:
