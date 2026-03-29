@@ -7,16 +7,16 @@ InitRunner is available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Do
 ```bash
 # Interactive chat with memory
 docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest chat
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
 
 # Chat with cherry-picked tools
 docker run --rm -it -e OPENAI_API_KEY \
     -v initrunner-data:/data -v .:/workspace \
     ghcr.io/vladkesler/initrunner:latest \
-    chat --tools git --tools filesystem
+    run -i --tools git --tools filesystem
 
 # Enable all built-in tools at once
-#   chat --tool-profile all
+#   run -i --tool-profile all
 ```
 
 ## RAG (document chat)
@@ -25,7 +25,7 @@ docker run --rm -it -e OPENAI_API_KEY \
 # Chat with your documents (instant RAG)
 docker run --rm -it -e OPENAI_API_KEY \
     -v initrunner-data:/data -v ./docs:/docs \
-    ghcr.io/vladkesler/initrunner:latest chat --ingest /docs
+    ghcr.io/vladkesler/initrunner:latest run -i --ingest /docs
 
 # Ingest documents for a role, then query
 docker run --rm -e OPENAI_API_KEY \
@@ -41,7 +41,7 @@ docker run --rm -it -e OPENAI_API_KEY \
 ```bash
 docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
     -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest \
-    chat --telegram
+    run --bot telegram
 ```
 
 ## API server
@@ -50,15 +50,16 @@ docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
 # OpenAI-compatible API server on port 8000
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles \
     -p 8000:8000 ghcr.io/vladkesler/initrunner:latest \
-    serve /roles/my-agent.yaml --host 0.0.0.0
+    run /roles/my-agent.yaml --serve --host 0.0.0.0
 ```
 
 ## Web dashboard
 
 ```bash
-# Web dashboard at http://localhost:8420
+# Web dashboard at http://localhost:8100
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
-    -p 8420:8420 ghcr.io/vladkesler/initrunner:latest ui --role-dir /roles
+    -p 8100:8100 ghcr.io/vladkesler/initrunner:latest \
+    dashboard --expose --no-open --roles-dir /roles
 ```
 
 ## Docker Compose
@@ -69,7 +70,7 @@ For authorization with Cerbos policies, use `docker compose -f docker-compose.ce
 
 ## Docker sandbox for tool execution
 
-Shell, Python, and script tools can run inside Docker containers for kernel-level isolation — network namespaces, cgroups, read-only rootfs, memory/CPU limits. Enable it in your role YAML:
+Shell, Python, and script tools can run inside Docker containers for kernel-level isolation -- network namespaces, cgroups, read-only rootfs, memory/CPU limits. Enable it in your role YAML:
 
 ```yaml
 security:

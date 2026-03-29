@@ -79,7 +79,11 @@ def dashboard(
     expose: Annotated[bool, typer.Option("--expose", help="Bind to 0.0.0.0")] = False,
     api_key: Annotated[
         str | None,
-        typer.Option("--api-key", help="Require this API key for all requests"),
+        typer.Option(
+            "--api-key",
+            envvar="INITRUNNER_DASHBOARD_API_KEY",
+            help="Require this API key for all requests",
+        ),
     ] = None,
     roles_dir: Annotated[
         list[Path] | None,

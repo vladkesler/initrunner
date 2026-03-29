@@ -11,7 +11,7 @@
 # Usage:
 #   initrunner ingest role.yaml
 #   initrunner run role.yaml -i
-#   initrunner serve role.yaml --api-key <key>
+#   initrunner run role.yaml --serve --api-key <key>
 
 apiVersion: initrunner/v1
 kind: Agent

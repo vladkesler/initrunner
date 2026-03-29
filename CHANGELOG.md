@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.3.4] - 2026-03-29
+
+### Fixed
+- **Docker command drift** -- Docker docs, Dockerfile, compose files, and cloud deploy configs all referenced stale CLI commands (`chat`, `serve`, `ui`) that were removed in v1.45. Updated to use the current surface: `run` (with `--serve`, `-i`, `--bot`), `dashboard`, and `ingest`
+- **Container default CMD** -- Dockerfile now launches the dashboard (`dashboard --expose --no-open`) instead of printing `--help` and exiting. `docker compose up` immediately starts a useful service
+- **Dashboard port exposure** -- Dockerfile exposes port 8100 (dashboard default) alongside 8000 (API server). Compose files standardized to 8100
+- **`INITRUNNER_DASHBOARD_API_KEY` env var** -- the env var was referenced in docker-compose.cerbos.yml and render.yaml but had no effect. `--api-key` now reads `INITRUNNER_DASHBOARD_API_KEY` when the flag is omitted (explicit `--api-key` still wins)
+- **Stale deploy configs** -- `render.yaml` and `deploy/fly.toml` updated from dead `ui`/`--help` commands to `dashboard --expose --no-open`
+- **Helpdesk starter comment** -- usage comment updated from `initrunner serve` to `initrunner run --serve`
+
 ## [2026.3.3] - 2026-03-28
 
 ### Added

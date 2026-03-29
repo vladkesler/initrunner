@@ -10,7 +10,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.3-%2334D058" alt="v2026.3.3">
+  <img src="https://img.shields.io/badge/latest-v2026.3.4-%2334D058" alt="v2026.3.4">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -31,7 +31,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 14 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.3** -- Dashboard Cognition panel now configures reasoning, tool search, and autonomy visually. Compose builder surfaces sense routing with strategy selection and quality indicators. New Intelligence section in README. See the [Changelog](CHANGELOG.md).
+> **v2026.3.4** -- Docker container now boots the dashboard by default instead of printing help. Fixed all stale Docker command references. `INITRUNNER_DASHBOARD_API_KEY` env var now works. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -119,11 +119,16 @@ Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-revi
 **Or run with Docker**, no install needed:
 
 ```bash
+# Dashboard (default) -- http://localhost:8100
+docker run -d -e OPENAI_API_KEY -p 8100:8100 \
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest
+
+# Interactive chat
 docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
 ```
 
-See the [Docker guide](docs/getting-started/docker.md) for RAG, Telegram, API server, and more examples.
+See the [Docker guide](docs/getting-started/docker.md) for RAG, Telegram, API server, and compose examples.
 
 ## Define Agent Roles in YAML
 
@@ -403,7 +408,7 @@ The browser opens automatically. Flags:
 | `--port` | Listen on a different port (default: `8100`) |
 | `--no-open` | Don't open the browser automatically |
 | `--expose` | Bind to `0.0.0.0` instead of localhost |
-| `--api-key` | Protect access with a login page and cookie-based session |
+| `--api-key` | Protect access with a login page and cookie-based session (also reads `INITRUNNER_DASHBOARD_API_KEY` env var) |
 | `--roles-dir` | Extra directories to scan for role YAML files (repeatable) |
 
 ### Desktop (native window)
@@ -540,4 +545,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.3</sub></p>
+<p align="center"><sub>v2026.3.4</sub></p>
