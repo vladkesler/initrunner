@@ -23,8 +23,7 @@ services:
   initrunner:
     image: ghcr.io/vladkesler/initrunner:latest
     ports:
-      - "8420:8420"
-      - "8000:8000"
+      - "8100:8100"
     volumes:
       - initrunner-data:/data
     environment:
@@ -40,7 +39,7 @@ services:
       cerbos:
         condition: service_healthy
     restart: unless-stopped
-    command: ["initrunner", "ui", "--role-dir", "/data/roles"]
+    command: ["initrunner", "dashboard", "--expose", "--no-open", "--roles-dir", "/data/roles"]
 
 volumes:
   initrunner-data:

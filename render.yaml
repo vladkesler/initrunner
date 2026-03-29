@@ -22,4 +22,4 @@ services:
       mountPath: /data
       sizeGB: 1
     dockerCommand: >-
-      initrunner ui --role-dir /data/roles --host 0.0.0.0 --port 8420 --no-browser
+      initrunner dashboard --expose --no-open --roles-dir /data/roles --port 8420

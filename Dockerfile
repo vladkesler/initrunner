@@ -46,7 +46,7 @@ LABEL org.opencontainers.image.title="InitRunner" \
       org.opencontainers.image.source="https://github.com/vladkesler/initrunner" \
       org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
-EXPOSE 8000
+EXPOSE 8000 8100
 
 # Seed example roles for cloud/Docker first-boot
 COPY examples/roles/hello-world.yaml \
@@ -61,4 +61,4 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["initrunner", "--help"]
+CMD ["initrunner", "dashboard", "--expose", "--no-open"]
