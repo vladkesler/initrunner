@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -12,6 +14,20 @@ from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMeta
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
 from initrunner.agent.tools._registry import ToolBuildContext
+
+_HAS_FASTAPI = importlib.util.find_spec("fastapi") is not None
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    """Skip dashboard-dependent test files when fastapi is not installed."""
+    if _HAS_FASTAPI:
+        return None
+    name = collection_path.name
+    if name == "test_dashboard" and collection_path.is_dir():
+        return True
+    if name in ("test_capabilities.py", "test_dashboard_ingest_router.py"):
+        return True
+    return None
 
 
 def make_role(

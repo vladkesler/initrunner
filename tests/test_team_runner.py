@@ -175,6 +175,7 @@ class TestPersonaToRole:
         role = _persona_to_role("alpha", persona, team)
         assert role.metadata.name == "alpha"
         assert role.spec.role == "first persona role"
+        assert role.spec.model is not None
         assert role.spec.model.provider == "openai"
         assert role.spec.model.name == "gpt-5-mini"
         assert role.kind == "Agent"
@@ -199,12 +200,14 @@ class TestPersonaToRole:
         )
         alpha = team.spec.personas["alpha"]
         role = _persona_to_role("alpha", alpha, team)
+        assert role.spec.model is not None
         assert role.spec.model.provider == "anthropic"
         assert role.spec.model.name == "claude-sonnet-4-6"
 
         # bravo inherits team model
         bravo = team.spec.personas["bravo"]
         role_b = _persona_to_role("bravo", bravo, team)
+        assert role_b.spec.model is not None
         assert role_b.spec.model.provider == "openai"
 
     def test_tools_extend(self):
@@ -269,6 +272,7 @@ class TestTeamReportRole:
         role = _team_report_role(team)
         assert role.metadata.name == "test-team"
         assert role.spec.role == "Test team"
+        assert role.spec.model is not None
         assert role.spec.model.provider == "openai"
 
     def test_fallback_role_description(self):

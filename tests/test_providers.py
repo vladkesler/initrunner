@@ -183,6 +183,7 @@ class TestBuildEphemeralRole:
     def test_minimal_role(self):
         role = build_ephemeral_role("openai", "gpt-5-mini")
         assert role.metadata.name == "ephemeral-chat"
+        assert role.spec.model is not None
         assert role.spec.model.provider == "openai"
         assert role.spec.model.name == "gpt-5-mini"
         assert role.spec.triggers == []

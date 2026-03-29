@@ -88,15 +88,18 @@ def check_delegation_policy(
 ) -> bool:
     """Check whether *source_metadata* agent is allowed to delegate to *target_name*.
 
-    Returns ``True`` (allow) when Cerbos is disabled or ``agent_checks_enabled``
-    is False.  When *target_metadata* is available (inline delegation), resource
-    attrs include team, tags, and author.  When ``None`` (MCP remote), the
-    check uses only the target name as resource ID with empty attrs.
+    Returns ``True`` (allow) when the policy engine is disabled or
+    ``agent_checks`` is False.  When *target_metadata* is available (inline
+    delegation), resource attrs include team, tags, and author.  When ``None``
+    (MCP remote), the check uses only the target name as resource ID with
+    empty attrs.
     """
-    from initrunner.authz import AGENT, DELEGATE, agent_principal_from_role, get_current_authz
+    from initrunner.agent.executor import _cached_config
+    from initrunner.authz import AGENT, DELEGATE, agent_principal_from_role, get_current_engine
 
-    authz = get_current_authz()
-    if authz is None or not authz.agent_checks_enabled:
+    engine = get_current_engine()
+    agent_checks = getattr(_cached_config, "agent_checks", False)
+    if engine is None or not agent_checks:
         return True
 
     principal = agent_principal_from_role(source_metadata)
@@ -109,13 +112,14 @@ def check_delegation_policy(
             "tags": list(target_metadata.tags),
         }
 
-    return authz.check(
+    decision = engine.check(
         principal,
         AGENT,
         DELEGATE,
         resource_id=target_name,
         resource_attrs=resource_attrs,
     )
+    return decision.allowed
 
 
 # ---------------------------------------------------------------------------

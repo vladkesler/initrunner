@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026.3.6] - 2026-03-29
+
+### Changed
+- **Embedded policy engine** -- replaced Cerbos PDP sidecar with embedded [initguard](https://github.com/initrunner/initguard) policy engine. No sidecar container, no network round-trips, sub-millisecond evaluation. `INITRUNNER_POLICY_DIR` replaces five `INITRUNNER_CERBOS_*` env vars. `initguard` is now a core dependency (no `authz` extra). Policy loading fails fast when configured
+- **PolicyToolset** -- renamed `CerbosToolset` to `PolicyToolset`. Deny messages now include `decision.reason` and `decision.advice` from the policy engine
+
+### Removed
+- `docker-compose.cerbos.yml` -- no sidecar needed
+- `authz` optional extra -- initguard ships with core install
+- All `INITRUNNER_CERBOS_*` environment variables
+
+### Fixed
+- Dashboard test collection failures when `fastapi` extra not installed
+- Desktop test (`test_worker_failure`) mock triggering fastapi import
+
 ## [2026.3.5] - 2026-03-29
 
 ### Added

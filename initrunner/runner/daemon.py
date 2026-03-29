@@ -147,7 +147,7 @@ class DaemonRunner:
 
         from initrunner.agent.tools.scheduling import build_scheduling_toolset
 
-        # NOTE: Scheduling toolsets are exempt from Cerbos tool-level checks.
+        # NOTE: Scheduling toolsets are exempt from policy tool-level checks.
         # They are internal control-flow tools, not user-facing.
         self._scheduling_toolset = build_scheduling_toolset(autonomy_config, self._schedule_queue)
         console.print("[dim]  Scheduling enabled (in-memory, lost on restart).[/dim]")

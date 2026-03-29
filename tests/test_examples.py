@@ -26,7 +26,7 @@ for _p in _ALL_YAMLS:
             continue
     if not isinstance(_data, dict):
         continue
-    if _data.get("apiVersion", "").startswith("api.cerbos.dev/"):
+    if _data.get("apiVersion", "").startswith("initguard/"):
         continue
     if _data.get("kind") == "Compose":
         _COMPOSE_YAMLS.append(_p)
@@ -93,3 +93,38 @@ def test_suite_yaml_validates(path: Path) -> None:
     suite = TestSuiteDefinition.model_validate(data)
     assert suite.metadata.name
     assert len(suite.cases) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Policy YAML validation (initguard format)
+# ---------------------------------------------------------------------------
+
+_POLICY_DIRS: list[Path] = []
+for _candidate in EXAMPLES_DIR.iterdir():
+    if not _candidate.is_dir():
+        continue
+    _has_policy = any(
+        yaml.safe_load(f.read_text()).get("apiVersion", "").startswith("initguard/")
+        for f in _candidate.rglob("*.yaml")
+        if f.is_file() and isinstance(yaml.safe_load(f.read_text()), dict)
+    )
+    if _has_policy:
+        # Find the deepest directory containing policy files
+        for _sub in [_candidate, *sorted(_candidate.rglob("*"))]:
+            if _sub.is_dir() and any(_sub.glob("*.yaml")):
+                _yaml_files = list(_sub.glob("*.yaml"))
+                if _yaml_files and any(
+                    isinstance(d := yaml.safe_load(f.read_text()), dict)
+                    and d.get("apiVersion", "").startswith("initguard/")
+                    for f in _yaml_files
+                ):
+                    _POLICY_DIRS.append(_sub)
+
+
+@pytest.mark.parametrize("policy_dir", _POLICY_DIRS, ids=[_rel(p) for p in _POLICY_DIRS])
+def test_policy_yaml_validates(policy_dir: Path) -> None:
+    """Policy directories load without errors via initguard."""
+    from initguard import load_policies  # type: ignore[import-not-found]
+
+    policy_set = load_policies(str(policy_dir))
+    assert policy_set is not None

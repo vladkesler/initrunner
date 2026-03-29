@@ -42,6 +42,7 @@ class TestPipelinePattern:
         result = scaffold_compose_project("p", output_dir=tmp_path, provider="openai")
         for rp in result.role_paths:
             role = load_role(rp)
+            assert role.spec.model is not None
             assert role.spec.model.provider == "openai"
 
     def test_default_service_count(self, tmp_path: Path) -> None:

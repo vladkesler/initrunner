@@ -1,16 +1,35 @@
-"""Shared fixtures for dashboard tests."""
+"""Shared fixtures for dashboard tests.
 
+All tests in this directory require the ``dashboard`` extra (fastapi/uvicorn).
+When the extra is not installed, every test is skipped via the autouse fixture.
+"""
+
+from __future__ import annotations
+
+import importlib
+import importlib.util
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from initrunner.dashboard.app import create_app
-from initrunner.dashboard.config import DashboardSettings
-from initrunner.dashboard.deps import RoleCache, _role_id, get_role_cache
+_HAS_FASTAPI = importlib.util.find_spec("fastapi") is not None
+
+if _HAS_FASTAPI:
+    from initrunner.dashboard.app import create_app
+    from initrunner.dashboard.config import DashboardSettings
+    from initrunner.dashboard.deps import RoleCache, _role_id, get_role_cache
 
 
-def _make_discovered_role(path: str, name: str = "test-agent", error: str | None = None):
+@pytest.fixture(autouse=True)
+def _require_dashboard():
+    pytest.importorskip("fastapi", reason="dashboard extras not installed")
+
+
+def _make_discovered_role(
+    path: str, name: str = "test-agent", error: str | None = None
+) -> MagicMock:
     """Create a mock DiscoveredRole."""
     dr = MagicMock()
     dr.path = Path(path)
@@ -28,21 +47,22 @@ def _make_discovered_role(path: str, name: str = "test-agent", error: str | None
     return dr
 
 
-class MockRoleCache(RoleCache):
-    """RoleCache that skips real discovery in refresh()."""
+if _HAS_FASTAPI:
 
-    def __init__(self, roles):
-        self._settings = DashboardSettings()
-        self._cache = {_role_id(r.path): r for r in roles}
-        self._mock_roles = roles
+    class MockRoleCache(RoleCache):  # type: ignore[misc]
+        """RoleCache that skips real discovery in refresh()."""
 
-    def refresh(self):
-        # Return existing cache without scanning the filesystem
-        return self._cache
+        def __init__(self, roles: list[Any]) -> None:
+            self._settings = DashboardSettings()
+            self._cache = {_role_id(r.path): r for r in roles}
+            self._mock_roles = roles
+
+        def refresh(self) -> dict[str, Any]:
+            return self._cache
 
 
 @pytest.fixture
-def mock_roles():
+def mock_roles() -> list[MagicMock]:
     """Two mock discovered roles."""
     return [
         _make_discovered_role("/tmp/roles/agent-a.yaml", "agent-a"),
@@ -51,7 +71,7 @@ def mock_roles():
 
 
 @pytest.fixture
-def app(mock_roles):
+def app(mock_roles: list[Any]) -> Any:
     """Create a test FastAPI app with mock roles."""
     settings = DashboardSettings()
     application = create_app(settings)
@@ -63,7 +83,7 @@ def app(mock_roles):
 
 
 @pytest.fixture
-def client(app):
+def client(app: Any) -> Any:
     """Synchronous test client."""
     from starlette.testclient import TestClient
 

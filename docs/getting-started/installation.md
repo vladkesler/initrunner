@@ -90,7 +90,6 @@ The `[recommended]` bundle includes `search`, `ingest`, and `dashboard`. The `[a
 | **Interfaces** | |
 | `dashboard` | Web UI (FastAPI + Uvicorn) |
 | `desktop` | Desktop app (dashboard + PyWebView) |
-| `authz` | Cerbos agent policy enforcement |
 
 Combine specific extras with commas: `uv pip install "initrunner[ingest,search,anthropic]"`.
 

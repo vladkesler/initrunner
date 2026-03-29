@@ -1,21 +1,14 @@
----
-apiVersion: "api.cerbos.dev/v1"
-derivedRoles:
-  name: agent_derived_roles
-  definitions:
-    # Agents tagged "trusted" get elevated privileges
-    - name: trusted_agent
-      parentRoles: ["agent"]
-      condition:
-        match:
-          expr: request.principal.attr.tags.exists(t, t == "trusted")
+apiVersion: initguard/v1
+kind: DerivedRoles
+name: agent_derived_roles
+definitions:
+  # Agents tagged "trusted" get elevated privileges
+  - name: trusted_agent
+    parentRoles: ["agent"]
+    when: request.principal.attr.tags.exists(t, t == "trusted")
 
-    # Agents on the same team as the target resource
-    - name: same_team
-      parentRoles: ["agent"]
-      condition:
-        match:
-          all:
-            of:
-              - expr: request.principal.attr.team != ""
-              - expr: request.principal.attr.team == request.resource.attr.team
+  # Agents on the same team as the target resource
+  - name: same_team
+    parentRoles: ["agent"]
+    when: request.principal.attr.team != ""
+    unless: request.principal.attr.team != request.resource.attr.team

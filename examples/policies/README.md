@@ -1,6 +1,6 @@
-# Cerbos Agent Policy Set
+# Agent Policy Set
 
-Policy set for InitRunner's agent-as-principal policy engine. Agents get their own Cerbos identity derived from role metadata, and Cerbos governs what tools an agent can use and which agents it can delegate to.
+Policy set for InitRunner's agent-as-principal policy engine powered by [initguard](https://github.com/initrunner/initguard). Agents get their own identity derived from role metadata, and the embedded policy engine governs what tools an agent can use and which agents it can delegate to.
 
 ## Policy Set
 
@@ -16,9 +16,10 @@ Policies where agents are the principals. Agent identity is constructed from `ro
 
 | File | Description |
 |------|-------------|
+| `schema.yaml` | Attribute definitions for principals and resources (lint validation) |
 | `derived_roles.yaml` | `trusted_agent` (tags contain "trusted"), `same_team` (matching team attr) |
-| `agent_delegation_policy.yaml` | Same-team can delegate; trusted can delegate to anyone; deny delegation to "privileged"-tagged agents |
-| `agent_tool_policy.yaml` | Agents get safe tools; trusted agents get everything; deny shell/python to non-trusted |
+| `delegation_policy.yaml` | Same-team can delegate; trusted can delegate to anyone; deny delegation to "privileged"-tagged agents |
+| `tool_policy.yaml` | Agents get safe tools; trusted agents get everything; deny shell/python to non-trusted |
 
 #### Delegation Rules
 
@@ -35,27 +36,10 @@ Policies where agents are the principals. Agent identity is constructed from `ro
 
 ## Usage
 
-### With Docker Compose
-
 ```bash
-docker compose -f docker-compose.cerbos.yml up
-```
-
-### Environment Variables
-
-```bash
-INITRUNNER_CERBOS_ENABLED=true        # Enable Cerbos integration
-INITRUNNER_CERBOS_HOST=127.0.0.1      # PDP host
-INITRUNNER_CERBOS_PORT=3592           # PDP port
-INITRUNNER_CERBOS_AGENT_CHECKS=true   # Enable agent policy enforcement
-```
-
-### Standalone Cerbos
-
-```bash
-docker run --rm -p 3592:3592 \
-  -v ./examples/policies/agent:/policies \
-  ghcr.io/cerbos/cerbos:latest
+export INITRUNNER_POLICY_DIR=./examples/policies/agent
+export INITRUNNER_AGENT_CHECKS=true   # default: true when POLICY_DIR is set
+initrunner run role.yaml
 ```
 
 ## Customization

@@ -53,6 +53,7 @@ class TestQuickChatHonorsEndpoint:
                 with_memory=False,
             )
 
+        assert role.spec.model is not None
         assert role.spec.model.base_url == "https://openrouter.ai/api/v1"
         assert role.spec.model.api_key_env == "OPENROUTER_API_KEY"
         assert role.spec.model.provider == "openai"

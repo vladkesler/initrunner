@@ -118,16 +118,22 @@ def test_worker_failure():
     mock_uvicorn.Config.return_value = mock.MagicMock()
     mock_uvicorn.Server.return_value = mock_server
 
+    mock_dashboard_app = mock.MagicMock()
+    mock_dashboard_config = mock.MagicMock()
+
     with (
         mock.patch.dict(
             "sys.modules",
-            {**wv_mods, "uvicorn": mock_uvicorn},
+            {
+                **wv_mods,
+                "uvicorn": mock_uvicorn,
+                "initrunner.dashboard.app": mock_dashboard_app,
+                "initrunner.dashboard.config": mock_dashboard_config,
+            },
         ),
         mock.patch(f"{_WEBVIEW_MOD}._is_dashboard_healthy", return_value=False),
         mock.patch(f"{_WEBVIEW_MOD}._ensure_gi"),
         mock.patch("socket.socket") as mock_sock_cls,
-        mock.patch("initrunner.dashboard.app.create_app", return_value=mock.MagicMock()),
-        mock.patch("initrunner.dashboard.config.DashboardSettings", return_value=mock.MagicMock()),
     ):
         sock_inst = mock_sock_cls.return_value
         sock_inst.bind = mock.MagicMock()

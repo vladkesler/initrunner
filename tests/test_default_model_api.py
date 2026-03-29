@@ -168,6 +168,10 @@ class TestClearRunConfigModel:
 class TestSystemEndpoints:
     """Integration tests for /api/system/default-model endpoints."""
 
+    @pytest.fixture(autouse=True)
+    def _require_fastapi(self):
+        pytest.importorskip("fastapi", reason="dashboard extras not installed")
+
     @pytest.fixture
     def app(self):
         from initrunner.dashboard.app import create_app

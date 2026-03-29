@@ -90,7 +90,7 @@ docker run --rm -it -e GOOGLE_API_KEY \
 
 Use `docker compose up` with the included [`docker-compose.yml`](../../docker-compose.yml) (copy [`examples/.env.example`](../../examples/.env.example) to `.env` first). Example roles are seeded automatically on first boot. To use your own roles, uncomment the `./roles:/data/roles` volume mount in the compose file.
 
-For authorization with Cerbos policies, use `docker compose -f docker-compose.cerbos.yml up`. See [Cerbos Authorization](../security/cerbos.md#docker-compose) for details.
+For agent policy enforcement, mount your policy directory and set `INITRUNNER_POLICY_DIR`. See [Agent Policy](../security/agent-policy.md) for details.
 
 ## Docker sandbox for tool execution
 

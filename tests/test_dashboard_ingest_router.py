@@ -7,6 +7,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytest.importorskip("fastapi", reason="dashboard extras not installed")
+
 from fastapi.testclient import TestClient  # type: ignore[import-not-found]
 
 from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata

@@ -226,11 +226,11 @@ class TestToolPermissionsSchema:
 
 
 class TestBuildToolsetsPermissions:
-    def test_no_permissions_cerbos_only_wrapping(self):
-        """Toolset is wrapped CerbosToolset -> ObservableToolset."""
+    def test_no_permissions_policy_only_wrapping(self):
+        """Toolset is wrapped PolicyToolset -> ObservableToolset."""
         from unittest.mock import MagicMock, patch
 
-        from initrunner.agent.permissions import CerbosToolset
+        from initrunner.agent.permissions import PolicyToolset
         from initrunner.agent.schema.tools import ShellToolConfig
         from initrunner.agent.tool_events import ObservableToolset
 
@@ -261,9 +261,9 @@ class TestBuildToolsetsPermissions:
                 ),
             )
             toolsets = build_toolsets([tool], role)
-            # Outermost wrapper is ObservableToolset, inner is CerbosToolset
+            # Outermost wrapper is ObservableToolset, inner is PolicyToolset
             assert isinstance(toolsets[0], ObservableToolset)
-            assert isinstance(toolsets[0]._inner, CerbosToolset)
+            assert isinstance(toolsets[0]._inner, PolicyToolset)
             assert toolsets[0]._inner._inner is mock_toolset
 
     def test_permissions_wraps_toolset(self):

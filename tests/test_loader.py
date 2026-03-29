@@ -67,6 +67,7 @@ class TestLoadRole:
     def test_valid(self, valid_yaml: Path):
         role = load_role(valid_yaml)
         assert role.metadata.name == "test-agent"
+        assert role.spec.model is not None
         assert role.spec.model.temperature == 0.3
         assert role.spec.model.max_tokens == 1024
 
