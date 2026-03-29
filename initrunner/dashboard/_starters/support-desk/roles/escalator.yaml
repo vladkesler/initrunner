@@ -17,8 +17,6 @@ spec:
     escalation report with: severity level, customer impact summary,
     recommended response team, and suggested SLA timeline.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.2
   guardrails:
     max_tokens_per_run: 2000

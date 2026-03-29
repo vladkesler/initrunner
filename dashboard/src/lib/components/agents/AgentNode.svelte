@@ -56,7 +56,11 @@
 
 	<!-- Model -->
 	<p class="mt-1 truncate font-mono text-[11px] text-fg-faint">
-		{agent.provider ? `${agent.provider}/${agent.model}` : 'no model'}
+		{#if agent.provider}
+			{agent.provider}/{agent.model}
+		{:else}
+			<span class="rounded-full border border-edge bg-surface-2 px-1 py-0.5 font-mono text-[9px] text-fg-faint">auto</span>
+		{/if}
 	</p>
 
 	<!-- Description -->

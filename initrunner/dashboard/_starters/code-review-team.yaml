@@ -4,9 +4,6 @@ metadata:
   name: code-review-team
   description: Multi-perspective code review
 spec:
-  model:
-    provider: openai
-    name: gpt-5-mini
   personas:
     architect: "review for design patterns, SOLID principles, and architecture issues"
     security: "find security vulnerabilities, injection risks, auth issues"

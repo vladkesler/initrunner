@@ -160,11 +160,12 @@ class TestComposeSpecWithSharedDocuments:
 
 
 class TestBuildServicesWiresSharedDocuments:
+    @patch("initrunner.compose.orchestrator.resolve_role_model", side_effect=lambda r, *a, **kw: r)
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
     def test_build_services_wires_shared_documents(
-        self, mock_dotenv, mock_load_role, mock_build_agent, tmp_path
+        self, mock_dotenv, mock_load_role, mock_build_agent, _mock_resolve, tmp_path
     ):
         role = _make_role()
         mock_load_role.return_value = role

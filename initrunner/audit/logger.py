@@ -75,8 +75,8 @@ class AuditRecord:
             agent_name=role.metadata.name,
             timestamp=datetime.now(UTC).isoformat(),
             user_prompt=prompt,
-            model=role.spec.model.name,
-            provider=role.spec.model.provider,
+            model=role.spec.model.name,  # type: ignore[union-attr]
+            provider=role.spec.model.provider,  # type: ignore[union-attr]
             output=output_override if output_override is not None else result.output,
             tokens_in=result.tokens_in,
             tokens_out=result.tokens_out,

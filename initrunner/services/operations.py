@@ -237,7 +237,7 @@ def run_ingest_sync(
     return run_ingest(
         role.spec.ingest,
         role.metadata.name,
-        provider=role.spec.model.provider,
+        provider=role.spec.model.provider,  # type: ignore[union-attr]
         base_dir=role_path.parent,
         force=force,
         progress_callback=progress_callback,

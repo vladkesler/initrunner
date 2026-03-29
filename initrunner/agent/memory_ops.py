@@ -179,7 +179,7 @@ def auto_recall_for_resume(
         from initrunner.stores.base import MemoryType
 
         embed_provider = (
-            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"
+            role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"  # type: ignore[union-attr]
         )
         embed_model = role.spec.memory.embeddings.model
         query_embedding = _embed_single(
@@ -296,7 +296,7 @@ def import_memories(
         raise ValueError("Role has no memory config")
 
     mem_cfg = role.spec.memory
-    embed_provider = mem_cfg.embeddings.provider or role.spec.model.provider or "openai"
+    embed_provider = mem_cfg.embeddings.provider or role.spec.model.provider or "openai"  # type: ignore[union-attr]
     embed_model = mem_cfg.embeddings.model
     embedder = create_embedder(
         embed_provider,

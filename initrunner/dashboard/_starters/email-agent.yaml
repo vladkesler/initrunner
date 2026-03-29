@@ -172,8 +172,6 @@ spec:
 
     Always quote multi-word string values in IMAP queries.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.2
     max_tokens: 4096
   tools:

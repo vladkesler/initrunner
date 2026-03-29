@@ -405,9 +405,9 @@ async def stream_ingest_sse(
             pass
 
     def run_ingest():
-        from initrunner.agent.loader import load_role
+        from initrunner.agent.loader import load_role, resolve_role_model
 
-        role = load_role(role_path)
+        role = resolve_role_model(load_role(role_path), role_path)
         try:
             return run_ingest_sync(role, role_path, force=force, progress_callback=on_progress)
         finally:

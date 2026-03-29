@@ -31,8 +31,6 @@ spec:
     - If no relevant results are found, say so honestly
     - For PDF sources, mention the document name (not the full path)
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.1
   ingest:
     sources:
@@ -43,8 +41,7 @@ spec:
       chunk_size: 1024
       chunk_overlap: 100
     embeddings:
-      provider: openai
-      model: text-embedding-3-small
+        model: text-embedding-3-small
   guardrails:
     max_tokens_per_run: 30000
     max_tool_calls: 15

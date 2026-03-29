@@ -37,8 +37,6 @@ spec:
 
     Tone: concise, friendly, and professional. Prefer bullet points over prose.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.3
     max_tokens: 4096
   tools:

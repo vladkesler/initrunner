@@ -494,7 +494,7 @@ class TestBuildRoleFixPlan:
             "apiVersion": "initrunner/v1",
             "kind": "Agent",
             "metadata": {"name": "test", "spec_version": 1},
-            "spec": {"role": "test"},  # missing model
+            "spec": {},  # missing required 'role' field
         }
         plan = build_role_fix_plan(raw)
         assert plan.can_bump_spec_version is False

@@ -12,7 +12,7 @@ from pydantic_ai.settings import ModelSettings
 
 from initrunner._compat import require_provider
 from initrunner._yaml import load_raw_yaml
-from initrunner.agent.schema.base import ModelConfig
+from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
 from initrunner.agent.schema.role import RoleDefinition
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ def _inject_local_fallbacks(caps: list) -> None:
 def _validate_provider(role: RoleDefinition) -> None:
     """Check the provider SDK is installed, raising RoleLoadError if not."""
     try:
-        require_provider(role.spec.model.provider)
+        require_provider(role.spec.model.provider)  # type: ignore[union-attr]
     except RuntimeError as e:
         raise RoleLoadError(str(e)) from None
 
@@ -216,9 +216,9 @@ def _create_agent(
     capabilities: list | None = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
-    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}
-    if not role.spec.model.is_reasoning_model():
-        model_settings_kwargs["temperature"] = role.spec.model.temperature
+    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}  # type: ignore[union-attr]
+    if not role.spec.model.is_reasoning_model():  # type: ignore[union-attr]
+        model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
         "system_prompt": system_prompt,
@@ -234,9 +234,9 @@ def _create_agent(
 
     from initrunner.agent.history_summarizer import build_history_processor
 
-    kwargs["history_processors"] = [build_history_processor(role.spec.model)]
+    kwargs["history_processors"] = [build_history_processor(role.spec.model)]  # type: ignore[arg-type]
 
-    return Agent(_build_model(role.spec.model), **kwargs)
+    return Agent(_build_model(role.spec.model), **kwargs)  # type: ignore[arg-type]
 
 
 def build_agent(
@@ -248,6 +248,14 @@ def build_agent(
     prefer_async: bool = False,
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
+    # Ensure spec.model is a concrete ModelConfig (not PartialModelConfig)
+    model = role.spec.model
+    if model is None or (hasattr(model, "is_resolved") and not model.is_resolved()):
+        raise RoleLoadError(
+            "Model must be resolved before building an agent. Call resolve_role_model() first."
+        )
+    if not isinstance(role.spec.model, ModelConfig):
+        role = _set_model(role, ModelConfig(**role.spec.model.model_dump()))  # type: ignore[union-attr]
     _validate_provider(role)
     _validate_reasoning(role)
     system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
@@ -424,16 +432,148 @@ def _load_dotenv(role_dir: Path | None) -> None:
         load_dotenv(global_env, override=False)
 
 
-def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> RoleDefinition:
-    """Return a copy of *role* with its model config replaced."""
-    old_model = role.spec.model
-    update: dict[str, Any] = {"provider": provider, "name": name}
-    if provider != old_model.provider:
-        update["base_url"] = None
-        update["api_key_env"] = None
-    new_model = old_model.model_copy(update=update)
-    new_spec = role.spec.model_copy(update={"model": new_model})
+def _set_model(role: RoleDefinition, model: ModelConfig) -> RoleDefinition:
+    """Return a copy of *role* with its model set to a concrete ModelConfig."""
+    new_spec = role.spec.model_copy(update={"model": model})
     return role.model_copy(update={"spec": new_spec})
+
+
+def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> RoleDefinition:
+    """Return a copy of *role* with its model config replaced.
+
+    Preserves tuning fields (temperature, max_tokens, context_window) from the
+    existing model config.  Clears base_url/api_key_env when provider changes.
+    """
+    partial = role.spec.model
+    base: dict[str, Any] = {}
+    if partial is not None:
+        base = {
+            "temperature": partial.temperature,
+            "max_tokens": partial.max_tokens,
+            "context_window": partial.context_window,
+        }
+        if provider == partial.provider:
+            base["base_url"] = partial.base_url
+            base["api_key_env"] = partial.api_key_env
+    new_model = ModelConfig(provider=provider, name=name, **base)
+    return _set_model(role, new_model)
+
+
+def detect_default_model() -> tuple[str, str, str | None, str | None, str]:
+    """Detect the current default model and its source.
+
+    Returns ``(provider, name, base_url, api_key_env, source)`` where *source*
+    is one of ``"initrunner_model_env"``, ``"run_yaml"``, ``"auto_detected"``,
+    or ``"none"``.  Never raises.
+    """
+    # 1. INITRUNNER_MODEL env var
+    env_model = os.environ.get("INITRUNNER_MODEL")
+    if env_model:
+        from initrunner.model_aliases import parse_model_string, resolve_model_alias
+
+        try:
+            resolved = resolve_model_alias(env_model)
+            prov, name = parse_model_string(resolved)
+            return prov, name, None, None, "initrunner_model_env"
+        except ValueError:
+            pass
+
+    # 2. run.yaml (from `initrunner setup`)
+    from initrunner.cli.run_config import load_run_config
+
+    run_cfg = load_run_config()
+    if run_cfg.provider and run_cfg.model:
+        return (
+            run_cfg.provider,
+            run_cfg.model,
+            run_cfg.base_url,
+            run_cfg.api_key_env,
+            "run_yaml",
+        )
+
+    # 3. Auto-detect from API key env vars
+    from initrunner.services.providers import detect_provider_and_model
+
+    detected = detect_provider_and_model()
+    if detected is not None:
+        return detected.provider, detected.model, None, None, "auto_detected"
+
+    return "", "", None, None, "none"
+
+
+def _auto_detect_model() -> tuple[str, str, str | None, str | None]:
+    """Detect provider/model from env, run.yaml, or API keys.
+
+    Returns ``(provider, name, base_url, api_key_env)``.
+    Raises :class:`RoleLoadError` if nothing can be detected.
+    """
+    prov, name, base_url, api_key_env, source = detect_default_model()
+    if source == "none":
+        raise RoleLoadError(
+            "No model specified and none could be auto-detected.\n\n"
+            "To fix this, do one of:\n"
+            "  1. Add a model section to your role YAML:\n"
+            "       model:\n"
+            "         provider: openai\n"
+            "         name: gpt-5-mini\n"
+            "  2. Run 'initrunner setup' to configure a default provider\n"
+            "  3. Set INITRUNNER_MODEL=provider:model "
+            "(e.g. INITRUNNER_MODEL=openai:gpt-5-mini)\n"
+            "  4. Set an API key environment variable "
+            "(e.g. OPENAI_API_KEY, ANTHROPIC_API_KEY)"
+        )
+    return prov, name, base_url, api_key_env
+
+
+def resolve_role_model(
+    role: RoleDefinition,
+    role_path: Path | None = None,
+    *,
+    model_override: str | None = None,
+) -> RoleDefinition:
+    """Return a copy of *role* with ``spec.model`` as a concrete :class:`ModelConfig`.
+
+    Resolution order:
+
+    1. *model_override* parameter (CLI ``--model``, dashboard model picker)
+    2. Registry overrides for installed roles
+    3. ``INITRUNNER_MODEL`` env var
+    4. ``~/.initrunner/run.yaml`` (from ``initrunner setup``)
+    5. API key env var detection (``OPENAI_API_KEY``, etc.)
+
+    When the YAML provides a partial model config (e.g. ``temperature: 0.3``
+    without provider/name), the auto-detected provider/name is merged in and
+    the tuning fields are preserved.
+    """
+    from initrunner.model_aliases import parse_model_string
+
+    partial = role.spec.model  # PartialModelConfig | None
+
+    # 1. Explicit override wins
+    if model_override:
+        new_provider, new_name = parse_model_string(model_override)
+        return _apply_model_override(role, new_provider, new_name)
+
+    # 2. Already fully resolved in YAML
+    if partial is not None and partial.is_resolved():
+        resolved_role = _set_model(role, ModelConfig(**partial.model_dump()))
+        if role_path:
+            resolved_role = _apply_registry_overrides(resolved_role, role_path)
+        return resolved_role
+
+    # 3. Auto-detect and merge with partial tuning fields
+    prov, name, base_url, api_key_env = _auto_detect_model()
+    base = partial or PartialModelConfig()
+    resolved = ModelConfig(
+        provider=prov,
+        name=name,
+        base_url=base_url or base.base_url,
+        api_key_env=api_key_env or base.api_key_env,
+        temperature=base.temperature,
+        max_tokens=base.max_tokens,
+        context_window=base.context_window,
+    )
+    return _set_model(role, resolved)
 
 
 def load_and_build(
@@ -446,18 +586,12 @@ def load_and_build(
     When *model_override* is a ``provider:model`` string the role's model
     config is replaced before the agent is built.  Otherwise, if the role
     was installed via the registry and the user set a provider override,
-    that override is applied automatically.
+    that override is applied automatically.  If no model is specified in
+    the YAML, auto-detects from env vars / ``run.yaml``.
     """
     _load_dotenv(path.parent)
     role = load_role(path)
-    if model_override:
-        from initrunner.model_aliases import parse_model_string
-
-        new_provider, new_name = parse_model_string(model_override)
-        role = _apply_model_override(role, new_provider, new_name)
-    else:
-        # Apply registry overrides for installed roles (if any)
-        role = _apply_registry_overrides(role, path)
+    role = resolve_role_model(role, path, model_override=model_override)
     agent = build_agent(role, role_dir=path.parent, extra_skill_dirs=extra_skill_dirs)
     return role, agent
 
@@ -479,11 +613,12 @@ def _apply_registry_overrides(role: RoleDefinition, path: Path) -> RoleDefinitio
     if not provider or not model:
         return role
 
+    orig = role.spec.model
+    orig_str = f"{orig.provider}/{orig.name}" if isinstance(orig, ModelConfig) else "auto-detect"
     logger.info(
-        "Applying registry override: %s/%s (original: %s/%s)",
+        "Applying registry override: %s/%s (original: %s)",
         provider,
         model,
-        role.spec.model.provider,
-        role.spec.model.name,
+        orig_str,
     )
     return _apply_model_override(role, provider, model)

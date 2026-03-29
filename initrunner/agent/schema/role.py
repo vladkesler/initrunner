@@ -7,7 +7,13 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from initrunner.agent.schema.autonomy import AutonomyConfig
-from initrunner.agent.schema.base import ApiVersion, Kind, Metadata, ModelConfig, RoleMetadata
+from initrunner.agent.schema.base import (
+    ApiVersion,
+    Kind,
+    Metadata,
+    PartialModelConfig,
+    RoleMetadata,
+)
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.agent.schema.memory import MemoryConfig
@@ -74,7 +80,7 @@ class DaemonConfig(BaseModel):
 
 class AgentSpec(BaseModel):
     role: str
-    model: ModelConfig
+    model: PartialModelConfig | None = None
     output: OutputConfig = OutputConfig()
     tools: list[ToolConfig] = []
     skills: list[str] = []

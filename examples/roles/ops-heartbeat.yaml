@@ -29,8 +29,6 @@ spec:
     - If a command times out, report it as "timed out" and move to the next item
     - At the end, post a summary: items checked, passed, failed
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.0
   tools:
     - type: shell

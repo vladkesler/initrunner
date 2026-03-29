@@ -652,10 +652,13 @@ class TestSharedMemory:
             },
         }
 
+    @patch("initrunner.compose.orchestrator.resolve_role_model", side_effect=lambda r, *a, **kw: r)
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
-    def test_shared_memory_patches_store_path(self, mock_dotenv, mock_load, mock_build):
+    def test_shared_memory_patches_store_path(
+        self, mock_dotenv, mock_load, mock_build, _mock_resolve
+    ):
         from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
@@ -679,10 +682,11 @@ class TestSharedMemory:
             assert role.spec.memory is not None
             assert role.spec.memory.store_path == "/tmp/shared.db"
 
+    @patch("initrunner.compose.orchestrator.resolve_role_model", side_effect=lambda r, *a, **kw: r)
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
-    def test_shared_memory_default_path(self, mock_dotenv, mock_load, mock_build):
+    def test_shared_memory_default_path(self, mock_dotenv, mock_load, mock_build, _mock_resolve):
         from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
@@ -706,10 +710,13 @@ class TestSharedMemory:
             assert role.spec.memory.store_path is not None
             assert "mem-compose-shared.db" in role.spec.memory.store_path
 
+    @patch("initrunner.compose.orchestrator.resolve_role_model", side_effect=lambda r, *a, **kw: r)
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
-    def test_shared_memory_max_memories_propagated(self, mock_dotenv, mock_load, mock_build):
+    def test_shared_memory_max_memories_propagated(
+        self, mock_dotenv, mock_load, mock_build, _mock_resolve
+    ):
         from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}
@@ -732,10 +739,13 @@ class TestSharedMemory:
             assert role.spec.memory is not None
             assert role.spec.memory.semantic.max_memories == 500
 
+    @patch("initrunner.compose.orchestrator.resolve_role_model", side_effect=lambda r, *a, **kw: r)
     @patch("initrunner.compose.orchestrator.build_agent")
     @patch("initrunner.compose.orchestrator.load_role")
     @patch("initrunner.compose.orchestrator._load_dotenv")
-    def test_shared_memory_overrides_existing_role_memory(self, mock_dotenv, mock_load, mock_build):
+    def test_shared_memory_overrides_existing_role_memory(
+        self, mock_dotenv, mock_load, mock_build, _mock_resolve
+    ):
         from initrunner.agent.schema.role import RoleDefinition
 
         roles = {}

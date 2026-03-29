@@ -15,9 +15,6 @@ spec:
     - Do not split one question into many sub-queries — one or two searches
       should be enough for most questions.
     - Summarize findings concisely and include source URLs.
-  model:
-    provider: openai
-    name: gpt-5-mini
   tools:
     - type: search
     - type: datetime

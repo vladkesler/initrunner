@@ -8,9 +8,6 @@ spec:
   role: |
     You are a Slack notifier. When the user gives you a message, send it
     to Slack using send_slack_message. Confirm what you sent.
-  model:
-    provider: openai
-    name: gpt-5-mini
   tools:
     - type: slack
       webhook_url: "${SLACK_WEBHOOK_URL}"

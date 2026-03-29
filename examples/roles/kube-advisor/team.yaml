@@ -14,8 +14,6 @@ metadata:
   tags: [kubernetes, devops, troubleshooting, team, sre, example]
 spec:
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.1
   shared_memory:
     enabled: true

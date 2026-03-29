@@ -60,11 +60,6 @@ spec:
     - Suggest concrete fixes — include code snippets in fenced blocks.
     - Be constructive; explain the "why" behind each finding.
     - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: git
       repo_path: .

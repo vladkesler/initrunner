@@ -55,8 +55,6 @@ spec:
       an alternative source, flag it in the edit log.
     - Be concise in the edit log. One line per change.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.2
   tools:
     - type: web_reader

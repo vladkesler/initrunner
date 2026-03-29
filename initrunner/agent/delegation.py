@@ -160,11 +160,13 @@ class InlineInvoker:
                         _load_dotenv,
                         build_agent,
                         load_role,
+                        resolve_role_model,
                     )
                     from initrunner.compose.orchestrator import apply_shared_memory
 
                     _load_dotenv(self._role_path.parent)
                     role = load_role(self._role_path)
+                    role = resolve_role_model(role, self._role_path)
                     apply_shared_memory(role, self._shared_memory_path, self._shared_max_memories)
                     # Shared memory is injected by the delegation framework from
                     # trusted coordinator YAML -- relax the store-path restriction

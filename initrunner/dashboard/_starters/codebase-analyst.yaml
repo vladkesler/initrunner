@@ -92,11 +92,6 @@ spec:
     - Only answer based on what's in the indexed codebase and your memory.
     - If search_documents returns nothing relevant, say so -- don't guess.
     - Don't modify code. You're an analyst, not an editor.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: filesystem
       root_path: .

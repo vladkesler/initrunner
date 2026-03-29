@@ -13,8 +13,6 @@ spec:
     level, and the type of action needed (research, direct response,
     or human escalation). Be factual and brief.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.1
   guardrails:
     max_tokens_per_run: 1000

@@ -68,7 +68,7 @@ def _consolidate_inner(
     # Lazy import — this module is only loaded when consolidation runs
     from pydantic_ai import Agent
 
-    model_str = config.model_override or role.spec.model.to_model_string()
+    model_str = config.model_override or role.spec.model.to_model_string()  # type: ignore[union-attr]
     consolidation_agent = Agent(model_str)
     result = consolidation_agent.run_sync(prompt)
     raw_output = result.output if hasattr(result, "output") else str(result.data)
@@ -92,7 +92,7 @@ def _consolidate_inner(
     from initrunner.ingestion.embeddings import embed_single as _embed_single
     from initrunner.stores.base import MemoryType
 
-    embed_provider = role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"
+    embed_provider = role.spec.memory.embeddings.provider or role.spec.model.provider or "openai"  # type: ignore[union-attr]
     embed_model = role.spec.memory.embeddings.model
     embed_base_url = role.spec.memory.embeddings.base_url
     embed_api_key_env = role.spec.memory.embeddings.api_key_env

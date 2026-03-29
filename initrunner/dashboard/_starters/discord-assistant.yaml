@@ -74,8 +74,6 @@ spec:
     - Direct and helpful with dry humor. Not a chatbot -- a knowledgeable
       team member.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.4
     max_tokens: 4096
   tools:

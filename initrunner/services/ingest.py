@@ -113,7 +113,7 @@ def auto_ingest_if_needed(
     return run_ingest(
         ingest,
         role.metadata.name,
-        provider=role.spec.model.provider,
+        provider=role.spec.model.provider,  # type: ignore[union-attr]
         base_dir=base_dir,
         progress_callback=progress_callback,
         max_file_size_mb=resource_limits.max_file_size_mb,

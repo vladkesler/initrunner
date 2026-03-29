@@ -72,9 +72,12 @@ def validate(
     table.add_row("Name", role.metadata.name)
     table.add_row("Description", role.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(role.metadata.tags) if role.metadata.tags else "(none)")
-    table.add_row("Model", role.spec.model.to_model_string())
-    table.add_row("Temperature", str(role.spec.model.temperature))
-    table.add_row("Max Tokens", str(role.spec.model.max_tokens))
+    if role.spec.model and role.spec.model.name:
+        table.add_row("Model", f"{role.spec.model.provider}:{role.spec.model.name}")
+        table.add_row("Temperature", str(role.spec.model.temperature))
+        table.add_row("Max Tokens", str(role.spec.model.max_tokens))
+    else:
+        table.add_row("Model", "(auto-detect at runtime)")
     table.add_row("Timeout", f"{role.spec.guardrails.timeout_seconds}s")
     table.add_row("Max Tokens/Run", str(role.spec.guardrails.max_tokens_per_run))
     table.add_row("Max Tool Calls", str(role.spec.guardrails.max_tool_calls))
@@ -144,13 +147,16 @@ def validate(
     else:
         table.add_row("Sinks", "(none)")
 
-    try:
-        from initrunner._compat import require_provider
+    if role.spec.model and role.spec.model.name:
+        try:
+            from initrunner._compat import require_provider
 
-        require_provider(role.spec.model.provider)
-        table.add_row("Provider Status", "[green]available[/green]")
-    except RuntimeError as e:
-        table.add_row("Provider Status", f"[yellow]{e}[/yellow]")
+            require_provider(role.spec.model.provider)
+            table.add_row("Provider Status", "[green]available[/green]")
+        except RuntimeError as e:
+            table.add_row("Provider Status", f"[yellow]{e}[/yellow]")
+    else:
+        table.add_row("Provider Status", "[dim]auto-detect at runtime[/dim]")
 
     console.print(table)
     console.print("[green]Valid[/green]")
@@ -239,10 +245,10 @@ def configure(
     is_installed = installed_path is not None
 
     current_overrides = get_overrides_for_path(role_path) if is_installed else {}
-    effective_provider = current_overrides.get("provider", role_def.spec.model.provider)
-    effective_model = current_overrides.get("model", role_def.spec.model.name)
-    original_provider = role_def.spec.model.provider
-    original_model = role_def.spec.model.name
+    effective_provider = current_overrides.get("provider", role_def.spec.model.provider)  # type: ignore[union-attr]
+    effective_model = current_overrides.get("model", role_def.spec.model.name)  # type: ignore[union-attr]
+    original_provider = role_def.spec.model.provider  # type: ignore[union-attr]
+    original_model = role_def.spec.model.name  # type: ignore[union-attr]
 
     # Handle --reset
     if reset:

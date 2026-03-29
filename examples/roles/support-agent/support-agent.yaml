@@ -12,11 +12,6 @@ spec:
     articles before answering. Always cite your sources.
 
     '
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   ingest:
     sources:
     - ./knowledge-base/**/*.html

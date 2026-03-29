@@ -16,8 +16,6 @@ spec:
     friendly reply. Keep responses concise and actionable. Include
     relevant links or next steps when appropriate.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.5
   guardrails:
     max_tokens_per_run: 2000

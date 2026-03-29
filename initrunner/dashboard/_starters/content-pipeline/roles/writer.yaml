@@ -61,8 +61,6 @@ spec:
       noting that...").
     - Use datetime to include the current date in the article footer.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.4
   tools:
     - type: think

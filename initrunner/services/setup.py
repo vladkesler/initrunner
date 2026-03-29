@@ -418,10 +418,10 @@ def run_connectivity_test(role_path: Path) -> tuple[bool, str]:
 def run_ingest_for_role(role_path: Path) -> bool:
     """Run ingestion for a role. Returns True on success."""
     try:
-        from initrunner.agent.loader import load_role
+        from initrunner.agent.loader import load_role, resolve_role_model
         from initrunner.services.operations import run_ingest_sync
 
-        role = load_role(role_path)
+        role = resolve_role_model(load_role(role_path), role_path)
         stats = run_ingest_sync(role, role_path)
         return stats is not None
     except Exception as exc:

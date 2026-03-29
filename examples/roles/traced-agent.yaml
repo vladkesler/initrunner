@@ -29,8 +29,6 @@ spec:
     When asked what time it is, use the get_current_time tool and report
     the result. Keep responses short.
   model:
-    provider: openai
-    name: gpt-5-mini
     temperature: 0.0
     max_tokens: 256
   tools:

@@ -7,7 +7,13 @@ import os
 
 from fastapi import APIRouter  # type: ignore[import-not-found]
 
-from initrunner.dashboard.schemas import DoctorCheck, DoctorResponse, ToolTypeResponse
+from initrunner.dashboard.schemas import (
+    DefaultModelResponse,
+    DoctorCheck,
+    DoctorResponse,
+    SaveDefaultModelRequest,
+    ToolTypeResponse,
+)
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -124,3 +130,70 @@ async def doctor() -> DoctorResponse:
 @router.get("/tools")
 async def list_tools() -> list[ToolTypeResponse]:
     return await asyncio.to_thread(_list_tool_types)
+
+
+# -- Default model -------------------------------------------------------------
+
+
+def _get_default_model() -> DefaultModelResponse:
+    from initrunner.agent.loader import detect_default_model
+
+    prov, model, base_url, api_key_env, source = detect_default_model()
+    return DefaultModelResponse(
+        provider=prov,
+        model=model,
+        base_url=base_url,
+        api_key_env=api_key_env,
+        source=source,
+    )
+
+
+def _save_default_model(req: SaveDefaultModelRequest) -> DefaultModelResponse:
+    from initrunner.cli.run_config import save_run_config
+    from initrunner.dashboard.routers._provider_options import (
+        CUSTOM_PROVIDER_NAMES,
+        resolve_custom_provider,
+    )
+
+    # Normalize preset names to canonical runtime fields
+    provider = req.provider
+    base_url = req.base_url
+    api_key_env = req.api_key_env
+    if provider in CUSTOM_PROVIDER_NAMES:
+        provider, base_url, api_key_env = resolve_custom_provider(provider, base_url, api_key_env)
+
+    save_run_config(
+        provider=provider,
+        model=req.model,
+        base_url=base_url,
+        api_key_env=api_key_env,
+    )
+    return DefaultModelResponse(
+        provider=provider,
+        model=req.model,
+        base_url=base_url,
+        api_key_env=api_key_env,
+        source="run_yaml",
+    )
+
+
+def _clear_default_model() -> DefaultModelResponse:
+    from initrunner.cli.run_config import clear_run_config_model
+
+    clear_run_config_model()
+    return _get_default_model()
+
+
+@router.get("/default-model")
+async def get_default_model() -> DefaultModelResponse:
+    return await asyncio.to_thread(_get_default_model)
+
+
+@router.post("/default-model")
+async def save_default_model(req: SaveDefaultModelRequest) -> DefaultModelResponse:
+    return await asyncio.to_thread(_save_default_model, req)
+
+
+@router.delete("/default-model")
+async def reset_default_model() -> DefaultModelResponse:
+    return await asyncio.to_thread(_clear_default_model)

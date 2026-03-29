@@ -1,6 +1,12 @@
 # Changelog
 
-## [2026.3.4] - 2026-03-29
+## [2026.3.5] - 2026-03-29
+
+### Added
+- **Model auto-detection** -- the `model:` section in role and team YAML is now optional. When omitted, the provider and model are auto-detected from (in priority order): `INITRUNNER_MODEL` env var, `run.yaml` from `initrunner setup`, or API key env vars. Roles can keep a partial `model:` block with only tuning fields (temperature, max_tokens) and the provider/name are filled in at runtime. All 73 bundled starters no longer hardcode `openai:gpt-5-mini` -- they work with whatever provider the user configured
+- **`PartialModelConfig` schema type** -- new YAML-facing model config with optional provider/name. Runtime `ModelConfig` stays concrete. `resolve_role_model()` central helper converts partial to concrete before any execution, ingestion, or provider check
+- **Dashboard default model setting** -- new "Default Model" section on the System page. Pick provider/model from the browser, saves to `run.yaml`. Shows provenance (env var, run.yaml, auto-detected). Reset button returns to auto-detect. Preset names (OpenRouter) are normalized to canonical runtime fields before saving
+- **Auto-detect badge on agent cards** -- agents without a pinned model show a subtle `auto` pill badge in card, list, and flow canvas views instead of "no model"
 
 ### Fixed
 - **Docker command drift** -- Docker docs, Dockerfile, compose files, and cloud deploy configs all referenced stale CLI commands (`chat`, `serve`, `ui`) that were removed in v1.45. Updated to use the current surface: `run` (with `--serve`, `-i`, `--bot`), `dashboard`, and `ingest`

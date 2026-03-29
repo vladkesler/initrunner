@@ -64,11 +64,6 @@ spec:
     - No Markdown headings (#), no triple backticks — these don't render in Slack
 
     Do NOT pad output with disclaimers or preamble — the mrkdwn IS the deliverable.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
   tools:
     - type: git
       repo_path: .

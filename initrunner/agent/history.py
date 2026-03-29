@@ -77,7 +77,7 @@ def reduce_history(
         resolve_context_window,
     )
 
-    ctx_window = resolve_context_window(role.spec.model)
+    ctx_window = resolve_context_window(role.spec.model)  # type: ignore[union-attr]
     token_budget = int(ctx_window * _BUDGET_FRACTION)
     return enforce_token_budget(trimmed, token_budget, preserve_first=preserve_first)
 
