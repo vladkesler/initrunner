@@ -90,20 +90,28 @@ def make_auth_dispatch(
     allow_query_param: bool = False,
     allow_cookie: bool = False,
     cookie_name: str = "initrunner_token",
+    cookie_token: str = "",
     login_redirect: str | None = None,
     secure_cookies: bool = False,
 ):
     """Bearer token auth with timing-safe comparison.
 
     When *allow_cookie* is True, checks the ``initrunner_token`` cookie as
-    an additional auth source.  When *login_redirect* is set and the request
-    accepts HTML, unauthenticated requests are redirected to the login page
-    instead of returning a JSON 401.
+    an additional auth source.  When *cookie_token* is set, the cookie is
+    compared against that value (an HMAC-derived session token) instead of
+    the raw API key, so the key never appears in cookies or browser storage.
+    When *login_redirect* is set and the request accepts HTML,
+    unauthenticated requests are redirected to the login page instead of
+    returning a JSON 401.
     """
+    # Compare cookies against the session token when provided,
+    # otherwise fall back to comparing against the raw API key.
+    _cookie_expected = cookie_token or api_key
 
     async def dispatch(request: Request, call_next) -> Response:
         if applies_to(request):
             token = ""
+            from_cookie = False
             auth_header = request.headers.get("authorization", "")
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
@@ -119,7 +127,7 @@ def make_auth_dispatch(
                     resp = RedirectResponse(path, status_code=302)
                     resp.set_cookie(
                         key=cookie_name,
-                        value=token,
+                        value=_cookie_expected,
                         httponly=True,
                         samesite="strict",
                         secure=secure_cookies,
@@ -127,7 +135,12 @@ def make_auth_dispatch(
                     return resp
             if not token and allow_cookie:
                 token = request.cookies.get(cookie_name, "")
-            if not token or not hmac.compare_digest(token, api_key):
+                from_cookie = bool(token)
+
+            # Compare against the right secret: cookies use the session
+            # token, Bearer/query-param tokens use the raw API key.
+            expected = _cookie_expected if from_cookie else api_key
+            if not token or not hmac.compare_digest(token, expected):
                 # Redirect HTML requests to login page
                 if login_redirect:
                     accept = request.headers.get("accept", "")
