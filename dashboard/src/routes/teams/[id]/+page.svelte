@@ -138,7 +138,7 @@
 						<PersonaPipeline {detail} />
 					</div>
 				{:else if activeTab === 'run'}
-					<TeamRunPanel teamId={teamId} />
+					<TeamRunPanel teamId={teamId} {detail} />
 				{:else if activeTab === 'config'}
 					<div class="max-w-2xl">
 						<ConfigPanel team={detail} />

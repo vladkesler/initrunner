@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage } from '$lib/api/types';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { teamId, onRunCompleted }: { teamId: string; onRunCompleted?: () => void } = $props();
+	let { teamId, detail, onRunCompleted }: { teamId: string; detail: TeamDetail; onRunCompleted?: () => void } = $props();
 
 	let prompt = $state('');
 	let messages: TeamThreadMessage[] = $state([]);
@@ -26,7 +26,9 @@
 				identityLabel: m.role === 'user'
 					? 'You'
 					: isDebateStreaming
-						? `Agents thinking \u00B7 ${debateElapsed}s`
+						? debateRound
+							? `Round ${debateRound}/${detail.debate?.max_rounds ?? '?'} \u00B7 ${debateElapsed}s`
+							: `Agents thinking \u00B7 ${debateElapsed}s`
 						: (m.activePersona ?? 'Team'),
 				avatarSeeds: isDebateStreaming ? debateSeeds : undefined
 			};
@@ -59,8 +61,16 @@
 	let activeSet = $state(new Set<string>());
 	/** True once we see >1 concurrent personas; stays true until run finishes. */
 	let debateMode = $state(false);
-	/** All persona base names seen during this debate (for avatar seeds). */
-	let debateSeeds = $state<string[]>([]);
+	/** Persona base names from team detail (stable, no race condition). */
+	const debateSeeds = $derived(
+		detail.strategy === 'debate' ? detail.personas.map((p) => p.name) : []
+	);
+	/** Current debate round parsed from activePersona name. */
+	const debateRound = $derived.by(() => {
+		if (!activePersona) return null;
+		const m = activePersona.match(/\(round (\d+)\)/);
+		return m ? parseInt(m[1]) : null;
+	});
 	let debateStart = $state(0);
 	let debateElapsed = $state(0);
 	let debateTimer: ReturnType<typeof setInterval> | null = null;
@@ -68,7 +78,6 @@
 	$effect(() => {
 		if (activeSet.size > 1 && !debateMode) {
 			debateMode = true;
-			debateSeeds = [...activeSet].map((n) => n.replace(/ \(round \d+\)/, ''));
 		}
 	});
 
@@ -101,7 +110,6 @@
 		running = true;
 		activeSet = new Set();
 		debateMode = false;
-		debateSeeds = [];
 		const assistantIdx = messages.length - 1;
 
 		controller = streamTeamRun(
