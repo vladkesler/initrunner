@@ -40,6 +40,76 @@ def _store_chunks(
     return f"Stored {len(chunk_texts)} chunks from {url}"
 
 
+def _fetch_and_chunk(url, config, store_config):
+    """Domain-check, fetch (sync), and chunk. Returns (chunk_texts, markdown) or error str."""
+    error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
+    if error:
+        return error
+
+    try:
+        markdown = fetch_url_as_markdown(
+            url,
+            timeout=config.timeout_seconds,
+            user_agent=config.user_agent,
+            max_bytes=config.max_content_bytes,
+        )
+    except SSRFBlocked as e:
+        return str(e)
+    except Exception as e:
+        return f"Error fetching URL: {e}"
+
+    if not markdown.strip():
+        return f"No content extracted from {url}"
+
+    chunks = chunk_text(
+        markdown,
+        source=url,
+        strategy=store_config.chunking_strategy,
+        chunk_size=store_config.chunk_size,
+        chunk_overlap=store_config.chunk_overlap,
+    )
+    if not chunks:
+        return f"No chunks extracted from {url}"
+
+    return [c.text for c in chunks], markdown
+
+
+async def _fetch_and_chunk_async(url, config, store_config):
+    """Domain-check, fetch (async), and chunk. Returns (chunk_texts, markdown) or error str."""
+    error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
+    if error:
+        return error
+
+    try:
+        from initrunner._html import fetch_url_as_markdown_async
+
+        markdown = await fetch_url_as_markdown_async(
+            url,
+            timeout=config.timeout_seconds,
+            user_agent=config.user_agent,
+            max_bytes=config.max_content_bytes,
+        )
+    except SSRFBlocked as e:
+        return str(e)
+    except Exception as e:
+        return f"Error fetching URL: {e}"
+
+    if not markdown.strip():
+        return f"No content extracted from {url}"
+
+    chunks = chunk_text(
+        markdown,
+        source=url,
+        strategy=store_config.chunking_strategy,
+        chunk_size=store_config.chunk_size,
+        chunk_overlap=store_config.chunk_overlap,
+    )
+    if not chunks:
+        return f"No chunks extracted from {url}"
+
+    return [c.text for c in chunks], markdown
+
+
 @register_tool("web_scraper", WebScraperToolConfig)
 def build_web_scraper_toolset(
     config: WebScraperToolConfig,
@@ -67,57 +137,29 @@ def build_web_scraper_toolset(
             Args:
                 url: The URL to scrape and store.
             """
-            error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
-            if error:
-                return error
-
-            try:
-                from initrunner._html import fetch_url_as_markdown_async
-
-                markdown = await fetch_url_as_markdown_async(
-                    url,
-                    timeout=config.timeout_seconds,
-                    user_agent=config.user_agent,
-                    max_bytes=config.max_content_bytes,
-                )
-            except SSRFBlocked as e:
-                return str(e)
-            except Exception as e:
-                return f"Error fetching URL: {e}"
-
-            if not markdown.strip():
-                return f"No content extracted from {url}"
-
-            chunks = chunk_text(
-                markdown,
-                source=url,
-                strategy=store_config.chunking_strategy,
-                chunk_size=store_config.chunk_size,
-                chunk_overlap=store_config.chunk_overlap,
-            )
-            if not chunks:
-                return f"No chunks extracted from {url}"
-
-            # Embed concurrently using asyncio.gather
-            chunk_texts = [c.text for c in chunks]
+            result = await _fetch_and_chunk_async(url, config, store_config)
+            if isinstance(result, str):
+                return result
+            chunk_texts, markdown = result
 
             from initrunner.ingestion.embeddings import embed_single_async
 
-            embed_tasks = [
-                embed_single_async(
-                    store_config.embed_provider,
-                    store_config.embed_model,
-                    ct,
-                    base_url=store_config.embed_base_url,
-                    api_key_env=store_config.embed_api_key_env,
-                    input_type="document",
+            embeddings = await asyncio.gather(
+                *(
+                    embed_single_async(
+                        store_config.embed_provider,
+                        store_config.embed_model,
+                        ct,
+                        base_url=store_config.embed_base_url,
+                        api_key_env=store_config.embed_api_key_env,
+                        input_type="document",
+                    )
+                    for ct in chunk_texts
                 )
-                for ct in chunk_texts
-            ]
-            embeddings = await asyncio.gather(*embed_tasks)
+            )
 
-            result = _store_chunks(store_config, url, chunk_texts, list(embeddings))
-            return f"{result} ({len(markdown):,} chars)"
+            stored = _store_chunks(store_config, url, chunk_texts, list(embeddings))
+            return f"{stored} ({len(markdown):,} chars)"
 
     else:
 
@@ -130,50 +172,24 @@ def build_web_scraper_toolset(
             Args:
                 url: The URL to scrape and store.
             """
-            error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
-            if error:
-                return error
+            result = _fetch_and_chunk(url, config, store_config)
+            if isinstance(result, str):
+                return result
+            chunk_texts, markdown = result
 
-            try:
-                markdown = fetch_url_as_markdown(
-                    url,
-                    timeout=config.timeout_seconds,
-                    user_agent=config.user_agent,
-                    max_bytes=config.max_content_bytes,
+            embeddings = [
+                _embed_single(
+                    store_config.embed_provider,
+                    store_config.embed_model,
+                    ct,
+                    base_url=store_config.embed_base_url,
+                    api_key_env=store_config.embed_api_key_env,
+                    input_type="document",
                 )
-            except SSRFBlocked as e:
-                return str(e)
-            except Exception as e:
-                return f"Error fetching URL: {e}"
+                for ct in chunk_texts
+            ]
 
-            if not markdown.strip():
-                return f"No content extracted from {url}"
-
-            chunks = chunk_text(
-                markdown,
-                source=url,
-                strategy=store_config.chunking_strategy,
-                chunk_size=store_config.chunk_size,
-                chunk_overlap=store_config.chunk_overlap,
-            )
-            if not chunks:
-                return f"No chunks extracted from {url}"
-
-            chunk_texts = [c.text for c in chunks]
-            embeddings: list[list[float]] = []
-            for ct in chunk_texts:
-                embeddings.append(
-                    _embed_single(
-                        store_config.embed_provider,
-                        store_config.embed_model,
-                        ct,
-                        base_url=store_config.embed_base_url,
-                        api_key_env=store_config.embed_api_key_env,
-                        input_type="document",
-                    )
-                )
-
-            result = _store_chunks(store_config, url, chunk_texts, embeddings)
-            return f"{result} ({len(markdown):,} chars)"
+            stored = _store_chunks(store_config, url, chunk_texts, embeddings)
+            return f"{stored} ({len(markdown):,} chars)"
 
     return toolset

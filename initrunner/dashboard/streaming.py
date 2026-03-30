@@ -94,7 +94,7 @@ async def stream_run_sse(
 
     # Emit final result or error
     try:
-        result, new_messages = stream_task.result()
+        result, new_messages = await stream_task
 
         # Serialize trimmed history on success
         serialized_history = None
@@ -137,20 +137,20 @@ async def stream_compose_run_sse(
 ) -> AsyncIterator[str]:
     """SSE generator yielding service_start/service_complete/result/error events.
 
-    Runs ``run_compose_once_sync`` in a thread pool.  Service start/complete
-    callbacks push progress events to an ``asyncio.Queue``.
+    Runs compose graph directly as an async task (no thread pool hop).
+    Callbacks push progress events to an ``asyncio.Queue``.
     """
     from initrunner.agent.executor import RunResult
-    from initrunner.services.compose import run_compose_once_sync
+    from initrunner.services.compose import run_compose_once_async
 
-    loop = asyncio.get_running_loop()
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
     def on_service_start(name: str) -> None:
-        evt = json.dumps({"type": "service_start", "data": name})
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(
+                f"data: {json.dumps({'type': 'service_start', 'data': name})}\n\n"
+            )
+        except asyncio.QueueFull:
             pass
 
     def on_service_complete(name: str, result: RunResult) -> None:
@@ -169,13 +169,13 @@ async def stream_compose_run_sse(
             }
         )
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
             pass
 
-    def run_compose():
+    async def _run_compose():
         try:
-            return run_compose_once_sync(
+            return await run_compose_once_async(
                 compose,
                 base_dir,
                 prompt,
@@ -185,12 +185,9 @@ async def stream_compose_run_sse(
                 on_service_complete=on_service_complete,
             )
         finally:
-            try:
-                loop.call_soon_threadsafe(event_queue.put_nowait, None)
-            except RuntimeError:
-                pass
+            event_queue.put_nowait(None)
 
-    compose_task = loop.run_in_executor(None, run_compose)
+    compose_task = asyncio.create_task(_run_compose())
 
     # Forward progress events as SSE
     heartbeat_counter = 0
@@ -216,7 +213,7 @@ async def stream_compose_run_sse(
 
     # Emit final result or error
     try:
-        compose_result = compose_task.result()
+        compose_result = await compose_task
 
         # Serialize entry service message history
         serialized_history = None
@@ -268,20 +265,19 @@ async def stream_team_run_sse(
 ) -> AsyncIterator[str]:
     """SSE generator yielding persona_start/persona_complete/result/error events.
 
-    Runs ``run_team_dispatch`` in a thread pool. Persona start/complete
-    callbacks push progress events to an ``asyncio.Queue``.
+    Runs team graph directly as an async task (no thread pool hop).
     """
     from initrunner.agent.executor import RunResult
-    from initrunner.team.runner import run_team_dispatch
+    from initrunner.team.graph import run_team_graph_async
 
-    loop = asyncio.get_running_loop()
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
     def on_persona_start(name: str) -> None:
-        evt = json.dumps({"type": "persona_start", "data": name})
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(
+                f"data: {json.dumps({'type': 'persona_start', 'data': name})}\n\n"
+            )
+        except asyncio.QueueFull:
             pass
 
     def on_persona_complete(name: str, result: RunResult) -> None:
@@ -302,13 +298,13 @@ async def stream_team_run_sse(
             }
         )
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
             pass
 
-    def run_team():
+    async def _run_team():
         try:
-            return run_team_dispatch(
+            return await run_team_graph_async(
                 team,
                 prompt,
                 team_dir=team_dir,
@@ -317,12 +313,9 @@ async def stream_team_run_sse(
                 on_persona_complete=on_persona_complete,
             )
         finally:
-            try:
-                loop.call_soon_threadsafe(event_queue.put_nowait, None)
-            except RuntimeError:
-                pass
+            event_queue.put_nowait(None)
 
-    team_task = loop.run_in_executor(None, run_team)
+    team_task = asyncio.create_task(_run_team())
 
     # Forward progress events as SSE
     heartbeat_counter = 0
@@ -348,27 +341,38 @@ async def stream_team_run_sse(
 
     # Emit final result or error
     try:
-        team_result = team_task.result()
+        team_result = await team_task
+
+        # Build steps with optional metadata (round_num, step_kind)
+        step_entries = []
+        for i, (name, res) in enumerate(
+            zip(team_result.agent_names, team_result.agent_results, strict=True)
+        ):
+            entry = {
+                "persona_name": name,
+                "output": res.output,
+                "tokens_in": res.tokens_in,
+                "tokens_out": res.tokens_out,
+                "duration_ms": res.duration_ms,
+                "tool_calls": res.tool_calls,
+                "tool_call_names": res.tool_call_names,
+                "success": res.success,
+                "error": res.error,
+                "step_kind": "persona",
+                "round_num": None,
+                "max_rounds": None,
+            }
+            if i < len(team_result.step_metadata):
+                meta = team_result.step_metadata[i]
+                entry["step_kind"] = meta.step_kind
+                entry["round_num"] = meta.round_num
+                entry["max_rounds"] = meta.max_rounds
+            step_entries.append(entry)
 
         payload = {
             "team_run_id": team_result.team_run_id,
             "output": team_result.final_output,
-            "steps": [
-                {
-                    "persona_name": name,
-                    "output": res.output,
-                    "tokens_in": res.tokens_in,
-                    "tokens_out": res.tokens_out,
-                    "duration_ms": res.duration_ms,
-                    "tool_calls": res.tool_calls,
-                    "tool_call_names": res.tool_call_names,
-                    "success": res.success,
-                    "error": res.error,
-                }
-                for name, res in zip(
-                    team_result.agent_names, team_result.agent_results, strict=True
-                )
-            ],
+            "steps": step_entries,
             "tokens_in": team_result.total_tokens_in,
             "tokens_out": team_result.total_tokens_out,
             "total_tokens": team_result.total_tokens,
@@ -438,7 +442,7 @@ async def stream_ingest_sse(
 
     # Emit final result or error
     try:
-        stats = ingest_task.result()
+        stats = await ingest_task
         payload = {
             "new": stats.new if stats else 0,
             "updated": stats.updated if stats else 0,
@@ -458,4 +462,96 @@ async def stream_ingest_sse(
         yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
     except Exception as exc:
         _logger.exception("Error during ingest SSE streaming")
+        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+
+async def stream_team_ingest_sse(
+    team: TeamDefinition,
+    team_dir: Path,
+    *,
+    force: bool = False,
+) -> AsyncIterator[str]:
+    """SSE generator for team shared-document ingestion."""
+    from initrunner.agent.schema.ingestion import IngestConfig
+    from initrunner.ingestion.pipeline import run_ingest
+    from initrunner.stores.base import DEFAULT_STORES_DIR
+
+    loop = asyncio.get_running_loop()
+    event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    store_path = team.spec.shared_documents.store_path or str(
+        DEFAULT_STORES_DIR / f"{team.metadata.name}-shared.lance"
+    )
+    ingest_config = IngestConfig(
+        sources=team.spec.shared_documents.sources,
+        store_path=store_path,
+        store_backend=team.spec.shared_documents.store_backend,
+        embeddings=team.spec.shared_documents.embeddings,
+        chunking=team.spec.shared_documents.chunking,
+    )
+    provider = team.spec.model.provider if team.spec.model else ""
+
+    def on_progress(path: Path, status) -> None:
+        evt = json.dumps({"type": "progress", "data": {"path": str(path), "status": str(status)}})
+        try:
+            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
+    def run() -> object:
+        try:
+            return run_ingest(
+                ingest_config,
+                team.metadata.name,
+                provider=provider,
+                base_dir=team_dir,
+                force=force,
+                progress_callback=on_progress,
+            )
+        finally:
+            loop.call_soon_threadsafe(event_queue.put_nowait, None)
+
+    ingest_task = loop.run_in_executor(None, run)
+
+    heartbeat_counter = 0
+    while not ingest_task.done():
+        try:
+            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+            if event is None:
+                break
+            yield event
+            heartbeat_counter = 0
+        except TimeoutError:
+            heartbeat_counter += 1
+            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
+                yield ": heartbeat\n\n"
+                heartbeat_counter = 0
+
+    while not event_queue.empty():
+        event = event_queue.get_nowait()
+        if event is None:
+            break
+        yield event
+
+    try:
+        stats = await ingest_task
+        payload = {
+            "new": stats.new if stats else 0,  # type: ignore[unresolved-attribute]
+            "updated": stats.updated if stats else 0,  # type: ignore[unresolved-attribute]
+            "skipped": stats.skipped if stats else 0,  # type: ignore[unresolved-attribute]
+            "errored": stats.errored if stats else 0,  # type: ignore[unresolved-attribute]
+            "total_chunks": stats.total_chunks if stats else 0,  # type: ignore[unresolved-attribute]
+            "file_results": [
+                {
+                    "path": str(r.path),
+                    "status": str(r.status),
+                    "chunks": r.chunks,
+                    "error": r.error,
+                }
+                for r in (stats.file_results if stats else [])  # type: ignore[unresolved-attribute]
+            ],
+        }
+        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+    except Exception as exc:
+        _logger.exception("Error during team ingest SSE streaming")
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"

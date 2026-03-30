@@ -1,0 +1,26 @@
+apiVersion: initrunner/v1
+kind: Team
+metadata:
+  name: debate-team
+  description: Multi-round debate on technical decisions with opposing viewpoints
+  tags:
+    - debate
+    - decision-making
+    - architecture
+spec:
+  model:
+    provider: openai
+    name: gpt-5-mini
+  strategy: debate
+  personas:
+    optimist: "argue for why the proposed approach will succeed, citing benefits and opportunities"
+    skeptic: "find flaws, risks, failure modes, and hidden costs in the proposal"
+    pragmatist: "evaluate trade-offs, propose practical compromises, and recommend the path forward"
+  debate:
+    max_rounds: 2
+    synthesize: true
+  guardrails:
+    max_tokens_per_run: 50000
+    timeout_seconds: 120
+    team_token_budget: 300000
+    team_timeout_seconds: 600

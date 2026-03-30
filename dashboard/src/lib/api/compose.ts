@@ -68,16 +68,18 @@ export function fetchComposeBuilderOptions(): Promise<ComposeBuilderOptions> {
 }
 
 export function seedCompose(req: {
-	pattern: string;
+	mode?: 'pattern' | 'starter';
+	pattern?: string;
 	name: string;
-	services: SlotAssignment[];
-	service_count: number;
-	shared_memory: boolean;
+	services?: SlotAssignment[];
+	service_count?: number;
+	shared_memory?: boolean;
 	provider: string;
 	model?: string | null;
 	base_url?: string | null;
 	api_key_env?: string | null;
 	routing_strategy?: 'all' | 'keyword' | 'sense' | null;
+	starter_slug?: string;
 }): Promise<ComposeSeedResponse> {
 	return request('/api/compose-builder/seed', {
 		method: 'POST',

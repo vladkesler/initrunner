@@ -9,6 +9,7 @@
 		hubFeatured,
 		type BuilderOptions,
 		type ValidationIssue,
+		type EmbeddingWarning,
 		type SaveResult,
 		type HubSearchResult
 	} from '$lib/api/builder';
@@ -63,6 +64,7 @@
 	let yamlText = $state('');
 	let explanation = $state('');
 	let issues: ValidationIssue[] = $state([]);
+	let embeddingWarning: EmbeddingWarning | null = $state(null);
 
 	// Save state
 	let selectedDir = $state('');
@@ -141,6 +143,7 @@
 						yamlText = result.yaml_text;
 						explanation = result.explanation;
 						issues = result.issues;
+						embeddingWarning = result.embedding_warning;
 						agentName = starterSlug;
 						mode = 'template';
 						step = 'editor';
@@ -286,6 +289,7 @@
 			yamlText = result.yaml_text;
 			explanation = result.explanation;
 			issues = result.issues;
+			embeddingWarning = result.embedding_warning;
 			if (mode !== 'hub' && agentName.trim()) {
 				const slug = agentName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 				filename = slug ? `${slug}.yaml` : 'role.yaml';
@@ -346,6 +350,7 @@
 		yamlText = '';
 		explanation = '';
 		issues = [];
+		embeddingWarning = null;
 		saveResult = null;
 		saveError = null;
 		showOverwrite = false;
@@ -429,6 +434,7 @@
 			bind:selectedDir
 			bind:filename
 			bind:issues
+			bind:embeddingWarning
 			{saving}
 			{saveError}
 			{showOverwrite}

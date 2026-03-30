@@ -302,6 +302,55 @@ class TestTeamSpec:
         )
         assert spec.strategy == "parallel"
 
+    def test_debate_strategy_accepted(self):
+        spec = TeamSpec(
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
+            personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
+            strategy="debate",
+        )
+        assert spec.strategy == "debate"
+        assert spec.debate.max_rounds == 3
+        assert spec.debate.synthesize is True
+
+    def test_debate_custom_config(self):
+        spec = TeamSpec(
+            model=ModelConfig(provider="openai", name="gpt-5-mini"),
+            personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
+            strategy="debate",
+            debate={"max_rounds": 5, "synthesize": False},  # type: ignore[invalid-argument-type]
+        )
+        assert spec.debate.max_rounds == 5
+        assert spec.debate.synthesize is False
+
+    def test_debate_max_rounds_too_low(self):
+        with pytest.raises(ValidationError, match="greater than or equal to 2"):
+            TeamSpec(
+                model=ModelConfig(provider="openai", name="gpt-5-mini"),
+                personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
+                strategy="debate",
+                debate={"max_rounds": 1},  # type: ignore[invalid-argument-type]
+            )
+
+    def test_debate_max_rounds_too_high(self):
+        with pytest.raises(ValidationError, match="less than or equal to 10"):
+            TeamSpec(
+                model=ModelConfig(provider="openai", name="gpt-5-mini"),
+                personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
+                strategy="debate",
+                debate={"max_rounds": 11},  # type: ignore[invalid-argument-type]
+            )
+
+    def test_debate_rejects_persona_env(self):
+        with pytest.raises(ValidationError, match="not supported with strategy='debate'"):
+            TeamSpec(
+                model=ModelConfig(provider="openai", name="gpt-5-mini"),
+                personas={  # type: ignore[invalid-argument-type]
+                    "aa": {"role": "first", "environment": {"FOO": "bar"}},
+                    "bb": "second",
+                },
+                strategy="debate",
+            )
+
 
 class TestTeamDocumentsConfig:
     def test_disabled_defaults(self):

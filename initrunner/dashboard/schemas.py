@@ -250,6 +250,7 @@ class StarterInfo(BaseModel):
     description: str
     tags: list[str]
     features: list[str]
+    kind: str = "Agent"  # Agent, Team, or Compose
 
 
 class StartersResponse(BaseModel):
@@ -274,11 +275,35 @@ class ValidationIssueResponse(BaseModel):
     severity: str  # "error" | "warning"
 
 
+class EmbeddingOption(BaseModel):
+    """An available embedding provider the user can choose."""
+
+    provider: str  # "openai", "google", "ollama"
+    env_var: str  # "OPENAI_API_KEY", "GOOGLE_API_KEY", "" for ollama
+    is_configured: bool  # key is set / ollama running
+
+
+class EmbeddingWarning(BaseModel):
+    """Warning when the generated YAML needs embeddings but the effective provider is unusable."""
+
+    llm_provider: str  # user's LLM provider (e.g. "xai")
+    feature: str  # "RAG", "memory", or "RAG and memory"
+    current_provider: str  # effective embedding provider
+    options: list[EmbeddingOption]  # available providers with status
+    message: str  # human-readable explanation
+
+
 class SeedResponse(BaseModel):
     yaml_text: str
     explanation: str
     issues: list[ValidationIssueResponse]
     ready: bool
+    embedding_warning: EmbeddingWarning | None = None
+
+
+class SetEmbeddingProviderRequest(BaseModel):
+    yaml_text: str
+    embedding_provider: str  # target provider from allowlist
 
 
 class ValidateRequest(BaseModel):
@@ -511,9 +536,10 @@ class ComposeBuilderOptionsResponse(BaseModel):
 
 
 class ComposeSeedRequest(BaseModel):
-    pattern: str
+    mode: Literal["pattern", "starter"] = "pattern"
+    pattern: str = ""
     name: str
-    services: list[SlotAssignment]
+    services: list[SlotAssignment] = []
     service_count: int = 3
     shared_memory: bool = False
     provider: str = "openai"
@@ -521,6 +547,7 @@ class ComposeSeedRequest(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     routing_strategy: Literal["all", "keyword", "sense"] | None = None
+    starter_slug: str | None = None
 
 
 class ComposeSeedResponse(BaseModel):
@@ -601,6 +628,7 @@ class TeamDetail(BaseModel):
     shared_documents: dict  # TeamDocumentsConfig serialized
     tools: list[ItemSummary] = []
     observability: dict | None = None
+    debate: dict | None = None  # {max_rounds, synthesize} when strategy=debate
     features: list[str] = []
 
 
@@ -613,6 +641,9 @@ class TeamRunRequest(BaseModel):
 
 class PersonaStepResponse(BaseModel):
     persona_name: str
+    step_kind: str = "persona"  # "persona" | "synthesis"
+    round_num: int | None = None
+    max_rounds: int | None = None
     output: str = ""
     tokens_in: int = 0
     tokens_out: int = 0
@@ -667,7 +698,7 @@ class PersonaSeedEntry(BaseModel):
 
 
 class TeamSeedRequest(BaseModel):
-    mode: Literal["blank"]
+    mode: Literal["blank", "starter"] = "blank"
     name: str
     strategy: str = "sequential"
     persona_count: int = 2
@@ -676,6 +707,9 @@ class TeamSeedRequest(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
+    debate_max_rounds: int = 3
+    debate_synthesize: bool = True
+    starter_slug: str | None = None
 
 
 class TeamSeedResponse(BaseModel):

@@ -1,6 +1,6 @@
 # Team Mode -- Single-File Multi-Agent Collaboration
 
-Team mode lets multiple personas collaborate on a single task, defined in one YAML file. Each persona runs in insertion order (sequential) or concurrently (parallel), with optional shared memory and document stores. Personas can override the team's model and tools.
+Team mode lets multiple personas collaborate on a single task, defined in one YAML file. Three execution strategies: **sequential** (linear handoff), **parallel** (independent, concurrent), and **debate** (multi-round concurrent argumentation with synthesis). Optional shared memory and document stores. Personas can override the team's model and tools.
 
 Team mode fills the gap between single-agent runs and full Compose orchestration:
 
@@ -75,7 +75,8 @@ The `--task` flag is an alias for `--prompt` (`-p`). Both work.
 | `tools` | `list[ToolConfig]` | `[]` | Tools shared by all personas. |
 | `guardrails` | `TeamGuardrails` | *(defaults)* | Per-persona and team-level budget controls. |
 | `handoff_max_chars` | `int` | `4000` | Max chars of prior output passed to next persona (sequential only). |
-| `strategy` | `"sequential" \| "parallel"` | `"sequential"` | Execution strategy. |
+| `strategy` | `"sequential" \| "parallel" \| "debate"` | `"sequential"` | Execution strategy. |
+| `debate` | `DebateConfig` | `{max_rounds: 3, synthesize: true}` | Debate-specific settings (only used when `strategy: debate`). |
 | `shared_memory` | `SharedMemoryConfig` | *(disabled)* | Shared memory store across personas. |
 | `shared_documents` | `TeamDocumentsConfig` | *(disabled)* | Shared document store with pre-run ingestion. |
 | `observability` | `ObservabilityConfig` | `null` | OpenTelemetry tracing configuration. |
@@ -222,6 +223,38 @@ spec:
 - **Per-persona env vars**: not supported (rejected at parse time). `os.environ` is process-global.
 - **Final output**: concatenation of all successful outputs in declared order, separated by `## {persona_name}` headers.
 
+### Debate
+
+Multi-round concurrent argumentation. Each round runs all personas in parallel; between rounds, every persona sees all positions from the previous round (including their own) and refines. Optional synthesis step at the end produces a unified answer.
+
+```yaml
+spec:
+  strategy: debate
+  personas:
+    optimist: "argue for why this approach will succeed"
+    skeptic: "find flaws, risks, and failure modes"
+    pragmatist: "evaluate trade-offs and propose the practical path"
+  debate:
+    max_rounds: 3      # 2-10, default 3
+    synthesize: true   # add a final synthesis step
+```
+
+**Semantics:**
+- **Per-round parallelism**: all personas run concurrently within each round via `asyncio.gather()`.
+- **Self-position visible**: each persona sees their own prior output (marked "(you)") alongside all others, so they can refine their earlier stance.
+- **Context truncation**: prior positions are truncated within the existing `handoff_max_chars` budget, shared equally across all positions.
+- **Failure behavior**: if any persona fails in a round, the rest of that round finishes, then the debate stops. No further rounds or synthesis. `final_output` comes from the last fully completed round.
+- **Synthesis**: when `synthesize: true` (default), a synthesis agent runs after the final round using the team-level model with no tools. It produces a unified answer from all final positions.
+- **Token budget**: checked before each round. If exceeded, the debate stops.
+- **Team timeout**: covers the entire debate (all rounds + synthesis).
+- **Per-persona env vars**: not supported (same as parallel -- concurrent execution).
+- **Final output**: synthesis output (if enabled) or formatted last-round positions with `## {persona_name}` headers.
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `debate.max_rounds` | `int` | `3` | Number of debate rounds (2-10). |
+| `debate.synthesize` | `bool` | `true` | Run a synthesis step after the final round. |
+
 ### Handoff Between Personas (sequential)
 
 Each persona after the first receives a prompt structured as:
@@ -319,9 +352,9 @@ Each persona run is logged to the audit trail with:
 | Feature | Team Mode | Delegation | Compose |
 |---------|-----------|------------|---------|
 | Files needed | 1 | 3+ (coordinator + sub-roles) | 2+ (compose + roles) |
-| Execution | Sequential or parallel | Tool-call driven | Trigger-driven services |
-| Lifetime | One-shot | One-shot | Long-running daemon |
-| Agent interaction | Output handoff (seq) / independent (par) | Tool call/response | Queue-based messaging |
+| Execution | Sequential or parallel | Tool-call driven | Graph-based (parallel fan-out) |
+| Lifetime | One-shot | One-shot | One-shot or daemon |
+| Agent interaction | Output handoff (seq) / independent (par) | Tool call/response | Graph edges (DelegationEnvelope) |
 | Per-persona model | Yes | Yes (per role file) | Yes (per role file) |
 | Per-persona tools | Yes (extend/replace) | Yes (per role file) | Yes (per role file) |
 | Shared memory | Yes | No | Yes |

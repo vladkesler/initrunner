@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage } from '$lib/api/types';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
+	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { teamId, onRunCompleted }: { teamId: string; onRunCompleted?: () => void } = $props();
+	let { teamId, detail, onRunCompleted }: { teamId: string; detail: TeamDetail; onRunCompleted?: () => void } = $props();
 
 	let prompt = $state('');
 	let messages: TeamThreadMessage[] = $state([]);
@@ -16,12 +17,20 @@
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
 		messages.map((m) => {
+			const isDebateStreaming = debateMode && m.status === 'streaming';
 			const base: ThreadMessage = {
 				role: m.role,
 				content: m.content,
 				status: m.status,
 				error: m.error,
-			identityLabel: m.role === 'user' ? 'You' : (m.activePersona ?? 'Team')
+				identityLabel: m.role === 'user'
+					? 'You'
+					: isDebateStreaming
+						? debateRound
+							? `Round ${debateRound}/${detail.debate?.max_rounds ?? '?'} \u00B7 ${debateElapsed}s`
+							: `Agents thinking \u00B7 ${debateElapsed}s`
+						: (m.activePersona ?? 'Team'),
+				avatarSeeds: isDebateStreaming ? debateSeeds : undefined
 			};
 			if (m.result) {
 				base.result = {
@@ -38,7 +47,7 @@
 		})
 	);
 
-	/** Active persona from the last streaming message. */
+	/** Active persona(s) from the last streaming message. */
 	const activePersona = $derived.by(() => {
 		if (!running || messages.length === 0) return null;
 		const last = messages[messages.length - 1];
@@ -46,6 +55,43 @@
 			return last.activePersona ?? null;
 		}
 		return null;
+	});
+
+	/** All currently-running personas (for debate concurrent display). */
+	let activeSet = $state(new Set<string>());
+	/** True once we see >1 concurrent personas; stays true until run finishes. */
+	let debateMode = $state(false);
+	/** Persona base names from team detail (stable, no race condition). */
+	const debateSeeds = $derived(
+		detail.strategy === 'debate' ? detail.personas.map((p) => p.name) : []
+	);
+	/** Current debate round parsed from activePersona name. */
+	const debateRound = $derived.by(() => {
+		if (!activePersona) return null;
+		const m = activePersona.match(/\(round (\d+)\)/);
+		return m ? parseInt(m[1]) : null;
+	});
+	let debateStart = $state(0);
+	let debateElapsed = $state(0);
+	let debateTimer: ReturnType<typeof setInterval> | null = null;
+
+	$effect(() => {
+		if (activeSet.size > 1 && !debateMode) {
+			debateMode = true;
+		}
+	});
+
+	$effect(() => {
+		if (debateMode && !debateTimer) {
+			debateStart = Math.floor(Date.now() / 1000);
+			debateElapsed = 0;
+			debateTimer = setInterval(() => {
+				debateElapsed = Math.floor(Date.now() / 1000) - debateStart;
+			}, 1000);
+		} else if (!debateMode && debateTimer) {
+			clearInterval(debateTimer);
+			debateTimer = null;
+		}
 	});
 
 	function handleRun() {
@@ -62,6 +108,8 @@
 		];
 
 		running = true;
+		activeSet = new Set();
+		debateMode = false;
 		const assistantIdx = messages.length - 1;
 
 		controller = streamTeamRun(
@@ -70,16 +118,19 @@
 			{
 				onPersonaStart(name) {
 					if (requestVersion !== currentVersion) return;
+					activeSet = new Set([...activeSet, name]);
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						activePersona: name
 					};
 				},
-				onPersonaComplete(_step: PersonaStepResponse) {
-					// Progress tracked via persona_start; result has full steps
+				onPersonaComplete(step: PersonaStepResponse) {
+					activeSet = new Set([...activeSet].filter((n) => n !== step.persona_name));
 				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
+					debateMode = false;
+					if (debateTimer) { clearInterval(debateTimer); debateTimer = null; }
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						content: r.output,
@@ -138,8 +189,8 @@
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
-	<!-- Active persona indicator -->
-	{#if activePersona}
+	<!-- Active persona indicator (non-debate) -->
+	{#if activePersona && !debateMode}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
 			Running {activePersona}...

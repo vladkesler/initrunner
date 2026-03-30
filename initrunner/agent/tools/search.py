@@ -280,30 +280,24 @@ async def _do_search_async(
 ) -> str:
     """Async variant of ``_do_search``.
 
-    Runs the provider function in ``run_in_executor`` since some providers
+    Runs the sync ``_do_search`` in ``run_in_executor`` since some providers
     (duckduckgo) are inherently blocking.
     """
-    try:
-        loop = asyncio.get_running_loop()
-        results = await loop.run_in_executor(
-            None,
-            lambda: provider_fn(
-                query=query,
-                max_results=min(num_results, max_results),
-                safe_search=safe_search,
-                api_key=api_key,
-                timeout=timeout_seconds,
-                news=news,
-                days_back=days_back,
-            ),
-        )
-        return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
-    except ImportError as e:
-        return f"Error: {e}"
-    except TimeoutError:
-        return f"Error: search timed out after {timeout_seconds}s"
-    except Exception as e:
-        return f"Error: search failed: {e}"
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: _do_search(
+            query,
+            num_results,
+            max_results,
+            safe_search,
+            api_key,
+            timeout_seconds,
+            provider_fn,
+            news=news,
+            days_back=days_back,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

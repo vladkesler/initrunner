@@ -287,7 +287,9 @@ The embedding model is determined by the agent's `spec.model.provider` unless ov
 | `ollama` | `ollama:nomic-embed-text` | Ollama running locally |
 | All others | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
 
-> **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic`, you still need `OPENAI_API_KEY` set for embeddings. This only applies when using RAG or memory — pure chat agents don't need it.
+> **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic`, you still need `OPENAI_API_KEY` set for embeddings. This only applies when using RAG or memory -- pure chat agents don't need it.
+
+> **Dashboard shortcut:** When creating an agent in the [dashboard builder](../interfaces/dashboard.md#new-agent-agentsnew), an embedding warning banner appears automatically if the effective embedding provider is unusable. You can configure the missing API key inline or switch to a different embedding provider (e.g. Google or Ollama) directly from the editor.
 
 ### Overriding the Embedding Model
 

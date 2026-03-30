@@ -42,12 +42,7 @@ def run_compose_once_sync(
     on_service_start: Callable[[str], None] | None = None,
     on_service_complete: Callable | None = None,
 ) -> ComposeRunResult:
-    """Run a single prompt through a compose chain (sync).
-
-    Builds services in one_shot mode (no triggers, no role sinks), wires
-    delegates, walks the delegation chain via synchronous BFS, and returns
-    per-service results.  DelegateSinks write audit events normally.
-    """
+    """Run a single prompt through a compose graph (sync)."""
     from initrunner.compose.orchestrator import ComposeOrchestrator
 
     orchestrator = ComposeOrchestrator(compose, base_dir, audit_logger=audit_logger)
@@ -57,6 +52,42 @@ def run_compose_once_sync(
         on_service_start=on_service_start,
         on_service_complete=on_service_complete,
     )
+
+
+async def run_compose_once_async(
+    compose: ComposeDefinition,
+    base_dir: Path,
+    prompt: str,
+    *,
+    message_history: list | None = None,
+    audit_logger: AuditLogger | None = None,
+    on_service_start: Callable[[str], None] | None = None,
+    on_service_complete: Callable | None = None,
+) -> ComposeRunResult:
+    """Run a single prompt through a compose graph (async).
+
+    Used by dashboard streaming to avoid the thread pool hop.
+    """
+    from initrunner.compose.graph import run_compose_graph_async
+    from initrunner.compose.orchestrator import ComposeOrchestrator
+
+    orchestrator = ComposeOrchestrator(compose, base_dir, audit_logger=audit_logger)
+    orchestrator._build_services(one_shot=True)
+    entry = orchestrator._find_entry()
+
+    _refs, _entry_name, total_ms, timed_out = await run_compose_graph_async(
+        compose,
+        orchestrator._services,
+        prompt,
+        entry_service=entry.name,
+        message_history=message_history,
+        audit_logger=audit_logger,
+        on_service_start=on_service_start,
+        on_service_complete=on_service_complete,
+        one_shot=True,
+    )
+
+    return orchestrator._collect_results(entry, total_ms, timed_out=timed_out)
 
 
 # ---------------------------------------------------------------------------

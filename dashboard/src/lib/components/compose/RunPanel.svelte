@@ -1,11 +1,27 @@
 <script lang="ts">
 	import { streamComposeRun } from '$lib/api/compose';
-	import type { ComposeRunResponse, ComposeThreadMessage, ServiceStepResponse, ThreadMessage } from '$lib/api/types';
+	import type {
+		ComposeRunResponse,
+		ComposeThreadMessage,
+		ComposeDetail,
+		ServiceStepResponse,
+		ThreadMessage
+	} from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ServiceTrace from './ServiceTrace.svelte';
+	import PipelineStepper from './PipelineStepper.svelte';
+	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { composeId, onRunCompleted }: { composeId: string; onRunCompleted?: () => void } = $props();
+	let {
+		composeId,
+		detail,
+		onRunCompleted
+	}: {
+		composeId: string;
+		detail: ComposeDetail;
+		onRunCompleted?: () => void;
+	} = $props();
 
 	let prompt = $state('');
 	let messages: ComposeThreadMessage[] = $state([]);
@@ -13,6 +29,15 @@
 	let running = $state(false);
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
+
+	// Pipeline progress tracking
+	let completedServices = $state<string[]>([]);
+	let activeServices = $state(new Set<string>());
+	let composeStart = $state(0);
+	let composeElapsed = $state(0);
+	let composeTimer: ReturnType<typeof setInterval> | null = null;
+
+	const totalServices = $derived(detail.services.length);
 
 	/** Adapt ComposeThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
@@ -22,7 +47,7 @@
 				content: m.content,
 				status: m.status,
 				error: m.error,
-			identityLabel: m.role === 'user' ? 'You' : (m.activeService ?? 'Compose')
+				identityLabel: m.role === 'user' ? 'You' : (m.activeService ?? 'Compose')
 			};
 			if (m.result) {
 				base.result = {
@@ -39,16 +64,6 @@
 		})
 	);
 
-	/** Active service from the last streaming message. */
-	const activeService = $derived.by(() => {
-		if (!running || messages.length === 0) return null;
-		const last = messages[messages.length - 1];
-		if (last.role === 'assistant' && last.status === 'streaming') {
-			return last.activeService ?? null;
-		}
-		return null;
-	});
-
 	function handleRun() {
 		if (!prompt.trim() || running) return;
 
@@ -63,6 +78,14 @@
 		];
 
 		running = true;
+		completedServices = [];
+		activeServices = new Set();
+		composeStart = Math.floor(Date.now() / 1000);
+		composeElapsed = 0;
+		composeTimer = setInterval(() => {
+			composeElapsed = Math.floor(Date.now() / 1000) - composeStart;
+		}, 1000);
+
 		const assistantIdx = messages.length - 1;
 
 		controller = streamComposeRun(
@@ -71,16 +94,20 @@
 			{
 				onServiceStart(name) {
 					if (requestVersion !== currentVersion) return;
+					activeServices = new Set([...activeServices, name]);
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						activeService: name
 					};
 				},
-				onServiceComplete(_step: ServiceStepResponse) {
-					// Progress tracked via service_start; result has full steps
+				onServiceComplete(step: ServiceStepResponse) {
+					activeServices = new Set([...activeServices].filter((n) => n !== step.service_name));
+					completedServices = [...completedServices, step.service_name];
 				},
 				onResult(r: ComposeRunResponse) {
 					if (requestVersion !== currentVersion) return;
+					if (composeTimer) { clearInterval(composeTimer); composeTimer = null; }
+					activeServices = new Set();
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						content: r.output,
@@ -97,6 +124,8 @@
 				},
 				onError(error: string) {
 					if (requestVersion !== currentVersion) return;
+					if (composeTimer) { clearInterval(composeTimer); composeTimer = null; }
+					activeServices = new Set();
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						status: 'error',
@@ -114,6 +143,8 @@
 		controller?.abort();
 		controller = null;
 		running = false;
+		if (composeTimer) { clearInterval(composeTimer); composeTimer = null; }
+		activeServices = new Set();
 
 		const lastIdx = messages.length - 1;
 		if (lastIdx >= 0 && messages[lastIdx].role === 'assistant' && messages[lastIdx].status === 'streaming') {
@@ -125,10 +156,13 @@
 		controller?.abort();
 		controller = null;
 		running = false;
+		if (composeTimer) { clearInterval(composeTimer); composeTimer = null; }
 		requestVersion++;
 		messages = [];
 		messageHistory = null;
 		prompt = '';
+		completedServices = [];
+		activeServices = new Set();
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -143,25 +177,29 @@
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
-	<!-- Active service indicator -->
-	{#if activeService}
-		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
-			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
-			Running {activeService}...
-		</div>
-	{:else if running}
-		<div class="flex items-center gap-2 text-[12px] text-fg-faint">
-			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-fg-faint"></span>
-			Starting compose...
-		</div>
-	{/if}
-
 	<!-- Thread -->
 	<ConversationThread
 		messages={threadMessages}
 		emptyText="Send a prompt to run it through the composition"
 		assistantLabel="Compose"
 	>
+		{#snippet messageHeader({ msg })}
+			{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeServices.size > 0 || completedServices.length > 0)}
+				<PipelineStepper
+					services={detail.services.map((s) => s.name)}
+					{completedServices}
+					{activeServices}
+					elapsed={composeElapsed}
+				/>
+			{:else}
+				<div class="flex items-center gap-2">
+					<SeedAvatar seed={msg.identityLabel ?? 'Compose'} spinning={msg.status === 'streaming'} />
+					<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+						{msg.identityLabel ?? 'Compose'}
+					</span>
+				</div>
+			{/if}
+		{/snippet}
 		{#snippet messageFooter({ msg, index })}
 			{@const composeMsg = messages[index]}
 			{#if composeMsg?.role === 'assistant' && composeMsg.result?.steps}
@@ -205,7 +243,7 @@
 					</button>
 				{:else}
 					<button
-						class="flex h-7 w-7 items-center justify-center rounded-full border border-edge bg-surface-2 text-accent-primary transition-[border-color,background-color] duration-150 hover:border-accent-primary/40 hover:bg-accent-primary/5 disabled:opacity-30 disabled:pointer-events-none"
+						class="flex h-7 w-7 items-center justify-center rounded-full border border-edge bg-surface-2 text-accent-primary transition-[border-color,background-color] duration-150 hover:border-accent-primary/40 hover:bg-accent-primary/5 disabled:pointer-events-none disabled:opacity-30"
 						onclick={handleRun}
 						disabled={!prompt.trim()}
 						aria-label="Run"

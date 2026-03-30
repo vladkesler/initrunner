@@ -21,6 +21,7 @@ from initrunner.agent.skills import (
     check_requirements,
     load_skill,
 )
+from initrunner.services._yaml_validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +40,6 @@ class DiscoveredSkillFull:
     requirement_statuses: list[RequirementStatus] = field(default_factory=list)
     has_resources: bool = False
     error: str | None = None
-
-
-@dataclass
-class ValidationIssue:
-    field: str
-    message: str
-    severity: str  # "error" | "warning"
 
 
 class SkillDeleteBlockedError(Exception):

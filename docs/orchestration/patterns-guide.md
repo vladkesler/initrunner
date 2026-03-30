@@ -13,9 +13,9 @@ This guide covers all five patterns side-by-side: what they do, when to pick eac
 | **Kind** | `Agent` | `Agent` | `Agent` | `Team` | `Compose` |
 | **Key config** | `spec.reasoning` | `spec.tools[type:delegate]` | `spec.tools[type:spawn]` | `spec.personas` | `spec.services` |
 | **Who decides routing** | You + LLM | LLM (runtime) | LLM (runtime) | You (YAML) | You (YAML) |
-| **Execution** | Iterative loop | Blocking tool call | Non-blocking tasks | Sequential or parallel | Trigger-driven |
-| **Lifetime** | One run | Within parent run | Within parent run | One run | Daemon |
-| **Communication** | N/A | Tool call/response | Task submit/poll | Output handoff | Queue-based sinks |
+| **Execution** | Iterative loop | Blocking tool call | Non-blocking tasks | Sequential or parallel | Graph-based (parallel fan-out) |
+| **Lifetime** | One run | Within parent run | Within parent run | One run | One-shot or daemon |
+| **Communication** | N/A | Tool call/response | Task submit/poll | Output handoff | Graph edges (DelegationEnvelope) |
 | **Triggers** | No | No | No | No | Yes (cron, file, webhook) |
 | **Shared memory** | N/A | Optional | Optional | Yes | Yes |
 | **Error isolation** | Per-agent | Per-delegation | Per-task | Per-persona | Per-service |
@@ -411,7 +411,7 @@ flowchart TD
     Esc --> Out3[Result]
 ```
 
-Each service monitors an inbox queue. Triggers (webhooks, cron schedules, file watchers) start service runs. When a service finishes, its output flows through a sink. Delegate sinks route output to other services' inboxes. Routing strategies control where messages go: `all` (fan-out to every target), `keyword` (score-based matching), or `sense` (keyword + LLM tiebreaker).
+The compose topology is compiled into a pydantic-graph execution graph. Each service becomes a graph step. Fan-out delegation uses Fork/Join for parallel execution; routing strategies (`keyword`/`sense`) use Decision nodes. In daemon mode, trigger events (webhooks, cron, file watchers) spawn independent graph runs via a bounded ingress queue.
 
 ### Example: support desk
 
@@ -586,7 +586,7 @@ How InitRunner's patterns map to other agent frameworks. Comparison current as o
 |--|------------|-----------|--------|---------|
 | **Config format** | YAML, no code required | Python graph DSL | Python decorators | Python classes |
 | **Runtime model** | CLI + daemon + systemd | Server deployment | In-process | Conversation loop |
-| **Agent communication** | Tool calls + queue sinks | Graph edges + shared state | Delegation + context | Chat messages |
+| **Agent communication** | Tool calls + graph edges | Graph edges + shared state | Delegation + context | Chat messages |
 | **Built-in persistence** | Yes (LanceDB, SQLite) | Checkpointing | No | No |
 | **Built-in triggers** | Yes (cron, file, webhook) | No (external) | No (external) | No (external) |
 | **Distributed mode** | MCP + systemd | LangGraph Cloud | No | No |
@@ -596,7 +596,7 @@ How InitRunner's patterns map to other agent frameworks. Comparison current as o
 
 **YAML-first configuration.** Switching from Solo to Team to Compose is a YAML change, not a code rewrite. You do not need to learn a new API for each pattern. Other frameworks require Python code for every pattern, which means rewriting agent logic when you change coordination strategy.
 
-**Built-in lifecycle.** Triggers, sinks, memory, audit logging, and guardrails are all part of the platform. LangGraph and CrewAI require you to bolt on external schedulers, message queues, and persistence layers. InitRunner ships them.
+**Built-in lifecycle.** Triggers, sinks, memory, audit logging, and guardrails are all part of the platform. LangGraph and CrewAI require you to bolt on external schedulers and persistence layers. InitRunner ships them.
 
 **Daemon-native.** Compose runs as a systemd service with health checks, restart policies, and structured logging. Other frameworks are typically run-once processes that need external supervision for long-running workloads.
 

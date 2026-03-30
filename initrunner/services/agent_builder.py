@@ -15,11 +15,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
-
-import yaml
+from typing import TYPE_CHECKING
 
 from initrunner.role_generator import build_schema_reference
+from initrunner.services._yaml_validation import ValidationIssue, parse_yaml_text
 
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
@@ -34,11 +33,8 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class ValidationIssue:
-    field: str
-    message: str
-    severity: Literal["error", "warning", "info"]
+# ValidationIssue is re-exported from _yaml_validation for backward compat.
+__all__ = ["ValidationIssue"]
 
 
 @dataclass
@@ -71,28 +67,8 @@ class PostCreateResult:
 
 def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIssue]]:
     """Parse and validate YAML text, returning the role and any issues."""
-    issues: list[ValidationIssue] = []
-
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError as e:
-        issues.append(
-            ValidationIssue(
-                field="yaml",
-                message=f"Invalid YAML syntax: {e}",
-                severity="error",
-            )
-        )
-        return None, issues
-
-    if not isinstance(raw, dict):
-        issues.append(
-            ValidationIssue(
-                field="yaml",
-                message="YAML must be a mapping",
-                severity="error",
-            )
-        )
+    raw, issues = parse_yaml_text(text)
+    if raw is None:
         return None, issues
 
     from initrunner.deprecations import validate_role_dict

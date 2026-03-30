@@ -1,4 +1,4 @@
-import { request } from '$lib/api/client';
+import { request, ApiError } from '$lib/api/client';
 import type {
 	TeamSummary,
 	TeamDetail,
@@ -9,8 +9,15 @@ import type {
 	TeamValidateResponse,
 	TeamSaveResponse,
 	PersonaSeedEntry,
-	ValidationIssue
+	ValidationIssue,
+	MemoryItem,
+	IngestDocument,
+	IngestSummary,
+	IngestSSEEvent,
+	IngestStats
 } from './types';
+
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 export function fetchTeamList(): Promise<TeamSummary[]> {
 	return request<TeamSummary[]>('/api/teams');
@@ -40,15 +47,18 @@ export function fetchTeamBuilderOptions(): Promise<TeamBuilderOptions> {
 }
 
 export function seedTeam(req: {
-	mode: 'blank';
+	mode: 'blank' | 'starter';
 	name: string;
-	strategy: string;
-	persona_count: number;
+	strategy?: string;
+	persona_count?: number;
 	personas?: PersonaSeedEntry[] | null;
 	provider: string;
 	model?: string | null;
 	base_url?: string | null;
 	api_key_env?: string | null;
+	debate_max_rounds?: number;
+	debate_synthesize?: boolean;
+	starter_slug?: string;
 }): Promise<TeamSeedResponse> {
 	return request<TeamSeedResponse>('/api/team-builder/seed', {
 		method: 'POST',
@@ -145,5 +155,123 @@ export function streamTeamRun(
 			}
 		});
 
+	return controller;
+}
+
+// -- Team Memory ---------------------------------------------------------------
+
+export function getTeamMemories(
+	teamId: string,
+	params?: { category?: string; memory_type?: string; limit?: number }
+): Promise<MemoryItem[]> {
+	const search = new URLSearchParams();
+	if (params?.category) search.set('category', params.category);
+	if (params?.memory_type) search.set('memory_type', params.memory_type);
+	if (params?.limit) search.set('limit', String(params.limit));
+	const qs = search.toString();
+	return request<MemoryItem[]>(`/api/teams/${teamId}/memories${qs ? `?${qs}` : ''}`);
+}
+
+export function consolidateTeamMemories(teamId: string): Promise<{ consolidated: number }> {
+	return request(`/api/teams/${teamId}/memories/consolidate`, { method: 'POST' });
+}
+
+// -- Team Ingest ---------------------------------------------------------------
+
+export function getTeamIngestDocuments(teamId: string): Promise<IngestDocument[]> {
+	return request<IngestDocument[]>(`/api/teams/${teamId}/ingest/documents`);
+}
+
+export function getTeamIngestSummary(teamId: string): Promise<IngestSummary> {
+	return request<IngestSummary>(`/api/teams/${teamId}/ingest/summary`);
+}
+
+export function deleteTeamIngestDocument(
+	teamId: string,
+	source: string
+): Promise<{ chunks_deleted: number }> {
+	return request(`/api/teams/${teamId}/ingest/documents?source=${encodeURIComponent(source)}`, {
+		method: 'DELETE'
+	});
+}
+
+export function addTeamIngestUrl(teamId: string, url: string): Promise<IngestStats> {
+	return request(`/api/teams/${teamId}/ingest/add-url`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ url })
+	});
+}
+
+export async function uploadTeamIngestFiles(teamId: string, files: FileList): Promise<IngestStats> {
+	const formData = new FormData();
+	for (const file of files) {
+		formData.append('files', file);
+	}
+	const res = await fetch(`${BASE}/api/teams/${teamId}/ingest/upload`, {
+		method: 'POST',
+		body: formData
+	});
+	if (!res.ok) {
+		const body = await res.json().catch(() => ({ detail: res.statusText }));
+		throw new ApiError(res.status, body.detail ?? res.statusText);
+	}
+	return res.json();
+}
+
+export function streamTeamIngest(
+	teamId: string,
+	force: boolean,
+	callbacks: {
+		onProgress: (path: string, status: string) => void;
+		onResult: (stats: IngestStats) => void;
+		onError: (error: string) => void;
+	}
+): AbortController {
+	const controller = new AbortController();
+	fetch(`${BASE}/api/teams/${teamId}/ingest/run?force=${force}`, {
+		method: 'POST',
+		signal: controller.signal
+	})
+		.then(async (res) => {
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ detail: res.statusText }));
+				callbacks.onError(body.detail ?? res.statusText);
+				return;
+			}
+			const reader = res.body!.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+
+				const parts = buffer.split('\n\n');
+				buffer = parts.pop()!;
+
+				for (const part of parts) {
+					if (!part.startsWith('data: ')) continue;
+					try {
+						const event: IngestSSEEvent = JSON.parse(part.slice(6));
+						if (event.type === 'progress') {
+							callbacks.onProgress(event.data.path, event.data.status);
+						} else if (event.type === 'result') {
+							callbacks.onResult(event.data);
+						} else if (event.type === 'error') {
+							callbacks.onError(event.data);
+						}
+					} catch {
+						// skip malformed events
+					}
+				}
+			}
+		})
+		.catch((err) => {
+			if (err.name !== 'AbortError') {
+				callbacks.onError(String(err));
+			}
+		});
 	return controller;
 }

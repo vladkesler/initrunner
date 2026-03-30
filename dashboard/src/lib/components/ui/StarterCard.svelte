@@ -7,10 +7,18 @@
 	}
 
 	let { starter, index }: Props = $props();
+
+	const href = $derived(
+		starter.kind === 'Team'
+			? `/teams/new?starter=${starter.slug}`
+			: starter.kind === 'Compose'
+				? `/compose/new?starter=${starter.slug}`
+				: `/agents/new?starter=${starter.slug}`
+	);
 </script>
 
 <a
-	href="/agents/new?starter={starter.slug}"
+	href={href}
 	class="group card-surface relative block overflow-hidden bg-surface-1 p-4 transition-[background-color] duration-150 animate-fade-in-up hover:bg-surface-2"
 	style="animation-delay: {index * 60}ms"
 >

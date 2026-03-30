@@ -63,6 +63,13 @@ class TeamGuardrails(BaseModel):
     team_timeout_seconds: Annotated[int, Field(gt=0)] | None = None
 
 
+class DebateConfig(BaseModel):
+    """Configuration for the debate strategy."""
+
+    max_rounds: Annotated[int, Field(ge=2, le=10)] = 3
+    synthesize: bool = True
+
+
 class TeamSpec(BaseModel):
     model: PartialModelConfig | None = None
     personas: dict[str, PersonaConfig] = Field(min_length=2)
@@ -72,7 +79,8 @@ class TeamSpec(BaseModel):
     shared_memory: SharedMemoryConfig = SharedMemoryConfig()
     shared_documents: TeamDocumentsConfig = TeamDocumentsConfig()
     observability: ObservabilityConfig | None = None
-    strategy: Literal["sequential", "parallel"] = "sequential"
+    strategy: Literal["sequential", "parallel", "debate"] = "sequential"
+    debate: DebateConfig = Field(default_factory=DebateConfig)
 
     @field_validator("personas", mode="before")
     @classmethod
@@ -107,13 +115,13 @@ class TeamSpec(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _validate_parallel_no_persona_env(self) -> TeamSpec:
-        if self.strategy == "parallel":
+    def _validate_concurrent_no_persona_env(self) -> TeamSpec:
+        if self.strategy in ("parallel", "debate"):
             for name, persona in self.personas.items():
                 if persona.environment:
                     raise ValueError(
                         f"Per-persona environment variables are not supported with "
-                        f"strategy='parallel' (persona '{name}'). "
+                        f"strategy='{self.strategy}' (persona '{name}'). "
                         f"os.environ is process-global; concurrent env mutations are unsafe."
                     )
         return self

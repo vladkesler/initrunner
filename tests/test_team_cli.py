@@ -77,15 +77,16 @@ class TestDetectYamlKind:
 
 class TestTeamRunCli:
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_run_dry_run_with_task(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        from unittest.mock import AsyncMock
+
         from initrunner.agent.executor import RunResult
 
         mock_build.return_value = MagicMock()
-        mock_exec.return_value = (
-            RunResult(run_id="r1", output="dry-run output", success=True),
-            [],
+        mock_exec.side_effect = AsyncMock(
+            return_value=(RunResult(run_id="r1", output="dry-run output", success=True), [])
         )
 
         team_file = tmp_path / "team.yaml"
@@ -99,15 +100,16 @@ class TestTeamRunCli:
         assert "test-team" in result.output
 
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_run_dry_run_with_prompt(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        from unittest.mock import AsyncMock
+
         from initrunner.agent.executor import RunResult
 
         mock_build.return_value = MagicMock()
-        mock_exec.return_value = (
-            RunResult(run_id="r1", output="output", success=True),
-            [],
+        mock_exec.side_effect = AsyncMock(
+            return_value=(RunResult(run_id="r1", output="output", success=True), [])
         )
 
         team_file = tmp_path / "team.yaml"
@@ -128,15 +130,16 @@ class TestTeamRunCli:
         assert "requires" in result.output
 
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_task_alias_works(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        from unittest.mock import AsyncMock
+
         from initrunner.agent.executor import RunResult
 
         mock_build.return_value = MagicMock()
-        mock_exec.return_value = (
-            RunResult(run_id="r1", output="output", success=True),
-            [],
+        mock_exec.side_effect = AsyncMock(
+            return_value=(RunResult(run_id="r1", output="output", success=True), [])
         )
 
         team_file = tmp_path / "team.yaml"
@@ -148,16 +151,18 @@ class TestTeamRunCli:
         assert result.exit_code == 0
 
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_persona_failure_exits_nonzero(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+
         from initrunner.agent.executor import RunResult
 
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            (RunResult(run_id="r1", output="ok", success=True), []),
-            (RunResult(run_id="r2", success=False, error="API error"), []),
-        ]
+
+        async def _side_effect(*a, **kw):
+            return (RunResult(run_id="r1", success=False, error="API error"), [])
+
+        mock_exec.side_effect = _side_effect
 
         team_file = tmp_path / "team.yaml"
         team_file.write_text(_TEAM_YAML)

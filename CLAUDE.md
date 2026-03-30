@@ -44,7 +44,7 @@ docs/                    # detailed documentation by subsystem
 
 These rules apply to every task in this codebase:
 
-- **Sync CLI, async compose**: CLI is synchronous — use PydanticAI's `run_sync`. Compose orchestration uses an internal asyncio event loop with agent runs dispatched to a thread pool. The sync façade (`run_compose()`, `start()`/`stop()`) is preserved. Tools can provide async variants via `ToolBuildContext.prefer_async`.
+- **Sync CLI, async compose**: CLI is synchronous -- use PydanticAI's `run_sync`. Compose and team execution use pydantic-graph beta with `anyio.run()` as the sync bridge. The sync facade (`run_compose()`, `start()`/`stop()`, `run_team_dispatch()`) is preserved. Graph steps use `execute_run_async()` for native async agent execution. Tools can provide async variants via `ToolBuildContext.prefer_async`.
 - **Self-registering tools**: add a new tool by creating one file in `agent/tools/` using `@register_tool(type_name, ConfigClass)`. Auto-discovered via `pkgutil.iter_modules()`.
 - **Lazy imports in CLI**: CLI commands use lazy imports so `--help` stays fast. Don't add top-level imports in `cli/main.py`.
 - **`audit.log()` never raises**: audit failures must not crash agent runs.

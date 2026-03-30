@@ -949,34 +949,180 @@ class TestOnPersonaComplete:
 
 class TestRunTeamDispatch:
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_sequential_dispatch(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="sequential")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "out1"),
-            _ok_result("r2", "out2"),
-        ]
+
+        async def _side_effect(*a, **kw):
+            return _ok_result("r1", "out1")
+
+        mock_exec.side_effect = _side_effect
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is True
 
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_parallel_dispatch(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = _parallel_side_effect(
-            {
-                "alpha": _ok_result("r1", "out1"),
-                "bravo": _ok_result("r2", "out2"),
-            }
-        )
+
+        async def _side_effect(*a, **kw):
+            return _ok_result("r1", "out1")
+
+        mock_exec.side_effect = _side_effect
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is True
+
+
+class TestDebateStrategy:
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_debate_runs_all_personas_all_rounds(
+        self, mock_dotenv, mock_exec, mock_build, tmp_path
+    ):
+        """3 personas x 2 rounds + synthesis = 7 execute_run_async calls."""
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 2
+        mock_build.return_value = MagicMock()
+
+        call_count = 0
+
+        async def _side_effect(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            return _ok_result(f"r{call_count}", f"output-{call_count}")
+
+        mock_exec.side_effect = _side_effect
+
+        result = run_team_dispatch(team, "task", team_dir=tmp_path)
+        assert result.success is True
+        # 2 personas x 2 rounds + 1 synthesis = 5
+        assert call_count == 5
+        assert result.final_output  # synthesis produced output
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_debate_no_synthesis(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        """synthesize=false skips the synthesis step."""
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 2
+        team.spec.debate.synthesize = False
+        mock_build.return_value = MagicMock()
+
+        call_count = 0
+
+        async def _side_effect(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            return _ok_result(f"r{call_count}", f"output-{call_count}")
+
+        mock_exec.side_effect = _side_effect
+
+        result = run_team_dispatch(team, "task", team_dir=tmp_path)
+        assert result.success is True
+        # 2 personas x 2 rounds, no synthesis = 4
+        assert call_count == 4
+        assert "## alpha" in result.final_output
+        assert "## bravo" in result.final_output
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_debate_failure_stops_next_round(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        """Persona failure in round 1 stops debate, no round 2 or synthesis."""
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 3
+        mock_build.return_value = MagicMock()
+
+        call_count = 0
+
+        async def _side_effect(agent, role, prompt, **kw):
+            nonlocal call_count
+            call_count += 1
+            name = kw.get("trigger_metadata", {}).get("agent_name", "")
+            if name == "alpha":
+                return _ok_result("r-ok", "ok")
+            # bravo fails
+            from initrunner.agent.executor import RunResult as RR
+
+            r = RR(run_id="r-fail", success=False, error="API error")
+            return r, []
+
+        mock_exec.side_effect = _side_effect
+
+        result = run_team_dispatch(team, "task", team_dir=tmp_path)
+        assert result.success is False
+        assert "failed" in result.error  # type: ignore[unsupported-operator]
+        # Only round 1 ran (2 personas), no round 2, no synthesis
+        assert call_count == 2
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_debate_round2_sees_round1_outputs(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        """Round 2 personas receive round 1 positions in their prompt."""
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 2
+        team.spec.debate.synthesize = False
+        mock_build.return_value = MagicMock()
+
+        prompts_seen: list[str] = []
+
+        async def _side_effect(agent, role, prompt, **kw):
+            prompts_seen.append(prompt)
+            return _ok_result("r1", "my position")
+
+        mock_exec.side_effect = _side_effect
+
+        result = run_team_dispatch(team, "task", team_dir=tmp_path)
+        assert result.success is True
+
+        # Round 1 prompts (first 2) should NOT have prior positions
+        assert "prior-agent-output" not in prompts_seen[0]
+        assert "prior-agent-output" not in prompts_seen[1]
+
+        # Round 2 prompts (next 2) SHOULD have prior positions
+        assert "prior-agent-output" in prompts_seen[2]
+        assert "prior-agent-output" in prompts_seen[3]
+        # Self-position should be marked with "(you)"
+        assert "(you)" in prompts_seen[2] or "(you)" in prompts_seen[3]
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_debate_callbacks_include_round(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        """Callbacks fire with round info in display name."""
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 2
+        mock_build.return_value = MagicMock()
+
+        async def _side_effect(*a, **kw):
+            return _ok_result("r1", "output")
+
+        mock_exec.side_effect = _side_effect
+
+        starts = []
+        completes = []
+
+        result = run_team_dispatch(
+            team,
+            "task",
+            team_dir=tmp_path,
+            on_persona_start=starts.append,
+            on_persona_complete=lambda n, r: completes.append(n),
+        )
+
+        assert result.success is True
+        assert "alpha (round 1)" in starts
+        assert "bravo (round 2)" in starts
+        assert "synthesis" in starts
 
 
 class TestBackwardCompat:

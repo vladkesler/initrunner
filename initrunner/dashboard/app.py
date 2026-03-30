@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import logging
 from collections.abc import AsyncIterator
@@ -88,6 +89,11 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     if settings.api_key:
         _expected_key: str = settings.api_key
         _COOKIE_NAME = "initrunner_token"
+        # Derive a session token from the API key so the raw key never
+        # appears in cookies, browser storage, or proxy logs.
+        _session_token: str = hmac.new(
+            _expected_key.encode(), b"initrunner-session", hashlib.sha256
+        ).hexdigest()
 
         def _safe_next(value: str) -> str:
             """Validate *next* is a relative path to prevent open redirects."""
@@ -95,6 +101,12 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             if parsed.scheme or parsed.netloc:
                 return "/"
             return value if value.startswith("/") else "/"
+
+        def _is_https(request: Request) -> bool:
+            """True when the request arrived over HTTPS (direct or proxied)."""
+            if request.url.scheme == "https":
+                return True
+            return request.headers.get("x-forwarded-proto", "") == "https"
 
         @app.get("/login", include_in_schema=False)
         async def login_page(
@@ -105,6 +117,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
 
         @app.post("/login", include_in_schema=False, response_model=None)
         async def login_submit(
+            request: Request,
             api_key: str = Form(...),
             next: str = Form("/"),
         ) -> HTMLResponse | RedirectResponse:
@@ -117,9 +130,10 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             resp = RedirectResponse(safe_next, status_code=303)
             resp.set_cookie(
                 key=_COOKIE_NAME,
-                value=_expected_key,
+                value=_session_token,
                 httponly=True,
                 samesite="strict",
+                secure=_is_https(request),
             )
             return resp
 
@@ -142,6 +156,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     from initrunner.dashboard.routers.skills import router as skills_router
     from initrunner.dashboard.routers.system import router as system_router
     from initrunner.dashboard.routers.team_builder import router as team_builder_router
+    from initrunner.dashboard.routers.team_ingest import router as team_ingest_router
+    from initrunner.dashboard.routers.team_memory import router as team_memory_router
     from initrunner.dashboard.routers.teams import router as teams_router
 
     app.include_router(agents_router)
@@ -156,6 +172,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     app.include_router(compose_builder_router)
     app.include_router(teams_router)
     app.include_router(team_builder_router)
+    app.include_router(team_memory_router)
+    app.include_router(team_ingest_router)
     app.include_router(skills_router)
 
     # -- Static file serving (production) -----------------------------------
@@ -192,7 +210,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     async def _unhandled(request: Request, exc: Exception):
         _logger.exception("Unhandled error on %s %s", request.method, request.url.path)
         return JSONResponse(
-            {"detail": str(exc)},
+            {"detail": "Internal server error"},
             status_code=500,
         )
 
@@ -204,6 +222,9 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             make_auth_dispatch,
         )
 
+        _auth_session_token = hmac.new(
+            _auth_key.encode(), b"initrunner-session", hashlib.sha256
+        ).hexdigest()
         app.add_middleware(
             BaseHTTPMiddleware,  # type: ignore[arg-type]
             dispatch=make_auth_dispatch(
@@ -213,6 +234,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
                 error_message="Invalid API key",
                 allow_query_param=False,
                 allow_cookie=True,
+                cookie_token=_auth_session_token,
                 login_redirect="/login",
             ),
         )

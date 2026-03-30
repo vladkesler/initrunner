@@ -8,6 +8,7 @@
 	} from '$lib/api/compose';
 	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
+	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
@@ -269,6 +270,31 @@
 			if (options.detected_provider) selectedProvider = options.detected_provider;
 			if (options.detected_model) selectedModel = options.detected_model;
 			if (options.save_dirs.length > 0) selectedDir = options.save_dirs[0];
+
+			// Handle ?starter= URL param
+			const starterSlug = page.url.searchParams.get('starter');
+			if (starterSlug && options.detected_provider) {
+				generating = true;
+				try {
+					const result = await seedCompose({
+						mode: 'starter',
+						starter_slug: starterSlug,
+						name: starterSlug,
+						provider: options.detected_provider,
+						model: options.detected_model ?? undefined
+					});
+					composeYaml = result.compose_yaml;
+					roleYamls = result.role_yamls;
+					issues = result.issues;
+					isReady = result.ready;
+					projectName = starterSlug;
+					step = 'editor';
+				} catch {
+					toast.error(`Failed to load starter: ${starterSlug}`);
+				} finally {
+					generating = false;
+				}
+			}
 		} catch {
 			optionsError = 'Could not load builder options.';
 			toast.error('Failed to load builder options');

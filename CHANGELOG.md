@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026.3.8] - 2026-03-30
+
+### Added
+- **Debate strategy for teams** -- multi-round concurrent argumentation with configurable rounds and synthesis. Three personas argue from different angles, refine positions across rounds, and a final synthesis consolidates the outcome. Dashboard visualizes the debate pipeline with round nodes, persona cards, and synthesis step
+- **Debate team starter** -- `debate-team` starter pack with optimist/skeptic/pragmatist personas, available from the launchpad and teams tab
+- **Starters across all builders** -- starter packs now work in agent, team, and compose builders through a unified `mode: "starter"` seed flow. Team and compose zero states show relevant starter cards. StarterCard routes to the correct builder based on kind
+- **Embedding warning banner** -- agent builder editor warns when the generated YAML needs embeddings but the effective provider is unusable. Shows selectable provider chips (openai/google/ollama) with inline key configuration or one-click provider switching via `POST /api/builder/set-embedding-provider`
+- **Clustered avatars for teams** -- debate rounds show clustered spinning avatar spheres for all concurrent personas instead of a single avatar. Compose runs show a pipeline stepper with spinning service avatars replacing the static avatar row
+- **Team detail tabs** -- memory and ingest tabs on the team detail page
+
+### Changed
+- **Pydantic-graph execution** -- compose and team runners now use pydantic-graph for orchestration instead of thread-per-service. Fan-out, routing, and delegation run as graph steps with native async agent execution
+- **Dashboard session security** -- session cookie stores an HMAC-derived token instead of the raw API key. `secure` flag set automatically when behind HTTPS. Unhandled exception handler returns generic "Internal server error" instead of leaking `str(exc)`
+
+### Fixed
+- Debate avatar flashing between rounds
+- Fan-out terminal join and routing transform in compose graphs
+- Compose stream awaits and team pipeline visual alignment
+
 ## [2026.3.7] - 2026-03-30
 
 ### Changed

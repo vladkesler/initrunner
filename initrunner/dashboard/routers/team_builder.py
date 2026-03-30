@@ -61,6 +61,36 @@ async def seed_team(body: TeamSeedRequest) -> TeamSeedResponse:
         body.provider, body.base_url, body.api_key_env
     )
 
+    if body.mode == "starter":
+        # Load starter YAML and rewrite model block
+        if not body.starter_slug:
+            raise HTTPException(status_code=400, detail="starter_slug is required for mode=starter")
+        from initrunner.dashboard.routers.builder import _rewrite_model_block
+        from initrunner.services.starters import resolve_starter_path
+        from initrunner.templates import _default_model_name
+
+        path = resolve_starter_path(body.starter_slug)
+        if path is None:
+            raise HTTPException(status_code=404, detail=f"Starter not found: {body.starter_slug}")
+
+        model = body.model or _default_model_name(runtime_provider)
+        yaml_text = path.read_text(encoding="utf-8")
+        yaml_text = _rewrite_model_block(yaml_text, provider=runtime_provider, name=model)
+        if team_base_url:
+            yaml_text = _inject_team_model_fields(yaml_text, team_base_url, team_api_key_env)
+
+        _, issues = await asyncio.to_thread(validate_team_yaml, yaml_text)
+        issue_responses = [
+            ValidationIssueResponse(field=i.field, message=i.message, severity=i.severity)
+            for i in issues
+        ]
+        return TeamSeedResponse(
+            yaml_text=yaml_text,
+            explanation=f"Loaded starter: {body.starter_slug}",
+            issues=issue_responses,
+            ready=not any(i.severity == "error" for i in issues),
+        )
+
     # Build resolved persona dicts when structured personas are provided
     personas_resolved: list[dict] | None = None
     if body.personas:
@@ -87,6 +117,8 @@ async def seed_team(body: TeamSeedRequest) -> TeamSeedResponse:
         provider=runtime_provider,
         model=body.model,
         personas=personas_resolved,
+        debate_max_rounds=body.debate_max_rounds,
+        debate_synthesize=body.debate_synthesize,
     )
 
     # Inject team-level base_url/api_key_env into generated YAML

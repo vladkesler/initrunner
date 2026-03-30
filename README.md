@@ -16,7 +16,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.7-%2334D058" alt="v2026.3.7">
+  <img src="https://img.shields.io/badge/latest-v2026.3.8-%2334D058" alt="v2026.3.8">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -35,9 +35,9 @@ initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research
 initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
 ```
 
-14 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
+15 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.7** -- New branding: InitRunner logo replaces mascot across README, PyPI, and dashboard. See the [Changelog](CHANGELOG.md).
+> **v2026.3.8** -- Debate strategy for teams, embedding warning banner in the builder, starters across all builders (agent/team/compose), and session security hardening. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -73,6 +73,7 @@ Run `initrunner run --list` to see all available starters. The model is auto-det
 |---------|-------------|------|
 | `helpdesk` | Drop your docs in, get an AI helpdesk with citations and memory | Agent (RAG) |
 | `code-review-team` | Multi-perspective review: architect, security, maintainer | Team |
+| `debate-team` | Multi-round debate: optimist, skeptic, pragmatist argue and synthesize | Team (Debate) |
 | `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer with shared memory | Team |
 | `codebase-analyst` | Index your repo, chat about architecture, learns patterns across sessions | Agent (RAG) |
 | `web-researcher` | Search the web and produce structured briefings with citations | Agent |
@@ -549,4 +550,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.7</sub></p>
+<p align="center"><sub>v2026.3.8</sub></p>

@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from initrunner.team.schema import TeamDefinition
 
-from initrunner.services.agent_builder import ValidationIssue
+from initrunner.services._yaml_validation import (
+    ValidationIssue,
+    extract_pydantic_errors,
+    parse_yaml_text,
+)
 
 
 def build_blank_team_yaml(
@@ -18,6 +22,8 @@ def build_blank_team_yaml(
     provider: str = "openai",
     model: str | None = None,
     personas: list[dict] | None = None,
+    debate_max_rounds: int = 3,
+    debate_synthesize: bool = True,
 ) -> str:
     """Generate a minimal valid Team YAML from parameters.
 
@@ -27,6 +33,14 @@ def build_blank_team_yaml(
     """
     model_name = model or "gpt-5-mini"
     personas_block = _build_personas_block(personas, persona_count)
+
+    debate_block = ""
+    if strategy == "debate":
+        debate_block = (
+            f"  debate:\n"
+            f"    max_rounds: {debate_max_rounds}\n"
+            f"    synthesize: {'true' if debate_synthesize else 'false'}\n"
+        )
 
     return (
         f"apiVersion: initrunner/v1\n"
@@ -39,6 +53,7 @@ def build_blank_team_yaml(
         f"    provider: {provider}\n"
         f"    name: {model_name}\n"
         f"  strategy: {strategy}\n"
+        f"{debate_block}"
         f"  personas:\n"
         f"{personas_block}"
         f"  tools: []\n"
@@ -109,20 +124,8 @@ def _persona_name(index: int) -> str:
 
 def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[ValidationIssue]]:
     """Parse and validate team YAML, returning the definition and any issues."""
-    import yaml
-
-    issues: list[ValidationIssue] = []
-
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        issues.append(ValidationIssue(field="yaml", message=str(exc), severity="error"))
-        return None, issues
-
-    if not isinstance(raw, dict):
-        issues.append(
-            ValidationIssue(field="yaml", message="Expected a YAML mapping", severity="error")
-        )
+    raw, issues = parse_yaml_text(text)
+    if raw is None:
         return None, issues
 
     from initrunner.deprecations import validate_team_dict
@@ -133,8 +136,7 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
         issues.append(ValidationIssue(field="deprecation", message=str(exc), severity="error"))
         return None, issues
     except Exception as exc:
-        for err in _extract_pydantic_errors(exc):
-            issues.append(err)
+        issues.extend(extract_pydantic_errors(exc))
         return None, issues
 
     # Cross-field warnings
@@ -161,20 +163,6 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
     return team, issues
 
 
-def _extract_pydantic_errors(exc: Exception) -> list[ValidationIssue]:
-    """Extract structured validation issues from a Pydantic ValidationError."""
-    from pydantic import ValidationError
-
-    issues: list[ValidationIssue] = []
-    if isinstance(exc, ValidationError):
-        for err in exc.errors():
-            field = ".".join(str(loc) for loc in err["loc"])
-            issues.append(ValidationIssue(field=field, message=err["msg"], severity="error"))
-    else:
-        issues.append(ValidationIssue(field="spec", message=str(exc), severity="error"))
-    return issues
-
-
 def build_team_next_steps(path: Path, team: TeamDefinition) -> list[str]:
     """Generate contextual CLI hints based on team features."""
     steps: list[str] = []
@@ -186,7 +174,14 @@ def build_team_next_steps(path: Path, team: TeamDefinition) -> list[str]:
     if team.spec.shared_memory.enabled:
         steps.append("Shared memory is enabled -- personas will share a memory store")
 
-    if team.spec.strategy == "parallel":
+    if team.spec.strategy == "debate":
+        rounds = team.spec.debate.max_rounds
+        synth = "with synthesis" if team.spec.debate.synthesize else "no synthesis"
+        steps.append(
+            f"Debate strategy: {rounds} rounds, {len(team.spec.personas)} "
+            f"personas per round ({synth})"
+        )
+    elif team.spec.strategy == "parallel":
         steps.append(f"Parallel strategy: all {len(team.spec.personas)} personas run concurrently")
     else:
         max_chars = team.spec.handoff_max_chars

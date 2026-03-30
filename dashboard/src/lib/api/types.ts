@@ -90,6 +90,7 @@ export interface ThreadMessage {
 	result?: ThreadResultMeta | null;
 	error?: string | null;
 	identityLabel?: string | null;
+	avatarSeeds?: string[];
 }
 
 export interface AuditRecord {
@@ -475,11 +476,15 @@ export interface TeamDetail {
 	shared_documents: Record<string, unknown>;
 	tools: ItemSummary[];
 	observability: Record<string, unknown> | null;
+	debate: { max_rounds: number; synthesize: boolean } | null;
 	features: string[];
 }
 
 export interface PersonaStepResponse {
 	persona_name: string;
+	step_kind: 'persona' | 'synthesis';
+	round_num: number | null;
+	max_rounds: number | null;
 	output: string;
 	tokens_in: number;
 	tokens_out: number;

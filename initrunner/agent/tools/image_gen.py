@@ -29,6 +29,22 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _openai_kwargs(prompt: str, size: str, quality: str, style: str, model: str) -> dict:
+    """Build the shared kwargs dict for OpenAI image generation."""
+    kwargs: dict = {
+        "model": model or "dall-e-3",
+        "prompt": prompt,
+        "size": size,
+        "response_format": "b64_json",
+        "n": 1,
+    }
+    if quality:
+        kwargs["quality"] = quality
+    if style:
+        kwargs["style"] = style
+    return kwargs
+
+
 def _generate_openai(
     prompt: str,
     size: str,
@@ -42,21 +58,8 @@ def _generate_openai(
     from openai import OpenAI  # type: ignore[import-not-found]
 
     client = OpenAI(api_key=api_key, timeout=timeout)
-    kwargs: dict = {
-        "model": model or "dall-e-3",
-        "prompt": prompt,
-        "size": size,
-        "response_format": "b64_json",
-        "n": 1,
-    }
-    if quality:
-        kwargs["quality"] = quality
-    if style:
-        kwargs["style"] = style
-
-    response = client.images.generate(**kwargs)
-    b64 = response.data[0].b64_json
-    return base64.b64decode(b64)
+    response = client.images.generate(**_openai_kwargs(prompt, size, quality, style, model))
+    return base64.b64decode(response.data[0].b64_json)
 
 
 async def _generate_openai_async(
@@ -72,21 +75,29 @@ async def _generate_openai_async(
     from openai import AsyncOpenAI  # type: ignore[import-not-found]
 
     client = AsyncOpenAI(api_key=api_key, timeout=timeout)
-    kwargs: dict = {
-        "model": model or "dall-e-3",
-        "prompt": prompt,
-        "size": size,
-        "response_format": "b64_json",
-        "n": 1,
-    }
-    if quality:
-        kwargs["quality"] = quality
-    if style:
-        kwargs["style"] = style
+    response = await client.images.generate(**_openai_kwargs(prompt, size, quality, style, model))
+    return base64.b64decode(response.data[0].b64_json)
 
-    response = await client.images.generate(**kwargs)
-    b64 = response.data[0].b64_json
-    return base64.b64decode(b64)
+
+def _stability_request_params(prompt: str, size: str, model: str) -> tuple[str, dict]:
+    """Build URL and body for a Stability AI request."""
+    width, _, height = size.partition("x")
+    body = {
+        "text_prompts": [{"text": prompt}],
+        "width": int(width) if width else 1024,
+        "height": int(height) if height else 1024,
+    }
+    engine = model or "stable-diffusion-xl-1024-v1-0"
+    url = f"https://api.stability.ai/v1/generation/{engine}/text-to-image"
+    return url, body
+
+
+def _stability_extract(data: dict) -> bytes:
+    """Extract PNG bytes from a Stability API response."""
+    artifacts = data.get("artifacts", [])
+    if not artifacts:
+        raise RuntimeError("Stability API returned no artifacts")
+    return base64.b64decode(artifacts[0]["base64"])
 
 
 def _generate_stability(
@@ -99,31 +110,15 @@ def _generate_stability(
     """Generate an image via Stability AI REST API, return raw PNG bytes."""
     import httpx
 
-    width, _, height = size.partition("x")
-    body = {
-        "text_prompts": [{"text": prompt}],
-        "width": int(width) if width else 1024,
-        "height": int(height) if height else 1024,
-    }
-    engine = model or "stable-diffusion-xl-1024-v1-0"
-    url = f"https://api.stability.ai/v1/generation/{engine}/text-to-image"
-
+    url, body = _stability_request_params(prompt, size, model)
     with httpx.Client(timeout=timeout) as client:
         resp = client.post(
             url,
             json=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Accept": "application/json",
-            },
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
         )
         resp.raise_for_status()
-        data = resp.json()
-
-    artifacts = data.get("artifacts", [])
-    if not artifacts:
-        raise RuntimeError("Stability API returned no artifacts")
-    return base64.b64decode(artifacts[0]["base64"])
+        return _stability_extract(resp.json())
 
 
 async def _generate_stability_async(
@@ -136,31 +131,15 @@ async def _generate_stability_async(
     """Async variant of ``_generate_stability``."""
     import httpx
 
-    width, _, height = size.partition("x")
-    body = {
-        "text_prompts": [{"text": prompt}],
-        "width": int(width) if width else 1024,
-        "height": int(height) if height else 1024,
-    }
-    engine = model or "stable-diffusion-xl-1024-v1-0"
-    url = f"https://api.stability.ai/v1/generation/{engine}/text-to-image"
-
+    url, body = _stability_request_params(prompt, size, model)
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(
             url,
             json=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Accept": "application/json",
-            },
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
         )
         resp.raise_for_status()
-        data = resp.json()
-
-    artifacts = data.get("artifacts", [])
-    if not artifacts:
-        raise RuntimeError("Stability API returned no artifacts")
-    return base64.b64decode(artifacts[0]["base64"])
+        return _stability_extract(resp.json())
 
 
 # ---------------------------------------------------------------------------

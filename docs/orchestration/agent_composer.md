@@ -1,6 +1,6 @@
 # Agent Composer — Multi-Agent Orchestration
 
-Agent Composer lets you define multiple agents as services in a single `compose.yaml` file, wire them together with delegate sinks, and run them all with one command. Each service runs as an asyncio task on a shared event loop, with agent executions dispatched to a thread pool. Delegate sinks route output from one service to another via in-memory queues.
+Agent Composer lets you define multiple agents as services in a single `compose.yaml` file, wire them together with delegation edges, and run them all with one command. The service topology is compiled into a [pydantic-graph](https://ai.pydantic.dev/graph/beta/parallel/) execution graph. Fan-out patterns (one service delegating to multiple targets) run in parallel via Fork/Join; routing strategies (keyword/sense) use Decision nodes. Both one-shot and daemon execution use the same graph engine.
 
 ## Quick Start
 
@@ -142,7 +142,7 @@ services:
 
 ## Delegate Sink
 
-Delegate sinks route a service's output to one or more other services. The upstream service's agent output becomes the downstream service's input prompt. Routing is done via in-memory queues with blocking backpressure.
+Delegate sinks route a service's output to one or more other services. The upstream service's agent output becomes the downstream service's input prompt. Each delegation edge carries an immutable `DelegationEnvelope` with the prompt, trace chain, and metadata.
 
 ```yaml
 sink:
@@ -174,10 +174,8 @@ sink:
 | `target` | `str \| list[str]` | *(required)* | Target service name(s) to route output to. |
 | `strategy` | `"all" \| "keyword" \| "sense"` | `"all"` | Routing strategy for multi-target delegates. See [Routing Strategy](#routing-strategy). |
 | `keep_existing_sinks` | `bool` | `false` | When `true`, the service's role-level sinks (webhook, file, custom) are also activated alongside the delegate. When `false`, only the delegate sink is used. |
-| `queue_size` | `int` | `100` | Maximum number of events buffered in the target's inbox queue. |
-| `timeout_seconds` | `int` | `60` | How long to block when the target queue is full before dropping the message. |
-| `circuit_breaker_threshold` | `int \| null` | `null` | Number of consecutive delivery failures (drops + errors) before the circuit opens and rejects all messages. `null` disables the circuit breaker. |
-| `circuit_breaker_reset_seconds` | `int` | `60` | Seconds to wait in open state before allowing a single probe message through (half-open). If the probe succeeds, the circuit closes; if it fails, it re-opens. |
+| `queue_size` | `int` | `100` | Daemon ingress queue capacity (bounded backpressure for trigger-driven runs). |
+| `timeout_seconds` | `int` | `60` | Reserved (kept for schema compatibility). |
 
 ### Routing Strategy
 
@@ -253,13 +251,9 @@ The [dashboard compose builder](../interfaces/dashboard.md) exposes routing stra
 
 When only one target is specified, `strategy` has no effect -- the message always goes to that target regardless of the strategy setting.
 
-### Backpressure Behavior
+### Fan-In Behavior
 
-Delegate sinks use `queue.Queue` with blocking puts. When the downstream service is processing slowly and its inbox fills up:
-
-1. The upstream service blocks on `queue.put()` for up to `timeout_seconds`.
-2. If the queue is still full after the timeout, the message is dropped with a warning to stderr.
-3. The upstream service continues operating — a dropped delegate message never crashes the sender.
+When multiple services delegate to the same downstream target (diamond pattern: A->[B,C]->D), the downstream service runs **once** with the concatenated output from all upstream branches. Outputs are joined in YAML declaration order (topology order), separated by `---`. This is more efficient than running the downstream service multiple times.
 
 ### Role Sink Interaction
 
@@ -273,22 +267,13 @@ When no compose `sink:` is configured at all, the service uses its role-level si
 
 Only successful runs are forwarded via delegate sinks. If an agent run fails (`success: false`), the delegate sink silently skips the event. This prevents error messages from cascading through the pipeline.
 
-### Circuit Breaker
+### Delegation Policy
 
-When `circuit_breaker_threshold` is set, the delegate sink tracks consecutive delivery failures (drops and errors — `filtered` events don't count) and transitions through three states:
+Each delegation edge checks `check_delegation_policy()` before executing the target service. If the policy engine denies the delegation (based on agent authorization rules), the target step produces empty output and the delegation chain stops for that branch. See [Agent Policy](../security/agent-policy.md).
 
-```
-CLOSED ──(N consecutive failures)──> OPEN ──(reset timer expires)──> HALF_OPEN
-  ^                                                                      │
-  └──────────(probe succeeds)──────────────────────────────────────────────┘
-                                      OPEN <──(probe fails)──────────────┘
-```
+### Depth Limit
 
-- **Closed** (default): messages are delivered normally. The failure counter resets on each successful delivery.
-- **Open**: all messages are immediately rejected with `circuit_open` audit status. No delivery is attempted. After `circuit_breaker_reset_seconds` elapses, the circuit moves to half-open.
-- **Half-open**: a single probe message is allowed through. If it succeeds, the circuit closes and the failure counter resets. If it fails, the circuit re-opens for another reset interval.
-
-The circuit breaker is disabled by default (`circuit_breaker_threshold: null`).
+Delegation chains are limited to 20 services. If a chain exceeds this depth (e.g. due to misconfigured circular references that bypass cycle detection), the step produces empty output and logs a warning.
 
 ## Startup Order
 
@@ -356,14 +341,9 @@ restart:
 | `on-failure` | Restart only if the service has recorded at least one error (`error_count > 0`). |
 | `always` | Restart whenever the service thread is no longer alive, regardless of exit reason. |
 
-### Health Monitor
+### Health Reporting
 
-When any service has a non-`none` restart policy, a health monitor starts automatically. In compose mode, it runs as an asyncio task on the shared event loop; in standalone mode, it runs as a thread. It checks every 10 seconds whether each service is alive and applies the restart policy:
-
-1. Skip services with `condition: none`.
-2. For `on-failure`, skip if `error_count == 0`.
-3. If `max_retries` has been reached, log a warning and stop attempting restarts.
-4. Otherwise, wait `delay_seconds`, then restart the service.
+Per-service run and error counts are tracked and available via `service_health()`. In daemon mode, each trigger event spawns an independent graph run; failed runs increment the service's error counter. The `restart` configuration fields are reserved for future use with daemon-level retry policies.
 
 ## Health Checks
 
@@ -400,56 +380,44 @@ Services without a compose `sink:` behave identically to running the role with `
 
 ## Runtime Architecture
 
-### Async Event Loop
+### Graph Execution
 
-The compose orchestrator runs a shared asyncio event loop in a dedicated daemon thread. Each service runs as an asyncio task on this loop, while agent executions (LLM calls) are dispatched to a `ThreadPoolExecutor`. This design enables efficient orchestration (queue polling, health checks, signal handling) without blocking on I/O.
-
-```
-Main thread (sync CLI)
-  │
-  └── Daemon thread: asyncio event loop
-        ├── Task: service-a (_service_run_async)
-        ├── Task: service-b (_service_run_async)
-        ├── Task: health monitor
-        └── ThreadPoolExecutor (agent runs)
-```
-
-The sync façade is preserved — `ComposeOrchestrator.start()`, `stop()`, and `run_compose()` remain sync methods. The async loop is an internal implementation detail.
-
-### Async Tool Execution
-
-Compose services build agents with `prefer_async=True`, which gives I/O-bound tools (HTTP, web scraper, search) async closures. When the agent runs via PydanticAI's async `agent.run()`, these tools execute natively on the event loop without thread-pool overhead. Sync tools are auto-wrapped by PydanticAI.
-
-For async executor details, see `execute_run_async()` and `execute_run_stream_async()` in `services/execution.py` (which delegates to `agent/executor.py`).
-
-### Queue Bridge
-
-Delegate sinks use sync `queue.Queue` for compatibility. Each service runs an internal bridge coroutine that drains the sync queue into an `asyncio.Queue`:
+The compose topology is compiled into a pydantic-graph `Graph` at runtime. Each service becomes a `Step` node; fan-out delegation becomes `Fork(broadcast)`; fan-in becomes `Join` with topology-ordered concatenation; keyword/sense routing becomes `Decision` nodes.
 
 ```
-DelegateSink.send()  →  queue.Queue.put()  →  _inbox_bridge()  →  asyncio.Queue  →  _service_run_async()
-     (sync)                (sync)              (async bridge)        (async)            (async)
+compose.yaml
+    ↓ build_compose_graph()
+pydantic-graph Graph
+    ↓ graph.run()
+anyio task group (parallel branches via Fork/Join)
 ```
 
-This keeps `DelegateSink` fully sync while letting the service loop use `await` on the async side.
+### One-Shot Mode
 
-### Shutdown Semantics
+`run_once()` builds the graph and runs it synchronously via `anyio.run()`. The graph engine handles parallelism natively -- fan-out branches execute concurrently as anyio tasks. Each step calls `execute_run_async()` for native async agent execution.
 
-Shutdown follows a structured sequence:
+### Daemon Mode
 
-1. First Ctrl+C (or SIGTERM) sets the stop event — services stop accepting new inbox events.
-2. Each service waits for any in-flight agent run to complete (grace period, default 30s).
-3. After the grace period, a warning is logged and the service detaches from the in-flight run.
-4. Service tasks are cancelled on the shared loop.
-5. The event loop thread joins.
-6. The `ThreadPoolExecutor` shuts down with `wait=True` to let in-flight runs complete naturally.
-7. Delegate sinks flush their audit threads.
+`start()` spawns a background thread running an anyio event loop. Trigger events (cron, webhook, file watcher) are enqueued to a bounded `threading.Queue(maxsize=32)` -- trigger threads block when the queue is full, providing backpressure. A dispatcher task polls the ingress queue and spawns independent graph runs for each event.
 
-A second Ctrl+C force-exits immediately via `os._exit(1)`.
+```
+Trigger threads → ingress Queue(32) → dispatcher task → graph.run() per event
+```
 
-### Executor Pool Sizing
+Multiple graph runs execute concurrently. Each run is independent -- no shared mutable state between runs.
 
-The thread pool for agent runs is configurable via `max_agent_workers` on `ComposeOrchestrator`. Default: `min(32, len(services) + 4)`. This pool is separate from the global `_TIMEOUT_POOL` used by standalone `execute_run()` calls.
+### DelegationEnvelope
+
+Data flows between services via immutable `DelegationEnvelope` objects. Each envelope carries the prompt, a trace chain (immutable tuple of service names), the original prompt, and metadata. In fan-out, each branch gets its own copy -- no shared mutable state between parallel branches.
+
+### Shutdown
+
+1. First Ctrl+C (or SIGTERM) sets the shutdown event.
+2. The dispatcher stops accepting new trigger events.
+3. In-flight graph runs complete naturally.
+4. The daemon thread joins (30s timeout).
+
+A second Ctrl+C force-exits via `os._exit(1)`.
 
 ## Shared Memory
 
