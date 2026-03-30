@@ -13,7 +13,7 @@ spec:
     skeptic: "find flaws, risks, failure modes, and hidden costs in the proposal"
     pragmatist: "evaluate trade-offs, propose practical compromises, and recommend the path forward"
   debate:
-    max_rounds: 3
+    max_rounds: 2
     synthesize: true
   guardrails:
     max_tokens_per_run: 50000

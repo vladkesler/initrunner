@@ -7,12 +7,14 @@
 	import { loadOr404 } from '$lib/utils/load';
 	import PersonaPipeline from '$lib/components/teams/PersonaPipeline.svelte';
 	import TeamRunPanel from '$lib/components/teams/TeamRunPanel.svelte';
+	import TeamMemoryTab from '$lib/components/teams/TeamMemoryTab.svelte';
+	import TeamIngestTab from '$lib/components/teams/TeamIngestTab.svelte';
 	import ConfigPanel from '$lib/components/teams/ConfigPanel.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import { ArrowLeft, Play, GitBranch, Settings, FileCode, Trash2 } from 'lucide-svelte';
+	import { ArrowLeft, Play, GitBranch, Brain, Database, Settings, FileCode, Trash2 } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let detail: TeamDetail | null = $state(null);
@@ -28,12 +30,14 @@
 	const tabKey = $derived(`team-tab-${teamId}`);
 	let activeTab = $state('pipeline');
 
-	const tabs = ['pipeline', 'run', 'config', 'editor'] as const;
+	const tabs = ['pipeline', 'run', 'memory', 'ingest', 'config', 'editor'] as const;
 	type Tab = (typeof tabs)[number];
 
 	const tabMeta: Record<Tab, { label: string; icon: typeof Play }> = {
 		pipeline: { label: 'Pipeline', icon: GitBranch },
 		run: { label: 'Run', icon: Play },
+		memory: { label: 'Memory', icon: Brain },
+		ingest: { label: 'Ingest', icon: Database },
 		config: { label: 'Config', icon: Settings },
 		editor: { label: 'Editor', icon: FileCode }
 	};
@@ -139,6 +143,10 @@
 					</div>
 				{:else if activeTab === 'run'}
 					<TeamRunPanel teamId={teamId} {detail} />
+				{:else if activeTab === 'memory'}
+					<TeamMemoryTab teamId={teamId} hasMemory={!!(detail.shared_memory as Record<string, unknown>)?.enabled} />
+				{:else if activeTab === 'ingest'}
+					<TeamIngestTab teamId={teamId} hasIngest={!!(detail.shared_documents as Record<string, unknown>)?.enabled} />
 				{:else if activeTab === 'config'}
 					<div class="max-w-2xl">
 						<ConfigPanel team={detail} />

@@ -142,6 +142,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     from initrunner.dashboard.routers.skills import router as skills_router
     from initrunner.dashboard.routers.system import router as system_router
     from initrunner.dashboard.routers.team_builder import router as team_builder_router
+    from initrunner.dashboard.routers.team_ingest import router as team_ingest_router
+    from initrunner.dashboard.routers.team_memory import router as team_memory_router
     from initrunner.dashboard.routers.teams import router as teams_router
 
     app.include_router(agents_router)
@@ -156,6 +158,8 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     app.include_router(compose_builder_router)
     app.include_router(teams_router)
     app.include_router(team_builder_router)
+    app.include_router(team_memory_router)
+    app.include_router(team_ingest_router)
     app.include_router(skills_router)
 
     # -- Static file serving (production) -----------------------------------

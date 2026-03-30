@@ -463,3 +463,95 @@ async def stream_ingest_sse(
     except Exception as exc:
         _logger.exception("Error during ingest SSE streaming")
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+
+async def stream_team_ingest_sse(
+    team: TeamDefinition,
+    team_dir: Path,
+    *,
+    force: bool = False,
+) -> AsyncIterator[str]:
+    """SSE generator for team shared-document ingestion."""
+    from initrunner.agent.schema.ingestion import IngestConfig
+    from initrunner.ingestion.pipeline import run_ingest
+    from initrunner.stores.base import DEFAULT_STORES_DIR
+
+    loop = asyncio.get_running_loop()
+    event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    store_path = team.spec.shared_documents.store_path or str(
+        DEFAULT_STORES_DIR / f"{team.metadata.name}-shared.lance"
+    )
+    ingest_config = IngestConfig(
+        sources=team.spec.shared_documents.sources,
+        store_path=store_path,
+        store_backend=team.spec.shared_documents.store_backend,
+        embeddings=team.spec.shared_documents.embeddings,
+        chunking=team.spec.shared_documents.chunking,
+    )
+    provider = team.spec.model.provider if team.spec.model else ""
+
+    def on_progress(path: Path, status) -> None:
+        evt = json.dumps({"type": "progress", "data": {"path": str(path), "status": str(status)}})
+        try:
+            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
+    def run() -> object:
+        try:
+            return run_ingest(
+                ingest_config,
+                team.metadata.name,
+                provider=provider,
+                base_dir=team_dir,
+                force=force,
+                progress_callback=on_progress,
+            )
+        finally:
+            loop.call_soon_threadsafe(event_queue.put_nowait, None)
+
+    ingest_task = loop.run_in_executor(None, run)
+
+    heartbeat_counter = 0
+    while not ingest_task.done():
+        try:
+            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
+            if event is None:
+                break
+            yield event
+            heartbeat_counter = 0
+        except TimeoutError:
+            heartbeat_counter += 1
+            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
+                yield ": heartbeat\n\n"
+                heartbeat_counter = 0
+
+    while not event_queue.empty():
+        event = event_queue.get_nowait()
+        if event is None:
+            break
+        yield event
+
+    try:
+        stats = await ingest_task
+        payload = {
+            "new": stats.new if stats else 0,
+            "updated": stats.updated if stats else 0,
+            "skipped": stats.skipped if stats else 0,
+            "errored": stats.errored if stats else 0,
+            "total_chunks": stats.total_chunks if stats else 0,
+            "file_results": [
+                {
+                    "path": str(r.path),
+                    "status": str(r.status),
+                    "chunks": r.chunks,
+                    "error": r.error,
+                }
+                for r in (stats.file_results if stats else [])
+            ],
+        }
+        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+    except Exception as exc:
+        _logger.exception("Error during team ingest SSE streaming")
+        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
