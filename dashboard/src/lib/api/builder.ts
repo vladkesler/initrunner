@@ -64,6 +64,7 @@ export interface StarterInfo {
 	description: string;
 	tags: string[];
 	features: string[];
+	kind: string;
 }
 
 export interface StartersResponse {

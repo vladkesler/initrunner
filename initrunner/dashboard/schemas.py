@@ -250,6 +250,7 @@ class StarterInfo(BaseModel):
     description: str
     tags: list[str]
     features: list[str]
+    kind: str = "Agent"  # Agent, Team, or Compose
 
 
 class StartersResponse(BaseModel):

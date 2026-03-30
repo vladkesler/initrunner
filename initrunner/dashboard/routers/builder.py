@@ -232,11 +232,24 @@ async def list_starters() -> StartersResponse:
                 description=e.description,
                 tags=e.tags,
                 features=e.features,
+                kind=e.kind,
             )
             for e in entries
-            if e.kind == "Agent"
+            if e.kind in ("Agent", "Team")
         ]
     )
+
+
+@router.get("/starters/{slug}/yaml")
+async def get_starter_yaml(slug: str) -> dict:
+    """Return the raw YAML text for a starter by slug."""
+    from initrunner.services.starters import resolve_starter_path
+
+    path = await asyncio.to_thread(resolve_starter_path, slug)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"Starter not found: {slug}")
+    yaml_text = path.read_text(encoding="utf-8")
+    return {"yaml_text": yaml_text}
 
 
 @router.post("/seed")

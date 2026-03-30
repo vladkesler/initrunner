@@ -20,6 +20,7 @@ STARTERS_DIR = Path(__file__).resolve().parent.parent / "dashboard" / "_starters
 STARTER_ORDER = [
     "helpdesk",
     "code-review-team",
+    "debate-team",
     "deep-researcher",
     "codebase-analyst",
     "web-researcher",

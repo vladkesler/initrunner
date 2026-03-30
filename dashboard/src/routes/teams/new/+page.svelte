@@ -3,7 +3,9 @@
 	import { fetchTeamBuilderOptions, seedTeam, validateTeam, saveTeam } from '$lib/api/teams';
 	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
+	import { request } from '$lib/api/client';
 	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
+	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
@@ -262,6 +264,26 @@
 			if (options.detected_provider) selectedProvider = options.detected_provider;
 			if (options.detected_model) selectedModel = options.detected_model;
 			if (options.save_dirs.length > 0) selectedDir = options.save_dirs[0];
+
+			// Handle ?starter= URL param
+			const starterSlug = page.url.searchParams.get('starter');
+			if (starterSlug && options.detected_provider) {
+				generating = true;
+				try {
+					const res = await request<{ yaml_text: string }>(`/api/builder/starters/${starterSlug}/yaml`);
+					const result = await validateTeam(res.yaml_text);
+					yamlText = res.yaml_text;
+					issues = result.issues;
+					isReady = result.ready;
+					teamName = starterSlug;
+					filename = `${starterSlug}.yaml`;
+					step = 'editor';
+				} catch {
+					toast.error(`Failed to load starter: ${starterSlug}`);
+				} finally {
+					generating = false;
+				}
+			}
 		} catch {
 			optionsError = 'Could not load builder options.';
 			toast.error('Failed to load builder options');
