@@ -33,7 +33,7 @@ from initrunner.team.runner import (
     _run_pre_ingestion,
     _setup_team_tracing,
 )
-from initrunner.team.schema import TeamDefinition
+from initrunner.team.schema import PersonaConfig, TeamDefinition
 
 logger = get_logger("team.graph")
 
@@ -364,6 +364,18 @@ async def run_team_graph_async(
                     f"{team.spec.guardrails.team_token_budget}"
                 )
 
+        elif team.spec.strategy == "debate":
+            timeout = team.spec.guardrails.team_timeout_seconds
+            try:
+                if timeout:
+                    with anyio.fail_after(float(timeout)):
+                        await _run_debate_async(team, task, deps, result)
+                else:
+                    await _run_debate_async(team, task, deps, result)
+            except TimeoutError:
+                result.success = False
+                result.error = "Team timeout exceeded"
+
         else:
             # Sequential
             graph = _build_sequential_graph(team)
@@ -393,6 +405,209 @@ async def run_team_graph_async(
             shutdown_tracing()
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Debate execution
+# ---------------------------------------------------------------------------
+
+
+async def _run_debate_async(
+    team: TeamDefinition,
+    task: str,
+    deps: TeamGraphDeps,
+    result: TeamResult,
+) -> None:
+    """Run multi-round debate with asyncio.gather per round."""
+    import asyncio
+
+    max_rounds = team.spec.debate.max_rounds
+    positions: list[tuple[str, str]] = []
+    last_complete_round: list[tuple[str, str]] = []
+
+    for round_num in range(1, max_rounds + 1):
+        # Check token budget before each round
+        if team.spec.guardrails.team_token_budget is not None:
+            if result.total_tokens >= team.spec.guardrails.team_token_budget:
+                result.success = False
+                result.error = (
+                    f"Team token budget exceeded: {result.total_tokens} >= "
+                    f"{team.spec.guardrails.team_token_budget}"
+                )
+                break
+
+        # Run all personas concurrently for this round
+        coros = [
+            _run_debate_persona(
+                name,
+                persona,
+                team,
+                task,
+                positions,
+                round_num,
+                max_rounds,
+                deps,
+                result,
+            )
+            for name, persona in team.spec.personas.items()
+        ]
+        round_results = await asyncio.gather(*coros)
+
+        # Check for failures
+        round_failed = any(output == "" for _name, output in round_results)
+        if round_failed:
+            result.success = False
+            failed_names = [n for n, o in round_results if o == ""]
+            result.error = f"Debate round {round_num}: persona(s) failed: {', '.join(failed_names)}"
+            # final_output from last fully completed round
+            result.final_output = _format_debate_positions(last_complete_round)
+            return
+
+        last_complete_round = list(round_results)
+        positions = list(round_results)
+
+    # All rounds succeeded
+    if team.spec.debate.synthesize:
+        synth_output = await _run_synthesis(team, task, positions, deps, result)
+        result.final_output = synth_output
+    else:
+        result.final_output = _format_debate_positions(positions)
+
+
+async def _run_debate_persona(
+    persona_name: str,
+    persona: PersonaConfig,
+    team: TeamDefinition,
+    task: str,
+    prior_positions: list[tuple[str, str]],
+    round_num: int,
+    max_rounds: int,
+    deps: TeamGraphDeps,
+    result: TeamResult,
+) -> tuple[str, str]:
+    """Execute one persona for one debate round. Returns (name, output)."""
+    from initrunner.team.runner import (
+        _apply_shared_stores,
+        _build_debate_prompt,
+        _persona_to_role,
+    )
+
+    display_name = f"{persona_name} (round {round_num})"
+
+    if deps.on_persona_start:
+        deps.on_persona_start(display_name)
+
+    role = _persona_to_role(persona_name, persona, team)
+    _apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
+
+    prompt = _build_debate_prompt(
+        task,
+        persona_name,
+        round_num,
+        max_rounds,
+        prior_positions,
+        team.spec.handoff_max_chars,
+    )
+
+    trigger_metadata = {
+        "team_name": team.metadata.name,
+        "team_run_id": deps.team_run_id,
+        "agent_name": persona_name,
+        "debate_round": str(round_num),
+    }
+
+    from initrunner.agent.loader import build_agent
+
+    agent = build_agent(role, role_dir=deps.team_dir)
+    run_result, _ = await execute_run_async(
+        agent,
+        role,
+        prompt,
+        audit_logger=deps.audit_logger,
+        model_override=deps.dry_run_model,
+        trigger_type="team",
+        trigger_metadata=trigger_metadata,
+    )
+
+    _accumulate_result(result, display_name, run_result)
+
+    if deps.on_persona_complete:
+        deps.on_persona_complete(display_name, run_result)
+
+    if not run_result.success:
+        return (persona_name, "")
+    return (persona_name, run_result.output)
+
+
+async def _run_synthesis(
+    team: TeamDefinition,
+    task: str,
+    positions: list[tuple[str, str]],
+    deps: TeamGraphDeps,
+    result: TeamResult,
+) -> str:
+    """Run the final synthesis step."""
+    from initrunner.agent.schema.base import Kind, RoleMetadata
+    from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+    from initrunner.team.runner import _build_synthesis_prompt
+
+    if deps.on_persona_start:
+        deps.on_persona_start("synthesis")
+
+    # Build a minimal synthesis role using the team model
+    spec = AgentSpec(
+        role=(
+            "You are a synthesis agent. Your job is to produce a unified, "
+            "balanced answer from multiple debate positions."
+        ),
+        model=team.spec.model,
+        tools=[],
+    )
+    role = RoleDefinition(
+        apiVersion=team.apiVersion,
+        kind=Kind.AGENT,
+        metadata=RoleMetadata(name="synthesis"),
+        spec=spec,
+    )
+
+    prompt = _build_synthesis_prompt(
+        task,
+        positions,
+        team.spec.debate.max_rounds,
+    )
+
+    trigger_metadata = {
+        "team_name": team.metadata.name,
+        "team_run_id": deps.team_run_id,
+        "agent_name": "synthesis",
+    }
+
+    from initrunner.agent.loader import build_agent
+
+    agent = build_agent(role, role_dir=deps.team_dir)
+    run_result, _ = await execute_run_async(
+        agent,
+        role,
+        prompt,
+        audit_logger=deps.audit_logger,
+        model_override=deps.dry_run_model,
+        trigger_type="team",
+        trigger_metadata=trigger_metadata,
+    )
+
+    _accumulate_result(result, "synthesis", run_result)
+
+    if deps.on_persona_complete:
+        deps.on_persona_complete("synthesis", run_result)
+
+    return run_result.output if run_result.success else ""
+
+
+def _format_debate_positions(positions: list[tuple[str, str]]) -> str:
+    """Format debate positions for final output."""
+    if not positions:
+        return ""
+    return "\n\n".join(f"## {name}\n\n{output}" for name, output in positions if output)
 
 
 def _collect_parallel_results(
