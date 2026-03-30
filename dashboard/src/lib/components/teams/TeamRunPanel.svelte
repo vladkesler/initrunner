@@ -38,7 +38,7 @@
 		})
 	);
 
-	/** Active persona from the last streaming message. */
+	/** Active persona(s) from the last streaming message. */
 	const activePersona = $derived.by(() => {
 		if (!running || messages.length === 0) return null;
 		const last = messages[messages.length - 1];
@@ -47,6 +47,9 @@
 		}
 		return null;
 	});
+
+	/** All currently-running personas (for debate concurrent display). */
+	let activeSet = $state(new Set<string>());
 
 	function handleRun() {
 		if (!prompt.trim() || running) return;
@@ -62,6 +65,7 @@
 		];
 
 		running = true;
+		activeSet = new Set();
 		const assistantIdx = messages.length - 1;
 
 		controller = streamTeamRun(
@@ -70,13 +74,14 @@
 			{
 				onPersonaStart(name) {
 					if (requestVersion !== currentVersion) return;
+					activeSet = new Set([...activeSet, name]);
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						activePersona: name
 					};
 				},
-				onPersonaComplete(_step: PersonaStepResponse) {
-					// Progress tracked via persona_start; result has full steps
+				onPersonaComplete(step: PersonaStepResponse) {
+					activeSet = new Set([...activeSet].filter((n) => n !== step.persona_name));
 				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
@@ -139,7 +144,17 @@
 
 <div class="flex flex-1 flex-col gap-3">
 	<!-- Active persona indicator -->
-	{#if activePersona}
+	{#if activeSet.size > 1}
+		<!-- Multiple concurrent personas (debate) -->
+		<div class="flex flex-wrap items-center gap-2">
+			{#each [...activeSet] as name}
+				<span class="inline-flex items-center gap-1.5 border border-accent-primary/20 bg-accent-primary/[0.06] px-2 py-1 font-mono text-[11px] text-accent-primary">
+					<span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-primary" style="animation: debate-spin 1.5s linear infinite;"></span>
+					{name}
+				</span>
+			{/each}
+		</div>
+	{:else if activePersona}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
 			Running {activePersona}...
