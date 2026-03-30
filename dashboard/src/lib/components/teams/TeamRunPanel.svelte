@@ -17,12 +17,20 @@
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
 		messages.map((m) => {
+			const isDebateStreaming = activeSet.size > 1 && m.status === 'streaming';
 			const base: ThreadMessage = {
 				role: m.role,
 				content: m.content,
 				status: m.status,
 				error: m.error,
-			identityLabel: m.role === 'user' ? 'You' : (m.activePersona ?? 'Team')
+				identityLabel: m.role === 'user'
+					? 'You'
+					: isDebateStreaming
+						? `Agents thinking \u00B7 ${debateElapsed}s`
+						: (m.activePersona ?? 'Team'),
+				avatarSeeds: isDebateStreaming
+					? [...activeSet].map((n) => n.replace(/ \(round \d+\)/, ''))
+					: undefined
 			};
 			if (m.result) {
 				base.result = {
@@ -160,21 +168,8 @@
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
-	<!-- Active persona indicator -->
-	{#if activeSet.size > 1}
-		<!-- Clustered spinning avatars (debate) -->
-		<div class="flex items-center gap-3">
-			<div class="flex items-center -space-x-2">
-				{#each [...activeSet] as name, i}
-					<div style="z-index: {activeSet.size - i}">
-						<SeedAvatar seed={name.replace(/ \(round \d+\)/, '')} size={28} spinning />
-					</div>
-				{/each}
-			</div>
-			<span class="font-mono text-[13px] text-fg-muted">Agents thinking</span>
-			<span class="font-mono text-[11px] text-fg-faint" style="font-variant-numeric: tabular-nums">{debateElapsed}s</span>
-		</div>
-	{:else if activePersona}
+	<!-- Active persona indicator (non-debate) -->
+	{#if activePersona && activeSet.size <= 1}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
 			Running {activePersona}...

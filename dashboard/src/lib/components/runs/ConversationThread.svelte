@@ -56,7 +56,17 @@
 					<!-- Agent turn -->
 					<div class="flex flex-col gap-1.5">
 						<div class="flex items-center gap-2">
-							<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
+							{#if msg.avatarSeeds?.length}
+								<div class="flex items-center -space-x-1.5">
+									{#each msg.avatarSeeds as seed, i}
+										<div style="z-index: {msg.avatarSeeds.length - i}">
+											<SeedAvatar {seed} size={32} spinning={msg.status === 'streaming'} />
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
+							{/if}
 							<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? assistantLabel}</span>
 						</div>
 						<div

@@ -90,6 +90,7 @@ export interface ThreadMessage {
 	result?: ThreadResultMeta | null;
 	error?: string | null;
 	identityLabel?: string | null;
+	avatarSeeds?: string[];
 }
 
 export interface AuditRecord {
