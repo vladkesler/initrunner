@@ -83,6 +83,7 @@ async def test_stream_run_sse_awaits_future(_mock_run_result, _mock_role):
         patch("initrunner.services.execution.build_agent_sync", side_effect=slow_build),
         patch("initrunner.services.execution.execute_run_stream_sync", side_effect=slow_stream),
     ):
+
         async def run():
             events = []
             async for event in stream_run_sse(Path("/tmp/role.yaml"), "hello"):
@@ -135,12 +136,7 @@ async def test_stream_compose_run_sse_awaits_future():
         compose_def = MagicMock()
 
         async def run():
-            return [
-                e
-                async for e in stream_compose_run_sse(
-                    compose_def, Path("/tmp"), "hello"
-                )
-            ]
+            return [e async for e in stream_compose_run_sse(compose_def, Path("/tmp"), "hello")]
 
         async def release():
             await asyncio.sleep(0.05)
@@ -187,12 +183,7 @@ async def test_stream_team_run_sse_awaits_future():
         team_def = MagicMock()
 
         async def run():
-            return [
-                e
-                async for e in stream_team_run_sse(
-                    team_def, Path("/tmp"), "hello"
-                )
-            ]
+            return [e async for e in stream_team_run_sse(team_def, Path("/tmp"), "hello")]
 
         async def release():
             await asyncio.sleep(0.05)

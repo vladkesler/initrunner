@@ -332,7 +332,7 @@ def _wire_routing_decision(builder, steps, source_name, targets, strategy, servi
         from initrunner.services.role_selector import select_candidate_sync
 
         envelope = ctx.inputs
-        result = await anyio.to_thread.run_sync(
+        result = await anyio.to_thread.run_sync(  # type: ignore[unresolved-attribute]
             lambda: select_candidate_sync(envelope.prompt, candidates, allow_llm=allow_llm)
         )
         selected = result.candidate.name

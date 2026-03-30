@@ -302,7 +302,6 @@ class TestTeamSpec:
         )
         assert spec.strategy == "parallel"
 
-
     def test_debate_strategy_accepted(self):
         spec = TeamSpec(
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
@@ -318,7 +317,7 @@ class TestTeamSpec:
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
             personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
             strategy="debate",
-            debate={"max_rounds": 5, "synthesize": False},
+            debate={"max_rounds": 5, "synthesize": False},  # type: ignore[invalid-argument-type]
         )
         assert spec.debate.max_rounds == 5
         assert spec.debate.synthesize is False
@@ -329,7 +328,7 @@ class TestTeamSpec:
                 model=ModelConfig(provider="openai", name="gpt-5-mini"),
                 personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
                 strategy="debate",
-                debate={"max_rounds": 1},
+                debate={"max_rounds": 1},  # type: ignore[invalid-argument-type]
             )
 
     def test_debate_max_rounds_too_high(self):
@@ -338,7 +337,7 @@ class TestTeamSpec:
                 model=ModelConfig(provider="openai", name="gpt-5-mini"),
                 personas={"aa": "first", "bb": "second"},  # type: ignore[invalid-argument-type]
                 strategy="debate",
-                debate={"max_rounds": 11},
+                debate={"max_rounds": 11},  # type: ignore[invalid-argument-type]
             )
 
     def test_debate_rejects_persona_env(self):

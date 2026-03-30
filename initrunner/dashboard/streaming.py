@@ -536,11 +536,11 @@ async def stream_team_ingest_sse(
     try:
         stats = await ingest_task
         payload = {
-            "new": stats.new if stats else 0,
-            "updated": stats.updated if stats else 0,
-            "skipped": stats.skipped if stats else 0,
-            "errored": stats.errored if stats else 0,
-            "total_chunks": stats.total_chunks if stats else 0,
+            "new": stats.new if stats else 0,  # type: ignore[unresolved-attribute]
+            "updated": stats.updated if stats else 0,  # type: ignore[unresolved-attribute]
+            "skipped": stats.skipped if stats else 0,  # type: ignore[unresolved-attribute]
+            "errored": stats.errored if stats else 0,  # type: ignore[unresolved-attribute]
+            "total_chunks": stats.total_chunks if stats else 0,  # type: ignore[unresolved-attribute]
             "file_results": [
                 {
                     "path": str(r.path),
@@ -548,7 +548,7 @@ async def stream_team_ingest_sse(
                     "chunks": r.chunks,
                     "error": r.error,
                 }
-                for r in (stats.file_results if stats else [])
+                for r in (stats.file_results if stats else [])  # type: ignore[unresolved-attribute]
             ],
         }
         yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"

@@ -193,9 +193,7 @@ class TestComposeOrchestrator:
         role = RoleDefinition.model_validate(role_data)
         mock_load.return_value = (role, MagicMock())
 
-        compose_data = _make_compose_data(
-            {"standalone": {"role": "roles/standalone.yaml"}}
-        )
+        compose_data = _make_compose_data({"standalone": {"role": "roles/standalone.yaml"}})
         compose = ComposeDefinition.model_validate(compose_data)
 
         orch = ComposeOrchestrator(compose, Path("."))
@@ -240,7 +238,7 @@ class TestSharedMemory:
         role = RoleDefinition.model_validate(_make_role_data())
         apply_shared_memory(role, "/tmp/shared.db", max_memories=500)
 
-        assert role.spec.memory.semantic.max_memories == 500
+        assert role.spec.memory.semantic.max_memories == 500  # type: ignore[unresolved-attribute]
 
     def test_shared_memory_overrides_existing_role_memory(self):
         from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig

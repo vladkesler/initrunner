@@ -304,7 +304,7 @@ async def run_team_graph_async(
 
     # Pre-ingest shared documents
     if shared_doc_path and team.spec.shared_documents.sources:
-        await anyio.to_thread.run_sync(lambda: _run_pre_ingestion(team, shared_doc_path, team_dir))
+        await anyio.to_thread.run_sync(lambda: _run_pre_ingestion(team, shared_doc_path, team_dir))  # type: ignore[unresolved-attribute]
 
     # Initialize tracing
     tracing_provider = _setup_team_tracing(team)
@@ -343,7 +343,7 @@ async def run_team_graph_async(
             if isinstance(graph_output, list):
                 sorted_outputs = sorted(graph_output, key=lambda t: t[0])
                 output_parts = []
-                for _idx, pname, output in sorted_outputs:
+                for _idx, pname, output in sorted_outputs:  # type: ignore[not-iterable]
                     if output:
                         output_parts.append(f"## {pname}\n\n{output}")
                 result.final_output = "\n\n".join(output_parts)

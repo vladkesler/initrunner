@@ -983,7 +983,9 @@ class TestDebateStrategy:
     @patch("initrunner.agent.loader.build_agent")
     @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
-    def test_debate_runs_all_personas_all_rounds(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+    def test_debate_runs_all_personas_all_rounds(
+        self, mock_dotenv, mock_exec, mock_build, tmp_path
+    ):
         """3 personas x 2 rounds + synthesis = 7 execute_run_async calls."""
         team = _make_team(strategy="debate")
         team.spec.debate.max_rounds = 2
@@ -1057,7 +1059,7 @@ class TestDebateStrategy:
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is False
-        assert "failed" in result.error
+        assert "failed" in result.error  # type: ignore[unsupported-operator]
         # Only round 1 ran (2 personas), no round 2, no synthesis
         assert call_count == 2
 
@@ -1110,7 +1112,9 @@ class TestDebateStrategy:
         completes = []
 
         result = run_team_dispatch(
-            team, "task", team_dir=tmp_path,
+            team,
+            "task",
+            team_dir=tmp_path,
             on_persona_start=starts.append,
             on_persona_complete=lambda n, r: completes.append(n),
         )

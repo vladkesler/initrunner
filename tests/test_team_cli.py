@@ -154,7 +154,6 @@ class TestTeamRunCli:
     @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_persona_failure_exits_nonzero(self, mock_dotenv, mock_exec, mock_build, tmp_path):
-        from unittest.mock import AsyncMock
 
         from initrunner.agent.executor import RunResult
 

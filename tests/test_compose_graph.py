@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import anyio
-import pytest
+from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
 from initrunner.compose.graph import (
-    ComposeGraphDeps,
-    DelegationEnvelope,
     _ServiceRef,
     build_compose_graph,
     run_compose_graph_sync,
@@ -98,7 +92,7 @@ class TestBuildComposeGraph:
         )
         compose = ComposeDefinition.model_validate(data)
         refs = {n: _make_service_ref(n) for n in ["entry", "svc-a", "svc-b"]}
-        graph, entry = build_compose_graph(compose, refs)
+        _graph, entry = build_compose_graph(compose, refs)
         assert entry == "entry"
 
     def test_diamond_builds(self):
@@ -121,7 +115,7 @@ class TestBuildComposeGraph:
         )
         compose = ComposeDefinition.model_validate(data)
         refs = {n: _make_service_ref(n) for n in ["entry", "svc-a", "svc-b", "final"]}
-        graph, entry = build_compose_graph(compose, refs)
+        _graph, entry = build_compose_graph(compose, refs)
         assert entry == "entry"
 
 
@@ -142,8 +136,8 @@ class TestRunComposeGraph:
         compose = ComposeDefinition.model_validate(data)
 
         # Build mock ComposeService objects (used by run_compose_graph_sync)
-        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
         from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
 
         services = {}
         for name in ["producer", "consumer"]:
@@ -156,8 +150,10 @@ class TestRunComposeGraph:
             )
             services[name] = svc
 
-        refs, entry, elapsed, timed_out = run_compose_graph_sync(
-            compose, services, "hello",
+        _refs, _entry, _elapsed, timed_out = run_compose_graph_sync(
+            compose,
+            services,
+            "hello",
             entry_service="producer",
             timeout_seconds=30,
         )
@@ -189,8 +185,8 @@ class TestRunComposeGraph:
         )
         compose = ComposeDefinition.model_validate(data)
 
-        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
         from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
 
         services = {}
         for name in ["entry", "svc-a", "svc-b"]:
@@ -203,8 +199,10 @@ class TestRunComposeGraph:
             )
 
         t0 = time.monotonic()
-        refs, entry, elapsed, timed_out = run_compose_graph_sync(
-            compose, services, "hello",
+        _refs, _entry, _elapsed, timed_out = run_compose_graph_sync(
+            compose,
+            services,
+            "hello",
             entry_service="entry",
             timeout_seconds=30,
         )
@@ -218,6 +216,7 @@ class TestRunComposeGraph:
     @patch("initrunner.compose.graph.execute_run_async")
     def test_callbacks_fire(self, mock_exec):
         """on_service_start and on_service_complete callbacks fire."""
+
         async def _exec(agent, role, prompt, **kwargs):
             return _make_run_result("done"), []
 
@@ -226,8 +225,8 @@ class TestRunComposeGraph:
         data = _make_compose_data()
         compose = ComposeDefinition.model_validate(data)
 
-        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
         from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
 
         services = {}
         for name in ["producer", "consumer"]:
@@ -242,8 +241,10 @@ class TestRunComposeGraph:
         starts = []
         completes = []
 
-        refs, entry, elapsed, timed_out = run_compose_graph_sync(
-            compose, services, "hello",
+        _refs, _entry, _elapsed, _timed_out = run_compose_graph_sync(
+            compose,
+            services,
+            "hello",
             entry_service="producer",
             on_service_start=starts.append,
             on_service_complete=lambda name, r: completes.append(name),
@@ -257,6 +258,7 @@ class TestRunComposeGraph:
     @patch("initrunner.compose.graph.execute_run_async")
     def test_service_failure_isolation(self, mock_exec):
         """Failed service produces empty output, doesn't crash others."""
+
         async def _exec(agent, role, prompt, **kwargs):
             name = role.metadata.name
             if name == "svc-a":
@@ -277,8 +279,8 @@ class TestRunComposeGraph:
         )
         compose = ComposeDefinition.model_validate(data)
 
-        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
         from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.compose.orchestrator import ComposeService, ComposeServiceConfig
 
         services = {}
         for name in ["entry", "svc-a", "svc-b"]:
@@ -290,8 +292,10 @@ class TestRunComposeGraph:
                 config=ComposeServiceConfig(role=f"roles/{name}.yaml"),
             )
 
-        refs, entry, elapsed, timed_out = run_compose_graph_sync(
-            compose, services, "hello",
+        refs, _entry, _elapsed, _timed_out = run_compose_graph_sync(
+            compose,
+            services,
+            "hello",
             entry_service="entry",
             timeout_seconds=30,
         )
