@@ -253,6 +253,115 @@ def _effective_embedding_provider(role: object) -> tuple[str, str]:
     return emb_prov, _default_embedding_key_env(emb_prov)
 
 
+# ---------------------------------------------------------------------------
+# Cached Ollama status (avoids 2s blocking on every /validate debounce)
+# ---------------------------------------------------------------------------
+
+_ollama_cache: tuple[float, bool] = (0.0, False)
+_OLLAMA_CACHE_TTL = 30.0
+
+
+def _is_ollama_running_cached() -> bool:
+    """Return cached Ollama reachability (30s TTL)."""
+    import time
+
+    now = time.monotonic()
+    cached_at, cached_val = _ollama_cache
+    if now - cached_at < _OLLAMA_CACHE_TTL:
+        return cached_val
+    # Refresh
+    result = is_ollama_running()
+    globals()["_ollama_cache"] = (now, result)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Embedding status check for dashboard builder
+# ---------------------------------------------------------------------------
+
+# Explicit allowlist of embedding providers surfaced in the builder UI.
+# Do NOT derive from _PROVIDER_EMBEDDING_KEY_DEFAULTS (it has "anthropic"
+# as an alias for OPENAI_API_KEY, which would be a confusing option).
+_SELECTABLE_EMBEDDING_PROVIDERS: list[tuple[str, str]] = [
+    ("openai", "OPENAI_API_KEY"),
+    ("google", "GOOGLE_API_KEY"),
+    ("ollama", ""),
+]
+
+
+def check_embedding_status(role: object) -> dict | None:
+    """Check if a role needs embeddings and whether the effective provider is usable.
+
+    Returns a dict with warning metadata (matching ``EmbeddingWarning`` schema)
+    when the effective embedding provider is unusable, or ``None`` if everything
+    is fine or the role doesn't need embeddings.
+    """
+    spec = getattr(role, "spec", None)
+    if spec is None:
+        return None
+
+    has_ingest = getattr(spec, "ingest", None) is not None
+    has_memory = getattr(spec, "memory", None) is not None
+    if not has_ingest and not has_memory:
+        return None
+
+    emb_provider, emb_env = _effective_embedding_provider(role)
+    if not emb_provider:
+        return None
+
+    # Check if effective provider is usable
+    if emb_provider == "ollama":
+        if _is_ollama_running_cached():
+            return None
+    elif emb_env and os.environ.get(emb_env):
+        return None
+
+    # Effective provider is broken -- build the warning
+    llm_provider = ""
+    if getattr(spec, "model", None) and getattr(spec.model, "provider", ""):
+        llm_provider = spec.model.provider
+
+    if has_ingest and has_memory:
+        feature = "RAG and memory"
+    elif has_ingest:
+        feature = "RAG"
+    else:
+        feature = "memory"
+
+    # Build selectable options with current status
+    options = []
+    for prov, env in _SELECTABLE_EMBEDDING_PROVIDERS:
+        if prov == "ollama":
+            configured = _is_ollama_running_cached()
+        else:
+            configured = bool(os.environ.get(env))
+        options.append(
+            {
+                "provider": prov,
+                "env_var": env,
+                "is_configured": configured,
+            }
+        )
+
+    msg = (
+        f"This agent uses {feature}, which requires embeddings. "
+        f"{llm_provider.capitalize() if llm_provider else 'The selected provider'} "
+        f"doesn't provide them, so {emb_provider.capitalize()} is used instead. "
+    )
+    if emb_provider == "ollama":
+        msg += "Start Ollama to enable local embeddings."
+    else:
+        msg += f"Set {emb_env} to enable this."
+
+    return {
+        "llm_provider": llm_provider,
+        "feature": feature,
+        "current_provider": emb_provider,
+        "options": options,
+        "message": msg,
+    }
+
+
 def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     """Check whether the user has the provider/embedding keys a role needs.
 

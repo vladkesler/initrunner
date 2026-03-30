@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { validateYaml, type ValidationIssue } from '$lib/api/builder';
+	import { validateYaml, type ValidationIssue, type EmbeddingWarning } from '$lib/api/builder';
 	import CognitionPanel from './CognitionPanel.svelte';
+	import EmbeddingWarningBanner from '$lib/components/ui/EmbeddingWarningBanner.svelte';
 	import {
 		Brain,
 		CircleX,
@@ -17,6 +18,7 @@
 		selectedDir = $bindable(''),
 		filename = $bindable('role.yaml'),
 		issues = $bindable<ValidationIssue[]>([]),
+		embeddingWarning = $bindable<EmbeddingWarning | null>(null),
 		saving,
 		saveError,
 		showOverwrite,
@@ -31,6 +33,7 @@
 		selectedDir: string;
 		filename: string;
 		issues: ValidationIssue[];
+		embeddingWarning: EmbeddingWarning | null;
 		saving: boolean;
 		saveError: string | null;
 		showOverwrite: boolean;
@@ -51,18 +54,27 @@
 		validateTimer = setTimeout(async () => {
 			if (!yamlText.trim()) {
 				issues = [];
+				embeddingWarning = null;
 				return;
 			}
 			validating = true;
 			try {
 				const result = await validateYaml(yamlText);
 				issues = result.issues;
+				embeddingWarning = result.embedding_warning;
 			} catch {
 				// skip
 			} finally {
 				validating = false;
 			}
 		}, 500);
+	}
+
+	function handleEmbeddingResolved(result: { yaml_text: string; embedding_warning: EmbeddingWarning | null }) {
+		yamlText = result.yaml_text;
+		embeddingWarning = result.embedding_warning;
+		// Trigger re-validation for issues
+		handleYamlInput();
 	}
 
 	onDestroy(() => {
@@ -74,6 +86,14 @@
 	<div class="border-l-2 border-l-info bg-info/5 px-3 py-2">
 		<p class="text-[13px] text-fg-muted">{explanation}</p>
 	</div>
+{/if}
+
+{#if embeddingWarning}
+	<EmbeddingWarningBanner
+		warning={embeddingWarning}
+		{yamlText}
+		onResolved={handleEmbeddingResolved}
+	/>
 {/if}
 
 <!-- Toolbar -->

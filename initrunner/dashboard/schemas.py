@@ -274,11 +274,35 @@ class ValidationIssueResponse(BaseModel):
     severity: str  # "error" | "warning"
 
 
+class EmbeddingOption(BaseModel):
+    """An available embedding provider the user can choose."""
+
+    provider: str  # "openai", "google", "ollama"
+    env_var: str  # "OPENAI_API_KEY", "GOOGLE_API_KEY", "" for ollama
+    is_configured: bool  # key is set / ollama running
+
+
+class EmbeddingWarning(BaseModel):
+    """Warning when the generated YAML needs embeddings but the effective provider is unusable."""
+
+    llm_provider: str  # user's LLM provider (e.g. "xai")
+    feature: str  # "RAG", "memory", or "RAG and memory"
+    current_provider: str  # effective embedding provider
+    options: list[EmbeddingOption]  # available providers with status
+    message: str  # human-readable explanation
+
+
 class SeedResponse(BaseModel):
     yaml_text: str
     explanation: str
     issues: list[ValidationIssueResponse]
     ready: bool
+    embedding_warning: EmbeddingWarning | None = None
+
+
+class SetEmbeddingProviderRequest(BaseModel):
+    yaml_text: str
+    embedding_provider: str  # target provider from allowlist
 
 
 class ValidateRequest(BaseModel):

@@ -76,11 +76,26 @@ export interface ValidationIssue {
 	severity: 'error' | 'warning' | 'info';
 }
 
+export interface EmbeddingOption {
+	provider: string;
+	env_var: string;
+	is_configured: boolean;
+}
+
+export interface EmbeddingWarning {
+	llm_provider: string;
+	feature: string;
+	current_provider: string;
+	options: EmbeddingOption[];
+	message: string;
+}
+
 export interface SeedResult {
 	yaml_text: string;
 	explanation: string;
 	issues: ValidationIssue[];
 	ready: boolean;
+	embedding_warning: EmbeddingWarning | null;
 }
 
 export interface SaveResult {
@@ -135,6 +150,16 @@ export function validateYaml(yaml_text: string): Promise<SeedResult> {
 	return request('/api/builder/validate', {
 		method: 'POST',
 		body: JSON.stringify({ yaml_text })
+	});
+}
+
+export function setEmbeddingProvider(body: {
+	yaml_text: string;
+	embedding_provider: string;
+}): Promise<SeedResult> {
+	return request('/api/builder/set-embedding-provider', {
+		method: 'POST',
+		body: JSON.stringify(body)
 	});
 }
 

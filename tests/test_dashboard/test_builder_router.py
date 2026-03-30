@@ -928,3 +928,207 @@ def test_hub_seed_custom_provider(builder_client, tmp_path):
     assert "name: anthropic/claude-sonnet-4" in yaml_text
     assert "base_url: https://openrouter.ai/api/v1" in yaml_text
     assert "api_key_env: OPENROUTER_API_KEY" in yaml_text
+
+
+# -- Embedding warning tests ---------------------------------------------------
+
+_RAG_YAML = """\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: rag-agent
+  description: Agent with RAG
+spec:
+  role: |
+    You are a helpful assistant that answers questions from documents.
+  model:
+    provider: {provider}
+    name: gpt-4o
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+"""
+
+_MEMORY_YAML = """\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: memory-agent
+  description: Agent with memory
+spec:
+  role: |
+    You are a helpful assistant with memory.
+  model:
+    provider: {provider}
+    name: gpt-4o
+  memory: {{}}
+"""
+
+
+def test_seed_embedding_warning_present(builder_client, monkeypatch):
+    """RAG template with anthropic shows embedding warning when OPENAI_API_KEY missing."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    # Mock Ollama as not running
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/seed",
+            json={
+                "mode": "template",
+                "template": "rag",
+                "provider": "anthropic",
+                "name": "test-rag",
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    warning = data["embedding_warning"]
+    assert warning is not None
+    assert warning["current_provider"] == "openai"
+    assert warning["llm_provider"] == "anthropic"
+    assert "RAG" in warning["feature"]
+    assert len(warning["options"]) == 3
+    # Options should be openai, google, ollama (not anthropic)
+    option_providers = {o["provider"] for o in warning["options"]}
+    assert option_providers == {"openai", "google", "ollama"}
+    assert "anthropic" not in option_providers
+
+
+def test_seed_no_embedding_warning_when_key_set(builder_client, monkeypatch):
+    """No warning when the effective embedding key is already configured."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+    resp = builder_client.post(
+        "/api/builder/seed",
+        json={
+            "mode": "template",
+            "template": "rag",
+            "provider": "anthropic",
+            "name": "test-rag",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["embedding_warning"] is None
+
+
+def test_seed_no_embedding_warning_no_rag(builder_client, monkeypatch):
+    """No warning for blank template without ingest or memory."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    resp = builder_client.post(
+        "/api/builder/seed",
+        json={"mode": "blank", "provider": "anthropic", "name": "test-agent"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["embedding_warning"] is None
+
+
+def test_validate_embedding_warning(builder_client, monkeypatch):
+    """Validate endpoint also returns embedding warning."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/validate",
+            json={"yaml_text": _RAG_YAML.format(provider="xai")},
+        )
+    assert resp.status_code == 200
+    warning = resp.json()["embedding_warning"]
+    assert warning is not None
+    assert warning["llm_provider"] == "xai"
+    assert warning["current_provider"] == "openai"
+
+
+def test_embedding_warning_options_reflect_env(builder_client, monkeypatch):
+    """Options correctly reflect which embedding keys are configured."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/validate",
+            json={"yaml_text": _RAG_YAML.format(provider="xai")},
+        )
+    assert resp.status_code == 200
+    warning = resp.json()["embedding_warning"]
+    assert warning is not None
+    options_by_provider = {o["provider"]: o for o in warning["options"]}
+    assert options_by_provider["openai"]["is_configured"] is False
+    assert options_by_provider["google"]["is_configured"] is True
+    assert options_by_provider["ollama"]["is_configured"] is False
+
+
+def test_set_embedding_provider(builder_client, monkeypatch):
+    """set-embedding-provider patches YAML and re-validates."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/set-embedding-provider",
+            json={
+                "yaml_text": _RAG_YAML.format(provider="xai"),
+                "embedding_provider": "google",
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    # Warning should be cleared since google key is set
+    assert data["embedding_warning"] is None
+    # YAML should contain the new embedding provider
+    assert "provider: google" in data["yaml_text"]
+
+
+def test_set_embedding_provider_both_sections(builder_client, monkeypatch):
+    """When both ingest and memory exist, switching updates both."""
+    yaml_text = """\
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: full-agent
+  description: Agent with RAG and memory
+spec:
+  role: |
+    You are a helpful assistant.
+  model:
+    provider: xai
+    name: gpt-4o
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+  memory: {}
+"""
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/set-embedding-provider",
+            json={"yaml_text": yaml_text, "embedding_provider": "google"},
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["embedding_warning"] is None
+    # The canonicalized YAML should have google in the embeddings section
+    assert "google" in data["yaml_text"]
+
+
+def test_set_embedding_provider_invalid(builder_client):
+    """Invalid embedding provider returns 400."""
+    resp = builder_client.post(
+        "/api/builder/set-embedding-provider",
+        json={
+            "yaml_text": _RAG_YAML.format(provider="xai"),
+            "embedding_provider": "anthropic",
+        },
+    )
+    assert resp.status_code == 400
+    assert "Invalid" in resp.json()["detail"]
+
+
+def test_embedding_warning_memory_feature(builder_client, monkeypatch):
+    """Warning correctly identifies 'memory' feature."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with patch("initrunner.services.providers.is_ollama_running", return_value=False):
+        resp = builder_client.post(
+            "/api/builder/validate",
+            json={"yaml_text": _MEMORY_YAML.format(provider="groq")},
+        )
+    assert resp.status_code == 200
+    warning = resp.json()["embedding_warning"]
+    assert warning is not None
+    assert warning["feature"] == "memory"
+    assert warning["llm_provider"] == "groq"

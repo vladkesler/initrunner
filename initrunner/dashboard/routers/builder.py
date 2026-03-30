@@ -20,6 +20,7 @@ from initrunner.dashboard.routers._provider_options import (
 )
 from initrunner.dashboard.schemas import (
     BuilderOptionsResponse,
+    EmbeddingWarning,
     EnvVarStatus,
     HubSearchResponse,
     HubSearchResultResponse,
@@ -28,6 +29,7 @@ from initrunner.dashboard.schemas import (
     SaveResponse,
     SeedRequest,
     SeedResponse,
+    SetEmbeddingProviderRequest,
     StarterInfo,
     StartersResponse,
     TemplateInfo,
@@ -127,6 +129,27 @@ def _rewrite_model_block(
         result.append(line)
 
     return "\n".join(result)
+
+
+# ---------------------------------------------------------------------------
+# Embedding warning helper
+# ---------------------------------------------------------------------------
+
+
+def _check_embedding_warning(yaml_text: str) -> EmbeddingWarning | None:
+    """Check if YAML needs embeddings and the effective provider is unusable."""
+    from initrunner.services.agent_builder import _validate_yaml
+    from initrunner.services.providers import check_embedding_status
+
+    role, _ = _validate_yaml(yaml_text)
+    if role is None:
+        return None
+
+    result = check_embedding_status(role)
+    if result is None:
+        return None
+
+    return EmbeddingWarning(**result)
 
 
 # ---------------------------------------------------------------------------
@@ -305,11 +328,14 @@ async def seed_agent(
         if base_url != OLLAMA_DEFAULT_BASE_URL:
             yaml_text = _rewrite_model_block(yaml_text, base_url=base_url)
 
+    embedding_warning = await asyncio.to_thread(_check_embedding_warning, yaml_text)
+
     return SeedResponse(
         yaml_text=yaml_text,
         explanation=explanation,
         issues=_issues_to_response(issues),
         ready=ready,
+        embedding_warning=embedding_warning,
     )
 
 
@@ -319,12 +345,68 @@ async def validate_yaml(req: ValidateRequest) -> SeedResponse:
 
     _, issues = await asyncio.to_thread(_validate_yaml, req.yaml_text)
     ready = not any(i.severity == "error" for i in issues)
+    embedding_warning = await asyncio.to_thread(_check_embedding_warning, req.yaml_text)
 
     return SeedResponse(
         yaml_text=req.yaml_text,
         explanation="",
         issues=_issues_to_response(issues),
         ready=ready,
+        embedding_warning=embedding_warning,
+    )
+
+
+@router.post("/set-embedding-provider")
+async def set_embedding_provider(req: SetEmbeddingProviderRequest) -> SeedResponse:
+    """Patch embedding provider in YAML and re-validate."""
+    from initrunner.services.agent_builder import _validate_yaml
+    from initrunner.services.providers import _SELECTABLE_EMBEDDING_PROVIDERS
+
+    allowed = {p for p, _ in _SELECTABLE_EMBEDDING_PROVIDERS}
+    if req.embedding_provider not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid embedding provider. Choose from: {', '.join(sorted(allowed))}",
+        )
+
+    def _run() -> tuple[str, list, bool, EmbeddingWarning | None]:
+        from initrunner.services.roles import canonicalize_role_yaml
+
+        role, issues = _validate_yaml(req.yaml_text)
+        if role is None:
+            return req.yaml_text, issues, False, None
+
+        # Mutate embedding provider on both ingest and memory sections
+        if role.spec.ingest is not None:
+            role.spec.ingest.embeddings.provider = req.embedding_provider
+        if role.spec.memory is not None:
+            role.spec.memory.embeddings.provider = req.embedding_provider
+
+        yaml_text = canonicalize_role_yaml(role)
+
+        # Re-validate the serialized result
+        role2, issues2 = _validate_yaml(yaml_text)
+        ready = not any(i.severity == "error" for i in issues2)
+
+        from initrunner.services.providers import check_embedding_status
+
+        warning_data = check_embedding_status(role2) if role2 else None
+        warning = EmbeddingWarning(**warning_data) if warning_data else None
+
+        return yaml_text, issues2, ready, warning
+
+    try:
+        yaml_text, issues, ready, embedding_warning = await asyncio.to_thread(_run)
+    except Exception as e:
+        _logger.error("set-embedding-provider failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return SeedResponse(
+        yaml_text=yaml_text,
+        explanation="",
+        issues=_issues_to_response(issues),
+        ready=ready,
+        embedding_warning=embedding_warning,
     )
 
 
@@ -532,9 +614,12 @@ async def hub_seed_endpoint(req: HubSeedRequest) -> SeedResponse:
             f"for the full package."
         )
 
+    embedding_warning = await asyncio.to_thread(_check_embedding_warning, yaml_text)
+
     return SeedResponse(
         yaml_text=yaml_text,
         explanation=explanation,
         issues=_issues_to_response(issues),
         ready=ready,
+        embedding_warning=embedding_warning,
     )

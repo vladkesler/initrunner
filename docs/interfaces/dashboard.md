@@ -85,6 +85,8 @@ All modes include a provider/model selector so the generated (or loaded) YAML us
 
 After choosing a mode and provider/model, the page generates a role YAML and opens an editor with live validation. A **Cognition** toggle (lime-tinted, always visible) in the toolbar opens a structured side panel for configuring reasoning patterns, autonomy, think, todo, and tool search without hand-editing YAML. The panel includes a link to the [reasoning docs](https://www.initrunner.ai/docs/reasoning). It reads from and writes to the YAML text using `js-yaml` (client-side parse/dump). Edit the YAML, pick a save location from the configured role directories, and save. The new agent appears immediately in the agents list.
 
+**Embedding warning**: when the generated YAML includes RAG (`spec.ingest`) or memory (`spec.memory`) and the effective embedding provider is unusable (API key missing or Ollama not running), a warning banner appears between the explanation block and the toolbar. The banner shows which embedding provider is needed and why, plus selectable pill chips for the three available embedding providers (openai, google, ollama) with green/orange status dots indicating which keys are configured. Users can either configure the missing key inline (password input + save button) or switch to a configured alternative (e.g. pick Google if `GOOGLE_API_KEY` is already set). Switching calls `POST /api/builder/set-embedding-provider` which patches `embeddings.provider` in both `ingest` and `memory` sections, reserializes via `canonicalize_role_yaml()`, and re-validates. The banner auto-dismisses when the next validation returns no embedding warning. See [Embedding Configuration](../configuration/providers.md#embedding-configuration) for the underlying resolution rules.
+
 **Tool Search** (in Cognition panel): when an agent has 10 or more tools configured, a **Tool Search** section appears in the Cognition panel with an info banner showing the expected context savings. Enabling it writes `spec.tool_search` to the YAML with auto-pinned common functions (`current_time`, `parse_date`, etc.). A checklist shows all resolved function names (not tool type names) with their origin type, letting users pick which tools stay always-visible vs discoverable at runtime via `search_tools`. A collapsible **Tuning** section exposes `max_results` (1-20). The function name mapping is loaded from the builder options endpoint (`tool_func_map`) and resolved client-side with zero round-trips. See [Tool Search](../core/tool-search.md) for details on the underlying mechanism.
 
 Validation issues use three severity levels: **error** (blocks save), **warning** (advisory), and **info** (recommendations such as "Think tool with critique recommended for reflexion pattern").
@@ -506,7 +508,7 @@ Generate role YAML from a template, natural language description, or blank skele
 {"mode": "template", "template": "rag", "provider": "openai", "model": "gpt-4o"}
 ```
 
-Response includes `yaml_text`, `explanation`, `issues[]`, and `ready` (true when no validation errors).
+Response includes `yaml_text`, `explanation`, `issues[]`, `ready` (true when no validation errors), and `embedding_warning` (null when the effective embedding provider is usable, or an object with `llm_provider`, `feature`, `current_provider`, `options[]`, and `message` when it is not).
 
 ### `POST /api/builder/validate`
 
@@ -515,6 +517,16 @@ Validate YAML text against the role schema. Performs Pydantic schema validation,
 ```json
 {"yaml_text": "apiVersion: initrunner/v1\n..."}
 ```
+
+### `POST /api/builder/set-embedding-provider`
+
+Patch the embedding provider in the YAML's `ingest` and `memory` sections, reserialize, and re-validate. Used by the embedding warning banner to switch embedding providers without manual YAML editing.
+
+```json
+{"yaml_text": "...", "embedding_provider": "google"}
+```
+
+`embedding_provider` must be one of `openai`, `google`, or `ollama`. Response is the same `SeedResponse` shape as `/api/builder/seed` with the updated YAML and a re-checked `embedding_warning` (null if the new provider is configured).
 
 ### `GET /api/builder/hub-search`
 

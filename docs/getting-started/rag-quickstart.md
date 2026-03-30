@@ -47,6 +47,8 @@ This extracts text, splits it into chunks, generates embeddings, and stores vect
 
 **Anthropic users:** set `OPENAI_API_KEY` for the default embedding model, or set `embeddings.provider: google` or `embeddings.provider: ollama` to avoid needing an OpenAI key.
 
+> **Tip:** The [dashboard builder](../interfaces/dashboard.md#new-agent-agentsnew) detects missing embedding keys automatically and lets you configure them inline or switch providers without editing YAML.
+
 ## Step 3: Ask questions
 
 ```bash
