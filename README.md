@@ -16,7 +16,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.3.6-%2334D058" alt="v2026.3.6">
+  <img src="https://img.shields.io/badge/latest-v2026.3.7-%2334D058" alt="v2026.3.7">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -37,7 +37,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 14 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.3.6** -- Embedded policy engine: replaced Cerbos sidecar with [initguard](https://github.com/initrunner/initguard) for in-process ABAC. One env var (`INITRUNNER_POLICY_DIR`) replaces five. Zero ty errors. See the [Changelog](CHANGELOG.md).
+> **v2026.3.7** -- New branding: InitRunner logo replaces mascot across README, PyPI, and dashboard. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -549,4 +549,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.6</sub></p>
+<p align="center"><sub>v2026.3.7</sub></p>
