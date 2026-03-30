@@ -123,12 +123,13 @@ async def test_stream_compose_run_sse_awaits_future():
     compose_result.error = None
     compose_result.entry_messages = None
 
-    def slow_compose(*a, **kw):
-        gate.wait(timeout=5)
+    async def slow_compose(*a, **kw):
+        await asyncio.sleep(0.05)
+        gate.set()
         return compose_result
 
     with patch(
-        "initrunner.services.compose.run_compose_once_sync",
+        "initrunner.services.compose.run_compose_once_async",
         side_effect=slow_compose,
     ):
         compose_def = MagicMock()
@@ -174,12 +175,13 @@ async def test_stream_team_run_sse_awaits_future():
     team_result.success = True
     team_result.error = None
 
-    def slow_team(*a, **kw):
-        gate.wait(timeout=5)
+    async def slow_team(*a, **kw):
+        await asyncio.sleep(0.05)
+        gate.set()
         return team_result
 
     with patch(
-        "initrunner.team.runner.run_team_dispatch",
+        "initrunner.team.graph.run_team_graph_async",
         side_effect=slow_team,
     ):
         team_def = MagicMock()

@@ -319,9 +319,9 @@ Each persona run is logged to the audit trail with:
 | Feature | Team Mode | Delegation | Compose |
 |---------|-----------|------------|---------|
 | Files needed | 1 | 3+ (coordinator + sub-roles) | 2+ (compose + roles) |
-| Execution | Sequential or parallel | Tool-call driven | Trigger-driven services |
-| Lifetime | One-shot | One-shot | Long-running daemon |
-| Agent interaction | Output handoff (seq) / independent (par) | Tool call/response | Queue-based messaging |
+| Execution | Sequential or parallel | Tool-call driven | Graph-based (parallel fan-out) |
+| Lifetime | One-shot | One-shot | One-shot or daemon |
+| Agent interaction | Output handoff (seq) / independent (par) | Tool call/response | Graph edges (DelegationEnvelope) |
 | Per-persona model | Yes | Yes (per role file) | Yes (per role file) |
 | Per-persona tools | Yes (extend/replace) | Yes (per role file) | Yes (per role file) |
 | Shared memory | Yes | No | Yes |

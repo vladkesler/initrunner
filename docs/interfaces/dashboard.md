@@ -352,7 +352,7 @@ The backend imports exclusively from `initrunner.services.*` and `initrunner.con
 
 ### Streaming
 
-Agent runs use SSE (Server-Sent Events). The backend runs `execute_run_stream_sync` in a thread pool and forwards tokens to the browser via an `asyncio.Queue` bridge. Events:
+Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stream_sync` in a thread pool with an `asyncio.Queue` bridge. Compose and team runs use the graph engine directly via `asyncio.create_task` (no thread pool hop). Events:
 
 | Event type | Payload |
 |------------|---------|

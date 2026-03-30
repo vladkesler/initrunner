@@ -299,11 +299,11 @@ Note that live tests are non-deterministic — LLM outputs vary between runs. Us
 
 ## Async Tests
 
-Tests for the async runtime (compose event loop, async executor, async signal handlers) use `pytest-asyncio`:
+Tests for async execution use `pytest-asyncio`:
 
 | Test File | Coverage |
 |-----------|----------|
-| `tests/test_compose_async_internals.py` | Queue bridge, shared event loop, shutdown grace period, trigger bridge, executor pool sizing |
+| `tests/test_compose_graph.py` | Graph-based compose execution: fan-out parallelism, fan-in join ordering, callbacks, failure isolation |
 | `tests/test_executor_async.py` | `execute_run_async`, `execute_run_stream_async`, async retry logic, `prefer_async` tool building |
 | `tests/test_signal_async.py` | Async signal handler, double-Ctrl-C force exit |
 

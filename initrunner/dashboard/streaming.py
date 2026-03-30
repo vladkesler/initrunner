@@ -137,20 +137,20 @@ async def stream_compose_run_sse(
 ) -> AsyncIterator[str]:
     """SSE generator yielding service_start/service_complete/result/error events.
 
-    Runs ``run_compose_once_sync`` in a thread pool.  Service start/complete
-    callbacks push progress events to an ``asyncio.Queue``.
+    Runs compose graph directly as an async task (no thread pool hop).
+    Callbacks push progress events to an ``asyncio.Queue``.
     """
     from initrunner.agent.executor import RunResult
-    from initrunner.services.compose import run_compose_once_sync
+    from initrunner.services.compose import run_compose_once_async
 
-    loop = asyncio.get_running_loop()
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
     def on_service_start(name: str) -> None:
-        evt = json.dumps({"type": "service_start", "data": name})
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(
+                f"data: {json.dumps({'type': 'service_start', 'data': name})}\n\n"
+            )
+        except asyncio.QueueFull:
             pass
 
     def on_service_complete(name: str, result: RunResult) -> None:
@@ -169,13 +169,13 @@ async def stream_compose_run_sse(
             }
         )
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
             pass
 
-    def run_compose():
+    async def _run_compose():
         try:
-            return run_compose_once_sync(
+            return await run_compose_once_async(
                 compose,
                 base_dir,
                 prompt,
@@ -185,12 +185,9 @@ async def stream_compose_run_sse(
                 on_service_complete=on_service_complete,
             )
         finally:
-            try:
-                loop.call_soon_threadsafe(event_queue.put_nowait, None)
-            except RuntimeError:
-                pass
+            event_queue.put_nowait(None)
 
-    compose_task = loop.run_in_executor(None, run_compose)
+    compose_task = asyncio.create_task(_run_compose())
 
     # Forward progress events as SSE
     heartbeat_counter = 0
@@ -268,20 +265,19 @@ async def stream_team_run_sse(
 ) -> AsyncIterator[str]:
     """SSE generator yielding persona_start/persona_complete/result/error events.
 
-    Runs ``run_team_dispatch`` in a thread pool. Persona start/complete
-    callbacks push progress events to an ``asyncio.Queue``.
+    Runs team graph directly as an async task (no thread pool hop).
     """
     from initrunner.agent.executor import RunResult
-    from initrunner.team.runner import run_team_dispatch
+    from initrunner.team.graph import run_team_graph_async
 
-    loop = asyncio.get_running_loop()
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
     def on_persona_start(name: str) -> None:
-        evt = json.dumps({"type": "persona_start", "data": name})
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(
+                f"data: {json.dumps({'type': 'persona_start', 'data': name})}\n\n"
+            )
+        except asyncio.QueueFull:
             pass
 
     def on_persona_complete(name: str, result: RunResult) -> None:
@@ -302,13 +298,13 @@ async def stream_team_run_sse(
             }
         )
         try:
-            loop.call_soon_threadsafe(event_queue.put_nowait, f"data: {evt}\n\n")
-        except RuntimeError:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
             pass
 
-    def run_team():
+    async def _run_team():
         try:
-            return run_team_dispatch(
+            return await run_team_graph_async(
                 team,
                 prompt,
                 team_dir=team_dir,
@@ -317,12 +313,9 @@ async def stream_team_run_sse(
                 on_persona_complete=on_persona_complete,
             )
         finally:
-            try:
-                loop.call_soon_threadsafe(event_queue.put_nowait, None)
-            except RuntimeError:
-                pass
+            event_queue.put_nowait(None)
 
-    team_task = loop.run_in_executor(None, run_team)
+    team_task = asyncio.create_task(_run_team())
 
     # Forward progress events as SSE
     heartbeat_counter = 0

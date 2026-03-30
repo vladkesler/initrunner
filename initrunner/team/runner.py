@@ -527,7 +527,7 @@ def run_team_dispatch(
     task: str,
     **kwargs: Any,
 ) -> TeamResult:
-    """Dispatch to sequential or parallel runner based on team strategy."""
-    if team.spec.strategy == "parallel":
-        return run_team_parallel(team, task, **kwargs)
-    return run_team(team, task, **kwargs)
+    """Dispatch to graph-based team execution."""
+    from initrunner.team.graph import run_team_graph_sync
+
+    return run_team_graph_sync(team, task, **kwargs)

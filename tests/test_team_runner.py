@@ -949,31 +949,31 @@ class TestOnPersonaComplete:
 
 class TestRunTeamDispatch:
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_sequential_dispatch(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="sequential")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = [
-            _ok_result("r1", "out1"),
-            _ok_result("r2", "out2"),
-        ]
+
+        async def _side_effect(*a, **kw):
+            return _ok_result("r1", "out1")
+
+        mock_exec.side_effect = _side_effect
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is True
 
     @patch("initrunner.agent.loader.build_agent")
-    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.team.graph.execute_run_async")
     @patch("initrunner.agent.loader._load_dotenv")
     def test_parallel_dispatch(self, mock_dotenv, mock_exec, mock_build, tmp_path):
         team = _make_team(strategy="parallel")
         mock_build.return_value = MagicMock()
-        mock_exec.side_effect = _parallel_side_effect(
-            {
-                "alpha": _ok_result("r1", "out1"),
-                "bravo": _ok_result("r2", "out2"),
-            }
-        )
+
+        async def _side_effect(*a, **kw):
+            return _ok_result("r1", "out1")
+
+        mock_exec.side_effect = _side_effect
 
         result = run_team_dispatch(team, "task", team_dir=tmp_path)
         assert result.success is True
