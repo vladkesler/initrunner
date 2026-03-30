@@ -199,6 +199,37 @@ def build_compose_graph(
         transform = builder.step(node_id=NodeID(f"_transform_{target}"))(transform_fn)
         join_transforms[target] = transform
 
+    # Identify terminal services (no outgoing delegation)
+    terminal_services: set[str] = set()
+    for name in reachable:
+        targets = delegation_edges.get(name, [])
+        if not [t for t in targets if t in reachable]:
+            terminal_services.add(name)
+
+    # Identify fan-out sources whose ALL targets are terminal (need a terminal join)
+    # This prevents branches from independently hitting End before siblings finish
+    terminal_joins: dict[str, object] = {}
+    terminal_join_transforms: dict[str, object] = {}
+    for name in reachable:
+        targets = delegation_edges.get(name, [])
+        reachable_targets = [t for t in targets if t in reachable]
+        strategy = strategies.get(name, "all")
+        if (
+            len(reachable_targets) > 1
+            and strategy == "all"
+            and all(t in terminal_services for t in reachable_targets)
+            and not any(t in fan_in_targets for t in reachable_targets)
+        ):
+            join = builder.join(
+                reducer=reduce_list_append,
+                initial_factory=list,
+                node_id=NodeID(f"_terminal_join_{name}"),
+            )
+            terminal_joins[name] = join
+            transform_fn = _make_join_transform(f"terminal_{name}")
+            transform = builder.step(node_id=NodeID(f"_terminal_transform_{name}"))(transform_fn)
+            terminal_join_transforms[name] = transform
+
     # Wire start -> entry
     builder.add(builder.edge_from(builder.start_node).to(steps[entry_name]))
 
@@ -208,8 +239,9 @@ def build_compose_graph(
         reachable_targets = [t for t in targets if t in reachable]
 
         if not reachable_targets:
-            # Terminal service -> end
-            builder.add(builder.edge_from(steps[name]).to(builder.end_node))
+            # Terminal service -> end (or -> terminal join if part of a fan-out)
+            # Direct terminal-to-end wiring is handled below per-service
+            pass  # wired after fan-out logic
             continue
 
         strategy = strategies.get(name, "all")
@@ -223,11 +255,15 @@ def build_compose_graph(
             # Fan-out: broadcast to all targets
             fork_id = ForkID(f"fork_{name}")
 
-            def _make_broadcast(targets_=reachable_targets):
+            def _make_broadcast(
+                targets_=reachable_targets,
+                joins_=joins,
+                fan_in_=fan_in_targets,
+            ):
                 def _broadcast(ep):
                     paths = []
                     for t in targets_:
-                        dest = joins[t] if t in fan_in_targets else steps[t]
+                        dest = joins_[t] if t in fan_in_ else steps[t]
                         paths.append(ep.to(dest))
                     return paths
 
@@ -240,10 +276,34 @@ def build_compose_graph(
             # Keyword/sense routing -- Decision node
             _wire_routing_decision(builder, steps, name, reachable_targets, strategy, service_refs)
 
-    # Wire join -> transform -> target step for fan-in
+    # Wire fan-in join -> transform -> target step
     for target in fan_in_targets:
         builder.add(builder.edge_from(joins[target]).to(join_transforms[target]))
         builder.add(builder.edge_from(join_transforms[target]).to(steps[target]))
+
+    # Wire terminal joins -> transform -> end
+    for source_name, join in terminal_joins.items():
+        transform = terminal_join_transforms[source_name]
+        builder.add(builder.edge_from(join).to(transform))
+        builder.add(builder.edge_from(transform).to(builder.end_node))
+
+    # Wire remaining terminal services directly to end
+    # (those not part of a fan-out terminal join)
+    fan_out_terminal_services: set[str] = set()
+    for source_name in terminal_joins:
+        targets = delegation_edges.get(source_name, [])
+        fan_out_terminal_services.update(t for t in targets if t in reachable)
+
+    for name in terminal_services:
+        if name in fan_out_terminal_services:
+            # Route to the terminal join of the parent fan-out source
+            for source_name, join in terminal_joins.items():
+                source_targets = delegation_edges.get(source_name, [])
+                if name in source_targets:
+                    builder.add(builder.edge_from(steps[name]).to(join))
+                    break
+        else:
+            builder.add(builder.edge_from(steps[name]).to(builder.end_node))
 
     return builder.build(), entry_name
 
