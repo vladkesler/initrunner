@@ -9,6 +9,8 @@
 	} from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ServiceTrace from './ServiceTrace.svelte';
+	import PipelineStepper from './PipelineStepper.svelte';
+	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let {
@@ -40,22 +42,12 @@
 	/** Adapt ComposeThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
 		messages.map((m) => {
-			const isStreaming = m.status === 'streaming';
-			const hasActive = isStreaming && activeServices.size > 0;
-			const stepNum = completedServices.length + 1;
-			const activeNames = [...activeServices];
-
 			const base: ThreadMessage = {
 				role: m.role,
 				content: m.content,
 				status: m.status,
 				error: m.error,
-				identityLabel: m.role === 'user'
-					? 'You'
-					: hasActive
-						? `Step ${stepNum}/${totalServices} \u00B7 ${activeNames.join(', ')} \u00B7 ${composeElapsed}s`
-						: (m.activeService ?? 'Compose'),
-				avatarSeeds: hasActive ? activeNames : undefined
+				identityLabel: m.role === 'user' ? 'You' : (m.activeService ?? 'Compose')
 			};
 			if (m.result) {
 				base.result = {
@@ -191,6 +183,23 @@
 		emptyText="Send a prompt to run it through the composition"
 		assistantLabel="Compose"
 	>
+		{#snippet messageHeader({ msg })}
+			{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeServices.size > 0 || completedServices.length > 0)}
+				<PipelineStepper
+					services={detail.services.map((s) => s.name)}
+					{completedServices}
+					{activeServices}
+					elapsed={composeElapsed}
+				/>
+			{:else}
+				<div class="flex items-center gap-2">
+					<SeedAvatar seed={msg.identityLabel ?? 'Compose'} spinning={msg.status === 'streaming'} />
+					<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+						{msg.identityLabel ?? 'Compose'}
+					</span>
+				</div>
+			{/if}
+		{/snippet}
 		{#snippet messageFooter({ msg, index })}
 			{@const composeMsg = messages[index]}
 			{#if composeMsg?.role === 'assistant' && composeMsg.result?.steps}

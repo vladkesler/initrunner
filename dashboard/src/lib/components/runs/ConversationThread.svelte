@@ -8,11 +8,13 @@
 		messages = [],
 		emptyText = 'Run an agent to see output here',
 		assistantLabel = 'Agent',
+		messageHeader,
 		messageFooter
 	}: {
 		messages?: ThreadMessage[];
 		emptyText?: string;
 		assistantLabel?: string;
+		messageHeader?: Snippet<[{ msg: ThreadMessage; index: number }]>;
 		messageFooter?: Snippet<[{ msg: ThreadMessage; index: number }]>;
 	} = $props();
 
@@ -55,20 +57,24 @@
 				{:else}
 					<!-- Agent turn -->
 					<div class="flex flex-col gap-1.5">
-						<div class="flex items-center gap-2">
-							{#if msg.avatarSeeds?.length}
-								<div class="flex items-center -space-x-1.5">
-									{#each msg.avatarSeeds as seed, i}
-										<div style="z-index: {msg.avatarSeeds.length - i}">
-											<SeedAvatar {seed} size={32} spinning={msg.status === 'streaming'} />
-										</div>
-									{/each}
-								</div>
-							{:else}
-								<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
-							{/if}
-							<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? assistantLabel}</span>
-						</div>
+						{#if messageHeader}
+							{@render messageHeader({ msg, index: i })}
+						{:else}
+							<div class="flex items-center gap-2">
+								{#if msg.avatarSeeds?.length}
+									<div class="flex items-center -space-x-1.5">
+										{#each msg.avatarSeeds as seed, j}
+											<div style="z-index: {msg.avatarSeeds.length - j}">
+												<SeedAvatar {seed} size={32} spinning={msg.status === 'streaming'} />
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
+								{/if}
+								<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? assistantLabel}</span>
+							</div>
+						{/if}
 						<div
 							class="bg-surface-1 px-4 py-3 transition-[border-color,box-shadow] duration-200"
 							class:border-l-2={msg.status === 'streaming'}
