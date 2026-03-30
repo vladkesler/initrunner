@@ -8,7 +8,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from initrunner.team.schema import TeamDefinition
 
-from initrunner.services.agent_builder import ValidationIssue
+from initrunner.services._yaml_validation import (
+    ValidationIssue,
+    extract_pydantic_errors,
+    parse_yaml_text,
+)
 
 
 def build_blank_team_yaml(
@@ -120,20 +124,8 @@ def _persona_name(index: int) -> str:
 
 def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[ValidationIssue]]:
     """Parse and validate team YAML, returning the definition and any issues."""
-    import yaml
-
-    issues: list[ValidationIssue] = []
-
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        issues.append(ValidationIssue(field="yaml", message=str(exc), severity="error"))
-        return None, issues
-
-    if not isinstance(raw, dict):
-        issues.append(
-            ValidationIssue(field="yaml", message="Expected a YAML mapping", severity="error")
-        )
+    raw, issues = parse_yaml_text(text)
+    if raw is None:
         return None, issues
 
     from initrunner.deprecations import validate_team_dict
@@ -144,8 +136,7 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
         issues.append(ValidationIssue(field="deprecation", message=str(exc), severity="error"))
         return None, issues
     except Exception as exc:
-        for err in _extract_pydantic_errors(exc):
-            issues.append(err)
+        issues.extend(extract_pydantic_errors(exc))
         return None, issues
 
     # Cross-field warnings
@@ -170,20 +161,6 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
         )
 
     return team, issues
-
-
-def _extract_pydantic_errors(exc: Exception) -> list[ValidationIssue]:
-    """Extract structured validation issues from a Pydantic ValidationError."""
-    from pydantic import ValidationError
-
-    issues: list[ValidationIssue] = []
-    if isinstance(exc, ValidationError):
-        for err in exc.errors():
-            field = ".".join(str(loc) for loc in err["loc"])
-            issues.append(ValidationIssue(field=field, message=err["msg"], severity="error"))
-    else:
-        issues.append(ValidationIssue(field="spec", message=str(exc), severity="error"))
-    return issues
 
 
 def build_team_next_steps(path: Path, team: TeamDefinition) -> list[str]:

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from initrunner._constants import SKIP_DIRS
 
@@ -88,50 +88,70 @@ def _scan_yaml_kind(dirs: list[Path], kind: str) -> Iterator[Path]:
                 yield p
 
 
+_D = TypeVar("_D")
+
+
+def _discover_sync(
+    dirs: list[Path],
+    kind: str,
+    loader: Callable[[Path], object],
+    error_classes: tuple[type[Exception], ...],
+    make_success: Callable[[Path, object], _D],
+    make_error: Callable[[Path, str], _D],
+) -> list[_D]:
+    """Generic discovery: scan for YAML files of *kind*, load each, collect results."""
+    results: list[_D] = []
+    for p in _scan_yaml_kind(dirs, kind):
+        try:
+            obj = loader(p)
+            results.append(make_success(p, obj))
+        except error_classes as e:
+            results.append(make_error(p, str(e)))
+        except Exception as e:
+            results.append(make_error(p, str(e)))
+    return results
+
+
 def discover_roles_sync(dirs: list[Path]) -> list[DiscoveredRole]:
     """Scan directories for role YAML files (sync)."""
     from initrunner.agent.loader import RoleLoadError, load_role
 
-    results: list[DiscoveredRole] = []
-    for p in _scan_yaml_kind(dirs, "Agent"):
-        try:
-            role = load_role(p)
-            results.append(DiscoveredRole(path=p, role=role))
-        except RoleLoadError as e:
-            results.append(DiscoveredRole(path=p, error=str(e)))
-    return results
+    return _discover_sync(
+        dirs,
+        "Agent",
+        load_role,
+        (RoleLoadError,),
+        lambda p, r: DiscoveredRole(path=p, role=r),
+        lambda p, e: DiscoveredRole(path=p, error=e),
+    )
 
 
 def discover_composes_sync(dirs: list[Path]) -> list[DiscoveredCompose]:
     """Scan directories for compose YAML files (sync)."""
     from initrunner.compose.loader import ComposeLoadError, load_compose
 
-    results: list[DiscoveredCompose] = []
-    for p in _scan_yaml_kind(dirs, "Compose"):
-        try:
-            compose = load_compose(p)
-            results.append(DiscoveredCompose(path=p, compose=compose))
-        except ComposeLoadError as e:
-            results.append(DiscoveredCompose(path=p, error=str(e)))
-        except Exception as e:
-            results.append(DiscoveredCompose(path=p, error=str(e)))
-    return results
+    return _discover_sync(
+        dirs,
+        "Compose",
+        load_compose,
+        (ComposeLoadError,),
+        lambda p, c: DiscoveredCompose(path=p, compose=c),
+        lambda p, e: DiscoveredCompose(path=p, error=e),
+    )
 
 
 def discover_teams_sync(dirs: list[Path]) -> list[DiscoveredTeam]:
     """Scan directories for team YAML files (sync)."""
     from initrunner.team.loader import TeamLoadError, load_team
 
-    results: list[DiscoveredTeam] = []
-    for p in _scan_yaml_kind(dirs, "Team"):
-        try:
-            team = load_team(p)
-            results.append(DiscoveredTeam(path=p, team=team))
-        except TeamLoadError as e:
-            results.append(DiscoveredTeam(path=p, error=str(e)))
-        except Exception as e:
-            results.append(DiscoveredTeam(path=p, error=str(e)))
-    return results
+    return _discover_sync(
+        dirs,
+        "Team",
+        load_team,
+        (TeamLoadError,),
+        lambda p, t: DiscoveredTeam(path=p, team=t),
+        lambda p, e: DiscoveredTeam(path=p, error=e),
+    )
 
 
 def get_default_role_dirs(explicit_dir: Path | None = None) -> list[Path]:

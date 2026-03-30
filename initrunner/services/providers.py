@@ -49,9 +49,9 @@ def list_ollama_models(*, timeout: int = _OLLAMA_TIMEOUT) -> list[str]:
         return []
 
 
-# Explicit priority order — first match wins.
-# Do NOT rely on dict insertion order for correctness.
-_PROVIDER_PRIORITY: list[tuple[str, str]] = [
+# Canonical provider → API key env mapping, in priority order.
+# This is the single source of truth; loader.py derives its dict from this.
+PROVIDER_KEY_ENVS: list[tuple[str, str]] = [
     ("anthropic", "ANTHROPIC_API_KEY"),
     ("openai", "OPENAI_API_KEY"),
     ("google", "GOOGLE_API_KEY"),
@@ -60,6 +60,9 @@ _PROVIDER_PRIORITY: list[tuple[str, str]] = [
     ("cohere", "CO_API_KEY"),
     ("xai", "XAI_API_KEY"),
 ]
+
+# Backward-compat alias
+_PROVIDER_PRIORITY = PROVIDER_KEY_ENVS
 
 _BOT_TOKEN_ENVS: dict[str, str] = {
     "telegram": "TELEGRAM_BOT_TOKEN",
@@ -136,7 +139,7 @@ def detect_provider_and_model() -> DetectedProvider | None:
 
     _load_env()
 
-    for provider, env_var in _PROVIDER_PRIORITY:
+    for provider, env_var in PROVIDER_KEY_ENVS:
         if os.environ.get(env_var):
             return DetectedProvider(provider=provider, model=_default_model_name(provider))
 
@@ -187,7 +190,7 @@ def list_available_providers() -> list[DetectedProvider]:
     _load_env()
 
     result: list[DetectedProvider] = []
-    for provider, env_var in _PROVIDER_PRIORITY:
+    for provider, env_var in PROVIDER_KEY_ENVS:
         if os.environ.get(env_var):
             result.append(DetectedProvider(provider=provider, model=_default_model_name(provider)))
 
