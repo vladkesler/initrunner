@@ -3,6 +3,7 @@
 	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
+	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let { teamId, onRunCompleted }: { teamId: string; onRunCompleted?: () => void } = $props();
@@ -50,6 +51,22 @@
 
 	/** All currently-running personas (for debate concurrent display). */
 	let activeSet = $state(new Set<string>());
+	let debateStart = $state(0);
+	let debateElapsed = $state(0);
+	let debateTimer: ReturnType<typeof setInterval> | null = null;
+
+	$effect(() => {
+		if (activeSet.size > 1 && !debateTimer) {
+			debateStart = Math.floor(Date.now() / 1000);
+			debateElapsed = 0;
+			debateTimer = setInterval(() => {
+				debateElapsed = Math.floor(Date.now() / 1000) - debateStart;
+			}, 1000);
+		} else if (activeSet.size <= 1 && debateTimer) {
+			clearInterval(debateTimer);
+			debateTimer = null;
+		}
+	});
 
 	function handleRun() {
 		if (!prompt.trim() || running) return;
@@ -145,14 +162,17 @@
 <div class="flex flex-1 flex-col gap-3">
 	<!-- Active persona indicator -->
 	{#if activeSet.size > 1}
-		<!-- Multiple concurrent personas (debate) -->
-		<div class="flex flex-wrap items-center gap-2">
-			{#each [...activeSet] as name}
-				<span class="inline-flex items-center gap-1.5 border border-accent-primary/20 bg-accent-primary/[0.06] px-2 py-1 font-mono text-[11px] text-accent-primary">
-					<span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-primary" style="animation: debate-spin 1.5s linear infinite;"></span>
-					{name}
-				</span>
-			{/each}
+		<!-- Clustered spinning avatars (debate) -->
+		<div class="flex items-center gap-3">
+			<div class="flex items-center -space-x-2">
+				{#each [...activeSet] as name, i}
+					<div style="z-index: {activeSet.size - i}">
+						<SeedAvatar seed={name.replace(/ \(round \d+\)/, '')} size={28} spinning />
+					</div>
+				{/each}
+			</div>
+			<span class="font-mono text-[13px] text-fg-muted">Agents thinking</span>
+			<span class="font-mono text-[11px] text-fg-faint" style="font-variant-numeric: tabular-nums">{debateElapsed}s</span>
 		</div>
 	{:else if activePersona}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
