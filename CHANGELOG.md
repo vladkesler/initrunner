@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.3.7] - 2026-03-30
+
+### Changed
+- Replace mascot with new InitRunner logo in README (light/dark theme support)
+- Add logo and favicon to dashboard sidebar
+
 ## [2026.3.6] - 2026-03-29
 
 ### Changed

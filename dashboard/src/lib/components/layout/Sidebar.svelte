@@ -66,9 +66,9 @@
 	<!-- Logo -->
 	<div class="flex h-12 items-center border-b border-edge px-3">
 		{#if collapsed}
-			<span class="w-full text-center font-mono text-sm font-medium text-accent-primary">></span>
+			<img src="/icon.svg" alt="InitRunner" class="mx-auto h-5 w-auto" />
 		{:else}
-			<span class="font-mono text-sm font-medium uppercase tracking-[0.08em] text-fg-faint"><span class="text-accent-primary">></span> InitRunner</span>
+			<img src="/logo.svg" alt="InitRunner" class="h-5 w-auto" />
 		{/if}
 	</div>
 
