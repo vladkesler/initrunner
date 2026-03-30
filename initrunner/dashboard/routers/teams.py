@@ -104,6 +104,10 @@ def _detail_from(tid: str, discovered) -> TeamDetail:
 
     shared_tools = [_tool_summary(t) for t in team.spec.tools]
 
+    debate = None
+    if team.spec.strategy == "debate":
+        debate = team.spec.debate.model_dump()
+
     return TeamDetail(
         id=tid,
         name=team.metadata.name,
@@ -118,6 +122,7 @@ def _detail_from(tid: str, discovered) -> TeamDetail:
         shared_documents=team.spec.shared_documents.model_dump(),
         tools=shared_tools,
         observability=team.spec.observability.model_dump() if team.spec.observability else None,
+        debate=debate,
         features=_team_features(team.spec),
     )
 

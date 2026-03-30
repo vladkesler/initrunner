@@ -18,6 +18,8 @@ def build_blank_team_yaml(
     provider: str = "openai",
     model: str | None = None,
     personas: list[dict] | None = None,
+    debate_max_rounds: int = 3,
+    debate_synthesize: bool = True,
 ) -> str:
     """Generate a minimal valid Team YAML from parameters.
 
@@ -27,6 +29,14 @@ def build_blank_team_yaml(
     """
     model_name = model or "gpt-5-mini"
     personas_block = _build_personas_block(personas, persona_count)
+
+    debate_block = ""
+    if strategy == "debate":
+        debate_block = (
+            f"  debate:\n"
+            f"    max_rounds: {debate_max_rounds}\n"
+            f"    synthesize: {'true' if debate_synthesize else 'false'}\n"
+        )
 
     return (
         f"apiVersion: initrunner/v1\n"
@@ -39,6 +49,7 @@ def build_blank_team_yaml(
         f"    provider: {provider}\n"
         f"    name: {model_name}\n"
         f"  strategy: {strategy}\n"
+        f"{debate_block}"
         f"  personas:\n"
         f"{personas_block}"
         f"  tools: []\n"
@@ -186,7 +197,14 @@ def build_team_next_steps(path: Path, team: TeamDefinition) -> list[str]:
     if team.spec.shared_memory.enabled:
         steps.append("Shared memory is enabled -- personas will share a memory store")
 
-    if team.spec.strategy == "parallel":
+    if team.spec.strategy == "debate":
+        rounds = team.spec.debate.max_rounds
+        synth = "with synthesis" if team.spec.debate.synthesize else "no synthesis"
+        steps.append(
+            f"Debate strategy: {rounds} rounds, {len(team.spec.personas)} "
+            f"personas per round ({synth})"
+        )
+    elif team.spec.strategy == "parallel":
         steps.append(f"Parallel strategy: all {len(team.spec.personas)} personas run concurrently")
     else:
         max_chars = team.spec.handoff_max_chars

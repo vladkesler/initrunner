@@ -21,6 +21,7 @@ from initrunner._ids import generate_id
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
 from initrunner.team.runner import (
+    StepMetadata,
     TeamResult,
     _accumulate_result,
     _apply_shared_stores,
@@ -529,7 +530,12 @@ async def _run_debate_persona(
         trigger_metadata=trigger_metadata,
     )
 
-    _accumulate_result(result, display_name, run_result)
+    _accumulate_result(
+        result,
+        display_name,
+        run_result,
+        metadata=StepMetadata(step_kind="persona", round_num=round_num, max_rounds=max_rounds),
+    )
 
     if deps.on_persona_complete:
         deps.on_persona_complete(display_name, run_result)
@@ -595,7 +601,14 @@ async def _run_synthesis(
         trigger_metadata=trigger_metadata,
     )
 
-    _accumulate_result(result, "synthesis", run_result)
+    _accumulate_result(
+        result,
+        "synthesis",
+        run_result,
+        metadata=StepMetadata(
+            step_kind="synthesis", round_num=None, max_rounds=team.spec.debate.max_rounds
+        ),
+    )
 
     if deps.on_persona_complete:
         deps.on_persona_complete("synthesis", run_result)

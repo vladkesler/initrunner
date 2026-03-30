@@ -96,8 +96,16 @@
 			value: 'parallel' as const,
 			label: 'Parallel',
 			description: 'Personas execute simultaneously, results are merged at the end.'
+		},
+		{
+			value: 'debate' as const,
+			label: 'Debate',
+			description: 'Multi-round concurrent argumentation. Personas argue, refine, then synthesize.'
 		}
 	];
+
+	let debateMaxRounds = $state(3);
+	let debateSynthesize = $state(true);
 
 	// -- Actions --------------------------------------------------------------
 
@@ -166,7 +174,9 @@
 				provider: selectedProvider || 'openai',
 				model: (teamIsCustom ? customModelName.trim() : selectedModel) || null,
 				base_url: customBaseUrl || null,
-				api_key_env: teamApiKeyEnv
+				api_key_env: teamApiKeyEnv,
+				debate_max_rounds: debateMaxRounds,
+				debate_synthesize: debateSynthesize
 			});
 			yamlText = result.yaml_text;
 			issues = result.issues;
@@ -302,7 +312,7 @@
 			<!-- Strategy selector -->
 			<div>
 				<span class="mb-2 block text-[12px] font-medium text-fg-muted">Strategy</span>
-				<div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+				<div class="grid grid-cols-1 gap-2 md:grid-cols-3">
 					{#each strategies as s}
 						<button
 							class="border p-4 text-left transition-[border-color,background-color] duration-150 {strategy === s.value ? 'border-accent-primary/40 bg-accent-primary/[0.06]' : 'border-edge bg-surface-1 hover:border-accent-primary/20'}"
@@ -318,6 +328,31 @@
 						</button>
 					{/each}
 				</div>
+
+				{#if strategy === 'debate'}
+					<div class="mt-3 flex items-center gap-6 border border-edge bg-surface-1 p-4">
+						<div class="flex items-center gap-3">
+							<label for="debate-rounds" class="text-[12px] text-fg-muted">Rounds</label>
+							<input
+								id="debate-rounds"
+								type="range"
+								min="2"
+								max="10"
+								bind:value={debateMaxRounds}
+								class="h-1 w-24 cursor-pointer appearance-none bg-edge accent-accent-primary [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-primary"
+							/>
+							<span class="font-mono text-[13px] text-fg" style="font-variant-numeric: tabular-nums">{debateMaxRounds}</span>
+						</div>
+						<label class="flex cursor-pointer items-center gap-2 text-[12px] text-fg-muted">
+							<input
+								type="checkbox"
+								bind:checked={debateSynthesize}
+								class="h-3.5 w-3.5 cursor-pointer appearance-none border border-edge bg-surface-0 checked:border-accent-primary checked:bg-accent-primary/20"
+							/>
+							Synthesize
+						</label>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Personas -->

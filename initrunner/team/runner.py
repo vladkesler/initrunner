@@ -24,11 +24,21 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
+class StepMetadata:
+    """Per-step metadata for structured round tracking."""
+
+    step_kind: str = "persona"  # "persona" | "synthesis"
+    round_num: int | None = None
+    max_rounds: int | None = None
+
+
+@dataclass
 class TeamResult:
     team_run_id: str
     team_name: str
     agent_results: list[RunResult] = field(default_factory=list)
     agent_names: list[str] = field(default_factory=list)
+    step_metadata: list[StepMetadata] = field(default_factory=list)
     final_output: str = ""
     total_tokens_in: int = 0
     total_tokens_out: int = 0
@@ -321,10 +331,16 @@ def _apply_shared_stores(
         )
 
 
-def _accumulate_result(result: TeamResult, persona_name: str, run_result: RunResult) -> None:
+def _accumulate_result(
+    result: TeamResult,
+    persona_name: str,
+    run_result: RunResult,
+    metadata: StepMetadata | None = None,
+) -> None:
     """Add a persona's run result to the team result."""
     result.agent_results.append(run_result)
     result.agent_names.append(persona_name)
+    result.step_metadata.append(metadata or StepMetadata())
     result.total_tokens_in += run_result.tokens_in
     result.total_tokens_out += run_result.tokens_out
     result.total_tokens += run_result.total_tokens

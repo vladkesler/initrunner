@@ -277,6 +277,11 @@ body::after {
   animation: glow-pulse 2s ease-in-out infinite;
 }
 
+@keyframes debate-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ── Reduced Motion ───────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

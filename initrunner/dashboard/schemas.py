@@ -601,6 +601,7 @@ class TeamDetail(BaseModel):
     shared_documents: dict  # TeamDocumentsConfig serialized
     tools: list[ItemSummary] = []
     observability: dict | None = None
+    debate: dict | None = None  # {max_rounds, synthesize} when strategy=debate
     features: list[str] = []
 
 
@@ -613,6 +614,9 @@ class TeamRunRequest(BaseModel):
 
 class PersonaStepResponse(BaseModel):
     persona_name: str
+    step_kind: str = "persona"  # "persona" | "synthesis"
+    round_num: int | None = None
+    max_rounds: int | None = None
     output: str = ""
     tokens_in: int = 0
     tokens_out: int = 0
@@ -676,6 +680,8 @@ class TeamSeedRequest(BaseModel):
     model: str | None = None
     base_url: str | None = None
     api_key_env: str | None = None
+    debate_max_rounds: int = 3
+    debate_synthesize: bool = True
 
 
 class TeamSeedResponse(BaseModel):

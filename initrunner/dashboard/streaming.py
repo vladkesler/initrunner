@@ -343,25 +343,36 @@ async def stream_team_run_sse(
     try:
         team_result = await team_task
 
+        # Build steps with optional metadata (round_num, step_kind)
+        step_entries = []
+        for i, (name, res) in enumerate(
+            zip(team_result.agent_names, team_result.agent_results, strict=True)
+        ):
+            entry = {
+                "persona_name": name,
+                "output": res.output,
+                "tokens_in": res.tokens_in,
+                "tokens_out": res.tokens_out,
+                "duration_ms": res.duration_ms,
+                "tool_calls": res.tool_calls,
+                "tool_call_names": res.tool_call_names,
+                "success": res.success,
+                "error": res.error,
+                "step_kind": "persona",
+                "round_num": None,
+                "max_rounds": None,
+            }
+            if i < len(team_result.step_metadata):
+                meta = team_result.step_metadata[i]
+                entry["step_kind"] = meta.step_kind
+                entry["round_num"] = meta.round_num
+                entry["max_rounds"] = meta.max_rounds
+            step_entries.append(entry)
+
         payload = {
             "team_run_id": team_result.team_run_id,
             "output": team_result.final_output,
-            "steps": [
-                {
-                    "persona_name": name,
-                    "output": res.output,
-                    "tokens_in": res.tokens_in,
-                    "tokens_out": res.tokens_out,
-                    "duration_ms": res.duration_ms,
-                    "tool_calls": res.tool_calls,
-                    "tool_call_names": res.tool_call_names,
-                    "success": res.success,
-                    "error": res.error,
-                }
-                for name, res in zip(
-                    team_result.agent_names, team_result.agent_results, strict=True
-                )
-            ],
+            "steps": step_entries,
             "tokens_in": team_result.total_tokens_in,
             "tokens_out": team_result.total_tokens_out,
             "total_tokens": team_result.total_tokens,

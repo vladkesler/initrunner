@@ -49,6 +49,8 @@ export function seedTeam(req: {
 	model?: string | null;
 	base_url?: string | null;
 	api_key_env?: string | null;
+	debate_max_rounds?: number;
+	debate_synthesize?: boolean;
 }): Promise<TeamSeedResponse> {
 	return request<TeamSeedResponse>('/api/team-builder/seed', {
 		method: 'POST',

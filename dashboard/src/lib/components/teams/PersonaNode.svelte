@@ -7,22 +7,30 @@
 		persona: PersonaDetail;
 		state: 'idle' | 'active' | 'complete' | 'error' | 'pending';
 		step: PersonaStepResponse | null;
+		isDebate?: boolean;
 	}> = $props();
 
 	const persona = $derived(data.persona);
 	const state = $derived(data.state);
 	const step = $derived(data.step);
+	const isDebate = $derived(data.isDebate ?? false);
 </script>
 
 <Handle type="target" position={Position.Top} class="!bg-fg-faint !w-2 !h-2 !border-edge" />
 
 <div
-	class="w-[240px] bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
+	class="relative w-[240px] bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
 		{state === 'error' ? 'card-surface-error' : 'card-surface'}
 		{state === 'active' ? 'glow-lime-subtle' : ''}
 		{selected ? 'glow-lime' : ''}
 		{state === 'pending' ? 'opacity-40' : ''}"
 >
+	{#if isDebate && state === 'active'}
+		<div
+			class="pointer-events-none absolute inset-[-3px] border-2 border-transparent"
+			style="border-top-color: oklch(0.91 0.20 128); animation: debate-spin 2s linear infinite;"
+		></div>
+	{/if}
 	<!-- Name row -->
 	<div class="flex items-center justify-between gap-2">
 		<div class="flex items-center gap-2">

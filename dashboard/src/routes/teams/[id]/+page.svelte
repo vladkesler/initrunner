@@ -97,7 +97,7 @@
 			<div class="flex items-center gap-3">
 				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">{detail.name}</h1>
 				<span class="rounded-full border border-accent-primary/20 bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
-					{detail.strategy}
+					{detail.strategy}{#if detail.debate} ({detail.debate.max_rounds} rounds){/if}
 				</span>
 				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">
 					{detail.personas.length} personas

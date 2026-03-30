@@ -87,6 +87,8 @@ async def seed_team(body: TeamSeedRequest) -> TeamSeedResponse:
         provider=runtime_provider,
         model=body.model,
         personas=personas_resolved,
+        debate_max_rounds=body.debate_max_rounds,
+        debate_synthesize=body.debate_synthesize,
     )
 
     # Inject team-level base_url/api_key_env into generated YAML

@@ -35,16 +35,31 @@
 
 	// ── State helpers ─────────────────────────────────────────────────
 
-	function personaState(name: string): 'active' | 'complete' | 'error' | 'pending' | 'idle' {
+	function personaState(name: string, roundNum?: number): 'active' | 'complete' | 'error' | 'pending' | 'idle' {
 		if (!steps) return 'idle';
-		if (activePersona === name) return 'active';
-		const step = steps.find((s) => s.persona_name === name);
-		if (!step) return 'pending';
+		// For debate: match on display name pattern "name (round N)"
+		const displayName = roundNum != null ? `${name} (round ${roundNum})` : name;
+		if (activePersona === displayName) return 'active';
+		const step = steps.find((s) =>
+			roundNum != null
+				? s.round_num === roundNum && s.persona_name === displayName
+				: s.persona_name === name
+		);
+		if (!step) {
+			// Check if active persona is in a later round (this round is done)
+			if (roundNum != null && steps.some((s) => s.round_num === roundNum)) return 'idle';
+			return 'pending';
+		}
 		return step.success ? 'complete' : 'error';
 	}
 
-	function stepFor(name: string): PersonaStepResponse | null {
-		return steps?.find((s) => s.persona_name === name) ?? null;
+	function stepFor(name: string, roundNum?: number): PersonaStepResponse | null {
+		if (!steps) return null;
+		if (roundNum != null) {
+			const displayName = `${name} (round ${roundNum})`;
+			return steps.find((s) => s.persona_name === displayName) ?? null;
+		}
+		return steps.find((s) => s.persona_name === name) ?? null;
 	}
 
 	// ── Graph builder ─────────────────────────────────────────────────
@@ -82,6 +97,97 @@
 						labelStyle: 'fill: oklch(0.91 0.20 128 / 0.6); font-size: 10px; font-family: var(--font-mono);'
 					});
 				}
+			}
+		} else if (strategy === 'debate') {
+			// Debate: rows of personas per round, connected vertically
+			const maxRounds = detail.debate?.max_rounds ?? 3;
+			const synthesize = detail.debate?.synthesize ?? true;
+			const totalWidth = personas.length * NODE_WIDTH + (personas.length - 1) * H_GAP;
+			const ROUND_GAP = 60; // gap between round label and persona row
+
+			for (let r = 1; r <= maxRounds; r++) {
+				const roundY = OFFSET_Y + (r - 1) * (NODE_HEIGHT + V_GAP + ROUND_GAP + 40);
+
+				// Round label anchor
+				const anchorX = OFFSET_X + (totalWidth - ANCHOR_WIDTH) / 2;
+				nodes.push({
+					id: `__round_${r}`,
+					type: 'anchor',
+					position: { x: anchorX, y: roundY },
+					data: { label: `Round ${r}`, hasTarget: r > 1, hasSource: true },
+					connectable: false,
+					draggable: false
+				});
+
+				// Persona nodes in a row
+				const personaY = roundY + 60 + ROUND_GAP;
+				for (let i = 0; i < personas.length; i++) {
+					const p = personas[i];
+					const nodeId = `${p.name}_r${r}`;
+					nodes.push({
+						id: nodeId,
+						type: 'persona',
+						position: { x: OFFSET_X + i * (NODE_WIDTH + H_GAP), y: personaY },
+						data: {
+							persona: p,
+							state: personaState(p.name, r),
+							step: stepFor(p.name, r),
+							isDebate: true
+						},
+						connectable: false,
+						draggable: false
+					});
+
+					// Round anchor -> persona
+					edges.push({
+						id: `e-round${r}-${nodeId}`,
+						source: `__round_${r}`,
+						target: nodeId,
+						type: 'smoothstep',
+						animated: true,
+						style: 'stroke: oklch(0.91 0.20 128); stroke-width: 2px;'
+					});
+				}
+
+				// Personas -> next round anchor (except last round)
+				if (r < maxRounds) {
+					for (const p of personas) {
+						edges.push({
+							id: `e-${p.name}_r${r}-round${r + 1}`,
+							source: `${p.name}_r${r}`,
+							target: `__round_${r + 1}`,
+							type: 'smoothstep',
+							animated: true,
+							style: 'stroke: oklch(0.91 0.20 128 / 0.4); stroke-width: 1px;'
+						});
+					}
+				}
+			}
+
+			// Synthesis node (or output anchor)
+			const lastRoundY = OFFSET_Y + (maxRounds - 1) * (NODE_HEIGHT + V_GAP + ROUND_GAP + 40);
+			const synthY = lastRoundY + 60 + ROUND_GAP + NODE_HEIGHT + V_GAP;
+			const anchorX = OFFSET_X + (totalWidth - ANCHOR_WIDTH) / 2;
+
+			const synthLabel = synthesize ? 'Synthesis' : 'Final Output';
+			nodes.push({
+				id: '__synthesis',
+				type: 'anchor',
+				position: { x: anchorX, y: synthY },
+				data: { label: synthLabel, hasTarget: true, hasSource: false },
+				connectable: false,
+				draggable: false
+			});
+
+			for (const p of personas) {
+				edges.push({
+					id: `e-${p.name}_r${maxRounds}-synth`,
+					source: `${p.name}_r${maxRounds}`,
+					target: '__synthesis',
+					type: 'smoothstep',
+					animated: true,
+					style: 'stroke: oklch(0.91 0.20 128); stroke-width: 2px;'
+				});
 			}
 		} else {
 			// Parallel: input -> personas -> output
