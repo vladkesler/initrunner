@@ -17,7 +17,7 @@
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
 		messages.map((m) => {
-			const isDebateStreaming = activeSet.size > 1 && m.status === 'streaming';
+			const isDebateStreaming = debateMode && m.status === 'streaming';
 			const base: ThreadMessage = {
 				role: m.role,
 				content: m.content,
@@ -28,9 +28,7 @@
 					: isDebateStreaming
 						? `Agents thinking \u00B7 ${debateElapsed}s`
 						: (m.activePersona ?? 'Team'),
-				avatarSeeds: isDebateStreaming
-					? [...activeSet].map((n) => n.replace(/ \(round \d+\)/, ''))
-					: undefined
+				avatarSeeds: isDebateStreaming ? debateSeeds : undefined
 			};
 			if (m.result) {
 				base.result = {
@@ -59,18 +57,29 @@
 
 	/** All currently-running personas (for debate concurrent display). */
 	let activeSet = $state(new Set<string>());
+	/** True once we see >1 concurrent personas; stays true until run finishes. */
+	let debateMode = $state(false);
+	/** All persona base names seen during this debate (for avatar seeds). */
+	let debateSeeds = $state<string[]>([]);
 	let debateStart = $state(0);
 	let debateElapsed = $state(0);
 	let debateTimer: ReturnType<typeof setInterval> | null = null;
 
 	$effect(() => {
-		if (activeSet.size > 1 && !debateTimer) {
+		if (activeSet.size > 1 && !debateMode) {
+			debateMode = true;
+			debateSeeds = [...activeSet].map((n) => n.replace(/ \(round \d+\)/, ''));
+		}
+	});
+
+	$effect(() => {
+		if (debateMode && !debateTimer) {
 			debateStart = Math.floor(Date.now() / 1000);
 			debateElapsed = 0;
 			debateTimer = setInterval(() => {
 				debateElapsed = Math.floor(Date.now() / 1000) - debateStart;
 			}, 1000);
-		} else if (activeSet.size <= 1 && debateTimer) {
+		} else if (!debateMode && debateTimer) {
 			clearInterval(debateTimer);
 			debateTimer = null;
 		}
@@ -91,6 +100,8 @@
 
 		running = true;
 		activeSet = new Set();
+		debateMode = false;
+		debateSeeds = [];
 		const assistantIdx = messages.length - 1;
 
 		controller = streamTeamRun(
@@ -110,6 +121,8 @@
 				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
+					debateMode = false;
+					if (debateTimer) { clearInterval(debateTimer); debateTimer = null; }
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						content: r.output,
@@ -169,7 +182,7 @@
 
 <div class="flex flex-1 flex-col gap-3">
 	<!-- Active persona indicator (non-debate) -->
-	{#if activePersona && activeSet.size <= 1}
+	{#if activePersona && !debateMode}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
 			Running {activePersona}...
