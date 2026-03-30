@@ -2,7 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { fetchComposeList, deleteCompose } from '$lib/api/compose';
+	import { getStarters, type StarterInfo } from '$lib/api/builder';
 	import type { ComposeSummary } from '$lib/api/types';
+	import StarterCard from '$lib/components/ui/StarterCard.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Workflow, Plus, ExternalLink, Trash2 } from 'lucide-svelte';
@@ -13,6 +15,7 @@
 	let query = $state('');
 	let pendingDelete: ComposeSummary | null = $state(null);
 	let searchEl: HTMLInputElement | undefined = $state();
+	let composeStarters = $state<StarterInfo[]>([]);
 
 	const filtered = $derived(() => {
 		if (!query.trim()) return composes;
@@ -34,7 +37,12 @@
 
 	onMount(async () => {
 		try {
-			composes = await fetchComposeList();
+			const [c, st] = await Promise.all([
+				fetchComposeList(),
+				getStarters().catch(() => ({ starters: [] }))
+			]);
+			composes = c;
+			composeStarters = st.starters.filter((s) => s.kind === 'Compose');
 		} catch {
 			toast.error('Failed to load compositions');
 		} finally {
@@ -117,6 +125,19 @@
 				Create a Composition
 			</a>
 		</div>
+
+		{#if composeStarters.length > 0}
+			<div>
+				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					Start from a template
+				</h2>
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+					{#each composeStarters as starter, i}
+						<StarterCard {starter} index={i} />
+					{/each}
+				</div>
+			</div>
+		{/if}
 	{:else}
 		{@const results = filtered()}
 		{#if results.length === 0 && query}

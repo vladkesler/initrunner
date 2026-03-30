@@ -536,9 +536,10 @@ class ComposeBuilderOptionsResponse(BaseModel):
 
 
 class ComposeSeedRequest(BaseModel):
-    pattern: str
+    mode: Literal["pattern", "starter"] = "pattern"
+    pattern: str = ""
     name: str
-    services: list[SlotAssignment]
+    services: list[SlotAssignment] = []
     service_count: int = 3
     shared_memory: bool = False
     provider: str = "openai"
@@ -546,6 +547,7 @@ class ComposeSeedRequest(BaseModel):
     base_url: str | None = None
     api_key_env: str | None = None
     routing_strategy: Literal["all", "keyword", "sense"] | None = None
+    starter_slug: str | None = None
 
 
 class ComposeSeedResponse(BaseModel):
@@ -696,7 +698,7 @@ class PersonaSeedEntry(BaseModel):
 
 
 class TeamSeedRequest(BaseModel):
-    mode: Literal["blank"]
+    mode: Literal["blank", "starter"] = "blank"
     name: str
     strategy: str = "sequential"
     persona_count: int = 2
@@ -707,6 +709,7 @@ class TeamSeedRequest(BaseModel):
     api_key_env: str | None = None
     debate_max_rounds: int = 3
     debate_synthesize: bool = True
+    starter_slug: str | None = None
 
 
 class TeamSeedResponse(BaseModel):

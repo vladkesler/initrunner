@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fetchTeamList, deleteTeam } from '$lib/api/teams';
+	import { getStarters, type StarterInfo } from '$lib/api/builder';
 	import type { TeamSummary } from '$lib/api/types';
 	import TeamList from '$lib/components/teams/TeamList.svelte';
+	import StarterCard from '$lib/components/ui/StarterCard.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Users, Plus } from 'lucide-svelte';
@@ -13,6 +15,7 @@
 	let query = $state('');
 	let pendingDelete: TeamSummary | null = $state(null);
 	let searchEl: HTMLInputElement | undefined = $state();
+	let teamStarters = $state<StarterInfo[]>([]);
 
 	const filtered = $derived(() => {
 		if (!query.trim()) return teams;
@@ -34,7 +37,12 @@
 
 	onMount(async () => {
 		try {
-			teams = await fetchTeamList();
+			const [t, st] = await Promise.all([
+				fetchTeamList(),
+				getStarters().catch(() => ({ starters: [] }))
+			]);
+			teams = t;
+			teamStarters = st.starters.filter((s) => s.kind === 'Team');
 		} catch {
 			toast.error('Failed to load teams');
 		} finally {
@@ -109,6 +117,19 @@
 				Create a Team
 			</a>
 		</div>
+
+		{#if teamStarters.length > 0}
+			<div>
+				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					Start from a template
+				</h2>
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+					{#each teamStarters as starter, i}
+						<StarterCard {starter} index={i} />
+					{/each}
+				</div>
+			</div>
+		{/if}
 	{:else}
 		{@const results = filtered()}
 		{#if results.length === 0 && query}

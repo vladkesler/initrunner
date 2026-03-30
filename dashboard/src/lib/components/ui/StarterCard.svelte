@@ -11,7 +11,9 @@
 	const href = $derived(
 		starter.kind === 'Team'
 			? `/teams/new?starter=${starter.slug}`
-			: `/agents/new?starter=${starter.slug}`
+			: starter.kind === 'Compose'
+				? `/compose/new?starter=${starter.slug}`
+				: `/agents/new?starter=${starter.slug}`
 	);
 </script>
 

@@ -3,7 +3,6 @@
 	import { fetchTeamBuilderOptions, seedTeam, validateTeam, saveTeam } from '$lib/api/teams';
 	import { saveProviderKey } from '$lib/api/providers';
 	import { ApiError } from '$lib/api/client';
-	import { request } from '$lib/api/client';
 	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
 	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -270,9 +269,14 @@
 			if (starterSlug && options.detected_provider) {
 				generating = true;
 				try {
-					const res = await request<{ yaml_text: string }>(`/api/builder/starters/${starterSlug}/yaml`);
-					const result = await validateTeam(res.yaml_text);
-					yamlText = res.yaml_text;
+					const result = await seedTeam({
+						mode: 'starter',
+						starter_slug: starterSlug,
+						name: starterSlug,
+						provider: options.detected_provider,
+						model: options.detected_model ?? undefined
+					});
+					yamlText = result.yaml_text;
 					issues = result.issues;
 					isReady = result.ready;
 					teamName = starterSlug;

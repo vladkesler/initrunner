@@ -47,10 +47,10 @@ export function fetchTeamBuilderOptions(): Promise<TeamBuilderOptions> {
 }
 
 export function seedTeam(req: {
-	mode: 'blank';
+	mode: 'blank' | 'starter';
 	name: string;
-	strategy: string;
-	persona_count: number;
+	strategy?: string;
+	persona_count?: number;
 	personas?: PersonaSeedEntry[] | null;
 	provider: string;
 	model?: string | null;
@@ -58,6 +58,7 @@ export function seedTeam(req: {
 	api_key_env?: string | null;
 	debate_max_rounds?: number;
 	debate_synthesize?: boolean;
+	starter_slug?: string;
 }): Promise<TeamSeedResponse> {
 	return request<TeamSeedResponse>('/api/team-builder/seed', {
 		method: 'POST',
