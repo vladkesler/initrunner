@@ -280,7 +280,7 @@
 			</TabsList>
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
-				<RunPanel {composeId} onRunCompleted={async () => {
+				<RunPanel {composeId} {detail} onRunCompleted={async () => {
 					const [s, e] = await Promise.allSettled([
 						fetchComposeStats(composeId),
 						fetchComposeEvents(composeId)
