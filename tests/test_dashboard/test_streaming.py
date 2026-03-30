@@ -1,0 +1,250 @@
+"""Regression tests for dashboard SSE streaming -- sentinel/future race.
+
+The four ``stream_*_sse`` helpers in ``initrunner/dashboard/streaming.py``
+push a ``None`` sentinel from a ``finally`` block *before* the executor
+future is marked done.  If the consumer reads the sentinel and then calls
+``.result()`` synchronously, it hits ``InvalidStateError``.  The fix is to
+``await`` the future instead.  These tests force the race deterministically
+and assert each helper emits a ``result`` event, not an ``error`` event.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import threading
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+@pytest.fixture
+def _mock_run_result():
+    """Minimal RunResult mock."""
+    r = MagicMock()
+    r.run_id = "run-1"
+    r.output = "ok"
+    r.tokens_in = 1
+    r.tokens_out = 1
+    r.total_tokens = 2
+    r.tool_calls = 0
+    r.tool_call_names = []
+    r.duration_ms = 10
+    r.success = True
+    r.error = None
+    return r
+
+
+@pytest.fixture
+def _mock_role():
+    role = MagicMock()
+    role.spec.memory = None
+    role.spec.session = None
+    return role
+
+
+# ── helpers ──────────────────────────────────────────────────────────────
+
+
+async def _collect(aiter):
+    """Drain an async iterator into a list."""
+    return [item async for item in aiter]
+
+
+def _parse_last_data_event(events: list[str]) -> dict:
+    """Parse the last ``data:`` SSE line into a dict."""
+    for event in reversed(events):
+        if event.startswith("data: "):
+            return json.loads(event.removeprefix("data: ").strip())
+    raise AssertionError("No data event found")
+
+
+# ── stream_run_sse ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_run_sse_awaits_future(_mock_run_result, _mock_role):
+    """stream_run_sse must await the executor future, not call .result()."""
+    from initrunner.dashboard.streaming import stream_run_sse
+
+    gate = threading.Event()
+
+    def slow_build(path, **kw):
+        return (_mock_role, MagicMock())
+
+    def slow_stream(agent, role, prompt, **kw):
+        # Simulate sentinel arriving before executor marks future done:
+        # the finally block fires immediately, but we stall the return.
+        gate.wait(timeout=5)
+        return (_mock_run_result, [])
+
+    with (
+        patch("initrunner.services.execution.build_agent_sync", side_effect=slow_build),
+        patch("initrunner.services.execution.execute_run_stream_sync", side_effect=slow_stream),
+    ):
+        async def run():
+            events = []
+            async for event in stream_run_sse(Path("/tmp/role.yaml"), "hello"):
+                events.append(event)
+            return events
+
+        # Release the gate after a brief delay so the executor future resolves
+        async def release():
+            await asyncio.sleep(0.05)
+            gate.set()
+
+        results, _ = await asyncio.gather(run(), release())
+
+    last = _parse_last_data_event(results)
+    assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["success"] is True
+
+
+# ── stream_compose_run_sse ───────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_compose_run_sse_awaits_future():
+    """stream_compose_run_sse must await the executor future."""
+    from initrunner.dashboard.streaming import stream_compose_run_sse
+
+    gate = threading.Event()
+
+    compose_result = MagicMock()
+    compose_result.output = "done"
+    compose_result.output_mode = "last"
+    compose_result.final_service_name = "svc-1"
+    compose_result.steps = []
+    compose_result.total_tokens_in = 1
+    compose_result.total_tokens_out = 1
+    compose_result.total_duration_ms = 10
+    compose_result.success = True
+    compose_result.error = None
+    compose_result.entry_messages = None
+
+    def slow_compose(*a, **kw):
+        gate.wait(timeout=5)
+        return compose_result
+
+    with patch(
+        "initrunner.services.compose.run_compose_once_sync",
+        side_effect=slow_compose,
+    ):
+        compose_def = MagicMock()
+
+        async def run():
+            return [
+                e
+                async for e in stream_compose_run_sse(
+                    compose_def, Path("/tmp"), "hello"
+                )
+            ]
+
+        async def release():
+            await asyncio.sleep(0.05)
+            gate.set()
+
+        results, _ = await asyncio.gather(run(), release())
+
+    last = _parse_last_data_event(results)
+    assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["success"] is True
+
+
+# ── stream_team_run_sse ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_team_run_sse_awaits_future():
+    """stream_team_run_sse must await the executor future."""
+    from initrunner.dashboard.streaming import stream_team_run_sse
+
+    gate = threading.Event()
+
+    team_result = MagicMock()
+    team_result.team_run_id = "t-1"
+    team_result.final_output = "done"
+    team_result.agent_names = []
+    team_result.agent_results = []
+    team_result.total_tokens_in = 1
+    team_result.total_tokens_out = 1
+    team_result.total_tokens = 2
+    team_result.total_duration_ms = 10
+    team_result.success = True
+    team_result.error = None
+
+    def slow_team(*a, **kw):
+        gate.wait(timeout=5)
+        return team_result
+
+    with patch(
+        "initrunner.team.runner.run_team_dispatch",
+        side_effect=slow_team,
+    ):
+        team_def = MagicMock()
+
+        async def run():
+            return [
+                e
+                async for e in stream_team_run_sse(
+                    team_def, Path("/tmp"), "hello"
+                )
+            ]
+
+        async def release():
+            await asyncio.sleep(0.05)
+            gate.set()
+
+        results, _ = await asyncio.gather(run(), release())
+
+    last = _parse_last_data_event(results)
+    assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["success"] is True
+
+
+# ── stream_ingest_sse ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_ingest_sse_awaits_future():
+    """stream_ingest_sse must await the executor future."""
+    from initrunner.dashboard.streaming import stream_ingest_sse
+
+    gate = threading.Event()
+
+    ingest_stats = MagicMock()
+    ingest_stats.new = 1
+    ingest_stats.updated = 0
+    ingest_stats.skipped = 0
+    ingest_stats.errored = 0
+    ingest_stats.total_chunks = 5
+    ingest_stats.file_results = []
+
+    mock_role = MagicMock()
+
+    def slow_ingest(role, path, **kw):
+        gate.wait(timeout=5)
+        return ingest_stats
+
+    with (
+        patch("initrunner.agent.loader.load_role", return_value=mock_role),
+        patch("initrunner.agent.loader.resolve_role_model", return_value=mock_role),
+        patch(
+            "initrunner.services.operations.run_ingest_sync",
+            side_effect=slow_ingest,
+        ),
+    ):
+
+        async def run():
+            return [e async for e in stream_ingest_sse(Path("/tmp/role.yaml"))]
+
+        async def release():
+            await asyncio.sleep(0.05)
+            gate.set()
+
+        results, _ = await asyncio.gather(run(), release())
+
+    last = _parse_last_data_event(results)
+    assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["new"] == 1

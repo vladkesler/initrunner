@@ -8,7 +8,7 @@
 	<Handle type="target" position={Position.Top} class="!bg-accent-primary !w-2 !h-2 !border-edge" />
 {/if}
 
-<div class="w-[200px] border border-accent-primary/30 bg-accent-primary/5 px-4 py-2 text-center font-mono text-[12px] text-accent-primary">
+<div class="w-[200px] card-surface bg-surface-1 px-4 py-2 text-center font-mono text-[12px] text-accent-primary">
 	{data.label}
 </div>
 

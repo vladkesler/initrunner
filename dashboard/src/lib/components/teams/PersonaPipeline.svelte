@@ -3,6 +3,8 @@
 		SvelteFlow,
 		Background,
 		Controls,
+		MiniMap,
+		Panel,
 		type Node,
 		type Edge
 	} from '@xyflow/svelte';
@@ -10,6 +12,7 @@
 	import type { TeamDetail, PersonaDetail, PersonaStepResponse } from '$lib/api/types';
 	import PersonaNode from './PersonaNode.svelte';
 	import AnchorNode from './AnchorNode.svelte';
+	import { RotateCcw } from 'lucide-svelte';
 
 	let {
 		detail,
@@ -115,7 +118,7 @@
 					target: p.name,
 					type: 'smoothstep',
 					animated: true,
-					style: 'stroke: oklch(0.91 0.20 128 / 0.6); stroke-width: 1.5px;'
+					style: 'stroke: oklch(0.91 0.20 128); stroke-width: 2px;'
 				});
 			}
 
@@ -137,12 +140,23 @@
 					target: '__output',
 					type: 'smoothstep',
 					animated: true,
-					style: 'stroke: oklch(0.91 0.20 128 / 0.6); stroke-width: 1.5px;'
+					style: 'stroke: oklch(0.91 0.20 128); stroke-width: 2px;'
 				});
 			}
 		}
 
 		return { nodes, edges };
+	}
+
+	// ── MiniMap colors ────────────────────────────────────────────────
+
+	function minimapNodeColor(node: Node): string {
+		if (node.type === 'anchor') return '#00e5ff';
+		const st = node.data?.state as string | undefined;
+		if (st === 'active') return '#c8ff00';
+		if (st === 'error') return '#ff4d6a';
+		if (st === 'complete') return '#34d399';
+		return '#2a2a30';
 	}
 
 	// ── Reactive state ────────────────────────────────────────────────
@@ -152,6 +166,7 @@
 	const graph = $derived(buildGraph(detail.personas, detail.strategy, detail.handoff_max_chars));
 	let nodes = $state.raw<Node[]>([]);
 	let edges = $state.raw<Edge[]>([]);
+	let viewKey = $state(0);
 
 	$effect(() => {
 		nodes = graph.nodes;
@@ -160,6 +175,7 @@
 </script>
 
 <div style:width="100%" style:height="100%">
+	{#key viewKey}
 	<SvelteFlow
 		bind:nodes
 		bind:edges
@@ -176,5 +192,17 @@
 	>
 		<Background gap={24} size={1} />
 		<Controls showInteractive={false} />
+		<MiniMap nodeColor={minimapNodeColor} pannable zoomable />
+
+		<Panel position="bottom-left">
+			<button
+				class="flex items-center gap-1.5 border border-edge bg-surface-0/90 px-3 py-1.5 font-mono text-[11px] text-fg-faint backdrop-blur-sm transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+				onclick={() => viewKey++}
+			>
+				<RotateCcw size={12} strokeWidth={1.5} />
+				Reset view
+			</button>
+		</Panel>
 	</SvelteFlow>
+	{/key}
 </div>

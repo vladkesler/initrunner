@@ -94,7 +94,7 @@ async def stream_run_sse(
 
     # Emit final result or error
     try:
-        result, new_messages = stream_task.result()
+        result, new_messages = await stream_task
 
         # Serialize trimmed history on success
         serialized_history = None
@@ -216,7 +216,7 @@ async def stream_compose_run_sse(
 
     # Emit final result or error
     try:
-        compose_result = compose_task.result()
+        compose_result = await compose_task
 
         # Serialize entry service message history
         serialized_history = None
@@ -348,7 +348,7 @@ async def stream_team_run_sse(
 
     # Emit final result or error
     try:
-        team_result = team_task.result()
+        team_result = await team_task
 
         payload = {
             "team_run_id": team_result.team_run_id,
@@ -438,7 +438,7 @@ async def stream_ingest_sse(
 
     # Emit final result or error
     try:
-        stats = ingest_task.result()
+        stats = await ingest_task
         payload = {
             "new": stats.new if stats else 0,
             "updated": stats.updated if stats else 0,
