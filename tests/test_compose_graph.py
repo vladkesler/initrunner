@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
 from initrunner.compose.graph import (
-    _ServiceRef,
+    ServiceRef,
     build_compose_graph,
     run_compose_graph_sync,
 )
@@ -43,12 +43,12 @@ def _make_compose_data(services: dict | None = None) -> dict:
     }
 
 
-def _make_service_ref(name: str) -> _ServiceRef:
+def _make_service_ref(name: str) -> ServiceRef:
     from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(_make_role_data(name))
     agent = MagicMock()
-    return _ServiceRef(
+    return ServiceRef(
         name=name,
         role=role,
         agent=agent,

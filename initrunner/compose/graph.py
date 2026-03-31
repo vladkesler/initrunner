@@ -76,7 +76,7 @@ class DelegationEnvelope:
 class ComposeGraphDeps:
     """Injected into every graph step."""
 
-    services: dict[str, _ServiceRef]
+    services: dict[str, ServiceRef]
     compose_name: str
     audit_logger: AuditLogger | None
     on_service_start: Callable[[str], None] | None
@@ -85,7 +85,7 @@ class ComposeGraphDeps:
 
 
 @dataclass
-class _ServiceRef:
+class ServiceRef:
     """Thin reference to a compose service for graph steps."""
 
     name: str
@@ -96,6 +96,10 @@ class _ServiceRef:
     last_messages: list | None = None
     run_count: int = 0
     error_count: int = 0
+
+
+# Backward-compatible alias
+_ServiceRef = ServiceRef
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +121,7 @@ class _RunRequest:
 
 def build_compose_graph(
     compose: ComposeDefinition,
-    service_refs: dict[str, _ServiceRef],
+    service_refs: dict[str, ServiceRef],
 ):
     """Build a pydantic-graph from compose service topology.
 
@@ -532,7 +536,7 @@ def _make_join_transform(target_name: str):
     return join_transform
 
 
-def _prune_memory(ref: _ServiceRef) -> None:
+def _prune_memory(ref: ServiceRef) -> None:
     """Prune stale memory sessions for a service."""
     from initrunner.stores.factory import open_memory_store
 
@@ -556,11 +560,11 @@ def build_service_refs(
     services: dict,
     *,
     one_shot: bool = True,
-) -> dict[str, _ServiceRef]:
-    """Convert ComposeService instances to lightweight _ServiceRef objects."""
-    refs: dict[str, _ServiceRef] = {}
+) -> dict[str, ServiceRef]:
+    """Convert ComposeService instances to lightweight ServiceRef objects."""
+    refs: dict[str, ServiceRef] = {}
     for name, svc in services.items():
-        refs[name] = _ServiceRef(
+        refs[name] = ServiceRef(
             name=name,
             role=svc.role,
             agent=svc.agent,
@@ -569,8 +573,8 @@ def build_service_refs(
     return refs
 
 
-def sync_refs_back(services: dict, refs: dict[str, _ServiceRef]) -> None:
-    """Copy results from _ServiceRef back to ComposeService for _collect_results."""
+def sync_refs_back(services: dict, refs: dict[str, ServiceRef]) -> None:
+    """Copy results from ServiceRef back to ComposeService for _collect_results."""
     for name, ref in refs.items():
         if name in services:
             svc = services[name]
@@ -593,7 +597,7 @@ async def run_compose_graph_async(
     on_service_start: Callable[[str], None] | None = None,
     on_service_complete: Callable[[str, RunResult], None] | None = None,
     one_shot: bool = True,
-) -> tuple[dict[str, _ServiceRef], str, int, bool]:
+) -> tuple[dict[str, ServiceRef], str, int, bool]:
     """Run the compose graph asynchronously.
 
     Returns ``(refs, entry_name, elapsed_ms, timed_out)`` so the caller
@@ -645,7 +649,7 @@ def run_compose_graph_sync(
     services: dict,
     prompt: str,
     **kwargs,
-) -> tuple[dict[str, _ServiceRef], str, int, bool]:
+) -> tuple[dict[str, ServiceRef], str, int, bool]:
     """Synchronous wrapper for ``run_compose_graph_async``."""
 
     async def _run():

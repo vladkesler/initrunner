@@ -68,26 +68,15 @@ async def run_compose_once_async(
 
     Used by dashboard streaming to avoid the thread pool hop.
     """
-    from initrunner.compose.graph import run_compose_graph_async
     from initrunner.compose.orchestrator import ComposeOrchestrator
 
     orchestrator = ComposeOrchestrator(compose, base_dir, audit_logger=audit_logger)
-    orchestrator._build_services(one_shot=True)
-    entry = orchestrator._find_entry()
-
-    _refs, _entry_name, total_ms, timed_out = await run_compose_graph_async(
-        compose,
-        orchestrator._services,
+    return await orchestrator.run_once_async(
         prompt,
-        entry_service=entry.name,
         message_history=message_history,
-        audit_logger=audit_logger,
         on_service_start=on_service_start,
         on_service_complete=on_service_complete,
-        one_shot=True,
     )
-
-    return orchestrator._collect_results(entry, total_ms, timed_out=timed_out)
 
 
 # ---------------------------------------------------------------------------

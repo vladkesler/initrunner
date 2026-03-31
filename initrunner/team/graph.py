@@ -20,21 +20,12 @@ from pydantic_graph.beta.join import reduce_list_append
 from initrunner._ids import generate_id
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
-from initrunner.team.runner import (
-    StepMetadata,
-    TeamResult,
-    _accumulate_result,
-    _apply_shared_stores,
-    _build_agent_prompt,
-    _build_parallel_prompt,
-    _persona_env,
-    _persona_to_role,
-    _resolve_shared_paths,
-    _resolve_team_model,
-    _run_pre_ingestion,
-    _setup_team_tracing,
-)
+from initrunner.team.prompts import build_agent_prompt, build_parallel_prompt
+from initrunner.team.results import StepMetadata, TeamResult, accumulate_result
+from initrunner.team.roles import persona_to_role
+from initrunner.team.runtime import persona_env, resolve_team_model, setup_team_tracing
 from initrunner.team.schema import PersonaConfig, TeamDefinition
+from initrunner.team.stores import apply_shared_stores, resolve_shared_paths, run_pre_ingestion
 
 logger = get_logger("team.graph")
 
@@ -130,11 +121,11 @@ def _make_sequential_persona_step(persona_name: str, index: int):
                 return ""
 
         # Build role and agent
-        role = _persona_to_role(persona_name, persona, team)
-        _apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
+        role = persona_to_role(persona_name, persona, team)
+        apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
         # Build prompt with prior outputs
-        prompt = _build_agent_prompt(
+        prompt = build_agent_prompt(
             deps.task, persona_name, state.prior_outputs, team.spec.handoff_max_chars
         )
 
@@ -147,7 +138,7 @@ def _make_sequential_persona_step(persona_name: str, index: int):
         # Execute with persona environment
         from initrunner.agent.loader import build_agent
 
-        with _persona_env(persona.environment):
+        with persona_env(persona.environment):
             agent = build_agent(role, role_dir=deps.team_dir)
             result, _ = await execute_run_async(
                 agent,
@@ -161,7 +152,7 @@ def _make_sequential_persona_step(persona_name: str, index: int):
 
         # Accumulate to team result
         if state.team_result:
-            _accumulate_result(state.team_result, persona_name, result)
+            accumulate_result(state.team_result, persona_name, result)
             state.total_tokens = state.team_result.total_tokens
 
         # Callback
@@ -196,7 +187,7 @@ def _build_parallel_graph(team: TeamDefinition):
         state_type=TeamGraphState,
         deps_type=TeamGraphDeps,
         input_type=str,
-        output_type=list[tuple[int, str, str]],
+        output_type=list[tuple[int, str, RunResult]],
     )
 
     # Create steps for each persona (returns indexed tuple for ordering)
@@ -231,7 +222,7 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
 
     async def persona_step(
         ctx: StepContext[TeamGraphState, TeamGraphDeps, str],
-    ) -> tuple[int, str, str]:
+    ) -> tuple[int, str, RunResult]:
         deps = ctx.deps
         team = deps.team
         persona = team.spec.personas[persona_name]
@@ -240,10 +231,10 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
         if deps.on_persona_start:
             deps.on_persona_start(persona_name)
 
-        role = _persona_to_role(persona_name, persona, team)
-        _apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
+        role = persona_to_role(persona_name, persona, team)
+        apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
-        prompt = _build_parallel_prompt(deps.task, persona_name)
+        prompt = build_parallel_prompt(deps.task, persona_name)
 
         trigger_metadata = {
             "team_name": team.metadata.name,
@@ -268,8 +259,7 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
         if deps.on_persona_complete:
             deps.on_persona_complete(persona_name, result)
 
-        output = result.output if result.success else ""
-        return (declared_index, persona_name, output)
+        return (declared_index, persona_name, result)
 
     persona_step.__name__ = f"step_{persona_name}"
     persona_step.__qualname__ = f"step_{persona_name}"
@@ -298,16 +288,16 @@ async def run_team_graph_async(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
-    _resolve_team_model(team)
+    resolve_team_model(team)
 
-    shared_mem_path, shared_doc_path = _resolve_shared_paths(team)
+    shared_mem_path, shared_doc_path = resolve_shared_paths(team)
 
     # Pre-ingest shared documents
     if shared_doc_path and team.spec.shared_documents.sources:
-        await anyio.to_thread.run_sync(lambda: _run_pre_ingestion(team, shared_doc_path, team_dir))  # type: ignore[unresolved-attribute]
+        await anyio.to_thread.run_sync(lambda: run_pre_ingestion(team, shared_doc_path, team_dir))  # type: ignore[unresolved-attribute]
 
     # Initialize tracing
-    tracing_provider = _setup_team_tracing(team)
+    tracing_provider = setup_team_tracing(team)
 
     try:
         deps = TeamGraphDeps(
@@ -339,18 +329,7 @@ async def run_team_graph_async(
                 result.error = "Team timeout exceeded"
                 return result
 
-            # Collect parallel results in declared order
-            if isinstance(graph_output, list):
-                sorted_outputs = sorted(graph_output, key=lambda t: t[0])
-                output_parts = []
-                for _idx, pname, output in sorted_outputs:  # type: ignore[not-iterable]
-                    if output:
-                        output_parts.append(f"## {pname}\n\n{output}")
-                result.final_output = "\n\n".join(output_parts)
-
-            # Accumulate results from parallel runs
-            # (parallel steps don't accumulate via state.team_result directly)
-            # Re-collect from graph output
+            # Accumulate results and build final output from parallel runs
             _collect_parallel_results(result, team, graph_output)
 
             # Post-run token budget check
@@ -487,21 +466,17 @@ async def _run_debate_persona(
     result: TeamResult,
 ) -> tuple[str, str]:
     """Execute one persona for one debate round. Returns (name, output)."""
-    from initrunner.team.runner import (
-        _apply_shared_stores,
-        _build_debate_prompt,
-        _persona_to_role,
-    )
+    from initrunner.team.prompts import build_debate_prompt
 
     display_name = f"{persona_name} (round {round_num})"
 
     if deps.on_persona_start:
         deps.on_persona_start(display_name)
 
-    role = _persona_to_role(persona_name, persona, team)
-    _apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
+    role = persona_to_role(persona_name, persona, team)
+    apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
-    prompt = _build_debate_prompt(
+    prompt = build_debate_prompt(
         task,
         persona_name,
         round_num,
@@ -530,7 +505,7 @@ async def _run_debate_persona(
         trigger_metadata=trigger_metadata,
     )
 
-    _accumulate_result(
+    accumulate_result(
         result,
         display_name,
         run_result,
@@ -555,7 +530,7 @@ async def _run_synthesis(
     """Run the final synthesis step."""
     from initrunner.agent.schema.base import Kind, RoleMetadata
     from initrunner.agent.schema.role import AgentSpec, RoleDefinition
-    from initrunner.team.runner import _build_synthesis_prompt
+    from initrunner.team.prompts import build_synthesis_prompt
 
     if deps.on_persona_start:
         deps.on_persona_start("synthesis")
@@ -576,7 +551,7 @@ async def _run_synthesis(
         spec=spec,
     )
 
-    prompt = _build_synthesis_prompt(
+    prompt = build_synthesis_prompt(
         task,
         positions,
         team.spec.debate.max_rounds,
@@ -601,7 +576,7 @@ async def _run_synthesis(
         trigger_metadata=trigger_metadata,
     )
 
-    _accumulate_result(
+    accumulate_result(
         result,
         "synthesis",
         run_result,
@@ -626,25 +601,35 @@ def _format_debate_positions(positions: list[tuple[str, str]]) -> str:
 def _collect_parallel_results(
     result: TeamResult,
     team: TeamDefinition,
-    graph_output: list[tuple[int, str, str]] | None,
+    graph_output: list[tuple[int, str, RunResult]] | None,
 ) -> None:
     """Collect results from parallel graph output into TeamResult.
 
-    Note: parallel steps run execute_run_async but don't accumulate
-    via state.team_result (concurrent mutation isn't safe).  We need
-    the graph step to return enough info to build the result.
-    For now, the on_persona_complete callback is the accumulation path.
+    Sorts by declared index to preserve persona order, accumulates all
+    metrics from each RunResult, and derives failure from run_result.success.
     """
-    # Results are already accumulated via on_persona_complete callbacks
-    # and _accumulate_result in the step functions (which is not thread-safe
-    # for parallel).  For the parallel path, we track failures.
     if graph_output is None:
         return
-    for _idx, pname, output in graph_output:
-        if not output:
-            result.success = False
-            if not result.error:
-                result.error = f"Persona '{pname}' failed or produced no output"
+
+    sorted_items = sorted(graph_output, key=lambda t: t[0])
+    failed_personas: list[str] = []
+    output_parts: list[str] = []
+
+    for _idx, pname, run_result in sorted_items:
+        accumulate_result(result, pname, run_result)
+        if not run_result.success:
+            failed_personas.append(pname)
+        elif run_result.output:
+            output_parts.append(f"## {pname}\n\n{run_result.output}")
+
+    result.final_output = "\n\n".join(output_parts)
+
+    if failed_personas:
+        result.success = False
+        if len(failed_personas) == 1:
+            result.error = f"Persona '{failed_personas[0]}' failed"
+        else:
+            result.error = f"Persona(s) failed: {', '.join(failed_personas)}"
 
 
 def run_team_graph_sync(
