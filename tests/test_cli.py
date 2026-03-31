@@ -1232,8 +1232,8 @@ class TestResolveRolePathInstalled:
             )
         )
 
-        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
-        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr("initrunner.registry._manifest.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry._manifest.MANIFEST_PATH", manifest_path)
 
         resolved = resolve_role_path(Path("code-reviewer"))
         assert resolved == role_dir / "role.yaml"
@@ -1263,8 +1263,8 @@ class TestResolveRolePathInstalled:
             )
         )
 
-        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
-        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr("initrunner.registry._manifest.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry._manifest.MANIFEST_PATH", manifest_path)
 
         from initrunner.agent.executor import RunResult
 

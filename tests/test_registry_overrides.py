@@ -22,8 +22,8 @@ def registry_env(tmp_path, monkeypatch):
     roles_dir.mkdir()
     manifest_path = roles_dir / "registry.json"
 
-    monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
-    monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+    monkeypatch.setattr("initrunner.registry._manifest.ROLES_DIR", roles_dir)
+    monkeypatch.setattr("initrunner.registry._manifest.MANIFEST_PATH", manifest_path)
 
     # Seed manifest with one installed hub role
     manifest = {
