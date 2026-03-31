@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.3.9] - 2026-03-31
+
+### Changed
+- **Split executor.py** -- extracted `executor_auth.py`, `executor_models.py`, `executor_output.py`, and `executor_retry.py` from the 478-line executor module into focused submodules
+- **Split schema/tools.py** -- converted the 557-line tool config module into `initrunner/agent/schema/tools/` package with domain-grouped submodules (`_base`, `_comms`, `_exec`, `_integration`, `_io`, `_media`, `_reasoning`, `_web`). API surface regression test added
+- **Split registry.py** -- converted the 789-line role registry module into `initrunner/registry/` package with focused submodules (`_exceptions`, `_types`, `_manifest`, `_overrides`, `_resolve`, `_preview`, `_install`, `_manage`, `_update`). All existing imports preserved via `__init__.py` re-exports. Pinned 25-name API surface regression test added
+- **Clean up team/compose orchestration** -- extracted `team/prompts.py`, `team/results.py`, `team/roles.py`, `team/runtime.py` from the 445-line team runner. Expanded `team/stores.py` for shared state management
+- **Centralized provider detection** -- moved `PROVIDER_KEY_ENVS_DICT` to `providers.py` as the canonical dict form. Migrated all 12 consumers from the `loader.py` re-export chain to direct `providers.py` imports. `ALL_PROVIDERS` in `setup.py` derived from canonical source with a drift-catching assertion
+- **Consolidated optional dependency handling** -- added `MissingExtraError`, `require_extra()`, and `is_extra_available()` to `_compat.py`. Migrated 12 ad-hoc `try/except ImportError` blocks across 8 files to use the new helpers with consistent error messages. Deduplicated HTML processing in `_html.py`
+
 ## [2026.3.8] - 2026-03-30
 
 ### Added
