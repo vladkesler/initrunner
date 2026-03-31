@@ -28,7 +28,7 @@ class TestCheckDelegationPolicy:
         source = Metadata(name="source-agent", description="")
         with (
             patch("initrunner.authz.get_current_engine", return_value=mock_engine),
-            patch("initrunner.agent.executor._cached_config", mock_config),
+            patch("initrunner.agent.executor_auth._cached_config", mock_config),
         ):
             assert check_delegation_policy(source, "target-agent") is True
 
@@ -48,7 +48,7 @@ class TestCheckDelegationPolicy:
 
         with (
             patch("initrunner.authz.get_current_engine", return_value=mock_engine),
-            patch("initrunner.agent.executor._cached_config", mock_config),
+            patch("initrunner.agent.executor_auth._cached_config", mock_config),
         ):
             result = check_delegation_policy(source, "target-agent", target)
 
@@ -81,7 +81,7 @@ class TestCheckDelegationPolicy:
         source = Metadata(name="source-agent", description="")
         with (
             patch("initrunner.authz.get_current_engine", return_value=mock_engine),
-            patch("initrunner.agent.executor._cached_config", mock_config),
+            patch("initrunner.agent.executor_auth._cached_config", mock_config),
         ):
             assert check_delegation_policy(source, "target-agent") is False
 
@@ -98,7 +98,7 @@ class TestCheckDelegationPolicy:
 
         with (
             patch("initrunner.authz.get_current_engine", return_value=mock_engine),
-            patch("initrunner.agent.executor._cached_config", mock_config),
+            patch("initrunner.agent.executor_auth._cached_config", mock_config),
         ):
             result = check_delegation_policy(source, "remote-agent")
 

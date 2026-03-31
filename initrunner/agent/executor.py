@@ -1,439 +1,68 @@
-"""Execute agent runs with guardrails and audit logging."""
+"""Execute agent runs with guardrails and audit logging.
+
+This module is the orchestration layer and compatibility facade. The
+implementation is split across focused sub-modules:
+
+- ``executor_models``  -- RunResult, AutonomousResult, TokenBudgetStatus
+- ``executor_auth``    -- agent principal scoping, policy engine globals
+- ``executor_retry``   -- retry + timeout resilience primitives
+- ``executor_output``  -- validation, output processing, audit, observability
+
+All names that were historically importable from this module are explicitly
+re-imported below so that existing ``from initrunner.agent.executor import X``
+statements continue to work.  The one exception is mutable globals
+(``_cached_config``, ``_cached_engine``, ``_authz_resolved``) which live
+exclusively in ``executor_auth``.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import atexit
-import contextvars
-import json
-import logging
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as _FuturesTimeout
-from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any
 
-from pydantic import BaseModel
 from pydantic_ai import Agent, UsageLimits
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
 
 from initrunner._ids import generate_id
 from initrunner.agent.capabilities.content_guard import ContentBlockedError
-from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
+from initrunner.agent.prompt import UserPrompt
 from initrunner.agent.schema.role import RoleDefinition
-from initrunner.audit.logger import AuditLogger, AuditRecord
-
-_logger = logging.getLogger(__name__)
+from initrunner.audit.logger import AuditLogger
 
 # ---------------------------------------------------------------------------
-# Agent principal scoping (policy engine)
+# Explicit re-exports from sub-modules (compatibility facade)
 # ---------------------------------------------------------------------------
-
-_cached_engine: Any = None
-_cached_config: Any = None
-_authz_resolved = False
-
-
-def _ensure_authz() -> None:
-    """One-time: load config, build policy engine, set ContextVar.
-
-    Fail-fast: when ``INITRUNNER_POLICY_DIR`` is set but policy loading
-    fails, the error propagates (operator explicitly opted in).
-    """
-    global _cached_engine, _cached_config, _authz_resolved
-    if _authz_resolved:
-        return
-    _authz_resolved = True
-
-    from initrunner.authz import load_authz_config, load_engine, set_current_engine
-
-    config = load_authz_config()
-    if config is None:
-        return
-
-    engine = load_engine(config)
-    info = engine.info()
-    _cached_engine = engine
-    _cached_config = config
-    set_current_engine(engine)
-    _logger.info(
-        "Policy engine enabled: %d policies, %d rules",
-        info.policy_count,
-        info.rule_count,
-    )
-
-
-def _enter_agent_context(role: RoleDefinition) -> contextvars.Token | None:
-    """Set the agent principal ContextVar for the current run."""
-    _ensure_authz()
-    if _cached_engine is None:
-        return None
-
-    from initrunner.authz import agent_principal_from_role, set_current_agent_principal
-
-    principal = agent_principal_from_role(role.metadata)
-    return set_current_agent_principal(principal)
-
-
-def _exit_agent_context(token: contextvars.Token | None) -> None:
-    """Reset the agent principal ContextVar."""
-    if token is not None:
-        from initrunner.authz import _current_agent_principal
-
-        _current_agent_principal.reset(token)
-
-
-_RETRY_MAX_ATTEMPTS = 3
-_RETRY_BACKOFF_BASE = 1.0  # seconds
-_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-
-_TIMEOUT_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="run_timeout")
-atexit.register(_TIMEOUT_POOL.shutdown, wait=False)
-
-
-_T = TypeVar("_T")
-
-
-def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
-    """Run *fn* in a thread pool with a hard timeout (seconds).
-
-    Uses ``copy_context()`` so that ContextVars (e.g. agent principal/engine)
-    propagate to the pool thread where ``agent.run_sync()`` executes.
-    """
-    ctx = contextvars.copy_context()
-    future = _TIMEOUT_POOL.submit(ctx.run, fn)
-    try:
-        return future.result(timeout=timeout)  # type: ignore[return-value]
-    except _FuturesTimeout:
-        raise TimeoutError(f"Run timed out after {int(timeout)}s") from None
-
+from .executor_auth import (
+    _enter_agent_context,
+    _exit_agent_context,
+)
+from .executor_models import (  # noqa: F401
+    AutonomousResult,
+    RunResult,
+    TokenBudgetStatus,
+    check_token_budget,
+)
+from .executor_output import (
+    _audit_result,
+    _create_run_span,
+    _handle_run_error,
+    _process_agent_output,
+    _process_stream_output,
+    _record_span_metrics,
+    _validate_input_or_fail,
+)
+from .executor_retry import (
+    _retry_model_call,
+    _retry_model_call_async,
+    _run_with_timeout,
+    _should_retry,  # noqa: F401
+)
 
 # ---------------------------------------------------------------------------
-# Retry helpers
-# ---------------------------------------------------------------------------
-
-
-def _should_retry(exc: ModelHTTPError, attempt: int) -> float | None:
-    """Return delay seconds if retryable and more attempts remain, else None."""
-    if exc.status_code not in _RETRYABLE_STATUS_CODES:
-        return None
-    if attempt >= _RETRY_MAX_ATTEMPTS - 1:
-        return None
-    delay = _RETRY_BACKOFF_BASE * (2**attempt)
-    _logger.warning(
-        "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
-        exc.status_code,
-        attempt + 1,
-        _RETRY_MAX_ATTEMPTS,
-        delay,
-    )
-    return delay
-
-
-def _retry_model_call(
-    fn: Callable[[], _T],
-    *,
-    on_retry: Callable[[], None] | None = None,
-) -> _T:
-    """Call *fn* with retry-on-transient-HTTP-error logic.
-
-    Retries up to ``_RETRY_MAX_ATTEMPTS`` times for status codes in
-    ``_RETRYABLE_STATUS_CODES``, using exponential backoff.  Calls
-    *on_retry* (if provided) before each retry attempt — only when an
-    actual retry will follow.
-    """
-    last_http_error: ModelHTTPError | None = None
-    for attempt in range(_RETRY_MAX_ATTEMPTS):
-        try:
-            return fn()
-        except ModelHTTPError as e:
-            delay = _should_retry(e, attempt)
-            if delay is None:
-                raise
-            last_http_error = e
-            if on_retry is not None:
-                on_retry()
-            time.sleep(delay)
-    raise last_http_error  # type: ignore[misc]
-
-
-async def _retry_model_call_async(
-    fn: Callable[..., Any],
-    *,
-    on_retry: Callable[[], None] | None = None,
-) -> Any:
-    """Async variant of ``_retry_model_call`` — uses ``asyncio.sleep``."""
-    last_http_error: ModelHTTPError | None = None
-    for attempt in range(_RETRY_MAX_ATTEMPTS):
-        try:
-            return await fn()
-        except ModelHTTPError as e:
-            delay = _should_retry(e, attempt)
-            if delay is None:
-                raise
-            last_http_error = e
-            if on_retry is not None:
-                on_retry()
-            await asyncio.sleep(delay)
-    raise last_http_error  # type: ignore[misc]
-
-
-# ---------------------------------------------------------------------------
-# Result dataclasses
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class RunResult:
-    run_id: str
-    output: str = ""
-    tokens_in: int = 0
-    tokens_out: int = 0
-    total_tokens: int = 0
-    tool_calls: int = 0
-    duration_ms: int = 0
-    success: bool = True
-    error: str | None = None
-    tool_call_names: list[str] = field(default_factory=list)
-
-
-@dataclass
-class AutonomousResult:
-    run_id: str
-    iterations: list[RunResult]
-    final_output: str = ""
-    final_status: str = "completed"
-    finish_summary: str | None = None
-    total_tokens_in: int = 0
-    total_tokens_out: int = 0
-    total_tokens: int = 0
-    total_tool_calls: int = 0
-    total_duration_ms: int = 0
-    iteration_count: int = 0
-    success: bool = True
-    error: str | None = None
-    final_messages: list | None = None
-
-
-@dataclass
-class TokenBudgetStatus:
-    budget: int | None = None
-    consumed: int = 0
-    remaining: int | None = None
-    exceeded: bool = False
-    warning: bool = False  # True at >= 80% consumed
-
-
-def check_token_budget(consumed: int, budget: int | None) -> TokenBudgetStatus:
-    """Check token consumption against an optional budget."""
-    if budget is None:
-        return TokenBudgetStatus(consumed=consumed)
-    if budget <= 0:
-        return TokenBudgetStatus(
-            budget=budget, consumed=consumed, remaining=0, exceeded=True, warning=False
-        )
-    remaining = max(0, budget - consumed)
-    exceeded = consumed >= budget
-    warning = not exceeded and (consumed / budget >= 0.8)
-    return TokenBudgetStatus(
-        budget=budget,
-        consumed=consumed,
-        remaining=remaining,
-        exceeded=exceeded,
-        warning=warning,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Shared guardrail helpers (used by both execute_run and execute_run_stream)
-# ---------------------------------------------------------------------------
-
-
-def _validate_input_or_fail(
-    prompt: UserPrompt,
-    role: RoleDefinition,
-    run_id: str,
-    *,
-    audit_logger: AuditLogger | None = None,
-    model_override: Model | str | None = None,
-    trigger_type: str | None = None,
-    trigger_metadata: dict[str, str] | None = None,
-    principal_id: str | None = None,
-) -> RunResult | None:
-    """Run pre-flight content validation. Returns a failed RunResult if blocked, else None."""
-    from initrunner.agent.policies import redact_text, validate_input
-
-    prompt_text = extract_text_from_prompt(prompt)
-    content_policy = role.spec.security.content
-    validation = validate_input(prompt_text, content_policy, model_override=model_override)
-    if not validation.valid:
-        result = RunResult(run_id=run_id, success=False, error=validation.reason, duration_ms=0)
-        if audit_logger is not None:
-            audit_prompt = redact_text(prompt_text, content_policy)
-            audit_logger.log(
-                AuditRecord.from_run(
-                    result,
-                    role,
-                    audit_prompt,
-                    trigger_type=trigger_type,
-                    trigger_metadata=trigger_metadata,
-                    principal_id=principal_id,
-                )
-            )
-        return result
-    return None
-
-
-def _handle_run_error(
-    result: RunResult,
-    exc: Exception,
-    partial_output: str = "",
-    *,
-    timeout_seconds: float | None = None,
-) -> None:
-    """Populate *result* fields for a caught run-time exception.
-
-    When *timeout_seconds* is provided and *exc* is a ``TimeoutError``
-    with an empty message (as from ``asyncio.wait_for``), the error
-    string is formatted using the timeout value.
-    """
-    result.success = False
-    if isinstance(exc, ModelHTTPError):
-        result.error = f"Model API error: {exc}"
-    elif isinstance(exc, UsageLimitExceeded):
-        result.error = f"Usage limit exceeded: {exc}"
-    elif isinstance(exc, TimeoutError) and not str(exc) and timeout_seconds is not None:
-        result.error = f"TimeoutError: Run timed out after {int(timeout_seconds)}s"
-    else:
-        result.error = f"{type(exc).__name__}: {exc}"
-    if partial_output:
-        result.output = partial_output
-
-
-def _apply_output_validation(result: RunResult, role: RoleDefinition) -> None:
-    """Apply post-run output validation and mutation in-place."""
-    from initrunner.agent.policies import validate_output
-
-    content_policy = role.spec.security.content
-    output_result = validate_output(result.output, content_policy)
-    if output_result.blocked:
-        result.success = False
-        result.error = output_result.reason
-        result.output = ""
-    else:
-        result.output = output_result.text
-
-
-def _audit_result(
-    result: RunResult,
-    role: RoleDefinition,
-    prompt: UserPrompt,
-    *,
-    audit_logger: AuditLogger | None,
-    trigger_type: str | None = None,
-    trigger_metadata: dict[str, str] | None = None,
-    principal_id: str | None = None,
-) -> None:
-    """Log result to audit trail if a logger is provided."""
-    if audit_logger is None:
-        return
-    from initrunner.agent.policies import redact_text
-
-    prompt_text = extract_text_from_prompt(prompt)
-    summary = attachment_summary(prompt)
-    content_policy = role.spec.security.content
-    audit_prompt = redact_text(prompt_text, content_policy)
-    if summary:
-        audit_prompt = f"{audit_prompt} {summary}"
-    audit_output = redact_text(result.output, content_policy)
-    audit_logger.log(
-        AuditRecord.from_run(
-            result,
-            role,
-            audit_prompt,
-            output_override=audit_output,
-            trigger_type=trigger_type,
-            trigger_metadata=trigger_metadata,
-            principal_id=principal_id,
-        )
-    )
-
-
-# ---------------------------------------------------------------------------
-# Shared output processing (deduplicates sync/async paths)
-# ---------------------------------------------------------------------------
-
-
-def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
-    """Serialize agent output, validate, extract usage. Returns new_messages."""
-    raw_output = agent_result.output
-    if isinstance(raw_output, BaseModel):
-        result.output = raw_output.model_dump_json()
-    elif isinstance(raw_output, (dict, list)):
-        result.output = json.dumps(raw_output)
-    else:
-        result.output = str(raw_output)
-
-    _apply_output_validation(result, role)
-
-    usage = agent_result.usage()
-    result.tokens_in = usage.input_tokens or 0
-    result.tokens_out = usage.output_tokens or 0
-    result.total_tokens = usage.total_tokens or 0
-    result.tool_calls = usage.tool_calls or 0
-    new_messages = agent_result.all_messages()
-    result.tool_call_names = _extract_tool_call_names(new_messages)
-    return new_messages
-
-
-def _process_stream_output(
-    output_parts: list[str],
-    usage: Any,
-    new_messages: list,
-    result: RunResult,
-    role: RoleDefinition,
-) -> None:
-    """Finalize stream output: join parts, validate, extract usage."""
-    result.tool_call_names = _extract_tool_call_names(new_messages)
-    result.output = "".join(output_parts)
-    _apply_output_validation(result, role)
-
-    if usage is not None:
-        result.tokens_in = usage.input_tokens or 0
-        result.tokens_out = usage.output_tokens or 0
-        result.total_tokens = usage.total_tokens or 0
-        result.tool_calls = usage.tool_calls or 0
-
-
-def _record_span_metrics(span: Any, result: RunResult) -> None:
-    """Set standard OpenTelemetry span attributes from a RunResult."""
-    span.set_attribute("initrunner.tokens_total", result.total_tokens)
-    span.set_attribute("initrunner.duration_ms", result.duration_ms)
-    span.set_attribute("initrunner.success", result.success)
-
-
-@contextmanager
-def _create_run_span(run_id: str, role: RoleDefinition, trigger_type: str | None = None):
-    """Create an OpenTelemetry span with standard agent-run attributes."""
-    from opentelemetry import trace  # type: ignore[import-not-found]
-
-    tracer = trace.get_tracer("initrunner")
-    with tracer.start_as_current_span(
-        "initrunner.agent.run",
-        attributes={
-            "initrunner.run_id": run_id,
-            "initrunner.agent_name": role.metadata.name,
-            "initrunner.trigger_type": trigger_type or "",
-        },
-    ) as span:
-        yield span
-
-
-# ---------------------------------------------------------------------------
-# Shared run preparation (used by both execute_run and execute_run_stream)
+# Shared run preparation
 # ---------------------------------------------------------------------------
 
 
@@ -698,21 +327,8 @@ def execute_run(
     )
 
 
-def _extract_tool_call_names(messages: list) -> list[str]:
-    """Extract tool call names from message history."""
-    from pydantic_ai.messages import ModelResponse, ToolCallPart
-
-    return [
-        part.tool_name
-        for msg in messages
-        if isinstance(msg, ModelResponse)
-        for part in msg.parts
-        if isinstance(part, ToolCallPart)
-    ]
-
-
 # ---------------------------------------------------------------------------
-# Streaming execution (with same guardrails as execute_run)
+# Streaming execution
 # ---------------------------------------------------------------------------
 
 
