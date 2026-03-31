@@ -78,7 +78,7 @@ def build_my_toolset(config: MyToolConfig, ctx: ToolBuildContext) -> FunctionToo
     return toolset
 ```
 
-4. Add your config class to `initrunner/agent/schema/tools.py`.
+4. Add your config class to the appropriate domain file in `initrunner/agent/schema/tools/` and re-export it from `__init__.py`.
 5. Write tests in `tests/agent/tools/test_my_tool.py`.
 6. Run all checks: `uv run pytest tests/ -v && uv run ruff check . && uv run ruff format --check .`
 7. Open a PR.
