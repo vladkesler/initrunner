@@ -10,6 +10,13 @@
 - **Centralized provider detection** -- moved `PROVIDER_KEY_ENVS_DICT` to `providers.py` as the canonical dict form. Migrated all 12 consumers from the `loader.py` re-export chain to direct `providers.py` imports. `ALL_PROVIDERS` in `setup.py` derived from canonical source with a drift-catching assertion
 - **Consolidated optional dependency handling** -- added `MissingExtraError`, `require_extra()`, and `is_extra_available()` to `_compat.py`. Migrated 12 ad-hoc `try/except ImportError` blocks across 8 files to use the new helpers with consistent error messages. Deduplicated HTML processing in `_html.py`
 
+### Fixed
+- `test_run_format_json_no_footer` mock leaked into content validation and JSON serialization
+- `require_provider` tests failed when optional extras (boto3, groq) were installed
+
+### Dependencies
+- Bump pygments 2.19.2 to 2.20.0
+
 ## [2026.3.8] - 2026-03-30
 
 ### Added
