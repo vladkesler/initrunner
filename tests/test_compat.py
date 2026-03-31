@@ -29,13 +29,15 @@ class TestRequireProvider:
 
     def test_bedrock_known_provider(self):
         """bedrock should get an import hint, not 'Unknown provider'."""
-        with pytest.raises(RuntimeError, match="uv pip install initrunner"):
-            require_provider("bedrock")
+        with patch("initrunner._compat.importlib.import_module", side_effect=ImportError):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner"):
+                require_provider("bedrock")
 
     def test_missing_provider_gives_install_hint(self):
-        # groq is unlikely to be installed in test env
-        with pytest.raises(RuntimeError, match="uv pip install initrunner"):
-            require_provider("groq")
+        """Missing SDK should give an install hint with the correct extra."""
+        with patch("initrunner._compat.importlib.import_module", side_effect=ImportError):
+            with pytest.raises(RuntimeError, match="uv pip install initrunner"):
+                require_provider("groq")
 
 
 class TestRequireIngest:
