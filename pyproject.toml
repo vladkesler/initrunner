@@ -121,6 +121,7 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "initrunner/_yaml.py" = ["UP047"]  # TypeVar needed for Python 3.11 compat (PEP 695 is 3.12+)
+"initrunner/agent/schema/tools/_*.py" = ["RUF012"]  # Pydantic models: mutable defaults are safe
 
 [tool.ruff.lint.isort]
 known-first-party = ["initrunner"]

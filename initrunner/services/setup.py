@@ -13,23 +13,30 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from initrunner.services.providers import PROVIDER_KEY_ENVS
+
 _logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
+# Key-based providers derived from canonical source; order is intentional (most common first).
+_KEY_PROVIDERS: set[str] = {p for p, _ in PROVIDER_KEY_ENVS}
 ALL_PROVIDERS: list[str] = [
-    "openai",
+    "openai",  # most common first-time setup
     "anthropic",
     "google",
     "groq",
     "mistral",
     "cohere",
-    "bedrock",
     "xai",
-    "ollama",
+    "bedrock",  # keyless: AWS IAM auth
+    "ollama",  # keyless: local
 ]
+assert _KEY_PROVIDERS == {p for p in ALL_PROVIDERS if p not in ("bedrock", "ollama")}, (
+    "ALL_PROVIDERS key-based entries out of sync with PROVIDER_KEY_ENVS"
+)
 
 PROVIDER_DESCRIPTIONS: dict[str, str] = {
     "openai": "GPT models (most popular)",
@@ -123,9 +130,9 @@ def needs_setup() -> bool:
     """True if no API key is configured anywhere."""
     from dotenv import dotenv_values
 
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
     from initrunner.config import get_global_env_path
     from initrunner.services.presets import CUSTOM_PRESETS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     all_env_vars = list(_PROVIDER_API_KEY_ENVS.values()) + [p.api_key_env for p in CUSTOM_PRESETS]
 
@@ -153,8 +160,8 @@ def detect_existing_provider() -> tuple[str, str] | None:
     """Detect a configured provider. Returns (provider, env_var) or None."""
     from dotenv import dotenv_values
 
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
     from initrunner.config import get_global_env_path
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     for prov, env_var in _PROVIDER_API_KEY_ENVS.items():
         if os.environ.get(env_var):

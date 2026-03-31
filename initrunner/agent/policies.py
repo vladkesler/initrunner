@@ -173,17 +173,15 @@ def redact_text(text: str, policy: ContentPolicy) -> str:
 
 def _check_profanity(text: str) -> ValidationResult:
     """Check for profanity using better-profanity library."""
-    try:
-        from better_profanity import profanity  # type: ignore[import-not-found]
-    except ImportError:
+    from initrunner._compat import is_extra_available
+
+    if not is_extra_available("better_profanity"):
         return ValidationResult(
             valid=False,
-            reason=(
-                "Profanity filter requires 'better-profanity'. "
-                "Install with: uv pip install initrunner[safety]"
-            ),
+            reason=("'better-profanity' is required: uv pip install initrunner[safety]"),
             validator="profanity",
         )
+    from better_profanity import profanity  # type: ignore[import-not-found]
 
     if profanity.contains_profanity(text):
         return ValidationResult(

@@ -20,8 +20,9 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 
 def _run_doctor_checks() -> list[DoctorCheck]:
     """Run provider health checks (mirrors CLI doctor command)."""
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
+    from initrunner.agent.loader import _load_dotenv
     from initrunner.dashboard.routers._provider_options import CUSTOM_PRESETS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     _load_dotenv(None)
 

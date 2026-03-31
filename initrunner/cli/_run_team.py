@@ -15,7 +15,7 @@ def _display_team_result(team_result: object) -> None:
     from rich.markdown import Markdown
     from rich.panel import Panel
 
-    from initrunner.team.runner import TeamResult
+    from initrunner.team.results import TeamResult
 
     tr: TeamResult = team_result  # type: ignore[assignment]
 
@@ -58,7 +58,8 @@ def _run_team(
         raise typer.Exit(1)
 
     from initrunner.team.loader import TeamLoadError, load_team
-    from initrunner.team.runner import _team_report_role, run_team_dispatch
+    from initrunner.team.roles import team_report_role
+    from initrunner.team.runner import run_team_dispatch
 
     try:
         team = load_team(team_file)
@@ -119,7 +120,7 @@ def _run_team(
             error=result.error,
         )
         # Build a synthetic role for the report
-        synthetic_role = _team_report_role(team)
+        synthetic_role = team_report_role(team)
         _maybe_export_report(
             synthetic_role,
             synthetic,

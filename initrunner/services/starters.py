@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import os
 import re
@@ -273,15 +272,13 @@ def resolve_starter_path(name: str) -> Path | None:
 
 def _is_extra_installed(extra: str) -> bool:
     """Check if a pip extra's marker package is importable."""
+    from initrunner._compat import is_extra_available
+
     marker = _EXTRA_MARKERS.get(extra)
     if marker is None:
         return True
     _, module_name = marker
-    try:
-        importlib.import_module(module_name)
-    except ImportError:
-        return False
-    return True
+    return is_extra_available(module_name)
 
 
 def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:

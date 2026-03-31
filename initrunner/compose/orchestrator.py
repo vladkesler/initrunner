@@ -354,6 +354,37 @@ class ComposeOrchestrator:
 
         return self._collect_results(entry, total_ms, timed_out=timed_out)
 
+    async def run_once_async(
+        self,
+        prompt: str,
+        *,
+        entry_service: str | None = None,
+        message_history: list | None = None,
+        timeout_seconds: float = 300,
+        on_service_start: Callable[[str], None] | None = None,
+        on_service_complete: Callable[[str, RunResult], None] | None = None,
+    ) -> ComposeRunResult:
+        """Run a single prompt through the compose graph asynchronously."""
+        from initrunner.compose.graph import run_compose_graph_async
+
+        self._build_services(one_shot=True)
+        entry = self._find_entry(entry_service)
+
+        _refs, _entry_name, total_ms, timed_out = await run_compose_graph_async(
+            self._compose,
+            self._services,
+            prompt,
+            entry_service=entry.name,
+            message_history=message_history,
+            timeout_seconds=timeout_seconds,
+            audit_logger=self._audit_logger,
+            on_service_start=on_service_start,
+            on_service_complete=on_service_complete,
+            one_shot=True,
+        )
+
+        return self._collect_results(entry, total_ms, timed_out=timed_out)
+
     # ------------------------------------------------------------------
     # Daemon execution
     # ------------------------------------------------------------------

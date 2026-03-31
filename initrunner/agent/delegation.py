@@ -94,7 +94,7 @@ def check_delegation_policy(
     (MCP remote), the check uses only the target name as resource ID with
     empty attrs.
     """
-    from initrunner.agent.executor import _cached_config
+    from initrunner.agent.executor_auth import _cached_config
     from initrunner.authz import AGENT, DELEGATE, agent_principal_from_role, get_current_engine
 
     engine = get_current_engine()

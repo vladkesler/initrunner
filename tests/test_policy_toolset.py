@@ -50,11 +50,11 @@ def _make_engine(*, allowed: bool = True, reason: str = "", advice: str = ""):
 @pytest.fixture()
 def _enable_agent_checks(monkeypatch):
     """Set _cached_config.agent_checks = True in executor module."""
-    import initrunner.agent.executor as exc_mod
+    import initrunner.agent.executor_auth as auth_mod
 
     mock_config = MagicMock()
     mock_config.agent_checks = True
-    monkeypatch.setattr(exc_mod, "_cached_config", mock_config)
+    monkeypatch.setattr(auth_mod, "_cached_config", mock_config)
 
 
 @pytest.mark.asyncio
@@ -82,11 +82,11 @@ async def test_no_principal_passes_through(_enable_agent_checks):
 @pytest.mark.asyncio
 async def test_agent_checks_disabled_passes_through(monkeypatch):
     """When agent_checks is False, tool call passes through."""
-    import initrunner.agent.executor as exc_mod
+    import initrunner.agent.executor_auth as auth_mod
 
     mock_config = MagicMock()
     mock_config.agent_checks = False
-    monkeypatch.setattr(exc_mod, "_cached_config", mock_config)
+    monkeypatch.setattr(auth_mod, "_cached_config", mock_config)
 
     inner = _make_inner()
     engine = _make_engine()

@@ -141,7 +141,7 @@ class PolicyToolset(AbstractToolset[Any]):
         ctx: Any,
         tool: ToolsetTool[Any],
     ) -> Any:
-        from initrunner.agent.executor import _cached_config
+        from initrunner.agent.executor_auth import _cached_config
         from initrunner.authz import EXECUTE, TOOL, get_current_agent_principal, get_current_engine
 
         engine = get_current_engine()

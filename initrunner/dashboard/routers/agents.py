@@ -94,7 +94,8 @@ def _check_provider(discovered) -> str | None:
     import os
 
     from initrunner._compat import require_provider
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, _load_dotenv
+    from initrunner.agent.loader import _load_dotenv
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     spec = discovered.role.spec
     if not spec.model or not spec.model.name:

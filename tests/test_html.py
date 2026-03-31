@@ -1,11 +1,11 @@
-"""Tests for initrunner._html — shared fetch + HTML→markdown utility."""
+"""Tests for initrunner._html — shared fetch + HTML->markdown utility."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from initrunner._html import fetch_url_as_markdown
+from initrunner._html import fetch_url_as_markdown, fetch_url_as_markdown_async
 
 
 def _mock_response(text: str, content_type: str = "text/html", status_code: int = 200):
@@ -101,3 +101,70 @@ class TestFetchUrlAsMarkdown:
         with _patch_client(side_effect=httpx.ConnectError("connection refused")):
             with pytest.raises(httpx.ConnectError):
                 fetch_url_as_markdown("https://down.example.com")
+
+
+# ---------------------------------------------------------------------------
+# Async variant
+# ---------------------------------------------------------------------------
+
+
+def _patch_async_client(response=None, side_effect=None):
+    """Create a mock httpx.AsyncClient context manager that returns the given response."""
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_cm)
+    mock_cm.__aexit__ = AsyncMock(return_value=False)
+    if side_effect:
+        mock_cm.get.side_effect = side_effect
+    else:
+        mock_cm.get.return_value = response
+    return patch("initrunner._html.httpx.AsyncClient", return_value=mock_cm)
+
+
+class TestFetchUrlAsMarkdownAsync:
+    @pytest.mark.anyio
+    async def test_html_conversion(self):
+        html = "<html><body><h1>Title</h1><p>Hello world</p></body></html>"
+
+        with _patch_async_client(_mock_response(html)):
+            result = await fetch_url_as_markdown_async("https://example.com")
+
+        assert "Title" in result
+        assert "Hello world" in result
+
+    @pytest.mark.anyio
+    async def test_strips_script_style_noscript(self):
+        html = (
+            "<html><body>"
+            "<script>alert(1)</script>"
+            "<style>.x{color:red}</style>"
+            "<noscript>Enable JS</noscript>"
+            "<p>Safe content</p>"
+            "</body></html>"
+        )
+
+        with _patch_async_client(_mock_response(html)):
+            result = await fetch_url_as_markdown_async("https://example.com")
+
+        assert "alert" not in result
+        assert "color:red" not in result
+        assert "Enable JS" not in result
+        assert "Safe content" in result
+
+    @pytest.mark.anyio
+    async def test_non_html_content(self):
+        plain = "This is plain text content"
+
+        with _patch_async_client(_mock_response(plain, content_type="text/plain")):
+            result = await fetch_url_as_markdown_async("https://example.com/file.txt")
+
+        assert result == plain
+
+    @pytest.mark.anyio
+    async def test_truncation(self):
+        html = "<html><body><p>" + "x" * 1000 + "</p></body></html>"
+
+        with _patch_async_client(_mock_response(html)):
+            result = await fetch_url_as_markdown_async("https://example.com", max_bytes=100)
+
+        assert len(result) <= 100 + len("\n[truncated]")
+        assert result.endswith("[truncated]")

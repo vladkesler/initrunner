@@ -13,6 +13,31 @@ from initrunner.agent._urls import AsyncSSRFSafeTransport, SSRFSafeTransport
 _USER_AGENT = f"initrunner/{__version__}"
 
 
+def _response_to_markdown(resp: httpx.Response, max_bytes: int) -> str:
+    """Convert an httpx response to markdown, stripping unsafe HTML elements.
+
+    Non-HTML content is returned as truncated plain text.
+    """
+    content_type = resp.headers.get("content-type", "")
+    if "html" not in content_type:
+        return truncate_output(resp.text, max_bytes)
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    for tag in soup.find_all(src=True):
+        if tag["src"].startswith("data:"):  # type: ignore[union-attr]
+            tag.decompose()
+    for tag in soup.find_all(href=True):
+        if tag["href"].startswith("data:"):  # type: ignore[union-attr]
+            tag.decompose()
+
+    md = markdownify.markdownify(str(soup), strip=["img"])
+    return truncate_output(md, max_bytes)
+
+
 def fetch_url_as_markdown(
     url: str,
     *,
@@ -32,27 +57,7 @@ def fetch_url_as_markdown(
     ) as client:
         resp = client.get(url)
         resp.raise_for_status()
-
-    content_type = resp.headers.get("content-type", "")
-    if "html" not in content_type:
-        return truncate_output(resp.text, max_bytes)
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Strip script, style, noscript tags
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-
-    # Strip inline base64 data URIs
-    for tag in soup.find_all(src=True):
-        if tag["src"].startswith("data:"):  # type: ignore[union-attr]
-            tag.decompose()
-    for tag in soup.find_all(href=True):
-        if tag["href"].startswith("data:"):  # type: ignore[union-attr]
-            tag.decompose()
-
-    md = markdownify.markdownify(str(soup), strip=["img"])
-    return truncate_output(md, max_bytes)
+    return _response_to_markdown(resp, max_bytes)
 
 
 async def fetch_url_as_markdown_async(
@@ -74,22 +79,4 @@ async def fetch_url_as_markdown_async(
     ) as client:
         resp = await client.get(url)
         resp.raise_for_status()
-
-    content_type = resp.headers.get("content-type", "")
-    if "html" not in content_type:
-        return truncate_output(resp.text, max_bytes)
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-
-    for tag in soup.find_all(src=True):
-        if tag["src"].startswith("data:"):  # type: ignore[union-attr]
-            tag.decompose()
-    for tag in soup.find_all(href=True):
-        if tag["href"].startswith("data:"):  # type: ignore[union-attr]
-            tag.decompose()
-
-    md = markdownify.markdownify(str(soup), strip=["img"])
-    return truncate_output(md, max_bytes)
+    return _response_to_markdown(resp, max_bytes)

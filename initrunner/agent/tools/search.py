@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
+from initrunner._compat import MissingExtraError
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._truncate import truncate_output
 from initrunner.agent.schema.tools import SearchToolConfig
@@ -36,12 +37,10 @@ def _search_duckduckgo(
     days_back: int = 7,
 ) -> list[dict[str, str]]:
     """Search using DuckDuckGo (free, no API key required)."""
-    try:
-        from ddgs import DDGS  # type: ignore[import-not-found]
-    except ImportError:
-        raise ImportError(
-            "ddgs is required: uv pip install ddgs or uv pip install initrunner[search]"
-        ) from None
+    from initrunner._compat import require_extra
+
+    require_extra("ddgs")
+    from ddgs import DDGS  # type: ignore[import-not-found]
 
     safesearch = "moderate" if safe_search else "off"
     ddgs = DDGS()
@@ -253,7 +252,7 @@ def _do_search(
             days_back=days_back,
         )
         return truncate_output(_format_results(results), _MAX_SEARCH_BYTES)
-    except ImportError as e:
+    except MissingExtraError as e:
         return f"Error: {e}"
     except TimeoutError:
         return f"Error: search timed out after {timeout_seconds}s"

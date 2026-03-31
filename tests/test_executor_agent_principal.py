@@ -29,19 +29,19 @@ def _make_role(name: str = "test-agent", team: str = "") -> RoleDefinition:
 
 @pytest.fixture(autouse=True)
 def _reset_executor_state():
-    """Reset executor module-level state between tests."""
-    import initrunner.agent.executor as exc_mod
+    """Reset executor_auth module-level state between tests."""
+    import initrunner.agent.executor_auth as auth_mod
     from initrunner.authz import set_current_agent_principal, set_current_engine
 
-    exc_mod._cached_engine = None
-    exc_mod._cached_config = None
-    exc_mod._authz_resolved = False
+    auth_mod._cached_engine = None
+    auth_mod._cached_config = None
+    auth_mod._authz_resolved = False
     set_current_agent_principal(None)
     set_current_engine(None)
     yield
-    exc_mod._cached_engine = None
-    exc_mod._cached_config = None
-    exc_mod._authz_resolved = False
+    auth_mod._cached_engine = None
+    auth_mod._cached_config = None
+    auth_mod._authz_resolved = False
     set_current_agent_principal(None)
     set_current_engine(None)
 
@@ -57,11 +57,11 @@ class TestEnterExitAgentContext:
 
     def test_sets_principal_when_engine_available(self):
         """When policies are configured, principal is set for the run."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
 
         mock_engine = MagicMock()
-        exc_mod._cached_engine = mock_engine
-        exc_mod._authz_resolved = True  # type: ignore[assignment]
+        auth_mod._cached_engine = mock_engine
+        auth_mod._authz_resolved = True  # type: ignore[assignment]
 
         role = _make_role("my-agent", team="backend")
         token = _enter_agent_context(role)
@@ -77,11 +77,11 @@ class TestEnterExitAgentContext:
 
     def test_different_roles_get_different_principals(self):
         """Each run should get its own principal based on the role."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
 
         mock_engine = MagicMock()
-        exc_mod._cached_engine = mock_engine
-        exc_mod._authz_resolved = True  # type: ignore[assignment]
+        auth_mod._cached_engine = mock_engine
+        auth_mod._authz_resolved = True  # type: ignore[assignment]
 
         role_a = _make_role("agent-a", team="alpha")
         token_a = _enter_agent_context(role_a)
@@ -100,12 +100,12 @@ class TestEnterExitAgentContext:
 
     def test_exit_resets_to_previous(self):
         """_exit_agent_context resets to the previous ContextVar value."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
         from initrunner.authz import Principal, set_current_agent_principal
 
         mock_engine = MagicMock()
-        exc_mod._cached_engine = mock_engine
-        exc_mod._authz_resolved = True  # type: ignore[assignment]
+        auth_mod._cached_engine = mock_engine
+        auth_mod._authz_resolved = True  # type: ignore[assignment]
 
         outer = Principal(id="agent:outer", roles=["agent"])
         set_current_agent_principal(outer)
@@ -125,17 +125,17 @@ class TestEnterExitAgentContext:
 class TestEnsureAuthzCaching:
     def test_only_resolves_once(self):
         """_ensure_authz should only resolve config once."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
 
         with patch("initrunner.authz.load_authz_config", return_value=None) as mock_load:
-            exc_mod._ensure_authz()
-            exc_mod._ensure_authz()
-            exc_mod._ensure_authz()
+            auth_mod._ensure_authz()
+            auth_mod._ensure_authz()
+            auth_mod._ensure_authz()
             mock_load.assert_called_once()
 
     def test_fail_fast_on_bad_policies(self, tmp_path):
         """When POLICY_DIR is set but policies are invalid, error propagates."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
         from initrunner.authz import AuthzConfig
 
         bad_file = tmp_path / "bad.yaml"
@@ -146,17 +146,17 @@ class TestEnsureAuthzCaching:
 
         with patch("initrunner.authz.load_authz_config", return_value=config):
             with pytest.raises(PolicyLoadError):
-                exc_mod._ensure_authz()
+                auth_mod._ensure_authz()
 
     def test_loads_engine_from_real_policies(self):
         """_ensure_authz loads engine from real example policies."""
-        import initrunner.agent.executor as exc_mod
+        import initrunner.agent.executor_auth as auth_mod
         from initrunner.authz import AuthzConfig, get_current_engine
 
         config = AuthzConfig(policy_dir=str(POLICIES_DIR), agent_checks=True)
 
         with patch("initrunner.authz.load_authz_config", return_value=config):
-            exc_mod._ensure_authz()
+            auth_mod._ensure_authz()
 
-        assert exc_mod._cached_engine is not None
+        assert auth_mod._cached_engine is not None
         assert get_current_engine() is not None

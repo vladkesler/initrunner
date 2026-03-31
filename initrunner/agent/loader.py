@@ -14,13 +14,9 @@ from initrunner._compat import require_provider
 from initrunner._yaml import load_raw_yaml
 from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
 from initrunner.agent.schema.role import RoleDefinition
-from initrunner.services.providers import PROVIDER_KEY_ENVS as _PROVIDER_KEY_ENVS
+from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
 logger = logging.getLogger(__name__)
-
-# Derived from the canonical list in providers.py (priority-ordered).
-# Kept here as a dict for dict-lookup convenience and backward compat.
-_PROVIDER_API_KEY_ENVS: dict[str, str] = dict(_PROVIDER_KEY_ENVS)
 
 
 class RoleLoadError(Exception):

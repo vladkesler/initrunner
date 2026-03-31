@@ -1232,8 +1232,8 @@ class TestResolveRolePathInstalled:
             )
         )
 
-        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
-        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr("initrunner.registry._manifest.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry._manifest.MANIFEST_PATH", manifest_path)
 
         resolved = resolve_role_path(Path("code-reviewer"))
         assert resolved == role_dir / "role.yaml"
@@ -1263,8 +1263,8 @@ class TestResolveRolePathInstalled:
             )
         )
 
-        monkeypatch.setattr("initrunner.registry.ROLES_DIR", roles_dir)
-        monkeypatch.setattr("initrunner.registry.MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr("initrunner.registry._manifest.ROLES_DIR", roles_dir)
+        monkeypatch.setattr("initrunner.registry._manifest.MANIFEST_PATH", manifest_path)
 
         from initrunner.agent.executor import RunResult
 
@@ -1366,9 +1366,9 @@ class TestSuggestNext:
 
         assert buf.getvalue() == ""
 
-    @patch("initrunner.runner.run_single")
+    @patch("initrunner.services.execution.execute_run_sync")
     @patch("initrunner.agent.loader.load_and_build")
-    def test_run_format_json_no_footer(self, mock_load, mock_run_single, tmp_path):
+    def test_run_format_json_no_footer(self, mock_load, mock_exec, tmp_path):
         """--format json must not append next-step text."""
         from initrunner.agent.executor import RunResult
         from initrunner.agent.schema.output import OutputConfig
@@ -1380,7 +1380,7 @@ class TestSuggestNext:
         role.spec.output = OutputConfig(type="text")
         agent = MagicMock()
         mock_load.return_value = (role, agent)
-        mock_run_single.return_value = (
+        mock_exec.return_value = (
             RunResult(run_id="test", output='{"result": "ok"}', success=True),
             [],
         )
