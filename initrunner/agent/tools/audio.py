@@ -57,19 +57,19 @@ def _do_get_youtube_transcript(
     language: str,
 ) -> str:
     """Fetch a YouTube transcript with import guard, fallback, and truncation."""
+    from initrunner._compat import MissingExtraError, require_extra
+
     try:
-        from youtube_transcript_api import (  # type: ignore[import-not-found]
-            YouTubeTranscriptApi,
-        )
-        from youtube_transcript_api._errors import (  # type: ignore[import-not-found]
-            NoTranscriptFound,
-            TranscriptsDisabled,
-        )
-    except ImportError:
-        return (
-            "Error: youtube-transcript-api is required."
-            " Install with: uv pip install initrunner[audio]"
-        )
+        require_extra("youtube_transcript_api")
+    except MissingExtraError as e:
+        return f"Error: {e}"
+    from youtube_transcript_api import (  # type: ignore[import-not-found]
+        YouTubeTranscriptApi,
+    )
+    from youtube_transcript_api._errors import (  # type: ignore[import-not-found]
+        NoTranscriptFound,
+        TranscriptsDisabled,
+    )
 
     video_id = _extract_video_id(url)
     if not video_id:

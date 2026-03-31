@@ -25,24 +25,15 @@ _BOT_TOKEN_ENVS: dict[str, str] = {
     "discord": "DISCORD_BOT_TOKEN",
 }
 
-_SDK_PACKAGES: dict[str, tuple[str, str]] = {
-    "telegram": ("telegram", "python-telegram-bot"),
-    "discord": ("discord", "discord.py"),
-}
-
 
 def _verify_bot_sdk(platform: str) -> None:
     """Verify the platform SDK is importable, with install hint on failure."""
-    import importlib
+    from initrunner._compat import MissingExtraError, require_extra
 
-    module_name, pip_name = _SDK_PACKAGES[platform]
     try:
-        importlib.import_module(module_name)
-    except ImportError:
-        console.print(
-            f"[red]Error:[/red] {pip_name} is not installed.\n"
-            f"  Install it: [bold]uv pip install {pip_name}[/bold]"
-        )
+        require_extra(platform)
+    except MissingExtraError as e:
+        console.print(f"[red]Error:[/red] {e}")
         import typer
 
         raise typer.Exit(1) from None

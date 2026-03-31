@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import importlib
 import os
 from dataclasses import dataclass
 
@@ -269,8 +268,6 @@ def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
 
 
 def _is_module_available(module_name: str) -> bool:
-    try:
-        importlib.import_module(module_name)
-        return True
-    except ImportError:
-        return False
+    from initrunner._compat import is_extra_available
+
+    return is_extra_available(module_name)

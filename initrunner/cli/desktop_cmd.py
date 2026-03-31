@@ -28,14 +28,14 @@ def desktop(
     ] = None,
 ) -> None:
     """Launch the dashboard in a native desktop window."""
+    from initrunner._compat import MissingExtraError, require_extra
+
     try:
-        import webview  # type: ignore[import-not-found]
-    except ImportError:
-        console.print(
-            "[red]Desktop mode requires pywebview.[/red]\n"
-            "Install with: [bold]uv pip install 'initrunner\\[desktop]'[/bold]"
-        )
+        require_extra("webview")
+    except MissingExtraError as e:
+        console.print(f"[red]{e}[/red]")
         raise SystemExit(1) from None
+    import webview  # type: ignore[import-not-found]
 
     _ensure_gi()
 

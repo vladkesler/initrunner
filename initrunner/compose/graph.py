@@ -39,6 +39,16 @@ logger = get_logger("compose.graph")
 _MAX_DELEGATION_DEPTH = 20
 
 
+def _try_import_otel_context():
+    """Import and return ``opentelemetry.context``, or ``None`` if unavailable."""
+    try:
+        from opentelemetry import context  # type: ignore[import-not-found]
+
+        return context
+    except ImportError:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Envelope -- immutable per-edge data, never shared across fan-out branches
 # ---------------------------------------------------------------------------
@@ -430,14 +440,10 @@ def _make_service_step(service_name: str, topology_index: int):
         from initrunner.observability import extract_trace_context
 
         parent_ctx = extract_trace_context(trigger_metadata)
+        otel_context = _try_import_otel_context()
         ctx_token = None
-        if parent_ctx is not None:
-            try:
-                from opentelemetry import context as otel_context  # type: ignore[import-not-found]
-
-                ctx_token = otel_context.attach(parent_ctx)
-            except ImportError:
-                pass
+        if parent_ctx is not None and otel_context is not None:
+            ctx_token = otel_context.attach(parent_ctx)
 
         try:
             msg_history = envelope.message_history if service_name == deps.entry_service else None
@@ -451,15 +457,8 @@ def _make_service_step(service_name: str, topology_index: int):
                 trigger_metadata=trigger_metadata,
             )
         finally:
-            if ctx_token is not None:
-                try:
-                    from opentelemetry import (
-                        context as otel_context,  # type: ignore[import-not-found]
-                    )
-
-                    otel_context.detach(ctx_token)
-                except ImportError:
-                    pass
+            if ctx_token is not None and otel_context is not None:
+                otel_context.detach(ctx_token)
 
         # Update service ref
         ref.last_result = result

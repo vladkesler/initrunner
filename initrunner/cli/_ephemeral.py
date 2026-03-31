@@ -124,24 +124,13 @@ def get_bot_prompt(platform: str) -> str:
 
 def verify_bot_sdk(platform: str) -> None:
     """Verify the platform SDK is importable, with install hint on failure."""
-    if platform == "telegram":
-        try:
-            import telegram  # type: ignore[import-unresolved]  # noqa: F401
-        except ImportError:
-            console.print(
-                "[red]Error:[/red] python-telegram-bot is not installed.\n"
-                "  Install it: [bold]uv pip install initrunner\\[telegram][/bold]"
-            )
-            raise typer.Exit(1) from None
-    elif platform == "discord":
-        try:
-            import discord  # type: ignore[import-unresolved]  # noqa: F401
-        except ImportError:
-            console.print(
-                "[red]Error:[/red] discord.py is not installed.\n"
-                "  Install it: [bold]uv pip install initrunner\\[discord][/bold]"
-            )
-            raise typer.Exit(1) from None
+    from initrunner._compat import MissingExtraError, require_extra
+
+    try:
+        require_extra(platform)
+    except MissingExtraError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
 
 
 # ---------------------------------------------------------------------------
