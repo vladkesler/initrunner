@@ -51,8 +51,8 @@ async def list_providers() -> list[ProviderResponse]:
 
 def _build_provider_status() -> tuple[list[ProviderStatus], str | None, str | None]:
     """Build full provider status list including standard, presets, and Ollama."""
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
     from initrunner.dashboard.routers._provider_options import CUSTOM_PRESETS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
     from initrunner.services.providers import detect_provider_and_model
 
     statuses: list[ProviderStatus] = []
@@ -117,8 +117,8 @@ async def provider_status() -> ProviderStatusResponse:
 
 @router.post("/save-key")
 async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
     from initrunner.dashboard.routers._provider_options import CUSTOM_PRESETS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     # Resolve env var name
     if req.provider:

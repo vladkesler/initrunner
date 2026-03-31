@@ -241,7 +241,7 @@ def run_setup(
     # ---------------------------------------------------------------
     # API key / credentials
     # ---------------------------------------------------------------
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     env_path = get_global_env_path()
 

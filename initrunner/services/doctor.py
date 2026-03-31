@@ -64,7 +64,7 @@ def _build_extra_markers() -> dict[str, tuple[str, str]]:
 def diagnose_providers() -> list[ProviderDiagnosis]:
     """Check each standard provider's API key and SDK status."""
     from initrunner._compat import _PROVIDER_EXTRAS, require_provider
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     results: list[ProviderDiagnosis] = []
     for provider, env_var in _PROVIDER_API_KEY_ENVS.items():
@@ -244,7 +244,7 @@ def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
     Honors ``spec.model.api_key_env`` when set.  Returns ``None`` when the
     provider cannot be determined.
     """
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+    from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     spec = raw_data.get("spec", {})
     model = spec.get("model", {})

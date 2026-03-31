@@ -50,7 +50,7 @@ def list_ollama_models(*, timeout: int = _OLLAMA_TIMEOUT) -> list[str]:
 
 
 # Canonical provider → API key env mapping, in priority order.
-# This is the single source of truth; loader.py derives its dict from this.
+# This is the single source of truth; consumers import PROVIDER_KEY_ENVS_DICT.
 PROVIDER_KEY_ENVS: list[tuple[str, str]] = [
     ("anthropic", "ANTHROPIC_API_KEY"),
     ("openai", "OPENAI_API_KEY"),
@@ -60,6 +60,9 @@ PROVIDER_KEY_ENVS: list[tuple[str, str]] = [
     ("cohere", "CO_API_KEY"),
     ("xai", "XAI_API_KEY"),
 ]
+
+# Dict form for key-lookup convenience.
+PROVIDER_KEY_ENVS_DICT: dict[str, str] = dict(PROVIDER_KEY_ENVS)
 
 # Backward-compat alias
 _PROVIDER_PRIORITY = PROVIDER_KEY_ENVS
@@ -371,7 +374,7 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     Loads the role YAML and inspects ``spec.model``, ``spec.ingest.embeddings``,
     and ``spec.memory.embeddings``.
     """
-    from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS, load_role, resolve_role_model
+    from initrunner.agent.loader import load_role, resolve_role_model
 
     _load_env()
     role = resolve_role_model(load_role(role_path), role_path)
@@ -380,7 +383,7 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     role_model = role.spec.model.name  # type: ignore[union-attr]
 
     # Check if user has the required LLM key
-    env_var = role.spec.model.api_key_env or _PROVIDER_API_KEY_ENVS.get(role_provider, "")  # type: ignore[union-attr]
+    env_var = role.spec.model.api_key_env or PROVIDER_KEY_ENVS_DICT.get(role_provider, "")  # type: ignore[union-attr]
     user_has_key = bool(os.environ.get(env_var)) if env_var else True
     # Ollama needs no key
     if role_provider == "ollama":

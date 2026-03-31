@@ -68,7 +68,7 @@ def _post_install_provider_check(result: object, *, yes: bool = False) -> None:
         )
     else:
         # Mismatch -- build adaptation options
-        from initrunner.agent.loader import _PROVIDER_API_KEY_ENVS
+        from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
         env_var = _PROVIDER_API_KEY_ENVS.get(compat.role_provider, compat.role_provider.upper())
         lines = [
