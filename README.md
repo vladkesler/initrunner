@@ -9,17 +9,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11+-3776ab?logo=python&logoColor=white" alt="Python 3.11+">
   <a href="https://pypi.org/project/initrunner/"><img src="https://img.shields.io/pypi/v/initrunner?color=%2334D058&v=1" alt="PyPI version"></a>
   <a href="https://pypi.org/project/initrunner/"><img src="https://img.shields.io/pypi/dm/initrunner?color=%2334D058" alt="PyPI downloads"></a>
-  <a href="https://github.com/vladkesler/initrunner"><img src="https://img.shields.io/github/stars/vladkesler/initrunner?style=flat&color=%2334D058" alt="GitHub stars"></a>
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.4.2-%2334D058" alt="v2026.4.2">
-  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
-  <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
   <a href="https://discord.gg/GRTZmVcW"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
@@ -27,7 +21,7 @@
   <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
 </p>
 
-**AI agents that work.** A docs assistant that answers from your knowledge base. A research team that searches the web and writes cited reports. A code review team that catches bugs before your human reviewers do. Each one is a single command:
+A docs assistant that answers from your knowledge base with citations. A research team that searches the web and writes sourced reports. A code review team that catches bugs from three different angles. Each one is a YAML file and a command:
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
@@ -35,113 +29,64 @@ initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research
 initrunner run code-review-team -p "Review the latest commit" # multi-perspective code review
 ```
 
-15 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
+You describe the agent -- its role, tools, knowledge sources, memory -- in a single YAML file. InitRunner handles tool wiring, retrieval, model switching, and deployment. The same file runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.2** -- PydanticAI + LangChain agent import: convert existing agents to InitRunner with `initrunner new --pydantic-ai my_agent.py` or `--langchain`. Dashboard Import mode with framework toggle, structured output support, auto-detected providers. See the [Changelog](CHANGELOG.md).
-
-## Contents
-
-- [Quickstart](#quickstart)
-- [Define an Agent in YAML](#define-agent-roles-in-yaml)
-- [Why InitRunner](#why-initrunner)
-- [Features](#features)
-- [Intelligence](#intelligence)
-- [User Interfaces](#user-interfaces)
-- [Security & Authorization](#security--authorization)
-- [Distribution & Deployment](#distribution--deployment)
-- [Documentation](#documentation)
-- [Community](#community--contributing)
+> **v2026.4.2** -- PydanticAI + LangChain agent import: convert existing agents to InitRunner with `initrunner new --pydantic-ai my_agent.py` or `--langchain`. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
-
-**Install and configure:**
 
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh
 initrunner setup        # wizard: pick provider, model, API key
 ```
 
-Or install with a package manager: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md) and [Setup](docs/getting-started/setup.md).
+Or: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md).
 
-**Upgrade:** re-run the install command, or: `uv tool upgrade initrunner` / `pipx upgrade initrunner`.
+### Try a starter
 
-### Try a starter agent
-
-Run `initrunner run --list` to see all available starters. The model is auto-detected from your API key.
+Run `initrunner run --list` for the full catalog. The model is auto-detected from your API key.
 
 | Starter | What it does | Kind |
 |---------|-------------|------|
-| `helpdesk` | Drop your docs in, get an AI helpdesk with citations and memory | Agent (RAG) |
+| `helpdesk` | Drop your docs in, get a Q&A agent with citations and memory | Agent (RAG) |
 | `code-review-team` | Multi-perspective review: architect, security, maintainer | Team |
-| `debate-team` | Multi-round debate: optimist, skeptic, pragmatist argue and synthesize | Team (Debate) |
 | `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer with shared memory | Team |
 | `codebase-analyst` | Index your repo, chat about architecture, learns patterns across sessions | Agent (RAG) |
 | `web-researcher` | Search the web and produce structured briefings with citations | Agent |
 | `content-pipeline` | Topic researcher, writer, editor/fact-checker via webhook or cron | Compose |
-| `project-monitor` | Heartbeat-driven health checks, learns baselines over time | Agent (Daemon) |
 | `telegram-assistant` | Telegram bot with memory and web search | Agent (Daemon) |
-| `discord-assistant` | Discord bot with memory and web search | Agent (Daemon) |
-| `rag-agent` | Document Q&A agent with ingestion and citations | Agent (RAG) |
-| `memory-assistant` | Personal assistant that learns and remembers across sessions | Agent |
 | `email-agent` | Monitors inbox, triages messages, drafts replies, alerts Slack on urgent mail | Agent (Daemon) |
-| `ci-pipeline` | Webhook receiver, build analyzer, Slack notifier for CI events | Compose |
-| `support-desk` | Sense-routed intake, researcher, responder, and escalator | Compose |
+| `support-desk` | Sense-routed intake: auto-routes to researcher, responder, or escalator | Compose |
+| `memory-assistant` | Personal assistant that remembers across sessions | Agent |
 
-RAG starters auto-ingest on first run -- just `cd` into your project and go:
+RAG starters auto-ingest on first run. Just `cd` into your project:
 
 ```bash
 cd ~/myproject
 initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
 ```
 
-Want to customize? Copy locally and edit:
+### Build your own
 
 ```bash
-initrunner run helpdesk --save ./my-helpdesk/
-# add your docs to ./my-helpdesk/knowledge-base/, then:
-initrunner run ./my-helpdesk/ -i
+initrunner new "a research assistant that summarizes papers"  # generates a role.yaml
+initrunner run --ingest ./docs/    # or skip YAML entirely -- chat with your docs
 ```
 
-### Use a premade agent from InitHub
+Browse and install community agents from [InitHub](https://hub.initrunner.ai/): `initrunner search "code review"` / `initrunner install alice/code-reviewer`.
 
-Browse [hub.initrunner.ai](https://hub.initrunner.ai/) or search from the terminal:
-
-```bash
-initrunner search "code review"                                    # find agents
-initrunner install alice/code-reviewer                             # install one
-initrunner run alice/code-reviewer -p "Review the latest commit"   # run it
-```
-
-See [Registry docs](docs/agents/registry.md) for version pinning, updates, and OCI sources.
-
-### Or build your own
+**Docker**, no install needed:
 
 ```bash
-initrunner new "a research assistant that summarizes papers"  # AI-generates a role.yaml
-initrunner run --ingest ./docs/    # or skip YAML entirely -- chat with your docs, memory on by default
-```
-
-Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-reviewer`. See [Tutorial](docs/getting-started/tutorial.md).
-
-Migrating from PydanticAI or LangChain? `initrunner new --pydantic-ai my_agent.py` or `--langchain my_agent.py` converts your agent automatically. See [PydanticAI Import](docs/getting-started/pydanticai-import.md) or [LangChain Import](docs/getting-started/langchain-import.md).
-
-**Or run with Docker**, no install needed:
-
-```bash
-# Dashboard (default) -- http://localhost:8100
 docker run -d -e OPENAI_API_KEY -p 8100:8100 \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest
-
-# Interactive chat
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest        # dashboard
 docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i # chat
 ```
 
-See the [Docker guide](docs/getting-started/docker.md) for RAG, Telegram, API server, and compose examples.
+See the [Docker guide](docs/getting-started/docker.md) for more.
 
-## Define Agent Roles in YAML
-
-When you need more control, define an agent as a YAML file:
+## Define an Agent in YAML
 
 ```yaml
 apiVersion: initrunner/v1
@@ -166,46 +111,35 @@ spec:
 initrunner run reviewer.yaml -p "Review the latest commit"
 ```
 
-That's it. No Python, no boilerplate. The `model:` section is optional -- omit it and InitRunner auto-detects from your API key. Or pin a specific model: `model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }`.
+No Python, no boilerplate. The `model:` section is optional -- omit it and InitRunner auto-detects from your API key. Works with Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI, OpenRouter, Ollama, and any OpenAI-compatible endpoint. 28 built-in tools: filesystem, git, HTTP, Python, shell, SQL, search, email, Slack, MCP, audio, PDF extraction, CSV analysis, image generation, and more. Need a custom tool? [One file, one decorator](docs/agents/tool_creation.md).
 
 ## Why InitRunner
 
-**Zero config to start.** `initrunner run` gives you an AI assistant with persistent memory and document search out of the box. No YAML, no setup beyond an API key.
+A YAML file *is* the agent. Its tools, knowledge sources, memory, triggers, model, guardrails -- all declared in one place. You can read it and immediately understand what the agent does. You can diff it, review it in a PR, hand it to a teammate. When you want to switch from GPT to Claude, you change one line. When you want to add RAG, you add an `ingest:` section.
 
-**Config, not code.** Define your agent's tools, knowledge base, and memory in one YAML file. No framework boilerplate, no wiring classes together. 25+ built-in tools (filesystem, git, HTTP, Python, shell, SQL, search, email, MCP, think, script, and more) work out of the box. Need a custom tool? One file, one decorator.
+The same file runs as an interactive chat (`-i`), a one-shot command (`-p "..."`), a cron/webhook/file-watch daemon (`--daemon`), or an OpenAI-compatible API (`--serve`). You don't pick a deployment mode upfront and build around it. You pick it at runtime with a flag.
 
-**Version-control your agents.** Agent configs are plain text. Diff them, review them in PRs, validate in CI, reproduce anywhere. Your agent definition lives next to your code.
-
-**Prototype to production.** Same YAML runs as an interactive chat, a one-shot CLI command, a trigger-driven daemon, or an OpenAI-compatible API. No rewrite when you're ready to deploy.
+What this gets you in practice: your agent config lives in version control next to your code. New team members read the YAML and understand what the agent does. You review agent changes in PRs like any other config. And the agent you prototyped interactively is the same one you deploy as a daemon or API -- no rewrite, just a different flag.
 
 ## How It Compares
 
-|  | InitRunner | Build from scratch | LangChain |
-|---|---|---|---|
-| **Setup** | `curl -fsSL https://initrunner.ai/install.sh \| sh` + API key | Install 5-10 packages, write glue code | `pip install langchain` + adapters |
-| **Agent config** | One YAML file | Python classes + wiring | Python chains + config objects |
-| **RAG** | `--ingest ./docs/` (one flag) | Embed, store, retrieve, prompt - DIY | Loaders > splitters > vectorstore chain |
-| **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
-| **Model switching** | `--model` flag, aliases, or change YAML | Rewrite client code | Swap LLM class + adjust prompts |
-| **Multi-agent** | `compose.yaml` with delegation + auto-routing | Custom orchestration layer | Agent executor + custom routing |
-| **Migration** | `--pydantic-ai` / `--langchain` imports agents | N/A | N/A |
+|  | InitRunner | LangChain | CrewAI | AutoGen |
+|---|---|---|---|---|
+| **Agent config** | YAML file | Python chains + config | Python classes | Python classes |
+| **RAG** | `--ingest ./docs/` (one flag) | Loaders + splitters + vectorstore | RAG tool or custom | External setup |
+| **Memory** | Built-in, on by default | Add-on (multiple options) | Short/long-term memory | External |
+| **Multi-agent** | `compose.yaml` or `kind: Team` | LangGraph | Crew definition | Group chat |
+| **Deployment modes** | Same YAML: REPL / daemon / API | Custom per mode | CLI or Kickoff | Custom |
+| **Model switching** | Change 1 YAML line | Swap LLM class | Config per agent | Config per agent |
+| **Custom tools** | 1 file, 1 decorator | `@tool` decorator | `@tool` decorator | Function call |
+| **Bot deployment** | `--telegram` / `--discord` flag | Separate integration | Separate integration | Separate integration |
+| **Migration** | `--pydantic-ai` / `--langchain` import | N/A | N/A | N/A |
 
-## What Can You Build?
+## What You Get
 
-- **A Telegram bot that answers questions about your codebase** - point it at your repo, deploy with one flag
-- **A cron job that monitors competitors and sends daily digests** - cron trigger + web scraper + Slack sink
-- **A document Q&A agent for your team's knowledge base** - ingest PDFs and Markdown, serve as an API
-- **A code review bot triggered by new commits** - file-watch trigger + git tools + structured output
-- **A multi-agent pipeline with auto-routing: intake > researcher / responder / escalator** - sense routing picks the right target per message (`initrunner examples copy support-desk`)
-- **A personal assistant that remembers everything** - persistent memory across sessions, no setup
+### Knowledge and memory
 
-## Features
-
-Start with the code-reviewer above. Each step adds one capability - no rewrites, just add a section to your YAML.
-
-### Knowledge & memory
-
-Point at your docs for RAG - a `search_documents` tool is auto-registered. Set `auto: true` and it indexes on first run, no extra step:
+Point your agent at a directory. It extracts, chunks, embeds, and indexes your documents. During conversation, the agent searches the index automatically and cites what it finds. Memory persists across sessions.
 
 ```yaml
 spec:
@@ -218,59 +152,14 @@ spec:
 ```
 
 ```bash
-initrunner run role.yaml -i   # auto-ingests on first run, then search_documents + memory ready
+initrunner run role.yaml -i   # auto-ingests on first run, memory + search ready
 ```
-
-Common junk directories (`node_modules`, `.venv`, `__pycache__`, `.git`) are auto-excluded from glob patterns. Or ingest manually: `initrunner ingest role.yaml`.
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
-### Capabilities
+### Triggers and daemons
 
-Use native PydanticAI capabilities directly in YAML -- no tool wiring needed:
-
-```yaml
-spec:
-  capabilities:
-    - Thinking
-    - WebSearch
-    - WebFetch: { max_size: 1048576 }
-  model: { provider: anthropic, name: claude-sonnet-4-5-20250929 }
-```
-
-Capabilities like Thinking, WebSearch, WebFetch, ImageGeneration, and MCP are resolved at build time. `InputGuardCapability` enforces content policy from `security.content_policy`. See [Capabilities](docs/core/capabilities.md).
-
-### Clarify tool
-
-Let agents ask follow-up questions mid-run instead of guessing:
-
-```yaml
-spec:
-  tools:
-    - type: clarify
-```
-
-The agent calls `clarify("Which branch should I deploy?")` and blocks until the user responds. Works in REPL, Telegram/Discord bots, daemon mode, and autonomous runs. See [Tools](docs/agents/tools.md).
-
-### Context budget guard
-
-Long autonomous runs accumulate history that can exceed the context window. The built-in history processor estimates token usage and drops oldest message pairs when the budget is exceeded:
-
-```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-    context_window: 200000   # optional -- auto-detected per provider
-  autonomy:
-    max_iterations: 50
-```
-
-No extra config needed -- the guard activates automatically for autonomous and daemon runs. See [Autonomy](docs/orchestration/autonomy.md).
-
-### Triggers
-
-Turn it into a daemon that reacts to events - cron, file watch, webhook, heartbeat, Telegram, or Discord:
+Turn any agent into a daemon that reacts to cron schedules, file changes, webhooks, or heartbeats:
 
 ```yaml
 spec:
@@ -289,9 +178,9 @@ initrunner run role.yaml --daemon   # runs until stopped
 
 See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
 
-### Compose agents
+### Multi-agent orchestration
 
-Orchestrate multiple agents into a chain - one agent's output feeds into the next. Use `strategy: sense` to auto-route messages to the right target:
+Chain agents together. One agent's output feeds into the next. Sense routing auto-picks the right target per message (keyword matching first, single LLM call to break ties):
 
 ```yaml
 apiVersion: initrunner/v1
@@ -309,205 +198,105 @@ spec:
     responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up compose.yaml`. See [Orchestration Patterns](docs/orchestration/patterns-guide.md) for all five patterns side-by-side, or dive into [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md).
+Run with `initrunner compose up compose.yaml`. See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md).
 
-## Intelligence
-
-### Reasoning patterns
+### Reasoning and tool management
 
 Control how your agent thinks, not just what it does:
 
 ```yaml
 spec:
   reasoning:
-    pattern: plan_execute    # plan upfront, then execute each step
+    pattern: plan_execute    # plans upfront, then executes each step
     auto_plan: true
   tools:
-    - type: think            # internal scratchpad -- agent reasons before acting
-      critique: true         # self-evaluates each thought
+    - type: think            # internal scratchpad with self-critique
+      critique: true
     - type: todo             # structured task list for multi-step work
 ```
 
-Four patterns: `react` (simple tool loop), `todo_driven` (works through a task list), `plan_execute` (plans then acts), and `reflexion` (self-critiques and retries). The dashboard Cognition panel lets you switch patterns, toggle think/todo tools, and tune autonomy settings visually -- no YAML editing required.
+Four reasoning patterns: `react`, `todo_driven`, `plan_execute`, and `reflexion`. See [Reasoning](docs/core/reasoning.md).
 
-See [Reasoning](docs/core/reasoning.md) · [Autonomy](docs/orchestration/autonomy.md).
+Agents with many tools waste context and pick worse. Tool search hides tools behind on-demand keyword discovery -- the agent sees only `search_tools` and a few pinned tools, then discovers what it needs per-turn. BM25 scoring, no API calls, typically saves 60-80% context. See [Tool Search](docs/core/tool-search.md).
 
-### Sense routing
+## Architecture
 
-When a compose pipeline has multiple targets, sense routing picks the right one automatically:
-
-```yaml
-triager:
-  role: roles/triager.yaml
-  sink:
-    type: delegate
-    strategy: sense
-    target: [researcher, responder, escalator]
+```
+initrunner/
+  agent/        Role schema, loader, executor, 28 self-registering tools
+  runner/       Single-shot, REPL, autonomous, daemon execution modes
+  compose/      Multi-agent orchestration via compose.yaml
+  triggers/     Cron, file watcher, webhook, heartbeat, Telegram, Discord
+  stores/       Document + memory stores (LanceDB, zvec)
+  ingestion/    Extract -> chunk -> embed -> store pipeline
+  mcp/          MCP server integration and gateway
+  audit/        Append-only SQLite audit trail
+  services/     Shared business logic layer
+  cli/          Typer + Rich CLI entry point
 ```
 
-Two-pass scoring: first, keyword matching against each target's tags, name, and description (zero API calls). If scores are close, a single LLM call breaks the tie. In practice, keyword scoring resolves 90%+ of routing decisions -- the LLM tiebreaker fires only on genuinely ambiguous messages.
+Built on [PydanticAI](https://ai.pydantic.dev/) for the agent framework, Pydantic for config validation, LanceDB for vector search. See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup.
 
-<details>
-<summary>Scoring weights and strategy comparison</summary>
+## Security
 
-| Signal | Weight | Example |
-|--------|--------|---------|
-| Tags | 3x | `tags: [research, analysis, investigation]` |
-| Name | 2x | `name: researcher` |
-| Description | 1.5x | `description: Investigates technical issues` |
+InitRunner ships with an embedded [initguard](https://github.com/initrunner/initguard) policy engine. Agents get identity from their role metadata (name, team, tags, author), and every tool call and delegation is checked against your policies:
 
-| Strategy | Behavior | Cost |
-|----------|----------|------|
-| `all` | Fan-out to every target (default) | None |
-| `keyword` | Keyword scoring only | None |
-| `sense` | Keyword + LLM tiebreaker | 0-1 LLM call per message |
+- **Tool-level authorization** -- agents can only call tools their policy allows
+- **Delegation policy** -- controls which agents can hand off to which others
+- **Content filtering** -- input guardrails with configurable content policy
+- **PEP 578 sandboxing** -- audit hooks for dangerous operations
+- **Docker isolation** -- optional sandboxed execution environment
+- **Token budgets and rate limiting** -- prevent runaway costs
+- **Env var scrubbing** -- sensitive keys stripped from subprocess environments
+- **Append-only audit trail** -- every tool call logged to SQLite
 
-</details>
-
-The dashboard compose builder exposes all three strategies as inline controls when you create a Route composition, with quality indicators showing how well each target's metadata is optimized for routing.
-
-See [Intent Sensing](docs/core/intent_sensing.md) · [Compose Routing](docs/orchestration/agent_composer.md#routing-strategy).
-
-### Tool search
-
-Agents with many tools waste context and pick worse. Tool search hides tools behind on-demand keyword discovery:
-
-```yaml
-spec:
-  tools:
-    - type: datetime
-    - type: web_reader
-    - type: search
-    - type: python
-    - type: slack
-    - type: filesystem
-    - type: git
-    - type: shell
-    # ... 10+ tools
-  tool_search:
-    enabled: true
-    always_available: [current_time, fetch_page]
+```bash
+export INITRUNNER_POLICY_DIR=./policies
+initrunner run role.yaml                  # tool calls + delegation checked against policies
 ```
 
-The agent sees only `search_tools` and the pinned tools. When it needs something else, it calls `search_tools("send slack message")`, discovers `send_slack_message`, and calls it -- all in one turn. BM25 keyword search, no API calls, no embeddings. Typically saves 60-80% context on tool-heavy agents.
-
-The dashboard Cognition panel lets you toggle tool search and pick always-visible tools from a checklist when creating or editing an agent.
-
-See [Tool Search](docs/core/tool-search.md).
+See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ## User Interfaces
 
 <p align="center">
   <img src="assets/screenshot-dashboard.png" alt="InitRunner Dashboard" width="800"><br>
-  <em>Dashboard Launchpad - agents, activity, compositions, and teams at a glance</em>
+  <em>Dashboard -- agents, activity, compositions, and teams at a glance</em>
 </p>
 
-Manage agents, run prompts, build compositions, and browse audit trails from a visual interface. Two modes are available: a web dashboard that opens in your browser, and a native desktop app.
-
-### Dashboard (web)
-
 ```bash
-pip install "initrunner[dashboard]"   # included in initrunner[all]
+pip install "initrunner[dashboard]"
 initrunner dashboard                  # opens http://localhost:8100
 ```
 
-The browser opens automatically. Flags:
+Browse agents, run prompts, build compositions visually, configure reasoning patterns, and review audit trails. Also available as a native desktop window (`initrunner desktop`). See [Dashboard docs](docs/interfaces/dashboard.md).
 
-| Flag | Description |
-|------|-------------|
-| `--port` | Listen on a different port (default: `8100`) |
-| `--no-open` | Don't open the browser automatically |
-| `--expose` | Bind to `0.0.0.0` instead of localhost |
-| `--api-key` | Protect access with a login page and cookie-based session (also reads `INITRUNNER_DASHBOARD_API_KEY` env var) |
-| `--roles-dir` | Extra directories to scan for role YAML files (repeatable) |
-
-### Desktop (native window)
-
-```bash
-pip install "initrunner[desktop]"     # adds pywebview
-initrunner desktop                    # opens a native OS window
-```
-
-No browser needed. The desktop app embeds the dashboard in a native window using the platform's WebView (WKWebView on macOS, WebView2 on Windows). On Linux, GTK and WebKit packages are required -- the command detects missing packages and prints the install command for your distro.
-
-If a dashboard is already running on the port, the desktop window connects to it instead of starting a second backend.
-
-### What's in the UI
-
-- **Agent management** -- browse, create, delete, and inspect agents in a flow canvas or list view
-- **Cognition panel** -- configure reasoning patterns, autonomy, think/todo tools, and tool search visually
-- **Run panel** -- send prompts and stream responses in real time
-- **Compose and Team builders** -- visual editors with routing strategy selection and quality indicators
-- **Audit log** -- filterable run history with token usage and durations
-- **System health** -- detected providers, doctor checks, and tool registry
-
-See the full [Dashboard docs](docs/interfaces/dashboard.md) and [Design System](docs/interfaces/design-system.md).
-
-## Security & Authorization
-
-Built-in security with an embedded [initguard](https://github.com/initrunner/initguard) agent-as-principal policy engine. Agents get identity from `role.metadata` (name, team, tags, author), with **tool-level authorization** and **delegation policy** enforced across CLI, compose, daemon, and API:
-
-```bash
-export INITRUNNER_POLICY_DIR=./policies   # point to your policy YAML directory
-initrunner run role.yaml                  # tool calls + delegation checked against policies
-```
-
-Also includes content filtering, PEP 578 sandboxing, Docker isolation, token budgets, and rate limiting out of the box. See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
-
-### More capabilities
+## More Capabilities
 
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
-| **Skills** - reusable tool + prompt bundles, auto-discovered | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
-| **Team mode** - multi-persona on one task | `kind: Team` + `spec: { personas: {…} }` | [Team Mode](docs/orchestration/team_mode.md) |
-| **API server** - OpenAI-compatible endpoint | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
-| **Multimodal** - images, audio, video, docs | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
-| **Structured output** - validated JSON schemas | `spec: { output: { schema: {…} } }` | [Structured Output](docs/core/structured-output.md) |
-| **Evals** - test agent output quality | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
-| **MCP gateway** - expose agents as MCP tools | `initrunner mcp serve agent.yaml` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
-| **MCP toolkit** - tools without an agent | `initrunner mcp toolkit` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
-| **Configure** - switch provider/model on any role | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
+| **Skills** -- reusable tool + prompt bundles | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **Team mode** -- multi-persona on one task | `kind: Team` + `spec: { personas: {…} }` | [Team Mode](docs/orchestration/team_mode.md) |
+| **API server** -- OpenAI-compatible endpoint | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
+| **Multimodal** -- images, audio, video, docs | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
+| **Structured output** -- validated JSON schemas | `spec: { output: { schema: {…} } }` | [Structured Output](docs/core/structured-output.md) |
+| **Evals** -- test agent output quality | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
+| **MCP gateway** -- expose agents as MCP tools | `initrunner mcp serve agent.yaml` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
+| **MCP toolkit** -- tools without an agent | `initrunner mcp toolkit` | [MCP Gateway](docs/interfaces/mcp-gateway.md) |
+| **Capabilities** -- native PydanticAI features | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
+| **Observability** -- OpenTelemetry integration | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
+| **Configure** -- switch provider/model on any role | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
 
-See [Tutorial](docs/getting-started/tutorial.md) for a guided walkthrough.
+## Distribution
 
-## Distribution & Deployment
+**InitHub:** Browse and install community agents at [hub.initrunner.ai](https://hub.initrunner.ai/). Publish your own with `initrunner publish`. See [Registry](docs/agents/registry.md).
 
-### InitHub
+**OCI registries:** Push role bundles to any OCI-compliant registry: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`. See [OCI Distribution](docs/core/oci-distribution.md).
 
-```bash
-initrunner search "code review"                          # browse InitHub
-initrunner install alice/code-reviewer                   # install from InitHub
-initrunner install alice/code-reviewer@1.2.0             # pin a version
-```
-
-See [Registry](docs/agents/registry.md).
-
-```bash
-initrunner login                        # browser-based device code auth
-initrunner login --token <TOKEN>        # CI/headless
-initrunner publish                      # publish from current agent directory
-```
-
-See [Publishing Guide](https://hub.initrunner.ai/docs/publish).
-
-### OCI registry
-
-Publish and install complete role bundles to any OCI-compliant container registry:
-
-```bash
-initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0       # from current dir
-initrunner publish ./my-agent/ oci://ghcr.io/org/my-agent --tag 1.0.0  # or pass a path
-initrunner install oci://ghcr.io/org/my-agent:1.0.0
-```
-
-See [OCI Distribution](docs/core/oci-distribution.md).
-
-### Cloud deploy
+**Cloud deploy:**
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
-
-**Fly.io:** See the `deploy/fly.toml` configuration in the repository.
 
 ## Documentation
 
@@ -517,35 +306,29 @@ See [OCI Distribution](docs/core/oci-distribution.md).
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
 | Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Tool Search](docs/core/tool-search.md) · [Autonomy](docs/orchestration/autonomy.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) · [Intent Sensing](docs/core/intent_sensing.md) |
+| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Deprecations](docs/operations/deprecations.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
-
-See [`docs/`](docs/) for the full index.
+| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples
 
 ```bash
-initrunner examples list               # see all available examples
+initrunner examples list               # 60+ agents, teams, and compose projects
 initrunner examples copy code-reviewer # copy to current directory
 ```
 
-The [`examples/`](examples/) directory includes 20+ ready-to-run agents, skills, and compose projects.
+## Upgrading
 
-## Upgrading & Deprecations
-
-Role YAML files now include `metadata.spec_version` to track schema compatibility. When InitRunner removes or renames a config field, the deprecation system gives a clear error message pointing to the fix instead of a cryptic validation failure.
-
-Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version status. Add `--fix` to auto-install missing SDKs, install required extras for your role's tools/triggers, and bump `spec_version` -- or `--fix --yes` for non-interactive CI. See the [Deprecations guide](docs/operations/deprecations.md) for the full list of removed fields and migration instructions.
+Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version issues. Add `--fix` to auto-repair, or `--fix --yes` for CI. See [Deprecations](docs/operations/deprecations.md).
 
 ## Community & Contributing
 
-- [Discord - InitRunner Hub](https://discord.gg/GRTZmVcW) - Chat, ask questions, share roles
-- [GitHub Issues](https://github.com/vladkesler/initrunner/issues) - Bug reports and feature requests
-- [Changelog](CHANGELOG.md) - Release notes and version history
+- [Discord](https://discord.gg/GRTZmVcW) -- chat, ask questions, share roles
+- [GitHub Issues](https://github.com/vladkesler/initrunner/issues) -- bug reports and feature requests
+- [Changelog](CHANGELOG.md) -- release notes
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and PR guidelines. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and PR guidelines.
 
 ## License
 
@@ -553,4 +336,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.3.9</sub></p>
+<p align="center"><sub>v2026.4.2</sub></p>
