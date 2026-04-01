@@ -6,14 +6,14 @@ from unittest.mock import patch
 
 import pytest
 
-# Default all SDKs as available so tests don't depend on installed extras
-_MOCK_SDK_AVAILABLE = patch(
-    "initrunner.services.providers._provider_sdk_available", return_value=True
-)
-
 from initrunner.services.providers import (
     check_role_provider_compatibility,
     list_available_providers,
+)
+
+# Default all SDKs as available so tests don't depend on installed extras
+_MOCK_SDK_AVAILABLE = patch(
+    "initrunner.services.providers._provider_sdk_available", return_value=True
 )
 
 ROLE_OPENAI = textwrap.dedent("""\
