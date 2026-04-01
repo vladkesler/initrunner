@@ -13,6 +13,9 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 
+from initrunner.services._sidecar_common import DEFAULT_BLOCKED_MODULES
+from initrunner.services._sidecar_common import validate_sidecar_imports as validate_sidecar_imports
+
 # ---------------------------------------------------------------------------
 # Known LangChain tool class -> InitRunner tool type mapping
 # ---------------------------------------------------------------------------
@@ -88,26 +91,8 @@ _UNSUPPORTED_CLASSES: dict[str, str] = {
     ),
 }
 
-# Default blocked imports for custom tool sandbox
-_DEFAULT_BLOCKED_MODULES: frozenset[str] = frozenset(
-    {
-        "os",
-        "subprocess",
-        "shutil",
-        "sys",
-        "importlib",
-        "ctypes",
-        "socket",
-        "http.server",
-        "pickle",
-        "shelve",
-        "marshal",
-        "code",
-        "codeop",
-        "threading",
-        "_thread",
-    }
-)
+# Re-export for backwards compatibility
+_DEFAULT_BLOCKED_MODULES = DEFAULT_BLOCKED_MODULES
 
 
 # ---------------------------------------------------------------------------
@@ -664,33 +649,8 @@ def build_sidecar_module(lc_import: LangChainImport) -> str | None:
     return "\n".join(parts)
 
 
-def validate_sidecar_imports(sidecar_source: str) -> list[str]:
-    """Check sidecar source against the default sandbox blocked module list.
-
-    Returns a list of warning strings for any blocked imports found.
-    Does NOT raise -- the caller decides severity.
-    """
-    warnings: list[str] = []
-    try:
-        tree = ast.parse(sidecar_source)
-    except SyntaxError:
-        warnings.append("Generated sidecar module has syntax errors -- review manually.")
-        return warnings
-
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                base = (alias.name or "").split(".")[0]
-                if isinstance(node, ast.ImportFrom) and node.module:
-                    base = node.module.split(".")[0]
-                if base in _DEFAULT_BLOCKED_MODULES:
-                    warnings.append(
-                        f"Sidecar tool module imports '{base}' which is blocked by"
-                        " default sandbox policy."
-                        " Review security.sandbox.blocked_custom_modules."
-                    )
-
-    return warnings
+# validate_sidecar_imports is imported from _sidecar_common at the top of this module
+# and re-exported for backwards compatibility.
 
 
 # ---------------------------------------------------------------------------

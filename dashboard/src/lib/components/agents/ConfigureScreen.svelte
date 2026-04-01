@@ -16,7 +16,8 @@
 		Check
 	} from 'lucide-svelte';
 
-	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'langchain';
+	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'import';
+	type ImportFramework = 'langchain' | 'pydanticai';
 
 	let {
 		options,
@@ -24,6 +25,8 @@
 		agentName = $bindable(''),
 		description = $bindable(''),
 		langchainSource = $bindable(''),
+		pydanticaiSource = $bindable(''),
+		importFramework = $bindable<ImportFramework>('langchain'),
 		selectedTemplate = $bindable(null),
 		selectedProvider = $bindable(''),
 		selectedModel = $bindable(''),
@@ -53,6 +56,8 @@
 		agentName: string;
 		description: string;
 		langchainSource: string;
+		pydanticaiSource: string;
+		importFramework: ImportFramework;
 		selectedTemplate: string | null;
 		selectedProvider: string;
 		selectedModel: string;
@@ -89,7 +94,7 @@
 		{ id: 'template', label: 'Template', desc: 'Start from a preset', icon: LayoutTemplate },
 		{ id: 'blank', label: 'Blank', desc: 'Minimal skeleton', icon: FileCode },
 		{ id: 'hub', label: 'InitHub', desc: 'Browse hub.initrunner.ai', icon: Globe },
-		{ id: 'langchain', label: 'Import', desc: 'From LangChain code', icon: Import }
+		{ id: 'import', label: 'Import', desc: 'From existing code', icon: Import }
 	];
 
 	async function copySetupCommand(text: string) {
@@ -266,19 +271,48 @@
 	</div>
 {/if}
 
-<!-- LangChain source input -->
-{#if mode === 'langchain'}
+<!-- Import: framework toggle + source input -->
+{#if mode === 'import'}
 	<div>
 		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-			LangChain source
+			Framework
 		</h2>
-		<textarea
-			bind:value={langchainSource}
-			placeholder={"from langchain.agents import create_agent\nfrom langchain.tools import tool\n\n@tool\ndef my_tool(query: str) -> str:\n    ..."}
-			class="w-full resize-none border border-edge bg-surface-1 p-3 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
-			style="min-height: 200px"
-			disabled={generating}
-		></textarea>
+		<div class="flex items-center gap-0.5 rounded-full border border-edge bg-surface-1 p-0.5 w-fit">
+			{#each [['langchain', 'LangChain'], ['pydanticai', 'PydanticAI']] as [key, label]}
+				{@const active = importFramework === key}
+				<button
+					class="rounded-full px-4 py-1.5 font-mono text-[12px] transition-[color,background-color] duration-150
+						{active
+							? 'bg-accent-primary/10 text-accent-primary'
+							: 'text-fg-faint hover:text-fg-muted'}"
+					aria-pressed={active}
+					onclick={() => (importFramework = key as ImportFramework)}
+				>{label}</button>
+			{/each}
+		</div>
+	</div>
+
+	<div>
+		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			{importFramework === 'langchain' ? 'LangChain' : 'PydanticAI'} source
+		</h2>
+		{#if importFramework === 'langchain'}
+			<textarea
+				bind:value={langchainSource}
+				placeholder={"from langchain.agents import create_agent\nfrom langchain.tools import tool\n\n@tool\ndef my_tool(query: str) -> str:\n    ..."}
+				class="w-full resize-none border border-edge bg-surface-1 p-3 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+				style="min-height: 200px"
+				disabled={generating}
+			></textarea>
+		{:else}
+			<textarea
+				bind:value={pydanticaiSource}
+				placeholder={"from pydantic_ai import Agent\n\nagent = Agent(\n    \"openai:gpt-5\",\n    system_prompt=\"...\",\n)\n\n@agent.tool\ndef my_tool(ctx, query: str) -> str:\n    ..."}
+				class="w-full resize-none border border-edge bg-surface-1 p-3 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+				style="min-height: 200px"
+				disabled={generating}
+			></textarea>
+		{/if}
 	</div>
 {/if}
 
@@ -309,7 +343,7 @@
 		bind:customModelName
 		bind:customBaseUrl
 		bind:apiKey
-		hint={mode === 'langchain'
+		hint={mode === 'import'
 			? 'Used by the builder to generate YAML. Your agent\u2019s model comes from the source code.'
 			: 'Powers the agent and generates the role YAML. You can change it later.'}
 	/>

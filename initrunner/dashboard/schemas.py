@@ -258,12 +258,13 @@ class StartersResponse(BaseModel):
 
 
 class SeedRequest(BaseModel):
-    mode: Literal["template", "description", "blank", "starter", "langchain"]
+    mode: Literal["template", "description", "blank", "starter", "langchain", "pydanticai"]
     name: str
     template: str | None = None
     description: str | None = None
     starter_slug: str | None = None
     langchain_source: str | None = None
+    pydanticai_source: str | None = None
     provider: str
     model: str | None = None
     base_url: str | None = None

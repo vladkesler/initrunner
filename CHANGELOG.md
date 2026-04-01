@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026.4.2] - 2026-04-01
+
+### Added
+- **PydanticAI agent import** -- `initrunner new --pydantic-ai <file>` converts PydanticAI scripts to role.yaml via CLI or dashboard. AST extraction of `Agent()` model config, `system_prompt`/`instructions`, `@agent.tool`/`@agent.tool_plain`/`FunctionToolset` tools, `output_type` (including `NativeOutput`/`ToolOutput`/`PromptedOutput` unwrapping), `ModelSettings`, `UsageLimits`. Sidecar module with `RunContext` parameter stripping and body-reference TODO insertion. Warns on `pydantic_graph`, `logfire`, MCP servers, `builtin_tools`, `@agent.output_validator`
+- **Dashboard Import mode redesign** -- single "Import" card with pill toggle for LangChain/PydanticAI framework selection. Separate source buffers per framework
+- **Dashboard structured output fallback** -- SSE streaming auto-falls back to non-streaming execution for `output.type: json_schema` roles instead of crashing
+- **Shared sidecar validation** -- `_sidecar_common.py` extracts blocked-module validation used by both LangChain and PydanticAI importers
+- **PydanticAI import documentation** -- `docs/getting-started/pydanticai-import.md` with real before/after example
+
+### Fixed
+- **Provider auto-detection crashes on missing SDK** -- `detect_provider_and_model()` and `list_available_providers()` now skip providers whose Python SDK is not installed, falling through to the next available provider
+- **Async tool RunContext stripping** -- regex patterns now handle `async def` functions
+- **Dashboard starter override** -- manual mode selection clears `pendingStarter` so `?starter=` URL params don't override user choice
+
 ## [2026.4.1] - 2026-04-01
 
 ### Added

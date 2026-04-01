@@ -621,6 +621,101 @@ class BuilderSession:
 
         return self._make_turn_result(explanation or "Imported from LangChain source.")
 
+    def seed_from_pydanticai(
+        self,
+        source_path: Path,
+        provider: str,
+        model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ) -> TurnResult:
+        """Seed from a PydanticAI Python file via AST extraction + LLM normalization."""
+        self.seed_source = f"pydanticai:{source_path}"
+        source = source_path.read_text(encoding="utf-8")
+        return self.seed_from_pydanticai_source(
+            source, provider, model_name, base_url=base_url, api_key_env=api_key_env
+        )
+
+    def seed_from_pydanticai_source(
+        self,
+        source: str,
+        provider: str,
+        model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ) -> TurnResult:
+        """Seed from PydanticAI Python source string via AST extraction + LLM normalization."""
+        from initrunner.services._pydanticai_prompt import PYDANTICAI_IMPORT_PROMPT
+        from initrunner.services.pydanticai_import import (
+            build_sidecar_module,
+            extract_pydanticai_import,
+            validate_sidecar_imports,
+        )
+
+        if not self.seed_source:
+            self.seed_source = "pydanticai:source"
+
+        # 1. AST extraction (deterministic)
+        pai_import = extract_pydanticai_import(source)
+
+        # 2. Build sidecar module for custom tools
+        sidecar = build_sidecar_module(pai_import)
+        if sidecar is not None:
+            self._sidecar_source = sidecar
+            sandbox_warnings = validate_sidecar_imports(sidecar)
+            pai_import.warnings.extend(sandbox_warnings)
+
+        # 3. Store warnings
+        self.import_warnings = list(pai_import.warnings)
+
+        # 4. LLM normalization -- build a one-shot import agent (not cached)
+        from pydantic_ai import Agent
+
+        from initrunner.agent.loader import _build_model
+        from initrunner.agent.schema.base import ModelConfig
+        from initrunner.templates import _default_model_name
+
+        if model_name is None:
+            model_name = _default_model_name(provider)
+
+        schema_ref = build_schema_reference()
+        tool_sum = build_tool_summary()
+        system = PYDANTICAI_IMPORT_PROMPT.format(
+            schema_reference=schema_ref,
+            tool_summary=tool_sum,
+        )
+
+        gen_model_config = ModelConfig(
+            provider=provider,
+            name=model_name,
+            base_url=base_url,
+            api_key_env=api_key_env,
+        )
+        model = _build_model(gen_model_config)
+        import_agent = Agent(model, system_prompt=system)
+
+        # 5. Send structured summary to LLM
+        prompt_text = pai_import.to_prompt_text()
+        result = import_agent.run_sync(
+            f"Convert this PydanticAI agent to an InitRunner role.yaml:\n\n{prompt_text}"
+        )
+        self._messages = list(result.all_messages())
+
+        explanation, yaml_content = self._extract_yaml_from_response(result.output)
+        self.yaml_text = yaml_content
+
+        # 6. Auto-repair on validation failure
+        if any(i.severity == "error" for i in self.issues):
+            repaired = self._auto_repair(
+                provider, model_name, base_url=base_url, api_key_env=api_key_env
+            )
+            if repaired is not None:
+                self.yaml_text = repaired
+
+        return self._make_turn_result(explanation or "Imported from PydanticAI source.")
+
     # -- Refinement ----------------------------------------------------------
 
     def refine(
@@ -702,6 +797,7 @@ class BuilderSession:
             sidecar_module = f"{safe_stem}_tools"
             # Replace placeholder module name in YAML
             self._yaml_text = self._yaml_text.replace("_langchain_tools", sidecar_module)
+            self._yaml_text = self._yaml_text.replace("_pydanticai_tools", sidecar_module)
             # Invalidate caches after YAML mutation
             self._role_cache = None
             self._issues_cache = None

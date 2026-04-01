@@ -131,10 +131,22 @@ def _get_first_ollama_model() -> str | None:
     return models[0] if models else None
 
 
+def _provider_sdk_available(provider: str) -> bool:
+    """Return True if the SDK for *provider* is importable."""
+    from initrunner._compat import require_provider
+
+    try:
+        require_provider(provider)
+        return True
+    except RuntimeError:
+        return False
+
+
 def detect_provider_and_model() -> DetectedProvider | None:
     """Auto-detect provider from env vars and dotenv files.
 
     Checks providers in explicit priority order (anthropic first).
+    Skips providers whose SDK is not installed.
     Falls back to Ollama if running locally with no API keys.
     Returns None if nothing is configured.
     """
@@ -143,7 +155,7 @@ def detect_provider_and_model() -> DetectedProvider | None:
     _load_env()
 
     for provider, env_var in PROVIDER_KEY_ENVS:
-        if os.environ.get(env_var):
+        if os.environ.get(env_var) and _provider_sdk_available(provider):
             return DetectedProvider(provider=provider, model=_default_model_name(provider))
 
     # Fallback: Ollama running locally
@@ -187,14 +199,14 @@ def resolve_provider_and_model(
 
 
 def list_available_providers() -> list[DetectedProvider]:
-    """Return all providers the user has API keys for, in priority order."""
+    """Return all providers the user has API keys for and whose SDK is installed."""
     from initrunner.templates import _default_model_name
 
     _load_env()
 
     result: list[DetectedProvider] = []
     for provider, env_var in PROVIDER_KEY_ENVS:
-        if os.environ.get(env_var):
+        if os.environ.get(env_var) and _provider_sdk_available(provider):
             result.append(DetectedProvider(provider=provider, model=_default_model_name(provider)))
 
     if _is_ollama_running():

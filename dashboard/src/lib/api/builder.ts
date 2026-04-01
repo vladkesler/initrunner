@@ -130,12 +130,13 @@ export function getBuilderOptions(): Promise<BuilderOptions> {
 }
 
 export function seedAgent(body: {
-	mode: 'template' | 'description' | 'blank' | 'starter' | 'langchain';
+	mode: 'template' | 'description' | 'blank' | 'starter' | 'langchain' | 'pydanticai';
 	name: string;
 	template?: string;
 	description?: string;
 	starter_slug?: string;
 	langchain_source?: string;
+	pydanticai_source?: string;
 	provider: string;
 	model?: string;
 	base_url?: string;

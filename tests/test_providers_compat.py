@@ -11,6 +11,11 @@ from initrunner.services.providers import (
     list_available_providers,
 )
 
+# Default all SDKs as available so tests don't depend on installed extras
+_MOCK_SDK_AVAILABLE = patch(
+    "initrunner.services.providers._provider_sdk_available", return_value=True
+)
+
 ROLE_OPENAI = textwrap.dedent("""\
     apiVersion: initrunner/v1
     kind: Agent
@@ -110,7 +115,10 @@ class TestListAvailableProviders:
         monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
         monkeypatch.delenv("CO_API_KEY", raising=False)
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        with patch("initrunner.services.providers._is_ollama_running", return_value=False):
+        with (
+            patch("initrunner.services.providers._is_ollama_running", return_value=False),
+            _MOCK_SDK_AVAILABLE,
+        ):
             result = list_available_providers()
         assert len(result) == 1
         assert result[0].provider == "groq"
@@ -124,7 +132,10 @@ class TestListAvailableProviders:
         monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
         monkeypatch.delenv("CO_API_KEY", raising=False)
         monkeypatch.delenv("XAI_API_KEY", raising=False)
-        with patch("initrunner.services.providers._is_ollama_running", return_value=False):
+        with (
+            patch("initrunner.services.providers._is_ollama_running", return_value=False),
+            _MOCK_SDK_AVAILABLE,
+        ):
             result = list_available_providers()
         providers = [r.provider for r in result]
         assert "anthropic" in providers
@@ -185,7 +196,10 @@ class TestCheckRoleProviderCompatibility:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.setenv("GROQ_API_KEY", "gsk_test")
-        with patch("initrunner.services.providers._is_ollama_running", return_value=False):
+        with (
+            patch("initrunner.services.providers._is_ollama_running", return_value=False),
+            _MOCK_SDK_AVAILABLE,
+        ):
             compat = check_role_provider_compatibility(role_file(ROLE_OPENAI))
         assert compat.role_provider == "openai"
         assert compat.user_has_key is False

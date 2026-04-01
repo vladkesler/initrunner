@@ -176,7 +176,7 @@ class TestAgentToolExecution:
             # Call while patch is active (handler calls execute_run at invocation time)
             tool = asyncio.run(mcp.get_tool("bot"))
             assert tool is not None
-            result = tool.fn(prompt="hello")
+            result = tool.fn(prompt="hello")  # type: ignore[unresolved-attribute]
             assert result == "hi there"
 
     def test_failure_returns_error_string(self):
@@ -192,7 +192,7 @@ class TestAgentToolExecution:
             )
             _register_agent_tool(mcp, entry, "bot", None)
             tool = asyncio.run(mcp.get_tool("bot"))
-            result = tool.fn(prompt="hello")
+            result = tool.fn(prompt="hello")  # type: ignore[unresolved-attribute]
             assert result == "Error: model overloaded"
 
     def test_exception_caught(self):
@@ -205,7 +205,7 @@ class TestAgentToolExecution:
             mock_exec.side_effect = RuntimeError("boom")
             _register_agent_tool(mcp, entry, "bot", None)
             tool = asyncio.run(mcp.get_tool("bot"))
-            result = tool.fn(prompt="hello")
+            result = tool.fn(prompt="hello")  # type: ignore[unresolved-attribute]
             assert "Internal error" in result
             assert "boom" in result
 
@@ -236,7 +236,7 @@ class TestAgentToolExecution:
 
             for name in ("alpha", "beta", "gamma"):
                 tool = asyncio.run(mcp.get_tool(name))
-                assert tool.fn(prompt="x") == f"from:{name}"
+                assert tool.fn(prompt="x") == f"from:{name}"  # type: ignore[union-attr]
 
 
 # ---------------------------------------------------------------------------
