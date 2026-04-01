@@ -13,7 +13,7 @@ changes.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -44,6 +44,7 @@ class TurnResult:
     explanation: str  # LLM's explanation / questions
     yaml_text: str  # Full current YAML
     issues: list[ValidationIssue]  # Validation results
+    import_warnings: list[str] = field(default_factory=list)  # Lossy import warnings
 
     @property
     def ready(self) -> bool:
@@ -58,6 +59,7 @@ class PostCreateResult:
     issues: list[str]
     next_steps: list[str]  # Contextual based on role features
     omitted_assets: list[str]  # Files from multi-file bundles not imported
+    generated_assets: list[str] = field(default_factory=list)  # Written sidecar paths
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +275,8 @@ class BuilderSession:
         self._agent: object | None = None  # Lazy PydanticAI Agent
         self.seed_source: str = ""
         self.omitted_assets: list[str] = []
+        self.import_warnings: list[str] = []
+        self._sidecar_source: str | None = None  # Custom tool module content
 
     # -- Properties ----------------------------------------------------------
 
@@ -360,6 +364,7 @@ class BuilderSession:
             explanation=explanation,
             yaml_text=self._yaml_text,
             issues=self.issues,
+            import_warnings=list(self.import_warnings),
         )
 
     def _extract_yaml_from_response(self, text: str) -> tuple[str, str]:
@@ -521,6 +526,101 @@ class BuilderSession:
 
         return self._make_turn_result(explanation)
 
+    def seed_from_langchain(
+        self,
+        source_path: Path,
+        provider: str,
+        model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ) -> TurnResult:
+        """Seed from a LangChain Python file via AST extraction + LLM normalization."""
+        self.seed_source = f"langchain:{source_path}"
+        source = source_path.read_text(encoding="utf-8")
+        return self.seed_from_langchain_source(
+            source, provider, model_name, base_url=base_url, api_key_env=api_key_env
+        )
+
+    def seed_from_langchain_source(
+        self,
+        source: str,
+        provider: str,
+        model_name: str | None = None,
+        *,
+        base_url: str | None = None,
+        api_key_env: str | None = None,
+    ) -> TurnResult:
+        """Seed from LangChain Python source string via AST extraction + LLM normalization."""
+        from initrunner.services._langchain_prompt import LANGCHAIN_IMPORT_PROMPT
+        from initrunner.services.langchain_import import (
+            build_sidecar_module,
+            extract_langchain_import,
+            validate_sidecar_imports,
+        )
+
+        if not self.seed_source:
+            self.seed_source = "langchain:source"
+
+        # 1. AST extraction (deterministic)
+        lc_import = extract_langchain_import(source)
+
+        # 2. Build sidecar module for custom tools
+        sidecar = build_sidecar_module(lc_import)
+        if sidecar is not None:
+            self._sidecar_source = sidecar
+            sandbox_warnings = validate_sidecar_imports(sidecar)
+            lc_import.warnings.extend(sandbox_warnings)
+
+        # 3. Store warnings
+        self.import_warnings = list(lc_import.warnings)
+
+        # 4. LLM normalization -- build a one-shot import agent (not cached)
+        from pydantic_ai import Agent
+
+        from initrunner.agent.loader import _build_model
+        from initrunner.agent.schema.base import ModelConfig
+        from initrunner.templates import _default_model_name
+
+        if model_name is None:
+            model_name = _default_model_name(provider)
+
+        schema_ref = build_schema_reference()
+        tool_sum = build_tool_summary()
+        system = LANGCHAIN_IMPORT_PROMPT.format(
+            schema_reference=schema_ref,
+            tool_summary=tool_sum,
+        )
+
+        gen_model_config = ModelConfig(
+            provider=provider,
+            name=model_name,
+            base_url=base_url,
+            api_key_env=api_key_env,
+        )
+        model = _build_model(gen_model_config)
+        import_agent = Agent(model, system_prompt=system)
+
+        # 5. Send structured summary to LLM
+        prompt_text = lc_import.to_prompt_text()
+        result = import_agent.run_sync(
+            f"Convert this LangChain agent to an InitRunner role.yaml:\n\n{prompt_text}"
+        )
+        self._messages = list(result.all_messages())
+
+        explanation, yaml_content = self._extract_yaml_from_response(result.output)
+        self.yaml_text = yaml_content
+
+        # 6. Auto-repair on validation failure
+        if any(i.severity == "error" for i in self.issues):
+            repaired = self._auto_repair(
+                provider, model_name, base_url=base_url, api_key_env=api_key_env
+            )
+            if repaired is not None:
+                self.yaml_text = repaired
+
+        return self._make_turn_result(explanation or "Imported from LangChain source.")
+
     # -- Refinement ----------------------------------------------------------
 
     def refine(
@@ -590,9 +690,21 @@ class BuilderSession:
 
         issue_strings: list[str] = []
         valid = True
+        generated_paths: list[str] = []
 
         if path.exists() and not force:
             raise FileExistsError(f"{path} already exists. Use --force to overwrite.")
+
+        # Resolve sidecar module name from output YAML stem
+        if self._sidecar_source is not None:
+            # Sanitize stem to valid Python identifier (hyphens -> underscores)
+            safe_stem = path.stem.replace("-", "_")
+            sidecar_module = f"{safe_stem}_tools"
+            # Replace placeholder module name in YAML
+            self._yaml_text = self._yaml_text.replace("_langchain_tools", sidecar_module)
+            # Invalidate caches after YAML mutation
+            self._role_cache = None
+            self._issues_cache = None
 
         try:
             role = save_role_yaml_sync(path, self._yaml_text)
@@ -604,6 +716,12 @@ class BuilderSession:
             valid = False
             role = self.role
 
+        # Write sidecar module
+        if self._sidecar_source is not None:
+            sidecar_path = path.parent / f"{sidecar_module}.py"
+            sidecar_path.write_text(self._sidecar_source)
+            generated_paths.append(str(sidecar_path))
+
         next_steps = build_next_steps(role, path) if role else [f"initrunner validate {path}"]
 
         return PostCreateResult(
@@ -612,4 +730,5 @@ class BuilderSession:
             issues=issue_strings,
             next_steps=next_steps,
             omitted_assets=self.omitted_assets,
+            generated_assets=generated_paths,
         )

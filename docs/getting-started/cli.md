@@ -253,6 +253,7 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--template TEXT` | Start from a named template (use `--list-templates` to see options) |
 | `--list-templates` | Show available templates and exit |
 | `--blank` | Start from a minimal blank template |
+| `--langchain PATH` | Import from a LangChain Python file (see [LangChain Import](langchain-import.md)) |
 | `--provider TEXT` | Model provider (auto-detected if omitted) |
 | `--model TEXT` | Model name (uses provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
@@ -275,6 +276,9 @@ initrunner new --from hello-world
 
 # Blank template with specific provider
 initrunner new --blank --provider anthropic
+
+# Import a LangChain agent
+initrunner new --langchain my_agent.py
 
 # Fully interactive (no seed)
 initrunner new

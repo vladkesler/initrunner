@@ -33,7 +33,9 @@ def desktop(
     try:
         require_extra("webview")
     except MissingExtraError as e:
-        console.print(f"[red]{e}[/red]")
+        from rich.markup import escape
+
+        console.print(f"[red]{escape(str(e))}[/red]")
         raise SystemExit(1) from None
     import webview  # type: ignore[import-not-found]
 

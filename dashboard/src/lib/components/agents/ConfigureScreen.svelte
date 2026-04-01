@@ -9,19 +9,21 @@
 		Sparkles,
 		FileCode,
 		Globe,
+		Import,
 		Loader2,
 		ExternalLink,
 		Copy,
 		Check
 	} from 'lucide-svelte';
 
-	type Mode = 'description' | 'template' | 'blank' | 'hub';
+	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'langchain';
 
 	let {
 		options,
 		mode = $bindable(null),
 		agentName = $bindable(''),
 		description = $bindable(''),
+		langchainSource = $bindable(''),
 		selectedTemplate = $bindable(null),
 		selectedProvider = $bindable(''),
 		selectedModel = $bindable(''),
@@ -50,6 +52,7 @@
 		mode: Mode | null;
 		agentName: string;
 		description: string;
+		langchainSource: string;
 		selectedTemplate: string | null;
 		selectedProvider: string;
 		selectedModel: string;
@@ -85,7 +88,8 @@
 		{ id: 'description', label: 'Describe', desc: 'AI generates YAML', icon: Sparkles },
 		{ id: 'template', label: 'Template', desc: 'Start from a preset', icon: LayoutTemplate },
 		{ id: 'blank', label: 'Blank', desc: 'Minimal skeleton', icon: FileCode },
-		{ id: 'hub', label: 'InitHub', desc: 'Browse hub.initrunner.ai', icon: Globe }
+		{ id: 'hub', label: 'InitHub', desc: 'Browse hub.initrunner.ai', icon: Globe },
+		{ id: 'langchain', label: 'Import', desc: 'From LangChain code', icon: Import }
 	];
 
 	async function copySetupCommand(text: string) {
@@ -262,6 +266,22 @@
 	</div>
 {/if}
 
+<!-- LangChain source input -->
+{#if mode === 'langchain'}
+	<div>
+		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			LangChain source
+		</h2>
+		<textarea
+			bind:value={langchainSource}
+			placeholder={"from langchain.agents import create_agent\nfrom langchain.tools import tool\n\n@tool\ndef my_tool(query: str) -> str:\n    ..."}
+			class="w-full resize-none border border-edge bg-surface-1 p-3 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+			style="min-height: 200px"
+			disabled={generating}
+		></textarea>
+	</div>
+{/if}
+
 <!-- Hub search -->
 {#if mode === 'hub'}
 	<HubSearchPanel
@@ -289,6 +309,9 @@
 		bind:customModelName
 		bind:customBaseUrl
 		bind:apiKey
+		hint={mode === 'langchain'
+			? 'Used by the builder to generate YAML. Your agent\u2019s model comes from the source code.'
+			: 'Powers the agent and generates the role YAML. You can change it later.'}
 	/>
 
 	<!-- Generate button -->

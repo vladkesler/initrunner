@@ -25,7 +25,7 @@
 
 	// -- State ----------------------------------------------------------------
 
-	type Mode = 'description' | 'template' | 'blank' | 'hub';
+	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'langchain';
 	type Step = 'configure' | 'editor' | 'success';
 
 	let step: Step = $state('configure');
@@ -45,6 +45,7 @@
 	let customModelName = $state('');
 	let customBaseUrl = $state('');
 	let apiKey = $state('');
+	let langchainSource = $state('');
 	let generating = $state(false);
 	let generateError: string | null = $state(null);
 
@@ -65,6 +66,8 @@
 	let explanation = $state('');
 	let issues: ValidationIssue[] = $state([]);
 	let embeddingWarning: EmbeddingWarning | null = $state(null);
+	let sidecarSource: string | null = $state(null);
+	let importWarnings: string[] = $state([]);
 
 	// Save state
 	let selectedDir = $state('');
@@ -102,6 +105,7 @@
 		if (mode !== 'hub' && !agentName.trim()) return false;
 		if (mode === 'template' && !selectedTemplate) return false;
 		if (mode === 'description' && !description.trim()) return false;
+		if (mode === 'langchain' && !langchainSource.trim()) return false;
 		if (mode === 'hub' && !selectedHubRef) return false;
 		if (isCustomEndpoint && !customModelName.trim()) return false;
 		if (selectedProvider === 'custom' && !customBaseUrl.trim()) return false;
@@ -109,7 +113,9 @@
 		return true;
 	});
 
-	const generateButtonLabel = $derived(mode === 'hub' ? 'Load from Hub' : 'Generate');
+	const generateButtonLabel = $derived(
+		mode === 'hub' ? 'Load from Hub' : mode === 'langchain' ? 'Import' : 'Generate'
+	);
 
 	// -- Load options ---------------------------------------------------------
 
@@ -280,6 +286,7 @@
 					name: agentName.trim(),
 					template: mode === 'template' ? selectedTemplate! : undefined,
 					description: mode === 'description' ? description.trim() : undefined,
+					langchain_source: mode === 'langchain' ? langchainSource : undefined,
 					provider: selectedProvider,
 					model: (isCustomEndpoint ? customModelName.trim() : selectedModel) || undefined,
 					base_url: customBaseUrl || undefined,
@@ -290,6 +297,8 @@
 			explanation = result.explanation;
 			issues = result.issues;
 			embeddingWarning = result.embedding_warning;
+			sidecarSource = result.sidecar_source ?? null;
+			importWarnings = result.import_warnings ?? [];
 			if (mode !== 'hub' && agentName.trim()) {
 				const slug = agentName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 				filename = slug ? `${slug}.yaml` : 'role.yaml';
@@ -316,7 +325,8 @@
 				yaml_text: yamlText,
 				directory: selectedDir,
 				filename: filename,
-				force
+				force,
+				sidecar_source: sidecarSource ?? undefined
 			});
 			step = 'success';
 		} catch (e) {
@@ -351,6 +361,9 @@
 		explanation = '';
 		issues = [];
 		embeddingWarning = null;
+		sidecarSource = null;
+		importWarnings = [];
+		langchainSource = '';
 		saveResult = null;
 		saveError = null;
 		showOverwrite = false;
@@ -401,6 +414,7 @@
 			bind:mode
 			bind:agentName
 			bind:description
+			bind:langchainSource
 			bind:selectedTemplate
 			bind:selectedProvider
 			bind:selectedModel
@@ -435,6 +449,7 @@
 			bind:filename
 			bind:issues
 			bind:embeddingWarning
+			{importWarnings}
 			{saving}
 			{saveError}
 			{showOverwrite}
