@@ -333,8 +333,11 @@ class TestCLILangchain:
 
     def test_langchain_in_help(self):
         """--langchain flag appears in help output."""
+        import re
+
         result = runner.invoke(app, ["new", "--help"])
-        assert "--langchain" in result.output
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--langchain" in plain
 
 
 # ---------------------------------------------------------------------------
