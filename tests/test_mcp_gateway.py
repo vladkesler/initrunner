@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -173,9 +174,9 @@ class TestAgentToolExecution:
             mock_exec.return_value = (_FakeRunResult(success=True, output="hi there"), [])
             _register_agent_tool(mcp, entry, "bot", None)
             # Call while patch is active (handler calls execute_run at invocation time)
-            tools = mcp._tool_manager._tools
-            assert "bot" in tools
-            result = tools["bot"].fn(prompt="hello")  # type: ignore[unresolved-attribute]
+            tool = asyncio.run(mcp.get_tool("bot"))
+            assert tool is not None
+            result = tool.fn(prompt="hello")
             assert result == "hi there"
 
     def test_failure_returns_error_string(self):
@@ -190,7 +191,8 @@ class TestAgentToolExecution:
                 [],
             )
             _register_agent_tool(mcp, entry, "bot", None)
-            result = mcp._tool_manager._tools["bot"].fn(prompt="hello")  # type: ignore[unresolved-attribute]
+            tool = asyncio.run(mcp.get_tool("bot"))
+            result = tool.fn(prompt="hello")
             assert result == "Error: model overloaded"
 
     def test_exception_caught(self):
@@ -202,7 +204,8 @@ class TestAgentToolExecution:
         with patch("initrunner.agent.executor.execute_run") as mock_exec:
             mock_exec.side_effect = RuntimeError("boom")
             _register_agent_tool(mcp, entry, "bot", None)
-            result = mcp._tool_manager._tools["bot"].fn(prompt="hello")  # type: ignore[unresolved-attribute]
+            tool = asyncio.run(mcp.get_tool("bot"))
+            result = tool.fn(prompt="hello")
             assert "Internal error" in result
             assert "boom" in result
 
@@ -231,10 +234,9 @@ class TestAgentToolExecution:
                 tool_name = _make_tool_name(entry.name, seen)
                 _register_agent_tool(mcp, entry, tool_name, None)
 
-            tools = mcp._tool_manager._tools
-            assert tools["alpha"].fn(prompt="x")  # type: ignore[unresolved-attribute] == "from:alpha"
-            assert tools["beta"].fn(prompt="x")  # type: ignore[unresolved-attribute] == "from:beta"
-            assert tools["gamma"].fn(prompt="x")  # type: ignore[unresolved-attribute] == "from:gamma"
+            for name in ("alpha", "beta", "gamma"):
+                tool = asyncio.run(mcp.get_tool(name))
+                assert tool.fn(prompt="x") == f"from:{name}"
 
 
 # ---------------------------------------------------------------------------
