@@ -34,6 +34,17 @@
 		</div>
 	{/if}
 
+	{#if saveResult.generated_assets?.length > 0}
+		<div class="mt-6">
+			<h3 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+				Generated files
+			</h3>
+			{#each saveResult.generated_assets as asset}
+				<p class="font-mono text-[13px] text-ok">+ {asset}</p>
+			{/each}
+		</div>
+	{/if}
+
 	{#if saveResult.next_steps.length > 0}
 		<div class="mt-6">
 			<h3 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">

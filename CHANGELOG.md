@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026.4.1] - 2026-04-01
+
+### Added
+- **LangChain agent import** -- convert LangChain Python agents to InitRunner role.yaml via CLI (`initrunner new --langchain <file>`) or dashboard ("Import" mode card). AST-based extraction of model config, system prompt, `@tool` functions, known tool class mapping, structured output, and guardrails, with LLM normalization to produce minimal valid YAML
+- **Sidecar tool module generation** -- custom `@tool` functions are extracted into a sibling Python module with decorator stripped, non-LangChain imports preserved, and sandbox import validation. Module name derived from YAML filename with hyphens sanitized to underscores
+- **Import warnings** -- unsupported LangChain features (LCEL pipelines, LangGraph, memory, retrievers, callbacks, human-in-the-loop) produce explicit warnings with actionable InitRunner alternatives. Surfaced in CLI output and dashboard editor
+- **Model selector hint** -- dashboard builder shows context-sensitive hint below the "Model" heading explaining what the model selection does
+- **LangChain import documentation** -- migration guide at `docs/getting-started/langchain-import.md` covering CLI, dashboard, tool mapping, warnings, and scope
+
+### Fixed
+- Rich markup swallowing `[extra]` brackets in `MissingExtraError` messages -- `initrunner desktop` showed `uv pip install initrunner` instead of `uv pip install initrunner[desktop]`. Same fix applied to bot SDK checks in `_ephemeral.py`
+
 ## [2026.3.9] - 2026-03-31
 
 ### Changed

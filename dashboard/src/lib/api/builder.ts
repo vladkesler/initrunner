@@ -97,6 +97,8 @@ export interface SeedResult {
 	issues: ValidationIssue[];
 	ready: boolean;
 	embedding_warning: EmbeddingWarning | null;
+	sidecar_source: string | null;
+	import_warnings: string[];
 }
 
 export interface SaveResult {
@@ -105,6 +107,7 @@ export interface SaveResult {
 	issues: string[];
 	next_steps: string[];
 	agent_id: string;
+	generated_assets: string[];
 }
 
 export interface HubSearchResult {
@@ -127,11 +130,12 @@ export function getBuilderOptions(): Promise<BuilderOptions> {
 }
 
 export function seedAgent(body: {
-	mode: 'template' | 'description' | 'blank' | 'starter';
+	mode: 'template' | 'description' | 'blank' | 'starter' | 'langchain';
 	name: string;
 	template?: string;
 	description?: string;
 	starter_slug?: string;
+	langchain_source?: string;
 	provider: string;
 	model?: string;
 	base_url?: string;
@@ -169,6 +173,7 @@ export function saveAgent(body: {
 	directory: string;
 	filename: string;
 	force?: boolean;
+	sidecar_source?: string;
 }): Promise<SaveResult> {
 	return request('/api/builder/save', {
 		method: 'POST',

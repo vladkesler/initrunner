@@ -262,7 +262,7 @@ async def seed_agent(
 
     session = BuilderSession()
 
-    def _run() -> tuple[str, str, list, bool]:
+    def _run() -> tuple[str, str, list, bool, str | None, list[str]]:
         if req.mode == "blank":
             from initrunner.templates import _default_model_name
 
@@ -304,12 +304,36 @@ async def seed_agent(
             raw = _rewrite_model_block(raw, provider=runtime_provider, name=model)
             session.yaml_text = raw
             turn = session._make_turn_result(f"Loaded starter: {req.starter_slug}")
+        elif req.mode == "langchain":
+            if not req.langchain_source:
+                raise ValueError("langchain_source is required for mode=langchain")
+            turn = session.seed_from_langchain_source(
+                req.langchain_source,
+                runtime_provider,
+                req.model,
+                base_url=base_url,
+                api_key_env=api_key_env,
+            )
         else:
             raise ValueError(f"Unknown mode: {req.mode}")
-        return turn.explanation, turn.yaml_text, turn.issues, turn.ready
+        return (
+            turn.explanation,
+            turn.yaml_text,
+            turn.issues,
+            turn.ready,
+            session._sidecar_source,
+            list(session.import_warnings),
+        )
 
     try:
-        explanation, yaml_text, issues, ready = await asyncio.to_thread(_run)
+        (
+            explanation,
+            yaml_text,
+            issues,
+            ready,
+            sidecar_source,
+            import_warnings,
+        ) = await asyncio.to_thread(_run)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -337,6 +361,8 @@ async def seed_agent(
         issues=_issues_to_response(issues),
         ready=ready,
         embedding_warning=embedding_warning,
+        sidecar_source=sidecar_source,
+        import_warnings=import_warnings,
     )
 
 
@@ -435,6 +461,8 @@ async def save_agent(
     output_path = target_dir / req.filename
     session = BuilderSession()
     session.yaml_text = req.yaml_text
+    if req.sidecar_source is not None:
+        session._sidecar_source = req.sidecar_source
 
     def _run():
         return session.save(output_path, force=req.force)
@@ -457,6 +485,7 @@ async def save_agent(
         issues=result.issues,
         next_steps=result.next_steps,
         agent_id=agent_id,
+        generated_assets=result.generated_assets,
     )
 
 

@@ -22,6 +22,9 @@ def new(
     ] = None,
     template: Annotated[str | None, typer.Option("--template", help="Template name")] = None,
     blank: Annotated[bool, typer.Option("--blank", help="Start from blank template")] = False,
+    langchain: Annotated[
+        str | None, typer.Option("--langchain", help="Import from LangChain Python file")
+    ] = None,
     list_templates: Annotated[
         bool, typer.Option("--list-templates", help="Show available templates and exit")
     ] = False,
@@ -69,11 +72,13 @@ def new(
             from_source is not None,
             template is not None,
             blank,
+            langchain is not None,
         ]
     )
     if seed_count > 1:
         console.print(
-            "[red]Error:[/red] Specify at most one of: DESCRIPTION, --from, --template, --blank"
+            "[red]Error:[/red] Specify at most one of:"
+            " DESCRIPTION, --from, --template, --blank, --langchain"
         )
         raise typer.Exit(1)
 
@@ -94,13 +99,21 @@ def new(
 
     # --- Seed ---
     try:
-        turn = _seed_session(session, description, from_source, template, blank, provider, model)
+        turn = _seed_session(
+            session, description, from_source, template, blank, langchain, provider, model
+        )
     except (ValueError, FileNotFoundError, OSError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
     # --- Show initial result ---
     _display_turn(turn, session)
+
+    # --- Show import warnings ---
+    if turn.import_warnings:
+        console.print("\n[bold yellow]Import warnings:[/bold yellow]")
+        for w in turn.import_warnings:
+            console.print(f"  [yellow]-[/yellow] {w}")
 
     # --- Show omitted asset warnings ---
     if session.omitted_assets:
@@ -135,6 +148,11 @@ def new(
         for issue in result.issues:
             console.print(f"[yellow]Warning:[/yellow] {issue}")
 
+    if result.generated_assets:
+        console.print("\n[bold]Generated files:[/bold]")
+        for asset_path in result.generated_assets:
+            console.print(f"  [green]+[/green] {asset_path}")
+
     if result.omitted_assets:
         console.print(
             f"[dim]Note: omitted files from bundle: {', '.join(result.omitted_assets)}[/dim]"
@@ -151,6 +169,7 @@ def _seed_session(
     from_source: str | None,
     template: str | None,
     blank: bool,
+    langchain: str | None,
     provider: str,
     model: str | None,
 ) -> TurnResult:
@@ -164,6 +183,13 @@ def _seed_session(
 
     if from_source is not None:
         return _seed_from_source(session, from_source, provider, model)
+
+    if langchain is not None:
+        lc_path = Path(langchain)
+        if not lc_path.exists():
+            raise FileNotFoundError(f"LangChain file not found: {lc_path}")
+        with console.status("Importing LangChain agent..."):
+            return session.seed_from_langchain(lc_path, provider, model)
 
     if description is not None:
         with console.status("Generating..."):

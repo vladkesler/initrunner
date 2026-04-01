@@ -19,6 +19,7 @@
 		filename = $bindable('role.yaml'),
 		issues = $bindable<ValidationIssue[]>([]),
 		embeddingWarning = $bindable<EmbeddingWarning | null>(null),
+		importWarnings = [],
 		saving,
 		saveError,
 		showOverwrite,
@@ -34,6 +35,7 @@
 		filename: string;
 		issues: ValidationIssue[];
 		embeddingWarning: EmbeddingWarning | null;
+		importWarnings?: string[];
 		saving: boolean;
 		saveError: string | null;
 		showOverwrite: boolean;
@@ -94,6 +96,22 @@
 		{yamlText}
 		onResolved={handleEmbeddingResolved}
 	/>
+{/if}
+
+{#if importWarnings.length > 0}
+	<div class="border-l-2 border-l-warn bg-warn/5 px-4 py-3">
+		<h3 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-warn">
+			Import warnings
+		</h3>
+		<ul class="mt-2 space-y-1.5">
+			{#each importWarnings as warning}
+				<li class="flex gap-2 text-[13px] text-fg-muted">
+					<TriangleAlert size={14} class="mt-0.5 shrink-0 text-warn" />
+					<span>{warning}</span>
+				</li>
+			{/each}
+		</ul>
+	</div>
 {/if}
 
 <!-- Toolbar -->

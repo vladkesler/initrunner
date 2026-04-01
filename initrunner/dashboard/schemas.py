@@ -258,11 +258,12 @@ class StartersResponse(BaseModel):
 
 
 class SeedRequest(BaseModel):
-    mode: Literal["template", "description", "blank", "starter"]
+    mode: Literal["template", "description", "blank", "starter", "langchain"]
     name: str
     template: str | None = None
     description: str | None = None
     starter_slug: str | None = None
+    langchain_source: str | None = None
     provider: str
     model: str | None = None
     base_url: str | None = None
@@ -299,6 +300,8 @@ class SeedResponse(BaseModel):
     issues: list[ValidationIssueResponse]
     ready: bool
     embedding_warning: EmbeddingWarning | None = None
+    sidecar_source: str | None = None
+    import_warnings: list[str] = Field(default_factory=list)
 
 
 class SetEmbeddingProviderRequest(BaseModel):
@@ -315,6 +318,7 @@ class SaveRequest(BaseModel):
     directory: str
     filename: str
     force: bool = False
+    sidecar_source: str | None = None
 
 
 class SaveResponse(BaseModel):
@@ -323,6 +327,7 @@ class SaveResponse(BaseModel):
     issues: list[str]
     next_steps: list[str]
     agent_id: str
+    generated_assets: list[str] = Field(default_factory=list)
 
 
 # -- Key management ------------------------------------------------------------

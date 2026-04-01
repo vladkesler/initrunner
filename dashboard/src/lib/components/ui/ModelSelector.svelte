@@ -13,7 +13,8 @@
 		customModelName = $bindable(''),
 		customBaseUrl = $bindable(''),
 		apiKey = $bindable(''),
-		compact = false
+		compact = false,
+		hint = ''
 	}: {
 		providers: ProviderModels[];
 		customPresets: ProviderPreset[];
@@ -25,6 +26,7 @@
 		customBaseUrl: string;
 		apiKey: string;
 		compact?: boolean;
+		hint?: string;
 	} = $props();
 
 	// -- Derived ------------------------------------------------------------------
@@ -104,6 +106,9 @@
 	<div class={compact ? 'space-y-2' : ''}>
 		{#if !compact}
 			<h2 class={labelClass}>Model</h2>
+			{#if hint}
+				<p class="-mt-1.5 mb-2 text-[12px] text-fg-faint">{hint}</p>
+			{/if}
 		{/if}
 		<div class="flex gap-{compact ? '2' : '3'}">
 			<select

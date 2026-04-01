@@ -129,7 +129,9 @@ def verify_bot_sdk(platform: str) -> None:
     try:
         require_extra(platform)
     except MissingExtraError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        from rich.markup import escape
+
+        console.print(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(1) from None
 
 
