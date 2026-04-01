@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import textwrap
 from unittest.mock import MagicMock, patch
@@ -26,6 +27,18 @@ from initrunner.mcp.toolkit import (
 )
 
 runner = CliRunner()
+
+
+def _get_tool_names(mcp):  # type: ignore[no-untyped-def]
+    """Get the set of registered tool names from a FastMCP instance."""
+    tools = asyncio.run(mcp.list_tools())
+    return {t.name for t in tools}
+
+
+def _get_tool_fn(mcp, name):  # type: ignore[no-untyped-def]
+    """Extract a tool function from a FastMCP instance by name."""
+    tool = asyncio.run(mcp.get_tool(name))
+    return tool.fn
 
 
 # ---------------------------------------------------------------------------
@@ -128,13 +141,13 @@ class TestToolkitConfig:
 class TestBuildToolkit:
     def test_default_tools_registered(self):
         mcp = build_toolkit()
-        tools = mcp._tool_manager._tools
+        tool_names = _get_tool_names(mcp)
         # Should have default tool functions registered
-        assert len(tools) > 0
+        assert len(tool_names) > 0
 
     def test_default_tools_include_expected(self):
         mcp = build_toolkit()
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         # search registers web_search and news_search
         assert "web_search" in tool_names
         assert "news_search" in tool_names
@@ -150,7 +163,7 @@ class TestBuildToolkit:
 
     def test_selective_tools(self):
         mcp = build_toolkit(tool_names=["search"])
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "web_search" in tool_names
         assert "news_search" in tool_names
         # datetime should NOT be registered
@@ -158,7 +171,7 @@ class TestBuildToolkit:
 
     def test_selective_tools_datetime_only(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "current_time" in tool_names
         assert "parse_date" in tool_names
         assert "web_search" not in tool_names
@@ -170,7 +183,7 @@ class TestBuildToolkit:
     def test_config_tools_override_defaults(self):
         cfg = ToolkitConfig(tools={"datetime": {}})
         mcp = build_toolkit(cfg)
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "current_time" in tool_names
         # search should NOT be registered (not in config.tools)
         assert "web_search" not in tool_names
@@ -183,7 +196,7 @@ class TestBuildToolkit:
     def test_tool_names_override_config_tools(self):
         cfg = ToolkitConfig(tools={"datetime": {}, "search": {}})
         mcp = build_toolkit(cfg, tool_names=["datetime"])
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "current_time" in tool_names
         assert "web_search" not in tool_names
 
@@ -192,13 +205,13 @@ class TestBuildToolkit:
         db_path.touch()
         cfg = ToolkitConfig(tools={"sql": {"database": str(db_path)}})
         mcp = build_toolkit(cfg)
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "sql_query" in tool_names
 
     def test_http_tool_registration(self):
         cfg = ToolkitConfig(tools={"http": {"base_url": "https://api.example.com"}})
         mcp = build_toolkit(cfg)
-        tool_names = set(mcp._tool_manager._tools.keys())
+        tool_names = _get_tool_names(mcp)
         assert "http_request" in tool_names
 
     def test_all_registrars_exist(self):
@@ -218,7 +231,7 @@ class TestBuildToolkit:
 class TestToolExecution:
     def test_current_time(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        fn = mcp._tool_manager._tools["current_time"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "current_time")
         result = fn(tz="UTC")
         assert "UTC" in result
         # Should contain a date-like string
@@ -226,25 +239,25 @@ class TestToolExecution:
 
     def test_current_time_with_timezone(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        fn = mcp._tool_manager._tools["current_time"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "current_time")
         result = fn(tz="America/New_York")
         assert "E" in result  # EST or EDT
 
     def test_current_time_invalid_timezone(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        fn = mcp._tool_manager._tools["current_time"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "current_time")
         result = fn(tz="Invalid/Timezone")
         assert "Error" in result
 
     def test_parse_date(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        fn = mcp._tool_manager._tools["parse_date"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "parse_date")
         result = fn(date_string="2024-01-15")
         assert "2024-01-15" in result
 
     def test_parse_date_invalid(self):
         mcp = build_toolkit(tool_names=["datetime"])
-        fn = mcp._tool_manager._tools["parse_date"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "parse_date")
         result = fn(date_string="not a date at all xyz")
         assert "Error" in result
 
@@ -253,7 +266,7 @@ class TestToolExecution:
         csv_file.write_text("name,age,city\nAlice,30,NYC\nBob,25,LA\n")
         cfg = ToolkitConfig(tools={"csv_analysis": {"root_path": str(tmp_path)}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["inspect_csv"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "inspect_csv")
         result = fn(path="data.csv")
         assert "name" in result
         assert "age" in result
@@ -262,7 +275,7 @@ class TestToolExecution:
     def test_inspect_csv_file_not_found(self, tmp_path):
         cfg = ToolkitConfig(tools={"csv_analysis": {"root_path": str(tmp_path)}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["inspect_csv"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "inspect_csv")
         result = fn(path="nonexistent.csv")
         assert "Error" in result
 
@@ -271,7 +284,7 @@ class TestToolExecution:
         csv_file.write_text("name,score\nAlice,90\nBob,80\nCharlie,70\n")
         cfg = ToolkitConfig(tools={"csv_analysis": {"root_path": str(tmp_path)}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["summarize_csv"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "summarize_csv")
         result = fn(path="data.csv")
         assert "score" in result
         assert "numeric" in result
@@ -281,7 +294,7 @@ class TestToolExecution:
         csv_file.write_text("name,age,city\nAlice,30,NYC\nBob,25,LA\nCharlie,35,NYC\n")
         cfg = ToolkitConfig(tools={"csv_analysis": {"root_path": str(tmp_path)}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["query_csv"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "query_csv")
         result = fn(path="data.csv", filter_column="city", filter_value="NYC")
         assert "Alice" in result
         assert "Charlie" in result
@@ -294,7 +307,7 @@ class TestToolExecution:
         )
         with patch.dict("initrunner.agent.tools.search._PROVIDERS", {"duckduckgo": mock_fn}):
             mcp = build_toolkit(tool_names=["search"])
-            fn = mcp._tool_manager._tools["web_search"].fn  # type: ignore[attr-defined]
+            fn = _get_tool_fn(mcp, "web_search")
             result = fn(query="test")
         assert "Test Result" in result
         assert "https://example.com" in result
@@ -311,7 +324,7 @@ class TestToolExecution:
         )
         with patch.dict("initrunner.agent.tools.search._PROVIDERS", {"duckduckgo": mock_fn}):
             mcp = build_toolkit(tool_names=["search"])
-            fn = mcp._tool_manager._tools["news_search"].fn  # type: ignore[attr-defined]
+            fn = _get_tool_fn(mcp, "news_search")
             result = fn(query="test")
         assert "Breaking News" in result
 
@@ -319,7 +332,7 @@ class TestToolExecution:
     def test_fetch_page(self, mock_fetch):
         mock_fetch.return_value = "# Hello World\n\nThis is a test page."
         mcp = build_toolkit(tool_names=["web_reader"])
-        fn = mcp._tool_manager._tools["fetch_page"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "fetch_page")
         result = fn(url="https://example.com")
         assert "Hello World" in result
 
@@ -336,7 +349,7 @@ class TestToolExecution:
 
         cfg = ToolkitConfig(tools={"sql": {"database": str(db_path)}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["sql_query"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "sql_query")
         result = fn(query="SELECT * FROM users")
         assert "Alice" in result
         assert "Bob" in result
@@ -352,7 +365,7 @@ class TestToolExecution:
 
         cfg = ToolkitConfig(tools={"sql": {"database": str(db_path), "read_only": True}})
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["sql_query"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "sql_query")
         result = fn(query="INSERT INTO users VALUES (1, 'Alice')")
         assert "Error" in result
         assert "read-only" in result
@@ -362,7 +375,7 @@ class TestToolExecution:
             tools={"http": {"base_url": "https://api.example.com", "allowed_methods": ["GET"]}}
         )
         mcp = build_toolkit(cfg)
-        fn = mcp._tool_manager._tools["http_request"].fn  # type: ignore[attr-defined]
+        fn = _get_tool_fn(mcp, "http_request")
         result = fn(method="DELETE", path="/users/1")
         assert "Error" in result
         assert "not allowed" in result

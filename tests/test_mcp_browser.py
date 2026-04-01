@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from unittest.mock import patch
 
@@ -14,7 +15,8 @@ runner = CliRunner()
 
 def _get_tool_fn(mcp, name):  # type: ignore[no-untyped-def]
     """Extract a tool function from a FastMCP instance by name."""
-    return mcp._tool_manager._tools[name].fn  # type: ignore[union-attribute]
+    tool = asyncio.run(mcp.get_tool(name))
+    return tool.fn
 
 
 # ---------------------------------------------------------------------------
@@ -56,8 +58,8 @@ class TestBrowserMCPConfig:
 class TestBuildBrowserMCP:
     def test_returns_fastmcp_with_expected_tools(self):
         mcp = build_browser_mcp()
-        tools = mcp._tool_manager._tools  # type: ignore[union-attribute]
-        tool_names = set(tools.keys())
+        tools = asyncio.run(mcp.list_tools())
+        tool_names = {t.name for t in tools}
         expected = {
             "open_url",
             "snapshot",
