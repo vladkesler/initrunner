@@ -25,7 +25,8 @@
 
 	// -- State ----------------------------------------------------------------
 
-	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'langchain';
+	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'import';
+	type ImportFramework = 'langchain' | 'pydanticai';
 	type Step = 'configure' | 'editor' | 'success';
 
 	let step: Step = $state('configure');
@@ -46,6 +47,8 @@
 	let customBaseUrl = $state('');
 	let apiKey = $state('');
 	let langchainSource = $state('');
+	let pydanticaiSource = $state('');
+	let importFramework: ImportFramework = $state('langchain');
 	let generating = $state(false);
 	let generateError: string | null = $state(null);
 
@@ -105,7 +108,10 @@
 		if (mode !== 'hub' && !agentName.trim()) return false;
 		if (mode === 'template' && !selectedTemplate) return false;
 		if (mode === 'description' && !description.trim()) return false;
-		if (mode === 'langchain' && !langchainSource.trim()) return false;
+		if (mode === 'import') {
+			const src = importFramework === 'langchain' ? langchainSource : pydanticaiSource;
+			if (!src.trim()) return false;
+		}
 		if (mode === 'hub' && !selectedHubRef) return false;
 		if (isCustomEndpoint && !customModelName.trim()) return false;
 		if (selectedProvider === 'custom' && !customBaseUrl.trim()) return false;
@@ -114,7 +120,7 @@
 	});
 
 	const generateButtonLabel = $derived(
-		mode === 'hub' ? 'Load from Hub' : mode === 'langchain' ? 'Import' : 'Generate'
+		mode === 'hub' ? 'Load from Hub' : mode === 'import' ? 'Import' : 'Generate'
 	);
 
 	// -- Load options ---------------------------------------------------------
@@ -189,6 +195,7 @@
 	function selectMode(m: Mode) {
 		mode = m;
 		generateError = null;
+		pendingStarter = null;
 		if (m === 'blank') {
 			selectedTemplate = null;
 		}
@@ -282,11 +289,12 @@
 				pendingStarter = null;
 			} else {
 				result = await seedAgent({
-					mode: mode!,
+					mode: mode === 'import' ? importFramework : mode!,
 					name: agentName.trim(),
 					template: mode === 'template' ? selectedTemplate! : undefined,
 					description: mode === 'description' ? description.trim() : undefined,
-					langchain_source: mode === 'langchain' ? langchainSource : undefined,
+					langchain_source: mode === 'import' && importFramework === 'langchain' ? langchainSource : undefined,
+					pydanticai_source: mode === 'import' && importFramework === 'pydanticai' ? pydanticaiSource : undefined,
 					provider: selectedProvider,
 					model: (isCustomEndpoint ? customModelName.trim() : selectedModel) || undefined,
 					base_url: customBaseUrl || undefined,
@@ -364,6 +372,8 @@
 		sidecarSource = null;
 		importWarnings = [];
 		langchainSource = '';
+		pydanticaiSource = '';
+		importFramework = 'langchain';
 		saveResult = null;
 		saveError = null;
 		showOverwrite = false;
@@ -415,6 +425,8 @@
 			bind:agentName
 			bind:description
 			bind:langchainSource
+			bind:pydanticaiSource
+			bind:importFramework
 			bind:selectedTemplate
 			bind:selectedProvider
 			bind:selectedModel

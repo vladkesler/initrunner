@@ -39,6 +39,7 @@ def _mock_run_result():
 @pytest.fixture
 def _mock_role():
     role = MagicMock()
+    role.spec.output.type = "text"
     role.spec.memory = None
     role.spec.session = None
     return role
@@ -99,6 +100,38 @@ async def test_stream_run_sse_awaits_future(_mock_run_result, _mock_role):
 
     last = _parse_last_data_event(results)
     assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_stream_run_sse_structured_output_fallback(_mock_run_result, _mock_role):
+    """Structured output roles use non-streaming execution, no token events."""
+    from initrunner.dashboard.streaming import stream_run_sse
+
+    _mock_role.spec.output.type = "json_schema"
+
+    def fake_build(path, **kw):
+        return (_mock_role, MagicMock())
+
+    def fake_run_sync(agent, role, prompt, **kw):
+        return (_mock_run_result, [])
+
+    with (
+        patch("initrunner.services.execution.build_agent_sync", side_effect=fake_build),
+        patch("initrunner.services.execution.execute_run_sync", side_effect=fake_run_sync),
+        patch(
+            "initrunner.services.execution.execute_run_stream_sync",
+            side_effect=AssertionError("streaming should not be called"),
+        ),
+    ):
+        events = await _collect(stream_run_sse(Path("/tmp/role.yaml"), "hello"))
+
+    # No token events emitted
+    token_events = [e for e in events if '"type": "token"' in e]
+    assert token_events == []
+
+    last = _parse_last_data_event(events)
+    assert last["type"] == "result"
     assert last["data"]["success"] is True
 
 

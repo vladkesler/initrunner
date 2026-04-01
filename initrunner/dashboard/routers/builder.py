@@ -314,6 +314,16 @@ async def seed_agent(
                 base_url=base_url,
                 api_key_env=api_key_env,
             )
+        elif req.mode == "pydanticai":
+            if not req.pydanticai_source:
+                raise ValueError("pydanticai_source is required for mode=pydanticai")
+            turn = session.seed_from_pydanticai_source(
+                req.pydanticai_source,
+                runtime_provider,
+                req.model,
+                base_url=base_url,
+                api_key_env=api_key_env,
+            )
         else:
             raise ValueError(f"Unknown mode: {req.mode}")
         return (

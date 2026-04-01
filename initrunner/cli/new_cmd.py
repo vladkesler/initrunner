@@ -25,6 +25,9 @@ def new(
     langchain: Annotated[
         str | None, typer.Option("--langchain", help="Import from LangChain Python file")
     ] = None,
+    pydantic_ai: Annotated[
+        str | None, typer.Option("--pydantic-ai", help="Import from PydanticAI Python file")
+    ] = None,
     list_templates: Annotated[
         bool, typer.Option("--list-templates", help="Show available templates and exit")
     ] = False,
@@ -73,12 +76,13 @@ def new(
             template is not None,
             blank,
             langchain is not None,
+            pydantic_ai is not None,
         ]
     )
     if seed_count > 1:
         console.print(
             "[red]Error:[/red] Specify at most one of:"
-            " DESCRIPTION, --from, --template, --blank, --langchain"
+            " DESCRIPTION, --from, --template, --blank, --langchain, --pydantic-ai"
         )
         raise typer.Exit(1)
 
@@ -100,7 +104,15 @@ def new(
     # --- Seed ---
     try:
         turn = _seed_session(
-            session, description, from_source, template, blank, langchain, provider, model
+            session,
+            description,
+            from_source,
+            template,
+            blank,
+            langchain,
+            pydantic_ai,
+            provider,
+            model,
         )
     except (ValueError, FileNotFoundError, OSError) as e:
         console.print(f"[red]Error:[/red] {e}")
@@ -170,6 +182,7 @@ def _seed_session(
     template: str | None,
     blank: bool,
     langchain: str | None,
+    pydantic_ai: str | None,
     provider: str,
     model: str | None,
 ) -> TurnResult:
@@ -190,6 +203,13 @@ def _seed_session(
             raise FileNotFoundError(f"LangChain file not found: {lc_path}")
         with console.status("Importing LangChain agent..."):
             return session.seed_from_langchain(lc_path, provider, model)
+
+    if pydantic_ai is not None:
+        pai_path = Path(pydantic_ai)
+        if not pai_path.exists():
+            raise FileNotFoundError(f"PydanticAI file not found: {pai_path}")
+        with console.status("Importing PydanticAI agent..."):
+            return session.seed_from_pydanticai(pai_path, provider, model)
 
     if description is not None:
         with console.status("Generating..."):

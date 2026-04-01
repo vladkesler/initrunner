@@ -14,6 +14,10 @@ from initrunner.services.providers import (
 
 # Patch _load_env to prevent .env files in cwd from polluting tests
 _MOCK_LOAD_ENV = patch("initrunner.services.providers._load_env")
+# Default all SDKs as available so existing tests don't depend on installed extras
+_MOCK_SDK_AVAILABLE = patch(
+    "initrunner.services.providers._provider_sdk_available", return_value=True
+)
 
 
 @pytest.fixture()
@@ -44,7 +48,7 @@ class TestDetectProviderAndModel:
         """Anthropic takes priority when both keys are set."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "anthropic"
@@ -52,42 +56,42 @@ class TestDetectProviderAndModel:
     def test_openai_detected(self, clean_env, monkeypatch):
         """OpenAI detected when only its key is set."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "openai"
 
     def test_google_detected(self, clean_env, monkeypatch):
         monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "google"
 
     def test_groq_detected(self, clean_env, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "test-key")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "groq"
 
     def test_mistral_detected(self, clean_env, monkeypatch):
         monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "mistral"
 
     def test_cohere_detected(self, clean_env, monkeypatch):
         monkeypatch.setenv("CO_API_KEY", "test-key")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "cohere"
 
     def test_xai_detected_from_env(self, clean_env, monkeypatch):
         monkeypatch.setenv("XAI_API_KEY", "xai-test-key")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "xai"
@@ -139,7 +143,10 @@ class TestDetectProviderAndModel:
         (home / ".env").write_text('OPENAI_API_KEY="sk-from-dotenv"\n')
 
         # Don't mock _load_env here — we want it to actually load the .env
-        with patch("initrunner.services.providers._is_ollama_running", return_value=False):
+        with (
+            patch("initrunner.services.providers._is_ollama_running", return_value=False),
+            _MOCK_SDK_AVAILABLE,
+        ):
             result = detect_provider_and_model()
         assert result is not None
         assert result.provider == "openai"
@@ -147,10 +154,29 @@ class TestDetectProviderAndModel:
     def test_default_model_returned(self, clean_env, monkeypatch):
         """Provider detection includes a default model name."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-        with _MOCK_LOAD_ENV:
+        with _MOCK_LOAD_ENV, _MOCK_SDK_AVAILABLE:
             result = detect_provider_and_model()
         assert result is not None
         assert result.model  # Should be non-empty
+
+    def test_skips_provider_with_missing_sdk(self, clean_env, monkeypatch):
+        """Falls through to next provider when SDK is not installed."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+        def _sdk_available(provider: str) -> bool:
+            return provider != "anthropic"
+
+        with (
+            _MOCK_LOAD_ENV,
+            patch(
+                "initrunner.services.providers._provider_sdk_available",
+                side_effect=_sdk_available,
+            ),
+        ):
+            result = detect_provider_and_model()
+        assert result is not None
+        assert result.provider == "openai"
 
 
 class TestDetectBotTokens:

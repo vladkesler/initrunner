@@ -16,7 +16,7 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="tests/"><img src="https://img.shields.io/badge/tests-4001+-%2334D058" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/latest-v2026.4.1-%2334D058" alt="v2026.4.1">
+  <img src="https://img.shields.io/badge/latest-v2026.4.2-%2334D058" alt="v2026.4.2">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/badge/code%20style-ruff-d4aa00?logo=ruff&logoColor=white" alt="Ruff"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
   <a href="https://initrunner.ai/"><img src="https://img.shields.io/badge/website-initrunner.ai-blue" alt="Website"></a>
@@ -37,7 +37,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 starters included, or define your own in one YAML file. Built-in RAG, persistent memory, 25+ tools, any model.
 
-> **v2026.4.1** -- LangChain agent import: convert existing LangChain agents to InitRunner with `initrunner new --langchain my_agent.py` or via the dashboard. AST extraction + LLM normalization, custom tool sidecar generation, explicit warnings for unsupported features. See the [Changelog](CHANGELOG.md).
+> **v2026.4.2** -- PydanticAI + LangChain agent import: convert existing agents to InitRunner with `initrunner new --pydantic-ai my_agent.py` or `--langchain`. Dashboard Import mode with framework toggle, structured output support, auto-detected providers. See the [Changelog](CHANGELOG.md).
 
 ## Contents
 
@@ -123,7 +123,7 @@ initrunner run --ingest ./docs/    # or skip YAML entirely -- chat with your doc
 
 Fork a hub agent as a starting point: `initrunner new --from hub:alice/code-reviewer`. See [Tutorial](docs/getting-started/tutorial.md).
 
-Migrating from LangChain? `initrunner new --langchain my_agent.py` converts your agent automatically. See [LangChain Import](docs/getting-started/langchain-import.md).
+Migrating from PydanticAI or LangChain? `initrunner new --pydantic-ai my_agent.py` or `--langchain my_agent.py` converts your agent automatically. See [PydanticAI Import](docs/getting-started/pydanticai-import.md) or [LangChain Import](docs/getting-started/langchain-import.md).
 
 **Or run with Docker**, no install needed:
 
@@ -188,7 +188,7 @@ That's it. No Python, no boilerplate. The `model:` section is optional -- omit i
 | **Bot deployment** | `--telegram` / `--discord` flag | Build bot framework integration | Separate bot framework + adapter |
 | **Model switching** | `--model` flag, aliases, or change YAML | Rewrite client code | Swap LLM class + adjust prompts |
 | **Multi-agent** | `compose.yaml` with delegation + auto-routing | Custom orchestration layer | Agent executor + custom routing |
-| **Migration** | `--langchain` imports agents automatically | N/A | N/A |
+| **Migration** | `--pydantic-ai` / `--langchain` imports agents | N/A | N/A |
 
 ## What Can You Build?
 

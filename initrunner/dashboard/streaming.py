@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
 
+    from initrunner.agent.executor import RunResult
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger
     from initrunner.compose.schema import ComposeDefinition
     from initrunner.team.schema import TeamDefinition
@@ -19,6 +21,37 @@ if TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 _TOKEN_QUEUE_MAX = 65536
 _HEARTBEAT_INTERVAL = 10  # heartbeat every ~1s (10 * 0.1s timeout)
+
+
+def _build_result_payload(
+    result: RunResult,
+    new_messages: list[ModelMessage],
+    role: RoleDefinition,
+) -> dict:
+    """Build the SSE result payload dict from a RunResult."""
+    from pydantic_ai.messages import ModelMessagesTypeAdapter
+
+    from initrunner.agent.history import session_limits, trim_message_history
+
+    serialized_history = None
+    if result.success:
+        _, max_history = session_limits(role)
+        trimmed = trim_message_history(new_messages, max_history)
+        serialized_history = ModelMessagesTypeAdapter.dump_json(trimmed).decode("utf-8")
+
+    return {
+        "run_id": result.run_id,
+        "output": result.output,
+        "tokens_in": result.tokens_in,
+        "tokens_out": result.tokens_out,
+        "total_tokens": result.total_tokens,
+        "tool_calls": result.tool_calls,
+        "tool_call_names": result.tool_call_names,
+        "duration_ms": result.duration_ms,
+        "success": result.success,
+        "error": result.error,
+        "message_history": serialized_history,
+    }
 
 
 async def stream_run_sse(
@@ -47,6 +80,26 @@ async def stream_run_sse(
     except Exception as exc:
         _logger.error("Agent build failed: %s", exc)
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+        return
+
+    # Structured output doesn't support streaming -- run non-streaming
+    if role.spec.output.type != "text":
+        from initrunner.services.execution import execute_run_sync
+
+        try:
+            result, new_messages = await asyncio.to_thread(
+                execute_run_sync,
+                agent,
+                role,
+                prompt,
+                audit_logger=audit_logger,
+                message_history=message_history,
+            )
+            payload = _build_result_payload(result, new_messages, role)
+            yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+        except Exception as exc:
+            _logger.exception("Error during non-streaming structured-output run")
+            yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
         return
 
     def on_token(chunk: str) -> None:
@@ -95,33 +148,8 @@ async def stream_run_sse(
     # Emit final result or error
     try:
         result, new_messages = await stream_task
-
-        # Serialize trimmed history on success
-        serialized_history = None
-        if result.success:
-            from pydantic_ai.messages import ModelMessagesTypeAdapter
-
-            from initrunner.agent.history import session_limits, trim_message_history
-
-            _, max_history = session_limits(role)
-            trimmed = trim_message_history(new_messages, max_history)
-            serialized_history = ModelMessagesTypeAdapter.dump_json(trimmed).decode("utf-8")
-
-        payload = {
-            "run_id": result.run_id,
-            "output": result.output,
-            "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out,
-            "total_tokens": result.total_tokens,
-            "tool_calls": result.tool_calls,
-            "tool_call_names": result.tool_call_names,
-            "duration_ms": result.duration_ms,
-            "success": result.success,
-            "error": result.error,
-            "message_history": serialized_history,
-        }
-        event = json.dumps({"type": "result", "data": payload})
-        yield f"data: {event}\n\n"
+        payload = _build_result_payload(result, new_messages, role)
+        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
     except Exception as exc:
         _logger.exception("Error during SSE streaming")
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
@@ -140,7 +168,6 @@ async def stream_compose_run_sse(
     Runs compose graph directly as an async task (no thread pool hop).
     Callbacks push progress events to an ``asyncio.Queue``.
     """
-    from initrunner.agent.executor import RunResult
     from initrunner.services.compose import run_compose_once_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
@@ -267,7 +294,6 @@ async def stream_team_run_sse(
 
     Runs team graph directly as an async task (no thread pool hop).
     """
-    from initrunner.agent.executor import RunResult
     from initrunner.team.graph import run_team_graph_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
