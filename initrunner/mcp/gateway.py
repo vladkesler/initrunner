@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
+from fastmcp.server import create_proxy
+from fastmcp.server.transforms import Visibility
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -124,31 +126,26 @@ def _register_pass_through_tools(
         if not mcp_configs:
             continue
 
-        agent_prefix = _sanitize_name(entry.name) + "_"
+        agent_prefix = _sanitize_name(entry.name)
 
         for cfg in mcp_configs:
             transport = _build_pass_through_transport(cfg, entry.role, entry.role_path.parent)
-            proxy = FastMCP.as_proxy(transport)
+            proxy = create_proxy(transport)
 
-            # Build the combined prefix: agent_name_ + optional tool_prefix from config
-            prefix = agent_prefix
-            if cfg.tool_prefix:
-                prefix += cfg.tool_prefix
-
-            # Apply tool_filter / tool_exclude on the proxy
+            # Apply tool_filter / tool_exclude via Visibility transforms
             if cfg.tool_filter:
-                allowed = set(cfg.tool_filter)
-                proxy = proxy.filtered(  # type: ignore[unresolved-attribute]
-                    lambda _ctx, tool_def, _a=allowed: tool_def.name in _a
-                )
+                proxy.add_transform(Visibility(False, components={"tool"}, match_all=True))
+                proxy.add_transform(Visibility(True, names=set(cfg.tool_filter)))
             elif cfg.tool_exclude:
-                excluded = set(cfg.tool_exclude)
-                proxy = proxy.filtered(  # type: ignore[unresolved-attribute]
-                    lambda _ctx, tool_def, _e=excluded: tool_def.name not in _e
-                )
+                proxy.add_transform(Visibility(False, names=set(cfg.tool_exclude)))
 
-            proxy = proxy.prefixed(prefix)  # type: ignore[possibly-missing-attribute]
-            mcp.mount(proxy)
+            # Build the combined namespace: agent_name + optional tool_prefix
+            # mount() joins namespace and tool name with "_"
+            namespace = agent_prefix
+            if cfg.tool_prefix:
+                namespace += "_" + cfg.tool_prefix.rstrip("_")
+
+            mcp.mount(proxy, namespace=namespace)
 
 
 # ---------------------------------------------------------------------------
