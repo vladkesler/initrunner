@@ -133,6 +133,7 @@ them to see tools, triggers, guardrails, and ingestion in action.
 - **Example roles** — add new role YAMLs to `examples/roles/`. No Python required.
 - **Documentation improvements** — fix typos, clarify guides, add examples to `docs/`.
 - **Bug fixes** — check issues tagged `bug` and `good-first-issue`.
+- **Translations** — when updating `README.md`, please also update `README.zh-CN.md` and `README.ja.md` (or mark them as needing translation).
 - **Test coverage** — we always welcome more tests. Mirror the source layout under `tests/`.
 
 ## Architecture

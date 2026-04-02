@@ -96,7 +96,7 @@ The think tool works in both single-shot and autonomous mode. In single-shot, th
 
 ## Todo Tool
 
-Priority-aware task management with dependency resolution. Operates on the agent's unified `ReflectionState`, giving a single source of truth for progress.
+Priority-aware task management with dependency resolution. Operates on the agent's unified `ReflectionState`, giving a single source of truth for progress and budget awareness.
 
 ### Configuration
 
@@ -247,6 +247,9 @@ spec:
     pattern: todo_driven     # react | todo_driven | plan_execute | reflexion
     auto_plan: true          # prepend planning instructions to first turn
     reflection_rounds: 0     # post-completion self-critique rounds (reflexion only)
+    reflection_dimensions:   # per-round evaluation rubrics (reflexion only)
+      - name: correctness
+        prompt: "Check for errors..."
     auto_detect: true        # infer pattern from tool/autonomy config
 ```
 
@@ -255,7 +258,29 @@ spec:
 | `pattern` | string | `"react"` | Reasoning pattern to use |
 | `auto_plan` | bool | `false` | Prepend "create a todo list" to first turn |
 | `reflection_rounds` | int | `0` | Number of self-critique rounds after completion |
+| `reflection_dimensions` | list | `null` | Per-round evaluation dimensions (see [reflexion](#reflexion)) |
 | `auto_detect` | bool | `true` | Infer pattern from tool/autonomy config |
+
+### Budget-aware continuation prompts
+
+All strategies inject a `BUDGET:` block into the continuation prompt (iterations 2+) so the agent knows how much runway it has left. The autonomous runner populates `ReflectionState` with budget fields after each iteration, and `format_reflection_state()` renders them:
+
+```
+CURRENT STATUS:
+Todo List:
+  [x] 8c753a3f [high] Research Python
+  [>] a1b2c3d4 [high] Research Rust
+  [ ] e5f6g7h8 [medium] Write comparison
+
+BUDGET:
+- Iteration: 2/10 (20%)
+- Tokens: 12,000/50,000 (24%)
+- Time: 30s/300s (10%)
+```
+
+The iteration line always appears in autonomous mode. Token and time lines only appear when `autonomous_token_budget` or `autonomous_timeout_seconds` are configured in guardrails. Percentages are truncated to whole integers.
+
+This lets the agent make informed decisions: skip low-priority items when iterations are running out, compress remaining work when the token budget is tight, or wrap up proactively before hitting a hard limit.
 
 ### Patterns
 
@@ -289,7 +314,7 @@ How it works:
 
 #### plan_execute
 
-Two-phase execution. Phase 1 (planning): the agent creates a comprehensive plan without executing. Phase 2 (execution): the agent works through plan items. The runner tracks item counts and transitions from planning to execution when the todo list stabilizes (no new items added between iterations).
+Two-phase execution. Phase 1 (planning): the agent creates a comprehensive plan without executing. Phase 2 (execution): the agent works through plan items. The agent explicitly calls `finalize_plan()` to signal that planning is complete and transition to execution.
 
 **Requires** a `todo` tool in `spec.tools`.
 
@@ -301,30 +326,60 @@ reasoning:
 ```
 
 How it works:
-1. First turn: "PHASE 1 - PLANNING: Analyze this task and create a comprehensive todo list. Focus only on planning. Do not execute yet."
-2. Planning continues until item count stabilizes
+1. First turn: "PHASE 1 - PLANNING: Analyze this task and create a comprehensive todo list. Focus only on planning. Do not execute yet. When your plan is complete, call finalize_plan()."
+2. Planning continues until the agent calls `finalize_plan()` (requires at least one todo item)
 3. Phase transition: "PHASE 2 - EXECUTION: Work through your plan."
 4. Execution continues until auto-completion or `finish_task`
 
 #### reflexion
 
-Post-completion self-critique. After the agent finishes (calls `finish_task` or todo auto-completes), the runner re-opens the state and injects the agent's output back as a critique prompt for additional rounds.
+Post-completion self-critique. After the agent finishes (calls `finish_task` or todo auto-completes), the runner re-opens the state and injects dimension-specific evaluation prompts for additional rounds.
 
-**Requires** `reflection_rounds > 0`.
+**Requires** `reflection_rounds > 0` or non-empty `reflection_dimensions`.
+
+Each reflexion round focuses on a specific dimension with concrete evaluation questions, producing deeper self-critique than a generic "review your work" prompt.
+
+**Simple (uses built-in defaults):**
 
 ```yaml
 reasoning:
   pattern: reflexion
-  reflection_rounds: 1   # 1-3 rounds of self-critique
+  reflection_rounds: 2   # uses correctness, then completeness
 ```
+
+**Custom dimensions:**
+
+```yaml
+reasoning:
+  pattern: reflexion
+  reflection_dimensions:
+    - name: accuracy
+      prompt: >-
+        Verify all numbers, dates, and technical claims. Do code examples
+        compile and produce correct output? Fix any errors you find.
+    - name: coverage
+      prompt: >-
+        Are all requirements from the original prompt addressed? Are edge
+        cases and error conditions handled? Fill in any gaps.
+```
+
+When `reflection_dimensions` is provided, `reflection_rounds` is auto-derived from the list length. You can also set both -- if `reflection_rounds` exceeds the number of dimensions, dimensions cycle (round 3 with 2 dimensions reuses dimension 1).
+
+**Built-in defaults** (used when only `reflection_rounds` is set):
+
+| Round | Dimension | Focus |
+|-------|-----------|-------|
+| 1 | correctness | Factual errors, logical flaws, incorrect assumptions |
+| 2 | completeness | Missing sections, unaddressed requirements, edge cases |
+| 3 | clarity | Structure, conciseness, concrete examples |
 
 How it works:
 1. Agent works normally until completion
-2. Runner re-opens the state: "REFLECTION (1/1): Review your work so far. What could be improved?"
+2. Runner re-opens the state with the current round's dimension: `REFLECTION (1/2) -- ACCURACY: Verify all numbers...`
 3. Agent gets `reflection_rounds` additional turns to self-correct
 4. Final output is from the last iteration
 
-Reflexion composes with other patterns. A `todo_driven` agent with `reflection_rounds: 1` first completes its todo list, then gets one critique pass.
+Note: reflexion is its own reasoning pattern, not a modifier on other patterns. If you want todo-driven behavior with self-critique, set `reflection_rounds` (or `reflection_dimensions`) without an explicit `pattern` -- auto-detection will select `reflexion`, and the agent can still use todo tools for structured work.
 
 ### Auto-detection
 

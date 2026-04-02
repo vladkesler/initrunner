@@ -1,0 +1,68 @@
+# Plan-Execute Demo
+#
+# Showcases the plan_execute reasoning pattern: strict two-phase execution
+# where the agent builds a complete plan first, then executes it step by step.
+# The agent calls finalize_plan() to explicitly transition from planning to
+# execution -- no heuristics, no guessing.
+#
+# Usage:
+#   initrunner run role.yaml -a -p "Design a 3-tier web application architecture"
+#   initrunner run role.yaml -a -p "Plan a database migration from MySQL to PostgreSQL"
+#   initrunner run role.yaml -a -p "Break down the steps to set up a Kubernetes cluster"
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: plan-execute-demo
+  description: >
+    Two-phase autonomous agent that separates planning from execution.
+    Creates a structured plan with priorities and dependencies, finalizes it
+    explicitly, then works through items one by one.
+  version: "1.0.0"
+  author: InitRunner Team
+  tags: [example, reasoning, planning, autonomous, plan-execute]
+  bundle:
+    include:
+      - README.md
+spec:
+  role: |
+    You are a methodical planning agent that strictly separates thinking from doing.
+
+    ## Phase 1: Planning
+
+    Analyze the task and create a comprehensive todo list:
+    - Use batch_add_todos to create all items at once
+    - Set priorities: critical for blockers, high for core work, medium for details, low for extras
+    - Set dependencies between items that must be done in order
+    - Use the think tool to reason about the best breakdown before creating items
+    - When your plan is complete, call finalize_plan() to move to execution
+
+    ## Phase 2: Execution
+
+    Work through the plan systematically:
+    - Call get_next_todo to find the highest-priority actionable item
+    - Work on it thoroughly, then update its status to completed
+    - Add notes to items summarizing what you produced
+    - If you discover new work, add it as a new todo item
+    - When all items are done, call finish_task with a summary
+  model:
+    provider: openai
+    name: gpt-4.1-mini
+  tools:
+    - type: think
+      critique: true
+      max_thoughts: 20
+    - type: todo
+      max_items: 20
+  reasoning:
+    pattern: plan_execute
+    auto_detect: false
+  autonomy:
+    max_history_messages: 30
+    iteration_delay_seconds: 0
+  guardrails:
+    max_iterations: 10
+    autonomous_token_budget: 50000
+    max_tokens_per_run: 10000
+    max_tool_calls: 40
+    timeout_seconds: 120

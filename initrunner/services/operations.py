@@ -27,18 +27,21 @@ def query_audit_sync(
     limit: int = 100,
     audit_logger: AuditLogger | None = None,
     audit_db: Path | None = None,
+    exclude_trigger_types: list[str] | None = None,
 ) -> list[AuditRecord]:
     """Query audit records (sync)."""
+    _query_kwargs = dict(
+        agent_name=agent_name,
+        run_id=run_id,
+        trigger_type=trigger_type,
+        principal_id=principal_id,
+        since=since,
+        until=until,
+        limit=limit,
+        exclude_trigger_types=exclude_trigger_types,
+    )
     if audit_logger is not None:
-        return audit_logger.query(
-            agent_name=agent_name,
-            run_id=run_id,
-            trigger_type=trigger_type,
-            principal_id=principal_id,
-            since=since,
-            until=until,
-            limit=limit,
-        )
+        return audit_logger.query(**_query_kwargs)  # type: ignore[arg-type]
     from initrunner.audit.logger import DEFAULT_DB_PATH
     from initrunner.audit.logger import AuditLogger as _AuditLogger
 
@@ -46,15 +49,7 @@ def query_audit_sync(
     if not db_path.exists():
         return []
     with _AuditLogger(db_path) as logger:
-        return logger.query(
-            agent_name=agent_name,
-            run_id=run_id,
-            trigger_type=trigger_type,
-            principal_id=principal_id,
-            since=since,
-            until=until,
-            limit=limit,
-        )
+        return logger.query(**_query_kwargs)  # type: ignore[arg-type]
 
 
 def audit_prune_sync(

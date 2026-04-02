@@ -18,10 +18,14 @@
 </p>
 
 <p align="center">
-  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a> · <a href="https://github.com/vladkesler/initrunner/issues">Issues</a>
+  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a>
 </p>
 
-YAML-first AI agent platform. Define an agent's role, tools, knowledge base, and memory in one file. Run it as an interactive chat, a one-shot command, an autonomous daemon with cron/webhook/file-watch triggers, a Telegram/Discord bot, or an OpenAI-compatible API. RAG and persistent memory work out of the box. Manage everything from a web dashboard or native desktop app. Install with `curl` or `pip`, no containers required.
+<p align="center">
+  English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
+</p>
+
+YAML-first AI agent platform. Define an agent's role, tools, knowledge base, and memory in one file. Run it as an interactive chat, a one-shot command, an autonomous agent, a daemon with cron/webhook/file-watch triggers, a Telegram/Discord bot, or an OpenAI-compatible API. RAG and persistent memory work out of the box. Manage everything from a web dashboard or native desktop app. Install with `curl` or `pip`, no containers required.
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
@@ -31,7 +35,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.2**: PydanticAI + LangChain agent import. Convert existing agents with `initrunner new --pydantic-ai my_agent.py` or `--langchain`. See the [Changelog](CHANGELOG.md).
+> **v2026.4.3**: Autonomous execution docs, compose/team runs in Launchpad, dimension-specific reflexion, budget-aware continuation prompts, finalize_plan() tool, Electric Charcoal dashboard. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -117,7 +121,7 @@ The `model:` section is optional; omit it and InitRunner auto-detects from your 
 
 A YAML file *is* the agent. Tools, knowledge sources, memory, triggers, model, guardrails, all declared in one place. You can read it and immediately understand what the agent does. You can diff it, review it in a PR, hand it to a teammate. When you want to switch from GPT to Claude, you change one line. When you want to add RAG, you add an `ingest:` section.
 
-The same file runs as an interactive chat (`-i`), a one-shot command (`-p "..."`), a cron/webhook/file-watch daemon (`--daemon`), or an OpenAI-compatible API (`--serve`). You don't pick a deployment mode upfront and build around it. You pick it at runtime with a flag.
+The same file runs as an interactive chat (`-i`), a one-shot command (`-p "..."`), an autonomous agent (`-a`), a cron/webhook/file-watch daemon (`--daemon`), or an OpenAI-compatible API (`--serve`). You don't pick a deployment mode upfront and build around it. You pick it at runtime with a flag.
 
 What this gets you in practice: your agent config lives in version control next to your code. New team members read the YAML and understand what the agent does. You review agent changes in PRs like any other config. The agent you prototyped interactively is the same one you deploy as a daemon or API. Same file, different flag.
 
@@ -129,6 +133,7 @@ What this gets you in practice: your agent config lives in version control next 
 | **RAG** | `--ingest ./docs/` (one flag) | Loaders + splitters + vectorstore | RAG tool or custom | External setup |
 | **Memory** | Built-in, on by default | Add-on (multiple options) | Short/long-term memory | External |
 | **Multi-agent** | `compose.yaml` or `kind: Team` | LangGraph | Crew definition | Group chat |
+| **Autonomous execution** | `-a` flag + YAML guardrails | Custom agent loop | Sequential process | Conversation loop |
 | **Deployment modes** | Same YAML: REPL / daemon / API | Custom per mode | CLI or Kickoff | Custom |
 | **Model switching** | Change 1 YAML line | Swap LLM class | Config per agent | Config per agent |
 | **Custom tools** | 1 file, 1 decorator | `@tool` decorator | `@tool` decorator | Function call |
@@ -218,6 +223,25 @@ spec:
 Four reasoning patterns: `react`, `todo_driven`, `plan_execute`, and `reflexion`. See [Reasoning](docs/core/reasoning.md).
 
 Agents with many tools waste context and pick worse. Tool search hides tools behind on-demand keyword discovery: the agent sees only `search_tools` and a few pinned tools, then discovers what it needs per-turn. BM25 scoring, no API calls, typically saves 60-80% context. See [Tool Search](docs/core/tool-search.md).
+
+### Autonomous execution
+
+Most runs are one turn: you prompt, the agent responds. Add `-a` and the agent keeps going. It builds a todo list, works through each item, and finishes when everything is done. You set the budget -- iterations, tokens, and time -- so it can't run away.
+
+```yaml
+spec:
+  autonomy:
+    compaction: { enabled: true, threshold: 30 }
+  guardrails:
+    max_iterations: 15
+    autonomous_token_budget: 100000
+```
+
+```bash
+initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
+```
+
+Works with triggers too: set `autonomous: true` on any trigger and the daemon runs the full loop instead of a single response. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ## Architecture
 
@@ -336,4 +360,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.2</sub></p>
+<p align="center"><sub>v2026.4.3</sub></p>

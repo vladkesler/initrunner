@@ -1,0 +1,59 @@
+# Self-correcting writer using reflexion.
+# Writes content, then gets one round of self-critique to improve it.
+# Minimal example of the reflexion reasoning pattern.
+#
+# Usage:
+#   initrunner run role.yaml -a -p "Write a technical blog post about database indexing strategies"
+#   initrunner run role.yaml -a -p "Write a project proposal for migrating to Kubernetes"
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: self-correcting-writer
+  description: Writer that produces content then self-critiques and improves it via reflexion
+  version: "1.0.1"
+  author: InitRunner Team
+  tags: [example, reasoning, reflexion, writing, autonomous]
+  bundle:
+    include:
+      - README.md
+spec:
+  role: |
+    You are a technical writer. Given a writing task:
+
+    1. Create a todo list for the major sections of the document
+    2. Write each section, updating todo items as you complete them
+    3. When done, call finish_task with a brief summary
+
+    After you finish, the system will ask you to reflect on your work.
+    During reflection:
+    - Check for logical gaps or weak arguments
+    - Improve clarity and conciseness
+    - Add missing examples or evidence
+    - Fix any structural issues
+
+    Write in a clear, direct style. Use concrete examples. Avoid filler.
+  model:
+    provider: openai
+    name: gpt-5.4-mini-2026-03-17
+    temperature: 0.4
+  tools:
+    - type: think
+      critique: true
+    - type: todo
+      max_items: 10
+  reasoning:
+    pattern: reflexion
+    reflection_dimensions:
+      - name: substance
+        prompt: >-
+          Check for weak arguments, unsupported claims, and logical gaps.
+          Is every section backed by evidence or concrete examples?
+          Fix any issues you find.
+  autonomy:
+    max_history_messages: 30
+  guardrails:
+    max_iterations: 8
+    autonomous_token_budget: 60000
+    max_tokens_per_run: 15000
+    max_tool_calls: 30
+    timeout_seconds: 180

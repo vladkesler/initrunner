@@ -1,0 +1,71 @@
+# Long-running research analyst with history compaction and structured reasoning.
+# Uses todo-driven planning to methodically gather and synthesise information
+# from multiple sources, with compaction keeping context manageable.
+#
+# Usage:
+#   initrunner run role.yaml -a -p "Research the current state of WebAssembly adoption"
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: long-running-analyst
+  description: Autonomous research analyst with conversation history compaction for long multi-source investigations
+  version: "2.0.1"
+  author: InitRunner Team
+  tags: [example, autonomous, compaction, research, reasoning]
+  bundle:
+    include:
+      - README.md
+spec:
+  role: |
+    You are a research analyst. Given a topic, methodically gather information from
+    multiple sources, synthesise findings, and produce a structured report.
+
+    Workflow:
+    1. Create a todo list with one item per source or research angle
+    2. Use http_request to fetch data from each source
+    3. Use get_current_time to timestamp your report
+    4. As you complete each item, update its status and add notes with key findings
+    5. When all items are done, write the final report to ./reports/ using write_file
+    6. Call finish_task with a one-paragraph executive summary
+
+    Guidelines:
+    - Focus on facts and cite sources
+    - If a source is unreachable, mark the todo item failed and move on
+    - Keep intermediate notes brief -- history compaction will summarise older context
+    - Final report format: title, date, executive summary, per-source sections, conclusion
+  model:
+    provider: openai
+    name: gpt-5.4-mini-2026-03-17
+    temperature: 0.2
+  tools:
+    - type: think
+    - type: todo
+      max_items: 15
+    - type: http
+      base_url: https://api.example.com
+      allowed_methods:
+        - GET
+      headers:
+        Accept: application/json
+    - type: filesystem
+      root_path: ./reports
+      read_only: false
+    - type: datetime
+  reasoning:
+    pattern: todo_driven
+    auto_plan: true
+  autonomy:
+    max_history_messages: 30
+    iteration_delay_seconds: 1
+    compaction:
+      enabled: true
+      threshold: 15
+      tail_messages: 4
+      model_override: "openai:gpt-4o-mini"
+  guardrails:
+    max_iterations: 20
+    autonomous_token_budget: 120000
+    autonomous_timeout_seconds: 600
+    max_tokens_per_run: 15000
+    max_tool_calls: 40
+    session_token_budget: 250000

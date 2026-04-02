@@ -102,6 +102,7 @@ class ComposeRunResult:
     output: str
     output_mode: str  # "single" | "multiple" | "none"
     final_service_name: str | None
+    compose_run_id: str = ""
     steps: list[ServiceStepResult] = field(default_factory=list)
     entry_messages: list | None = None
     total_tokens_in: int = 0
@@ -334,8 +335,10 @@ class ComposeOrchestrator:
         on_service_complete: Callable[[str, RunResult], None] | None = None,
     ) -> ComposeRunResult:
         """Run a single prompt through the compose graph synchronously."""
+        from initrunner._ids import generate_id
         from initrunner.compose.graph import run_compose_graph_sync
 
+        compose_run_id = generate_id()
         self._build_services(one_shot=True)
         entry = self._find_entry(entry_service)
 
@@ -350,9 +353,13 @@ class ComposeOrchestrator:
             on_service_start=on_service_start,
             on_service_complete=on_service_complete,
             one_shot=True,
+            compose_run_id=compose_run_id,
         )
 
-        return self._collect_results(entry, total_ms, timed_out=timed_out)
+        result = self._collect_results(entry, total_ms, timed_out=timed_out)
+        result.compose_run_id = compose_run_id
+        self._log_aggregate(compose_run_id, prompt, result)
+        return result
 
     async def run_once_async(
         self,
@@ -365,8 +372,10 @@ class ComposeOrchestrator:
         on_service_complete: Callable[[str, RunResult], None] | None = None,
     ) -> ComposeRunResult:
         """Run a single prompt through the compose graph asynchronously."""
+        from initrunner._ids import generate_id
         from initrunner.compose.graph import run_compose_graph_async
 
+        compose_run_id = generate_id()
         self._build_services(one_shot=True)
         entry = self._find_entry(entry_service)
 
@@ -381,9 +390,13 @@ class ComposeOrchestrator:
             on_service_start=on_service_start,
             on_service_complete=on_service_complete,
             one_shot=True,
+            compose_run_id=compose_run_id,
         )
 
-        return self._collect_results(entry, total_ms, timed_out=timed_out)
+        result = self._collect_results(entry, total_ms, timed_out=timed_out)
+        result.compose_run_id = compose_run_id
+        self._log_aggregate(compose_run_id, prompt, result)
+        return result
 
     # ------------------------------------------------------------------
     # Daemon execution
@@ -499,6 +512,49 @@ class ComposeOrchestrator:
             total_duration_ms=total_duration_ms,
             success=not timed_out and all(s.success for s in steps),
             error=error,
+        )
+
+    def _log_aggregate(
+        self,
+        compose_run_id: str,
+        prompt: str,
+        result: ComposeRunResult,
+    ) -> None:
+        """Log a top-level aggregate audit row for the compose run."""
+        if not self._audit_logger:
+            return
+        import json
+        from datetime import UTC, datetime
+
+        from initrunner.audit.logger import AuditRecord
+
+        self._audit_logger.log(
+            AuditRecord(
+                run_id=compose_run_id,
+                agent_name=self._compose.metadata.name,
+                timestamp=datetime.now(UTC).isoformat(),
+                user_prompt=prompt,
+                model="multi",
+                provider="multi",
+                output=result.output,
+                tokens_in=result.total_tokens_in,
+                tokens_out=result.total_tokens_out,
+                total_tokens=result.total_tokens_in + result.total_tokens_out,
+                tool_calls=sum(s.tool_calls for s in result.steps),
+                duration_ms=result.total_duration_ms,
+                success=result.success,
+                error=result.error,
+                trigger_type="compose_run",
+                trigger_metadata=json.dumps(
+                    {
+                        "compose_name": self._compose.metadata.name,
+                        "compose_run_id": compose_run_id,
+                        "scope": "aggregate",
+                        "final_service_name": result.final_service_name,
+                        "output_mode": result.output_mode,
+                    }
+                ),
+            )
         )
 
     # ------------------------------------------------------------------

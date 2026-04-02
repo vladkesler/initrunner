@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from initrunner.agent.reflection import ReflectionState
-from initrunner.agent.schema.reasoning import ReasoningConfig
+from initrunner.agent.schema.reasoning import (
+    DEFAULT_REFLEXION_DIMENSIONS,
+    ReasoningConfig,
+    ReflexionDimension,
+)
 from initrunner.agent.schema.tools import TodoToolConfig
 
 if TYPE_CHECKING:
@@ -31,6 +35,8 @@ class ReasoningStrategy(Protocol):
     def should_continue(self, state: ReflectionState, iteration: int) -> bool: ...
 
     def post_completion_rounds(self) -> int: ...
+
+    def build_strategy_toolsets(self, state: ReflectionState) -> list[AbstractToolset]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +64,9 @@ class ReactStrategy:
 
     def post_completion_rounds(self) -> int:
         return 0
+
+    def build_strategy_toolsets(self, state: ReflectionState) -> list[AbstractToolset]:
+        return []
 
 
 class TodoDrivenStrategy:
@@ -96,14 +105,15 @@ class TodoDrivenStrategy:
     def post_completion_rounds(self) -> int:
         return 0
 
+    def build_strategy_toolsets(self, state: ReflectionState) -> list[AbstractToolset]:
+        return []
+
 
 class PlanExecuteStrategy:
-    """Two-phase: plan first, then execute."""
+    """Two-phase: plan first, then execute via explicit finalize_plan() tool."""
 
     def __init__(self, continuation_prompt: str) -> None:
         self._continuation = continuation_prompt
-        self._phase: str = "planning"
-        self._last_item_count: int = 0
 
     def wrap_initial_prompt(self, prompt: UserPrompt) -> UserPrompt:
         from initrunner.agent.prompt import extract_text_from_prompt
@@ -112,34 +122,25 @@ class PlanExecuteStrategy:
         return (
             f"PHASE 1 - PLANNING: Analyze this task and create a comprehensive "
             f"todo list using batch_add_todos. Focus only on planning. "
-            f"Do not execute yet.\n\n{text}"
+            f"Do not execute yet. When your plan is complete, call "
+            f"finalize_plan().\n\n{text}"
         )
 
     def build_continuation_prompt(self, state: ReflectionState) -> str:
         from initrunner.agent.reflection import format_reflection_state
 
         state_text = format_reflection_state(state)
-        current_count = len(state.todo.items)
 
-        # Transition from planning to execution when items exist and no new ones added
-        if (
-            self._phase == "planning"
-            and current_count > 0
-            and current_count == self._last_item_count
-        ):
-            self._phase = "executing"
-
-        self._last_item_count = current_count
-
-        if self._phase == "planning":
+        if state.plan_finalized:
             return (
-                "Continue planning. Add more todo items if needed. When your plan "
-                "is complete, the next iteration will begin execution.\n\n"
+                "PHASE 2 - EXECUTION: Work through your plan. Call get_next_todo, "
+                "execute the item, update its status. Continue until all items "
+                "are done.\n\n"
                 f"CURRENT STATUS:\n{state_text}"
             )
         return (
-            "PHASE 2 - EXECUTION: Work through your plan. Call get_next_todo, "
-            "execute the item, update its status. Continue until all items are done.\n\n"
+            "Continue planning. Add more todo items if needed. When your plan "
+            "is complete, call finalize_plan() to begin execution.\n\n"
             f"CURRENT STATUS:\n{state_text}"
         )
 
@@ -149,13 +150,38 @@ class PlanExecuteStrategy:
     def post_completion_rounds(self) -> int:
         return 0
 
+    def build_strategy_toolsets(self, state: ReflectionState) -> list[AbstractToolset]:
+        from pydantic_ai.toolsets.function import FunctionToolset
+
+        toolset = FunctionToolset()
+
+        @toolset.tool_plain
+        def finalize_plan() -> str:
+            """Signal that planning is complete and execution should begin.
+
+            Call this after you have added all todo items and are satisfied
+            with the plan. The next iteration will switch to execution phase.
+            """
+            if not state.todo.items:
+                return "Create at least one todo item before finalizing the plan."
+            state.plan_finalized = True
+            return "Plan finalized. Switching to execution phase."
+
+        return [toolset]
+
 
 class ReflexionStrategy:
     """Post-completion self-critique rounds."""
 
-    def __init__(self, continuation_prompt: str, reflection_rounds: int) -> None:
+    def __init__(
+        self,
+        continuation_prompt: str,
+        reflection_rounds: int,
+        dimensions: list[ReflexionDimension],
+    ) -> None:
         self._continuation = continuation_prompt
         self._reflection_rounds = reflection_rounds
+        self._dimensions = dimensions
         self._base_completed = False
         self._reflexion_count = 0
 
@@ -169,11 +195,12 @@ class ReflexionStrategy:
 
         if self._base_completed:
             self._reflexion_count += 1
+            dim = self._dimensions[(self._reflexion_count - 1) % len(self._dimensions)]
             return (
-                f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}): "
-                f"Review your work so far. What could be improved? "
-                f"Are there errors or gaps? Make corrections if needed, then "
-                f"call finish_task when satisfied.\n\n"
+                f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}) "
+                f"-- {dim.name.upper()}:\n"
+                f"{dim.prompt}\n\n"
+                f"Make corrections if needed, then call finish_task when satisfied.\n\n"
                 f"Your previous summary: {state.summary}\n\n"
                 f"CURRENT STATUS:\n{state_text}"
             )
@@ -198,6 +225,9 @@ class ReflexionStrategy:
 
     def post_completion_rounds(self) -> int:
         return self._reflection_rounds
+
+    def build_strategy_toolsets(self, state: ReflectionState) -> list[AbstractToolset]:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +262,11 @@ def resolve_strategy(
     if pattern == "plan_execute":
         return PlanExecuteStrategy(continuation)
     if pattern == "reflexion":
-        return ReflexionStrategy(continuation, config.reflection_rounds)
+        if config.reflection_dimensions is not None:
+            dims = list(config.reflection_dimensions)
+        else:
+            dims = DEFAULT_REFLEXION_DIMENSIONS[: config.reflection_rounds]
+        return ReflexionStrategy(continuation, config.reflection_rounds, dims)
     return ReactStrategy(continuation)
 
 

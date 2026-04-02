@@ -8,6 +8,7 @@ export function queryAudit(params?: {
 	since?: string;
 	until?: string;
 	limit?: number;
+	exclude_trigger_types?: string[];
 }): Promise<AuditRecord[]> {
 	const search = new URLSearchParams();
 	if (params?.agent_name) search.set('agent_name', params.agent_name);
@@ -16,6 +17,11 @@ export function queryAudit(params?: {
 	if (params?.since) search.set('since', params.since);
 	if (params?.until) search.set('until', params.until);
 	if (params?.limit) search.set('limit', String(params.limit));
+	if (params?.exclude_trigger_types) {
+		for (const t of params.exclude_trigger_types) {
+			search.append('exclude_trigger_types', t);
+		}
+	}
 	const qs = search.toString();
 	return request(`/api/audit${qs ? `?${qs}` : ''}`);
 }

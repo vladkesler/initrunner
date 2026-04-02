@@ -609,3 +609,94 @@ class TestConversationalTriggerEarlyExit:
         assert auto_result.final_status == "max_iterations"
         assert auto_result.iteration_count == 3
         assert mock_execute.call_count == 3
+
+
+class TestBudgetAwareContinuationPrompt:
+    """Integration test: budget fields are wired into continuation prompts."""
+
+    def test_second_iteration_prompt_contains_budget(self):
+        """After iteration 1 completes, the prompt for iteration 2 should
+        contain BUDGET with iterations_completed=1."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.runner.autonomous import run_autonomous
+
+        call_count = 0
+        captured_prompts: list[str] = []
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            # Capture the prompt passed to execute_run
+            prompt_arg = args[2] if len(args) > 2 else kwargs.get("prompt", args[2])
+            captured_prompts.append(str(prompt_arg))
+            return (
+                RunResult(
+                    run_id=f"r{call_count}",
+                    output="working",
+                    total_tokens=500,
+                    tool_calls=1,
+                ),
+                [{"role": "assistant", "content": "working"}],
+            )
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                side_effect=side_effect,
+            ),
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            role = _make_role(max_iterations=2, autonomous_token_budget=10000)
+            agent = MagicMock()
+
+            run_autonomous(agent, role, "do work")
+
+        assert len(captured_prompts) == 2
+        # First prompt is the initial prompt -- no BUDGET block
+        assert "BUDGET:" not in captured_prompts[0]
+        # Second prompt is the continuation -- should have budget info
+        assert "BUDGET:" in captured_prompts[1]
+        assert "Iteration: 1/2 (50%)" in captured_prompts[1]
+        assert "Tokens:" in captured_prompts[1]
+        assert "500" in captured_prompts[1]
+
+
+class TestStrategyToolsetsWiring:
+    """Integration test: strategy toolsets are included in execute_run calls."""
+
+    def test_plan_execute_strategy_toolsets_wired(self):
+        """PlanExecuteStrategy's finalize_plan tool should appear in extra_toolsets."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.agent.schema.reasoning import ReasoningConfig
+        from initrunner.agent.schema.tools import TodoToolConfig
+        from initrunner.runner.autonomous import run_autonomous
+
+        role = _make_role(max_iterations=1)
+        role.spec.tools = [TodoToolConfig()]
+        role.spec.reasoning = ReasoningConfig(pattern="plan_execute", auto_detect=False)
+
+        result = RunResult(run_id="r1", output="planned", tool_calls=1)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(result, [{"role": "assistant", "content": "planned"}]),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            agent = MagicMock()
+            run_autonomous(agent, role, "design a system")
+
+            # Inspect extra_toolsets passed to execute_run
+            call_kwargs = mock_execute.call_args
+            extra = call_kwargs.kwargs.get("extra_toolsets", [])
+            tool_names = []
+            for toolset in extra:
+                tool_names.extend(toolset.tools.keys())
+            assert "finalize_plan" in tool_names

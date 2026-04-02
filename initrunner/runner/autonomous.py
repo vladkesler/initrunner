@@ -97,7 +97,10 @@ def run_autonomous(
     # Build run-scoped toolsets (todo, think, spawn, finish_task)
     run_scoped = build_run_scoped_toolsets(role, reflection_state, autonomy_config)
 
-    all_extra = list(run_scoped)
+    # Strategy-specific toolsets (e.g., finalize_plan for plan_execute)
+    strategy_toolsets = strategy.build_strategy_toolsets(reflection_state)
+
+    all_extra = list(run_scoped) + strategy_toolsets
     if extra_toolsets:
         all_extra.extend(extra_toolsets)
 
@@ -208,6 +211,15 @@ def run_autonomous(
             iterations.append(result)
             cumulative_tokens += result.total_tokens
             message_history = new_messages
+
+            # Update budget state so the next continuation prompt reflects
+            # completed work (iterations, tokens, elapsed time).
+            reflection_state.iterations_completed = iteration
+            reflection_state.max_iterations = max_iterations
+            reflection_state.tokens_consumed = cumulative_tokens
+            reflection_state.token_budget = token_budget
+            reflection_state.elapsed_seconds = time.monotonic() - loop_start
+            reflection_state.timeout_seconds = autonomous_timeout
 
             _display_iteration_result(
                 result, iteration, max_iterations, cumulative_tokens, token_budget

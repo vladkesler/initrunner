@@ -267,6 +267,61 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
 
 
 # ---------------------------------------------------------------------------
+# Aggregate audit logging
+# ---------------------------------------------------------------------------
+
+
+def _log_team_aggregate(
+    audit_logger: Any | None,
+    team: TeamDefinition,
+    task: str,
+    result: TeamResult,
+) -> None:
+    """Log a top-level aggregate audit row for the team run."""
+    if not audit_logger:
+        return
+    import json
+    from datetime import UTC, datetime
+
+    from initrunner.audit.logger import AuditRecord
+
+    # Use team-level model if no persona has overrides, else "multi"
+    has_overrides = any(p.model is not None for p in team.spec.personas.values())
+    if has_overrides or team.spec.model is None:
+        model, provider = "multi", "multi"
+    else:
+        model = team.spec.model.name
+        provider = team.spec.model.provider
+
+    audit_logger.log(
+        AuditRecord(
+            run_id=result.team_run_id,
+            agent_name=team.metadata.name,
+            timestamp=datetime.now(UTC).isoformat(),
+            user_prompt=task,
+            model=model,
+            provider=provider,
+            output=result.final_output,
+            tokens_in=result.total_tokens_in,
+            tokens_out=result.total_tokens_out,
+            total_tokens=result.total_tokens,
+            tool_calls=result.total_tool_calls,
+            duration_ms=result.total_duration_ms,
+            success=result.success,
+            error=result.error,
+            trigger_type="team_run",
+            trigger_metadata=json.dumps(
+                {
+                    "team_name": team.metadata.name,
+                    "team_run_id": result.team_run_id,
+                    "scope": "aggregate",
+                }
+            ),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Execution entry points
 # ---------------------------------------------------------------------------
 
@@ -327,6 +382,7 @@ async def run_team_graph_async(
             except TimeoutError:
                 result.success = False
                 result.error = "Team timeout exceeded"
+                _log_team_aggregate(audit_logger, team, task, result)
                 return result
 
             # Accumulate results and build final output from parallel runs
@@ -384,6 +440,7 @@ async def run_team_graph_async(
 
             shutdown_tracing()
 
+    _log_team_aggregate(audit_logger, team, task, result)
     return result
 
 

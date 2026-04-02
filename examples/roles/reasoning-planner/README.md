@@ -52,10 +52,9 @@ The reasoning config can be adjusted in `role.yaml`:
 reasoning:
   pattern: todo_driven    # plan-first execution
   auto_plan: true         # prepend "create a todo list" to first turn
-  reflection_rounds: 1    # one self-critique round after completion
 ```
 
-Set `reflection_rounds: 0` to skip the self-critique phase. Set `pattern: plan_execute` for a stricter two-phase approach where planning and execution are separated.
+Set `pattern: plan_execute` for a stricter two-phase approach where planning and execution are separated. For post-completion self-critique, use the `reflexion` pattern instead (see the self-correcting-writer example).
 
 ## Changing the model
 

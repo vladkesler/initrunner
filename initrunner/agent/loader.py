@@ -151,7 +151,10 @@ def _validate_reasoning(role: RoleDefinition) -> None:
             f"reasoning.pattern '{config.pattern}' requires a 'todo' tool in spec.tools"
         )
     if config.pattern == "reflexion" and config.reflection_rounds == 0:
-        raise RoleLoadError("reasoning.pattern 'reflexion' requires reflection_rounds > 0")
+        raise RoleLoadError(
+            "reasoning.pattern 'reflexion' requires reflection_rounds > 0 "
+            "or non-empty reflection_dimensions"
+        )
 
 
 def _resolve_skills_and_merge(

@@ -19,6 +19,7 @@
 			pattern: string;
 			auto_plan: boolean;
 			reflection_rounds: number;
+			reflection_dimensions: Array<{ name: string; prompt: string }> | null;
 			auto_detect: boolean;
 		};
 		autonomy: {
@@ -80,6 +81,7 @@
 					pattern: r.pattern ?? 'react',
 					auto_plan: r.auto_plan ?? false,
 					reflection_rounds: r.reflection_rounds ?? 0,
+					reflection_dimensions: r.reflection_dimensions ?? null,
 					auto_detect: r.auto_detect ?? true,
 				},
 				autonomy: {
@@ -154,7 +156,7 @@
 		applyChange((doc) => {
 			if (!doc.spec.reasoning) doc.spec.reasoning = {};
 			doc.spec.reasoning.pattern = pattern;
-			if (pattern === 'reflexion' && !doc.spec.reasoning.reflection_rounds) {
+			if (pattern === 'reflexion' && !doc.spec.reasoning.reflection_rounds && !doc.spec.reasoning.reflection_dimensions) {
 				doc.spec.reasoning.reflection_rounds = 2;
 			}
 		});
@@ -348,18 +350,27 @@
 		{/if}
 
 		{#if cog.reasoning.pattern === 'reflexion'}
-			<label class="flex items-center gap-3 pl-0.5">
-				<span class="font-mono text-[12px] text-fg-faint">reflection_rounds</span>
-				<input
-					type="number"
-					min="1"
-					max="3"
-					value={cog.reasoning.reflection_rounds || 2}
-					onchange={(e) => setReasoningField('reflection_rounds', parseInt(e.currentTarget.value) || 2)}
-					class="w-14 border border-edge bg-surface-1 px-2 py-1 font-mono text-[12px] text-fg-muted outline-none focus:border-accent-primary/40"
-					style="font-variant-numeric: tabular-nums"
-				/>
-			</label>
+			{#if cog.reasoning.reflection_dimensions?.length}
+				<div class="flex flex-col gap-1 pl-0.5">
+					<span class="font-mono text-[12px] text-fg-faint">dimensions</span>
+					{#each cog.reasoning.reflection_dimensions as dim}
+						<span class="font-mono text-[12px] text-fg-muted">{dim.name}</span>
+					{/each}
+				</div>
+			{:else}
+				<label class="flex items-center gap-3 pl-0.5">
+					<span class="font-mono text-[12px] text-fg-faint">reflection_rounds</span>
+					<input
+						type="number"
+						min="1"
+						max="3"
+						value={cog.reasoning.reflection_rounds || 2}
+						onchange={(e) => setReasoningField('reflection_rounds', parseInt(e.currentTarget.value) || 2)}
+						class="w-14 border border-edge bg-surface-1 px-2 py-1 font-mono text-[12px] text-fg-muted outline-none focus:border-accent-primary/40"
+						style="font-variant-numeric: tabular-nums"
+					/>
+				</label>
+			{/if}
 		{/if}
 
 		{#if cog.reasoning.pattern === 'todo_driven' || cog.reasoning.pattern === 'plan_execute'}

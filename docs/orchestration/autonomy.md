@@ -80,7 +80,8 @@ These fields in the `guardrails:` block control autonomous execution limits:
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `max_iterations` | `int` | `10` | Maximum number of loop iterations before the run stops. Can be overridden with `--max-iterations` on the CLI. |
-| `autonomous_token_budget` | `int \| null` | `null` (unlimited) | Total token budget across all iterations. The loop stops when this budget is exhausted. |
+| `autonomous_token_budget` | `int \| null` | `null` (unlimited) | Total token budget across all iterations. The loop stops when this budget is exhausted. The current consumption is shown to the agent in the continuation prompt BUDGET block. |
+| `autonomous_timeout_seconds` | `int \| null` | `null` (unlimited) | Wall-clock timeout for the entire autonomous run. Elapsed time is shown to the agent in the continuation prompt BUDGET block. |
 
 ## Tools
 
@@ -129,11 +130,20 @@ schedule_followup_at(prompt: str, iso_datetime: str) -> str
 
 1. **Iteration 1**: The user's original prompt is sent to the agent with run-scoped toolsets (todo, think, finish_task) injected. If a [reasoning strategy](../core/reasoning.md#reasoning-strategies) is configured, it may augment the prompt (e.g., `todo_driven` prepends "create a todo list first").
 
-2. **Iterations 2+**: The reasoning strategy builds a continuation prompt that includes the current todo state (rendered as a formatted checklist). This ensures the agent always sees its progress even if earlier messages were trimmed.
+2. **Iterations 2+**: The reasoning strategy builds a continuation prompt that includes the current todo state (rendered as a formatted checklist) and a **BUDGET** block showing consumed iterations, tokens, and wall-clock time against their respective limits. This ensures the agent always sees its progress and remaining resources even if earlier messages were trimmed. The agent can use this information to skip low-priority items, compress remaining work, or wrap up before hitting a hard limit.
 
 3. **History compaction, trimming, and budget enforcement**: After each iteration, if `compaction.enabled` is true and the history exceeds `compaction.threshold`, older messages are summarized by an LLM call and replaced with a single summary message. The most recent `compaction.tail_messages` messages are kept verbatim. After compaction, history is trimmed to `max_history_messages`. The first message (original prompt) is always preserved to maintain task context. Compaction follows the never-raises pattern -- if the summarization LLM call fails, the original history is kept and trimming proceeds normally. Finally, a token budget guard enforces that the trimmed history fits within the model's context window (see [Context Budget Guard](#context-budget-guard)).
 
-4. **Budget check**: Before each iteration, cumulative token usage is compared against `autonomous_token_budget`. If exceeded, the loop stops with status `budget_exceeded`.
+4. **Budget check**: Before each iteration, cumulative token usage is compared against `autonomous_token_budget`. If exceeded, the loop stops with status `budget_exceeded`. After each iteration, current budget state (iterations completed, tokens consumed, elapsed time) is written to the agent's `ReflectionState` so the next continuation prompt includes a BUDGET block like:
+
+   ```
+   BUDGET:
+   - Iteration: 3/10 (30%)
+   - Tokens: 15,000/50,000 (30%)
+   - Time: 45s/300s (15%)
+   ```
+
+   Lines for token budget and timeout only appear when those limits are configured. Percentages are truncated (not rounded).
 
 5. **Terminal conditions** (the loop stops when any of these occur):
    - The agent calls `finish_task` → status from the tool call (`completed`, `blocked`, or `failed`)
@@ -280,6 +290,7 @@ spec:
   guardrails:
     max_iterations: 8
     autonomous_token_budget: 30000
+    autonomous_timeout_seconds: 300
     max_tokens_per_run: 10000
     max_tool_calls: 20
 ```
