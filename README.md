@@ -35,7 +35,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.2**: PydanticAI + LangChain agent import. Convert existing agents with `initrunner new --pydantic-ai my_agent.py` or `--langchain`. See the [Changelog](CHANGELOG.md).
+> **v2026.4.3**: Autonomous execution docs, compose/team runs in Launchpad, dimension-specific reflexion, budget-aware continuation prompts, finalize_plan() tool, Electric Charcoal dashboard. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -360,4 +360,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.2</sub></p>
+<p align="center"><sub>v2026.4.3</sub></p>

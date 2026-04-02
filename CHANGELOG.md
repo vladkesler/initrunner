@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026.4.3] - 2026-04-02
+
+### Added
+- **Autonomous execution in README** -- new "Autonomous execution" subsection in "What You Get", comparison table row, `-a` flag in modes list. Applied to English, Chinese, and Japanese READMEs
+- **Chinese and Japanese READMEs** -- full translations at `README.zh-CN.md` and `README.ja.md` with language selector in the header and maintenance note in CONTRIBUTING.md
+- **Compose/team runs in dashboard Launchpad** -- one-shot compose and team runs now log a top-level aggregate audit row (`trigger_type: compose_run` / `team_run`) so they appear in the Launchpad recent activity feed. Dashboard stream routes now wire `audit_logger`. Backend `exclude_trigger_types` filter hides internal compose/delegate/team rows from Launchpad while keeping them in the full audit view
+- **Compose run correlation** -- `compose_run_id` propagated through `ComposeGraphDeps` into child service `trigger_metadata` for parent-child linking
+- **Dimension-specific reflexion** -- `reflection_dimensions` config with per-dimension evaluation rubrics and structured scoring. Dashboard CognitionPanel and ConfigPanel updated
+- **Budget-aware continuation prompts** -- autonomous continuation prompts now surface remaining iteration/token/time budget so the agent can plan accordingly
+- **Explicit finalize_plan() tool** -- replaces the plan-execute phase heuristic; agent calls `finalize_plan()` to transition from planning to execution. New `plan-execute` and `todo-planner` starters
+
+### Changed
+- **Launchpad redesigned** -- Electric Charcoal design system applied to the dashboard home page
+
+### Fixed
+- Type errors and formatting issues across audit, compose, team, and test modules
+
 ## [2026.4.2] - 2026-04-01
 
 ### Added
