@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026.4.4] - 2026-04-03
+
+### Added
+- **`--autopilot` flag** -- daemon mode where every trigger runs the full autonomous loop instead of single-shot. Messaging triggers (Telegram, Discord) now support multi-step reasoning with all existing guardrails (spin guard, token budget, iteration limits, finish_task). Individual triggers can opt in via `autonomous: true` without enabling it globally
+
+### Changed
+- **README restructured** -- security section promoted after autonomy, "Why InitRunner" replaces comparison grid, humanized section headers, docs table split for scannability. Chinese and Japanese translations synced with the revamped English version
+
 ## [2026.4.3] - 2026-04-02
 
 ### Added
@@ -15,7 +23,12 @@
 - **Launchpad redesigned** -- Electric Charcoal design system applied to the dashboard home page
 
 ### Fixed
+- **MCP gateway migrated to fastmcp 3.x** -- replaced deprecated `.filtered()`, `.prefixed()`, and `FastMCP.as_proxy()` with Visibility transforms and `create_proxy`. Fixes CVE-2025-64340, CVE-2026-27124, CVE-2026-32871. Version floor set to `fastmcp>=3.2.0`
 - Type errors and formatting issues across audit, compose, team, and test modules
+
+### Dependencies
+- anthropic 0.86.0 -> 0.87.0
+- aiohttp 3.13.3 -> 3.13.4
 
 ## [2026.4.2] - 2026-04-01
 

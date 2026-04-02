@@ -40,7 +40,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.3**: Autonomous execution docs, compose/team runs in Launchpad, dimension-specific reflexion, budget-aware continuation prompts, finalize_plan() tool, Electric Charcoal dashboard. See the [Changelog](CHANGELOG.md).
+> **v2026.4.4**: `--autopilot` flag for multi-step autonomous triggers, README restructured around security and autonomy. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -377,4 +377,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.3</sub></p>
+<p align="center"><sub>v2026.4.4</sub></p>
