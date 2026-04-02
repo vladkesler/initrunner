@@ -27,7 +27,12 @@
 
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
 
-YAML 优先的 AI Agent 平台。在一个文件中定义 Agent 的角色、工具、知识库和记忆。可作为交互式聊天、一次性命令、自主 Agent、带 cron/webhook/文件监听触发器的守护进程、Telegram/Discord 机器人或 OpenAI 兼容 API 运行。RAG 和持久化记忆开箱即用。通过 Web 仪表盘或原生桌面应用管理一切。使用 `curl` 或 `pip` 安装，无需容器。
+YAML 优先的 AI Agent 平台。一个文件定义 Agent。同一个文件可作为交互式聊天、一次性命令、自主 Worker 或生产守护进程运行。内置 12 层安全防护。使用 `curl` 或 `pip` 安装。
+
+<p align="center">
+  <img src="assets/screenshot-pipeline.png" alt="InitRunner Team Pipeline" width="800"><br>
+  <em>architecture-debate: 乐观者、怀疑者和务实者经过 2 轮讨论后综合</em>
+</p>
 
 ```bash
 initrunner run helpdesk -i                                    # 文档问答，支持 RAG + 记忆
@@ -119,32 +124,117 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 
 `model:` 部分是可选的；省略它，InitRunner 会根据你的 API 密钥自动检测。支持 Anthropic、OpenAI、Google、Groq、Mistral、Cohere、xAI、OpenRouter、Ollama 以及任何 OpenAI 兼容端点。28 个内置工具（文件系统、git、HTTP、Python、shell、SQL、搜索、邮件、Slack、MCP、音频、PDF 提取、CSV 分析、图像生成），你还可以用一个文件[添加自己的工具](docs/agents/tool_creation.md)。
 
+## 从聊天到自动驾驶
+
+同一个 YAML 文件适用于四种递进模式。你先用它聊天。效果好了，就让它自主运行。信任它之后，部署为守护进程。各阶段之间无需重写。
+
+**交互式和一次性：**
+
+```bash
+initrunner run role.yaml -i              # REPL：来回对话
+initrunner run role.yaml -p "Scan for security issues"  # 一个提示，一个回复
+```
+
+**自主模式：** 加上 `-a`，Agent 会持续工作。它建立任务列表，逐项完成，反思进度，全部做完后自动停止。你设定预算，防止失控。
+
+```bash
+initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
+```
+
+```yaml
+spec:
+  autonomy:
+    compaction: { enabled: true, threshold: 30 }
+  guardrails:
+    max_iterations: 15
+    autonomous_token_budget: 100000
+    autonomous_timeout_seconds: 600
+```
+
+四种推理策略控制 Agent 如何处理多步骤工作：`react`（默认）、`todo_driven`、`plan_execute` 和 `reflexion`。预算约束、迭代限制、超时和空转检测（连续多轮没有工具调用）确保自主运行有界。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
+
+**守护进程：** 添加触发器并切换到 `--daemon`。Agent 持续运行，响应 cron 调度、文件变更、webhook、Telegram 消息或 Discord 提及。每个事件触发一次提示-响应循环。
+
+```yaml
+spec:
+  triggers:
+    - type: cron
+      schedule: "0 9 * * 1"
+      prompt: "Generate the weekly status report."
+    - type: file_watch
+      paths: [./src]
+      prompt_template: "File changed: {path}. Review it."
+    - type: telegram
+      allowed_user_ids: [123456789]
+```
+
+```bash
+initrunner run role.yaml --daemon   # 运行直到 Ctrl+C
+```
+
+六种触发器类型：cron、webhook、file_watch、heartbeat、telegram 和 discord。守护进程热重载角色变更无需重启，执行每日和终身 Token 预算，最多同时运行 4 个触发器。查看 [触发器](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md)。
+
+**自动驾驶：** 守护进程是响应式的。自动驾驶是*先思考，再*响应。有人给你的 Telegram 机器人发消息"帮我找从纽约到伦敦下周的航班"。在守护进程模式下，你只有一次回答机会。在自动驾驶模式下，Agent 搜索网络、比较选项、核对日期，然后发回有价值的答案。
+
+```bash
+initrunner run role.yaml --autopilot   # 每个触发器都走完整的自主循环
+```
+
+`--autopilot` 就是 `--daemon`，但每个触发器运行多步自主执行而非单次回复。护栏与 `-a` 相同：迭代限制、Token 预算、空转检测、`finish_task`。Agent 规划、使用工具、反思，完成后回复。
+
+你也可以有选择性地设置。在单个触发器上设置 `autonomous: true`，其余保持快速单次响应。
+
+```yaml
+spec:
+  triggers:
+    - type: telegram
+      autonomous: true          # 思考、研究，然后回复
+    - type: cron
+      schedule: "0 9 * * 1"
+      prompt: "Generate the weekly status report."
+      autonomous: true          # 规划、收集数据、撰写、审查
+    - type: file_watch
+      paths: [./src]
+      prompt_template: "File changed: {path}. Review it."
+      # autonomous: false (default) -- 快速单次响应
+```
+
+Agent 可以在运行中自行安排后续任务。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
+
+**记忆贯穿一切。** 情景记忆、语义记忆和程序记忆在交互式会话、自主运行和守护进程触发之间持久化。每次会话结束后，整合过程使用 LLM 从事件历史中提取持久事实。Agent 不只是运行，它在学习。查看 [记忆](docs/core/memory.md)。
+
+## 安全
+
+InitRunner 内置 12 层安全防护。通过 `security:` 配置项启用，不是自动生效，但已集成就绪。没有 `security:` 部分的角色会获得安全默认值。重点是这些能力存在于框架内，而不是在生产六个月后从第三方库补上。
+
+**输入：** 服务器中间件（Bearer 认证配合时序安全比对、速率限制、请求体大小限制、HTTPS 强制、安全头、CORS）。内容策略引擎（脏话过滤、禁止模式匹配、提示长度限制、可选的 LLM 话题分类器）。输入守卫能力（PydanticAI `before_run` 钩子，在 Agent 启动前验证提示）。
+
+**授权：** [InitGuard](https://github.com/initrunner/initguard) ABAC 策略引擎（Agent 从角色元数据获取身份，每次工具调用和委托都根据类 Cedar 策略检查）。参数级权限规则（每个工具的 allow/deny glob 模式，deny 优先）。SQL 授权回调（在引擎层面阻止危险操作）。
+
+**执行：** PEP 578 审计钩子沙箱（按线程执行文件系统写限制、子进程阻止、私有 IP 网络阻止、危险模块导入阻止、eval/exec 阻止）。Docker 容器沙箱（只读根文件系统、内存/CPU 限制、网络隔离、PID 限制）。环境变量清理（前缀和后缀匹配从每个子进程环境中剥离敏感键）。
+
+**预算：** API 请求的令牌桶速率限制。五个粒度的 Token 预算：每次运行、每次会话、每次自主运行、守护进程每日和守护进程终身。
+
+**审计：** 仅追加 SQLite 日志，自动敏感信息清理（16 个正则模式覆盖 GitHub Token、AWS 密钥、Stripe 密钥、Slack Token 等）。每次工具调用、委托事件和安全违规都会被记录。
+
+```bash
+export INITRUNNER_POLICY_DIR=./policies
+initrunner run role.yaml                  # 工具调用 + 委托根据策略检查
+```
+
+查看 [Agent 策略](docs/security/agent-policy.md) · [安全](docs/security/security.md) · [护栏](docs/configuration/guardrails.md)。
+
 ## 为什么选择 InitRunner
 
-一个 YAML 文件*就是* Agent。工具、知识源、记忆、触发器、模型、护栏，全部声明在一处。你可以阅读它，立即理解 Agent 做什么。你可以 diff 它，在 PR 中审查它，交给队友。当你想从 GPT 切换到 Claude，只需改一行。当你想添加 RAG，加一个 `ingest:` 部分。
+**一个 YAML 文件就是 Agent。** 一个文件。可读、可 diff、可在 PR 中审查。打开它就知道 Agent 做什么：哪个模型、哪些工具、什么知识源、什么护栏。不需要先学会 Python 类层级才能配置一个工具。新团队成员读 YAML 就能理解。你在 PR 中审查 Agent 变更，就像审查其他配置一样。
 
-同一个文件可以作为交互式聊天（`-i`）、一次性命令（`-p "..."`）、自主 Agent（`-a`）、cron/webhook/文件监听守护进程（`--daemon`）或 OpenAI 兼容 API（`--serve`）运行。你不需要预先选择部署模式然后围绕它构建。你在运行时用一个标志选择。
+**同一个文件，不同的标志。** 你用 `-i` 交互式原型的 Agent 和你用 `--daemon` 部署的 Agent 是同一个。不需要重写、不需要部署适配器、没有和开发模式不同的"生产模式"。你在运行时用标志选择执行模式，而不是在设计时用架构决策选择。
 
-实际上这意味着：你的 Agent 配置和代码一起存在版本控制中。新团队成员阅读 YAML 就能理解 Agent 做什么。你在 PR 中审查 Agent 变更，就像审查其他配置一样。你交互式原型的 Agent 就是你部署为守护进程或 API 的那个。同一个文件，不同的标志。
+**安全内置，不是后补。** 大多数 Agent 框架把安全当作"到了生产再加认证中间件"。InitRunner 出厂就集成了策略引擎、PII 脱敏、沙箱、工具授权和审计日志。你通过配置启用它们，不需要花一个周末去接管道。
 
-## 横向对比
+**有刹车的自主性。** Agent 无人监督运行，但不会失控。Token 预算、迭代限制、墙钟超时和空转检测都是声明式 YAML 配置。你在启动单次自主运行之前决定给它多大的自由度。
 
-|  | InitRunner | LangChain | CrewAI | AutoGen |
-|---|---|---|---|---|
-| **Agent 配置** | YAML 文件 | Python chains + 配置 | Python 类 | Python 类 |
-| **RAG** | `--ingest ./docs/`（一个标志） | Loaders + splitters + vectorstore | RAG 工具或自定义 | 外部配置 |
-| **记忆** | 内置，默认开启 | 附加组件（多种选项） | 短期/长期记忆 | 外部 |
-| **多 Agent** | `compose.yaml` 或 `kind: Team` | LangGraph | Crew 定义 | Group chat |
-| **自主执行** | `-a` 标志 + YAML 护栏 | 自定义 Agent 循环 | 顺序流程 | 对话循环 |
-| **部署模式** | 同一 YAML: REPL / 守护进程 / API | 每种模式自定义 | CLI 或 Kickoff | 自定义 |
-| **模型切换** | 改 1 行 YAML | 替换 LLM 类 | 每个 Agent 配置 | 每个 Agent 配置 |
-| **自定义工具** | 1 个文件，1 个装饰器 | `@tool` 装饰器 | `@tool` 装饰器 | Function call |
-| **Bot 部署** | `--telegram` / `--discord` 标志 | 单独集成 | 单独集成 | 单独集成 |
-| **迁移** | `--pydantic-ai` / `--langchain` 导入 | N/A | N/A | N/A |
-
-## 功能概览
-
-### 知识库与记忆
+## 知识库与记忆
 
 将你的 Agent 指向一个目录。它会自动提取、分块、嵌入并索引你的文档。对话过程中，Agent 自动搜索索引并引用找到的内容。记忆跨会话持久化。
 
@@ -164,28 +254,7 @@ initrunner run role.yaml -i   # 首次运行自动摄入，记忆 + 搜索就绪
 
 查看 [摄入](docs/core/ingestion.md) · [记忆](docs/core/memory.md) · [RAG 快速开始](docs/getting-started/rag-quickstart.md)。
 
-### 触发器与守护进程
-
-将任何 Agent 变成对 cron 计划、文件变更、webhook 或心跳做出反应的守护进程：
-
-```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-```
-
-```bash
-initrunner run role.yaml --daemon   # 运行直到停止
-```
-
-查看 [触发器](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md)。
-
-### 多 Agent 编排
+## 多 Agent 编排
 
 将 Agent 串联起来。一个 Agent 的输出传入下一个。智能路由根据每条消息自动选择正确的目标（先关键词匹配，平局时用单次 LLM 调用打破）：
 
@@ -207,82 +276,6 @@ spec:
 
 运行 `initrunner compose up compose.yaml`。查看 [模式指南](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md)。
 
-### 推理与工具管理
-
-控制你的 Agent 如何思考，而不仅仅是做什么：
-
-```yaml
-spec:
-  reasoning:
-    pattern: plan_execute    # 先规划，然后逐步执行
-    auto_plan: true
-  tools:
-    - type: think            # 内部草稿本，带自我批评
-      critique: true
-    - type: todo             # 结构化任务列表，用于多步骤工作
-```
-
-四种推理模式：`react`、`todo_driven`、`plan_execute` 和 `reflexion`。查看 [推理](docs/core/reasoning.md)。
-
-工具多的 Agent 会浪费上下文并选择更差。工具搜索将工具隐藏在按需关键词发现之后：Agent 只看到 `search_tools` 和几个固定工具，然后按需发现每轮需要的。BM25 评分，无 API 调用，通常节省 60-80% 上下文。查看 [工具搜索](docs/core/tool-search.md)。
-
-### 自主执行
-
-大多数运行只有一轮：你发出提示，Agent 做出回应。加上 `-a`，Agent 会持续工作。它建立待办列表，逐项完成，全部做完后自动停止。你设定预算 -- 迭代次数、token 数量和时间 -- 防止失控。
-
-```yaml
-spec:
-  autonomy:
-    compaction: { enabled: true, threshold: 30 }
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
-```
-
-```bash
-initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
-```
-
-也支持触发器：在任意触发器上设置 `autonomous: true`，守护进程触发的运行就会使用完整循环而非单次响应。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
-
-## 架构
-
-```
-initrunner/
-  agent/        角色 Schema、加载器、执行器、28 个自注册工具
-  runner/       一次性、REPL、自主、守护进程执行模式
-  compose/      通过 compose.yaml 的多 Agent 编排
-  triggers/     Cron、文件监听、webhook、心跳、Telegram、Discord
-  stores/       文档 + 记忆存储（LanceDB、zvec）
-  ingestion/    提取 -> 分块 -> 嵌入 -> 存储 流水线
-  mcp/          MCP 服务器集成与网关
-  audit/        仅追加 SQLite 审计日志
-  services/     共享业务逻辑层
-  cli/          Typer + Rich CLI 入口
-```
-
-基于 [PydanticAI](https://ai.pydantic.dev/) 构建 Agent 框架，Pydantic 用于配置验证，LanceDB 用于向量搜索。查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发配置。
-
-## 安全
-
-InitRunner 内置了 [initguard](https://github.com/initrunner/initguard) 策略引擎。Agent 从角色元数据（名称、团队、标签、作者）获取身份，每次工具调用和委托都会根据你的策略进行检查：
-
-- **工具级授权**：Agent 只能调用其策略允许的工具
-- **委托策略**：控制哪些 Agent 可以委托给哪些其他 Agent
-- **内容过滤**：输入护栏，带可配置的内容策略
-- **PEP 578 沙箱**：危险操作的审计钩子
-- **Docker 隔离**：可选的沙箱执行环境
-- **Token 预算和速率限制**：防止成本失控
-- **环境变量清理**：敏感密钥从子进程环境中剥离
-- **仅追加审计日志**：每次工具调用记录到 SQLite
-
-```bash
-export INITRUNNER_POLICY_DIR=./policies
-initrunner run role.yaml                  # 工具调用 + 委托根据策略检查
-```
-
-查看 [Agent 策略](docs/security/agent-policy.md) · [安全](docs/security/security.md) · [护栏](docs/configuration/guardrails.md)。
-
 ## 用户界面
 
 <p align="center">
@@ -295,7 +288,7 @@ pip install "initrunner[dashboard]"
 initrunner dashboard                  # 打开 http://localhost:8100
 ```
 
-浏览 Agent、运行提示、可视化构建编排、配置推理模式、审查审计日志。也可作为原生桌面窗口使用（`initrunner desktop`）。查看 [仪表盘文档](docs/interfaces/dashboard.md)。
+运行 Agent、可视化构建编排、深入查看审计日志。也可作为原生桌面窗口使用（`initrunner desktop`）。查看 [仪表盘文档](docs/interfaces/dashboard.md)。
 
 ## 更多功能
 
@@ -312,6 +305,28 @@ initrunner dashboard                  # 打开 http://localhost:8100
 | **能力**（原生 PydanticAI 功能） | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
 | **可观测性**（OpenTelemetry 集成） | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
 | **配置**（切换任意角色的提供商/模型） | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
+| **推理**（结构化思维模式） | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
+| **工具搜索**（按需工具发现） | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
+
+## 架构
+
+```
+initrunner/
+  agent/        角色 Schema、加载器、执行器、28 个自注册工具
+  authz.py      InitGuard ABAC 策略引擎集成
+  runner/       一次性、REPL、自主、守护进程执行模式
+  compose/      通过 compose.yaml 的多 Agent 编排
+  triggers/     Cron、文件监听、webhook、心跳、Telegram、Discord
+  stores/       文档 + 记忆存储（LanceDB、zvec）
+  ingestion/    提取 -> 分块 -> 嵌入 -> 存储 流水线
+  mcp/          MCP 服务器集成与网关
+  audit/        仅追加 SQLite 审计日志，带敏感信息清理
+  middleware.py 服务器安全中间件（认证、速率限制、CORS、安全头）
+  services/     共享业务逻辑层
+  cli/          Typer + Rich CLI 入口
+```
+
+基于 [PydanticAI](https://ai.pydantic.dev/) 构建 Agent 框架，Pydantic 用于配置验证，LanceDB 用于向量搜索。查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发配置。
 
 ## 分发
 
@@ -328,14 +343,16 @@ initrunner dashboard                  # 打开 http://localhost:8100
 
 | 领域 | 关键文档 |
 |------|---------|
-| 入门 | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
-| Agent 与工具 | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
-| 智能 | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Tool Search](docs/core/tool-search.md) · [Autonomy](docs/orchestration/autonomy.md) |
+| 入门 | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
+| 快速开始 | [RAG](docs/getting-started/rag-quickstart.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
+| Agent 与工具 | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| 智能 | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | 知识与记忆 | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
+| 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| 运维 | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| 安全 | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| 运维 | [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## 示例
 

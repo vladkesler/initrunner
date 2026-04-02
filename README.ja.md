@@ -27,7 +27,12 @@
 
 > **注意:** これはコミュニティによる翻訳です。最新の情報は [英語版 README](README.md) を参照してください。翻訳は更新に遅れる場合があります。
 
-YAML ファーストの AI エージェントプラットフォーム。エージェントのロール、ツール、ナレッジベース、メモリを 1 つのファイルで定義。インタラクティブチャット、ワンショットコマンド、自律エージェント、cron/webhook/ファイル監視トリガー付きデーモン、Telegram/Discord ボット、OpenAI 互換 API として実行可能。RAG と永続メモリはすぐに使えます。Web ダッシュボードまたはネイティブデスクトップアプリですべてを管理。`curl` または `pip` でインストール、コンテナ不要。
+YAML ファーストの AI エージェントプラットフォーム。1 つのファイルでエージェントを定義。同じファイルがインタラクティブチャット、ワンショットコマンド、自律ワーカー、本番デーモンとして動作します。12 のセキュリティレイヤーを標準搭載。`curl` または `pip` でインストール。
+
+<p align="center">
+  <img src="assets/screenshot-pipeline.png" alt="InitRunner Team Pipeline" width="800"><br>
+  <em>architecture-debate: 楽観主義者、懐疑主義者、現実主義者が 2 ラウンドの議論を経て統合</em>
+</p>
 
 ```bash
 initrunner run helpdesk -i                                    # RAG + メモリでドキュメント Q&A
@@ -119,32 +124,117 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 
 `model:` セクションはオプションです。省略すると InitRunner が API キーから自動検出します。Anthropic、OpenAI、Google、Groq、Mistral、Cohere、xAI、OpenRouter、Ollama、および任意の OpenAI 互換エンドポイントに対応。28 の組み込みツール（ファイルシステム、git、HTTP、Python、shell、SQL、検索、メール、Slack、MCP、オーディオ、PDF 抽出、CSV 分析、画像生成）を搭載し、1 つのファイルで[独自のツールを追加](docs/agents/tool_creation.md)できます。
 
+## チャットからオートパイロットまで
+
+同じ YAML ファイルが 4 つのエスカレーションモードで動作します。まずチャットで試す。うまくいったら自律実行させる。信頼できたらデーモンとしてデプロイする。ステージ間の書き直しは不要です。
+
+**インタラクティブとワンショット：**
+
+```bash
+initrunner run role.yaml -i              # REPL：対話形式でやり取り
+initrunner run role.yaml -p "Scan for security issues"  # 1 つのプロンプト、1 つの応答
+```
+
+**自律モード：** `-a` を付けるとエージェントは作業を続けます。タスクリストを作り、各項目を処理し、進捗を振り返り、すべて完了したら終了します。予算を設定して暴走を防ぎます。
+
+```bash
+initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
+```
+
+```yaml
+spec:
+  autonomy:
+    compaction: { enabled: true, threshold: 30 }
+  guardrails:
+    max_iterations: 15
+    autonomous_token_budget: 100000
+    autonomous_timeout_seconds: 600
+```
+
+4 つの推論戦略がマルチステップ作業でのエージェントの思考方法を制御します：`react`（デフォルト）、`todo_driven`、`plan_execute`、`reflexion`。予算制約、イテレーション制限、タイムアウト、スピンガード（ツール呼び出しのない連続ターン）が自律実行を有界に保ちます。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+
+**デーモン：** トリガーを追加して `--daemon` に切り替えます。エージェントは継続的に実行し、cron スケジュール、ファイル変更、webhook、Telegram メッセージ、Discord メンションに反応します。各イベントが 1 回のプロンプト-応答サイクルを起動します。
+
+```yaml
+spec:
+  triggers:
+    - type: cron
+      schedule: "0 9 * * 1"
+      prompt: "Generate the weekly status report."
+    - type: file_watch
+      paths: [./src]
+      prompt_template: "File changed: {path}. Review it."
+    - type: telegram
+      allowed_user_ids: [123456789]
+```
+
+```bash
+initrunner run role.yaml --daemon   # Ctrl+C まで実行
+```
+
+6 種類のトリガー：cron、webhook、file_watch、heartbeat、telegram、discord。デーモンは再起動なしでロール変更をホットリロードし、日次・生涯トークン予算を適用し、最大 4 トリガーを同時実行します。[トリガー](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md) を参照。
+
+**オートパイロット：** デーモンは応答します。オートパイロットは*考えてから*応答します。誰かが Telegram ボットに「来週ニューヨークからロンドンへのフライトを探して」とメッセージを送ったとき、デーモンモードでは 1 回で回答します。オートパイロットでは、エージェントが Web を検索し、オプションを比較し、日程を確認し、読む価値のある回答を返します。
+
+```bash
+initrunner run role.yaml --autopilot   # すべてのトリガーが完全な自律ループを実行
+```
+
+`--autopilot` は `--daemon` と同じですが、各トリガーがシングルショットではなくマルチステップの自律実行を行います。ガードレールは `-a` と同じ：イテレーション制限、トークン予算、スピンガード、`finish_task`。エージェントが計画し、ツールを使い、振り返り、完了したら返信します。
+
+選択的に設定することもできます。個別のトリガーに `autonomous: true` を設定し、残りはクイックシングルショット応答のままにします。
+
+```yaml
+spec:
+  triggers:
+    - type: telegram
+      autonomous: true          # 考え、調査し、返信
+    - type: cron
+      schedule: "0 9 * * 1"
+      prompt: "Generate the weekly status report."
+      autonomous: true          # 計画、データ収集、執筆、レビュー
+    - type: file_watch
+      paths: [./src]
+      prompt_template: "File changed: {path}. Review it."
+      # autonomous: false (default) -- クイックシングル応答
+```
+
+エージェントは実行中にフォローアップタスクを自己スケジュールできます。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+
+**メモリはすべてを貫きます。** エピソード記憶、セマンティック記憶、手続き記憶がインタラクティブセッション、自律実行、デーモントリガーの間で永続化されます。各セッション後、統合プロセスが LLM を使ってエピソード履歴から永続的な事実を抽出します。エージェントは単に実行するだけではありません。学習します。[メモリ](docs/core/memory.md) を参照。
+
+## セキュリティ
+
+InitRunner は 12 のセキュリティレイヤーを搭載しています。`security:` 設定キーでオプトインする方式で、自動的に有効になるわけではありませんが、統合済みですぐに使えます。`security:` セクションのないロールは安全なデフォルト値が適用されます。重要なのは、これらの機能が本番稼働 6 か月後にサードパーティライブラリから追加するものではなく、フレームワーク内に存在しているということです。
+
+**入力：** サーバーミドルウェア（タイミングセーフ比較による Bearer 認証、レート制限、ボディサイズ制限、HTTPS 強制、セキュリティヘッダー、CORS）。コンテンツポリシーエンジン（不適切語フィルター、禁止パターンマッチング、プロンプト長制限、オプションの LLM トピック分類器）。入力ガードケイパビリティ（PydanticAI `before_run` フックでエージェント開始前にプロンプトを検証）。
+
+**認可：** [InitGuard](https://github.com/initrunner/initguard) ABAC ポリシーエンジン（エージェントはロールメタデータからアイデンティティを取得、すべてのツール呼び出しと委任を Cedar ライクなポリシーに対してチェック）。引数レベルのパーミッションルール（ツールごとの allow/deny glob パターン、deny 優先）。SQL 認可コールバック（エンジンレベルで危険な操作をブロック）。
+
+**実行：** PEP 578 監査フックサンドボックス（スレッドごとのファイルシステム書き込み制限、サブプロセスブロック、プライベート IP ネットワークブロック、危険モジュールインポートブロック、eval/exec ブロックの適用）。Docker コンテナサンドボックス（読み取り専用 rootfs、メモリ/CPU 制限、ネットワーク分離、PID 制限）。環境変数スクラブ（プレフィックスとサフィックスのマッチングですべてのサブプロセス環境から機密キーを除去）。
+
+**予算：** API リクエストのトークンバケットレート制限。5 つの粒度のトークン予算：実行ごと、セッションごと、自律実行ごと、デーモン日次、デーモン生涯。
+
+**監査：** 追記専用 SQLite 証跡、自動シークレットスクラブ（GitHub トークン、AWS キー、Stripe キー、Slack トークンなどをカバーする 16 の正規表現パターン）。すべてのツール呼び出し、委任イベント、セキュリティ違反が記録されます。
+
+```bash
+export INITRUNNER_POLICY_DIR=./policies
+initrunner run role.yaml                  # ツール呼び出し + 委任をポリシーに対してチェック
+```
+
+[エージェントポリシー](docs/security/agent-policy.md) · [セキュリティ](docs/security/security.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+
 ## なぜ InitRunner なのか
 
-YAML ファイルがエージェント*そのもの*です。ツール、ナレッジソース、メモリ、トリガー、モデル、ガードレール、すべてが一箇所に宣言されています。読めばエージェントが何をするか即座に理解できます。diff を取り、PR でレビューし、チームメイトに渡せます。GPT から Claude に切り替えたいときは 1 行変更するだけ。RAG を追加したいときは `ingest:` セクションを追加するだけです。
+**YAML ファイルがエージェントそのもの。** 1 つのファイル。可読で、diff でき、PR でレビューできます。開くだけでエージェントの動作がわかります：どのモデル、どのツール、どのナレッジソース、どのガードレール。ツールを設定するために Python のクラス階層を学ぶ必要はありません。新しいチームメンバーは YAML を読んで理解します。他の設定と同じように PR でエージェントの変更をレビューします。
 
-同じファイルをインタラクティブチャット（`-i`）、ワンショットコマンド（`-p "..."`）、自律エージェント（`-a`）、cron/webhook/ファイル監視デーモン（`--daemon`）、または OpenAI 互換 API（`--serve`）として実行できます。デプロイモードを事前に選んでそれに合わせて構築する必要はありません。実行時にフラグで選ぶだけです。
+**同じファイル、違うフラグ。** `-i` でインタラクティブにプロトタイプしたエージェントは、`--daemon` でデプロイするエージェントとまったく同じです。書き直し不要、デプロイメントアダプター不要、開発と異なる「本番モード」も不要。実行モードはデザイン時のアーキテクチャ決定ではなく、実行時のフラグで選びます。
 
-これが実際に意味すること：エージェント設定はコードと一緒にバージョン管理に置かれます。新しいチームメンバーは YAML を読んでエージェントの動作を理解します。他の設定と同様に PR でエージェントの変更をレビューします。インタラクティブにプロトタイプしたエージェントは、デーモンや API としてデプロイするものと同じです。同じファイル、違うフラグ。
+**セキュリティは内蔵、後付けではない。** ほとんどのエージェントフレームワークはセキュリティを「本番になったら認証ミドルウェアを追加」として扱います。InitRunner はポリシーエンジン、PII リダクション、サンドボックス、ツール認可、監査ログを統合済みで出荷します。設定で有効化するだけで、週末を費やして配管工事する必要はありません。
 
-## 他ツールとの比較
+**ブレーキ付きの自律性。** エージェントは無人で実行されますが、暴走はしません。トークン予算、イテレーション制限、ウォールクロックタイムアウト、スピンガードはすべて宣言的な YAML 設定です。1 回の自律実行が始まる前に、どれだけの自由度を与えるかを決められます。
 
-|  | InitRunner | LangChain | CrewAI | AutoGen |
-|---|---|---|---|---|
-| **エージェント設定** | YAML ファイル | Python chains + 設定 | Python クラス | Python クラス |
-| **RAG** | `--ingest ./docs/`（フラグ 1 つ） | Loaders + splitters + vectorstore | RAG ツールまたはカスタム | 外部セットアップ |
-| **メモリ** | 組み込み、デフォルトで有効 | アドオン（複数の選択肢） | 短期/長期メモリ | 外部 |
-| **マルチエージェント** | `compose.yaml` または `kind: Team` | LangGraph | Crew 定義 | Group chat |
-| **自律実行** | `-a` フラグ + YAML ガードレール | カスタムエージェントループ | 順次プロセス | 会話ループ |
-| **デプロイモード** | 同一 YAML: REPL / デーモン / API | モードごとにカスタム | CLI または Kickoff | カスタム |
-| **モデル切替** | YAML 1 行変更 | LLM クラスを差替 | エージェントごとに設定 | エージェントごとに設定 |
-| **カスタムツール** | 1 ファイル、1 デコレータ | `@tool` デコレータ | `@tool` デコレータ | Function call |
-| **ボットデプロイ** | `--telegram` / `--discord` フラグ | 別途統合 | 別途統合 | 別途統合 |
-| **移行** | `--pydantic-ai` / `--langchain` インポート | N/A | N/A | N/A |
-
-## 機能紹介
-
-### ナレッジとメモリ
+## ナレッジとメモリ
 
 エージェントをディレクトリに向けるだけ。ドキュメントを自動的に抽出、チャンク分割、埋め込み、インデックスします。会話中、エージェントは自動的にインデックスを検索し、見つけた内容を引用します。メモリはセッション間で永続化されます。
 
@@ -164,28 +254,7 @@ initrunner run role.yaml -i   # 初回実行時に自動取り込み、メモリ
 
 [取り込み](docs/core/ingestion.md) · [メモリ](docs/core/memory.md) · [RAG クイックスタート](docs/getting-started/rag-quickstart.md) を参照。
 
-### トリガーとデーモン
-
-任意のエージェントを cron スケジュール、ファイル変更、webhook、ハートビートに反応するデーモンに変換：
-
-```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-```
-
-```bash
-initrunner run role.yaml --daemon   # 停止するまで実行
-```
-
-[トリガー](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md) を参照。
-
-### マルチエージェントオーケストレーション
+## マルチエージェントオーケストレーション
 
 エージェントを連鎖させます。あるエージェントの出力が次のエージェントの入力になります。センスルーティングがメッセージごとに適切なターゲットを自動選択（まずキーワードマッチング、タイブレーク時に単一の LLM 呼び出し）：
 
@@ -207,82 +276,6 @@ spec:
 
 `initrunner compose up compose.yaml` で実行。[パターンガイド](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) を参照。
 
-### 推論とツール管理
-
-エージェントが何をするかだけでなく、どう考えるかを制御：
-
-```yaml
-spec:
-  reasoning:
-    pattern: plan_execute    # 事前に計画を立て、各ステップを実行
-    auto_plan: true
-  tools:
-    - type: think            # 自己批評付き内部スクラッチパッド
-      critique: true
-    - type: todo             # マルチステップ作業用の構造化タスクリスト
-```
-
-4 つの推論パターン：`react`、`todo_driven`、`plan_execute`、`reflexion`。[推論](docs/core/reasoning.md) を参照。
-
-ツールが多いエージェントはコンテキストを浪費し、選択精度が下がります。ツール検索はツールをオンデマンドのキーワード検索の背後に隠します：エージェントは `search_tools` と少数の固定ツールだけを見て、ターンごとに必要なものを発見します。BM25 スコアリング、API 呼び出しなし、通常 60-80% のコンテキストを節約。[ツール検索](docs/core/tool-search.md) を参照。
-
-### 自律実行
-
-通常の実行は 1 ターンで完結します。プロンプトを送り、エージェントが応答して終わり。`-a` を付けるとエージェントは作業を続けます。TODO リストを作り、各項目を順に処理し、すべて完了したら自動的に停止します。予算 -- イテレーション回数、トークン数、時間 -- を設定して暴走を防ぎます。
-
-```yaml
-spec:
-  autonomy:
-    compaction: { enabled: true, threshold: 30 }
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
-```
-
-```bash
-initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
-```
-
-トリガーでも使えます。任意のトリガーに `autonomous: true` を設定すると、デーモンが起動する実行は単一応答ではなくフルループになります。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
-
-## アーキテクチャ
-
-```
-initrunner/
-  agent/        ロールスキーマ、ローダー、エグゼキューター、28 の自己登録ツール
-  runner/       ワンショット、REPL、自律、デーモン実行モード
-  compose/      compose.yaml によるマルチエージェントオーケストレーション
-  triggers/     Cron、ファイルウォッチャー、webhook、ハートビート、Telegram、Discord
-  stores/       ドキュメント + メモリストア（LanceDB、zvec）
-  ingestion/    抽出 -> チャンク分割 -> 埋め込み -> 格納 パイプライン
-  mcp/          MCP サーバー統合とゲートウェイ
-  audit/        追記専用 SQLite 監査証跡
-  services/     共有ビジネスロジック層
-  cli/          Typer + Rich CLI エントリーポイント
-```
-
-エージェントフレームワークとして [PydanticAI](https://ai.pydantic.dev/)、設定バリデーションに Pydantic、ベクトル検索に LanceDB を使用。開発セットアップは [CONTRIBUTING.md](CONTRIBUTING.md) を参照。
-
-## セキュリティ
-
-InitRunner には [initguard](https://github.com/initrunner/initguard) ポリシーエンジンが組み込まれています。エージェントはロールメタデータ（名前、チーム、タグ、作者）からアイデンティティを取得し、すべてのツール呼び出しと委任がポリシーに対してチェックされます：
-
-- **ツールレベル認可**：エージェントはポリシーが許可するツールのみ呼び出し可能
-- **委任ポリシー**：どのエージェントがどのエージェントに委任できるかを制御
-- **コンテンツフィルタリング**：設定可能なコンテンツポリシー付き入力ガードレール
-- **PEP 578 サンドボックス**：危険な操作の監査フック
-- **Docker 分離**：オプションのサンドボックス実行環境
-- **トークン予算とレート制限**：コスト暴走を防止
-- **環境変数スクラブ**：機密キーをサブプロセス環境から除去
-- **追記専用監査証跡**：すべてのツール呼び出しを SQLite に記録
-
-```bash
-export INITRUNNER_POLICY_DIR=./policies
-initrunner run role.yaml                  # ツール呼び出し + 委任をポリシーに対してチェック
-```
-
-[エージェントポリシー](docs/security/agent-policy.md) · [セキュリティ](docs/security/security.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
-
 ## ユーザーインターフェース
 
 <p align="center">
@@ -295,7 +288,7 @@ pip install "initrunner[dashboard]"
 initrunner dashboard                  # http://localhost:8100 を開く
 ```
 
-エージェントの閲覧、プロンプトの実行、コンポジションの視覚的構築、推論パターンの設定、監査証跡のレビュー。ネイティブデスクトップウィンドウとしても利用可能（`initrunner desktop`）。[ダッシュボードドキュメント](docs/interfaces/dashboard.md) を参照。
+エージェントの実行、コンポジションの視覚的構築、監査証跡の詳細確認。ネイティブデスクトップウィンドウとしても利用可能（`initrunner desktop`）。[ダッシュボードドキュメント](docs/interfaces/dashboard.md) を参照。
 
 ## その他の機能
 
@@ -312,6 +305,28 @@ initrunner dashboard                  # http://localhost:8100 を開く
 | **ケイパビリティ**（ネイティブ PydanticAI 機能） | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
 | **オブザーバビリティ**（OpenTelemetry 統合） | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
 | **設定変更**（任意ロールのプロバイダー/モデル切替） | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
+| **推論**（構造化思考パターン） | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
+| **ツール検索**（オンデマンドツール発見） | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
+
+## アーキテクチャ
+
+```
+initrunner/
+  agent/        ロールスキーマ、ローダー、エグゼキューター、28 の自己登録ツール
+  authz.py      InitGuard ABAC ポリシーエンジン統合
+  runner/       ワンショット、REPL、自律、デーモン実行モード
+  compose/      compose.yaml によるマルチエージェントオーケストレーション
+  triggers/     Cron、ファイルウォッチャー、webhook、ハートビート、Telegram、Discord
+  stores/       ドキュメント + メモリストア（LanceDB、zvec）
+  ingestion/    抽出 -> チャンク分割 -> 埋め込み -> 格納 パイプライン
+  mcp/          MCP サーバー統合とゲートウェイ
+  audit/        追記専用 SQLite 監査証跡、シークレットスクラブ付き
+  middleware.py サーバーセキュリティミドルウェア（認証、レート制限、CORS、ヘッダー）
+  services/     共有ビジネスロジック層
+  cli/          Typer + Rich CLI エントリーポイント
+```
+
+エージェントフレームワークとして [PydanticAI](https://ai.pydantic.dev/)、設定バリデーションに Pydantic、ベクトル検索に LanceDB を使用。開発セットアップは [CONTRIBUTING.md](CONTRIBUTING.md) を参照。
 
 ## 配布
 
@@ -328,14 +343,16 @@ initrunner dashboard                  # http://localhost:8100 を開く
 
 | 領域 | 主要ドキュメント |
 |------|---------------|
-| 入門 | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
-| エージェントとツール | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
-| インテリジェンス | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Tool Search](docs/core/tool-search.md) · [Autonomy](docs/orchestration/autonomy.md) |
+| 入門 | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
+| クイックスタート | [RAG](docs/getting-started/rag-quickstart.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
+| エージェントとツール | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| インテリジェンス | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | ナレッジとメモリ | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
+| オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| 運用 | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| セキュリティ | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| 運用 | [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## サンプル
 
