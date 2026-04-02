@@ -36,7 +36,7 @@ class TestExcludeTriggerTypes:
             success=True,
         )
         defaults.update(overrides)
-        logger.log(AuditRecord(**defaults))
+        logger.log(AuditRecord(**defaults))  # type: ignore[arg-type]
 
     def test_no_exclusion_returns_all(self, tmp_path):
         logger = self._make_logger(tmp_path)
@@ -83,9 +83,7 @@ class TestExcludeTriggerTypes:
         self._log_record(
             logger, run_id="top1", trigger_type="compose_run", timestamp="2026-04-01T00:01:00"
         )
-        self._log_record(
-            logger, run_id="top2", trigger_type=None, timestamp="2026-04-01T00:02:00"
-        )
+        self._log_record(logger, run_id="top2", trigger_type=None, timestamp="2026-04-01T00:02:00")
 
         results = logger.query(limit=2, exclude_trigger_types=["compose"])
         assert len(results) == 2

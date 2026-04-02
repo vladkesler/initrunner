@@ -106,13 +106,13 @@ class TestPlanExecuteStrategy:
         state.todo.add("Step 1")
         toolsets = s.build_strategy_toolsets(state)
         assert len(toolsets) == 1
-        assert "finalize_plan" in toolsets[0].tools
+        assert "finalize_plan" in toolsets[0].tools  # type: ignore[union-attr]
 
     def test_finalize_plan_rejects_empty(self):
         s = PlanExecuteStrategy("Continue.")
         state = ReflectionState()
         toolsets = s.build_strategy_toolsets(state)
-        result = toolsets[0].tools["finalize_plan"].function()
+        result = toolsets[0].tools["finalize_plan"].function()  # type: ignore[union-attr]
         assert state.plan_finalized is False
         assert "at least one todo" in result.lower()
 
@@ -121,7 +121,7 @@ class TestPlanExecuteStrategy:
         state = ReflectionState()
         state.todo.add("Step 1")
         toolsets = s.build_strategy_toolsets(state)
-        result = toolsets[0].tools["finalize_plan"].function()
+        result = toolsets[0].tools["finalize_plan"].function()  # type: ignore[union-attr]
         assert state.plan_finalized is True
         assert "finalized" in result.lower()
 
@@ -367,4 +367,5 @@ class TestReflexionDimensions:
         ]
         config = ReasoningConfig(reflection_rounds=2, reflection_dimensions=dims)
         assert config.reflection_rounds == 2
+        assert config.reflection_dimensions is not None
         assert len(config.reflection_dimensions) == 2

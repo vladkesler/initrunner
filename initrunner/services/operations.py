@@ -30,7 +30,7 @@ def query_audit_sync(
     exclude_trigger_types: list[str] | None = None,
 ) -> list[AuditRecord]:
     """Query audit records (sync)."""
-    kwargs = dict(
+    _query_kwargs = dict(
         agent_name=agent_name,
         run_id=run_id,
         trigger_type=trigger_type,
@@ -41,7 +41,7 @@ def query_audit_sync(
         exclude_trigger_types=exclude_trigger_types,
     )
     if audit_logger is not None:
-        return audit_logger.query(**kwargs)
+        return audit_logger.query(**_query_kwargs)  # type: ignore[arg-type]
     from initrunner.audit.logger import DEFAULT_DB_PATH
     from initrunner.audit.logger import AuditLogger as _AuditLogger
 
@@ -49,7 +49,7 @@ def query_audit_sync(
     if not db_path.exists():
         return []
     with _AuditLogger(db_path) as logger:
-        return logger.query(**kwargs)
+        return logger.query(**_query_kwargs)  # type: ignore[arg-type]
 
 
 def audit_prune_sync(

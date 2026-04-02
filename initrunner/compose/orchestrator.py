@@ -545,13 +545,15 @@ class ComposeOrchestrator:
                 success=result.success,
                 error=result.error,
                 trigger_type="compose_run",
-                trigger_metadata=json.dumps({
-                    "compose_name": self._compose.metadata.name,
-                    "compose_run_id": compose_run_id,
-                    "scope": "aggregate",
-                    "final_service_name": result.final_service_name,
-                    "output_mode": result.output_mode,
-                }),
+                trigger_metadata=json.dumps(
+                    {
+                        "compose_name": self._compose.metadata.name,
+                        "compose_run_id": compose_run_id,
+                        "scope": "aggregate",
+                        "final_service_name": result.final_service_name,
+                        "output_mode": result.output_mode,
+                    }
+                ),
             )
         )
 

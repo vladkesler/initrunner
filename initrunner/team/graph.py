@@ -310,11 +310,13 @@ def _log_team_aggregate(
             success=result.success,
             error=result.error,
             trigger_type="team_run",
-            trigger_metadata=json.dumps({
-                "team_name": team.metadata.name,
-                "team_run_id": result.team_run_id,
-                "scope": "aggregate",
-            }),
+            trigger_metadata=json.dumps(
+                {
+                    "team_name": team.metadata.name,
+                    "team_run_id": result.team_run_id,
+                    "scope": "aggregate",
+                }
+            ),
         )
     )
 

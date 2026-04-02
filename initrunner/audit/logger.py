@@ -457,7 +457,7 @@ class AuditLogger:
         exclude_trigger_types: list[str] | None = None,
     ) -> list[AuditRecord]:
         """Query audit records with optional filters, ordered by timestamp DESC."""
-        filter_clauses = [
+        filter_clauses: list[tuple[str, object | None]] = [
             ("agent_name = ?", agent_name),
             ("run_id = ?", run_id),
             ("trigger_type = ?", trigger_type),
@@ -465,15 +465,15 @@ class AuditLogger:
             ("timestamp >= ?", since),
             ("timestamp <= ?", until),
         ]
-        filters = [(clause, val) for clause, val in filter_clauses if val is not None]
+        filters: list[tuple[str, object]] = [
+            (clause, val) for clause, val in filter_clauses if val is not None
+        ]
         where, params = _build_where(filters)
 
         # Exclusion filter for internal trigger types (applied before LIMIT)
         if exclude_trigger_types:
             placeholders = ", ".join("?" for _ in exclude_trigger_types)
-            excl_clause = (
-                f"(trigger_type IS NULL OR trigger_type NOT IN ({placeholders}))"
-            )
+            excl_clause = f"(trigger_type IS NULL OR trigger_type NOT IN ({placeholders}))"
             if where:
                 where += f" AND {excl_clause}"
             else:
