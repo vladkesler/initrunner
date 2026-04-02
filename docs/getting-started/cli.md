@@ -105,6 +105,7 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--resume` | Resume the previous REPL session (requires `memory:` config) |
 | `--dry-run` | Simulate with TestModel (no API calls) |
 | `--daemon` | Run in trigger-driven daemon mode |
+| `--autopilot` | Daemon mode with all triggers autonomous |
 | `--serve` | Serve agent as an OpenAI-compatible API |
 | `--bot TEXT` | Launch as a bot (`telegram` or `discord`) |
 | `--var TEXT` | Variable in `key=value` format (repeatable). Used with Pipeline kind. |

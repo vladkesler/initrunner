@@ -26,6 +26,7 @@ def _validate_flags(
     daemon_mode: bool,
     serve_mode: bool,
     autonomous: bool,
+    autopilot: bool,
     bot: str | None,
     output_format: str,
     no_stream: bool,
@@ -35,10 +36,11 @@ def _validate_flags(
     prompt: str | None,
 ) -> str:
     """Validate mutual exclusivity and format flags. Returns effective output_format."""
-    mode_flags = sum([daemon_mode, serve_mode, autonomous, bool(bot)])
+    mode_flags = sum([daemon_mode or autopilot, serve_mode, autonomous, bool(bot)])
     if mode_flags > 1:
         console.print(
-            "[red]Error:[/red] --daemon, --serve, --bot, and --autonomous are mutually exclusive."
+            "[red]Error:[/red] --daemon, --serve, --bot, --autonomous,"
+            " and --autopilot are mutually exclusive."
         )
         raise typer.Exit(1)
 
@@ -71,9 +73,10 @@ def _validate_flags(
     if sense and not prompt:
         console.print("[red]Error:[/red] --sense requires --prompt (-p).")
         raise typer.Exit(1)
-    if sense and (daemon_mode or serve_mode or bot):
+    if sense and (daemon_mode or autopilot or serve_mode or bot):
         console.print(
-            "[red]Error:[/red] --daemon, --serve, and --bot are not supported with --sense."
+            "[red]Error:[/red] --daemon, --autopilot, --serve,"
+            " and --bot are not supported with --sense."
         )
         raise typer.Exit(1)
 
@@ -85,6 +88,7 @@ def _validate_ephemeral_flags(
     daemon_mode: bool,
     serve_mode: bool,
     autonomous: bool,
+    autopilot: bool,
     dry_run: bool,
     save: Path | None,
     skill_dir: Path | None,
@@ -98,6 +102,8 @@ def _validate_ephemeral_flags(
     invalid = []
     if daemon_mode:
         invalid.append("--daemon")
+    if autopilot:
+        invalid.append("--autopilot")
     if serve_mode:
         invalid.append("--serve")
     if autonomous:
@@ -344,6 +350,8 @@ def _dispatch_daemon(
     no_audit: bool,
     skill_dir: Path | None,
     model: str | None,
+    *,
+    autopilot: bool = False,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
@@ -367,6 +375,7 @@ def _dispatch_daemon(
             memory_store=memory_store,
             role_path=role_file.resolve(),
             extra_skill_dirs=extra_skill_dirs,
+            autopilot=autopilot,
         )
 
 
@@ -485,6 +494,9 @@ def run(
     bot: Annotated[
         str | None, typer.Option("--bot", help="Launch as bot (telegram or discord)")
     ] = None,
+    autopilot: Annotated[
+        bool, typer.Option("--autopilot", help="Daemon mode with all triggers autonomous")
+    ] = False,
     # --- Serve options ---
     host: Annotated[
         str, typer.Option(help="Host to bind to", rich_help_panel="Serve Options")
@@ -592,6 +604,7 @@ def run(
             daemon_mode=daemon_mode,
             serve_mode=serve_mode,
             autonomous=autonomous,
+            autopilot=autopilot,
             dry_run=dry_run,
             save=save,
             skill_dir=skill_dir,
@@ -636,6 +649,7 @@ def run(
         daemon_mode=daemon_mode,
         serve_mode=serve_mode,
         autonomous=autonomous,
+        autopilot=autopilot,
         bot=bot,
         output_format=output_format,
         no_stream=no_stream,
@@ -698,6 +712,8 @@ def run(
             invalid.append("--sense")
         if daemon_mode:
             invalid.append("--daemon")
+        if autopilot:
+            invalid.append("--autopilot")
         if serve_mode:
             invalid.append("--serve")
         if bot:
@@ -708,9 +724,10 @@ def run(
             )
             raise typer.Exit(1)
 
-    if kind not in ("Agent",) and (daemon_mode or serve_mode or bot):
+    if kind not in ("Agent",) and (daemon_mode or autopilot or serve_mode or bot):
         console.print(
-            "[red]Error:[/red] --daemon, --serve, and --bot are only supported for Agent targets."
+            "[red]Error:[/red] --daemon, --autopilot, --serve,"
+            " and --bot are only supported for Agent targets."
         )
         raise typer.Exit(1)
 
@@ -751,8 +768,10 @@ def run(
         )
         return
 
-    if daemon_mode:
-        _dispatch_daemon(role_file, audit_db, no_audit, skill_dir, effective_model)
+    if daemon_mode or autopilot:
+        _dispatch_daemon(
+            role_file, audit_db, no_audit, skill_dir, effective_model, autopilot=autopilot
+        )
         return
 
     # --- Standard agent execution ---

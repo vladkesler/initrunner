@@ -506,11 +506,11 @@ class TestSpinGuard:
         assert mock_execute.call_count == 3
 
 
-class TestConversationalTriggerEarlyExit:
-    """Conversational triggers (telegram/discord) should exit after 1 iteration."""
+class TestConversationalTriggerAutonomous:
+    """Conversational triggers participate in the full autonomous loop."""
 
-    def test_telegram_single_iteration_with_tools(self):
-        """When trigger_type='telegram', only 1 iteration runs even if the agent used tools."""
+    def test_telegram_loops_with_tools(self):
+        """When trigger_type='telegram' and agent uses tools, runs full loop."""
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
@@ -532,19 +532,19 @@ class TestConversationalTriggerEarlyExit:
             patch("initrunner.runner.autonomous._display_iteration_result"),
             patch("initrunner.runner.autonomous._display_autonomous_summary"),
         ):
-            role = _make_role(max_iterations=10)
+            role = _make_role(max_iterations=3)
             agent = MagicMock()
 
             auto_result = run_autonomous(
                 agent, role, "what is the weather?", trigger_type="telegram"
             )
 
-        assert auto_result.final_status == "completed"
-        assert auto_result.iteration_count == 1
-        assert mock_execute.call_count == 1
+        assert auto_result.final_status == "max_iterations"
+        assert auto_result.iteration_count == 3
+        assert mock_execute.call_count == 3
 
-    def test_discord_single_iteration(self):
-        """Discord trigger also exits after 1 iteration."""
+    def test_discord_spin_guard_terminates(self):
+        """Discord trigger with no tools hits spin guard."""
         from unittest.mock import MagicMock, patch
 
         from initrunner.runner.autonomous import run_autonomous
@@ -571,9 +571,9 @@ class TestConversationalTriggerEarlyExit:
 
             auto_result = run_autonomous(agent, role, "hello", trigger_type="discord")
 
-        assert auto_result.final_status == "completed"
-        assert auto_result.iteration_count == 1
-        assert mock_execute.call_count == 1
+        assert auto_result.final_status == "blocked"
+        assert auto_result.iteration_count == 2
+        assert mock_execute.call_count == 2
 
     def test_non_conversational_trigger_still_loops(self):
         """Non-conversational triggers (e.g. cron) should NOT early-exit."""

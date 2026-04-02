@@ -244,11 +244,6 @@ def run_autonomous(
                 error_msg = result.error
                 break
 
-            # Conversational triggers: single iteration is sufficient
-            if trigger_type in CONVERSATIONAL_TRIGGER_TYPES:
-                final_status = "completed"
-                break
-
             # Spin guard: stop if no tool calls for N consecutive iterations
             if result.tool_calls == 0:
                 consecutive_no_tool_calls += 1

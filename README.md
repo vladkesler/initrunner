@@ -151,7 +151,7 @@ spec:
 
 Four reasoning strategies control how the agent thinks through multi-step work: `react` (default), `todo_driven`, `plan_execute`, and `reflexion`. Budget enforcement, iteration limits, timeout, and spin guards (consecutive turns with no tool calls) keep autonomous runs bounded. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
 
-**Daemon:** Add triggers and switch to `--daemon`. The agent runs continuously, reacting to cron schedules, file changes, webhooks, or heartbeats. Set `autonomous: true` on a trigger and that trigger runs the full autonomous loop instead of a single response.
+**Daemon:** Add triggers and switch to `--daemon`. The agent runs continuously, reacting to cron schedules, file changes, webhooks, Telegram messages, or Discord mentions. Each event fires a single prompt-response cycle.
 
 ```yaml
 spec:
@@ -159,17 +159,45 @@ spec:
     - type: cron
       schedule: "0 9 * * 1"
       prompt: "Generate the weekly status report."
-      autonomous: true
     - type: file_watch
       paths: [./src]
       prompt_template: "File changed: {path}. Review it."
+    - type: telegram
+      allowed_user_ids: [123456789]
 ```
 
 ```bash
-initrunner run role.yaml --daemon   # runs until stopped
+initrunner run role.yaml --daemon   # runs until Ctrl+C
 ```
 
-Six trigger types: cron, webhook, file_watch, heartbeat, telegram, and discord. The daemon hot-reloads role changes without restarting, enforces daily and lifetime token budgets, and runs up to 4 triggers concurrently. Agents can self-schedule follow-up tasks within a run. Telegram and Discord triggers always respond directly to the user (they ignore `autonomous: true` since a chat conversation expects immediate replies). See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
+Six trigger types: cron, webhook, file_watch, heartbeat, telegram, and discord. The daemon hot-reloads role changes without restarting, enforces daily and lifetime token budgets, and runs up to 4 triggers concurrently. See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
+
+**Autopilot:** A daemon responds. An autopilot *thinks, then* responds. Someone messages your Telegram bot "find me flights from NYC to London next week" -- in daemon mode, you get one shot at an answer. In autopilot, the agent searches the web, compares options, checks dates, and sends back something worth reading.
+
+```bash
+initrunner run role.yaml --autopilot   # every trigger gets the full autonomous loop
+```
+
+`--autopilot` is `--daemon` where every trigger runs multi-step autonomous execution instead of single-shot. Same guardrails as `-a`: iteration limits, token budgets, spin guards, `finish_task`. The agent plans, uses tools, reflects, and replies when it's done.
+
+You can also be selective. Set `autonomous: true` on individual triggers and leave the rest as quick single-shot responses.
+
+```yaml
+spec:
+  triggers:
+    - type: telegram
+      autonomous: true          # think, research, then reply
+    - type: cron
+      schedule: "0 9 * * 1"
+      prompt: "Generate the weekly status report."
+      autonomous: true          # plan, gather data, write, review
+    - type: file_watch
+      paths: [./src]
+      prompt_template: "File changed: {path}. Review it."
+      # autonomous: false (default) -- quick single response
+```
+
+Agents can self-schedule follow-up tasks within a run. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
 
 **Memory carries across everything.** Episodic, semantic, and procedural memory persist across interactive sessions, autonomous runs, and daemon triggers. After each session, consolidation extracts durable facts from episode history using an LLM. The agent doesn't just run. It learns. See [Memory](docs/core/memory.md).
 

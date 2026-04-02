@@ -45,22 +45,22 @@ class TestMutualExclusivity:
     def test_daemon_and_serve_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--daemon", "--serve"])
         assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+        assert "exclusive" in result.output
 
     def test_daemon_and_autonomous_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--daemon", "-a", "-p", "hi"])
         assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+        assert "exclusive" in result.output
 
     def test_serve_and_bot_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--serve", "--bot", "telegram"])
         assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+        assert "exclusive" in result.output
 
     def test_bot_and_autonomous_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "telegram", "-a", "-p", "hi"])
         assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+        assert "exclusive" in result.output
 
 
 class TestBotValidation:
@@ -131,6 +131,47 @@ class TestDaemonFlag:
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once()
+        # autopilot=False when using plain --daemon
+        assert mock_dispatch.call_args[1].get("autopilot") is False
+
+
+class TestAutopilotFlag:
+    def test_autopilot_dispatches_to_daemon(self, agent_yaml):
+        with patch("initrunner.cli.run_cmd._dispatch_daemon") as mock_dispatch:
+            result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot"])
+
+        assert result.exit_code == 0
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args[1]["autopilot"] is True
+
+    def test_autopilot_and_serve_exclusive(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--serve"])
+        assert result.exit_code == 1
+        assert "exclusive" in result.output
+
+    def test_autopilot_and_bot_exclusive(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--bot", "telegram"])
+        assert result.exit_code == 1
+        assert "exclusive" in result.output
+
+    def test_autopilot_and_autonomous_exclusive(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "-a", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "exclusive" in result.output
+
+    def test_autopilot_with_daemon_is_redundant_safe(self, agent_yaml):
+        """--autopilot --daemon should not error (redundant but valid)."""
+        with patch("initrunner.cli.run_cmd._dispatch_daemon") as mock_dispatch:
+            result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--daemon"])
+
+        assert result.exit_code == 0
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args[1]["autopilot"] is True
+
+    def test_autopilot_rejected_in_ephemeral_mode(self):
+        result = runner.invoke(app, ["run", "--autopilot"])
+        assert result.exit_code == 1
+        assert "--autopilot" in result.output
 
 
 class TestServeFlag:
