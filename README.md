@@ -25,7 +25,7 @@
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-YAML-first AI agent platform. One file defines the agent. The same file runs as an interactive chat, a one-shot command, an autonomous worker, or a production daemon. 12 security layers in the box. Install with `curl` or `pip`.
+YAML-first AI agent platform. Define an agent's role, tools, knowledge base, and memory in one file. Run it as an interactive chat, a one-shot command, an autonomous daemon with cron/webhook/file-watch triggers, a Telegram/Discord bot, or an OpenAI-compatible API. RAG and persistent memory work out of the box. Manage everything from a web dashboard or native desktop app. Install with `curl` or `pip`, no containers required.
 
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory

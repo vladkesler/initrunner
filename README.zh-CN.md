@@ -27,7 +27,7 @@
 
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
 
-YAML 优先的 AI Agent 平台。一个文件定义 Agent。同一个文件可作为交互式聊天、一次性命令、自主 Worker 或生产守护进程运行。内置 12 层安全防护。使用 `curl` 或 `pip` 安装。
+YAML 优先的 AI Agent 平台。在一个文件中定义 Agent 的角色、工具、知识库和记忆。可作为交互式聊天、一次性命令、带 cron/webhook/文件监听触发器的自主守护进程、Telegram/Discord 机器人或 OpenAI 兼容 API 运行。RAG 和持久记忆开箱即用。通过 Web 仪表盘或原生桌面应用管理一切。使用 `curl` 或 `pip` 安装，无需容器。
 
 ```bash
 initrunner run helpdesk -i                                    # 文档问答，支持 RAG + 记忆
