@@ -346,7 +346,10 @@ class TestPassThroughTools:
         role.spec.security.tools = MagicMock()
         agent = MagicMock()
         return _AgentEntry(
-            name=name, description=f"{name} agent", role=role, agent=agent,
+            name=name,
+            description=f"{name} agent",
+            role=role,
+            agent=agent,
             role_path=Path(f"/tmp/{name}.yaml"),
         )
 
