@@ -27,7 +27,7 @@
 
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
 
-YAML 优先的 AI Agent 平台。在一个文件中定义 Agent 的角色、工具、知识库和记忆。可作为交互式聊天、一次性命令、带 cron/webhook/文件监听触发器的自动守护进程、Telegram/Discord 机器人或 OpenAI 兼容 API 运行。RAG 和持久化记忆开箱即用。通过 Web 仪表盘或原生桌面应用管理一切。使用 `curl` 或 `pip` 安装，无需容器。
+YAML 优先的 AI Agent 平台。在一个文件中定义 Agent 的角色、工具、知识库和记忆。可作为交互式聊天、一次性命令、自主 Agent、带 cron/webhook/文件监听触发器的守护进程、Telegram/Discord 机器人或 OpenAI 兼容 API 运行。RAG 和持久化记忆开箱即用。通过 Web 仪表盘或原生桌面应用管理一切。使用 `curl` 或 `pip` 安装，无需容器。
 
 ```bash
 initrunner run helpdesk -i                                    # 文档问答，支持 RAG + 记忆
@@ -123,7 +123,7 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 
 一个 YAML 文件*就是* Agent。工具、知识源、记忆、触发器、模型、护栏，全部声明在一处。你可以阅读它，立即理解 Agent 做什么。你可以 diff 它，在 PR 中审查它，交给队友。当你想从 GPT 切换到 Claude，只需改一行。当你想添加 RAG，加一个 `ingest:` 部分。
 
-同一个文件可以作为交互式聊天（`-i`）、一次性命令（`-p "..."`）、cron/webhook/文件监听守护进程（`--daemon`）或 OpenAI 兼容 API（`--serve`）运行。你不需要预先选择部署模式然后围绕它构建。你在运行时用一个标志选择。
+同一个文件可以作为交互式聊天（`-i`）、一次性命令（`-p "..."`）、自主 Agent（`-a`）、cron/webhook/文件监听守护进程（`--daemon`）或 OpenAI 兼容 API（`--serve`）运行。你不需要预先选择部署模式然后围绕它构建。你在运行时用一个标志选择。
 
 实际上这意味着：你的 Agent 配置和代码一起存在版本控制中。新团队成员阅读 YAML 就能理解 Agent 做什么。你在 PR 中审查 Agent 变更，就像审查其他配置一样。你交互式原型的 Agent 就是你部署为守护进程或 API 的那个。同一个文件，不同的标志。
 
@@ -135,6 +135,7 @@ initrunner run reviewer.yaml -p "Review the latest commit"
 | **RAG** | `--ingest ./docs/`（一个标志） | Loaders + splitters + vectorstore | RAG 工具或自定义 | 外部配置 |
 | **记忆** | 内置，默认开启 | 附加组件（多种选项） | 短期/长期记忆 | 外部 |
 | **多 Agent** | `compose.yaml` 或 `kind: Team` | LangGraph | Crew 定义 | Group chat |
+| **自主执行** | `-a` 标志 + YAML 护栏 | 自定义 Agent 循环 | 顺序流程 | 对话循环 |
 | **部署模式** | 同一 YAML: REPL / 守护进程 / API | 每种模式自定义 | CLI 或 Kickoff | 自定义 |
 | **模型切换** | 改 1 行 YAML | 替换 LLM 类 | 每个 Agent 配置 | 每个 Agent 配置 |
 | **自定义工具** | 1 个文件，1 个装饰器 | `@tool` 装饰器 | `@tool` 装饰器 | Function call |
@@ -224,6 +225,25 @@ spec:
 四种推理模式：`react`、`todo_driven`、`plan_execute` 和 `reflexion`。查看 [推理](docs/core/reasoning.md)。
 
 工具多的 Agent 会浪费上下文并选择更差。工具搜索将工具隐藏在按需关键词发现之后：Agent 只看到 `search_tools` 和几个固定工具，然后按需发现每轮需要的。BM25 评分，无 API 调用，通常节省 60-80% 上下文。查看 [工具搜索](docs/core/tool-search.md)。
+
+### 自主执行
+
+大多数运行只有一轮：你发出提示，Agent 做出回应。加上 `-a`，Agent 会持续工作。它建立待办列表，逐项完成，全部做完后自动停止。你设定预算 -- 迭代次数、token 数量和时间 -- 防止失控。
+
+```yaml
+spec:
+  autonomy:
+    compaction: { enabled: true, threshold: 30 }
+  guardrails:
+    max_iterations: 15
+    autonomous_token_budget: 100000
+```
+
+```bash
+initrunner run role.yaml -a -p "Scan this repo for security issues and file a report"
+```
+
+也支持触发器：在任意触发器上设置 `autonomous: true`，守护进程触发的运行就会使用完整循环而非单次响应。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
 
 ## 架构
 
