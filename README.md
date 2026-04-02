@@ -140,9 +140,7 @@ What this gets you in practice: your agent config lives in version control next 
 | **Bot deployment** | `--telegram` / `--discord` flag | Separate integration | Separate integration | Separate integration |
 | **Migration** | `--pydantic-ai` / `--langchain` import | N/A | N/A | N/A |
 
-## What You Get
-
-### Knowledge and memory
+## Knowledge and memory
 
 Point your agent at a directory. It extracts, chunks, embeds, and indexes your documents. During conversation, the agent searches the index automatically and cites what it finds. Memory persists across sessions.
 
@@ -162,7 +160,7 @@ initrunner run role.yaml -i   # auto-ingests on first run, memory + search ready
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
-### Triggers and daemons
+## Triggers and daemons
 
 Turn any agent into a daemon that reacts to cron schedules, file changes, webhooks, or heartbeats:
 
@@ -183,7 +181,7 @@ initrunner run role.yaml --daemon   # runs until stopped
 
 See [Triggers](docs/core/triggers.md) · [Telegram](docs/getting-started/telegram.md) · [Discord](docs/getting-started/discord.md).
 
-### Multi-agent orchestration
+## Multi-agent orchestration
 
 Chain agents together. One agent's output feeds into the next. Sense routing auto-picks the right target per message (keyword matching first, single LLM call to break ties):
 
@@ -205,7 +203,7 @@ spec:
 
 Run with `initrunner compose up compose.yaml`. See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md).
 
-### Reasoning and tool management
+## Reasoning and tool management
 
 Control how your agent thinks, not just what it does:
 
@@ -224,7 +222,7 @@ Four reasoning patterns: `react`, `todo_driven`, `plan_execute`, and `reflexion`
 
 Agents with many tools waste context and pick worse. Tool search hides tools behind on-demand keyword discovery: the agent sees only `search_tools` and a few pinned tools, then discovers what it needs per-turn. BM25 scoring, no API calls, typically saves 60-80% context. See [Tool Search](docs/core/tool-search.md).
 
-### Autonomous execution
+## Autonomous execution
 
 Most runs are one turn: you prompt, the agent responds. Add `-a` and the agent keeps going. It builds a todo list, works through each item, and finishes when everything is done. You set the budget -- iterations, tokens, and time -- so it can't run away.
 
@@ -293,9 +291,9 @@ pip install "initrunner[dashboard]"
 initrunner dashboard                  # opens http://localhost:8100
 ```
 
-Browse agents, run prompts, build compositions visually, configure reasoning patterns, and review audit trails. Also available as a native desktop window (`initrunner desktop`). See [Dashboard docs](docs/interfaces/dashboard.md).
+Run agents, build compositions visually, and dig through audit trails. Also available as a native desktop window (`initrunner desktop`). See [Dashboard docs](docs/interfaces/dashboard.md).
 
-## More Capabilities
+## Everything else
 
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
@@ -326,14 +324,16 @@ Browse agents, run prompts, build compositions visually, configure reasoning pat
 
 | Area | Key docs |
 |------|----------|
-| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
-| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Structured Output](docs/core/structured-output.md) · [Providers](docs/configuration/providers.md) |
-| Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Tool Search](docs/core/tool-search.md) · [Autonomy](docs/orchestration/autonomy.md) |
+| Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
+| Quickstarts | [RAG](docs/getting-started/rag-quickstart.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
+| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Autonomy](docs/orchestration/autonomy.md) · [Triggers](docs/core/triggers.md) |
+| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Operations | [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) · [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Security | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| Operations | [Audit](docs/core/audit.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples
 
