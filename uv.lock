@@ -1553,6 +1553,7 @@ source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "croniter" },
+    { name = "fastmcp" },
     { name = "initguard" },
     { name = "jinja2" },
     { name = "lancedb" },
@@ -1675,6 +1676,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'desktop'", specifier = ">=0.135.2" },
     { name = "fastapi", marker = "extra == 'recommended'", specifier = ">=0.135.2" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
+    { name = "fastmcp", specifier = ">=3.2.0" },
     { name = "initguard", specifier = ">=2026.3.3" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "lancedb", specifier = ">=0.29.2" },

@@ -16,6 +16,7 @@ from initrunner.mcp.gateway import (
     _AgentEntry,
     _make_tool_name,
     _register_agent_tool,
+    _register_pass_through_tools,
     build_mcp_gateway,
     run_mcp_gateway,
 )
@@ -315,3 +316,146 @@ class TestMcpServeCli:
         # Verify transport default
         call_kwargs = mock_run.call_args
         assert call_kwargs[1]["transport"] == "stdio"
+
+
+# ---------------------------------------------------------------------------
+# TestPassThroughTools
+# ---------------------------------------------------------------------------
+
+
+class TestPassThroughTools:
+    """Tests for _register_pass_through_tools with fastmcp 3.x APIs."""
+
+    def _make_entry_with_mcp(
+        self, name: str, *, tool_filter=None, tool_exclude=None, tool_prefix=None
+    ) -> _AgentEntry:
+        from initrunner.agent.schema.tools import McpToolConfig
+
+        cfg = McpToolConfig(
+            type="mcp",
+            transport="stdio",
+            command="echo",
+            tool_filter=tool_filter or [],
+            tool_exclude=tool_exclude or [],
+            tool_prefix=tool_prefix,
+        )
+        role = MagicMock()
+        role.metadata.name = name
+        role.metadata.description = f"{name} agent"
+        role.spec.tools = [cfg]
+        role.spec.security.tools = MagicMock()
+        agent = MagicMock()
+        return _AgentEntry(
+            name=name,
+            description=f"{name} agent",
+            role=role,
+            agent=agent,
+            role_path=Path(f"/tmp/{name}.yaml"),
+        )
+
+    @patch("initrunner.mcp.gateway._build_pass_through_transport")
+    def test_basic_mount(self, mock_transport):
+        """Pass-through with no filter/exclude mounts a proxy with agent namespace."""
+        from fastmcp import FastMCP
+
+        source = FastMCP("source")
+
+        @source.tool
+        def greet(name: str) -> str:
+            return f"hi {name}"
+
+        mock_transport.return_value = source
+
+        parent = FastMCP("parent")
+        entries = [self._make_entry_with_mcp("bot")]
+        _register_pass_through_tools(parent, entries)
+
+        tools = asyncio.run(parent.list_tools())
+        tool_names = {t.name for t in tools}
+        assert "bot_greet" in tool_names
+
+    @patch("initrunner.mcp.gateway._build_pass_through_transport")
+    def test_tool_filter_allowlist(self, mock_transport):
+        """Only tools in tool_filter should be visible."""
+        from fastmcp import FastMCP
+
+        source = FastMCP("source")
+
+        @source.tool
+        def allowed_tool() -> str:
+            return "ok"
+
+        @source.tool
+        def hidden_tool() -> str:
+            return "nope"
+
+        mock_transport.return_value = source
+
+        parent = FastMCP("parent")
+        entries = [self._make_entry_with_mcp("bot", tool_filter=["allowed_tool"])]
+        _register_pass_through_tools(parent, entries)
+
+        tools = asyncio.run(parent.list_tools())
+        tool_names = {t.name for t in tools}
+        assert "bot_allowed_tool" in tool_names
+        assert "bot_hidden_tool" not in tool_names
+
+    @patch("initrunner.mcp.gateway._build_pass_through_transport")
+    def test_tool_exclude_blocklist(self, mock_transport):
+        """Tools in tool_exclude should be hidden."""
+        from fastmcp import FastMCP
+
+        source = FastMCP("source")
+
+        @source.tool
+        def keep_me() -> str:
+            return "ok"
+
+        @source.tool
+        def drop_me() -> str:
+            return "nope"
+
+        mock_transport.return_value = source
+
+        parent = FastMCP("parent")
+        entries = [self._make_entry_with_mcp("bot", tool_exclude=["drop_me"])]
+        _register_pass_through_tools(parent, entries)
+
+        tools = asyncio.run(parent.list_tools())
+        tool_names = {t.name for t in tools}
+        assert "bot_keep_me" in tool_names
+        assert "bot_drop_me" not in tool_names
+
+    @patch("initrunner.mcp.gateway._build_pass_through_transport")
+    def test_tool_prefix(self, mock_transport):
+        """Custom tool_prefix is appended to the agent namespace."""
+        from fastmcp import FastMCP
+
+        source = FastMCP("source")
+
+        @source.tool
+        def ping() -> str:
+            return "pong"
+
+        mock_transport.return_value = source
+
+        parent = FastMCP("parent")
+        entries = [self._make_entry_with_mcp("bot", tool_prefix="custom_")]
+        _register_pass_through_tools(parent, entries)
+
+        tools = asyncio.run(parent.list_tools())
+        tool_names = {t.name for t in tools}
+        assert "bot_custom_ping" in tool_names
+
+    @patch("initrunner.mcp.gateway._build_pass_through_transport")
+    def test_no_mcp_configs_skipped(self, mock_transport):
+        """Entries without MCP tool configs are silently skipped."""
+        from fastmcp import FastMCP
+
+        parent = FastMCP("parent")
+        entry = _make_entry("plain")  # no MCP tools
+        _register_pass_through_tools(parent, [entry])
+
+        mock_transport.assert_not_called()
+        tools = asyncio.run(parent.list_tools())
+        assert len(tools) == 0
