@@ -168,6 +168,21 @@ class TestStrategyToolsets:
         assert s.build_strategy_toolsets(state) == []
 
 
+class TestBudgetInContinuationPrompt:
+    def test_continuation_prompt_includes_budget(self):
+        s = ReactStrategy("Keep going.")
+        state = ReflectionState(
+            iterations_completed=4,
+            max_iterations=10,
+            tokens_consumed=30000,
+            token_budget=100000,
+        )
+        prompt = s.build_continuation_prompt(state)
+        assert "BUDGET:" in prompt
+        assert "Iteration: 4/10 (40%)" in prompt
+        assert "Tokens: 30,000/100,000 (30%)" in prompt
+
+
 class TestResolveStrategy:
     def _make_role(self, tools=None, autonomy=None, reasoning=None):
         from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata

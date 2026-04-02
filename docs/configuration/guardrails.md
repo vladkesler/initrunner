@@ -31,6 +31,21 @@ spec:
 | `session_token_budget` | int | *null* | Cumulative token budget for REPL session (warns at 80%) |
 | `daemon_token_budget` | int | *null* | Lifetime token budget for daemon process |
 | `daemon_daily_token_budget` | int | *null* | Daily token budget for daemon (resets at UTC midnight) |
+| `max_iterations` | int | `10` | Maximum iterations in autonomous mode |
+| `autonomous_token_budget` | int | *null* | Cumulative token budget for autonomous run |
+| `autonomous_timeout_seconds` | int | *null* | Wall-clock timeout for autonomous run |
+
+## Autonomous guardrails
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_iterations` | int | `10` | Maximum iterations in autonomous mode |
+| `autonomous_token_budget` | int | *null* | Cumulative token budget across all autonomous iterations |
+| `autonomous_timeout_seconds` | int | *null* | Wall-clock timeout for the entire autonomous run |
+
+In autonomous mode, the agent sees its remaining budget in every continuation prompt (iterations 2+). A `BUDGET:` block is appended showing consumed iterations, tokens, and elapsed time with percentages. Lines for token budget and timeout only appear when those limits are configured. This lets the agent make informed decisions about prioritization and wrap-up.
+
+See [Autonomous Execution](../orchestration/autonomy.md) for the full loop lifecycle.
 
 ## Token budgets
 

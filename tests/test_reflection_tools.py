@@ -74,6 +74,39 @@ class TestFormatReflectionState:
         result = format_reflection_state(state)
         assert "[-]" in result
 
+    def test_budget_block_absent_when_not_autonomous(self):
+        state = ReflectionState()
+        result = format_reflection_state(state)
+        assert "BUDGET:" not in result
+
+    def test_budget_block_iteration_only(self):
+        state = ReflectionState(iterations_completed=3, max_iterations=5)
+        result = format_reflection_state(state)
+        assert "BUDGET:" in result
+        assert "Iteration: 3/5 (60%)" in result
+        assert "Tokens:" not in result
+        assert "Time:" not in result
+
+    def test_budget_block_full(self):
+        state = ReflectionState(
+            iterations_completed=7,
+            max_iterations=10,
+            tokens_consumed=42000,
+            token_budget=50000,
+            elapsed_seconds=245.7,
+            timeout_seconds=300,
+        )
+        result = format_reflection_state(state)
+        assert "Iteration: 7/10 (70%)" in result
+        assert "Tokens: 42,000/50,000 (84%)" in result
+        assert "Time: 245s/300s (81%)" in result
+
+    def test_budget_percentages_truncate(self):
+        state = ReflectionState(iterations_completed=1, max_iterations=3)
+        result = format_reflection_state(state)
+        # 1/3 = 33.33...% should truncate to 33%, not round to 34%
+        assert "(33%)" in result
+
 
 class TestTodoList:
     def test_add_and_get(self):

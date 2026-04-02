@@ -96,7 +96,7 @@ The think tool works in both single-shot and autonomous mode. In single-shot, th
 
 ## Todo Tool
 
-Priority-aware task management with dependency resolution. Operates on the agent's unified `ReflectionState`, giving a single source of truth for progress.
+Priority-aware task management with dependency resolution. Operates on the agent's unified `ReflectionState`, giving a single source of truth for progress and budget awareness.
 
 ### Configuration
 
@@ -256,6 +256,27 @@ spec:
 | `auto_plan` | bool | `false` | Prepend "create a todo list" to first turn |
 | `reflection_rounds` | int | `0` | Number of self-critique rounds after completion |
 | `auto_detect` | bool | `true` | Infer pattern from tool/autonomy config |
+
+### Budget-aware continuation prompts
+
+All strategies inject a `BUDGET:` block into the continuation prompt (iterations 2+) so the agent knows how much runway it has left. The autonomous runner populates `ReflectionState` with budget fields after each iteration, and `format_reflection_state()` renders them:
+
+```
+CURRENT STATUS:
+Todo List:
+  [x] 8c753a3f [high] Research Python
+  [>] a1b2c3d4 [high] Research Rust
+  [ ] e5f6g7h8 [medium] Write comparison
+
+BUDGET:
+- Iteration: 2/10 (20%)
+- Tokens: 12,000/50,000 (24%)
+- Time: 30s/300s (10%)
+```
+
+The iteration line always appears in autonomous mode. Token and time lines only appear when `autonomous_token_budget` or `autonomous_timeout_seconds` are configured in guardrails. Percentages are truncated to whole integers.
+
+This lets the agent make informed decisions: skip low-priority items when iterations are running out, compress remaining work when the token budget is tight, or wrap up proactively before hitting a hard limit.
 
 ### Patterns
 

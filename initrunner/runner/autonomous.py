@@ -212,6 +212,15 @@ def run_autonomous(
             cumulative_tokens += result.total_tokens
             message_history = new_messages
 
+            # Update budget state so the next continuation prompt reflects
+            # completed work (iterations, tokens, elapsed time).
+            reflection_state.iterations_completed = iteration
+            reflection_state.max_iterations = max_iterations
+            reflection_state.tokens_consumed = cumulative_tokens
+            reflection_state.token_budget = token_budget
+            reflection_state.elapsed_seconds = time.monotonic() - loop_start
+            reflection_state.timeout_seconds = autonomous_timeout
+
             _display_iteration_result(
                 result, iteration, max_iterations, cumulative_tokens, token_budget
             )
