@@ -295,6 +295,8 @@ initrunner run role.yaml --daemon --no-audit
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
+| `--daemon` | `bool` | `false` | Run in daemon mode with triggers. |
+| `--autopilot` | `bool` | `false` | Daemon mode with all triggers autonomous. |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 
@@ -303,9 +305,10 @@ initrunner run role.yaml --daemon --no-audit
 1. The role is loaded and the agent is built.
 2. All triggers are started in daemon threads via `TriggerDispatcher`.
 3. When a trigger fires, the prompt is sent to the agent.
-4. **Messaging triggers** (Telegram, Discord) always use the direct execution path — `autonomous: true` on the trigger config is ignored. The agent's reply is sent back to the originating channel immediately, *before* display, sinks, and episode capture run.
-5. **Other triggers** (cron, file watch, webhook) use the autonomous loop when `autonomous: true` is set. The result is displayed and dispatched to sinks after the run completes.
-6. The daemon continues until interrupted.
+4. **All trigger types** (cron, file watch, webhook, Telegram, Discord, heartbeat) use the autonomous loop when `autonomous: true` is set on the trigger config. The `--autopilot` flag forces all triggers into autonomous mode regardless of per-trigger config.
+5. For **messaging triggers** (Telegram, Discord), the final output of the autonomous run is sent back to the originating channel. For **other triggers**, the result is displayed and dispatched to sinks.
+6. Triggers without `autonomous: true` (and not in `--autopilot` mode) use direct single-shot execution.
+7. The daemon continues until interrupted.
 
 ### Hot-Reload
 
@@ -399,12 +402,13 @@ triggers:
 |-------|------|---------|-------------|
 | `token_env` | `str` | `"TELEGRAM_BOT_TOKEN"` | Environment variable holding the bot token. |
 | `allowed_users` | `list[str]` | `[]` | Telegram usernames allowed to interact. Empty list allows all users. |
-| `allowed_user_ids` | `list[int]` | `[]` | Telegram user IDs allowed to interact. Empty list allows all users. Prefer over `allowed_users` — usernames are mutable, IDs are not. |
+| `allowed_user_ids` | `list[int]` | `[]` | Telegram user IDs allowed to interact. Empty list allows all users. Prefer over `allowed_users` -- usernames are mutable, IDs are not. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
+| `autonomous` | `bool` | `false` | Use the autonomous loop for each message (multi-step research before replying). |
 
 ### Behavior
 
-- Uses long-polling (outbound HTTPS) — no ports opened, no webhooks to configure.
+- Uses long-polling (outbound HTTPS) -- no ports opened, no webhooks to configure.
 - Only text messages are processed (commands like `/start` are ignored).
 - When `allowed_users` or `allowed_user_ids` is set, messages from unmatched users are silently dropped. Access is granted if the user matches **either** field (union semantics).
 - The agent's response is sent back to the originating chat, automatically chunked to Telegram's 4096-character message limit.
@@ -448,10 +452,11 @@ triggers:
 | `allowed_roles` | `list[str]` | `[]` | Role names required to interact. Empty list allows all users. DMs are denied when only roles are configured. |
 | `allowed_user_ids` | `list[str]` | `[]` | Discord user IDs allowed to interact. Works in both guild channels and DMs. |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's message text. |
+| `autonomous` | `bool` | `false` | Use the autonomous loop for each message (multi-step research before replying). |
 
 ### Behavior
 
-- Uses WebSocket client connection — outbound only, no ports opened.
+- Uses WebSocket client connection -- outbound only, no ports opened.
 - Responds to **DMs** and **@mentions** only (not every message in every channel).
 - When only `allowed_roles` is set, **DMs are denied** (DMs have no role context). When `allowed_user_ids` is also set, a user ID match grants DM access.
 - `channel_ids` restricts guild channels only — DMs are not affected by the channel filter.

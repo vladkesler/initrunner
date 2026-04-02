@@ -158,20 +158,21 @@ class TestReplyFnInDaemon:
         # reply_fn was attempted
         reply_fn.assert_called_once_with("Agent output")
 
-    @patch("initrunner.runner.daemon.execute_run")
-    def test_reply_fn_called_in_conversational_mode(self, mock_execute):
-        """Conversational triggers (telegram) skip autonomous and use execute_run."""
+    @patch("initrunner.runner.daemon.run_autonomous")
+    def test_reply_fn_called_in_conversational_autonomous(self, mock_autonomous):
+        """Conversational triggers (telegram) with autonomous use run_autonomous."""
         from initrunner.agent.schema.autonomy import AutonomyConfig
         from initrunner.runner.daemon import DaemonRunner
         from initrunner.triggers.base import register_conversational_trigger_type
 
         register_conversational_trigger_type("telegram")
 
-        mock_result = MagicMock(spec=RunResult)
-        mock_result.output = "Here is the detailed answer."
-        mock_result.total_tokens = 200
-        mock_result.success = True
-        mock_execute.return_value = (mock_result, None)
+        mock_auto_result = MagicMock()
+        mock_auto_result.final_output = "Here is the detailed answer."
+        mock_auto_result.final_messages = None
+        mock_auto_result.iterations = [MagicMock(output="Here is the detailed answer.")]
+        mock_auto_result.total_tokens = 200
+        mock_autonomous.return_value = mock_auto_result
 
         reply_fn = MagicMock()
         event = TriggerEvent(
@@ -193,6 +194,7 @@ class TestReplyFnInDaemon:
         runner._autonomous_trigger_types = {"telegram"}
         runner._on_trigger_inner(event)
 
+        mock_autonomous.assert_called_once()
         reply_fn.assert_called_once_with("Here is the detailed answer.")
 
     @patch("initrunner.runner.daemon.run_autonomous")
@@ -235,20 +237,21 @@ class TestReplyFnInDaemon:
 
         reply_fn.assert_called_once_with("Step 1 done.\n\nStep 2 done.")
 
-    @patch("initrunner.runner.daemon.execute_run")
-    def test_reply_fn_not_called_when_output_empty(self, mock_execute):
-        """Don't call reply_fn when output is empty."""
+    @patch("initrunner.runner.daemon.run_autonomous")
+    def test_reply_fn_not_called_when_output_empty(self, mock_autonomous):
+        """Don't call reply_fn when autonomous output is empty."""
         from initrunner.agent.schema.autonomy import AutonomyConfig
         from initrunner.runner.daemon import DaemonRunner
         from initrunner.triggers.base import register_conversational_trigger_type
 
         register_conversational_trigger_type("telegram")
 
-        mock_result = MagicMock(spec=RunResult)
-        mock_result.output = ""
-        mock_result.total_tokens = 50
-        mock_result.success = True
-        mock_execute.return_value = (mock_result, None)
+        mock_auto_result = MagicMock()
+        mock_auto_result.final_output = ""
+        mock_auto_result.final_messages = None
+        mock_auto_result.iterations = [MagicMock(output="")]
+        mock_auto_result.total_tokens = 50
+        mock_autonomous.return_value = mock_auto_result
 
         reply_fn = MagicMock()
         event = TriggerEvent(
@@ -271,6 +274,39 @@ class TestReplyFnInDaemon:
         runner._on_trigger_inner(event)
 
         reply_fn.assert_not_called()
+
+    @patch("initrunner.runner.daemon.run_autonomous")
+    def test_autopilot_forces_all_triggers_autonomous(self, mock_autonomous):
+        """Autopilot mode forces every trigger type into autonomous execution."""
+        from initrunner.runner.daemon import DaemonRunner
+
+        mock_auto_result = MagicMock()
+        mock_auto_result.final_output = "Done"
+        mock_auto_result.final_messages = None
+        mock_auto_result.iterations = [MagicMock(output="Done")]
+        mock_auto_result.total_tokens = 100
+        mock_autonomous.return_value = mock_auto_result
+
+        event = TriggerEvent(
+            trigger_type="cron",
+            prompt="Do cron work",
+        )
+
+        agent = MagicMock()
+        role = MagicMock()
+        role.spec.guardrails.daemon_token_budget = None
+        role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.triggers = []
+        role.spec.autonomy = None  # No autonomy config
+        role.spec.memory = None
+
+        runner = DaemonRunner(agent, role, autopilot=True)
+        # autopilot=True but no triggers registered yet; trigger_types populated in run()
+        # Manually add to simulate what run() does
+        runner._autonomous_trigger_types = {"cron"}
+        runner._on_trigger_inner(event)
+
+        mock_autonomous.assert_called_once()
 
     @patch("initrunner.runner.daemon.run_autonomous")
     def test_non_conversational_autonomous_still_uses_autonomous(self, mock_autonomous):
