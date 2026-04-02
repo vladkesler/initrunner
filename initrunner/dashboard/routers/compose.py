@@ -277,6 +277,7 @@ async def stream_compose_run(
 
         message_history = _parse_message_history(req.message_history)
 
+    from initrunner.dashboard.routers.runs import _audit_logger
     from initrunner.dashboard.streaming import stream_compose_run_sse
 
     return StreamingResponse(
@@ -284,6 +285,7 @@ async def stream_compose_run(
             dc.compose,
             dc.path.parent,
             req.prompt,
+            audit_logger=_audit_logger(),
             message_history=message_history,
         ),
         media_type="text/event-stream",

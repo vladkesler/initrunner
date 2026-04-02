@@ -454,21 +454,37 @@ class AuditLogger:
         since: str | None = None,
         until: str | None = None,
         limit: int = 1000,
+        exclude_trigger_types: list[str] | None = None,
     ) -> list[AuditRecord]:
         """Query audit records with optional filters, ordered by timestamp DESC."""
-        return self._query_table(
-            "audit_log",
-            [
-                ("agent_name = ?", agent_name),
-                ("run_id = ?", run_id),
-                ("trigger_type = ?", trigger_type),
-                ("principal_id = ?", principal_id),
-                ("timestamp >= ?", since),
-                ("timestamp <= ?", until),
-            ],
-            limit,
-            _row_to_record,
-        )
+        filter_clauses = [
+            ("agent_name = ?", agent_name),
+            ("run_id = ?", run_id),
+            ("trigger_type = ?", trigger_type),
+            ("principal_id = ?", principal_id),
+            ("timestamp >= ?", since),
+            ("timestamp <= ?", until),
+        ]
+        filters = [(clause, val) for clause, val in filter_clauses if val is not None]
+        where, params = _build_where(filters)
+
+        # Exclusion filter for internal trigger types (applied before LIMIT)
+        if exclude_trigger_types:
+            placeholders = ", ".join("?" for _ in exclude_trigger_types)
+            excl_clause = (
+                f"(trigger_type IS NULL OR trigger_type NOT IN ({placeholders}))"
+            )
+            if where:
+                where += f" AND {excl_clause}"
+            else:
+                where = f"WHERE {excl_clause}"
+            params.extend(exclude_trigger_types)
+
+        sql = f"SELECT * FROM audit_log {where} ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [_row_to_record(row) for row in rows]
 
     def log_security_event(
         self,

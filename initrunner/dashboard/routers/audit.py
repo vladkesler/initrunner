@@ -19,6 +19,7 @@ async def query_audit(
     since: str | None = Query(None, description="ISO 8601 datetime"),
     until: str | None = Query(None, description="ISO 8601 datetime"),
     limit: int = Query(50, ge=1, le=500),
+    exclude_trigger_types: list[str] | None = Query(None),  # noqa: B008
 ) -> list[AuditRecordResponse]:
     from initrunner.config import get_audit_db_path
     from initrunner.services.operations import query_audit_sync
@@ -32,6 +33,7 @@ async def query_audit(
         until=until,
         limit=limit,
         audit_db=get_audit_db_path(),
+        exclude_trigger_types=exclude_trigger_types,
     )
     return [
         AuditRecordResponse(

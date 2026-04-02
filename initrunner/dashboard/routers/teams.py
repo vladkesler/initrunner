@@ -209,6 +209,7 @@ async def stream_team_run(
     if discovered.error or discovered.team is None:
         raise HTTPException(422, detail=discovered.error or "Team failed to load")
 
+    from initrunner.dashboard.routers.runs import _audit_logger
     from initrunner.dashboard.streaming import stream_team_run_sse
 
     return StreamingResponse(
@@ -216,6 +217,7 @@ async def stream_team_run(
             discovered.team,
             discovered.path.parent,
             body.prompt,
+            audit_logger=_audit_logger(),
         ),
         media_type="text/event-stream",
         headers={

@@ -17,6 +17,7 @@ from typing import Any
 
 from initrunner._ids import generate_id
 from initrunner.agent.executor import RunResult
+from initrunner.team.graph import _log_team_aggregate
 
 # ---------------------------------------------------------------------------
 # Re-exports from new modules (public names + legacy underscore aliases)
@@ -208,6 +209,7 @@ def run_team(
 
             shutdown_tracing()
 
+    _log_team_aggregate(audit_logger, team, task, result)
     return result
 
 
@@ -345,6 +347,7 @@ def run_team_parallel(
 
             shutdown_tracing()
 
+    _log_team_aggregate(audit_logger, team, task, result)
     return result
 
 

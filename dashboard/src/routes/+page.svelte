@@ -118,7 +118,7 @@
 				listAgents(),
 				fetchComposeList().catch(() => [] as ComposeSummary[]),
 				fetchTeamList().catch(() => [] as TeamSummary[]),
-				queryAudit({ limit: 10 }),
+				queryAudit({ limit: 10, exclude_trigger_types: ['compose', 'delegate', 'team'] }),
 				fetchAuditStats(),
 				request<HealthStatus>('/api/health'),
 				getBuilderOptions().catch(() => null as BuilderOptions | null),

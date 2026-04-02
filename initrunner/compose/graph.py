@@ -82,6 +82,7 @@ class ComposeGraphDeps:
     on_service_start: Callable[[str], None] | None
     on_service_complete: Callable[[str, RunResult], None] | None
     entry_service: str
+    compose_run_id: str = ""
 
 
 @dataclass
@@ -437,6 +438,9 @@ def _make_service_step(service_name: str, topology_index: int):
         trigger_metadata = {
             "_compose_trace": ",".join((*envelope.trace, service_name)),
             "_compose_original_prompt": envelope.original_prompt,
+            "compose_name": deps.compose_name,
+            "compose_run_id": deps.compose_run_id,
+            "service_name": service_name,
         }
         if envelope.source_service:
             trigger_metadata["_compose_source_output"] = envelope.prompt[:500]
@@ -597,6 +601,7 @@ async def run_compose_graph_async(
     on_service_start: Callable[[str], None] | None = None,
     on_service_complete: Callable[[str, RunResult], None] | None = None,
     one_shot: bool = True,
+    compose_run_id: str = "",
 ) -> tuple[dict[str, ServiceRef], str, int, bool]:
     """Run the compose graph asynchronously.
 
@@ -625,6 +630,7 @@ async def run_compose_graph_async(
         on_service_start=on_service_start,
         on_service_complete=on_service_complete,
         entry_service=entry_name,
+        compose_run_id=compose_run_id,
     )
 
     timed_out = False
