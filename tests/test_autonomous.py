@@ -609,3 +609,41 @@ class TestConversationalTriggerEarlyExit:
         assert auto_result.final_status == "max_iterations"
         assert auto_result.iteration_count == 3
         assert mock_execute.call_count == 3
+
+
+class TestStrategyToolsetsWiring:
+    """Integration test: strategy toolsets are included in execute_run calls."""
+
+    def test_plan_execute_strategy_toolsets_wired(self):
+        """PlanExecuteStrategy's finalize_plan tool should appear in extra_toolsets."""
+        from unittest.mock import MagicMock, patch
+
+        from initrunner.agent.schema.reasoning import ReasoningConfig
+        from initrunner.agent.schema.tools import TodoToolConfig
+        from initrunner.runner.autonomous import run_autonomous
+
+        role = _make_role(max_iterations=1)
+        role.spec.tools = [TodoToolConfig()]
+        role.spec.reasoning = ReasoningConfig(pattern="plan_execute", auto_detect=False)
+
+        result = RunResult(run_id="r1", output="planned", tool_calls=1)
+
+        with (
+            patch(
+                "initrunner.runner.autonomous.execute_run",
+                return_value=(result, [{"role": "assistant", "content": "planned"}]),
+            ) as mock_execute,
+            patch("initrunner.runner.autonomous._display_autonomous_header"),
+            patch("initrunner.runner.autonomous._display_iteration_result"),
+            patch("initrunner.runner.autonomous._display_autonomous_summary"),
+        ):
+            agent = MagicMock()
+            run_autonomous(agent, role, "design a system")
+
+            # Inspect extra_toolsets passed to execute_run
+            call_kwargs = mock_execute.call_args
+            extra = call_kwargs.kwargs.get("extra_toolsets", [])
+            tool_names = []
+            for toolset in extra:
+                tool_names.extend(toolset.tools.keys())
+            assert "finalize_plan" in tool_names

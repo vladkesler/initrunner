@@ -66,24 +66,57 @@ class TestPlanExecuteStrategy:
         result = s.wrap_initial_prompt("Design a system")
         assert "PLANNING" in result
         assert "Design a system" in result
+        assert "finalize_plan" in result
 
     def test_phase_transition(self):
         s = PlanExecuteStrategy("Continue.")
         state = ReflectionState()
-        # First call: planning phase (no items yet)
-        prompt1 = s.build_continuation_prompt(state)
-        assert "planning" in prompt1.lower() or "Continue" in prompt1
 
-        # Add items
+        # Add items -- still planning
         state.todo.add("Step 1")
         state.todo.add("Step 2")
+        prompt1 = s.build_continuation_prompt(state)
+        assert "EXECUTION" not in prompt1
+        assert "finalize_plan" in prompt1
 
-        # Second call: still planning (items just added)
-        s.build_continuation_prompt(state)
+        # Finalize the plan
+        state.plan_finalized = True
+        prompt2 = s.build_continuation_prompt(state)
+        assert "EXECUTION" in prompt2
 
-        # Third call: items unchanged, transition to execution
-        prompt3 = s.build_continuation_prompt(state)
-        assert "EXECUTION" in prompt3
+    def test_no_transition_without_finalize(self):
+        s = PlanExecuteStrategy("Continue.")
+        state = ReflectionState()
+        state.todo.add("Step 1")
+        # Stable count across many iterations -- should NOT transition
+        for _ in range(5):
+            prompt = s.build_continuation_prompt(state)
+            assert "EXECUTION" not in prompt
+
+    def test_finalize_plan_tool(self):
+        s = PlanExecuteStrategy("Continue.")
+        state = ReflectionState()
+        state.todo.add("Step 1")
+        toolsets = s.build_strategy_toolsets(state)
+        assert len(toolsets) == 1
+        assert "finalize_plan" in toolsets[0].tools
+
+    def test_finalize_plan_rejects_empty(self):
+        s = PlanExecuteStrategy("Continue.")
+        state = ReflectionState()
+        toolsets = s.build_strategy_toolsets(state)
+        result = toolsets[0].tools["finalize_plan"].function()
+        assert state.plan_finalized is False
+        assert "at least one todo" in result.lower()
+
+    def test_finalize_plan_accepts_nonempty(self):
+        s = PlanExecuteStrategy("Continue.")
+        state = ReflectionState()
+        state.todo.add("Step 1")
+        toolsets = s.build_strategy_toolsets(state)
+        result = toolsets[0].tools["finalize_plan"].function()
+        assert state.plan_finalized is True
+        assert "finalized" in result.lower()
 
 
 class TestReflexionStrategy:
@@ -116,6 +149,23 @@ class TestReflexionStrategy:
         prompt = s.build_continuation_prompt(state)
         assert "REFLECTION" in prompt
         assert "Initial work done" in prompt
+
+
+class TestStrategyToolsets:
+    def test_react_no_strategy_toolsets(self):
+        s = ReactStrategy("Continue.")
+        state = ReflectionState()
+        assert s.build_strategy_toolsets(state) == []
+
+    def test_todo_driven_no_strategy_toolsets(self):
+        s = TodoDrivenStrategy("Continue.")
+        state = ReflectionState()
+        assert s.build_strategy_toolsets(state) == []
+
+    def test_reflexion_no_strategy_toolsets(self):
+        s = ReflexionStrategy("Continue.", reflection_rounds=1)
+        state = ReflectionState()
+        assert s.build_strategy_toolsets(state) == []
 
 
 class TestResolveStrategy:

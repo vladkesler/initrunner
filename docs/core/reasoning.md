@@ -289,7 +289,7 @@ How it works:
 
 #### plan_execute
 
-Two-phase execution. Phase 1 (planning): the agent creates a comprehensive plan without executing. Phase 2 (execution): the agent works through plan items. The runner tracks item counts and transitions from planning to execution when the todo list stabilizes (no new items added between iterations).
+Two-phase execution. Phase 1 (planning): the agent creates a comprehensive plan without executing. Phase 2 (execution): the agent works through plan items. The agent explicitly calls `finalize_plan()` to signal that planning is complete and transition to execution.
 
 **Requires** a `todo` tool in `spec.tools`.
 
@@ -301,8 +301,8 @@ reasoning:
 ```
 
 How it works:
-1. First turn: "PHASE 1 - PLANNING: Analyze this task and create a comprehensive todo list. Focus only on planning. Do not execute yet."
-2. Planning continues until item count stabilizes
+1. First turn: "PHASE 1 - PLANNING: Analyze this task and create a comprehensive todo list. Focus only on planning. Do not execute yet. When your plan is complete, call finalize_plan()."
+2. Planning continues until the agent calls `finalize_plan()` (requires at least one todo item)
 3. Phase transition: "PHASE 2 - EXECUTION: Work through your plan."
 4. Execution continues until auto-completion or `finish_task`
 

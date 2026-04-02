@@ -32,6 +32,8 @@ STARTER_ORDER = [
     "project-monitor",
     "ci-pipeline",
     "support-desk",
+    "todo-planner",
+    "plan-execute",
 ]
 
 FEATURE_MAP: list[tuple[str, str]] = [

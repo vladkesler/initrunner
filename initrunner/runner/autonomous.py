@@ -97,7 +97,10 @@ def run_autonomous(
     # Build run-scoped toolsets (todo, think, spawn, finish_task)
     run_scoped = build_run_scoped_toolsets(role, reflection_state, autonomy_config)
 
-    all_extra = list(run_scoped)
+    # Strategy-specific toolsets (e.g., finalize_plan for plan_execute)
+    strategy_toolsets = strategy.build_strategy_toolsets(reflection_state)
+
+    all_extra = list(run_scoped) + strategy_toolsets
     if extra_toolsets:
         all_extra.extend(extra_toolsets)
 

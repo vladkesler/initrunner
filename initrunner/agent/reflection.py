@@ -12,6 +12,7 @@ class ReflectionState:
     completed: bool = False
     summary: str = ""
     status: str = "completed"  # completed | blocked | failed
+    plan_finalized: bool = False
     todo: TodoList = field(default_factory=TodoList)
 
     def check_auto_complete(self) -> None:
