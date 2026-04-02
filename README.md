@@ -27,11 +27,6 @@
 
 YAML-first AI agent platform. One file defines the agent. The same file runs as an interactive chat, a one-shot command, an autonomous worker, or a production daemon. 12 security layers in the box. Install with `curl` or `pip`.
 
-<p align="center">
-  <img src="assets/screenshot-pipeline.png" alt="InitRunner Team Pipeline" width="800"><br>
-  <em>architecture-debate: optimist, skeptic, and pragmatist across 2 rounds, then synthesis</em>
-</p>
-
 ```bash
 initrunner run helpdesk -i                                    # docs Q&A with RAG + memory
 initrunner run deep-researcher -p "Compare vector databases"  # 3-agent research team

@@ -29,11 +29,6 @@
 
 YAML ファーストの AI エージェントプラットフォーム。1 つのファイルでエージェントを定義。同じファイルがインタラクティブチャット、ワンショットコマンド、自律ワーカー、本番デーモンとして動作します。12 のセキュリティレイヤーを標準搭載。`curl` または `pip` でインストール。
 
-<p align="center">
-  <img src="assets/screenshot-pipeline.png" alt="InitRunner Team Pipeline" width="800"><br>
-  <em>architecture-debate: 楽観主義者、懐疑主義者、現実主義者が 2 ラウンドの議論を経て統合</em>
-</p>
-
 ```bash
 initrunner run helpdesk -i                                    # RAG + メモリでドキュメント Q&A
 initrunner run deep-researcher -p "Compare vector databases"  # 3 エージェント研究チーム
