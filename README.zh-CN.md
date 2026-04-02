@@ -29,11 +29,6 @@
 
 YAML 优先的 AI Agent 平台。一个文件定义 Agent。同一个文件可作为交互式聊天、一次性命令、自主 Worker 或生产守护进程运行。内置 12 层安全防护。使用 `curl` 或 `pip` 安装。
 
-<p align="center">
-  <img src="assets/screenshot-pipeline.png" alt="InitRunner Team Pipeline" width="800"><br>
-  <em>architecture-debate: 乐观者、怀疑者和务实者经过 2 轮讨论后综合</em>
-</p>
-
 ```bash
 initrunner run helpdesk -i                                    # 文档问答，支持 RAG + 记忆
 initrunner run deep-researcher -p "Compare vector databases"  # 3-Agent 研究团队
