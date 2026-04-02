@@ -29,6 +29,7 @@
 		pattern?: string;
 		auto_plan?: boolean;
 		reflection_rounds?: number;
+		reflection_dimensions?: Array<{ name: string; prompt: string }> | null;
 		auto_detect?: boolean;
 	} | null);
 	const autonomy = $derived(detail.autonomy as {
@@ -275,11 +276,18 @@
 								<span class="ml-1 text-fg-muted">true</span>
 							</div>
 						{/if}
-						{#if reasoning.pattern === 'reflexion' && (reasoning.reflection_rounds ?? 0) > 0}
-							<div>
-								<span class="text-fg-faint">reflection_rounds</span>
-								<span class="ml-1 text-fg-muted">{reasoning.reflection_rounds}</span>
-							</div>
+						{#if reasoning.pattern === 'reflexion'}
+							{#if reasoning.reflection_dimensions?.length}
+								<div>
+									<span class="text-fg-faint">dimensions</span>
+									<span class="ml-1 text-fg-muted">{reasoning.reflection_dimensions.map(d => d.name).join(', ')}</span>
+								</div>
+							{:else if (reasoning.reflection_rounds ?? 0) > 0}
+								<div>
+									<span class="text-fg-faint">reflection_rounds</span>
+									<span class="ml-1 text-fg-muted">{reasoning.reflection_rounds}</span>
+								</div>
+							{/if}
 						{/if}
 						{#if reasoning.auto_detect === false}
 							<div>

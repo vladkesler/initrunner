@@ -41,7 +41,6 @@ spec:
   reasoning:
     pattern: todo_driven
     auto_plan: true
-    reflection_rounds: 1
   autonomy:
     max_history_messages: 40
     iteration_delay_seconds: 0

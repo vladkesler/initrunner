@@ -41,10 +41,15 @@ The reflexion config in `role.yaml`:
 ```yaml
 reasoning:
   pattern: reflexion
-  reflection_rounds: 1    # one self-critique round (max 3)
+  reflection_dimensions:
+    - name: substance
+      prompt: >-
+        Check for weak arguments, unsupported claims, and logical gaps.
+        Is every section backed by evidence or concrete examples?
+        Fix any issues you find.
 ```
 
-Increase `reflection_rounds` to 2 or 3 for more thorough self-review (at the cost of more tokens).
+Each dimension defines a focused evaluation rubric for one reflexion round. You can add up to 3 dimensions, or omit `reflection_dimensions` and set `reflection_rounds: 2` to use the built-in defaults (correctness, completeness, clarity).
 
 ## Changing the model
 

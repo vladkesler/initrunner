@@ -247,6 +247,9 @@ spec:
     pattern: todo_driven     # react | todo_driven | plan_execute | reflexion
     auto_plan: true          # prepend planning instructions to first turn
     reflection_rounds: 0     # post-completion self-critique rounds (reflexion only)
+    reflection_dimensions:   # per-round evaluation rubrics (reflexion only)
+      - name: correctness
+        prompt: "Check for errors..."
     auto_detect: true        # infer pattern from tool/autonomy config
 ```
 
@@ -255,6 +258,7 @@ spec:
 | `pattern` | string | `"react"` | Reasoning pattern to use |
 | `auto_plan` | bool | `false` | Prepend "create a todo list" to first turn |
 | `reflection_rounds` | int | `0` | Number of self-critique rounds after completion |
+| `reflection_dimensions` | list | `null` | Per-round evaluation dimensions (see [reflexion](#reflexion)) |
 | `auto_detect` | bool | `true` | Infer pattern from tool/autonomy config |
 
 ### Budget-aware continuation prompts
@@ -329,23 +333,53 @@ How it works:
 
 #### reflexion
 
-Post-completion self-critique. After the agent finishes (calls `finish_task` or todo auto-completes), the runner re-opens the state and injects the agent's output back as a critique prompt for additional rounds.
+Post-completion self-critique. After the agent finishes (calls `finish_task` or todo auto-completes), the runner re-opens the state and injects dimension-specific evaluation prompts for additional rounds.
 
-**Requires** `reflection_rounds > 0`.
+**Requires** `reflection_rounds > 0` or non-empty `reflection_dimensions`.
+
+Each reflexion round focuses on a specific dimension with concrete evaluation questions, producing deeper self-critique than a generic "review your work" prompt.
+
+**Simple (uses built-in defaults):**
 
 ```yaml
 reasoning:
   pattern: reflexion
-  reflection_rounds: 1   # 1-3 rounds of self-critique
+  reflection_rounds: 2   # uses correctness, then completeness
 ```
+
+**Custom dimensions:**
+
+```yaml
+reasoning:
+  pattern: reflexion
+  reflection_dimensions:
+    - name: accuracy
+      prompt: >-
+        Verify all numbers, dates, and technical claims. Do code examples
+        compile and produce correct output? Fix any errors you find.
+    - name: coverage
+      prompt: >-
+        Are all requirements from the original prompt addressed? Are edge
+        cases and error conditions handled? Fill in any gaps.
+```
+
+When `reflection_dimensions` is provided, `reflection_rounds` is auto-derived from the list length. You can also set both -- if `reflection_rounds` exceeds the number of dimensions, dimensions cycle (round 3 with 2 dimensions reuses dimension 1).
+
+**Built-in defaults** (used when only `reflection_rounds` is set):
+
+| Round | Dimension | Focus |
+|-------|-----------|-------|
+| 1 | correctness | Factual errors, logical flaws, incorrect assumptions |
+| 2 | completeness | Missing sections, unaddressed requirements, edge cases |
+| 3 | clarity | Structure, conciseness, concrete examples |
 
 How it works:
 1. Agent works normally until completion
-2. Runner re-opens the state: "REFLECTION (1/1): Review your work so far. What could be improved?"
+2. Runner re-opens the state with the current round's dimension: `REFLECTION (1/2) -- ACCURACY: Verify all numbers...`
 3. Agent gets `reflection_rounds` additional turns to self-correct
 4. Final output is from the last iteration
 
-Reflexion composes with other patterns. A `todo_driven` agent with `reflection_rounds: 1` first completes its todo list, then gets one critique pass.
+Note: reflexion is its own reasoning pattern, not a modifier on other patterns. If you want todo-driven behavior with self-critique, set `reflection_rounds` (or `reflection_dimensions`) without an explicit `pattern` -- auto-detection will select `reflexion`, and the agent can still use todo tools for structured work.
 
 ### Auto-detection
 

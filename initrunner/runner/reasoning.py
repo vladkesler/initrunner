@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from initrunner.agent.reflection import ReflectionState
-from initrunner.agent.schema.reasoning import ReasoningConfig
+from initrunner.agent.schema.reasoning import (
+    DEFAULT_REFLEXION_DIMENSIONS,
+    ReasoningConfig,
+    ReflexionDimension,
+)
 from initrunner.agent.schema.tools import TodoToolConfig
 
 if TYPE_CHECKING:
@@ -169,9 +173,15 @@ class PlanExecuteStrategy:
 class ReflexionStrategy:
     """Post-completion self-critique rounds."""
 
-    def __init__(self, continuation_prompt: str, reflection_rounds: int) -> None:
+    def __init__(
+        self,
+        continuation_prompt: str,
+        reflection_rounds: int,
+        dimensions: list[ReflexionDimension],
+    ) -> None:
         self._continuation = continuation_prompt
         self._reflection_rounds = reflection_rounds
+        self._dimensions = dimensions
         self._base_completed = False
         self._reflexion_count = 0
 
@@ -185,11 +195,12 @@ class ReflexionStrategy:
 
         if self._base_completed:
             self._reflexion_count += 1
+            dim = self._dimensions[(self._reflexion_count - 1) % len(self._dimensions)]
             return (
-                f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}): "
-                f"Review your work so far. What could be improved? "
-                f"Are there errors or gaps? Make corrections if needed, then "
-                f"call finish_task when satisfied.\n\n"
+                f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}) "
+                f"-- {dim.name.upper()}:\n"
+                f"{dim.prompt}\n\n"
+                f"Make corrections if needed, then call finish_task when satisfied.\n\n"
                 f"Your previous summary: {state.summary}\n\n"
                 f"CURRENT STATUS:\n{state_text}"
             )
@@ -251,7 +262,11 @@ def resolve_strategy(
     if pattern == "plan_execute":
         return PlanExecuteStrategy(continuation)
     if pattern == "reflexion":
-        return ReflexionStrategy(continuation, config.reflection_rounds)
+        if config.reflection_dimensions is not None:
+            dims = list(config.reflection_dimensions)
+        else:
+            dims = DEFAULT_REFLEXION_DIMENSIONS[: config.reflection_rounds]
+        return ReflexionStrategy(continuation, config.reflection_rounds, dims)
     return ReactStrategy(continuation)
 
 
