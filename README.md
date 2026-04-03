@@ -202,7 +202,7 @@ InitRunner ships 12 security layers. They're opt-in via the `security:` config k
 
 **Input:** Server middleware (Bearer auth with timing-safe comparison, rate limiting, body size limits, HTTPS enforcement, security headers, CORS). Content policy engine (profanity filter, blocked-pattern matching, prompt length limits, optional LLM topic classifier). Input guard capability (PydanticAI `before_run` hook that validates prompts before the agent starts).
 
-**Authorization:** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine (agents get identity from role metadata, every tool call and delegation checked against Cedar-like policies). Argument-level permission rules (per-tool allow/deny glob patterns, deny-wins precedence). SQL authorization callbacks (blocks dangerous operations at the engine level).
+**Authorization:** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine (agents get identity from role metadata, every tool call and delegation checked against CEL policies). Argument-level permission rules (per-tool allow/deny glob patterns, deny-wins precedence). SQL authorization callbacks (blocks dangerous operations at the engine level).
 
 **Execution:** PEP 578 audit hook sandbox (per-thread enforcement of filesystem write restrictions, subprocess blocking, private-IP network blocking, dangerous-module import blocking, eval/exec blocking). Docker container sandboxing (read-only rootfs, memory/CPU limits, network isolation, pid limits). Environment variable scrubbing (prefix and suffix matching strips sensitive keys from every subprocess environment).
 
