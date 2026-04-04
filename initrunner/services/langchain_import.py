@@ -62,8 +62,7 @@ _PROVIDER_CLASS_MAP: dict[str, str] = {
 # Modules whose presence signals unsupported features
 _UNSUPPORTED_MODULES: dict[str, str] = {
     "langgraph": (
-        "LangGraph state machine detected."
-        " Use InitRunner flow.yaml for multi-step orchestration."
+        "LangGraph state machine detected. Use InitRunner flow.yaml for multi-step orchestration."
     ),
     "langchain.memory": (
         "LangChain memory not imported. InitRunner memory is persistent and broader"

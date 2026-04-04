@@ -622,9 +622,7 @@ def run_flow(
 
     orchestrator = FlowOrchestrator(flow, base_dir, audit_logger=audit_logger)
 
-    console.print(
-        f"[bold]Flow[/bold] -- {flow.metadata.name} ({len(flow.spec.agents)} agents)"
-    )
+    console.print(f"[bold]Flow[/bold] -- {flow.metadata.name} ({len(flow.spec.agents)} agents)")
 
     table = Table(title="Agents")
     table.add_column("Agent", style="cyan")

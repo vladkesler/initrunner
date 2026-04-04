@@ -188,9 +188,7 @@ def test_get_flow_events_field_names(client):
     flows = client.get("/api/flows").json()
     fid = flows[0]["id"]
 
-    with patch(
-        "initrunner.dashboard.routers.flow._query_events", return_value=mock_events
-    ):
+    with patch("initrunner.dashboard.routers.flow._query_events", return_value=mock_events):
         resp = client.get(f"/api/flows/{fid}/events")
 
     assert resp.status_code == 200
