@@ -9,7 +9,7 @@ kind: Agent
 metadata:
   name: long-running-analyst
   description: Autonomous research analyst with conversation history compaction for long multi-source investigations
-  version: "2.0.1"
+  version: "2.0.2"
   author: InitRunner Team
   tags: [example, autonomous, compaction, research, reasoning]
   bundle:
