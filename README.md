@@ -269,6 +269,35 @@ spec:
 
 Run with `initrunner flow up flow.yaml`. See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md).
 
+## MCP -- plug into any tool ecosystem
+
+Agents can use any [MCP](https://modelcontextprotocol.io/) server as a tool source. Point at a server, and every tool it exposes becomes available to the agent:
+
+```yaml
+spec:
+  tools:
+    - type: mcp
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"]
+    - type: mcp
+      transport: sse
+      url: https://my-mcp-server.example.com/sse
+```
+
+Agents can consume multiple MCP servers alongside built-in tools. Three transports: `stdio` (local processes), `sse` (Server-Sent Events), and `streamable-http`. Tool filtering (`tool_filter` / `tool_exclude`) and namespacing (`tool_prefix`) keep things clean when servers expose many tools.
+
+Going the other direction, expose your agents *as* MCP tools so Claude Code, Cursor, Windsurf, and other MCP clients can call them:
+
+```bash
+initrunner mcp serve agent.yaml          # agent becomes an MCP tool
+initrunner mcp toolkit --tools search,sql  # expose raw tools, no LLM needed
+```
+
+The dashboard's [MCP Hub](/mcp) shows every configured server across all agents, lets you test any tool in isolation via the Playground, and visualizes the server-agent topology on a drag-and-drop canvas.
+
+See [MCP Gateway](docs/interfaces/mcp-gateway.md) · [Dashboard](docs/interfaces/dashboard.md#mcp-hub-mcp).
+
 ## User interfaces
 
 <p align="center">
