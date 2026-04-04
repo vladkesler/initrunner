@@ -102,7 +102,7 @@
 
 		<form class="flex flex-wrap items-end gap-3" onsubmit={(e) => { e.preventDefault(); handleSave(); }}>
 			<div>
-				<label for="prov-select-full" class="mb-1 block font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Provider</label>
+				<label for="prov-select-full" class="mb-1 block section-label">Provider</label>
 				<select id="prov-select-full" bind:value={selectedProvider} disabled={saving} class={inputClass}>
 					<option value="">Select provider</option>
 					{#each unconfigured as prov}
@@ -111,13 +111,13 @@
 									</select>
 			</div>
 			<div class="flex-1">
-				<label for="key-input-full" class="mb-1 block font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">{selectedEnvVar || 'API Key'}</label>
+				<label for="key-input-full" class="mb-1 block section-label">{selectedEnvVar || 'API Key'}</label>
 				<input id="key-input-full" type="password" bind:value={apiKey} disabled={saving} placeholder={selectedEnvVar || 'API key'} class={inputClass} />
 			</div>
 			<button
 				type="submit"
 				disabled={!canSubmit}
-				class="flex items-center gap-1.5 rounded-full bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40 disabled:hover:shadow-none"
+				class="flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40 disabled:hover:shadow-none"
 			>
 				{#if saving}<Loader2 size={14} class="animate-spin" />{/if}
 				{buttonLabel}
@@ -141,7 +141,7 @@
 			<button
 				type="submit"
 				disabled={!canSubmit}
-				class="flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40 disabled:hover:shadow-none"
+				class="flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40 disabled:hover:shadow-none"
 			>
 				{#if saving}<Loader2 size={12} class="animate-spin" />{/if}
 				{buttonLabel}

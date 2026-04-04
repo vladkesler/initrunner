@@ -1,10 +1,10 @@
-# Design System -- "Electric Charcoal"
+# Design System -- "Electric Charcoal v2"
 
-The dashboard's visual identity is called "Electric Charcoal." It is dark-only, designed to feel like mission control for AI agents -- powerful, electric, alive. Not safe, not corporate.
+The dashboard's visual identity is dark-only, designed to feel like professional mission control for AI agents -- powerful, precise, intentional. Not generic, not templated.
 
-**The anchor**: Electric lime (#c8ff00) on warm charcoal. Immediately distinctive.
+**The anchor**: Electric lime (#c8ff00) on deep charcoal. Immediately distinctive.
 
-**The constraint**: Binary border-radius. Elements are either perfectly sharp (0px) or fully round (pill). No middle ground.
+**The constraint**: Ternary border-radius. Elements are sharp (0px), micro-rounded (2px), or fully round (pill). No middle ground.
 
 ## Color System
 
@@ -18,22 +18,25 @@ All colors are defined as CSS custom properties in `dashboard/src/app.css` insid
 
 ### Accent Colors
 
-| Token | OKLCH | Hex (approx) | Usage |
-|-------|-------|-------------|-------|
-| `--color-accent-primary` | `oklch(0.91 0.20 128)` | #c8ff00 | Primary CTAs, active nav, tool type names, focus rings |
-| `--color-accent-primary-hover` | `oklch(0.95 0.18 128)` | -- | Hover state for primary buttons |
-| `--color-accent-primary-muted` | `oklch(0.91 0.20 128 / 0.15)` | -- | Tinted backgrounds (active nav item) |
-| `--color-accent-secondary` | `oklch(0.82 0.14 195)` | #00e5ff | Trigger type names, secondary highlights |
-| `--color-accent-secondary-muted` | `oklch(0.82 0.14 195 / 0.12)` | -- | Tinted backgrounds for secondary accent |
+| Token | OKLCH | Usage |
+|-------|-------|-------|
+| `--color-accent-primary` | `oklch(0.91 0.20 128)` | Primary CTAs, active nav indicator |
+| `--color-accent-primary-hover` | `oklch(0.95 0.18 128)` | Hover state for primary buttons |
+| `--color-accent-primary-muted` | `oklch(0.91 0.20 128 / 0.15)` | Tinted backgrounds |
+| `--color-accent-primary-dim` | `oklch(0.75 0.15 128)` | Desaturated lime for borders, secondary emphasis, focus rings |
+| `--color-accent-primary-wash` | `oklch(0.91 0.20 128 / 0.04)` | Barely-visible background tint (sidebar hover) |
+| `--color-accent-secondary` | `oklch(0.82 0.14 195)` | Trigger type names, secondary highlights |
+| `--color-accent-secondary-muted` | `oklch(0.82 0.14 195 / 0.12)` | Tinted backgrounds for secondary accent |
 
 ### Surface Scale
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `--color-surface-0` | `#0e0e10` | Page background, deepest layer |
-| `--color-surface-1` | `#161618` | Cards, sidebar, elevated surfaces |
-| `--color-surface-2` | `#1e1e22` | Hover states, active toggles |
-| `--color-surface-3` | `#2a2a30` | Focus outlines, tertiary surfaces |
+| `--color-surface-0` | `#0a0a0c` | Page background, deepest layer |
+| `--color-surface-05` | `#111113` | Sidebar, table headers, subtle elevation |
+| `--color-surface-1` | `#161618` | Cards, input backgrounds |
+| `--color-surface-2` | `#1c1c20` | Hover states, elevated surfaces |
+| `--color-surface-3` | `#28282e` | Pressed states, tertiary surfaces |
 
 ### Text Hierarchy
 
@@ -47,8 +50,10 @@ All colors are defined as CSS custom properties in `dashboard/src/app.css` insid
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| `--color-edge` | `#2a2a30` | Primary borders on cards, tables, inputs |
-| `--color-edge-subtle` | `#1e1e22` | Inner dividers, table row separators |
+| `--color-edge-strong` | `#353540` | Primary container boundaries |
+| `--color-edge` | `#2a2a30` | Standard card/table borders |
+| `--color-edge-subtle` | `#1e1e22` | Dividers within cards, table row separators |
+| `--color-edge-ghost` | `#161618` | Barely-visible structural lines |
 
 ### Status Colors
 
@@ -68,163 +73,160 @@ Fonts are loaded from Google Fonts in `dashboard/src/app.html`.
 | Role | Font | Weights | Usage |
 |------|------|---------|-------|
 | Display / Body | Space Grotesk | 300-700 | Page titles, section headers, body text, buttons |
-| Data / Code | IBM Plex Mono | 400, 500 | Agent names, stat numbers, code blocks, metadata labels, monospace data |
+| Data / Code | IBM Plex Mono | 400, 500 | Agent names, stat numbers, code blocks, metadata values |
 
 ### Type Scale
 
 | Element | Size | Weight | Tracking | Example |
 |---------|------|--------|----------|---------|
-| Page title (h1) | `text-xl` (20px) | `font-semibold` (600) | `-0.02em` | "Launchpad", "Agents" |
-| Section header | `text-[12px]` | `font-medium` (500) | `0.1em` | "TOP AGENTS", "TOOLS" (mono, uppercase) |
-| Stat number | `text-[22px]` | `font-semibold` (600) | `-0.02em` | "1,234" (mono, tabular-nums) |
+| Page title (h1) | `text-2xl` (24px) | `font-semibold` (600) | `-0.03em` | "Launchpad", "Agents" |
+| Section header | `.section-label` CSS class | `font-semibold` (600) | `0.14em` | "AGENT FLEET", "BUILD" (sans, uppercase) |
+| Stat number | `.metric-value` CSS class | `font-semibold` (600) | `-0.02em` | "1,234" (mono, tabular-nums) |
 | Body text | `text-[13px]` | `font-normal` (400) | default | Descriptions, prompts |
-| Small label | `text-[12px]` | `font-medium` (500) | `0.1em` | Drawer metadata labels (mono, uppercase) |
+| Small label | `.section-label` | `font-semibold` (600) | `0.14em` | Section headers (sans, uppercase) |
 | Badge / tag | `text-[12px]` | `font-normal` (400) | default | Feature pills, tag filters (mono) |
 
 ### Rules
 
-- Use `font-variant-numeric: tabular-nums` on all numeric data (stat cards, table columns, durations, token counts)
+- Section labels use `font-sans` (Space Grotesk), NOT `font-mono`
+- Use `font-variant-numeric: tabular-nums` on all numeric data
 - Use `text-wrap: balance` on multi-line headings
-- Monospace (`font-mono`) for: agent names, model identifiers, file paths, config values, stat numbers, section headers, table data
+- Monospace (`font-mono`) reserved for: agent names, model identifiers, file paths, config values, stat numbers, table data
+
+## Shared CSS Utility Classes
+
+Defined in `dashboard/src/app.css`:
+
+| Class | Purpose |
+|-------|---------|
+| `.section-label` | Uppercase section headers (sans, 11px, 600 weight, 0.14em tracking, fg-faint) |
+| `.metric-value` | Large stat numbers (mono, 22px, 600 weight, tabular-nums) |
+| `.metric-label` | Stat labels (12px, fg-faint) |
+| `.status-dot` | 6px solid-color circle (no box-shadow glow) |
+| `.active-border` | Restrained streaming/running indicator (dim lime border + subtle 6% shadow) |
+| `.card-surface` | Container border with left-accent slot (transparent by default, colored on hover) |
+| `.card-surface-error` | Error variant with red left border |
 
 ## Border Radius
 
-The binary rule eliminates the generic look of uniform medium radii.
+Ternary system:
 
 ### Sharp (0px)
 
-Applied via `--radius: 0rem` in `:root`. All shadcn components inherit this automatically.
-
-- Cards and panels (`card-surface`, config sections)
+- Cards and panels
 - Input fields, textareas, select dropdowns
 - Table containers
 - Command palette panel
 - Sidebar
 - Drawer panels
 - Code blocks and pre elements
-- Skeleton loading placeholders
+
+### Micro (2px -- `rounded-[2px]`)
+
+- Primary action buttons
+- Secondary action buttons
+- Kbd hint badges
+- Inline code badges
 
 ### Pill (`rounded-full`)
 
-Applied explicitly on each element.
-
-- Primary and secondary buttons
-- Tag filter buttons
-- View mode toggle (outer container + inner items)
+- Tag filter pills (CapabilityFilterBar)
 - Status badge/chip elements
-- Kbd hint badges (ESC, arrow keys)
-- Tool count badges
+- Version pills
+- Count badges
 - Scrollbar thumb
 
 ### Exception
 
-Danger/destructive buttons stay sharp (no `rounded-full`). The angular shape is a deliberate visual signal that the action is different and irreversible.
+Danger/destructive buttons stay sharp (no rounding). The angular shape signals irreversibility.
 
 ## Surface Treatments
 
 ### Card Surface
 
-The `.card-surface` utility creates a border with a lime-tinted top edge, mimicking light reflecting off a surface.
+The `.card-surface` utility creates a border with a left-accent slot:
 
 ```css
 .card-surface {
-  border: 1px solid #2a2a30;
-  border-top-color: oklch(0.91 0.20 128 / 0.15);
+  border: 1px solid var(--color-edge);
+  border-left: 2px solid transparent;
+  transition: border-color 200ms;
 }
 .card-surface:hover {
-  border-top-color: oklch(0.91 0.20 128 / 0.30);
+  border-color: var(--color-accent-primary-dim);
 }
 ```
-
-Used on: stat cards, agent flow nodes, top-agents bars, doctor check items, starter template cards.
 
 ### Card Surface -- Error Variant
 
-The `.card-surface-error` utility adds a red left border accent while preserving the lime top tint (dimmed). Used on agent nodes with load errors.
-
 ```css
 .card-surface-error {
-  border: 1px solid #2a2a30;
-  border-top-color: oklch(0.91 0.20 128 / 0.10);
+  border: 1px solid var(--color-edge);
   border-left: 2px solid var(--color-fail);
-}
-.card-surface-error:hover {
-  border-top-color: oklch(0.91 0.20 128 / 0.20);
+  transition: border-color 200ms;
 }
 ```
 
-### Noise Grain
-
-A full-viewport SVG fractal noise overlay at 4.5% opacity with `mix-blend-mode: soft-light`. Applied as a `body::after` pseudo-element with `pointer-events: none` and `z-index: 9999`.
-
-### Glow Utilities
-
-| Class | Effect | Usage |
-|-------|--------|-------|
-| `.glow-lime` | 20px lime box-shadow + inset top highlight | Stream output while running |
-| `.glow-cyan` | 16px cyan box-shadow + inset top highlight | Reserved for secondary accent states |
-| `.glow-lime-subtle` | 1px lime outline glow | Subtle emphasis |
-
-### Hover Gradient Wash
-
-Agent cards use a `::after` pseudo-element (or Svelte conditional div) that applies a diagonal lime gradient on hover:
-
-```
-bg-gradient-to-br from-accent-primary/[0.04] via-transparent to-transparent
-```
-
-The gradient is invisible by default and fades in with `opacity-0 group-hover:opacity-100`.
-
-## Animation
-
-All animations are defined in `dashboard/src/app.css` and respect `prefers-reduced-motion`.
-
-### fade-in-up
-
-Staggered card entry animation. Each card in a set receives an increasing `animation-delay` (0ms, 60ms, 120ms, 180ms).
+### Active Border (Streaming/Running State)
 
 ```css
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in-up { animation: fade-in-up 0.3s ease-out both; }
-```
-
-Used on: stat strip cards (Launchpad, Audit).
-
-### glow-pulse
-
-Breathing lime glow for active/streaming states.
-
-```css
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 16px oklch(0.91 0.20 128 / 0.08); }
-  50%      { box-shadow: 0 0 24px oklch(0.91 0.20 128 / 0.18); }
-}
-.animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
-```
-
-Used on: StreamOutput container while an agent is running.
-
-### Reduced Motion
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.active-border {
+  border-color: var(--color-accent-primary-dim);
+  box-shadow: 0 0 8px oklch(0.91 0.20 128 / 0.06);
 }
 ```
 
-### Transition Rules
+Used only on: streaming ConversationThread container, active flow nodes.
 
-- Always list explicit properties: `transition-[color,background-color] duration-150`
-- Never use `transition: all`
-- Only animate `transform` and `opacity` for GPU compositing (except `box-shadow` for glow effects)
-- Standard duration: `150ms` for micro-interactions, `200ms` for border/shadow transitions
+## Layout Architecture
+
+### Shell Structure
+
+```
++---sidebar (220px/48px)---+---header-bar (48px)----+
+|                          |  breadcrumbs    search  |
+|  BRAND (logo, home)      +-------------------------+
+|  BUILD (agents, flows,   |                         |
+|    teams, skills)        |  PAGE CONTENT            |
+|  OPERATE (audit)         |  (max-w-1400, px-8/10)  |
+|  META (system, toggle)   |                         |
++--------------------------+-------------------------+
+```
+
+### HeaderBar (`HeaderBar.svelte`)
+
+- Left: Breadcrumb trail from `breadcrumb.svelte.ts` store
+- Right: Cmd+K search trigger button, system health indicator
+- Height: 48px, `border-b border-edge bg-surface-0`
+
+### Sidebar Navigation
+
+Three zones separated by `border-edge-subtle` dividers:
+
+**Active indicator**: Left-edge 2px lime bar (`border-l-2 border-accent-primary`) + `text-fg`. No background highlight.
+
+**Hover**: Directional gradient: `bg-gradient-to-r from-accent-primary-wash to-transparent`.
+
+**Section labels**: `.section-label` class at 10px/0.15em tracking/60% opacity. Only visible when sidebar is expanded.
+
+**Collapsed**: 48px width, icons only. Section labels hidden. No flyout menus.
+
+### Breadcrumb System
+
+Store: `dashboard/src/lib/stores/breadcrumb.svelte.ts`
+
+Pages call `setCrumbs()` in `$effect` once data is loaded:
+- List pages: `setCrumbs([{ label: 'Agents' }])`
+- Detail pages: `setCrumbs([{ label: 'Agents', href: '/agents' }, { label: detail.name }])`
+- Creation pages: `setCrumbs([{ label: 'Agents', href: '/agents' }, { label: 'New Agent' }])`
+
+Fallback: HeaderBar derives placeholder crumbs from URL segments while store is empty.
+
+### Command Palette
+
+State: `dashboard/src/lib/stores/command-palette.svelte.ts`
+
+Shared between CommandPalette.svelte (keyboard trigger) and HeaderBar.svelte (visible button).
 
 ## Component Patterns
 
@@ -232,86 +234,71 @@ Used on: StreamOutput container while an agent is running.
 
 | Variant | Classes | Notes |
 |---------|---------|-------|
-| Primary | `rounded-full bg-accent-primary text-surface-0 px-6 py-2.5 font-medium` | Dark text on lime. Lime glow shadow on hover. |
-| Secondary | `rounded-full border border-edge bg-surface-1 text-fg-muted` | Outline pill. Lime border tint on hover. |
-| Danger | Sharp (no rounded-full), `border border-fail text-fail` | Angular shape signals irreversibility. |
+| Primary | `rounded-[2px] bg-accent-primary text-surface-0 font-medium` | Dark text on lime. No hover glow. |
+| Secondary | `rounded-[2px] border border-edge bg-transparent text-fg-muted` | Border shifts to accent-primary-dim on hover. |
+| Danger | Sharp (no rounding), `border border-fail text-fail` | Angular shape signals irreversibility. |
 
 ### Inputs
 
-Sharp corners (0px). Focus state: `focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]` (lime border + lime glow ring).
+Sharp corners (0px). Focus state: `focus:border-accent-primary-dim/60 focus:shadow-[0_0_0_3px_oklch(0.75_0.15_128/0.08)]`.
 
 ### Tables
 
-- Container: sharp, `border border-edge`
-- Header row: `border-b-2 border-edge` (double-weight for emphasis)
-- Header text: `text-[12px] tracking-[0.1em]` uppercase mono
-- Row hover: `hover:bg-accent-primary/[0.03]` (faintest lime tint)
-- Status dots in first column: `shadow-[0_0_4px_var(--color-ok)]` or `--color-fail`
+- No outer border wrapper
+- Header row: `bg-surface-05`, `.section-label` column headers
+- Row hover: `hover:bg-surface-1`
+- Row separators: `border-edge-subtle`
+- Status dots: `.status-dot` with solid color (no box-shadow glow)
 
-### Sidebar Navigation
+### Metrics Strip
 
-Active item uses a background tint (`bg-accent-primary/10 text-accent-primary`) instead of the traditional border-left indicator. A faint lime gradient line decorates the top of the sidebar's right edge.
+Stats rendered as a horizontal row in a single container (`bg-surface-1 border border-edge`). Stats separated by `border-l border-edge-subtle`. Each stat: `.metric-label` on top, `.metric-value` below. No individual card borders, no per-stat icons.
 
-**Collapsible groups**: The sidebar supports collapsible nav groups (e.g. "Orchestration" containing Flows and Teams). The group header is a `<button>` with a `ChevronRight` indicator that rotates 90deg when open. When a child route is active, the group is pinned open (toggle is inert) and the group header receives `text-accent-primary` without background tint, while the active child gets the full `bg-accent-primary/10 text-accent-primary` treatment. Children are indented via a `ml-3` (12px) wrapper. Open/closed state persists to localStorage via `safeGet`/`safeSet`.
+### Filter Bars
 
-**Collapsed flyout**: In icon-only mode (48px width), groups render as a single icon button. On hover or focus, a sharp flyout (`border-edge bg-surface-1 shadow-lg`) appears with a mono uppercase section header (`text-[11px] tracking-[0.12em]`) and child links. Focus management keeps the flyout open while focus moves between its children and closes on blur outside.
+**Dense multi-item (9+ items, wraps)**: `rounded-full` pills. Active: `border-accent-primary-dim/40 bg-accent-primary-wash text-fg`. Inactive: `border-edge bg-transparent text-fg-faint`.
 
-### Agent Picker
-
-Inline searchable dropdown for selecting agents in flow and team builders (`AgentPicker.svelte`). Sharp-cornered trigger and dropdown panel. Trigger shows selected agent name + model pill badge when set; when unset, shows `noneLabel` if provided (e.g. "Generate placeholder"), otherwise the `placeholder` text, with a chevron. Dropdown panel (`role="listbox"`, `tabindex="0"`): search input at top, scrollable agent list with name (mono 13px), description (12px faint, truncated), model pill (mono 10px), and up to 3 feature pills with "+N" overflow. Highlight: `bg-accent-primary/[0.06]`. Selected: left border accent + tinted background. Keyboard: arrow keys navigate, Enter selects, Escape closes. Click-outside closes via window click handler.
+**Few items (2-3)**: Flat underline tabs. Active: `border-b-2 border-accent-primary-dim text-fg`. Inactive: `border-b-2 border-transparent text-fg-faint`.
 
 ### Command Palette
 
-Sharp panel with faint lime border (`border-accent-primary/10`). Selected item: `bg-accent-primary/[0.08]`. Kbd badges use `rounded-full`. Group headers: `text-[11px] tracking-[0.12em]`.
+Sharp panel with dim lime border (`border-accent-primary-dim/40`). Positioned at `mt-[20vh]`. Group headers use `.section-label`. Kbd badges use `rounded-[2px]`.
 
-### Scope Badge
+## Animation
 
-Pill badge (`rounded-full`) for skill scope classification (`ScopeBadge.svelte`). Uses the same structural pattern as capability filter pills: `border px-2 py-0.5 font-mono text-[12px]`. Color varies by scope to convey resolution priority:
+All animations are defined in `dashboard/src/app.css` and respect `prefers-reduced-motion`.
 
-| Scope | Color treatment | Rationale |
-|-------|----------------|-----------|
-| `role-local` | `border-accent-secondary/30 bg-accent-secondary/10 text-accent-secondary` | Cyan = closest to agent, highest priority |
-| `project` | `border-accent-primary/30 bg-accent-primary/10 text-accent-primary` | Lime = project-level shared resource |
-| `extra` | `border-warn/30 bg-warn/10 text-warn` | Amber = externally provided |
-| `user` | `border-edge bg-surface-1 text-fg-faint` | Muted outline = global default |
+### fade-in-up
 
-Always includes a text label (never color alone).
+Subtle entry animation (4px translateY, 400ms duration). Staggered via `animation-delay`.
 
-### Seed Avatar
+### fade-in
 
-Deterministic identity avatar for conversation thread turns (`SeedAvatar.svelte`). Uses DiceBear Rings style (`@dicebear/core` + `@dicebear/rings`) to generate concentric ring patterns from a seed string. The same seed always produces the same avatar.
+Opacity-only fade (300ms). For secondary elements.
 
-**Container**: `rounded-full overflow-hidden shrink-0`, 24px default, `aria-hidden="true"` (adjacent label conveys identity).
+### Reduced Motion
 
-**Color palette**: Constrained to 6 colors drawn from the design system:
+All animations and transitions collapse to 0.01ms.
 
-| Color | Hex | Source |
-|-------|-----|--------|
-| Electric lime | `c8ff00` | accent-primary |
-| Muted teal | `6ec8b1` | desaturated accent-secondary |
-| Warm mid-gray | `8b8b99` | fg-muted range |
-| Cool charcoal | `5a5a6a` | surface-3 range |
-| Desaturated blue | `a0c4ff` | info hue family |
-| Warm amber | `d4a574` | warn hue family |
+## Anti-Patterns (Banned)
 
-**Background**: `161618` (surface-1) so ring patterns sit on matching ground.
+These patterns are explicitly banned:
 
-**Seeding**: User turns seed from `"You"`. Agent turns seed from the agent name (regular runs), active agent name (flow), or active persona name (team). In flow/team streaming, the avatar swaps to reflect the currently active sub-agent.
-
-**Scope**: Only used in `ConversationThread`. Not used in nav, launchpad, agent cards, or other surfaces.
-
-### Requirement Indicator
-
-Compact status dot with tooltip (`RequirementIndicator.svelte`). Green (`bg-ok`) dot with `box-shadow: 0 0 4px var(--color-ok)` when all requirements are met; amber (`bg-warn`) when some are unmet. Accompanied by mono `text-[12px] text-fg-faint` count text (e.g. "2/3 met"). Tooltip lists each requirement with check/cross marks. Hidden when no requirements exist.
+1. **Colored glow shadows** -- no `box-shadow` with accent colors on cards
+2. **Status dot glows** -- solid circles only, no `box-shadow`
+3. **Top-edge colored borders on cards** -- use left-accent or full-border hover
+4. **Pill-shaped primary buttons** -- use `rounded-[2px]`
+5. **Monospace section labels** -- use `.section-label` (sans-serif)
+6. **Gradient hover overlays on cards** -- use border-color transitions
+7. **Noise/grain texture overlays** -- removed entirely
+8. **Pulsing animations** -- removed entirely
 
 ## Token Source
 
 All design tokens live in `dashboard/src/app.css`:
 
-- **`@theme` block** -- Tailwind CSS v4 custom theme tokens (fonts, colors, surfaces)
+- **`@theme` block** -- Tailwind CSS v4 custom theme tokens (fonts, colors, surfaces, borders)
 - **`@theme inline` block** -- Bridge from shadcn-svelte CSS variables to Tailwind tokens
-- **`:root` block** -- shadcn-svelte CSS variable values (background, foreground, primary, etc.)
-- **Utility classes** -- `.card-surface`, `.card-surface-error`, `.glow-lime`, `.glow-cyan`, `.glow-lime-subtle`, `.scrollbar-none`, `.animate-fade-in-up`, `.animate-glow-pulse`
-- **SvelteFlow overrides** -- Custom CSS variables for dark mode canvas, minimap, controls, background dots, and node dimming (`.svelte-flow__node.dimmed`)
-
-To change the color scheme, update the `@theme` and `:root` blocks. All components reference tokens by name, not hardcoded values.
+- **`:root` block** -- shadcn-svelte CSS variable values
+- **Utility classes** -- `.section-label`, `.metric-value`, `.metric-label`, `.status-dot`, `.active-border`, `.card-surface`, `.card-surface-error`, `.scrollbar-none`, `.animate-fade-in-up`, `.animate-fade-in`
+- **SvelteFlow overrides** -- Custom CSS variables for dark mode canvas, minimap, controls

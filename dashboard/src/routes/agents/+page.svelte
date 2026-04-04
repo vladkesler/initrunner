@@ -10,6 +10,9 @@
 	import { Search, Workflow, List, X } from 'lucide-svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Agents' }]); });
 
 	let agents = $state<AgentSummary[]>([]);
 	let loading = $state(true);
@@ -159,7 +162,7 @@
 	<div class="space-y-5">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-3">
-				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Agents</h1>
+				<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Agents</h1>
 				{#if !loading}
 					<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">{agents.length}</span>
 				{/if}

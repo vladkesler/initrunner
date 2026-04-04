@@ -85,7 +85,7 @@
 	<!-- Toolbar -->
 	<div class="flex items-center gap-2">
 		<button
-			class="inline-flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+			class="inline-flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 			onclick={handleSave}
 			disabled={!canSave}
 		>

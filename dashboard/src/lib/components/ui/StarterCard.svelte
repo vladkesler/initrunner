@@ -22,13 +22,8 @@
 	class="group card-surface relative block overflow-hidden bg-surface-1 p-4 transition-[background-color] duration-150 animate-fade-in-up hover:bg-surface-2"
 	style="animation-delay: {index * 60}ms"
 >
-	<!-- Hover gradient wash -->
-	<div
-		class="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-primary/[0.04] via-transparent to-transparent opacity-0 transition-[opacity] duration-150 group-hover:opacity-100"
-	></div>
-
 	<div class="relative">
-		<div class="font-mono text-[13px] font-semibold text-fg transition-[color] duration-150 group-hover:text-accent-primary">
+		<div class="font-mono text-[13px] font-semibold text-fg transition-[color] duration-150 group-hover:text-fg">
 			{starter.name}
 		</div>
 		<div class="mt-1 line-clamp-2 text-[13px] text-fg-muted">

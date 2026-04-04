@@ -28,7 +28,7 @@
 			size={12}
 			class="shrink-0 text-fg-faint transition-transform duration-150 {expanded ? 'rotate-90' : ''}"
 		/>
-		<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<span class="section-label">
 			{title}
 		</span>
 		{#if count !== undefined}

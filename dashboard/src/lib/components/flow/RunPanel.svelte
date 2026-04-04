@@ -194,7 +194,7 @@
 			{:else}
 				<div class="flex items-center gap-2">
 					<SeedAvatar seed={msg.identityLabel ?? 'Flow'} spinning={msg.status === 'streaming'} />
-					<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					<span class="section-label">
 						{msg.identityLabel ?? 'Flow'}
 					</span>
 				</div>

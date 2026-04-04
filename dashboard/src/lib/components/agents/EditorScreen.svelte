@@ -100,7 +100,7 @@
 
 {#if importWarnings.length > 0}
 	<div class="border-l-2 border-l-warn bg-warn/5 px-4 py-3">
-		<h3 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-warn">
+		<h3 class="section-label text-warn">
 			Import warnings
 		</h3>
 		<ul class="mt-2 space-y-1.5">
@@ -180,7 +180,7 @@
 </div>
 
 <div>
-	<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+	<h2 class="mb-3 section-label">
 		Save to
 	</h2>
 	<div class="flex items-center gap-2">
@@ -229,7 +229,7 @@
 		Back
 	</button>
 	<button
-		class="flex items-center gap-2 rounded-full bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+		class="flex items-center gap-2 rounded-[2px] bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 		disabled={hasErrors || saving || !yamlText.trim() || !filename.trim()}
 		onclick={onSave}
 	>

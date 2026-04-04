@@ -32,7 +32,7 @@
 </script>
 
 <div>
-	<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+	<h2 class="mb-3 section-label">
 		Search InitHub
 	</h2>
 	<div class="relative">
@@ -81,7 +81,7 @@
 				</div>
 			{:else if hubFeaturedResults.length > 0}
 				<div class="mb-2 flex items-center justify-between">
-					<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					<span class="section-label">
 						Popular on InitHub
 					</span>
 					<a

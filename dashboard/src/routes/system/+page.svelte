@@ -10,6 +10,9 @@
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'System' }]); });
 
 	let version = $state('');
 	let providerData = $state<ProviderStatusResponse | null>(null);
@@ -140,7 +143,7 @@
 <div class="space-y-8">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">System</h1>
+		<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">System</h1>
 		{#if version}
 			<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">v{version}</span>
 		{/if}
@@ -151,7 +154,7 @@
 	{:else}
 		<!-- Providers -->
 		<div>
-			<h2 class="mb-1 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Providers</h2>
+			<h2 class="mb-1 section-label">Providers</h2>
 			<p class="mb-3 text-[12px] text-fg-faint">API keys that enable access to LLM services. Add keys here to unlock providers.</p>
 			{#if providerData}
 				<ProviderStatusBanner
@@ -165,7 +168,7 @@
 
 		<!-- Default Model -->
 		<div>
-			<h2 class="mb-1 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Default Model</h2>
+			<h2 class="mb-1 section-label">Default Model</h2>
 			<p class="mb-3 text-[12px] text-fg-faint">Which specific model agents use when their YAML doesn't pin one. Agents with an explicit <code class="font-mono">model:</code> section ignore this.</p>
 
 			{#if defaultModel && builderOpts}
@@ -202,7 +205,7 @@
 
 					<div class="mt-4 flex items-center gap-3">
 						<button
-							class="flex items-center gap-1.5 rounded-full border border-edge px-4 py-1.5 text-[13px] text-fg-muted transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg hover:border-accent-primary/20 disabled:opacity-40"
+							class="flex items-center gap-1.5 rounded-[2px] border border-edge px-4 py-1.5 text-[13px] text-fg-muted transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg hover:border-accent-primary/20 disabled:opacity-40"
 							onclick={handleSaveDefault}
 							disabled={dmSaving || !dmDirty}
 						>
@@ -212,7 +215,7 @@
 
 						{#if defaultModel.source === 'run_yaml'}
 							<button
-								class="flex items-center gap-1.5 rounded-full border border-edge px-3 py-1.5 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-edge"
+								class="flex items-center gap-1.5 rounded-[2px] border border-edge px-3 py-1.5 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-edge"
 								onclick={handleResetDefault}
 								disabled={dmSaving}
 							>
@@ -233,9 +236,9 @@
 		<!-- Doctor -->
 		<div>
 			<div class="mb-3 flex items-center gap-3">
-				<h2 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Health Check</h2>
+				<h2 class="section-label">Health Check</h2>
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-edge px-3 py-1 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-accent-primary/20"
+					class="flex items-center gap-1.5 rounded-[2px] border border-edge px-3 py-1 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-accent-primary/20"
 					class:opacity-50={doctorLoading}
 					onclick={loadDoctor}
 					disabled={doctorLoading}
@@ -271,7 +274,7 @@
 		<!-- Embedding Providers -->
 		{#if embeddingChecks.length > 0}
 			<div>
-				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Embedding Providers</h2>
+				<h2 class="mb-3 section-label">Embedding Providers</h2>
 				<div class="space-y-1">
 					{#each embeddingChecks as check}
 						{@const Icon = statusIcon(check.status)}
@@ -288,7 +291,7 @@
 
 		<!-- Tool Registry -->
 		<div>
-			<h2 class="mb-3 flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			<h2 class="mb-3 flex items-center gap-2 section-label">
 				<Wrench size={12} />
 				Tool Registry
 				{#if tools.length > 0}

@@ -46,7 +46,7 @@
 
 <div>
 	<h3
-		class="mb-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint"
+		class="mb-2 section-label"
 	>
 		Triggers
 	</h3>

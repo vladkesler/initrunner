@@ -13,7 +13,7 @@
 
 <div class="flex select-none items-center gap-2 pointer-events-none">
 	<Icon size={14} strokeWidth={1.5} class="text-fg-faint" />
-	<span class="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-fg-faint">
+	<span class="section-label">
 		{data.label}
 	</span>
 	<span class="font-mono text-[11px] text-fg-faint/50">

@@ -6,13 +6,14 @@
 	import { request } from '$lib/api/client';
 	import type { AgentSummary, AuditRecord, AuditStats, HealthStatus } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Plus, BookOpen, Stethoscope, Activity, CheckCircle, Timer, AlertTriangle, ArrowUpRight, Workflow, Users, ExternalLink, TrendingDown, TrendingUp } from 'lucide-svelte';
+	import { Plus, BookOpen, Stethoscope, AlertTriangle, ArrowUpRight, Workflow, Users, ExternalLink, TrendingDown, TrendingUp } from 'lucide-svelte';
 	import CapabilityGlyph from '$lib/components/agents/CapabilityGlyph.svelte';
 	import { fetchFlowList } from '$lib/api/flow';
 	import { fetchTeamList } from '$lib/api/teams';
 	import { getBuilderOptions, getStarters, type BuilderOptions, type StarterInfo } from '$lib/api/builder';
 	import type { FlowSummary, TeamSummary } from '$lib/api/types';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 	import StarterCard from '$lib/components/ui/StarterCard.svelte';
 	import CapabilityChips from '$lib/components/ui/CapabilityChips.svelte';
@@ -32,13 +33,11 @@
 	const agentIdByName = $derived(new Map(agents.map((a) => [a.name, a.id])));
 	const agentByName = $derived(new Map(agents.map((a) => [a.name, a])));
 
-	// Recent success count from last 10 fetched records (sample, not census)
 	const recentSuccessCount = $derived(recentAudit.filter((r) => r.success).length);
 	const recentSuccessRate = $derived(
 		recentAudit.length > 0 ? Math.round((recentSuccessCount / recentAudit.length) * 100) : null
 	);
 
-	// Success divergence: does the last-10 sample diverge from the all-time rate?
 	const successDiverging = $derived.by(() => {
 		if (!stats || recentSuccessRate === null) return 'none' as const;
 		const diff = recentSuccessRate - stats.success_rate;
@@ -47,12 +46,10 @@
 		return 'none' as const;
 	});
 
-	// Tokens per run (all-time average from stats)
 	const tokensPerRun = $derived(
 		stats && stats.total_runs > 0 ? Math.round(stats.total_tokens / stats.total_runs) : 0
 	);
 
-	// Grouped activity feed (consecutive same-agent collapse)
 	const groupedActivity = $derived.by(() => {
 		const groups: Array<{
 			agentName: string;
@@ -112,6 +109,10 @@
 		return `${n}`;
 	}
 
+	$effect(() => {
+		setCrumbs([{ label: 'Launchpad' }]);
+	});
+
 	onMount(async () => {
 		try {
 			const [a, c, t, audit, s, health, opts, st] = await Promise.all([
@@ -160,7 +161,7 @@
 		<div class="space-y-8 py-8">
 			<!-- Header -->
 			<div class="flex items-center gap-3">
-				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Welcome to InitRunner</h1>
+				<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Welcome to InitRunner</h1>
 				{#if version}
 					<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">v{version}</span>
 				{/if}
@@ -179,7 +180,7 @@
 			<div class="flex flex-wrap gap-4">
 				<a
 					href="/agents/new"
-					class="flex items-center gap-2 rounded-full bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
+					class="flex items-center gap-2 rounded-[2px] bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color] duration-150 hover:bg-accent-primary-hover"
 				>
 					<Plus size={16} />
 					Create an Agent
@@ -188,7 +189,7 @@
 					href="https://www.initrunner.ai/docs/quickstart"
 					target="_blank"
 					rel="noopener"
-					class="flex items-center gap-2 rounded-full border border-edge bg-surface-1 px-6 py-2.5 text-[13px] font-medium text-fg-muted transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg hover:border-accent-primary/20"
+					class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-6 py-2.5 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
 				>
 					<BookOpen size={16} />
 					Read the Quickstart
@@ -199,9 +200,7 @@
 			<!-- Starter templates -->
 			{#if starters.length > 0}
 				<div>
-					<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-						Start from a template
-					</h2>
+					<h2 class="section-label mb-3">Start from a template</h2>
 					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{#each starters.slice(0, 6) as starter, i}
 							<StarterCard {starter} index={i} />
@@ -218,9 +217,7 @@
 
 			<!-- Explore capabilities -->
 			<div>
-				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-					Explore
-				</h2>
+				<h2 class="section-label mb-3">Explore</h2>
 				<CapabilityChips />
 				<a
 					href="https://www.initrunner.ai/docs/quickstart"
@@ -235,11 +232,11 @@
 		</div>
 	{:else}
 		<!-- Main dashboard grid -->
-		<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 			<!-- Command bar -->
 			<div class="flex flex-wrap items-center justify-between gap-3 lg:col-span-3">
 				<div class="flex items-center gap-3">
-					<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Launchpad</h1>
+					<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Launchpad</h1>
 					{#if version}
 						<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">v{version}</span>
 					{/if}
@@ -247,28 +244,28 @@
 				<div class="flex items-center gap-3">
 					<a
 						href="/agents/new"
-						class="flex items-center gap-2 rounded-full bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
+						class="flex items-center gap-2 rounded-[2px] bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color] duration-150 hover:bg-accent-primary-hover"
 					>
 						<Plus size={14} />
 						New Agent
 					</a>
 					<a
 						href="/flows/new"
-						class="flex items-center gap-2 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-5 py-2 text-[13px] font-medium text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
 					>
 						<Workflow size={14} />
 						New Flow
 					</a>
 					<a
 						href="/teams/new"
-						class="flex items-center gap-2 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-5 py-2 text-[13px] font-medium text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
 					>
 						<Users size={14} />
 						New Team
 					</a>
 					<a
 						href="/system"
-						class="flex items-center gap-2 rounded-full border border-edge bg-surface-1 px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg hover:border-accent-primary/20"
+						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
 					>
 						<Stethoscope size={14} />
 						Run Doctor
@@ -276,59 +273,44 @@
 				</div>
 			</div>
 
-			<!-- Stats strip -->
+			<!-- Metrics strip -->
 			{#if stats}
-				<div class="grid grid-cols-2 gap-3 lg:col-span-3 lg:grid-cols-4">
+				<div class="flex border border-edge bg-surface-1 lg:col-span-3 animate-fade-in-up">
 					<!-- Total Runs -->
-					<div class="card-surface flex items-center gap-3 bg-surface-1 px-4 py-3 animate-fade-in-up" style="animation-delay: 0ms">
-						<Activity size={16} class="shrink-0 text-accent-primary/60" />
-						<div>
-							<div class="font-mono text-[22px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
-							<div class="text-[12px] text-fg-faint">total runs</div>
-							{#if recentAudit.length > 0}
-								<div class="mt-0.5 font-mono text-[11px] text-fg-faint">
-									<span class="text-accent-primary">{recentSuccessCount}</span>/{recentAudit.length} recent ok
-								</div>
-							{/if}
-						</div>
+					<div class="flex-1 px-5 py-4">
+						<div class="metric-label">Total runs</div>
+						<div class="metric-value mt-1">{stats.total_runs.toLocaleString()}</div>
+						{#if recentAudit.length > 0}
+							<div class="mt-1 font-mono text-[11px] text-fg-faint">
+								<span class="text-accent-primary-dim">{recentSuccessCount}</span>/{recentAudit.length} recent ok
+							</div>
+						{/if}
 					</div>
 					<!-- Success Rate -->
-					<div
-						class="flex items-center gap-3 bg-surface-1 px-4 py-3 animate-fade-in-up {stats.success_rate < 70 ? 'card-surface-error' : 'card-surface'}"
-						style="animation-delay: 60ms{stats.success_rate >= 70 && stats.success_rate < 90 ? '; border-top-color: var(--color-warn)' : ''}"
-					>
-						<CheckCircle size={16} class="shrink-0 {stats.success_rate >= 90 ? 'text-ok' : stats.success_rate >= 70 ? 'text-warn' : 'text-fail'}" />
-						<div>
-							<div class="font-mono text-[22px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
-							<div class="text-[12px] text-fg-faint">success rate</div>
-							{#if recentSuccessRate !== null && successDiverging !== 'none'}
-								<div class="mt-0.5 flex items-center gap-1 font-mono text-[11px]">
-									{#if successDiverging === 'worse'}
-										<TrendingDown size={10} class="text-fail" />
-										<span class="text-fail">last 10: {recentSuccessRate}%</span>
-									{:else}
-										<TrendingUp size={10} class="text-ok" />
-										<span class="text-ok">last 10: {recentSuccessRate}%</span>
-									{/if}
-								</div>
-							{/if}
-						</div>
+					<div class="flex-1 border-l border-edge-subtle px-5 py-4">
+						<div class="metric-label">Success rate</div>
+						<div class="metric-value mt-1">{stats.success_rate}%</div>
+						{#if recentSuccessRate !== null && successDiverging !== 'none'}
+							<div class="mt-1 flex items-center gap-1 font-mono text-[11px]">
+								{#if successDiverging === 'worse'}
+									<TrendingDown size={10} class="text-fail" />
+									<span class="text-fail">last 10: {recentSuccessRate}%</span>
+								{:else}
+									<TrendingUp size={10} class="text-ok" />
+									<span class="text-ok">last 10: {recentSuccessRate}%</span>
+								{/if}
+							</div>
+						{/if}
 					</div>
 					<!-- Tokens / Run -->
-					<div class="card-surface flex items-center gap-3 bg-surface-1 px-4 py-3 animate-fade-in-up" style="animation-delay: 120ms">
-						<Activity size={16} class="shrink-0 text-accent-primary/60" />
-						<div>
-							<div class="font-mono text-[22px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">~{formatTokens(tokensPerRun)}</div>
-							<div class="text-[12px] text-fg-faint">tokens / run</div>
-						</div>
+					<div class="flex-1 border-l border-edge-subtle px-5 py-4">
+						<div class="metric-label">Tokens / run</div>
+						<div class="metric-value mt-1">~{formatTokens(tokensPerRun)}</div>
 					</div>
 					<!-- Avg Duration -->
-					<div class="card-surface flex items-center gap-3 bg-surface-1 px-4 py-3 animate-fade-in-up" style="animation-delay: 180ms">
-						<Timer size={16} class="shrink-0 text-accent-primary/60" />
-						<div>
-							<div class="font-mono text-[22px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{formatDuration(stats.avg_duration_ms)}</div>
-							<div class="text-[12px] text-fg-faint">avg duration</div>
-						</div>
+					<div class="flex-1 border-l border-edge-subtle px-5 py-4">
+						<div class="metric-label">Avg duration</div>
+						<div class="metric-value mt-1">{formatDuration(stats.avg_duration_ms)}</div>
 					</div>
 				</div>
 			{/if}
@@ -336,7 +318,7 @@
 			<!-- Failing agents -->
 			{#if errorAgents.length > 0}
 				<div class="lg:col-span-3">
-					<h2 class="mb-3 flex items-center gap-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fail">
+					<h2 class="section-label mb-3 flex items-center gap-2 text-fail">
 						<AlertTriangle size={12} />
 						Failing Agents
 					</h2>
@@ -355,12 +337,12 @@
 			{/if}
 
 			<!-- Fleet + Feed columns -->
-			<div class="flex flex-col gap-4 lg:col-span-3 lg:flex-row lg:items-start">
+			<div class="flex flex-col gap-6 lg:col-span-3 lg:flex-row lg:items-start">
 				<!-- Left column: Fleet + Orchestration -->
 				<div class="min-w-0 lg:flex-[2]">
 				{#if stats && stats.top_agents.length > 0}
 						<div class="mb-3 flex items-baseline justify-between">
-							<h2 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Agent Fleet</h2>
+							<h2 class="section-label">Agent Fleet</h2>
 							<a href="/agents" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 						</div>
 						<div class="space-y-1.5">
@@ -368,25 +350,20 @@
 								{@const agent = agentByName.get(topAgent.name)}
 								{@const agentId = agentIdByName.get(topAgent.name)}
 								{@const hasError = agent?.error != null}
-								{@const isRich = agent != null && agent.features.length >= 4}
 								<a
 									href={agentId ? `/agents/${agentId}` : '/agents'}
 									class="group relative block overflow-hidden bg-surface-1 px-4 py-3 transition-[background-color,border-color] duration-200 hover:bg-surface-2
 										{hasError ? 'card-surface-error' : 'card-surface'}
-										{isRich && !hasError ? 'glow-lime-subtle' : ''}
 										animate-fade-in-up"
 									style="animation-delay: {i * 40}ms"
 								>
-									<!-- Hover gradient wash -->
-									<div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-primary/[0.04] via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"></div>
-
 									<div class="relative flex items-center gap-3">
 										<div class="w-[14px] shrink-0">
 											{#if agent}
 												<CapabilityGlyph features={agent.features} />
 											{/if}
 										</div>
-										<span class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 group-hover:text-accent-primary">{topAgent.name}</span>
+										<span class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 group-hover:text-fg">{topAgent.name}</span>
 										{#if hasError}
 											<AlertTriangle size={12} class="shrink-0 text-fail" />
 										{/if}
@@ -401,24 +378,22 @@
 						</div>
 				{/if}
 
-				<!-- Orchestration (in left column, below fleet) -->
+				<!-- Orchestration -->
 				{#if flows.length > 0 || teams.length > 0}
-					<div class="glow-cyan mt-6 p-4">
-						<h2 class="mb-4 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
-							Orchestration
-						</h2>
+					<div class="mt-6 border border-edge bg-surface-1 p-4">
+						<h2 class="section-label mb-4">Orchestration</h2>
 						<div class="space-y-5">
 							{#if flows.length > 0}
 								<div>
 									<div class="mb-2 flex items-baseline justify-between">
-										<h3 class="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-accent-secondary">Flows</h3>
+										<h3 class="section-label text-accent-secondary">Flows</h3>
 										<a href="/flows" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 									</div>
 									<div class="space-y-1.5">
 										{#each flows.slice(0, 2) as flow, i}
 											<a
 												href="/flows/{flow.id}"
-												class="card-surface flex items-center justify-between bg-surface-1 px-4 py-3 transition-[border-color,background-color] duration-150 hover:bg-accent-secondary/[0.03] animate-fade-in-up"
+												class="card-surface flex items-center justify-between bg-surface-2 px-4 py-3 transition-[border-color,background-color] duration-150 hover:bg-surface-3 animate-fade-in-up"
 												style="animation-delay: {i * 40}ms"
 											>
 												<div class="flex items-center gap-2.5">
@@ -434,14 +409,14 @@
 							{#if teams.length > 0}
 								<div>
 									<div class="mb-2 flex items-baseline justify-between">
-										<h3 class="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-accent-secondary">Teams</h3>
+										<h3 class="section-label text-accent-secondary">Teams</h3>
 										<a href="/teams" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 									</div>
 									<div class="space-y-1.5">
 										{#each teams.slice(0, 2) as team, i}
 											<a
 												href="/teams/{team.id}"
-												class="card-surface flex items-center justify-between bg-surface-1 px-4 py-3 transition-[border-color,background-color] duration-150 hover:bg-accent-secondary/[0.03] animate-fade-in-up"
+												class="card-surface flex items-center justify-between bg-surface-2 px-4 py-3 transition-[border-color,background-color] duration-150 hover:bg-surface-3 animate-fade-in-up"
 												style="animation-delay: {i * 40}ms"
 											>
 												<div class="flex items-center gap-2.5">
@@ -466,7 +441,7 @@
 				{#if recentAudit.length > 0}
 					<div class="min-w-0 lg:flex-1">
 						<div class="mb-3 flex items-baseline justify-between">
-							<h2 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Recent Runs</h2>
+							<h2 class="section-label">Recent Runs</h2>
 							<a href="/audit" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 						</div>
 						<div>
@@ -480,14 +455,13 @@
 										class="group flex items-center gap-3 px-3 py-1.5 transition-[background-color] duration-150 hover:bg-surface-1"
 									>
 										<span
-											class="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+											class="status-dot"
 											class:bg-ok={!group.hasFailure}
 											class:bg-fail={group.hasFailure}
-											style="box-shadow: 0 0 4px {group.hasFailure ? 'var(--color-fail)' : 'var(--color-ok)'}"
 										></span>
-										<span class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 group-hover:text-accent-primary">{group.agentName}</span>
+										<span class="font-mono text-[13px] text-fg-muted transition-[color] duration-150 group-hover:text-fg">{group.agentName}</span>
 										{#if !isSingle}
-											<span class="rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">x{group.runs.length}</span>
+											<span class="rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 text-[10px] text-fg-faint">x{group.runs.length}</span>
 										{/if}
 										<span class="ml-auto shrink-0 font-mono text-[12px] text-fg-faint">
 											{#if isSingle}

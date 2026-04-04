@@ -135,7 +135,7 @@
 							</p>
 						</div>
 						<div class="mt-2 flex items-center gap-2">
-							<span class="rounded-full bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
+							<span class="rounded-[2px] bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
 								{memory.memory_type}
 							</span>
 							{#if memory.category}

@@ -21,12 +21,8 @@
 <a
 	href="/agents/{agent.id}"
 	class="group relative block overflow-hidden bg-surface-1 p-4 transition-[background-color,border-color] duration-200 hover:bg-surface-2
-		{hasError ? 'card-surface-error' : 'card-surface'}
-		{isRich && !hasError ? 'glow-lime-subtle' : ''}"
+		{hasError ? 'card-surface-error' : 'card-surface'}"
 >
-	<!-- Hover gradient wash -->
-	<div class="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-primary/[0.04] via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"></div>
-
 	<div class="relative min-w-0">
 		<!-- Name row: hero icon + name + error indicator -->
 		<div class="flex items-center gap-2">

@@ -36,7 +36,7 @@
 <div class="fixed inset-0 z-40 bg-black/40" onclick={onClose} onkeydown={(e) => e.key === 'Escape' && onClose()}></div>
 
 <!-- Drawer panel -->
-<div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-edge border-t-2 border-t-accent-primary/20 bg-surface-0 shadow-2xl">
+<div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-edge bg-surface-0 shadow-2xl">
 	<!-- Header -->
 	<div class="flex items-center justify-between border-b border-edge px-5 py-4">
 		<div class="flex items-center gap-3">
@@ -62,38 +62,38 @@
 			<!-- Metadata grid -->
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Agent</div>
+					<div class="mb-1 section-label">Agent</div>
 					<div class="font-mono text-[13px] text-fg-muted">{record.agent_name}</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Model</div>
+					<div class="mb-1 section-label">Model</div>
 					<div class="font-mono text-[13px] text-fg-muted">{record.model}</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Provider</div>
+					<div class="mb-1 section-label">Provider</div>
 					<div class="font-mono text-[13px] text-fg-muted">{record.provider}</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Timestamp</div>
+					<div class="mb-1 section-label">Timestamp</div>
 					<div class="font-mono text-[13px] text-fg-muted">{formatTimestamp(record.timestamp)}</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Tokens</div>
+					<div class="mb-1 section-label">Tokens</div>
 					<div class="font-mono text-[13px] text-fg-muted">
 						{record.tokens_in.toLocaleString()} in / {record.tokens_out.toLocaleString()} out
 					</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Duration</div>
+					<div class="mb-1 section-label">Duration</div>
 					<div class="font-mono text-[13px] text-fg-muted">{record.duration_ms.toLocaleString()}ms</div>
 				</div>
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Tool Calls</div>
+					<div class="mb-1 section-label">Tool Calls</div>
 					<div class="font-mono text-[13px] text-fg-muted">{record.tool_calls}</div>
 				</div>
 				{#if record.trigger_type}
 					<div>
-						<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Trigger</div>
+						<div class="mb-1 section-label">Trigger</div>
 						<div class="font-mono text-[13px] text-fg-muted">{record.trigger_type}</div>
 					</div>
 				{/if}
@@ -101,7 +101,7 @@
 
 			<!-- Run ID -->
 			<div>
-				<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Run ID</div>
+				<div class="mb-1 section-label">Run ID</div>
 				<div class="flex items-center gap-2">
 					<code class="font-mono text-[13px] text-fg-faint">{record.run_id}</code>
 					<button
@@ -120,7 +120,7 @@
 			<!-- Error -->
 			{#if record.error}
 				<div>
-					<div class="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fail">Error</div>
+					<div class="mb-1 section-label text-fail">Error</div>
 					<pre class="overflow-x-auto border border-fail/20 bg-fail/5 p-3 font-mono text-[13px] leading-relaxed text-fail">{record.error}</pre>
 				</div>
 			{/if}
@@ -128,7 +128,7 @@
 			<!-- Prompt -->
 			<div>
 				<div class="mb-2 flex items-center justify-between">
-					<div class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Prompt</div>
+					<div class="section-label">Prompt</div>
 					<button
 						class="text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
 						onclick={() => copyText(record.user_prompt)}
@@ -142,7 +142,7 @@
 			<!-- Output -->
 			<div>
 				<div class="mb-2 flex items-center justify-between">
-					<div class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">Output</div>
+					<div class="section-label">Output</div>
 					<button
 						class="text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
 						onclick={() => copyText(record.output)}

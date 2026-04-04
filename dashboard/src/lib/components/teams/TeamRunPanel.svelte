@@ -192,7 +192,7 @@
 	<!-- Active persona indicator (non-debate) -->
 	{#if activePersona && !debateMode}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
-			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-primary"></span>
+			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-[2px] bg-accent-primary"></span>
 			Running {activePersona}...
 		</div>
 	{:else if running}

@@ -29,8 +29,7 @@
 <div
 	class="w-[240px] cursor-pointer bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
 		{hasError ? 'card-surface-error' : 'card-surface'}
-		{isRich && !hasError ? 'glow-lime-subtle' : ''}
-		{selected ? 'glow-lime' : ''}"
+		{selected ? 'active-border' : ''}"
 	onclick={handleClick}
 	role="link"
 	tabindex="0"

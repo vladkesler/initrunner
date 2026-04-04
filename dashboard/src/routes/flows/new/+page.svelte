@@ -10,6 +10,9 @@
 	import { ApiError } from '$lib/api/client';
 	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Flows', href: '/flows' }, { label: 'New Flow' }]); });
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
@@ -329,7 +332,7 @@
 	{:else if step === 'configure'}
 		<!-- STEP 1: CONFIGURE -->
 		<div class="space-y-5">
-			<h2 class="text-lg font-semibold text-fg">New Flow</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">New Flow</h2>
 
 			<!-- Project name -->
 			<div>
@@ -429,7 +432,7 @@
 				<!-- Routing strategy (route pattern only) -->
 				{#if isRoutePattern}
 					<div class="space-y-3 border-t border-edge pt-4">
-						<span class="block font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Routing strategy</span>
+						<span class="block section-label">Routing strategy</span>
 						<div class="flex gap-1">
 							{#each [
 								{ value: 'all', label: 'Broadcast', tip: 'Fastest. No intelligence.' },
@@ -541,7 +544,7 @@
 				<!-- Generate button -->
 				<div class="flex items-center gap-3">
 					<button
-						class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
+						class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
 						onclick={generate}
 						disabled={!canGenerate || generating}
 					>
@@ -562,7 +565,7 @@
 	{:else if step === 'editor'}
 		<!-- STEP 2: EDITOR -->
 		<div class="space-y-4">
-			<h2 class="text-lg font-semibold text-fg">flow.yaml</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">flow.yaml</h2>
 
 			<!-- YAML editor -->
 			<textarea
@@ -631,7 +634,7 @@
 					</div>
 				{/if}
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
+					class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:opacity-40 disabled:cursor-not-allowed"
 					onclick={save}
 					disabled={saving || !isReady}
 				>
@@ -662,7 +665,7 @@
 			<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-status-ok/30 bg-status-ok/10">
 				<CheckCircle size={24} class="text-status-ok" />
 			</div>
-			<h2 class="text-lg font-semibold text-fg">Flow saved</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Flow saved</h2>
 
 			<!-- Path -->
 			<button
@@ -691,12 +694,12 @@
 			<div class="flex items-center justify-center gap-3">
 				<a
 					href="/flows/{flowId}"
-					class="rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+					class="rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
 				>
 					View Flow
 				</a>
 				<button
-					class="rounded-full border border-edge bg-surface-1 px-4 py-2 font-mono text-[12px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="rounded-[2px] border border-edge bg-surface-1 px-4 py-2 font-mono text-[12px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={createAnother}
 				>
 					Create Another

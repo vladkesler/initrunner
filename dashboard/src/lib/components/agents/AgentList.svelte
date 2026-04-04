@@ -15,22 +15,21 @@
 		</p>
 	</div>
 {:else}
-	<div class="overflow-hidden border border-edge">
-		<table class="w-full">
-			<thead>
-				<tr class="border-b-2 border-edge bg-surface-1">
-					<th class="w-8 px-3 py-2"></th>
-					<th class="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Name</th>
-					<th class="hidden px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint md:table-cell">Description</th>
-					<th class="px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Model</th>
-					<th class="w-20 px-3 py-2 text-right text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Capabilities</th>
-					{#if onDelete}<th class="w-10 px-2 py-2"></th>{/if}
-				</tr>
-			</thead>
+	<table class="w-full">
+		<thead>
+			<tr class="border-b border-edge bg-surface-05">
+				<th class="w-8 px-3 py-2"></th>
+				<th class="section-label px-3 py-2 text-left">Name</th>
+				<th class="section-label hidden px-3 py-2 text-left md:table-cell">Description</th>
+				<th class="section-label px-3 py-2 text-left">Model</th>
+				<th class="section-label w-20 px-3 py-2 text-right">Capabilities</th>
+				{#if onDelete}<th class="w-10 px-2 py-2"></th>{/if}
+			</tr>
+		</thead>
 			<tbody>
 				{#each agents as agent (agent.id)}
 					<tr
-						class="group cursor-pointer border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-accent-primary/[0.03] {agent.error ? 'border-l-2 border-l-fail' : ''}"
+						class="group cursor-pointer border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-surface-1 {agent.error ? 'border-l-2 border-l-fail' : ''}"
 						onclick={() => goto(`/agents/${agent.id}`)}
 						onkeydown={(e) => { if (e.key === 'Enter') goto(`/agents/${agent.id}`); }}
 						tabindex="0"
@@ -38,13 +37,13 @@
 					>
 						<td class="w-8 px-3 py-2">
 							{#if agent.error}
-								<span class="inline-block h-1.5 w-1.5 rounded-full bg-fail shadow-[0_0_4px_var(--color-fail)]"></span>
+								<span class="status-dot bg-fail"></span>
 							{:else}
-								<span class="inline-block h-1.5 w-1.5 rounded-full bg-ok shadow-[0_0_4px_var(--color-ok)]"></span>
+								<span class="status-dot bg-ok"></span>
 							{/if}
 						</td>
 						<td class="px-3 py-2">
-							<a href="/agents/{agent.id}" class="text-[13px] font-medium text-fg transition-[color] duration-150 hover:text-accent-primary">{agent.name}</a>
+							<a href="/agents/{agent.id}" class="text-[13px] font-medium text-fg transition-[color] duration-150 hover:text-fg">{agent.name}</a>
 						</td>
 						<td class="hidden max-w-xs truncate px-3 py-2 text-[13px] text-fg-muted md:table-cell">
 							{agent.description || '\u2014'}
@@ -76,5 +75,4 @@
 				{/each}
 			</tbody>
 		</table>
-	</div>
 {/if}

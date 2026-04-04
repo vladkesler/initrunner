@@ -31,8 +31,7 @@
 
 <div
 	class="w-[240px] bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200 card-surface
-		{isRich ? 'glow-lime-subtle' : ''}
-		{selected ? 'glow-lime' : ''}"
+		{selected ? 'active-border' : ''}"
 >
 	<!-- Name row -->
 	<div class="flex items-center gap-2">

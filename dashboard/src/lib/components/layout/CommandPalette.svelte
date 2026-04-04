@@ -6,8 +6,9 @@
 	import { fetchFlowList } from '$lib/api/flow';
 	import { fetchTeamList } from '$lib/api/teams';
 	import type { AgentSummary, FlowSummary, TeamSummary } from '$lib/api/types';
+	import { isPaletteOpen, togglePalette, closePalette, openPalette } from '$lib/stores/command-palette.svelte';
 
-	let open = $state(false);
+	const open = $derived(isPaletteOpen());
 	let query = $state('');
 	let agents = $state<AgentSummary[]>([]);
 	let flows = $state<FlowSummary[]>([]);
@@ -94,18 +95,27 @@
 	});
 
 	function toggle() {
-		open = !open;
-		if (open) {
+		togglePalette();
+		if (isPaletteOpen()) {
 			query = '';
 			selectedIndex = 0;
 			loadData();
-			// Focus input after render
 			requestAnimationFrame(() => inputEl?.focus());
 		}
 	}
 
+	// Focus input when palette opens externally (e.g. header button)
+	$effect(() => {
+		if (isPaletteOpen()) {
+			query = '';
+			selectedIndex = 0;
+			loadData();
+			requestAnimationFrame(() => inputEl?.focus());
+		}
+	});
+
 	function navigate(href: string) {
-		open = false;
+		closePalette();
 		goto(href);
 	}
 
@@ -119,7 +129,7 @@
 
 		if (e.key === 'Escape') {
 			e.preventDefault();
-			open = false;
+			closePalette();
 		} else if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			selectedIndex = Math.min(selectedIndex + 1, flatFiltered.length - 1);
@@ -158,13 +168,13 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-		onclick={() => (open = false)}
-		onkeydown={(e) => e.key === 'Escape' && (open = false)}
+		onclick={() => closePalette()}
+		onkeydown={(e) => e.key === 'Escape' && closePalette()}
 	>
 		<!-- Panel -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="mx-auto mt-[15vh] w-full max-w-lg border border-accent-primary/10 bg-surface-1 shadow-2xl"
+			class="mx-auto mt-[20vh] w-full max-w-lg border border-accent-primary-dim/40 bg-surface-1 shadow-2xl"
 			onclick={(e) => e.stopPropagation()}
 			onkeydown={(e) => e.stopPropagation()}
 		>
@@ -177,7 +187,7 @@
 					placeholder="Search agents, flows, teams..."
 					class="w-full bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-faint"
 				/>
-				<kbd class="shrink-0 rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[12px] text-fg-faint">ESC</kbd>
+				<kbd class="shrink-0 rounded-[2px] border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[12px] text-fg-faint">ESC</kbd>
 			</div>
 
 			<!-- Results -->
@@ -189,7 +199,7 @@
 				{:else}
 					{@const flatIndex = { value: 0 }}
 					{#each grouped as [group, items]}
-						<div class="px-3 pb-1 pt-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-fg-faint">
+						<div class="px-3 pb-1 pt-2 section-label">
 							{group}
 						</div>
 						{#each items as item}
@@ -212,9 +222,9 @@
 
 			<!-- Footer -->
 			<div class="flex items-center gap-4 border-t border-edge px-4 py-2 font-mono text-[12px] text-fg-faint">
-				<span><kbd class="rounded-full border border-edge px-1.5">&#8593;&#8595;</kbd> navigate</span>
-				<span><kbd class="rounded-full border border-edge px-1.5">&#8629;</kbd> select</span>
-				<span><kbd class="rounded-full border border-edge px-1.5">esc</kbd> close</span>
+				<span><kbd class="rounded-[2px] border border-edge px-1.5">&#8593;&#8595;</kbd> navigate</span>
+				<span><kbd class="rounded-[2px] border border-edge px-1.5">&#8629;</kbd> select</span>
+				<span><kbd class="rounded-[2px] border border-edge px-1.5">esc</kbd> close</span>
 			</div>
 		</div>
 	</div>

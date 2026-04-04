@@ -48,7 +48,7 @@
 					<div class="flex flex-col gap-1.5">
 						<div class="flex items-center gap-2">
 							<SeedAvatar seed={msg.identityLabel ?? 'You'} />
-							<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? 'You'}</span>
+							<span class="section-label">{msg.identityLabel ?? 'You'}</span>
 						</div>
 						<div class="border-l-2 border-accent-primary/30 bg-accent-primary/[0.03] px-4 py-2.5">
 							<pre class="select-text cursor-text whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed text-fg">{msg.content}</pre>
@@ -72,14 +72,14 @@
 								{:else}
 									<SeedAvatar seed={msg.identityLabel ?? assistantLabel} spinning={msg.status === 'streaming'} />
 								{/if}
-								<span class="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-fg-faint">{msg.identityLabel ?? assistantLabel}</span>
+								<span class="section-label">{msg.identityLabel ?? assistantLabel}</span>
 							</div>
 						{/if}
 						<div
 							class="bg-surface-1 px-4 py-3 transition-[border-color,box-shadow] duration-200"
 							class:border-l-2={msg.status === 'streaming'}
 							class:border-accent-primary={msg.status === 'streaming'}
-							class:glow-lime={msg.status === 'streaming'}
+							class:active-border={msg.status === 'streaming'}
 						>
 							{#if msg.content}
 								<div class="select-text cursor-text whitespace-pre-wrap break-words text-[14px] leading-[1.7] text-fg">{msg.content}</div>

@@ -6,8 +6,9 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import AuditTable from '$lib/components/audit/AuditTable.svelte';
 	import AuditDetailDrawer from '$lib/components/audit/AuditDetailDrawer.svelte';
-	import { RefreshCw, Download, Activity, CheckCircle, Coins, Timer } from 'lucide-svelte';
+	import { RefreshCw, Download } from 'lucide-svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
 
 	let records = $state<AuditRecord[]>([]);
 	let stats = $state<AuditStats | null>(null);
@@ -22,6 +23,10 @@
 	const filteredRecords = $derived(
 		showFailuresOnly ? records.filter((r) => !r.success) : records
 	);
+
+	$effect(() => {
+		setCrumbs([{ label: 'Audit' }]);
+	});
 
 	async function load() {
 		loading = true;
@@ -91,7 +96,7 @@
 <div class="space-y-5">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Audit</h1>
+		<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Audit</h1>
 		{#if !loading}
 			<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">
 				{filteredRecords.length}
@@ -99,36 +104,24 @@
 		{/if}
 	</div>
 
-	<!-- Stats strip -->
+	<!-- Metrics strip -->
 	{#if stats && !loading}
-		<div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 0ms">
-				<Activity size={14} class="shrink-0 text-accent-primary/60" />
-				<div>
-					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.total_runs.toLocaleString()}</div>
-					<div class="text-[12px] text-fg-faint">runs</div>
-				</div>
+		<div class="flex border border-edge bg-surface-1 animate-fade-in-up">
+			<div class="flex-1 px-4 py-3">
+				<div class="metric-label">Runs</div>
+				<div class="metric-value mt-0.5" style="font-size: 18px">{stats.total_runs.toLocaleString()}</div>
 			</div>
-			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 60ms">
-				<CheckCircle size={14} class="shrink-0 {stats.success_rate >= 90 ? 'text-ok' : stats.success_rate >= 70 ? 'text-warn' : 'text-fail'}" />
-				<div>
-					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.success_rate}%</div>
-					<div class="text-[12px] text-fg-faint">success</div>
-				</div>
+			<div class="flex-1 border-l border-edge-subtle px-4 py-3">
+				<div class="metric-label">Success</div>
+				<div class="metric-value mt-0.5" style="font-size: 18px">{stats.success_rate}%</div>
 			</div>
-			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 120ms">
-				<Coins size={14} class="shrink-0 text-accent-primary/60" />
-				<div>
-					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.total_tokens.toLocaleString()}</div>
-					<div class="text-[12px] text-fg-faint">tokens</div>
-				</div>
+			<div class="flex-1 border-l border-edge-subtle px-4 py-3">
+				<div class="metric-label">Tokens</div>
+				<div class="metric-value mt-0.5" style="font-size: 18px">{stats.total_tokens.toLocaleString()}</div>
 			</div>
-			<div class="card-surface flex items-center gap-2.5 bg-surface-1 px-3 py-2 animate-fade-in-up" style="animation-delay: 180ms">
-				<Timer size={14} class="shrink-0 text-accent-primary/60" />
-				<div>
-					<div class="font-mono text-[18px] font-semibold tracking-[-0.02em] text-fg" style="font-variant-numeric: tabular-nums">{stats.avg_duration_ms.toLocaleString()}ms</div>
-					<div class="text-[12px] text-fg-faint">avg duration</div>
-				</div>
+			<div class="flex-1 border-l border-edge-subtle px-4 py-3">
+				<div class="metric-label">Avg duration</div>
+				<div class="metric-value mt-0.5" style="font-size: 18px">{stats.avg_duration_ms.toLocaleString()}ms</div>
 			</div>
 		</div>
 	{/if}
@@ -138,14 +131,14 @@
 		<input
 			bind:value={agentFilter}
 			placeholder="Filter by agent..."
-			class="max-w-[180px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+			class="max-w-[180px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary-dim/60 focus:shadow-[0_0_0_3px_oklch(0.75_0.15_128/0.08)]"
 			onkeydown={(e) => e.key === 'Enter' && load()}
 		/>
 
 		<input
 			bind:value={triggerFilter}
 			placeholder="Trigger type..."
-			class="max-w-[140px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+			class="max-w-[140px] border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-fg-faint focus:border-accent-primary-dim/60 focus:shadow-[0_0_0_3px_oklch(0.75_0.15_128/0.08)]"
 			onkeydown={(e) => e.key === 'Enter' && load()}
 		/>
 
@@ -154,34 +147,30 @@
 			<input
 				type="date"
 				bind:value={sinceFilter}
-				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40"
+				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-accent-primary-dim/60"
 				onchange={load}
 			/>
 			<span class="text-[13px] text-fg-faint">to</span>
 			<input
 				type="date"
 				bind:value={untilFilter}
-				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40"
+				class="border border-edge bg-surface-1 px-2 py-1.5 font-mono text-[13px] text-fg-muted outline-none transition-[border-color] duration-150 focus:border-accent-primary-dim/60"
 				onchange={load}
 			/>
 		</div>
 
-		<!-- Success filter -->
-		<div class="flex items-center gap-0.5 rounded-full border border-edge bg-surface-1 p-0.5">
+		<!-- Success filter (underline tabs) -->
+		<div class="flex items-center gap-0.5">
 			<button
-				class="rounded-full px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
-				class:bg-surface-2={!showFailuresOnly}
-				class:text-fg={!showFailuresOnly}
-				class:text-fg-faint={showFailuresOnly}
+				class="border-b-2 px-3 py-1.5 text-[13px] font-medium transition-[color,border-color] duration-150
+					{!showFailuresOnly ? 'border-accent-primary-dim text-fg' : 'border-transparent text-fg-faint hover:text-fg-muted'}"
 				onclick={() => (showFailuresOnly = false)}
 			>
 				All
 			</button>
 			<button
-				class="rounded-full px-2.5 py-1 text-[13px] font-medium transition-[color,background-color] duration-150"
-				class:bg-surface-2={showFailuresOnly}
-				class:text-fg={showFailuresOnly}
-				class:text-fg-faint={!showFailuresOnly}
+				class="border-b-2 px-3 py-1.5 text-[13px] font-medium transition-[color,border-color] duration-150
+					{showFailuresOnly ? 'border-accent-primary-dim text-fg' : 'border-transparent text-fg-faint hover:text-fg-muted'}"
 				onclick={() => (showFailuresOnly = true)}
 			>
 				Failures
@@ -208,7 +197,7 @@
 			</div>
 
 			<button
-				class="flex items-center gap-1.5 rounded-full border border-edge px-3 py-1.5 text-[13px] text-fg-faint transition-[color,background-color,border-color] duration-150 hover:bg-surface-2 hover:text-fg-muted hover:border-accent-primary/20"
+				class="flex items-center gap-1.5 rounded-[2px] border border-edge px-3 py-1.5 text-[13px] text-fg-faint transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg-muted"
 				onclick={load}
 				aria-label="Refresh"
 			>
@@ -222,9 +211,7 @@
 	{#if loading}
 		<Skeleton class="h-64 bg-surface-1" />
 	{:else}
-		<div class="overflow-hidden border border-edge">
-			<AuditTable records={filteredRecords} onRowClick={(r) => (selectedRecord = r)} />
-		</div>
+		<AuditTable records={filteredRecords} onRowClick={(r) => (selectedRecord = r)} />
 	{/if}
 </div>
 

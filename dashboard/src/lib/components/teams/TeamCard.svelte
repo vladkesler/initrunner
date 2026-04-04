@@ -7,7 +7,7 @@
 </script>
 
 <div
-	class="group cursor-pointer border bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-accent-primary/20 hover:bg-gradient-to-br hover:from-accent-primary/[0.03] hover:to-transparent {team.error ? 'card-surface-error' : 'card-surface'}"
+	class="group cursor-pointer border bg-surface-1 p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:bg-surface-2 {team.error ? 'card-surface-error' : 'card-surface'}"
 	style="animation: fadeIn 300ms ease-out {idx * 50}ms both"
 	role="link"
 	tabindex="0"

@@ -42,22 +42,22 @@
 {:else}
 	<table class="w-full">
 		<thead>
-			<tr class="border-b-2 border-edge">
+			<tr class="border-b border-edge bg-surface-05">
 				<th class="w-8 px-3 py-2"></th>
-				<th class="w-40 px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Time</th>
+				<th class="section-label w-40 px-3 py-2 text-left">Time</th>
 				{#if !hideAgentColumn}
-					<th class="min-w-[7rem] px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Agent</th>
+					<th class="section-label min-w-[7rem] px-3 py-2 text-left">Agent</th>
 				{/if}
-				<th class="hidden px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint lg:table-cell">Prompt</th>
-				<th class="w-20 px-3 py-2 text-right text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Tokens</th>
-				<th class="w-24 px-3 py-2 text-right text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Duration</th>
-				<th class="hidden px-3 py-2 text-left text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint md:table-cell">Model</th>
+				<th class="section-label hidden px-3 py-2 text-left lg:table-cell">Prompt</th>
+				<th class="section-label w-20 px-3 py-2 text-right">Tokens</th>
+				<th class="section-label w-24 px-3 py-2 text-right">Duration</th>
+				<th class="section-label hidden px-3 py-2 text-left md:table-cell">Model</th>
 			</tr>
 		</thead>
 		<tbody>
 			{#each records as record (record.run_id)}
 				<tr
-					class="border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-accent-primary/[0.03]"
+					class="border-b border-edge-subtle transition-[background-color] duration-150 hover:bg-surface-1"
 					class:cursor-pointer={!!onRowClick}
 					onclick={() => onRowClick?.(record)}
 					role={onRowClick ? 'button' : undefined}
@@ -66,10 +66,9 @@
 				>
 					<td class="w-8 px-3 py-2">
 						<span
-							class="inline-block h-1.5 w-1.5 rounded-full"
+							class="status-dot"
 							class:bg-ok={record.success}
 							class:bg-fail={!record.success}
-							style="box-shadow: 0 0 4px {record.success ? 'var(--color-ok)' : 'var(--color-fail)'}"
 						></span>
 					</td>
 					<td class="w-40 px-3 py-2 font-mono text-[13px] text-fg-faint">

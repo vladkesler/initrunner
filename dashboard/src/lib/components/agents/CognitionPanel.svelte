@@ -300,7 +300,7 @@
 	<!-- Header -->
 	<div class="flex items-center gap-2">
 		<Brain size={14} strokeWidth={1.5} class="text-fg-faint" />
-		<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<span class="section-label">
 			Cognition
 		</span>
 		<div class="flex-1"></div>
@@ -316,7 +316,7 @@
 
 	<!-- Reasoning Pattern -->
 	<div class="space-y-2">
-		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint" title="Reasoning strategy the agent uses to solve problems. react: tool loop, todo_driven: maintains a task list, plan_execute: plans then acts, reflexion: self-critiques and retries.">
+		<div class="section-label" title="Reasoning strategy the agent uses to solve problems. react: tool loop, todo_driven: maintains a task list, plan_execute: plans then acts, reflexion: self-critiques and retries.">
 			Pattern
 		</div>
 		<div class="grid grid-cols-2 gap-1">
@@ -408,7 +408,7 @@
 					size={11}
 					class="shrink-0 text-fg-faint transition-transform duration-150 {autonomyOpen ? 'rotate-90' : ''}"
 				/>
-				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<span class="section-label">
 					Autonomy
 				</span>
 				<div class="flex-1"></div>
@@ -425,7 +425,7 @@
 			</button>
 		{:else}
 			<label class="flex items-center gap-1.5" title="Agent runs multiple iterations independently without waiting for user input.">
-				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<span class="section-label">
 					Autonomy
 				</span>
 				<div class="flex-1"></div>
@@ -544,7 +544,7 @@
 	<!-- Think Tool -->
 	<div class="space-y-2">
 		<label class="flex items-center gap-1.5" title="Gives the agent a scratchpad for internal reasoning before acting. Critique mode adds self-evaluation.">
-			<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<span class="section-label">
 				Think
 			</span>
 			<div class="flex-1"></div>
@@ -593,7 +593,7 @@
 	<!-- Todo Tool -->
 	<div class="space-y-2">
 		<label class="flex items-center gap-1.5" title="Agent tracks tasks in a structured list. Required for todo_driven and plan_execute patterns.">
-			<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+			<span class="section-label">
 				Todo
 			</span>
 			<div class="flex-1"></div>
@@ -665,7 +665,7 @@
 	<!-- Tool Search -->
 	<div class="space-y-2 border-t border-edge pt-3">
 			<label class="flex items-center gap-1.5" title="Hides tools behind on-demand keyword discovery. The agent calls search_tools() to find what it needs. Reduces context and improves accuracy for agents with many tools.">
-				<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+				<span class="section-label">
 					Tool Search
 				</span>
 				<div class="flex-1"></div>
@@ -697,7 +697,7 @@
 			{#if cog.toolSearch.enabled}
 				<div class="space-y-2 pl-0.5">
 					<div class="flex items-center justify-between">
-						<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">Always visible</span>
+						<span class="section-label opacity-60">Always visible</span>
 						<span class="font-mono text-[10px] text-fg-faint/60">{cog.toolSearch.always_available.length} / {resolvedFuncs.length}</span>
 					</div>
 					<div class="max-h-40 space-y-0.5 overflow-y-auto">
@@ -735,7 +735,7 @@
 							size={10}
 							class="shrink-0 text-fg-faint transition-transform duration-150 {toolSearchTuningOpen ? 'rotate-90' : ''}"
 						/>
-						<span class="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-fg-faint/60">Tuning</span>
+						<span class="section-label opacity-60">Tuning</span>
 					</button>
 
 					{#if toolSearchTuningOpen}
@@ -760,7 +760,7 @@
 
 	<!-- Guardrails readout -->
 	<div class="border-t border-edge pt-3">
-		<div class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint" title="Safety limits. Max iterations caps tool call loops. Timeout kills runs that exceed the time limit.">
+		<div class="section-label" title="Safety limits. Max iterations caps tool call loops. Timeout kills runs that exceed the time limit.">
 			Guardrails
 		</div>
 		<div class="mt-1.5 flex gap-4 font-mono text-[12px]" style="font-variant-numeric: tabular-nums">
