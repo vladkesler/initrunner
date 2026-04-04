@@ -1,6 +1,6 @@
 # Deprecations & Schema Versioning
 
-InitRunner uses a centralized deprecation system to manage removed or renamed configuration fields across role, compose, and team YAML schemas. When a field is deprecated, you get a clear error message pointing to the replacement instead of a cryptic validation failure.
+InitRunner uses a centralized deprecation system to manage removed or renamed configuration fields across role, flow, and team YAML schemas. When a field is deprecated, you get a clear error message pointing to the replacement instead of a cryptic validation failure.
 
 ## spec_version
 
@@ -32,8 +32,8 @@ When you save or generate a role through InitRunner (builder, templates, `initru
 | DEP001 | Role | `spec.memory.max_memories` | Removed. Use `memory.semantic.max_memories` instead. |
 | DEP002 | Role | `spec.ingest.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 | DEP003 | Role | `spec.memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
-| DEP004 | Compose, Team | `spec.shared_memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
-| DEP005 | Compose, Team | `spec.shared_documents.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+| DEP004 | Flow, Team | `spec.shared_memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
+| DEP005 | Flow, Team | `spec.shared_documents.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 
 All current rules are error-severity with no automatic migration. Fix the YAML manually using the guidance in the error message.
 
@@ -108,4 +108,4 @@ spec:
     store_backend: lancedb
 ```
 
-The same fix applies to `memory.store_backend`, `shared_memory.store_backend`, and `shared_documents.store_backend` in role, compose, and team files.
+The same fix applies to `memory.store_backend`, `shared_memory.store_backend`, and `shared_documents.store_backend` in role, flow, and team files.

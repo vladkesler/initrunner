@@ -52,7 +52,7 @@
 <div class="space-y-1">
 	<!-- Model (always visible, not collapsible) -->
 	<div class="pb-3">
-		<h3 class="mb-2 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<h3 class="mb-2 section-label">
 			Model
 		</h3>
 		<div class="pl-0.5 font-mono text-[13px]">

@@ -8,17 +8,17 @@ This guide covers all five patterns side-by-side: what they do, when to pick eac
 
 ## Overview
 
-| | Solo | Delegate | Spawn | Team | Compose |
-|--|------|----------|-------|------|---------|
-| **Kind** | `Agent` | `Agent` | `Agent` | `Team` | `Compose` |
-| **Key config** | `spec.reasoning` | `spec.tools[type:delegate]` | `spec.tools[type:spawn]` | `spec.personas` | `spec.services` |
+| | Solo | Delegate | Spawn | Team | Flow |
+|--|------|----------|-------|------|------|
+| **Kind** | `Agent` | `Agent` | `Agent` | `Team` | `Flow` |
+| **Key config** | `spec.reasoning` | `spec.tools[type:delegate]` | `spec.tools[type:spawn]` | `spec.personas` | `spec.agents` |
 | **Who decides routing** | You + LLM | LLM (runtime) | LLM (runtime) | You (YAML) | You (YAML) |
 | **Execution** | Iterative loop | Blocking tool call | Non-blocking tasks | Sequential or parallel | Graph-based (parallel fan-out) |
 | **Lifetime** | One run | Within parent run | Within parent run | One run | One-shot or daemon |
 | **Communication** | N/A | Tool call/response | Task submit/poll | Output handoff | Graph edges (DelegationEnvelope) |
 | **Triggers** | No | No | No | No | Yes (cron, file, webhook) |
 | **Shared memory** | N/A | Optional | Optional | Yes | Yes |
-| **Error isolation** | Per-agent | Per-delegation | Per-task | Per-persona | Per-service |
+| **Error isolation** | Per-agent | Per-delegation | Per-task | Per-persona | Per-agent |
 | **Distributed** | No | Yes (MCP mode) | No | No | Yes (systemd) |
 | **Files needed** | 1 | 3+ | 3+ | 1 | 2+ |
 | **Typical agents** | 1 | 1-3 | 1-5 | 2-5 | 2-20 |
@@ -36,14 +36,14 @@ flowchart TD
     B -->|Yes, I define the roles in YAML| C[Is it long-running or event-driven?]
     B -->|No, the LLM picks at runtime| D[Do you need parallel execution?]
 
-    C -->|Yes, triggers and continuous services| Compose[Compose]
+    C -->|Yes, triggers and continuous agents| Flow[Flow]
     C -->|No, one-shot with multiple perspectives| Team[Team]
 
     D -->|Yes, fire N agents concurrently| Spawn[Spawn]
     D -->|No, call one specialist at a time| Delegate[Delegate]
 
     Solo:::pattern
-    Compose:::pattern
+    Flow:::pattern
     Team:::pattern
     Spawn:::pattern
     Delegate:::pattern
@@ -390,19 +390,19 @@ initrunner run team.yaml --task "Pods are pending in staging"
 
 ---
 
-## Compose
+## Flow
 
-Long-running daemon with independent services, triggers, and message routing. Each service wraps a role YAML file. Services communicate through delegate sinks.
+Long-running daemon with independent agents, triggers, and message routing. Each agent wraps a role YAML file. Agents communicate through delegate sinks.
 
-**Use when** you need event-driven agents that run continuously and route work between each other. Compose is for always-on pipelines: monitoring bots, support desks, CI/CD watchers.
+**Use when** you need event-driven agents that run continuously and route work between each other. Flow is for always-on pipelines: monitoring bots, support desks, CI/CD watchers.
 
-**Kind**: `Compose` | **Key config**: `spec.services`
+**Kind**: `Flow` | **Key config**: `spec.agents`
 
 ### How it works
 
 ```mermaid
 flowchart TD
-    WH[Webhook] -->|triggers| Intake[intake service]
+    WH[Webhook] -->|triggers| Intake[intake agent]
     Intake -->|sense routing| R[researcher]
     Intake -->|sense routing| Resp[responder]
     Intake -->|sense routing| Esc[escalator]
@@ -411,20 +411,20 @@ flowchart TD
     Esc --> Out3[Result]
 ```
 
-The compose topology is compiled into a pydantic-graph execution graph. Each service becomes a graph step. Fan-out delegation uses Fork/Join for parallel execution; routing strategies (`keyword`/`sense`) use Decision nodes. In daemon mode, trigger events (webhooks, cron, file watchers) spawn independent graph runs via a bounded ingress queue.
+The flow topology is compiled into a pydantic-graph execution graph. Each agent becomes a graph step. Fan-out delegation uses Fork/Join for parallel execution; routing strategies (`keyword`/`sense`) use Decision nodes. In daemon mode, trigger events (webhooks, cron, file watchers) spawn independent graph runs via a bounded ingress queue.
 
 ### Example: support desk
 
 ```yaml
 apiVersion: initrunner/v1
-kind: Compose
+kind: Flow
 metadata:
   name: support-desk
   description: >
     Support desk with intelligent auto-routing. Intake summarizes
     incoming requests, sense routing sends each to the right handler.
 spec:
-  services:
+  agents:
     intake:
       role: roles/intake.yaml
       sink:
@@ -437,11 +437,11 @@ spec:
 
     researcher:
       role: roles/researcher.yaml
-      depends_on: [intake]
+      needs: [intake]
 
     responder:
       role: roles/responder.yaml
-      depends_on: [intake]
+      needs: [intake]
       restart:
         condition: on-failure
         max_retries: 3
@@ -449,22 +449,22 @@ spec:
 
     escalator:
       role: roles/escalator.yaml
-      depends_on: [intake]
+      needs: [intake]
 ```
 
 ```bash
-initrunner compose up support-desk/compose.yaml
+initrunner flow up support-desk/flow.yaml
 ```
 
 ### Key considerations
 
-- Compose services stay alive between triggers. Good for steady workloads, overkill for rare events (use a webhook-triggered Solo agent instead).
-- `depends_on` controls startup order. Delegate sink targets do not need to be listed in `depends_on` -- the orchestrator handles that.
-- `restart` policies (`on-failure`, `always`) keep services resilient. Set `max_retries` to avoid infinite restart loops.
+- Flow agents stay alive between triggers. Good for steady workloads, overkill for rare events (use a webhook-triggered Solo agent instead).
+- `needs` controls startup order. Delegate sink targets do not need to be listed in `needs` -- the orchestrator handles that.
+- `restart` policies (`on-failure`, `always`) keep agents resilient. Set `max_retries` to avoid infinite restart loops.
 - `strategy: sense` calls the LLM to pick the best target. Use `keyword` for zero API calls, `all` to fan out everywhere.
-- Compose can run as a systemd service for production. See [Compose orchestration](agent_composer.md) for `compose install`.
+- Flow can run as a systemd service for production. See [Flow orchestration](flow.md) for `flow install`.
 
-**Deep dive**: [Compose orchestration](agent_composer.md) | [Sinks and routing](sinks.md)
+**Deep dive**: [Flow orchestration](flow.md) | [Sinks and routing](sinks.md)
 
 ---
 
@@ -478,8 +478,8 @@ flowchart LR
     Solo -->|add type: delegate| Delegate
     Spawn -->|wrap in Team YAML| Team
     Delegate -->|wrap in Team YAML| Team
-    Team -->|split into role files| Compose
-    Compose -->|add delegate tools to services| CD[Compose + Delegate]
+    Team -->|split into role files| Flow
+    Flow -->|add delegate tools to agents| FD[Flow + Delegate]
 ```
 
 ### Solo to Spawn
@@ -535,14 +535,14 @@ spec:
           role_file: ./agents/web-searcher.yaml
 ```
 
-### Team to Compose
+### Team to Flow
 
-Your Team pipeline needs to run on a schedule and respond to webhooks. Move each persona to its own role file and wire them in a Compose definition:
+Your Team pipeline needs to run on a schedule and respond to webhooks. Move each persona to its own role file and wire them in a Flow definition:
 
 ```yaml
-kind: Compose
+kind: Flow
 spec:
-  services:
+  agents:
     researcher:
       role: roles/researcher.yaml
       trigger:
@@ -553,7 +553,7 @@ spec:
         target: editor
     editor:
       role: roles/editor.yaml
-      depends_on: [researcher]
+      needs: [researcher]
 ```
 
 ## Pattern combinations
@@ -562,9 +562,9 @@ Patterns nest inside each other. A few common setups:
 
 **Team with delegate tools.** One persona in a Team uses `type: delegate` to call external specialists. The persona acts as a coordinator within the larger team pipeline.
 
-**Compose with spawn services.** A Compose service uses `type: spawn` internally to parallelize its work. The service fans out to sub-agents, collects results, and sends the synthesized output through its sink.
+**Flow with spawn agents.** A Flow agent uses `type: spawn` internally to parallelize its work. The agent fans out to sub-agents, collects results, and sends the synthesized output through its sink.
 
-**Compose with autonomous services.** A Compose service has `reasoning: todo_driven` and `autonomy: {}`. Each trigger starts an iterative agentic loop, not just a single prompt-response.
+**Flow with autonomous agents.** A Flow agent has `reasoning: todo_driven` and `autonomy: {}`. Each trigger starts an iterative agentic loop, not just a single prompt-response.
 
 ## Competitive comparison
 
@@ -578,7 +578,7 @@ How InitRunner's patterns map to other agent frameworks. Comparison current as o
 | Delegate | Tool-calling subgraph | `delegate_work=True` | Nested chat | `transfer_to_*` handoffs |
 | Spawn | Parallel branch + fan-in | `process: "parallel"` | Parallel group chat | N/A |
 | Team | Multi-node sequential graph | Crew (sequential process) | Sequential group chat | Multi-agent with handoffs |
-| Compose | LangGraph Cloud deployment | N/A | N/A | N/A |
+| Flow | LangGraph Cloud deployment | N/A | N/A | N/A |
 
 ### Feature comparison
 
@@ -594,13 +594,13 @@ How InitRunner's patterns map to other agent frameworks. Comparison current as o
 
 ### What sets InitRunner apart
 
-**YAML-first configuration.** Switching from Solo to Team to Compose is a YAML change, not a code rewrite. You do not need to learn a new API for each pattern. Other frameworks require Python code for every pattern, which means rewriting agent logic when you change coordination strategy.
+**YAML-first configuration.** Switching from Solo to Team to Flow is a YAML change, not a code rewrite. You do not need to learn a new API for each pattern. Other frameworks require Python code for every pattern, which means rewriting agent logic when you change coordination strategy.
 
 **Built-in lifecycle.** Triggers, sinks, memory, audit logging, and guardrails are all part of the platform. LangGraph and CrewAI require you to bolt on external schedulers and persistence layers. InitRunner ships them.
 
-**Daemon-native.** Compose runs as a systemd service with health checks, restart policies, and structured logging. Other frameworks are typically run-once processes that need external supervision for long-running workloads.
+**Daemon-native.** Flow runs as a systemd service with health checks, restart policies, and structured logging. Other frameworks are typically run-once processes that need external supervision for long-running workloads.
 
-**Progressive complexity.** Start with a Solo agent in one YAML file. Add a spawn tool for parallelism. Wrap it in a Team for multi-perspective review. Move to Compose for event-driven pipelines. Each step is additive -- you never throw away what you built.
+**Progressive complexity.** Start with a Solo agent in one YAML file. Add a spawn tool for parallelism. Wrap it in a Team for multi-perspective review. Move to Flow for event-driven pipelines. Each step is additive -- you never throw away what you built.
 
 ## Pitfalls
 
@@ -608,12 +608,12 @@ Common mistakes and how to avoid them.
 
 | Mistake | Why it hurts | Do this instead |
 |---------|-------------|-----------------|
-| Using Compose for a one-shot multi-perspective task | Compose is a daemon. Overkill when you just want 3 agents to review the same thing. | Use Team. One YAML file, no triggers needed. |
+| Using Flow for a one-shot multi-perspective task | Flow is a daemon. Overkill when you just want 3 agents to review the same thing. | Use Team. One YAML file, no triggers needed. |
 | Using Spawn when you only call one sub-agent at a time | Spawn's value is parallelism. Single sequential calls add a poll loop for no benefit. | Use Delegate. Simpler, blocking, no polling. |
 | Putting all logic in the coordinator, making sub-agents trivial | The coordinator becomes the bottleneck. Sub-agents become expensive no-ops. | Give sub-agents real autonomy. Keep the coordinator thin. |
 | Skipping `max_depth` on Delegate or Spawn | Agent A delegates to B, B delegates back to A. Infinite loop. | Always set `max_depth: 2` or `3`. |
 | Sharing memory without a read/write contract | Agents overwrite each other's memories with conflicting data. | Assign roles: one writer, others read-only, or use namespaced keys. |
-| Choosing Compose "for scale" when traffic is bursty | Services stay alive between triggers. Wasted resources for events that come once a day. | Use a webhook-triggered Solo agent. Move to Compose when you need inter-service routing. |
+| Choosing Flow "for scale" when traffic is bursty | Agents stay alive between triggers. Wasted resources for events that come once a day. | Use a webhook-triggered Solo agent. Move to Flow when you need inter-agent routing. |
 
 ## Cost and performance
 
@@ -625,13 +625,13 @@ Mental models for token usage and latency across patterns. No benchmarks (they g
 2. **Delegate** -- adds sub-agent tokens, but only one at a time. Moderate.
 3. **Team (sequential)** -- N persona runs. Each sees growing context from prior handoffs. Grows with the number of personas.
 4. **Spawn** -- N parallel agents, each with a full context window. Costs scale linearly with concurrency.
-5. **Compose** -- N services, each triggered independently. Highest total, but spread over time.
+5. **Flow** -- N agents, each triggered independently. Highest total, but spread over time.
 
 **Rules of thumb:**
 
 - Spawning 3 researchers costs roughly 3x a single researcher. Worth it when wall-clock time matters more than token spend.
 - Team sequential: the last persona sees all prior output. With 5 verbose personas, that is a lot of context. Use `handoff_max_chars` to cap handoff size.
-- Compose services are idle between triggers. Cost accrues per-trigger, not per-second. The daemon process itself is cheap.
+- Flow agents are idle between triggers. Cost accrues per-trigger, not per-second. The daemon process itself is cheap.
 - Delegate with `mode: mcp` adds HTTP round-trip latency (100-500ms) but lets you scale sub-agents to separate machines.
 
 ## Quick reference
@@ -642,7 +642,7 @@ Mental models for token usage and latency across patterns. No benchmarks (they g
 | Consult specialists one at a time | Delegate | `Agent` | `spec.tools[type:delegate]` |
 | Run specialists in parallel | Spawn | `Agent` | `spec.tools[type:spawn]` |
 | Fixed multi-role review pipeline | Team | `Team` | `spec.personas` |
-| Event-driven daemon with routing | Compose | `Compose` | `spec.services` |
+| Event-driven daemon with routing | Flow | `Flow` | `spec.agents` |
 
 ## Further reading
 
@@ -650,8 +650,8 @@ Mental models for token usage and latency across patterns. No benchmarks (they g
 - [Autonomous execution](autonomy.md) -- Solo pattern deep dive
 - [Delegation](delegation.md) -- Delegate pattern deep dive
 - [Team mode](team_mode.md) -- Team pattern deep dive
-- [Compose orchestration](agent_composer.md) -- Compose pattern deep dive
-- [Sinks and routing](sinks.md) -- result routing between services
+- [Flow orchestration](flow.md) -- Flow pattern deep dive
+- [Sinks and routing](sinks.md) -- result routing between agents
 - [Triggers](../core/triggers.md) -- cron, file watch, webhook configuration
 - [Reasoning strategies](../core/reasoning.md) -- todo_driven, plan_execute, reflexion
 - [Memory system](../core/memory.md) -- shared memory configuration

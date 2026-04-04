@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { getMcpHealthSummary } from '$lib/api/mcp';
 	import { onMount } from 'svelte';
-	import { Compass, Blocks, Sparkles, Workflow, Users, ScanEye, Cpu, Network, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
-	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let { collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void } = $props();
 
@@ -11,60 +11,41 @@
 		return page.url.pathname.startsWith(href);
 	}
 
-	const topItems = [
-		{ href: '/', label: 'Launchpad', icon: Compass },
-		{ href: '/agents', label: 'Agents', icon: Blocks }
-	];
-	const orchChildren = [
-		{ href: '/compose', label: 'Compose', icon: Workflow },
-		{ href: '/teams', label: 'Teams', icon: Users }
-	];
-	const midItems = [
+	const buildItems = [
+		{ href: '/agents', label: 'Agents', icon: Blocks },
+		{ href: '/flows', label: 'Flows', icon: Workflow },
+		{ href: '/teams', label: 'Teams', icon: Users },
 		{ href: '/skills', label: 'Skills', icon: Sparkles }
 	];
-	const bottomItems = [
-		{ href: '/audit', label: 'Audit', icon: ScanEye },
-		{ href: '/system', label: 'System', icon: Cpu }
+
+	const operateItems = [
+		{ href: '/mcp', label: 'MCP Hub', icon: Cable },
+		{ href: '/audit', label: 'Audit', icon: ScanEye }
 	];
 
-	let orchestrationOpen = $state(false);
-	let flyoutOpen = $state(false);
+	let mcpUnhealthy = $state(0);
 
 	onMount(() => {
-		if (safeGet('sidebar-orch-open') === 'true') orchestrationOpen = true;
+		const poll = () => {
+			getMcpHealthSummary()
+				.then((s) => { mcpUnhealthy = s.unhealthy; })
+				.catch(() => { /* ignore */ });
+		};
+		poll();
+		const id = setInterval(poll, 30_000);
+		return () => clearInterval(id);
 	});
 
-	const orchChildActive = $derived(
-		page.url.pathname.startsWith('/compose') || page.url.pathname.startsWith('/teams')
-	);
-
-	$effect(() => {
-		if (orchChildActive) orchestrationOpen = true;
-	});
-
-	function toggleOrchestration() {
-		if (orchChildActive) return;
-		orchestrationOpen = !orchestrationOpen;
-		safeSet('sidebar-orch-open', String(orchestrationOpen));
-	}
-
-	function handleFlyoutBlur(e: FocusEvent) {
-		const container = (e.currentTarget as HTMLElement).closest('[role="group"]');
-		if (!container?.contains(e.relatedTarget as Node)) {
-			flyoutOpen = false;
-		}
-	}
+	const homeActive = $derived(isActive('/'));
+	const sysActive = $derived(isActive('/system'));
 </script>
 
 <nav
-	class="relative flex h-full flex-col border-r border-edge bg-[#111113] transition-[width] duration-150"
-	style="width: {collapsed ? '48px' : '200px'}"
+	class="relative flex h-full flex-col border-r border-edge bg-surface-05 transition-[width] duration-150"
+	style="width: {collapsed ? '48px' : '220px'}"
 >
-	<!-- Lime gradient highlight on right edge -->
-	<div class="pointer-events-none absolute right-0 top-0 h-24 w-px bg-gradient-to-b from-accent-primary/15 via-transparent to-transparent"></div>
-
-	<!-- Logo -->
-	<div class="flex h-12 items-center border-b border-edge px-3">
+	<!-- Zone 1: Brand -->
+	<div class="flex h-12 items-center border-b border-edge-subtle px-3">
 		{#if collapsed}
 			<img src="/icon.svg" alt="InitRunner" class="mx-auto h-5 w-auto" />
 		{:else}
@@ -72,129 +53,95 @@
 		{/if}
 	</div>
 
-	<!-- Navigation -->
-	<div class="flex flex-1 flex-col gap-1 p-2">
-		<!-- Top items: Launchpad, Agents -->
-		{#each topItems as item}
-			{@const active = isActive(item.href)}
-			<a
-				href={item.href}
-				class="group flex items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
-				title={collapsed ? item.label : undefined}
-			>
-				<item.icon size={15} strokeWidth={1.5} />
-				{#if !collapsed}
-					<span class="font-mono">{item.label}</span>
-				{/if}
-			</a>
-		{/each}
+	<div class="flex flex-1 flex-col overflow-y-auto p-2">
+		<!-- Launchpad (primary home) -->
+		<a
+			href="/"
+			class="group mb-1 flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
+				{homeActive
+					? 'border-accent-primary text-fg'
+					: 'border-transparent text-fg-faint hover:bg-gradient-to-r hover:from-accent-primary-wash hover:to-transparent hover:text-fg-muted'}"
+			title={collapsed ? 'Launchpad' : undefined}
+		>
+			<Compass size={15} strokeWidth={1.5} />
+			{#if !collapsed}
+				<span>Launchpad</span>
+			{/if}
+		</a>
 
-		<!-- Orchestration group -->
-		{#if collapsed}
-			<!-- Collapsed: flyout variant -->
-			<div
-				class="relative"
-				role="group"
-				onmouseenter={() => (flyoutOpen = true)}
-				onmouseleave={() => (flyoutOpen = false)}
-			>
-				<button
-					class="group flex w-full items-center justify-center px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {orchChildActive ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
-					onfocus={() => (flyoutOpen = true)}
-					onblur={handleFlyoutBlur}
-					aria-expanded={flyoutOpen}
-					aria-label="Orchestration"
-				>
-					<Network size={15} strokeWidth={1.5} />
-				</button>
-
-				{#if flyoutOpen}
-					<div class="absolute left-full top-0 z-10 ml-1 min-w-[160px] border border-edge bg-surface-1 py-1 shadow-lg">
-						<div class="px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-fg-faint">
-							Orchestration
-						</div>
-						{#each orchChildren as child}
-							{@const active = isActive(child.href)}
-							<a
-								href={child.href}
-								class="flex items-center gap-2.5 px-3 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-muted hover:bg-surface-2 hover:text-fg'}"
-								onfocus={() => (flyoutOpen = true)}
-								onblur={handleFlyoutBlur}
-							>
-								<child.icon size={15} strokeWidth={1.5} />
-								<span class="font-mono">{child.label}</span>
-							</a>
-						{/each}
-					</div>
-				{/if}
+		<!-- Zone 2: Workspace -->
+		{#if !collapsed}
+			<div class="mb-1 mt-3 px-3 section-label" style="font-size: 10px; letter-spacing: 0.15em; opacity: 0.6">
+				Build
 			</div>
 		{:else}
-			<!-- Expanded: group header + children -->
-			<button
-				class="group flex w-full items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {orchChildActive ? 'text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
-				onclick={toggleOrchestration}
-				aria-expanded={orchestrationOpen}
-			>
-				<Network size={15} strokeWidth={1.5} />
-				<span class="font-mono">Orchestration</span>
-				<ChevronRight
-					size={12}
-					strokeWidth={1.5}
-					class="ml-auto transition-transform duration-150 {orchestrationOpen ? 'rotate-90' : ''}"
-				/>
-			</button>
-
-			{#if orchestrationOpen}
-				<div class="ml-3">
-					{#each orchChildren as child}
-						{@const active = isActive(child.href)}
-						<a
-							href={child.href}
-							class="group flex items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
-						>
-							<child.icon size={15} strokeWidth={1.5} />
-							<span class="font-mono">{child.label}</span>
-						</a>
-					{/each}
-				</div>
-			{/if}
+			<div class="my-2 border-t border-edge-subtle"></div>
 		{/if}
 
-		<!-- Skills (below Orchestration) -->
-		{#each midItems as item}
+		{#each buildItems as item}
 			{@const active = isActive(item.href)}
 			<a
 				href={item.href}
-				class="group flex items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
+				class="group flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
+					{active
+						? 'border-accent-primary text-fg'
+						: 'border-transparent text-fg-faint hover:bg-gradient-to-r hover:from-accent-primary-wash hover:to-transparent hover:text-fg-muted'}"
 				title={collapsed ? item.label : undefined}
 			>
 				<item.icon size={15} strokeWidth={1.5} />
 				{#if !collapsed}
-					<span class="font-mono">{item.label}</span>
+					<span>{item.label}</span>
 				{/if}
 			</a>
 		{/each}
 
-		<!-- Bottom items: Audit, System -->
-		{#each bottomItems as item}
+		{#if !collapsed}
+			<div class="mb-1 mt-4 px-3 section-label" style="font-size: 10px; letter-spacing: 0.15em; opacity: 0.6">
+				Operate
+			</div>
+		{:else}
+			<div class="my-2 border-t border-edge-subtle"></div>
+		{/if}
+
+		{#each operateItems as item}
 			{@const active = isActive(item.href)}
 			<a
 				href={item.href}
-				class="group flex items-center gap-2.5 px-2.5 py-2 text-[13px] transition-[color,background-color] duration-150 {active ? 'bg-accent-primary/10 text-accent-primary' : 'text-fg-faint hover:bg-surface-2 hover:text-fg-muted'}"
+				class="group relative flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
+					{active
+						? 'border-accent-primary text-fg'
+						: 'border-transparent text-fg-faint hover:bg-gradient-to-r hover:from-accent-primary-wash hover:to-transparent hover:text-fg-muted'}"
 				title={collapsed ? item.label : undefined}
 			>
 				<item.icon size={15} strokeWidth={1.5} />
 				{#if !collapsed}
-					<span class="font-mono">{item.label}</span>
+					<span>{item.label}</span>
+				{/if}
+				{#if item.href === '/mcp' && mcpUnhealthy > 0}
+					<span class="status-dot absolute right-2 top-1/2 -translate-y-1/2" style="background: var(--color-fail)"></span>
 				{/if}
 			</a>
 		{/each}
 	</div>
 
-	<!-- Collapse toggle -->
-	<div class="border-t border-edge p-2">
+	<!-- Zone 3: Meta (bottom) -->
+	<div class="border-t border-edge-subtle p-2">
+		<a
+			href="/system"
+			class="group flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
+				{sysActive
+					? 'border-accent-primary text-fg'
+					: 'border-transparent text-fg-faint hover:bg-gradient-to-r hover:from-accent-primary-wash hover:to-transparent hover:text-fg-muted'}"
+			title={collapsed ? 'System' : undefined}
+		>
+			<Cpu size={15} strokeWidth={1.5} />
+			{#if !collapsed}
+				<span>System</span>
+			{/if}
+		</a>
+
 		<button
-			class="flex w-full items-center justify-center py-1.5 text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+			class="mt-1 flex w-full items-center justify-center py-1.5 text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
 			onclick={onToggle}
 			aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 		>

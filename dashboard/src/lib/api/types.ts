@@ -174,14 +174,14 @@ export interface ToolType {
 	description: string;
 }
 
-// -- Compose ------------------------------------------------------------------
+// -- Flow ---------------------------------------------------------------------
 
-export interface ComposeSummary {
+export interface FlowSummary {
 	id: string;
 	name: string;
 	description: string;
-	service_count: number;
-	service_names: string[];
+	agent_count: number;
+	agent_names: string[];
 	path: string;
 	error: string | null;
 }
@@ -207,43 +207,43 @@ export interface HealthCheckDetail {
 	retries: number;
 }
 
-export interface ComposeServiceDetail {
+export interface FlowAgentDetail {
 	name: string;
 	role_path: string;
 	agent_id: string | null;
 	agent_name: string | null;
 	sink: SinkDetail | null;
-	depends_on: string[];
+	needs: string[];
 	trigger_summary: string | null;
 	restart: RestartDetail;
 	health_check: HealthCheckDetail;
 	environment_count: number;
 }
 
-export interface ComposeDetail {
+export interface FlowDetail {
 	id: string;
 	name: string;
 	description: string;
 	path: string;
-	services: ComposeServiceDetail[];
+	agents: FlowAgentDetail[];
 	shared_memory_enabled: boolean;
 	shared_documents_enabled: boolean;
 }
 
 export interface DelegateEvent {
 	timestamp: string;
-	source_service: string;
-	target_service: string;
+	source_agent: string;
+	target_agent: string;
 	status: string;
 	source_run_id: string;
-	compose_name: string | null;
+	flow_name: string | null;
 	reason: string | null;
 	trace: string | null;
 	payload_preview: string;
 }
 
-export interface ServiceStepResponse {
-	service_name: string;
+export interface AgentStepResponse {
+	agent_name: string;
 	output: string;
 	tokens_in: number;
 	tokens_out: number;
@@ -254,11 +254,11 @@ export interface ServiceStepResponse {
 	error: string | null;
 }
 
-export interface ComposeRunResponse {
+export interface FlowRunResponse {
 	output: string;
 	output_mode: 'single' | 'multiple' | 'none';
-	final_service_name: string | null;
-	steps: ServiceStepResponse[];
+	final_agent_name: string | null;
+	steps: AgentStepResponse[];
 	tokens_in: number;
 	tokens_out: number;
 	total_tokens: number;
@@ -268,16 +268,16 @@ export interface ComposeRunResponse {
 	message_history: string | null;
 }
 
-export interface ComposeThreadMessage {
+export interface FlowThreadMessage {
 	role: 'user' | 'assistant';
 	content: string;
 	status: 'complete' | 'streaming' | 'interrupted' | 'error';
-	activeService?: string | null;
-	result?: ComposeRunResponse | null;
+	activeAgent?: string | null;
+	result?: FlowRunResponse | null;
 	error?: string | null;
 }
 
-export interface ComposeStats {
+export interface FlowStats {
 	total_events: number;
 	by_status: Record<string, number>;
 }
@@ -287,8 +287,8 @@ export interface PatternInfo {
 	description: string;
 	fixed_topology: boolean;
 	slot_names: string[];
-	min_services: number;
-	max_services: number | null;
+	min_agents: number;
+	max_agents: number | null;
 }
 
 export interface AgentSlotModel {
@@ -327,7 +327,7 @@ export interface ProviderPreset {
 	key_configured: boolean;
 }
 
-export interface ComposeBuilderOptions {
+export interface FlowBuilderOptions {
 	patterns: PatternInfo[];
 	agents: AgentSlotOption[];
 	providers: ProviderModels[];
@@ -345,24 +345,24 @@ export interface ValidationIssue {
 	severity: string;
 }
 
-export interface ComposeSeedResponse {
-	compose_yaml: string;
+export interface FlowSeedResponse {
+	flow_yaml: string;
 	role_yamls: Record<string, string>;
 	issues: ValidationIssue[];
 	ready: boolean;
 }
 
-export interface ComposeValidateResponse {
+export interface FlowValidateResponse {
 	issues: ValidationIssue[];
 	ready: boolean;
 }
 
-export interface ComposeSaveResponse {
+export interface FlowSaveResponse {
 	path: string;
 	valid: boolean;
 	issues: string[];
 	next_steps: string[];
-	compose_id: string;
+	flow_id: string;
 }
 
 // -- Ingestion ----------------------------------------------------------------
@@ -624,4 +624,70 @@ export interface TeamSaveResponse {
 	issues: string[];
 	next_steps: string[];
 	team_id: string;
+}
+
+// -- MCP Hub ------------------------------------------------------------------
+
+export interface McpAgentRef {
+	agent_name: string;
+	agent_id: string;
+	role_path: string;
+	tool_filter: string[];
+	tool_exclude: string[];
+	tool_prefix: string | null;
+}
+
+export interface McpServer {
+	server_id: string;
+	display_name: string;
+	transport: 'stdio' | 'sse' | 'streamable-http';
+	command: string | null;
+	args: string[];
+	url: string | null;
+	agent_refs: McpAgentRef[];
+	health_status: 'healthy' | 'degraded' | 'unhealthy' | null;
+	health_checked_at: string | null;
+}
+
+export interface McpTool {
+	name: string;
+	description: string;
+	input_schema: Record<string, unknown>;
+}
+
+export interface McpHealthResult {
+	server_id: string;
+	status: 'healthy' | 'degraded' | 'unhealthy';
+	latency_ms: number;
+	tool_count: number;
+	error: string | null;
+	checked_at: string;
+}
+
+export interface McpPlaygroundResult {
+	tool_name: string;
+	output: string;
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+}
+
+export interface McpRegistryEntry {
+	name: string;
+	display_name: string;
+	description: string;
+	category: string;
+	transport: string;
+	command: string | null;
+	args: string[];
+	url: string | null;
+	install_hint: string;
+	homepage: string;
+	tags: string[];
+}
+
+export interface McpHealthSummary {
+	total: number;
+	healthy: number;
+	unhealthy: number;
 }

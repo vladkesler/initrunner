@@ -11,7 +11,7 @@ from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
 from initrunner.agent.schema.observability import ObservabilityConfig
 from initrunner.agent.schema.role import parse_tool_list
 from initrunner.agent.schema.tools import ToolConfig
-from initrunner.compose.schema import SharedMemoryConfig
+from initrunner.flow.schema import SharedMemoryConfig
 from initrunner.stores.base import StoreBackend
 
 

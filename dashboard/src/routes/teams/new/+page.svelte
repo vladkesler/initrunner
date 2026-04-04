@@ -6,6 +6,9 @@
 	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
 	import { page } from '$app/state';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Teams', href: '/teams' }, { label: 'New Team' }]); });
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
 	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
@@ -322,7 +325,7 @@
 	{:else if step === 'configure'}
 		<!-- STEP 1: CONFIGURE -->
 		<div class="space-y-5">
-			<h2 class="text-lg font-semibold text-fg">New Team</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">New Team</h2>
 
 			<!-- Team name -->
 			<div>
@@ -421,7 +424,7 @@
 			<!-- Generate button -->
 			<div class="flex items-center gap-3">
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+					class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
 					onclick={generate}
 					disabled={!canGenerate || generating}
 				>
@@ -442,7 +445,7 @@
 	{:else if step === 'editor'}
 		<!-- STEP 2: EDITOR -->
 		<div class="space-y-4">
-			<h2 class="text-lg font-semibold text-fg">team.yaml</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">team.yaml</h2>
 
 			<!-- YAML editor -->
 			<textarea
@@ -498,7 +501,7 @@
 					/>
 				</div>
 				<button
-					class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+					class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
 					onclick={save}
 					disabled={saving || !isReady}
 				>
@@ -529,7 +532,7 @@
 			<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-status-ok/30 bg-status-ok/10">
 				<CheckCircle size={24} class="text-status-ok" />
 			</div>
-			<h2 class="text-lg font-semibold text-fg">Team saved</h2>
+			<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Team saved</h2>
 
 			<!-- Path -->
 			<button
@@ -562,12 +565,12 @@
 			<div class="flex items-center justify-center gap-3">
 				<a
 					href="/teams/{teamId}"
-					class="rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+					class="rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
 				>
 					View Team
 				</a>
 				<button
-					class="rounded-full border border-edge bg-surface-1 px-4 py-2 font-mono text-[12px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
+					class="rounded-[2px] border border-edge bg-surface-1 px-4 py-2 font-mono text-[12px] text-fg-faint transition-[color,background-color] duration-150 hover:bg-surface-2 hover:text-fg-muted"
 					onclick={createAnother}
 				>
 					Create Another

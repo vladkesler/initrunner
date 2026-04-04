@@ -8,6 +8,9 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import SkillList from '$lib/components/skills/SkillList.svelte';
 	import { Sparkles, Search } from 'lucide-svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Skills' }]); });
 
 	let skills = $state<SkillSummary[]>([]);
 	let loading = $state(true);
@@ -108,7 +111,7 @@
 <div class="flex h-full flex-col gap-5">
 	<!-- Header -->
 	<div class="flex items-center gap-3">
-		<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Skills</h1>
+		<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Skills</h1>
 		<span
 			class="font-mono text-[13px] text-fg-faint"
 			style="font-variant-numeric: tabular-nums"
@@ -117,7 +120,7 @@
 		</span>
 		<a
 			href="/skills/new"
-			class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
+			class="ml-auto inline-flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover"
 		>
 			New Skill
 		</a>
@@ -196,7 +199,7 @@
 		<div class="flex flex-col items-center gap-4 py-16 text-center">
 			<p class="text-[13px] text-fg-faint">Failed to load skills.</p>
 			<button
-				class="rounded-full border border-edge px-4 py-1.5 text-[13px] text-fg-faint hover:text-fg-muted"
+				class="rounded-[2px] border border-edge px-4 py-1.5 text-[13px] text-fg-faint hover:text-fg-muted"
 				onclick={() => location.reload()}
 			>
 				Retry
@@ -211,7 +214,7 @@
 			</p>
 			<a
 				href="/skills/new"
-				class="rounded-full bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
+				class="rounded-[2px] bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover"
 			>
 				Create your first skill
 			</a>

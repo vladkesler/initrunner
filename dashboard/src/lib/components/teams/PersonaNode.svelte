@@ -21,8 +21,8 @@
 <div
 	class="relative w-[240px] bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
 		{state === 'error' ? 'card-surface-error' : 'card-surface'}
-		{state === 'active' ? 'glow-lime-subtle' : ''}
-		{selected ? 'glow-lime' : ''}
+		{state === 'active' ? 'active-border' : ''}
+		{selected ? 'active-border' : ''}
 		{state === 'pending' ? 'opacity-40' : ''}"
 >
 	{#if isDebate && state === 'active'}
@@ -39,7 +39,7 @@
 			{:else if state === 'error'}
 				<XCircle size={14} class="shrink-0 text-status-fail" />
 			{:else if state === 'active'}
-				<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent-primary"></span>
+				<span class="inline-block h-2 w-2 animate-pulse rounded-[2px] bg-accent-primary"></span>
 			{/if}
 			<span class="min-w-0 truncate font-mono text-[13px] font-semibold text-fg">{persona.name}</span>
 		</div>

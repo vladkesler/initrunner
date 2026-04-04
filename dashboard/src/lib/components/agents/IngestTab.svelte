@@ -297,7 +297,7 @@
 
 		<!-- Progress panel -->
 		{#if ingesting}
-			<div class="card-surface bg-surface-1 p-3 animate-glow-pulse">
+			<div class="card-surface bg-surface-1 p-3 active-border">
 				<div
 					class="max-h-48 space-y-1 overflow-y-auto font-mono text-[13px] scrollbar-none"
 				>
@@ -349,7 +349,7 @@
 								</p>
 								<div class="mt-1.5 flex flex-wrap items-center gap-2">
 									<span
-										class="rounded-full bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary"
+										class="rounded-[2px] bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary"
 									>
 										{doc.chunk_count} chunks
 									</span>

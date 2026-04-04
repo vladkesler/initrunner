@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026.4.5] - 2026-04-04
+
+### Added
+- **MCP Hub dashboard page** (`/mcp`) -- visual management center for MCP servers with four tabs: Servers (aggregated view with health dots, lazy tool introspection), Discover (curated registry of 12 popular MCP servers with YAML copy), Playground (execute any tool in isolation with auto-generated forms and history), Canvas (@xyflow topology of server-agent relationships). Sidebar health badge polls every 30s, Launchpad shows MCP health widget
+- **MCP Hub backend** -- server aggregation service with identity hashing and deduplication, health checks with 30s TTL cache, single-tool playground execution. 6 API endpoints under `/api/mcp/`. Sandbox enforcement (command allowlist, env scrubbing) flows through all operations
+- **Browser agent starter** -- `browser-agent.yaml` template with `initrunner-browser-mcp` and `@modelcontextprotocol/server-filesystem` MCP servers, giving new users a working MCP setup out of the box
+- **Browser MCP auto-sandbox workaround** -- `initrunner-browser-mcp` auto-retries with `--no-sandbox` when Chrome fails due to AppArmor/unprivileged user namespace restrictions (Ubuntu 23.10+, containers, VMs)
+
+### Changed
+- **Compose renamed to Flow** -- `kind: Compose` is now `kind: Flow`, `services:` is now `agents:`, `depends_on:` is now `needs:`. Old compose files get a clear error with exact field renames. 131 files changed across schema, CLI, dashboard, docs, and tests
+- **Dashboard visual redesign** (Electric Charcoal v2) -- deeper surface scale, desaturated accent tokens, sans-serif section labels, left-edge nav indicators, unified metrics strips, HeaderBar with breadcrumbs and Cmd+K trigger, ternary border-radius system (0px/2px/pill). Removed: noise grain, glow effects, lime top-edge card borders, monospace section labels, pill-shaped CTAs
+- **Dashboard screenshot updated** for v2 redesign
+- **Example role versions bumped** for flow rename republish
+
 ## [2026.4.4] - 2026-04-03
 
 ### Added

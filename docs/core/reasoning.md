@@ -1,6 +1,6 @@
 # Reasoning Primitives
 
-InitRunner's reasoning system gives agents structured cognitive tools and execution strategies. Two orthogonal layers compose naturally: **cognitive tools** (think, todo, spawn) that the LLM uses voluntarily within a turn, and **reasoning strategies** (react, todo_driven, plan_execute, reflexion) that orchestrate behavior across turns in autonomous mode.
+InitRunner's reasoning system gives agents structured cognitive tools and execution strategies. Two orthogonal layers combine naturally: **cognitive tools** (think, todo, spawn) that the LLM uses voluntarily within a turn, and **reasoning strategies** (react, todo_driven, plan_execute, reflexion) that orchestrate behavior across turns in autonomous mode.
 
 All reasoning tools are **run-scoped** -- built fresh per-run with isolated state, never leaking across REPL/daemon sessions.
 
@@ -455,9 +455,9 @@ spec:
 initrunner run reasoner.yaml -p "Should we migrate from REST to GraphQL?"
 ```
 
-## Composing Primitives
+## Combining Primitives
 
-The tools compose naturally through LLM reasoning. No special wiring needed.
+The tools combine naturally through LLM reasoning. No special wiring needed.
 
 ### think + todo (structured reasoning)
 

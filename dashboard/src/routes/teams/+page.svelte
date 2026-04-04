@@ -9,6 +9,9 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Search, X, Users, Plus } from 'lucide-svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Teams' }]); });
 
 	let teams = $state<TeamSummary[]>([]);
 	let loading = $state(true);
@@ -57,14 +60,14 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-3">
-			<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">Teams</h1>
+			<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Teams</h1>
 			{#if !loading}
 				<span class="border border-edge bg-surface-1 px-2 py-0.5 font-mono text-[12px] text-fg-faint">{teams.length}</span>
 			{/if}
 		</div>
 		<a
 			href="/teams/new"
-			class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-3 py-1.5 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+			class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-3 py-1.5 font-mono text-[12px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
 		>
 			<Plus size={14} />
 			New Team
@@ -111,7 +114,7 @@
 			</p>
 			<a
 				href="/teams/new"
-				class="flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
+				class="flex items-center gap-1.5 rounded-[2px] border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 font-mono text-[13px] text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
 			>
 				<Plus size={14} />
 				Create a Team
@@ -120,7 +123,7 @@
 
 		{#if teamStarters.length > 0}
 			<div>
-				<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+				<h2 class="mb-3 section-label">
 					Start from a template
 				</h2>
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

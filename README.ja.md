@@ -271,6 +271,35 @@ spec:
 
 `initrunner compose up compose.yaml` で実行。[パターンガイド](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) を参照。
 
+## MCP -- あらゆるツールエコシステムに接続
+
+エージェントは任意の [MCP](https://modelcontextprotocol.io/) サーバーをツールソースとして利用できます。サーバーを指定すれば、公開されているすべてのツールがエージェントで使えるようになります：
+
+```yaml
+spec:
+  tools:
+    - type: mcp
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"]
+    - type: mcp
+      transport: sse
+      url: https://my-mcp-server.example.com/sse
+```
+
+複数の MCP サーバーと組み込みツールを同時に使用可能。3つのトランスポート：`stdio`（ローカルプロセス）、`sse`（Server-Sent Events）、`streamable-http`。ツールフィルタリング（`tool_filter` / `tool_exclude`）と名前空間（`tool_prefix`）で、サーバーが多くのツールを公開する場合も整理できます。
+
+逆方向も可能。エージェントを MCP ツールとして公開し、Claude Code、Cursor、Windsurf などの MCP クライアントから呼び出せます：
+
+```bash
+initrunner mcp serve agent.yaml            # エージェントが MCP ツールになる
+initrunner mcp toolkit --tools search,sql  # LLM 不要で生ツールを公開
+```
+
+Dashboard の [MCP Hub](/mcp) では、全エージェントの MCP サーバーを一覧表示し、Playground で任意のツールを単独テストし、ドラッグ&ドロップキャンバスでサーバーとエージェントのトポロジーを視覚化できます。
+
+[MCP Gateway](docs/interfaces/mcp-gateway.md) · [Dashboard](docs/interfaces/dashboard.md#mcp-hub-mcp) を参照。
+
 ## ユーザーインターフェース
 
 <p align="center">

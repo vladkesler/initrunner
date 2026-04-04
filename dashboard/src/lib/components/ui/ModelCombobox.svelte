@@ -147,7 +147,7 @@
 			{#if customMode}
 				<!-- Custom model entry -->
 				<div class="px-3 pt-2.5 pb-1">
-					<span class="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">Custom model</span>
+					<span class="section-label">Custom model</span>
 				</div>
 				<div class="px-3 pb-2">
 					<input

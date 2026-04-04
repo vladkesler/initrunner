@@ -13,7 +13,7 @@ from initrunner.deprecations import (
     _get_nested,
     apply_deprecations,
     inspect_role_data,
-    validate_compose_dict,
+    validate_flow_dict,
     validate_role_dict,
     validate_team_dict,
 )
@@ -43,15 +43,15 @@ def _minimal_role_dict(**overrides) -> dict:
     return d
 
 
-def _minimal_compose_dict(**spec_overrides) -> dict:
+def _minimal_flow_dict(**spec_overrides) -> dict:
     d = {
         "apiVersion": "initrunner/v1",
-        "kind": "Compose",
-        "metadata": {"name": "test-compose"},
+        "kind": "Flow",
+        "metadata": {"name": "test-flow"},
         "spec": {
-            "services": {
-                "svc-a": {"role": "roles/a.yaml"},
-                "svc-b": {"role": "roles/b.yaml"},
+            "agents": {
+                "agent-a": {"role": "roles/a.yaml"},
+                "agent-b": {"role": "roles/b.yaml"},
             },
         },
     }
@@ -125,12 +125,12 @@ class TestApplyDeprecations:
         assert len(hits) == 1
         assert hits[0].id == "DEP003"
 
-    def test_zvec_compose(self):
-        data = _minimal_compose_dict(
+    def test_zvec_flow(self):
+        data = _minimal_flow_dict(
             shared_memory={"store_backend": "zvec"},
             shared_documents={"store_backend": "zvec"},
         )
-        _, hits = apply_deprecations(data, SchemaKind.COMPOSE)
+        _, hits = apply_deprecations(data, SchemaKind.FLOW)
         ids = {h.id for h in hits}
         assert "DEP004" in ids
         assert "DEP005" in ids
@@ -154,10 +154,10 @@ class TestApplyDeprecations:
         assert hits[0].severity == "error"
 
     def test_wrong_kind_ignored(self):
-        """Role-only rules don't fire on compose kind."""
-        data = _minimal_compose_dict()
+        """Role-only rules don't fire on flow kind."""
+        data = _minimal_flow_dict()
         data["spec"]["memory"] = {"max_memories": 500}
-        _, hits = apply_deprecations(data, SchemaKind.COMPOSE)
+        _, hits = apply_deprecations(data, SchemaKind.FLOW)
         assert not any(h.id == "DEP001" for h in hits)
 
     def test_lancedb_does_not_trigger(self):
@@ -214,20 +214,51 @@ class TestValidateRoleDict:
 
 
 # ---------------------------------------------------------------------------
-# validate_compose_dict / validate_team_dict
+# validate_flow_dict / validate_team_dict
 # ---------------------------------------------------------------------------
 
 
-class TestValidateComposeDict:
+class TestValidateFlowDict:
     def test_clean(self):
-        compose, hits = validate_compose_dict(_minimal_compose_dict())
-        assert compose.metadata.name == "test-compose"
+        flow, hits = validate_flow_dict(_minimal_flow_dict())
+        assert flow.metadata.name == "test-flow"
         assert hits == []
 
     def test_zvec_rejects(self):
-        data = _minimal_compose_dict(shared_memory={"store_backend": "zvec"})
+        data = _minimal_flow_dict(shared_memory={"store_backend": "zvec"})
         with pytest.raises(ValueError, match="DEP004"):
-            validate_compose_dict(data)
+            validate_flow_dict(data)
+
+    def test_hard_break_kind_compose(self):
+        """Old kind: Compose triggers a clear migration error."""
+        data = {
+            "apiVersion": "initrunner/v1",
+            "kind": "Compose",
+            "metadata": {"name": "old"},
+            "spec": {
+                "services": {
+                    "svc-a": {"role": "a.yaml", "depends_on": ["svc-b"]},
+                    "svc-b": {"role": "b.yaml"},
+                },
+            },
+        }
+        with pytest.raises(ValueError, match="kind: Compose has been renamed to kind: Flow"):
+            validate_flow_dict(data)
+
+    def test_hard_break_services_only(self):
+        """spec.services without kind: Compose still triggers."""
+        data = {
+            "apiVersion": "initrunner/v1",
+            "kind": "Flow",
+            "metadata": {"name": "old"},
+            "spec": {
+                "services": {
+                    "svc-a": {"role": "a.yaml"},
+                },
+            },
+        }
+        with pytest.raises(ValueError, match=r"spec\.services -> spec\.agents"):
+            validate_flow_dict(data)
 
 
 class TestValidateTeamDict:

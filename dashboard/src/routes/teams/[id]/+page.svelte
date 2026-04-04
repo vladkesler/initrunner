@@ -5,6 +5,9 @@
 	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml, deleteTeam } from '$lib/api/teams';
 	import type { TeamDetail } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { if (detail) setCrumbs([{ label: 'Teams', href: '/teams' }, { label: detail.name }]); });
 	import PersonaPipeline from '$lib/components/teams/PersonaPipeline.svelte';
 	import TeamRunPanel from '$lib/components/teams/TeamRunPanel.svelte';
 	import TeamMemoryTab from '$lib/components/teams/TeamMemoryTab.svelte';
@@ -99,7 +102,7 @@
 		<!-- Header -->
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">{detail.name}</h1>
+				<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">{detail.name}</h1>
 				<span class="rounded-full border border-accent-primary/20 bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
 					{detail.strategy}{#if detail.debate} ({detail.debate.max_rounds} rounds){/if}
 				</span>

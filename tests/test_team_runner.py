@@ -515,7 +515,7 @@ class TestRunTeam:
 
 
 class TestSharedMemory:
-    @patch("initrunner.compose.orchestrator.apply_shared_memory")
+    @patch("initrunner.flow.orchestrator.apply_shared_memory")
     @patch("initrunner.agent.loader.build_agent")
     @patch("initrunner.agent.executor.execute_run")
     @patch("initrunner.agent.loader._load_dotenv")
@@ -547,7 +547,7 @@ class TestSharedMemory:
             _ok_result("r2", "out2"),
         ]
 
-        with patch("initrunner.compose.orchestrator.apply_shared_memory") as mock_apply:
+        with patch("initrunner.flow.orchestrator.apply_shared_memory") as mock_apply:
             run_team(team, "task", team_dir=tmp_path)
             mock_apply.assert_not_called()
 

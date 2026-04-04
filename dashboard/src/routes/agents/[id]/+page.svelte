@@ -7,6 +7,9 @@
 	import type { AgentDetail, AuditStats, TriggerStat } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { if (detail) setCrumbs([{ label: 'Agents', href: '/agents' }, { label: detail.name }]); });
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
@@ -144,7 +147,7 @@
 		<!-- Header -->
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg" style="text-wrap: balance">
+				<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg" style="text-wrap: balance">
 					{detail.name}
 				</h1>
 				{#if detail.model.provider}

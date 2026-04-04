@@ -82,7 +82,7 @@ def resolve_custom_provider(
 
 @dataclasses.dataclass
 class ProviderOptions:
-    """Provider/model data shared between agent and compose builders."""
+    """Provider/model data shared between agent and flow builders."""
 
     providers: list[ProviderModels]
     detected_provider: str | None

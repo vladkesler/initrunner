@@ -55,16 +55,14 @@
 					{isActive
 						? isFail
 							? 'border-fail/30 bg-fail/10 text-fail'
-							: cat.accent === 'secondary'
-								? 'border-accent-secondary/30 bg-accent-secondary/10 text-accent-secondary'
-								: 'border-accent-primary/30 bg-accent-primary/10 text-accent-primary'
-						: 'border-edge bg-surface-1 text-fg-faint hover:text-fg-muted'}"
+							: 'border-accent-primary-dim/40 bg-accent-primary-wash text-fg'
+						: 'border-edge bg-transparent text-fg-faint hover:text-fg-muted'}"
 				onclick={() => onFilterChange(cat.key)}
 				aria-pressed={isActive}
 			>
 				<cat.icon size={14} strokeWidth={1.5} />
 				<span>{cat.label}</span>
-				<span class="opacity-50">({count})</span>
+				<span class="opacity-40">({count})</span>
 			</button>
 		{/if}
 	{/each}

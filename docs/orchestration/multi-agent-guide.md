@@ -20,7 +20,7 @@ Do you need multiple agents?
                     |
                     No --> Is it long-running with triggers or events?
                             |
-                            Yes --> Compose
+                            Yes --> Flow
                             |       (daemon with cron/file/webhook triggers, routed sinks)
                             |
                             No --> Does the parent agent decide at runtime?
@@ -34,10 +34,10 @@ Do you need multiple agents?
 
 ## Quick Comparison
 
-| | Single + Reasoning | Team | Compose | Spawn | Delegate |
-|--|-------------------|------|---------|-------|----------|
-| **Kind** | Agent | Team | Compose | Agent (tool) | Agent (tool) |
-| **Config** | `spec.reasoning` | `spec.personas` | `spec.services` | `spec.tools` | `spec.tools` |
+| | Single + Reasoning | Team | Flow | Spawn | Delegate |
+|--|-------------------|------|------|-------|----------|
+| **Kind** | Agent | Team | Flow | Agent (tool) | Agent (tool) |
+| **Config** | `spec.reasoning` | `spec.personas` | `spec.agents` | `spec.tools` | `spec.tools` |
 | **Who decides** | You + LLM | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
 | **Execution** | Iterative loop | Sequential/parallel | Trigger-driven | Non-blocking | Blocking |
 | **Lifetime** | One run | One run | Daemon | Within parent run | Within parent run |
@@ -96,14 +96,14 @@ initrunner run team.yaml -p "Pods are CrashLoopBackOff in staging"
 
 Use when: you want structured multi-perspective analysis with a fixed set of roles.
 
-### Compose
+### Flow
 
-Long-running daemon with independent services, each with their own triggers (cron, file watcher, webhook) and optional sinks that route output to other services.
+Long-running daemon with independent agents, each with their own triggers (cron, file watcher, webhook) and optional sinks that route output to other agents.
 
 ```yaml
-kind: Compose
+kind: Flow
 spec:
-  services:
+  agents:
     watcher:
       role: ./agents/watcher.yaml
       trigger:
@@ -118,7 +118,7 @@ spec:
 ```
 
 ```bash
-initrunner run compose.yaml  # runs as daemon
+initrunner run flow.yaml  # runs as daemon
 ```
 
 Use when: you need event-driven agents that run continuously and route work between each other.
@@ -212,14 +212,14 @@ spec:
     store_path: ./.initrunner/team_memory.db
 ```
 
-### Compose + Delegate Sinks (Event-Driven with Routing)
+### Flow + Delegate Sinks (Event-Driven with Routing)
 
-Services trigger on events and route output to the best-fit downstream service.
+Agents trigger on events and route output to the best-fit downstream agent.
 
 ```yaml
-kind: Compose
+kind: Flow
 spec:
-  services:
+  agents:
     intake:
       role: ./agents/intake.yaml
       trigger:
@@ -239,5 +239,5 @@ As your needs grow, patterns compose and upgrade naturally:
 
 - **Single agent** that needs parallel research? Add `type: spawn` to tools
 - **Spawn agent** that needs a fixed review workflow? Wrap it in a Team
-- **Team** that needs to run on a schedule? Move to Compose with a cron trigger
-- **Compose** services that need dynamic sub-delegation? Add `type: delegate` tools to individual services
+- **Team** that needs to run on a schedule? Move to Flow with a cron trigger
+- **Flow** agents that need dynamic sub-delegation? Add `type: delegate` tools to individual agents

@@ -38,24 +38,25 @@ initrunner dashboard --expose --api-key my-secret-key
 
 Action-oriented home page with two states.
 
-**Zero state** (no agents, composes, or teams):
+**Zero state** (no agents, flows, or teams):
 
 Onboarding surface designed to reduce time-to-first-agent:
 
 - **Provider status banner**: shows which AI providers are configured (env var presence + Ollama). When no providers are configured, shows an inline key entry form (provider dropdown + API key input + "Save & Verify" button) so users can configure a provider without leaving the dashboard. Links to the provider setup guide and the System page for full provider management.
 - **Primary CTAs**: "Create an Agent" and "Read the Quickstart" (links to `https://www.initrunner.ai/docs/quickstart`).
 - **Starter template cards**: up to 6 curated single-file Agent starters from `_starters/` (helpdesk, rag-agent, memory-assistant, telegram, discord, email). Each card shows name, description, and derived feature badges (RAG, Memory, Triggers, Web, etc.). Clicking a card navigates to `/agents/new?starter={slug}`, which auto-loads the starter YAML into the editor when a provider is detected.
-- **Capability chips**: pill links to RAG, Memory, Triggers, Compose, and Teams docs/creation flows.
+- **Capability chips**: pill links to RAG, Memory, Triggers, Flow, and Teams docs/creation flows.
 - **Full documentation link**: external link to the quickstart guide.
 
-**Full state** (agents, composes, or teams exist):
+**Full state** (agents, flows, or teams exist):
 
 - **Stats strip**: total runs, success rate, total tokens, average duration
-- **Quick actions**: "New Agent", "New Compose", "New Team", and "Run Doctor" buttons
+- **Quick actions**: "New Agent", "New Flow", "New Team", and "Run Doctor" buttons
 - **Failing agents**: red-bordered cards for agents with load errors
 - **Top agents**: bar chart of the 5 most-used agents (by run count)
 - **Recent activity**: compact timeline of last 10 runs
-- **Orchestration**: section header grouping the Compositions and Teams cards (appears when either exists)
+- **Orchestration**: section header grouping the Flows and Teams cards (appears when either exists)
+- **MCP Servers**: health summary card showing healthy/unhealthy/unchecked server counts with a link to `/mcp` (appears when MCP servers are configured)
 
 ### Agents (`/agents`)
 
@@ -127,23 +128,23 @@ Available for agents with `spec.ingest` configured. Provides full document lifec
 
 **Managed sources** persist in the store's `_meta` table as a JSON manifest. They survive re-ingestion (not purged by glob resolution) and survive store wipes (manifest is read before wipe and restored after). See [Managed Sources](../core/ingestion.md#managed-sources-dashboard) in the ingestion docs.
 
-### Compose (`/compose`)
+### Flows (`/flows`)
 
-Card grid of all discovered compose YAML files. Each card shows the composition name, description, service count, and service name pills. Each card has a trash icon (visible on hover) to delete the composition with a name-typing confirmation dialog. A [Docs](https://www.initrunner.ai/docs/compose) link in the header opens the compose documentation. Click a card to open the detail view.
+Card grid of all discovered flow YAML files. Each card shows the flow name, description, agent count, and agent name pills. Each card has a trash icon (visible on hover) to delete the flow with a name-typing confirmation dialog. A [Docs](https://www.initrunner.ai/docs/flows) link in the header opens the flow documentation. Click a card to open the detail view.
 
-### New Compose (`/compose/new`)
+### New Flow (`/flows/new`)
 
-Create a new multi-agent composition through a 3-step flow: **Configure -> Editor -> Success**.
+Create a new multi-agent flow through a 3-step process: **Configure -> Editor -> Success**.
 
 **Configure** -- pick a pattern and wire agents into slots:
 
 | Pattern | Description | Topology |
 |---------|-------------|----------|
-| **Pipeline** | Linear A -> B -> C pipeline | Adjustable service count (min 2) |
-| **Fan-out** | Dispatch to all workers simultaneously | Adjustable service count (min 3) |
-| **Route** | Route to the best specialist automatically | Adjustable service count (min 3), semantic slot names |
+| **Pipeline** | Linear A -> B -> C pipeline | Adjustable agent count (min 2) |
+| **Fan-out** | Dispatch to all workers simultaneously | Adjustable agent count (min 3) |
+| **Route** | Route to the best specialist automatically | Adjustable agent count (min 3), semantic slot names |
 
-The **Route** pattern uses semantic specialist names from a curated pool (`researcher`, `responder`, `escalator`, `analyst`, `summarizer`, `validator`, `coordinator`, `reviewer`) instead of generic numbered slots. At 3 services: intake + researcher + responder. Additional specialists appear as the count increases. A lime `sense` badge on the pattern card distinguishes it from the other patterns.
+The **Route** pattern uses semantic specialist names from a curated pool (`researcher`, `responder`, `escalator`, `analyst`, `summarizer`, `validator`, `coordinator`, `reviewer`) instead of generic numbered slots. At 3 agents: intake + researcher + responder. Additional specialists appear as the count increases. A lime `sense` badge on the pattern card distinguishes it from the other patterns.
 
 Each slot uses an **Agent Picker** -- a searchable inline dropdown that shows all discovered agents with their name, description, model badge, and feature pills. Search filters across name, description, tags, features, and path. Slots default to "Generate placeholder" (a generic role YAML is created at seed time). When an agent is selected, the trigger shows the agent name and model; clearing it reverts to the placeholder label. Provider/model selection and shared memory toggle are available for placeholder roles.
 
@@ -155,27 +156,27 @@ Each slot uses an **Agent Picker** -- a searchable inline dropdown that shows al
 | `keyword` | Keyword | [Intent Sensing](../core/intent_sensing.md) keyword scoring. Near-zero cost. |
 | `sense` | Sense (Recommended) | Keyword scoring first, LLM tiebreaker on ties. Highest accuracy. |
 
-The Route pattern defaults to **Sense** (with a lime "Recommended" badge). When Keyword or Sense is selected, a collapsible detail section reveals scoring weights (tags 3x, name 2x, description 1.5x) and per-slot quality indicators showing whether each target agent has tags and descriptions for effective routing. The strategy is passed to the seed endpoint and written into the generated `compose.yaml` as the intake service's `sink.strategy`.
+The Route pattern defaults to **Sense** (with a lime "Recommended" badge). When Keyword or Sense is selected, a collapsible detail section reveals scoring weights (tags 3x, name 2x, description 1.5x) and per-slot quality indicators showing whether each target agent has tags and descriptions for effective routing. The strategy is passed to the seed endpoint and written into the generated `flow.yaml` as the intake agent's `sink.strategy`.
 
-**Editor** -- review and edit the generated `compose.yaml` with live schema validation. Placeholder role YAMLs are shown in a collapsible section. Pick a save directory and project name, then save.
+**Editor** -- review and edit the generated `flow.yaml` with live schema validation. Placeholder role YAMLs are shown in a collapsible section. Pick a save directory and project name, then save.
 
-**Success** -- shows the saved path and CLI commands to validate and run the composition.
+**Success** -- shows the saved path and CLI commands to validate and run the flow.
 
-### Compose Detail (`/compose/{id}`)
+### Flow Detail (`/flows/{id}`)
 
-Tabbed detail page with a stats bar and five tabs. A **Delete** button in the header opens a confirmation dialog requiring the composition name to be typed. Deleting removes only the `compose.yaml` file (referenced role files are not affected) and redirects to the compose list.
+Tabbed detail page with a stats bar and five tabs. A **Delete** button in the header opens a confirmation dialog requiring the flow name to be typed. Deleting removes only the `flow.yaml` file (referenced role files are not affected) and redirects to the flow list.
 
-**Stats bar** (4 cards): total events, delivery rate %, service count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
+**Stats bar** (4 cards): total events, delivery rate %, agent count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active service name identify each turn (avatar swaps during streaming as services execute). The entry service (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Service-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal service shows output directly, fan-out shows per-service trace expanded. Collapsible pipeline trace under each response shows per-service name, duration, tokens, and output preview. Message history scoped to entry service for multi-turn conversations. |
-| **Graph** | SvelteFlow canvas showing the service DAG. Services are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `depends_on` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
-| **Events** | Delegation event table filtered by `compose_name`. Columns: status (color-coded dot with glow), source, target, routing (method + score from sense/keyword routing, lime for keyword matches, cyan for LLM tiebreaks), time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
-| **Config** | Collapsible per-service sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, depends_on, and environment count. When sink strategy is `sense` or `keyword`, an inline explanation appears below the strategy field. Shared memory/documents badges. |
+| **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active agent name identify each turn (avatar swaps during streaming as agents execute). The entry agent (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Agent-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal agent shows output directly, fan-out shows per-agent trace expanded. Collapsible pipeline trace under each response shows per-agent name, duration, tokens, and output preview. Message history scoped to entry agent for multi-turn conversations. |
+| **Graph** | SvelteFlow canvas showing the agent DAG. Agents are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `needs` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
+| **Events** | Delegation event table filtered by `flow_name`. Columns: status (color-coded dot with glow), source, target, routing (method + score from sense/keyword routing, lime for keyword matches, cyan for LLM tiebreaks), time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
+| **Config** | Collapsible per-agent sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, needs, and environment count. When sink strategy is `sense` or `keyword`, an inline explanation appears below the strategy field. Shared memory/documents badges. |
 | **Editor** | YAML editor with debounced schema validation, in-place save, reset, and copy. Warns when `metadata.name` changes (splits event history). |
 
-Events are filtered by `compose_name` (stored in the `delegate_events` audit table), so two compositions with overlapping service names show the correct events for each. Tab selection persists to localStorage.
+Events are filtered by `flow_name` (stored in the `delegate_events` audit table), so two flows with overlapping agent names show the correct events for each. Tab selection persists to localStorage.
 
 ### Teams (`/teams`)
 
@@ -255,6 +256,46 @@ Filterable table of all agent runs with analytics.
 - **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, and error details
 - **Export**: download filtered results as JSON or CSV
 
+### MCP Hub (`/mcp`)
+
+Visual management center for MCP servers configured across all agents. Four tabs:
+
+**Servers tab** -- aggregated view of every MCP server declared in any agent's `tools:` config.
+
+- Servers are deduplicated by connection identity (transport, command, args, url, cwd, headers, env keys). Two agents pointing at the same `npx @modelcontextprotocol/server-filesystem /tmp` show as one server entry with two agent refs.
+- Each server card shows: display name (from `config.summary()`), transport badge (`stdio`/`sse`/`streamable-http`), health dot (green/amber/red/gray), and agent chips linking to `/agents/{id}`.
+- Click to expand: lazy-loads the full tool list via introspection (`fastmcp.Client.list_tools()`). Each tool shows name, description, and a "Test" button that jumps to the Playground with that server+tool pre-selected.
+- Filter bar: transport type pills, text search across server names and agent names.
+- "Check Health" button triggers on-demand health checks for all servers.
+
+**Discover tab** -- curated registry of popular MCP servers shipped as static JSON.
+
+- Categories: filesystem, database, web, developer, productivity, communication.
+- Each card: name, description, category badge, transport indicator, copyable install command.
+- "Add to Agent" copies a ready-to-paste `tools:` YAML snippet to the clipboard.
+- Client-side search and category filtering.
+
+**Playground tab** -- execute any MCP tool in isolation without an LLM agent.
+
+- Cascading pickers: select server, then select tool (tool list loaded on server selection).
+- Auto-generated form from the tool's `inputSchema` JSON Schema (string/number/boolean/enum fields, required markers).
+- Execute button calls the tool directly via `build_transport()` + `fastmcp.Client.call_tool()`. Sandbox rules from the originating role are enforced (command allowlist, env scrubbing).
+- Response viewer: syntax-highlighted JSON output, timing badge, success/error indicator, copy button.
+- History sidebar: recent calls stored in localStorage (max 50, FIFO). Click to replay with the same arguments.
+
+**Canvas tab** -- @xyflow/svelte topology visualization of MCP server-agent relationships.
+
+- Two-column layout: MCP servers on the left, agents on the right.
+- Animated lime edges (`oklch(0.91 0.20 128)`) connect servers to consuming agents.
+- Draggable nodes with position persistence to localStorage.
+- "Auto-arrange" resets to default two-tier layout.
+- "Export YAML" copies all server configs as a `tools:` section to the clipboard.
+- Double-click an agent node to navigate to `/agents/{id}`.
+
+**Sidebar**: MCP Hub appears in the "Operate" section (between Skills and Audit). A red status dot appears on the nav item when any MCP server is unhealthy (polled every 30 seconds via `/api/mcp/health-summary`).
+
+**Launchpad widget**: when MCP servers exist, the Launchpad home page shows a health summary card with healthy/unhealthy/unchecked counts and a link to `/mcp`.
+
 ### System (`/system`)
 
 Four sections:
@@ -270,12 +311,12 @@ Four sections:
 
 Press `Cmd+K` (or `Ctrl+K`) anywhere to open the command palette. Provides:
 
-- Fuzzy search across all agents, compositions, and teams by name and description
-- Quick navigation to any page (Launchpad, Agents, Skills, Compose, Teams, Audit, System)
-- Quick actions: "New Agent", "New Skill", "New Compose", "New Team"
+- Fuzzy search across all agents, flows, and teams by name and description
+- Quick navigation to any page (Launchpad, Agents, Skills, Flows, Teams, Audit, System)
+- Quick actions: "New Agent", "New Skill", "New Flow", "New Team"
 - Keyboard navigation with arrow keys and Enter
 
-Results are grouped: Pages, Actions, Agents, Compositions, Teams.
+Results are grouped: Pages, Actions, Agents, Flows, Teams.
 
 ## Architecture
 
@@ -299,18 +340,18 @@ initrunner dashboard
   |      /api/builder/hub-search GET search InitHub packages
   |      /api/builder/hub-featured GET popular InitHub packages (5-min cache)
   |      /api/builder/hub-seed POST  load YAML from hub bundle
-  |      /api/compose          GET   list discovered compose files
-  |      /api/compose/{id}     GET   compose detail with service graph
-  |      /api/compose/{id}/yaml GET  raw compose YAML
-  |      /api/compose/{id}/events GET delegation events
-  |      /api/compose/{id}/stats  GET compose event statistics
-  |      /api/compose/{id}/yaml   PUT save edited compose YAML
-  |      /api/compose/{id}        DELETE delete compose YAML and evict from cache
-  |      /api/compose/{id}/run/stream POST streaming compose run (SSE)
-  |      /api/compose-builder/options GET patterns, agents, providers
-  |      /api/compose-builder/seed POST generate compose YAML
-  |      /api/compose-builder/validate POST schema-only validation
-  |      /api/compose-builder/save POST write compose + roles to disk
+  |      /api/flows             GET   list discovered flow files
+  |      /api/flows/{id}       GET   flow detail with agent graph
+  |      /api/flows/{id}/yaml  GET   raw flow YAML
+  |      /api/flows/{id}/events GET  delegation events
+  |      /api/flows/{id}/stats  GET  flow event statistics
+  |      /api/flows/{id}/yaml   PUT  save edited flow YAML
+  |      /api/flows/{id}        DELETE delete flow YAML and evict from cache
+  |      /api/flows/{id}/run/stream POST streaming flow run (SSE)
+  |      /api/flow-builder/options GET patterns, agents, providers
+  |      /api/flow-builder/seed POST generate flow YAML
+  |      /api/flow-builder/validate POST schema-only validation
+  |      /api/flow-builder/save POST write flow + roles to disk
   |      /api/teams            GET   list discovered team files
   |      /api/teams/{id}      GET   team detail with personas
   |      /api/teams/{id}/yaml GET   raw team YAML
@@ -329,6 +370,12 @@ initrunner dashboard
   |      /api/skills/{id}      DELETE delete skill (blocks if resource files exist)
   |      /api/skills/{id}/content GET raw SKILL.md content for editor
   |      /api/skills/{id}/content PUT validate-then-save skill content
+  |      /api/mcp/servers      GET   list deduplicated MCP servers across all agents
+  |      /api/mcp/servers/{id}/tools GET introspect server tools (with inputSchema)
+  |      /api/mcp/servers/{id}/health POST on-demand health check
+  |      /api/mcp/playground/call POST execute single MCP tool call
+  |      /api/mcp/registry     GET   curated MCP server catalog
+  |      /api/mcp/health-summary GET  aggregate health for sidebar badge
   |      /api/runs             POST  execute single run
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
@@ -354,7 +401,7 @@ The backend imports exclusively from `initrunner.services.*` and `initrunner.con
 
 ### Streaming
 
-Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stream_sync` in a thread pool with an `asyncio.Queue` bridge. Compose and team runs use the graph engine directly via `asyncio.create_task` (no thread pool hop). Events:
+Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stream_sync` in a thread pool with an `asyncio.Queue` bridge. Flow and team runs use the graph engine directly via `asyncio.create_task` (no thread pool hop). Events:
 
 | Event type | Payload |
 |------------|---------|
@@ -712,9 +759,9 @@ Returns all registered tool types.
 ]
 ```
 
-### `GET /api/compose`
+### `GET /api/flows`
 
-Returns all discovered compose definitions.
+Returns all discovered flow definitions.
 
 ```json
 [
@@ -722,38 +769,38 @@ Returns all discovered compose definitions.
     "id": "f1e2d3c4b5a6",
     "name": "support-desk",
     "description": "Intake routes to specialists via intent sensing.",
-    "service_count": 4,
-    "service_names": ["intake", "researcher", "responder", "escalator"],
-    "path": "/home/user/support-desk/compose.yaml",
+    "agent_count": 4,
+    "agent_names": ["intake", "researcher", "responder", "escalator"],
+    "path": "/home/user/support-desk/flow.yaml",
     "error": null
   }
 ]
 ```
 
-### `GET /api/compose/{id}`
+### `GET /api/flows/{id}`
 
-Returns full compose detail with service topology and agent cross-references.
+Returns full flow detail with agent topology and agent cross-references.
 
-### `GET /api/compose/{id}/yaml`
+### `GET /api/flows/{id}/yaml`
 
-Returns raw compose YAML content.
+Returns raw flow YAML content.
 
-### `GET /api/compose/{id}/events`
+### `GET /api/flows/{id}/events`
 
-Query delegation routing events for this compose. Filters by `compose_name` in the audit DB.
+Query delegation routing events for this flow. Filters by `flow_name` in the audit DB.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `source` | string | Filter by source service |
-| `target` | string | Filter by target service |
+| `source` | string | Filter by source agent |
+| `target` | string | Filter by target agent |
 | `status` | string | Filter by status (delivered/dropped/filtered/error/policy_denied/circuit_open) |
 | `since` | string | ISO 8601 start time |
 | `until` | string | ISO 8601 end time |
 | `limit` | int | Max events (default 200) |
 
-### `GET /api/compose/{id}/stats`
+### `GET /api/flows/{id}/stats`
 
-Returns aggregate event statistics for this composition. Status buckets are dynamic (not hard-coded).
+Returns aggregate event statistics for this flow. Status buckets are dynamic (not hard-coded).
 
 ```json
 {
@@ -767,63 +814,63 @@ Returns aggregate event statistics for this composition. Status buckets are dyna
 }
 ```
 
-### `PUT /api/compose/{id}/yaml`
+### `PUT /api/flows/{id}/yaml`
 
-Save edited compose YAML in place. Validates against the compose schema before writing; returns 422 with issue details on validation errors. Does not support rename -- writes to the existing file path only.
+Save edited flow YAML in place. Validates against the flow schema before writing; returns 422 with issue details on validation errors. Does not support rename -- writes to the existing file path only.
 
 ```json
-{ "yaml_text": "apiVersion: initrunner/v1\nkind: Compose\n..." }
+{ "yaml_text": "apiVersion: initrunner/v1\nkind: Flow\n..." }
 ```
 
 Returns `{ path, valid, issues[] }`.
 
-### `POST /api/compose/{id}/run/stream`
+### `POST /api/flows/{id}/run/stream`
 
-Run a single prompt through the compose pipeline via SSE. Uses the real orchestrator wiring (shared memory, delegate sinks, routing strategies) in one-shot mode -- triggers and non-delegate role sinks are suppressed.
+Run a single prompt through the flow pipeline via SSE. Uses the real orchestrator wiring (shared memory, delegate sinks, routing strategies) in one-shot mode -- triggers and non-delegate role sinks are suppressed.
 
 ```json
 { "prompt": "Analyze this email...", "message_history": null }
 ```
 
 SSE events:
-- `service_start` -- service name about to execute
-- `service_complete` -- per-service result (name, output preview, duration, tokens, success)
-- `result` -- final `ComposeRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, and entry service `message_history`
+- `agent_start` -- agent name about to execute
+- `agent_complete` -- per-agent result (name, output preview, duration, tokens, success)
+- `result` -- final `FlowRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, and entry agent `message_history`
 - `error` -- error string
 
-### `GET /api/compose-builder/options`
+### `GET /api/flow-builder/options`
 
 Returns available patterns, discovered agents (for slot assignment), provider/model options, and save directories.
 
-### `POST /api/compose-builder/seed`
+### `POST /api/flow-builder/seed`
 
-Generate compose YAML from a pattern and slot assignments.
+Generate flow YAML from a pattern and slot assignments.
 
 ```json
 {
   "pattern": "pipeline",
   "name": "my-pipeline",
-  "services": [
+  "agents": [
     {"slot": "step-1", "agent_id": "a1b2c3d4e5f6"},
     {"slot": "step-2", "agent_id": null}
   ],
-  "service_count": 2,
+  "agent_count": 2,
   "shared_memory": false,
   "provider": "openai"
 }
 ```
 
-Response includes `compose_yaml`, `role_yamls` (placeholder roles only), `issues[]`, and `ready`.
+Response includes `flow_yaml`, `role_yamls` (placeholder roles only), `issues[]`, and `ready`.
 
-### `POST /api/compose-builder/validate`
+### `POST /api/flow-builder/validate`
 
-Schema-only validation of compose YAML. Does not check that role files exist on disk.
+Schema-only validation of flow YAML. Does not check that role files exist on disk.
 
-### `POST /api/compose-builder/save`
+### `POST /api/flow-builder/save`
 
-Write compose YAML and placeholder roles to disk. Performs full validation (compose schema + role file existence).
+Write flow YAML and placeholder roles to disk. Performs full validation (flow schema + role file existence).
 
-Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `compose_id`. Returns 409 if the project directory already exists.
+Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `flow_id`. Returns 409 if the project directory already exists.
 
 ### `GET /api/teams`
 
@@ -917,6 +964,126 @@ Schema-only validation of team YAML.
 ### `POST /api/team-builder/save`
 
 Write team YAML to disk. Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `team_id`. Returns 409 if the file already exists and `force` is false.
+
+### `GET /api/mcp/servers`
+
+Returns all MCP servers configured across all discovered agents, deduplicated by connection identity (transport + command + args + url + cwd + headers + env keys).
+
+```json
+[
+  {
+    "server_id": "a1b2c3d4e5f6",
+    "display_name": "mcp: stdio npx",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    "url": null,
+    "agent_refs": [
+      {
+        "agent_name": "file-reader",
+        "agent_id": "abc123def456",
+        "role_path": "/agents/file-reader/role.yaml",
+        "tool_filter": ["read_file", "list_directory"],
+        "tool_exclude": [],
+        "tool_prefix": null
+      }
+    ],
+    "health_status": "healthy",
+    "health_checked_at": "2026-04-04T12:00:00+00:00"
+  }
+]
+```
+
+### `GET /api/mcp/servers/{server_id}/tools`
+
+Introspects an MCP server and returns its tools with full JSON Schema input definitions. Connects to the server via `build_transport()` with the originating role's sandbox config enforced.
+
+```json
+[
+  {
+    "name": "read_file",
+    "description": "Read a file from the filesystem",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "File path to read"}
+      },
+      "required": ["path"]
+    }
+  }
+]
+```
+
+### `POST /api/mcp/servers/{server_id}/health`
+
+Runs an on-demand health check against a server. Connects, calls `list_tools()` with a 5-second timeout, and measures latency. Results are cached for 30 seconds.
+
+```json
+{
+  "server_id": "a1b2c3d4e5f6",
+  "status": "healthy",
+  "latency_ms": 234,
+  "tool_count": 8,
+  "error": null,
+  "checked_at": "2026-04-04T12:00:00+00:00"
+}
+```
+
+Status values: `"healthy"` (< 3s), `"degraded"` (3-5s), `"unhealthy"` (timeout or error).
+
+### `POST /api/mcp/playground/call`
+
+Executes a single MCP tool call without an LLM agent. Connects to the server, calls the tool with the provided arguments, and returns the raw result. Sandbox rules from the originating role are enforced.
+
+Request:
+```json
+{
+  "server_id": "a1b2c3d4e5f6",
+  "tool_name": "read_file",
+  "arguments": {"path": "/tmp/example.txt"}
+}
+```
+
+Response:
+```json
+{
+  "tool_name": "read_file",
+  "output": "file contents here...",
+  "duration_ms": 45,
+  "success": true,
+  "error": null
+}
+```
+
+### `GET /api/mcp/registry`
+
+Returns the curated MCP server catalog (static JSON shipped with InitRunner).
+
+```json
+[
+  {
+    "name": "filesystem",
+    "display_name": "Filesystem",
+    "description": "Read, write, and search files on the local filesystem.",
+    "category": "filesystem",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/root"],
+    "url": null,
+    "install_hint": "npx -y @modelcontextprotocol/server-filesystem /path/to/root",
+    "homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+    "tags": ["files", "read", "write", "search"]
+  }
+]
+```
+
+### `GET /api/mcp/health-summary`
+
+Aggregate health counts for the sidebar badge. Uses the 30-second TTL cache, so unchecked servers show as neither healthy nor unhealthy.
+
+```json
+{"total": 3, "healthy": 2, "unhealthy": 0}
+```
 
 ### `GET /api/health`
 

@@ -128,7 +128,7 @@
 
 <!-- Mode selection -->
 <div>
-	<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+	<h2 class="mb-3 section-label">
 		Start from
 	</h2>
 	<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -153,7 +153,7 @@
 <!-- Template picker -->
 {#if mode === 'template'}
 	<div>
-		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<h2 class="mb-3 section-label">
 			Template
 		</h2>
 		<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -175,7 +175,7 @@
 		<!-- Setup guidance panel (discord, telegram) -->
 		{#if templateSetup}
 			<div class="mt-4 border-l-2 border-l-info bg-info/5 px-4 py-3">
-				<h3 class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-muted">
+				<h3 class="section-label">
 					Setup: {selectedTemplate} bot
 				</h3>
 
@@ -189,7 +189,7 @@
 				</ol>
 
 				<div class="mt-3">
-					<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+					<span class="section-label">
 						Environment variables
 					</span>
 					<div class="mt-1.5 flex flex-wrap gap-2">
@@ -207,7 +207,7 @@
 
 				{#if templateSetup.extras.length > 0}
 					<div class="mt-3">
-						<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+						<span class="section-label">
 							Install dependency
 						</span>
 						<div class="mt-1.5 flex items-center justify-between border border-edge bg-surface-1 px-3 py-2">
@@ -258,7 +258,7 @@
 <!-- Description input -->
 {#if mode === 'description'}
 	<div>
-		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<h2 class="mb-3 section-label">
 			Describe your agent
 		</h2>
 		<textarea
@@ -274,7 +274,7 @@
 <!-- Import: framework toggle + source input -->
 {#if mode === 'import'}
 	<div>
-		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<h2 class="mb-3 section-label">
 			Framework
 		</h2>
 		<div class="flex items-center gap-0.5 rounded-full border border-edge bg-surface-1 p-0.5 w-fit">
@@ -293,7 +293,7 @@
 	</div>
 
 	<div>
-		<h2 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<h2 class="mb-3 section-label">
 			{importFramework === 'langchain' ? 'LangChain' : 'PydanticAI'} source
 		</h2>
 		{#if importFramework === 'langchain'}
@@ -351,7 +351,7 @@
 	<!-- Generate button -->
 	<div>
 		<button
-			class="flex items-center gap-2 rounded-full bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+			class="flex items-center gap-2 rounded-[2px] bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 			disabled={!canGenerate() || generating}
 			onclick={onGenerate}
 		>

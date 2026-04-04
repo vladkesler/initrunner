@@ -22,6 +22,9 @@
 	import EditorScreen from '$lib/components/agents/EditorScreen.svelte';
 	import SuccessScreen from '$lib/components/agents/SuccessScreen.svelte';
 	import { ArrowLeft } from 'lucide-svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Agents', href: '/agents' }, { label: 'New Agent' }]); });
 
 	// -- State ----------------------------------------------------------------
 
@@ -409,7 +412,7 @@
 				Agents
 			</a>
 		{/if}
-		<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">New Agent</h1>
+		<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">New Agent</h1>
 	</div>
 
 	{#if optionsLoading}

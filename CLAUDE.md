@@ -1,6 +1,6 @@
 # InitRunner
 
-YAML-first AI agent platform. Define agents as declarative `role.yaml` files — model, tools, triggers, ingestion, guardrails — and run them as one-shot commands, interactive REPLs, trigger-driven daemons, or OpenAI-compatible API servers. Includes built-in RAG, long-term memory, multi-agent orchestration via `compose.yaml`, audit logging, and a self-registering tool system.
+YAML-first AI agent platform. Define agents as declarative `role.yaml` files — model, tools, triggers, ingestion, guardrails — and run them as one-shot commands, interactive REPLs, trigger-driven daemons, or OpenAI-compatible API servers. Includes built-in RAG, long-term memory, multi-agent orchestration via `flow.yaml`, audit logging, and a self-registering tool system.
 
 ## Tech Stack
 
@@ -25,7 +25,7 @@ initrunner/              # main package (flat layout)
 │   └── tools/           # self-registering tool modules
 ├── audit/               # append-only SQLite audit trail
 ├── cli/                 # Typer CLI entry point
-├── compose/             # multi-agent orchestration (compose.yaml)
+├── flow/                # multi-agent orchestration (flow.yaml)
 ├── ingestion/           # extract → chunk → embed → store pipeline
 ├── mcp/                 # MCP server integration
 ├── runner/              # single-shot, REPL, autonomous, daemon modes
@@ -36,7 +36,7 @@ initrunner/              # main package (flat layout)
 ├── _compat.py           # optional dependency helpers
 └── _html.py             # HTML fetch + markdown conversion
 tests/                   # pytest test suite
-examples/                # example role and compose YAML files
+examples/                # example role and flow YAML files
 docs/                    # detailed documentation by subsystem
 ```
 
@@ -44,7 +44,7 @@ docs/                    # detailed documentation by subsystem
 
 These rules apply to every task in this codebase:
 
-- **Sync CLI, async compose**: CLI is synchronous -- use PydanticAI's `run_sync`. Compose and team execution use pydantic-graph beta with `anyio.run()` as the sync bridge. The sync facade (`run_compose()`, `start()`/`stop()`, `run_team_dispatch()`) is preserved. Graph steps use `execute_run_async()` for native async agent execution. Tools can provide async variants via `ToolBuildContext.prefer_async`.
+- **Sync CLI, async flow**: CLI is synchronous -- use PydanticAI's `run_sync`. Flow and team execution use pydantic-graph beta with `anyio.run()` as the sync bridge. The sync facade (`run_flow()`, `start()`/`stop()`, `run_team_dispatch()`) is preserved. Graph steps use `execute_run_async()` for native async agent execution. Tools can provide async variants via `ToolBuildContext.prefer_async`.
 - **Self-registering tools**: add a new tool by creating one file in `agent/tools/` using `@register_tool(type_name, ConfigClass)`. Auto-discovered via `pkgutil.iter_modules()`.
 - **Lazy imports in CLI**: CLI commands use lazy imports so `--help` stays fast. Don't add top-level imports in `cli/main.py`.
 - **`audit.log()` never raises**: audit failures must not crash agent runs.
@@ -108,7 +108,7 @@ Detailed docs live in `docs/`. Key references:
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
 | Orchestration patterns (all 5, side-by-side) | `docs/orchestration/patterns-guide.md` |
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
-| Compose orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
+| Flow orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
 | Dashboard (web UI) | `docs/interfaces/dashboard.md` |
 | Dashboard design system | `docs/interfaces/design-system.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |

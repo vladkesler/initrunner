@@ -113,7 +113,7 @@
 
 	<!-- Provider chips -->
 	<div class="flex flex-wrap items-center gap-2 pl-[22px]">
-		<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+		<span class="section-label">
 			Embeddings
 		</span>
 		{#each warning.options as option}
@@ -148,7 +148,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-[13px] text-ok">Ready</span>
 				<button
-					class="flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+					class="flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 					disabled={applying}
 					onclick={handleApply}
 				>
@@ -171,7 +171,7 @@
 				<button
 					type="submit"
 					disabled={!apiKey.trim() || saving}
-					class="flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+					class="flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-4 py-1.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 				>
 					{#if saving}<Loader2 size={12} class="animate-spin" />{/if}
 					{saveLabel}

@@ -202,7 +202,7 @@ These PydanticAI features are detected and produce warnings:
 
 | Feature | Recommendation |
 |---|---|
-| `pydantic_graph` | Use InitRunner `compose.yaml` |
+| `pydantic_graph` | Use InitRunner `flow.yaml` |
 | `logfire` / `instrument=` | Use `spec.observability` |
 | `MCPServerStdio` / `MCPServerHTTP` | Use `type: mcp` in tools |
 | `builtin_tools=[...]` | Add equivalent InitRunner tools manually |

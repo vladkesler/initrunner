@@ -221,7 +221,7 @@
 								</p>
 							</div>
 							<div class="mt-2 flex items-center gap-2">
-								<span class="rounded-full bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
+								<span class="rounded-[2px] bg-accent-primary/10 px-2 py-0.5 font-mono text-[11px] text-accent-primary">
 									{memory.memory_type}
 								</span>
 								{#if memory.category}
@@ -281,7 +281,7 @@
 										<div class="space-y-3">
 											{#each expandedSession.messages as message}
 												<div class="flex gap-3">
-													<span class="shrink-0 font-mono text-[11px] font-medium uppercase tracking-[0.1em] {message.role === 'user' ? 'text-accent-primary' : 'text-accent-secondary'}">
+													<span class="shrink-0 section-label {message.role === 'user' ? 'text-accent-primary' : 'text-accent-secondary'}">
 														{message.role === 'user' ? 'YOU' : 'AI'}
 													</span>
 													<p class="flex-1 font-mono text-[13px] leading-relaxed text-fg-muted whitespace-pre-wrap">

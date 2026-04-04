@@ -54,44 +54,44 @@ initrunner validate role.yaml
 
 Both templates should scaffold a valid role that passes validation.
 
-## Compose
+## Flow
 
-### Validate compose definitions
+### Validate flow definitions
 
 ```bash
-initrunner compose validate examples/compose/email-pipeline/compose.yaml
-initrunner compose validate examples/compose/content-pipeline/compose.yaml
+initrunner flow validate examples/flows/email-pipeline/flow.yaml
+initrunner flow validate examples/flows/content-pipeline/flow.yaml
 ```
 
-Both should exit 0 and print a service summary table.
+Both should exit 0 and print an agent summary table.
 
-### Live compose smoke test
+### Live flow smoke test
 
-Running `compose up` requires API keys and is not suitable for automated smoke testing. To verify end-to-end manually:
+Running `flow up` requires API keys and is not suitable for automated smoke testing. To verify end-to-end manually:
 
 ```bash
 # Create a drafts directory with a test file
-mkdir -p examples/compose/content-pipeline/drafts
-echo "# Test Draft\n\nA short article about testing." > examples/compose/content-pipeline/drafts/test.md
+mkdir -p examples/flows/content-pipeline/drafts
+echo "# Test Draft\n\nA short article about testing." > examples/flows/content-pipeline/drafts/test.md
 
 # Start the pipeline (requires OPENAI_API_KEY)
-initrunner compose up examples/compose/content-pipeline/compose.yaml
+initrunner flow up examples/flows/content-pipeline/flow.yaml
 ```
 
-The content-watcher service should detect `test.md` via its `process_existing: true` trigger and delegate a research brief to the researcher.
+The content-watcher agent should detect `test.md` via its `process_existing: true` trigger and delegate a research brief to the researcher.
 
 ### Systemd command help
 
 Verify the systemd lifecycle commands are wired correctly. These only check CLI plumbing and do not require systemd to be running.
 
 ```bash
-initrunner compose install --help
-initrunner compose uninstall --help
-initrunner compose start --help
-initrunner compose stop --help
-initrunner compose restart --help
-initrunner compose status --help
-initrunner compose logs --help
+initrunner flow install --help
+initrunner flow uninstall --help
+initrunner flow start --help
+initrunner flow stop --help
+initrunner flow restart --help
+initrunner flow status --help
+initrunner flow logs --help
 ```
 
 All commands should exit 0 and print usage information.

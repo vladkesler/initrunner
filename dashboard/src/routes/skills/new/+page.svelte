@@ -4,6 +4,9 @@
 	import { createSkill, getSkillDirectories } from '$lib/api/skills';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { ArrowLeft, AlertCircle } from 'lucide-svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { setCrumbs([{ label: 'Skills', href: '/skills' }, { label: 'New Skill' }]); });
 
 	let name = $state('');
 	let directory = $state('');
@@ -65,14 +68,14 @@
 		Skills
 	</a>
 
-	<h1 class="text-xl font-semibold tracking-[-0.02em] text-fg">New Skill</h1>
+	<h1 class="text-2xl font-semibold tracking-[-0.03em] text-fg">New Skill</h1>
 
 	<div class="max-w-md space-y-5">
 		<!-- Name -->
 		<div class="space-y-1.5">
 			<label
 				for="skill-name"
-				class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint"
+				class="section-label"
 			>
 				Name
 			</label>
@@ -97,7 +100,7 @@
 		<div class="space-y-1.5">
 			<label
 				for="skill-dir"
-				class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint"
+				class="section-label"
 			>
 				Directory
 			</label>
@@ -116,7 +119,7 @@
 		<div class="space-y-1.5">
 			<label
 				for="skill-provider"
-				class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint"
+				class="section-label"
 			>
 				Provider (for template defaults)
 			</label>
@@ -133,7 +136,7 @@
 
 		<!-- Create button -->
 		<button
-			class="inline-flex items-center gap-1.5 rounded-full bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)] disabled:opacity-40"
+			class="inline-flex items-center gap-1.5 rounded-[2px] bg-accent-primary px-5 py-2 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover disabled:opacity-40"
 			onclick={handleCreate}
 			disabled={!canSave}
 		>

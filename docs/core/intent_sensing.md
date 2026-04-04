@@ -238,9 +238,9 @@ To avoid Pass 2 entirely, use `--dry-run` (skips LLM) or improve tag coverage so
 
 If every word in the prompt is a stop word (e.g. "do it"), Intent Sensing raises an error before searching. Use a prompt with at least one content word.
 
-## Compose Integration
+## Flow Integration
 
-Intent Sensing can also auto-route messages between services in a [compose pipeline](../orchestration/agent_composer.md). Set `strategy: keyword` or `strategy: sense` on a multi-target delegate sink:
+Intent Sensing can also auto-route messages between agents in a [flow pipeline](../orchestration/flow.md). Set `strategy: keyword` or `strategy: sense` on a multi-target delegate sink:
 
 ```yaml
 triager:
@@ -251,10 +251,10 @@ triager:
     target: [researcher, responder, escalator]
 ```
 
-The same two-pass scoring (keyword + optional LLM tiebreak) runs on each message, using the target services' role metadata (name, description, tags) as candidates. See [Agent Composer -- Routing Strategy](../orchestration/agent_composer.md#routing-strategy) for full details.
+The same two-pass scoring (keyword + optional LLM tiebreak) runs on each message, using the target agents' role metadata (name, description, tags) as candidates. See [Flow -- Routing Strategy](../orchestration/flow.md#routing-strategy) for full details.
 
 ### Dashboard Configuration
 
-The [dashboard compose builder](../interfaces/dashboard.md) surfaces routing strategy as a first-class option when creating a new composition with the **Route** pattern. Three inline pill buttons (Broadcast / Keyword / Sense) let you choose the strategy visually, with Sense recommended by default. A collapsible detail section shows scoring weights and per-slot quality indicators based on whether the assigned agents have tags and descriptions.
+The [dashboard flow builder](../interfaces/dashboard.md) surfaces routing strategy as a first-class option when creating a new flow with the **Route** pattern. Three inline pill buttons (Broadcast / Keyword / Sense) let you choose the strategy visually, with Sense recommended by default. A collapsible detail section shows scoring weights and per-slot quality indicators based on whether the assigned agents have tags and descriptions.
 
-The Route pattern supports variable service counts (3-10) with semantic specialist names (`researcher`, `responder`, `escalator`, `analyst`, etc.) that contribute to the 2x name-match weight in scoring. After creation, the compose detail Events tab shows a **Routing** column with the method and score for each delegation event.
+The Route pattern supports variable agent counts (3-10) with semantic specialist names (`researcher`, `responder`, `escalator`, `analyst`, etc.) that contribute to the 2x name-match weight in scoring. After creation, the flow detail Events tab shows a **Routing** column with the method and score for each delegation event.

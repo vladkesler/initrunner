@@ -1,4 +1,4 @@
-"""Shared compose YAML validation logic used by both builder and editor."""
+"""Shared flow YAML validation logic used by both builder and editor."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import yaml
 from initrunner.dashboard.schemas import ValidationIssueResponse
 
 
-def validate_compose_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
-    """Parse and validate compose YAML against schema + graph rules only."""
+def validate_flow_yaml(yaml_text: str) -> list[ValidationIssueResponse]:
+    """Parse and validate flow YAML against schema + graph rules only."""
     from initrunner.deprecations import validate_compose_dict
 
     issues: list[ValidationIssueResponse] = []

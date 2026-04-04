@@ -97,7 +97,7 @@
 	const labelClass = $derived(
 		compact
 			? 'font-mono text-[11px] text-fg-faint'
-			: 'mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint'
+			: 'mb-3 section-label'
 	);
 </script>
 

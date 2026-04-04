@@ -124,7 +124,7 @@ When `process_existing: true`, the trigger scans each watched directory on start
 - One event is fired per existing file that matches the configured `extensions`.
 - Files are processed in sorted order (alphabetical).
 - After the initial scan completes, live monitoring begins normally.
-- This is useful in compose pipelines where a service should process both existing and new files — for example, a content watcher that needs to handle drafts already present in a directory at startup.
+- This is useful in flow pipelines where an agent should process both existing and new files -- for example, a content watcher that needs to handle drafts already present in a directory at startup.
 
 ### Template Variables
 

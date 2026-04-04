@@ -22,7 +22,7 @@
 <div class="py-8">
 	<div class="flex items-center gap-3">
 		<CheckCircle size={20} class="text-ok" />
-		<h2 class="text-xl font-semibold tracking-[-0.02em] text-fg">Agent created</h2>
+		<h2 class="text-2xl font-semibold tracking-[-0.03em] text-fg">Agent created</h2>
 	</div>
 	<p class="mt-2 font-mono text-[13px] text-fg-muted">{saveResult.path}</p>
 
@@ -36,7 +36,7 @@
 
 	{#if saveResult.generated_assets?.length > 0}
 		<div class="mt-6">
-			<h3 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			<h3 class="mb-3 section-label">
 				Generated files
 			</h3>
 			{#each saveResult.generated_assets as asset}
@@ -47,7 +47,7 @@
 
 	{#if saveResult.next_steps.length > 0}
 		<div class="mt-6">
-			<h3 class="mb-3 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+			<h3 class="mb-3 section-label">
 				Next steps
 			</h3>
 			<div class="space-y-2">
@@ -74,7 +74,7 @@
 	<div class="mt-8 flex gap-3">
 		<a
 			href="/agents/{saveResult.agent_id}"
-			class="flex items-center gap-2 rounded-full bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover hover:shadow-[0_0_16px_oklch(0.91_0.20_128/0.25)]"
+			class="flex items-center gap-2 rounded-[2px] bg-accent-primary px-6 py-2.5 text-[13px] font-medium text-surface-0 transition-[background-color,box-shadow] duration-150 hover:bg-accent-primary-hover"
 		>
 			View Agent
 		</a>

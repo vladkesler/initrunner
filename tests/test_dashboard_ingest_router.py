@@ -60,7 +60,7 @@ def client_and_cache():
 
     with (
         patch("initrunner.dashboard.app.RoleCache", return_value=mock_cache),
-        patch("initrunner.dashboard.app.ComposeCache"),
+        patch("initrunner.dashboard.app.FlowCache"),
         patch("initrunner.dashboard.app.TeamCache"),
     ):
         app = create_app(DashboardSettings())

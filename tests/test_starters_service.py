@@ -25,7 +25,7 @@ class TestListStarters:
         for entry in list_starters():
             assert entry.slug
             assert entry.name
-            assert entry.kind in ("Agent", "Team", "Compose")
+            assert entry.kind in ("Agent", "Team", "Flow")
             assert isinstance(entry.path, Path)
             assert entry.path.is_file()
 
@@ -56,10 +56,10 @@ class TestListStarters:
         assert entry is not None
         assert entry.kind == "Team"
 
-    def test_composite_starters_are_compose_kind(self):
+    def test_composite_starters_are_flow_kind(self):
         entry = get_starter("ci-pipeline")
         assert entry is not None
-        assert entry.kind == "Compose"
+        assert entry.kind == "Flow"
 
 
 class TestGetStarter:
@@ -85,7 +85,7 @@ class TestResolveStarterPath:
         path = resolve_starter_path("ci-pipeline")
         assert path is not None
         assert path.is_file()
-        assert path.name == "compose.yaml"
+        assert path.name == "flow.yaml"
 
     def test_returns_none_for_unknown(self):
         assert resolve_starter_path("does-not-exist") is None

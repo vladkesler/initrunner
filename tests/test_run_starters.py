@@ -129,7 +129,7 @@ class TestRunSave:
         save_dir = tmp_path / "my-pipeline"
         result = runner.invoke(app, ["run", "ci-pipeline", "--save", str(save_dir)])
         assert result.exit_code == 0
-        assert (save_dir / "compose.yaml").is_file()
+        assert (save_dir / "flow.yaml").is_file()
         assert (save_dir / "roles").is_dir()
 
     def test_save_non_starter_fails(self, tmp_path: Path):

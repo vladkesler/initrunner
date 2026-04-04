@@ -14,6 +14,9 @@
 	import SkillConfigPanel from '$lib/components/skills/SkillConfigPanel.svelte';
 	import SkillEditorTab from '$lib/components/skills/SkillEditorTab.svelte';
 	import { ArrowLeft, Settings, FileCode, Trash2 } from 'lucide-svelte';
+	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+
+	$effect(() => { if (detail) setCrumbs([{ label: 'Skills', href: '/skills' }, { label: detail.name }]); });
 
 	let detail: SkillDetail | null = $state(null);
 	let content = $state('');
@@ -95,7 +98,7 @@
 		<div>
 			<div class="flex items-center gap-3">
 				<h1
-					class="text-xl font-semibold tracking-[-0.02em] text-fg"
+					class="text-2xl font-semibold tracking-[-0.03em] text-fg"
 					style="text-wrap: balance"
 				>
 					{detail.name}

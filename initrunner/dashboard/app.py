@@ -23,11 +23,11 @@ from starlette.responses import RedirectResponse
 
 from initrunner.dashboard.config import DashboardSettings
 from initrunner.dashboard.deps import (
-    ComposeCache,
+    FlowCache,
     RoleCache,
     SkillCache,
     TeamCache,
-    get_compose_cache,
+    get_flow_cache,
     get_role_cache,
     get_skill_cache,
     get_team_cache,
@@ -43,7 +43,7 @@ _STATIC_DIR = Path(__file__).parent / "_static"
 def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     settings = settings or DashboardSettings()
     role_cache = RoleCache(settings)
-    compose_cache = ComposeCache(settings)
+    flow_cache = FlowCache(settings)
     team_cache = TeamCache(settings)
     skill_cache = SkillCache(settings)
 
@@ -52,7 +52,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         import asyncio
 
         await asyncio.to_thread(role_cache.refresh)
-        await asyncio.to_thread(compose_cache.refresh)
+        await asyncio.to_thread(flow_cache.refresh)
         await asyncio.to_thread(team_cache.refresh)
         await asyncio.to_thread(skill_cache.refresh)
         yield
@@ -74,7 +74,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
 
     # -- Dependency overrides: inject caches as singletons ------------------
     app.dependency_overrides[get_role_cache] = lambda: role_cache
-    app.dependency_overrides[get_compose_cache] = lambda: compose_cache
+    app.dependency_overrides[get_flow_cache] = lambda: flow_cache
     app.dependency_overrides[get_team_cache] = lambda: team_cache
     app.dependency_overrides[get_skill_cache] = lambda: skill_cache
 
@@ -147,9 +147,10 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     from initrunner.dashboard.routers.agents import router as agents_router
     from initrunner.dashboard.routers.audit import router as audit_router
     from initrunner.dashboard.routers.builder import router as builder_router
-    from initrunner.dashboard.routers.compose import router as compose_router
-    from initrunner.dashboard.routers.compose_builder import router as compose_builder_router
+    from initrunner.dashboard.routers.flow import router as flow_router
+    from initrunner.dashboard.routers.flow_builder import router as flow_builder_router
     from initrunner.dashboard.routers.ingest import router as ingest_router
+    from initrunner.dashboard.routers.mcp_hub import router as mcp_hub_router
     from initrunner.dashboard.routers.memory import router as memory_router
     from initrunner.dashboard.routers.providers import router as providers_router
     from initrunner.dashboard.routers.runs import router as runs_router
@@ -168,13 +169,14 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     app.include_router(providers_router)
     app.include_router(system_router)
     app.include_router(builder_router)
-    app.include_router(compose_router)
-    app.include_router(compose_builder_router)
+    app.include_router(flow_router)
+    app.include_router(flow_builder_router)
     app.include_router(teams_router)
     app.include_router(team_builder_router)
     app.include_router(team_memory_router)
     app.include_router(team_ingest_router)
     app.include_router(skills_router)
+    app.include_router(mcp_hub_router)
 
     # -- Static file serving (production) -----------------------------------
     if _STATIC_DIR.is_dir():

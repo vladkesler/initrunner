@@ -1,6 +1,6 @@
-# MCP Gateway & Toolkit — Expose Agents and Tools as MCP Servers
+# MCP Gateway & Toolkit -- Expose Agents and Tools as MCP Servers
 
-InitRunner offers two ways to expose capabilities via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/):
+InitRunner offers two ways to expose capabilities via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/), plus a visual management hub in the [dashboard](dashboard.md#mcp-hub-mcp):
 
 | Command | What it exposes | LLM required? | Use case |
 |---------|----------------|----------------|----------|
@@ -464,3 +464,17 @@ from initrunner.services.operations import build_mcp_gateway_sync
 
 mcp = build_mcp_gateway_sync([Path("roles/agent.yaml")])
 ```
+
+## Dashboard Integration -- MCP Hub
+
+The dashboard includes an MCP Hub page (`/mcp`) for visual management of MCP servers configured as agent tools. See [Dashboard -- MCP Hub](dashboard.md#mcp-hub-mcp) for full details.
+
+Key features:
+
+- **Servers tab**: aggregated view of all MCP servers across all agents, deduplicated by connection identity. Expand any server to introspect its tools. Health check dots show server status.
+- **Discover tab**: curated registry of popular MCP servers with one-click YAML snippet copying.
+- **Playground tab**: execute any MCP tool in isolation (no LLM needed). Auto-generated forms from tool input schemas. History sidebar for quick replay.
+- **Canvas tab**: @xyflow/svelte topology visualization showing which agents consume which MCP servers.
+- **Health monitoring**: 30-second TTL cache for health checks. Sidebar badge shows a red dot when any server is unhealthy. Launchpad widget summarizes overall MCP health.
+
+The MCP Hub uses the same `build_transport()` and sandbox enforcement as agent execution -- command allowlists, env scrubbing, and SSRF protection all apply when the playground executes tool calls.

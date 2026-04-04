@@ -216,12 +216,12 @@ def list_starters() -> list[StarterEntry]:
         slug = path.stem
         starters[slug] = _build_entry(slug, raw, data, path)
 
-    # Composite starters (subdirectories with compose.yaml or role.yaml)
+    # Composite starters (subdirectories with flow.yaml or role.yaml)
     for child in STARTERS_DIR.iterdir():
         if not child.is_dir():
             continue
         slug = child.name
-        for candidate_name in ("compose.yaml", "role.yaml"):
+        for candidate_name in ("flow.yaml", "role.yaml"):
             candidate = child / candidate_name
             if candidate.is_file():
                 result = _load_single_yaml(candidate)
@@ -259,7 +259,7 @@ def resolve_starter_path(name: str) -> Path | None:
     # Composite starters
     composite = STARTERS_DIR / name
     if composite.is_dir():
-        for candidate_name in ("compose.yaml", "role.yaml"):
+        for candidate_name in ("flow.yaml", "role.yaml"):
             candidate = composite / candidate_name
             if candidate.is_file():
                 return candidate

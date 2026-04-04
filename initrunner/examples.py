@@ -1,4 +1,4 @@
-"""Examples catalog: browse, preview, and copy bundled example roles/compose/skills."""
+"""Examples catalog: browse, preview, and copy bundled example roles/flows/skills."""
 
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ def copy_example(name: str, output_dir: Path) -> list[Path]:
     written: list[Path] = []
 
     # Map from category to examples/ subdir
-    category_dirs = {"role": "roles", "compose": "compose", "skill": "skills"}
+    category_dirs = {"role": "roles", "flow": "flows", "skill": "skills"}
     category_subdir = category_dirs.get(entry.category, entry.category)
 
     for rel_path in entry.files:

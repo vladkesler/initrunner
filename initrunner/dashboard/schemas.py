@@ -250,7 +250,7 @@ class StarterInfo(BaseModel):
     description: str
     tags: list[str]
     features: list[str]
-    kind: str = "Agent"  # Agent, Team, or Compose
+    kind: str = "Agent"  # Agent, Team, or Flow
 
 
 class StartersResponse(BaseModel):
@@ -378,15 +378,15 @@ class HubSeedRequest(BaseModel):
     api_key_env: str | None = None
 
 
-# -- Compose: list / detail ---------------------------------------------------
+# -- Flow: list / detail -------------------------------------------------------
 
 
-class ComposeSummary(BaseModel):
+class FlowSummary(BaseModel):
     id: str
     name: str
     description: str
-    service_count: int
-    service_names: list[str]
+    agent_count: int
+    agent_names: list[str]
     path: str
     error: str | None = None
 
@@ -412,53 +412,53 @@ class HealthCheckDetail(BaseModel):
     retries: int = 3
 
 
-class ComposeServiceDetail(BaseModel):
+class FlowAgentDetail(BaseModel):
     name: str
     role_path: str
     agent_id: str | None = None
     agent_name: str | None = None
     sink: SinkDetail | None = None
-    depends_on: list[str] = Field(default_factory=list)
+    needs: list[str] = Field(default_factory=list)
     trigger_summary: str | None = None
     restart: RestartDetail = Field(default_factory=RestartDetail)
     health_check: HealthCheckDetail = Field(default_factory=HealthCheckDetail)
     environment_count: int = 0
 
 
-class ComposeDetail(BaseModel):
+class FlowDetail(BaseModel):
     id: str
     name: str
     description: str
     path: str
-    services: list[ComposeServiceDetail]
+    agents: list[FlowAgentDetail]
     shared_memory_enabled: bool = False
     shared_documents_enabled: bool = False
 
 
 class DelegateEventResponse(BaseModel):
     timestamp: str
-    source_service: str
-    target_service: str
+    source_agent: str
+    target_agent: str
     status: str
     source_run_id: str
-    compose_name: str | None = None
+    flow_name: str | None = None
     reason: str | None = None
     trace: str | None = None
     payload_preview: str = ""
 
 
-class ComposeStatsResponse(BaseModel):
+class FlowStatsResponse(BaseModel):
     total_events: int
     by_status: dict[str, int] = Field(default_factory=dict)
 
 
-class ComposeRunRequest(BaseModel):
+class FlowRunRequest(BaseModel):
     prompt: str
     message_history: str | None = None
 
 
-class ServiceStepResponse(BaseModel):
-    service_name: str
+class AgentStepResponse(BaseModel):
+    agent_name: str
     output: str = ""
     tokens_in: int = 0
     tokens_out: int = 0
@@ -469,11 +469,11 @@ class ServiceStepResponse(BaseModel):
     error: str | None = None
 
 
-class ComposeRunResponse(BaseModel):
+class FlowRunResponse(BaseModel):
     output: str = ""
     output_mode: str = "none"
-    final_service_name: str | None = None
-    steps: list[ServiceStepResponse] = Field(default_factory=list)
+    final_agent_name: str | None = None
+    steps: list[AgentStepResponse] = Field(default_factory=list)
     tokens_in: int = 0
     tokens_out: int = 0
     total_tokens: int = 0
@@ -483,17 +483,17 @@ class ComposeRunResponse(BaseModel):
     message_history: str | None = None
 
 
-class ComposeYamlSaveRequest(BaseModel):
+class FlowYamlSaveRequest(BaseModel):
     yaml_text: str
 
 
-class ComposeYamlSaveResponse(BaseModel):
+class FlowYamlSaveResponse(BaseModel):
     path: str
     valid: bool
     issues: list[str] = Field(default_factory=list)
 
 
-# -- Compose: builder ---------------------------------------------------------
+# -- Flow: builder -------------------------------------------------------------
 
 
 class PatternInfo(BaseModel):
@@ -501,8 +501,8 @@ class PatternInfo(BaseModel):
     description: str
     fixed_topology: bool
     slot_names: list[str]
-    min_services: int
-    max_services: int | None = None
+    min_agents: int
+    max_agents: int | None = None
 
 
 class AgentSlotModel(BaseModel):
@@ -529,7 +529,7 @@ class SlotAssignment(BaseModel):
     agent_id: str | None = None
 
 
-class ComposeBuilderOptionsResponse(BaseModel):
+class FlowBuilderOptionsResponse(BaseModel):
     patterns: list[PatternInfo]
     agents: list[AgentSlotOption]
     providers: list[ProviderModels]
@@ -541,12 +541,12 @@ class ComposeBuilderOptionsResponse(BaseModel):
     ollama_base_url: str
 
 
-class ComposeSeedRequest(BaseModel):
+class FlowSeedRequest(BaseModel):
     mode: Literal["pattern", "starter"] = "pattern"
     pattern: str = ""
     name: str
-    services: list[SlotAssignment] = []
-    service_count: int = 3
+    agents: list[SlotAssignment] = []
+    agent_count: int = 3
     shared_memory: bool = False
     provider: str = "openai"
     model: str | None = None
@@ -556,36 +556,36 @@ class ComposeSeedRequest(BaseModel):
     starter_slug: str | None = None
 
 
-class ComposeSeedResponse(BaseModel):
-    compose_yaml: str
+class FlowSeedResponse(BaseModel):
+    flow_yaml: str
     role_yamls: dict[str, str]
     issues: list[ValidationIssueResponse]
     ready: bool
 
 
-class ComposeValidateRequest(BaseModel):
+class FlowValidateRequest(BaseModel):
     yaml_text: str
 
 
-class ComposeValidateResponse(BaseModel):
+class FlowValidateResponse(BaseModel):
     issues: list[ValidationIssueResponse]
     ready: bool
 
 
-class ComposeSaveRequest(BaseModel):
-    compose_yaml: str
+class FlowSaveRequest(BaseModel):
+    flow_yaml: str
     role_yamls: dict[str, str]
     directory: str
     project_name: str
     force: bool = False
 
 
-class ComposeSaveResponse(BaseModel):
+class FlowSaveResponse(BaseModel):
     path: str
     valid: bool
     issues: list[str]
     next_steps: list[str]
-    compose_id: str
+    flow_id: str
 
 
 # -- Team: list / detail -------------------------------------------------------
@@ -940,3 +940,76 @@ class SkillRef(BaseModel):
 
     name: str
     skill_id: str | None = None
+
+
+# -- MCP Hub ------------------------------------------------------------------
+
+
+class McpAgentRefResponse(BaseModel):
+    agent_name: str
+    agent_id: str
+    role_path: str
+    tool_filter: list[str] = []
+    tool_exclude: list[str] = []
+    tool_prefix: str | None = None
+
+
+class McpServerResponse(BaseModel):
+    server_id: str
+    display_name: str
+    transport: str
+    command: str | None = None
+    args: list[str] = []
+    url: str | None = None
+    agent_refs: list[McpAgentRefResponse] = []
+    health_status: str | None = None
+    health_checked_at: str | None = None
+
+
+class McpToolResponse(BaseModel):
+    name: str
+    description: str
+    input_schema: dict = {}
+
+
+class McpHealthResponse(BaseModel):
+    server_id: str
+    status: str
+    latency_ms: int
+    tool_count: int
+    error: str | None = None
+    checked_at: str
+
+
+class McpPlaygroundRequest(BaseModel):
+    server_id: str
+    tool_name: str
+    arguments: dict = {}
+
+
+class McpPlaygroundResponse(BaseModel):
+    tool_name: str
+    output: str
+    duration_ms: int
+    success: bool
+    error: str | None = None
+
+
+class McpRegistryEntryResponse(BaseModel):
+    name: str
+    display_name: str
+    description: str
+    category: str
+    transport: str
+    command: str | None = None
+    args: list[str] = []
+    url: str | None = None
+    install_hint: str = ""
+    homepage: str = ""
+    tags: list[str] = []
+
+
+class McpHealthSummaryResponse(BaseModel):
+    total: int
+    healthy: int
+    unhealthy: int

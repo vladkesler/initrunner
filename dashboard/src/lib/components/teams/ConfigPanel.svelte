@@ -51,7 +51,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.model ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Model</span>
+			<span class="section-label">Model</span>
 		</button>
 		{#if sections.model}
 			<div class="pb-3 pl-[18px] pt-1">
@@ -76,7 +76,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.strategy ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Strategy</span>
+			<span class="section-label">Strategy</span>
 		</button>
 		{#if sections.strategy}
 			<div class="pb-3 pl-[18px] pt-1">
@@ -101,7 +101,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.guardrails ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Guardrails</span>
+			<span class="section-label">Guardrails</span>
 		</button>
 		{#if sections.guardrails}
 			<div class="pb-3 pl-[18px] pt-1">
@@ -133,7 +133,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.sharedMemory ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Shared Memory</span>
+			<span class="section-label">Shared Memory</span>
 		</button>
 		{#if sections.sharedMemory}
 			<div class="pb-3 pl-[18px] pt-1">
@@ -174,7 +174,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.sharedDocuments ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Shared Documents</span>
+			<span class="section-label">Shared Documents</span>
 		</button>
 		{#if sections.sharedDocuments}
 			<div class="pb-3 pl-[18px] pt-1">
@@ -211,7 +211,7 @@
 					size={12}
 					class="shrink-0 text-fg-faint transition-transform duration-150 {sections.tools ? 'rotate-90' : ''}"
 				/>
-				<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
+				<span class="section-label">
 					Tools
 				</span>
 				<span class="font-mono text-[12px] text-fg-faint">({team.tools.length})</span>
@@ -245,7 +245,7 @@
 				size={12}
 				class="shrink-0 text-fg-faint transition-transform duration-150 {sections.observability ? 'rotate-90' : ''}"
 			/>
-			<span class="font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">Observability</span>
+			<span class="section-label">Observability</span>
 		</button>
 		{#if sections.observability}
 			<div class="pb-3 pl-[18px] pt-1">

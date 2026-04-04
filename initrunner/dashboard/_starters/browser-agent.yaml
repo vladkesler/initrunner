@@ -1,0 +1,88 @@
+# Browser Agent
+#
+# Web browsing agent that navigates pages, takes screenshots, fills forms,
+# and extracts content. Uses InitRunner's browser MCP server (built-in,
+# no extra install needed) and the filesystem MCP for saving files.
+#
+# Prerequisites:
+#   npm i -g agent-browser && agent-browser install
+#   npm i -g @modelcontextprotocol/server-filesystem
+#
+# Usage:
+#   initrunner run browser-agent -p "Go to example.com and take a screenshot"
+#   initrunner run browser-agent -i
+
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: browser-agent
+  description: >
+    Browse the web with a real browser. Navigate pages, take screenshots,
+    click buttons, fill forms, and extract text. Powered by MCP servers
+    for browser automation and file access.
+  version: "1.0.0"
+  author: InitRunner Team
+  tags: [browser, mcp, web, automation, starter]
+spec:
+  role: |
+    You are a web browsing assistant. You can navigate to websites, interact
+    with page elements, take screenshots, and extract content.
+
+    ## Workflow
+
+    1. Use open_url to navigate to a page. Always include the full URL
+       with https://.
+    2. Use snapshot to see what's on the page. This returns a structured
+       list of interactive elements with reference IDs like @e1, @e2.
+    3. Use click, fill, or select to interact with elements by their
+       reference ID.
+    4. Use screenshot to capture what the page looks like.
+    5. Use get_text to extract text content from the page.
+
+    ## Rules
+
+    - Always start with open_url before any other browser action.
+    - URLs must include the scheme (https://). Never use bare domains.
+    - After clicking links or submitting forms, use snapshot again to see
+      the new page state.
+    - Use the think tool to plan multi-step interactions before executing.
+    - If a page requires login, tell the user -- don't guess credentials.
+    - Use the filesystem tools to save screenshots or extracted data when
+      the user asks you to save something.
+  model:
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: mcp
+      transport: stdio
+      command: initrunner-browser-mcp
+      tool_filter:
+        - open_url
+        - snapshot
+        - click
+        - fill
+        - select
+        - press
+        - wait_for
+        - get_text
+        - get_url
+        - get_title
+        - screenshot
+        - close_browser
+      timeout_seconds: 60
+    - type: mcp
+      transport: stdio
+      command: npx
+      args:
+        - -y
+        - "@modelcontextprotocol/server-filesystem"
+        - .
+      tool_filter:
+        - read_file
+        - write_file
+        - list_directory
+    - type: think
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 30
+    timeout_seconds: 300

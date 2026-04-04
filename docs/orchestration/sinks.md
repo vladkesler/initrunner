@@ -230,13 +230,13 @@ sink_dispatcher.add_sink(sink)
 
 This is a building block for programmatic wiring. There is no YAML `type: telegram` sink config -- channel adapters handle replies via `reply_fn` in the standard trigger flow.
 
-## Delegate Sink (Compose Only)
+## Delegate Sink (Flow Only)
 
-The `delegate` sink type is used exclusively in [compose definitions](agent_composer.md) to route a service's output to other services via graph edges. It is not available in standalone role YAML files -- it is configured via the `sink:` field on a compose service.
+The `delegate` sink type is used exclusively in [flow definitions](flow.md) to route an agent's output to other agents via graph edges. It is not available in standalone role YAML files -- it is configured via the `sink:` field on a flow agent.
 
-When targeting multiple services, set `strategy: keyword` or `strategy: sense` to auto-route messages to the best-matching target instead of fan-out. This uses the same [Intent Sensing](../core/intent_sensing.md) logic as `--sense` in the CLI. See [Agent Composer -- Routing Strategy](agent_composer.md#routing-strategy) for details.
+When targeting multiple agents, set `strategy: keyword` or `strategy: sense` to auto-route messages to the best-matching target instead of fan-out. This uses the same [Intent Sensing](../core/intent_sensing.md) logic as `--sense` in the CLI. See [Flow -- Routing Strategy](flow.md#routing-strategy) for details.
 
-See [Agent Composer -- Delegate Sink](agent_composer.md#delegate-sink) for configuration options and examples.
+See [Flow -- Delegate Sink](flow.md#delegate-sink) for configuration options and examples.
 
 ## Run Modes
 

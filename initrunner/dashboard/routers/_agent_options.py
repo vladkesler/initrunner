@@ -9,7 +9,7 @@ from initrunner.dashboard.schemas import AgentSlotModel, AgentSlotOption
 def build_agent_options(role_cache: RoleCache) -> list[AgentSlotOption]:
     """Build picker options from the role cache.
 
-    Used by both compose and team builder option endpoints.  Skips errored
+    Used by both flow and team builder option endpoints.  Skips errored
     roles and sorts the result by agent name.
     """
     agents: list[AgentSlotOption] = []

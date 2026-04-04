@@ -408,11 +408,11 @@ graph TD
     I --> I2[Interactive REPL]
     I --> I3[Daemon]
 
-    J[compose.yaml] --> K[Orchestrator]
-    K --> L[Service A]
-    K --> M[Service B]
+    J[flow.yaml] --> K[Orchestrator]
+    K --> L[Agent A]
+    K --> M[Agent B]
     L -->|delegate sink| M
     K --> N[Health Monitor]
 ```
 
-YAML role files define the agent. The loader parses and validates them, then constructs a PydanticAI agent wired with the configured tools, stores, and audit logger. The runner executes the agent in one of three modes: single-shot, interactive REPL, or trigger-driven daemon. For multi-agent workflows, a compose definition orchestrates multiple services with inter-service delegation and health monitoring.
+YAML role files define the agent. The loader parses and validates them, then constructs a PydanticAI agent wired with the configured tools, stores, and audit logger. The runner executes the agent in one of three modes: single-shot, interactive REPL, or trigger-driven daemon. For multi-agent workflows, a flow definition orchestrates multiple agents with inter-agent delegation and health monitoring.

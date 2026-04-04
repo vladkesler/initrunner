@@ -271,6 +271,35 @@ spec:
 
 运行 `initrunner compose up compose.yaml`。查看 [模式指南](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md)。
 
+## MCP -- 接入任何工具生态
+
+Agent 可以使用任何 [MCP](https://modelcontextprotocol.io/) 服务器作为工具来源。指向一个服务器，它暴露的所有工具都可供 Agent 使用：
+
+```yaml
+spec:
+  tools:
+    - type: mcp
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./data"]
+    - type: mcp
+      transport: sse
+      url: https://my-mcp-server.example.com/sse
+```
+
+Agent 可以同时使用多个 MCP 服务器和内置工具。三种传输方式：`stdio`（本地进程）、`sse`（Server-Sent Events）和 `streamable-http`。工具过滤（`tool_filter` / `tool_exclude`）和命名空间（`tool_prefix`）可以在服务器暴露大量工具时保持整洁。
+
+反过来，也可以把你的 Agent 暴露为 MCP 工具，让 Claude Code、Cursor、Windsurf 等 MCP 客户端调用：
+
+```bash
+initrunner mcp serve agent.yaml            # Agent 变成 MCP 工具
+initrunner mcp toolkit --tools search,sql  # 暴露原始工具，无需 LLM
+```
+
+Dashboard 的 [MCP Hub](/mcp) 展示所有 Agent 配置的 MCP 服务器，通过 Playground 独立测试任何工具，并在拖拽画布上可视化服务器与 Agent 的拓扑关系。
+
+查看 [MCP Gateway](docs/interfaces/mcp-gateway.md) · [Dashboard](docs/interfaces/dashboard.md#mcp-hub-mcp)。
+
 ## 用户界面
 
 <p align="center">

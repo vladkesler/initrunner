@@ -1,126 +1,126 @@
 [
   {
     "name": "ci-pipeline",
-    "category": "compose",
+    "category": "flow",
     "description": "CI event processing pipeline. A webhook receiver accepts CI webhooks, a build analyzer diagnoses failures, and a notifier sends Slack alerts and updates GitHub commit status.\n",
     "tags": [],
     "files": [
-      "ci-pipeline/compose.yaml",
+      "ci-pipeline/flow.yaml",
       "ci-pipeline/roles/build-analyzer.yaml",
       "ci-pipeline/roles/notifier.yaml",
       "ci-pipeline/roles/webhook-receiver.yaml"
     ],
-    "primary_file": "ci-pipeline/compose.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: ci-pipeline\n  description: >\n    CI event processing pipeline. A webhook receiver accepts CI webhooks,\n    a build analyzer diagnoses failures, and a notifier sends Slack alerts\n    and updates GitHub commit status.\nspec:\n  services:\n    webhook-receiver:\n      role: roles/webhook-receiver.yaml\n      sink:\n        type: delegate\n        target: build-analyzer\n\n    build-analyzer:\n      role: roles/build-analyzer.yaml\n      depends_on:\n        - webhook-receiver\n      sink:\n        type: delegate\n        target: notifier\n\n    notifier:\n      role: roles/notifier.yaml\n      depends_on:\n        - build-analyzer\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n",
+    "primary_file": "ci-pipeline/flow.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: ci-pipeline\n  description: >\n    CI event processing pipeline. A webhook receiver accepts CI webhooks,\n    a build analyzer diagnoses failures, and a notifier sends Slack alerts\n    and updates GitHub commit status.\nspec:\n  agents:\n    webhook-receiver:\n      role: roles/webhook-receiver.yaml\n      sink:\n        type: delegate\n        target: build-analyzer\n\n    build-analyzer:\n      role: roles/build-analyzer.yaml\n      needs:\n        - webhook-receiver\n      sink:\n        type: delegate\n        target: notifier\n\n    notifier:\n      role: roles/notifier.yaml\n      needs:\n        - build-analyzer\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
-      "compose"
+      "flow"
     ],
     "tools": []
   },
   {
     "name": "content-pipeline",
-    "category": "compose",
+    "category": "flow",
     "description": "Multi-agent content creation pipeline. A file watcher monitors ./drafts/ for new markdown or text files, extracts the topic, and delegates to a researcher. The researcher fans out to a writer (polished output) and a reviewer (QA checks). Memory is enabled for researcher and writer so they build up knowledge across runs.\n",
     "tags": [],
     "files": [
-      "content-pipeline/compose.yaml",
       "content-pipeline/drafts/kubernetes-overview.md",
+      "content-pipeline/flow.yaml",
       "content-pipeline/roles/content-watcher.yaml",
       "content-pipeline/roles/researcher.yaml",
       "content-pipeline/roles/reviewer.yaml",
       "content-pipeline/roles/writer.yaml"
     ],
-    "primary_file": "content-pipeline/compose.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: content-pipeline\n  description: >\n    Multi-agent content creation pipeline. A file watcher monitors ./drafts/\n    for new markdown or text files, extracts the topic, and delegates to a\n    researcher. The researcher fans out to a writer (polished output) and a\n    reviewer (QA checks). Memory is enabled for researcher and writer so they\n    build up knowledge across runs.\nspec:\n  shared_memory:\n    enabled: true\n    store_path: ./.initrunner/content-shared.db\n    max_memories: 2000\n  services:\n    content-watcher:\n      role: roles/content-watcher.yaml\n      sink:\n        type: delegate\n        target: researcher\n      health_check:\n        interval_seconds: 60\n        timeout_seconds: 15\n        retries: 5\n      environment:\n        CONTENT_DIR: ./drafts\n\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - content-watcher\n      sink:\n        type: delegate\n        target:\n          - writer\n          - reviewer\n\n    writer:\n      role: roles/writer.yaml\n      depends_on:\n        - researcher\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    reviewer:\n      role: roles/reviewer.yaml\n      depends_on:\n        - researcher\n      restart:\n        condition: on-failure\n        max_retries: 2\n        delay_seconds: 5\n",
+    "primary_file": "content-pipeline/flow.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: content-pipeline\n  description: >\n    Multi-agent content creation pipeline. A file watcher monitors ./drafts/\n    for new markdown or text files, extracts the topic, and delegates to a\n    researcher. The researcher fans out to a writer (polished output) and a\n    reviewer (QA checks). Memory is enabled for researcher and writer so they\n    build up knowledge across runs.\nspec:\n  shared_memory:\n    enabled: true\n    store_path: ./.initrunner/content-shared.db\n    max_memories: 2000\n  agents:\n    content-watcher:\n      role: roles/content-watcher.yaml\n      sink:\n        type: delegate\n        target: researcher\n      health_check:\n        interval_seconds: 60\n        timeout_seconds: 15\n        retries: 5\n      environment:\n        CONTENT_DIR: ./drafts\n\n    researcher:\n      role: roles/researcher.yaml\n      needs:\n        - content-watcher\n      sink:\n        type: delegate\n        target:\n          - writer\n          - reviewer\n\n    writer:\n      role: roles/writer.yaml\n      needs:\n        - researcher\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    reviewer:\n      role: roles/reviewer.yaml\n      needs:\n        - researcher\n      restart:\n        condition: on-failure\n        max_retries: 2\n        delay_seconds: 5\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
-      "compose"
+      "flow"
     ],
     "tools": []
   },
   {
     "name": "email-pipeline",
-    "category": "compose",
+    "category": "flow",
     "description": "Multi-agent email processing pipeline",
     "tags": [],
     "files": [
-      "ci-pipeline/compose.yaml",
+      "ci-pipeline/flow.yaml",
       "ci-pipeline/roles/build-analyzer.yaml",
       "ci-pipeline/roles/notifier.yaml",
       "ci-pipeline/roles/webhook-receiver.yaml",
-      "compose.yaml",
-      "content-pipeline/compose.yaml",
       "content-pipeline/drafts/kubernetes-overview.md",
+      "content-pipeline/flow.yaml",
       "content-pipeline/roles/content-watcher.yaml",
       "content-pipeline/roles/researcher.yaml",
       "content-pipeline/roles/reviewer.yaml",
       "content-pipeline/roles/writer.yaml",
+      "flow.yaml",
       "roles/inbox-watcher.yaml",
       "roles/researcher.yaml",
       "roles/responder.yaml",
       "roles/triager.yaml",
-      "support-desk/compose.yaml",
+      "support-desk/flow.yaml",
       "support-desk/roles/escalator.yaml",
       "support-desk/roles/intake.yaml",
       "support-desk/roles/researcher.yaml",
       "support-desk/roles/responder.yaml",
-      "test-pipeline/compose.yaml",
+      "test-pipeline/flow.yaml",
       "test-pipeline/roles/change-detector.yaml",
       "test-pipeline/roles/integration-runner.yaml",
       "test-pipeline/roles/unit-runner.yaml",
       "test-pipeline/roles/unit-runner.yaml.bak"
     ],
-    "primary_file": "compose.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: email-pipeline\n  description: Multi-agent email processing pipeline\nspec:\n  services:\n    inbox-watcher:\n      role: roles/inbox-watcher.yaml\n      sink:\n        type: delegate\n        target: triager\n    triager:\n      role: roles/triager.yaml\n      depends_on:\n        - inbox-watcher\n      sink:\n        type: delegate\n        target:\n          - researcher\n          - responder\n        circuit_breaker_threshold: 5\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - triager\n    responder:\n      role: roles/responder.yaml\n      depends_on:\n        - triager\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n",
+    "primary_file": "flow.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: email-pipeline\n  description: Multi-agent email processing pipeline\nspec:\n  agents:\n    inbox-watcher:\n      role: roles/inbox-watcher.yaml\n      sink:\n        type: delegate\n        target: triager\n    triager:\n      role: roles/triager.yaml\n      needs:\n        - inbox-watcher\n      sink:\n        type: delegate\n        target:\n          - researcher\n          - responder\n        circuit_breaker_threshold: 5\n    researcher:\n      role: roles/researcher.yaml\n      needs:\n        - triager\n    responder:\n      role: roles/responder.yaml\n      needs:\n        - triager\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
-      "compose"
+      "flow"
     ],
     "tools": []
   },
   {
     "name": "support-desk",
-    "category": "compose",
+    "category": "flow",
     "description": "Support desk pipeline with intelligent auto-routing. An intake agent summarizes incoming requests, then sense routing automatically sends each request to the right handler -- researcher for technical issues, responder for quick answers, or escalator for urgent/complex cases. No static fan-out: each message goes to exactly one target.\n",
     "tags": [],
     "files": [
-      "support-desk/compose.yaml",
+      "support-desk/flow.yaml",
       "support-desk/roles/escalator.yaml",
       "support-desk/roles/intake.yaml",
       "support-desk/roles/researcher.yaml",
       "support-desk/roles/responder.yaml"
     ],
-    "primary_file": "support-desk/compose.yaml",
-    "primary_content": "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: support-desk\n  description: >\n    Support desk pipeline with intelligent auto-routing. An intake agent\n    summarizes incoming requests, then sense routing automatically sends\n    each request to the right handler -- researcher for technical issues,\n    responder for quick answers, or escalator for urgent/complex cases.\n    No static fan-out: each message goes to exactly one target.\nspec:\n  services:\n    intake:\n      role: roles/intake.yaml\n      sink:\n        type: delegate\n        # strategy: sense uses keyword scoring + LLM tiebreak to pick the\n        # best target for each message. Use \"keyword\" for zero API calls,\n        # or \"all\" to fan out to every target (default).\n        strategy: sense\n        target:\n          - researcher\n          - responder\n          - escalator\n\n    researcher:\n      role: roles/researcher.yaml\n      depends_on:\n        - intake\n\n    responder:\n      role: roles/responder.yaml\n      depends_on:\n        - intake\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    escalator:\n      role: roles/escalator.yaml\n      depends_on:\n        - intake\n",
+    "primary_file": "support-desk/flow.yaml",
+    "primary_content": "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: support-desk\n  description: >\n    Support desk pipeline with intelligent auto-routing. An intake agent\n    summarizes incoming requests, then sense routing automatically sends\n    each request to the right handler -- researcher for technical issues,\n    responder for quick answers, or escalator for urgent/complex cases.\n    No static fan-out: each message goes to exactly one target.\nspec:\n  agents:\n    intake:\n      role: roles/intake.yaml\n      sink:\n        type: delegate\n        # strategy: sense uses keyword scoring + LLM tiebreak to pick the\n        # best target for each message. Use \"keyword\" for zero API calls,\n        # or \"all\" to fan out to every target (default).\n        strategy: sense\n        target:\n          - researcher\n          - responder\n          - escalator\n\n    researcher:\n      role: roles/researcher.yaml\n      needs:\n        - intake\n\n    responder:\n      role: roles/responder.yaml\n      needs:\n        - intake\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    escalator:\n      role: roles/escalator.yaml\n      needs:\n        - intake\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
-      "compose"
+      "flow"
     ],
     "tools": []
   },
   {
     "name": "test-pipeline",
-    "category": "compose",
+    "category": "flow",
     "description": "Multi-agent test pipeline. A file watcher detects repository changes, analyzes git diff to determine affected modules, and delegates to unit and integration test runners. Each runner posts its own results directly to Slack.\n",
     "tags": [],
     "files": [
-      "test-pipeline/compose.yaml",
+      "test-pipeline/flow.yaml",
       "test-pipeline/roles/change-detector.yaml",
       "test-pipeline/roles/integration-runner.yaml",
       "test-pipeline/roles/unit-runner.yaml",
       "test-pipeline/roles/unit-runner.yaml.bak"
     ],
-    "primary_file": "test-pipeline/compose.yaml",
-    "primary_content": "# Test Pipeline\n#\n# Multi-agent test pipeline. A file watcher detects changes, analyzes\n# git diff, and delegates to unit and integration test runners. Each\n# runner posts its own Slack summary directly.\n#\n# Prerequisites:\n#   Test framework (pytest, jest, etc.)\n#   Slack incoming webhook URL\n#\n# Usage:\n#   initrunner compose up examples/compose/test-pipeline/compose.yaml\napiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: test-pipeline\n  description: >\n    Multi-agent test pipeline. A file watcher detects repository changes,\n    analyzes git diff to determine affected modules, and delegates to unit\n    and integration test runners. Each runner posts its own results directly\n    to Slack.\nspec:\n  shared_memory:\n    enabled: true\n    store_path: ./.initrunner/test-pipeline-shared.db\n    max_memories: 1000\n  services:\n    change-detector:\n      role: roles/change-detector.yaml\n      sink:\n        type: delegate\n        target:\n          - unit-runner\n          - integration-runner\n      health_check:\n        interval_seconds: 60\n        timeout_seconds: 15\n        retries: 5\n\n    unit-runner:\n      role: roles/unit-runner.yaml\n      depends_on:\n        - change-detector\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    integration-runner:\n      role: roles/integration-runner.yaml\n      depends_on:\n        - change-detector\n      restart:\n        condition: on-failure\n        max_retries: 2\n        delay_seconds: 10\n",
+    "primary_file": "test-pipeline/flow.yaml",
+    "primary_content": "# Test Pipeline\n#\n# Multi-agent test pipeline. A file watcher detects changes, analyzes\n# git diff, and delegates to unit and integration test runners. Each\n# runner posts its own Slack summary directly.\n#\n# Prerequisites:\n#   Test framework (pytest, jest, etc.)\n#   Slack incoming webhook URL\n#\n# Usage:\n#   initrunner flow up examples/flows/test-pipeline/flow.yaml\napiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: test-pipeline\n  description: >\n    Multi-agent test pipeline. A file watcher detects repository changes,\n    analyzes git diff to determine affected modules, and delegates to unit\n    and integration test runners. Each runner posts its own results directly\n    to Slack.\nspec:\n  shared_memory:\n    enabled: true\n    store_path: ./.initrunner/test-pipeline-shared.db\n    max_memories: 1000\n  agents:\n    change-detector:\n      role: roles/change-detector.yaml\n      sink:\n        type: delegate\n        target:\n          - unit-runner\n          - integration-runner\n      health_check:\n        interval_seconds: 60\n        timeout_seconds: 15\n        retries: 5\n\n    unit-runner:\n      role: roles/unit-runner.yaml\n      needs:\n        - change-detector\n      restart:\n        condition: on-failure\n        max_retries: 3\n        delay_seconds: 5\n\n    integration-runner:\n      role: roles/integration-runner.yaml\n      needs:\n        - change-detector\n      restart:\n        condition: on-failure\n        max_retries: 2\n        delay_seconds: 10\n",
     "multi_file": true,
     "difficulty": "advanced",
     "features": [
-      "compose"
+      "flow"
     ],
     "tools": []
   },

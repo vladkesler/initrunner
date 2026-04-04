@@ -35,7 +35,7 @@ def ingest_status_color(status: object) -> str:
 
 
 _INITRUNNER_API_VERSIONS = {"initrunner/v1"}
-_INITRUNNER_KINDS = {"Agent", "Team"}
+_INITRUNNER_KINDS = {"Agent", "Team", "Flow"}
 
 
 def resolve_role_path(path: Path) -> Path:
@@ -395,8 +395,10 @@ def check_ollama_running() -> None:
 def detect_yaml_kind(path: Path) -> str:
     """Peek at a YAML file's ``kind`` field without full validation.
 
-    Returns the kind string (e.g. ``"Agent"``, ``"Team"``, ``"Compose"``).
+    Returns the kind string (e.g. ``"Agent"``, ``"Team"``, ``"Flow"``).
     Defaults to ``"Agent"`` on any failure.
+
+    Raises ``typer.Exit(1)`` if the file uses the removed ``kind: Compose``.
     """
     import yaml
 
@@ -404,7 +406,17 @@ def detect_yaml_kind(path: Path) -> str:
         with open(path) as f:
             data = yaml.safe_load(f)
         if isinstance(data, dict):
-            return data.get("kind", "Agent")
+            kind = data.get("kind", "Agent")
+            if kind == "Compose":
+                console.print(
+                    "[red]Error:[/red] kind: Compose has been renamed to kind: Flow. "
+                    "Also rename spec.services to spec.agents and depends_on to needs. "
+                    "See docs/orchestration/flow.md"
+                )
+                raise typer.Exit(1)
+            return kind
+    except typer.Exit:
+        raise
     except Exception:
         pass
     return "Agent"
@@ -413,7 +425,7 @@ def detect_yaml_kind(path: Path) -> str:
 def resolve_run_target(target: Path) -> tuple[Path, str]:
     """Resolve a run target to *(resolved_path, kind)*.
 
-    Explicit files may resolve to any kind (Agent, Team, Compose).
+    Explicit files may resolve to any kind (Agent, Team, Flow).
     Directory and installed-name resolution stays Agent/Team-only via
     :func:`resolve_role_path`.
     """
