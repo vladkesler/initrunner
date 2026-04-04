@@ -2,19 +2,19 @@
 
 Team mode lets multiple personas collaborate on a single task, defined in one YAML file. Three execution strategies: **sequential** (linear handoff), **parallel** (independent, concurrent), and **debate** (multi-round concurrent argumentation with synthesis). Optional shared memory and document stores. Personas can override the team's model and tools.
 
-Team mode fills the gap between single-agent runs and full Compose orchestration:
+Team mode fills the gap between single-agent runs and full Flow orchestration:
 
 - **Single agent** -- one role, one run
 - **Team mode** -- multiple personas, one file, one-shot pipeline
 - **Delegation** -- parent agent calls sub-agents via tool calls (requires multiple files)
-- **Compose** -- long-running daemon services with triggers, queues, health checks
+- **Flow** -- long-running daemon agents with triggers, queues, health checks
 
 ## What's New in v2
 
 - **Per-persona model overrides** -- each persona can use a different model
 - **Per-persona tool overrides** -- extend or replace shared tools per persona
 - **Per-persona environment variables** -- set env vars scoped to a persona's run (sequential only)
-- **Shared memory** -- personas share a memory store (reuses compose's `SharedMemoryConfig`)
+- **Shared memory** -- personas share a memory store (reuses flow's `SharedMemoryConfig`)
 - **Shared documents (RAG)** -- team-level document sources ingested before the pipeline runs
 - **Parallel execution** -- run all personas concurrently with deterministic result ordering
 - **Observability** -- OpenTelemetry tracing with proper setup/shutdown lifecycle
@@ -138,7 +138,7 @@ spec:
     store_path: ./data/team-memory.db  # optional, defaults to ~/.initrunner/memory/{name}-shared.db
 ```
 
-Uses the same `SharedMemoryConfig` as compose. The `apply_shared_memory()` function patches each persona's synthesized role at runtime.
+Uses the same `SharedMemoryConfig` as flow. The `apply_shared_memory()` function patches each persona's synthesized role at runtime.
 
 ### Shared Documents (RAG)
 
@@ -349,9 +349,9 @@ Each persona run is logged to the audit trail with:
 
 ## Comparison with Other Multi-Agent Approaches
 
-| Feature | Team Mode | Delegation | Compose |
-|---------|-----------|------------|---------|
-| Files needed | 1 | 3+ (coordinator + sub-roles) | 2+ (compose + roles) |
+| Feature | Team Mode | Delegation | Flow |
+|---------|-----------|------------|------|
+| Files needed | 1 | 3+ (coordinator + sub-roles) | 2+ (flow + roles) |
 | Execution | Sequential or parallel | Tool-call driven | Graph-based (parallel fan-out) |
 | Lifetime | One-shot | One-shot | One-shot or daemon |
 | Agent interaction | Output handoff (seq) / independent (par) | Tool call/response | Graph edges (DelegationEnvelope) |
@@ -368,4 +368,4 @@ Each persona run is logged to the audit trail with:
 - No interactive/REPL team mode
 - Triggers not supported (team stays one-shot)
 
-See also: [Delegation](delegation.md), [Compose Orchestration](sinks.md), [Autonomous Execution](autonomy.md)
+See also: [Delegation](delegation.md), [Flow Orchestration](sinks.md), [Autonomous Execution](autonomy.md)

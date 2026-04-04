@@ -52,7 +52,7 @@ _UNSUPPORTED_OUTPUT_TYPES: set[str] = {"TextOutput", "StructuredDict"}
 _UNSUPPORTED_MODULES: dict[str, str] = {
     "pydantic_graph": (
         "pydantic-graph state machine detected."
-        " Use InitRunner compose.yaml for multi-step orchestration."
+        " Use InitRunner flow.yaml for multi-step orchestration."
     ),
     "logfire": ("Logfire instrumentation detected. Use spec.observability instead."),
 }

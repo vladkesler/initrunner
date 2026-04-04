@@ -123,5 +123,5 @@ This is useful for container deployments or CI environments where the home direc
 
 - **Python 3.11+** is required.
 - **Linux / macOS / WSL** are fully supported.
-- **Windows** works but systemd-related compose features (`compose install/start/stop`) are unavailable.
+- **Windows** works but systemd-related flow features (`flow install/start/stop`) are unavailable.
 - **Docker**: if using Ollama on the host from inside a container, set `base_url: http://host.docker.internal:11434/v1` in your role YAML.

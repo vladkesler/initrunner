@@ -144,7 +144,7 @@ Some LangChain features have no direct equivalent and produce explicit warnings 
 |---|---|---|
 | `ConversationBufferMemory` | "LangChain memory not imported" | Configure `spec.memory` manually |
 | LCEL pipelines (`prompt \| model \| parser`) | "LCEL pipeline detected but not importable" | Describe chain logic in `spec.role` |
-| LangGraph state machines | "LangGraph state machine detected" | Use `compose.yaml` for orchestration |
+| LangGraph state machines | "LangGraph state machine detected" | Use `flow.yaml` for orchestration |
 | Retrievers / VectorStores | "Retriever/VectorStore detected" | Configure `spec.ingest` for RAG |
 | Callback handlers | "LangChain callbacks not imported" | Use `spec.observability` for tracing |
 | `HumanInTheLoopMiddleware` | "Human-in-the-loop middleware not imported" | Use `confirmation: true` on tool permissions |
@@ -194,7 +194,7 @@ This is useful for adding InitRunner-specific features (memory, triggers, autono
 
 The importer targets **classic LangChain agents** built with `create_agent`, `init_chat_model`, or provider-specific chat model classes. It handles `@tool` functions, known tool classes, structured output, and basic middleware.
 
-LangGraph workflows, LCEL chains, multi-agent handoff patterns, and advanced streaming configurations are out of scope for automatic conversion. These require manual migration using [compose.yaml](../orchestration/delegation.md) or [team mode](../orchestration/team_mode.md).
+LangGraph workflows, LCEL chains, multi-agent handoff patterns, and advanced streaming configurations are out of scope for automatic conversion. These require manual migration using [flow.yaml](../orchestration/delegation.md) or [team mode](../orchestration/team_mode.md).
 
 ## See Also
 

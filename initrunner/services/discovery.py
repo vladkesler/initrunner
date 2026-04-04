@@ -1,4 +1,4 @@
-"""Role, compose, and team discovery, validation, and default directory helpers."""
+"""Role, flow, and team discovery, validation, and default directory helpers."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
-    from initrunner.compose.schema import ComposeDefinition
+    from initrunner.flow.schema import FlowDefinition
     from initrunner.team.schema import TeamDefinition
 
 
@@ -29,11 +29,11 @@ class DiscoveredRole:
 
 
 @dataclass
-class DiscoveredCompose:
-    """A compose YAML file discovered on disk."""
+class DiscoveredFlow:
+    """A flow YAML file discovered on disk."""
 
     path: Path
-    compose: ComposeDefinition | None = None
+    flow: FlowDefinition | None = None
     error: str | None = None
 
 
@@ -126,17 +126,17 @@ def discover_roles_sync(dirs: list[Path]) -> list[DiscoveredRole]:
     )
 
 
-def discover_composes_sync(dirs: list[Path]) -> list[DiscoveredCompose]:
-    """Scan directories for compose YAML files (sync)."""
-    from initrunner.compose.loader import ComposeLoadError, load_compose
+def discover_flows_sync(dirs: list[Path]) -> list[DiscoveredFlow]:
+    """Scan directories for flow YAML files (sync)."""
+    from initrunner.flow.loader import FlowLoadError, load_flow
 
     return _discover_sync(
         dirs,
-        "Compose",
-        load_compose,
-        (ComposeLoadError,),
-        lambda p, c: DiscoveredCompose(path=p, compose=c),
-        lambda p, e: DiscoveredCompose(path=p, error=e),
+        "Flow",
+        load_flow,
+        (FlowLoadError,),
+        lambda p, c: DiscoveredFlow(path=p, flow=c),
+        lambda p, e: DiscoveredFlow(path=p, error=e),
     )
 
 

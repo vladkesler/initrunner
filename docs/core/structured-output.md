@@ -145,7 +145,7 @@ The file must contain a valid JSON Schema object. Relative paths are resolved fr
 
 ## Pipeline Precedence
 
-When using compose pipelines, a pipeline step's `output_format` overrides the role-level `spec.output` config. This allows the same role to produce different output formats depending on the pipeline context.
+When using flow pipelines, a pipeline step's `output_format` overrides the role-level `spec.output` config. This allows the same role to produce different output formats depending on the pipeline context.
 
 ## Streaming Limitation
 

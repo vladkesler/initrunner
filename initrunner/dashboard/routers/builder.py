@@ -235,7 +235,7 @@ async def list_starters() -> StartersResponse:
                 kind=e.kind,
             )
             for e in entries
-            if e.kind in ("Agent", "Team", "Compose")
+            if e.kind in ("Agent", "Team", "Flow")
         ]
     )
 

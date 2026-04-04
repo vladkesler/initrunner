@@ -194,14 +194,14 @@ PydanticAI emits these spans when `instrument` is set on the Agent:
 
 ## Distributed Traces via Delegation
 
-In compose orchestrations, trace context propagates automatically through delegation chains using W3C Trace Context (`traceparent`/`tracestate` headers).
+In flow orchestrations, trace context propagates automatically through delegation chains using W3C Trace Context (`traceparent`/`tracestate` headers).
 
 ```
-initrunner.agent.run [service_a]
+initrunner.agent.run [agent_a]
 ├── agent run [PydanticAI]
 │   ├── chat gpt-4o
 │   └── running tool (delegate)
-└── initrunner.agent.run [service_b]    ← linked via traceparent
+└── initrunner.agent.run [agent_b]    ← linked via traceparent
     └── agent run [PydanticAI]
         └── chat gpt-4o
 ```

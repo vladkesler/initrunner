@@ -51,10 +51,10 @@ class TestDetectYamlKind:
         f.write_text(_TEAM_YAML)
         assert detect_yaml_kind(f) == "Team"
 
-    def test_compose_kind(self, tmp_path):
-        f = tmp_path / "compose.yaml"
-        f.write_text("apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: test\n")
-        assert detect_yaml_kind(f) == "Compose"
+    def test_flow_kind(self, tmp_path):
+        f = tmp_path / "flow.yaml"
+        f.write_text("apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: test\n")
+        assert detect_yaml_kind(f) == "Flow"
 
     def test_missing_kind_defaults_agent(self, tmp_path):
         f = tmp_path / "no-kind.yaml"

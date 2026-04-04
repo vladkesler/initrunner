@@ -3,14 +3,14 @@
 	import { onMount } from 'svelte';
 	import { Search, Blocks, ScanEye, Cpu, Compass, Plus, Users, Workflow } from 'lucide-svelte';
 	import { listAgents } from '$lib/api/agents';
-	import { fetchComposeList } from '$lib/api/compose';
+	import { fetchFlowList } from '$lib/api/flow';
 	import { fetchTeamList } from '$lib/api/teams';
-	import type { AgentSummary, ComposeSummary, TeamSummary } from '$lib/api/types';
+	import type { AgentSummary, FlowSummary, TeamSummary } from '$lib/api/types';
 
 	let open = $state(false);
 	let query = $state('');
 	let agents = $state<AgentSummary[]>([]);
-	let composes = $state<ComposeSummary[]>([]);
+	let flows = $state<FlowSummary[]>([]);
 	let teams = $state<TeamSummary[]>([]);
 	let selectedIndex = $state(0);
 	let inputEl: HTMLInputElement | undefined = $state();
@@ -27,12 +27,12 @@
 	const staticItems: PaletteItem[] = [
 		{ id: 'nav-launchpad', label: 'Launchpad', href: '/', icon: Compass, group: 'Pages' },
 		{ id: 'nav-agents', label: 'Agents', href: '/agents', icon: Blocks, group: 'Pages' },
-		{ id: 'nav-compose', label: 'Compose', href: '/compose', icon: Workflow, group: 'Pages' },
+		{ id: 'nav-flows', label: 'Flows', href: '/flows', icon: Workflow, group: 'Pages' },
 		{ id: 'nav-audit', label: 'Audit', href: '/audit', icon: ScanEye, group: 'Pages' },
 		{ id: 'nav-teams', label: 'Teams', href: '/teams', icon: Users, group: 'Pages' },
 		{ id: 'nav-system', label: 'System', href: '/system', icon: Cpu, group: 'Pages' },
 		{ id: 'action-new', label: 'New Agent', href: '/agents/new', icon: Plus, group: 'Actions' },
-		{ id: 'action-new-compose', label: 'New Compose', href: '/compose/new', icon: Plus, group: 'Actions' },
+		{ id: 'action-new-flow', label: 'New Flow', href: '/flows/new', icon: Plus, group: 'Actions' },
 		{ id: 'action-new-team', label: 'New Team', href: '/teams/new', icon: Plus, group: 'Actions' }
 	];
 
@@ -45,13 +45,13 @@
 			icon: Blocks,
 			group: 'Agents'
 		}));
-		const composeItems: PaletteItem[] = composes.map((c) => ({
-			id: `compose-${c.id}`,
+		const flowItems: PaletteItem[] = flows.map((c) => ({
+			id: `flow-${c.id}`,
 			label: c.name,
 			sublabel: c.description,
-			href: `/compose/${c.id}`,
+			href: `/flows/${c.id}`,
 			icon: Workflow,
-			group: 'Compositions'
+			group: 'Flows'
 		}));
 		const teamItems: PaletteItem[] = teams.map((t) => ({
 			id: `team-${t.id}`,
@@ -61,7 +61,7 @@
 			icon: Users,
 			group: 'Teams'
 		}));
-		return [...staticItems, ...agentItems, ...composeItems, ...teamItems];
+		return [...staticItems, ...agentItems, ...flowItems, ...teamItems];
 	});
 
 	const filtered = $derived.by(() => {
@@ -137,11 +137,11 @@
 		try {
 			const [a, c, t] = await Promise.all([
 				listAgents().catch(() => [] as AgentSummary[]),
-				fetchComposeList().catch(() => [] as ComposeSummary[]),
+				fetchFlowList().catch(() => [] as FlowSummary[]),
 				fetchTeamList().catch(() => [] as TeamSummary[])
 			]);
 			agents = a;
-			composes = c;
+			flows = c;
 			teams = t;
 		} catch {
 			// API not available
@@ -174,7 +174,7 @@
 				<input
 					bind:this={inputEl}
 					bind:value={query}
-					placeholder="Search agents, compositions, teams..."
+					placeholder="Search agents, flows, teams..."
 					class="w-full bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-faint"
 				/>
 				<kbd class="shrink-0 rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[12px] text-fg-faint">ESC</kbd>

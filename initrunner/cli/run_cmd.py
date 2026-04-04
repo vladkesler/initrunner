@@ -1,4 +1,4 @@
-"""Run command: unified dispatcher for agent, team, compose, and ephemeral modes."""
+"""Run command: unified dispatcher for agent, team, flow, and ephemeral modes."""
 
 from __future__ import annotations
 
@@ -282,21 +282,21 @@ def _handle_save(role_file: Path, save_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _dispatch_compose(compose_file: Path, audit_db: Path | None, no_audit: bool) -> None:
-    """Run a compose file (foreground)."""
-    from initrunner.compose.loader import ComposeLoadError
-    from initrunner.services.compose import load_compose_sync, run_compose_sync
+def _dispatch_flow(flow_file: Path, audit_db: Path | None, no_audit: bool) -> None:
+    """Run a flow file (foreground)."""
+    from initrunner.flow.loader import FlowLoadError
+    from initrunner.services.flow import load_flow_sync, run_flow_sync
 
     try:
-        compose = load_compose_sync(compose_file)
-    except ComposeLoadError as e:
+        flow = load_flow_sync(flow_file)
+    except FlowLoadError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     try:
-        run_compose_sync(compose, compose_file.parent, audit_logger=audit_logger)
+        run_flow_sync(flow, flow_file.parent, audit_logger=audit_logger)
     finally:
         if audit_logger is not None:
             audit_logger.close()
@@ -689,12 +689,12 @@ def run(
     if kind == "Pipeline":
         console.print(
             "[red]Error:[/red] kind: Pipeline has been removed.\n"
-            "Use Team for one-shot multi-agent workflows, or Compose for long-running services."
+            "Use Team for one-shot multi-agent workflows, or Flow for long-running agents."
         )
         raise typer.Exit(1)
 
     # --- Kind-specific flag validation ---
-    if kind == "Compose":
+    if kind == "Flow":
         invalid = []
         if prompt:
             invalid.append("--prompt")
@@ -719,9 +719,7 @@ def run(
         if bot:
             invalid.append("--bot")
         if invalid:
-            console.print(
-                f"[red]Error:[/red] {', '.join(invalid)} not supported for Compose targets."
-            )
+            console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported for Flow targets.")
             raise typer.Exit(1)
 
     if kind not in ("Agent",) and (daemon_mode or autopilot or serve_mode or bot):
@@ -736,8 +734,8 @@ def run(
         _run_team(role_file, prompt, dry_run, audit_db, no_audit, report, report_template)
         return
 
-    if kind == "Compose":
-        _dispatch_compose(role_file, audit_db, no_audit)
+    if kind == "Flow":
+        _dispatch_flow(role_file, audit_db, no_audit)
         return
 
     # --- Agent mode: flag-based dispatch ---

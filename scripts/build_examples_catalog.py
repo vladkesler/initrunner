@@ -33,7 +33,7 @@ SKIP_NAMES = {"__pycache__", ".pyc", ".env.example"}
 # Categories map top-level dirs to catalog category names
 CATEGORIES = {
     "roles": "role",
-    "compose": "compose",
+    "flows": "flow",
     "skills": "skill",
 }
 
@@ -171,10 +171,10 @@ def _build_role_entry(path: Path, category_dir: Path) -> dict | None:
     return None
 
 
-def _build_compose_entry(path: Path, category_dir: Path) -> dict | None:
-    """Build a catalog entry for a compose example."""
-    if path.is_file() and path.name in ("compose.yaml", "compose.yml"):
-        # Top-level compose file with roles/ subdir
+def _build_flow_entry(path: Path, category_dir: Path) -> dict | None:
+    """Build a catalog entry for a flow example."""
+    if path.is_file() and path.name in ("flow.yaml", "flow.yml"):
+        # Top-level flow file with roles/ subdir
         content = path.read_text(encoding="utf-8")
         data = _parse_yaml(content)
         metadata = data.get("metadata", {})
@@ -184,8 +184,8 @@ def _build_compose_entry(path: Path, category_dir: Path) -> dict | None:
         files = _collect_files(parent, category_dir)
 
         return {
-            "name": metadata.get("name", parent.name if parent != category_dir else "compose"),
-            "category": "compose",
+            "name": metadata.get("name", parent.name if parent != category_dir else "flow"),
+            "category": "flow",
             "description": metadata.get("description", ""),
             "tags": metadata.get("tags", []),
             "files": files,
@@ -193,32 +193,32 @@ def _build_compose_entry(path: Path, category_dir: Path) -> dict | None:
             "primary_content": content,
             "multi_file": len(files) > 1,
             "difficulty": "advanced",
-            "features": ["compose"],
+            "features": ["flow"],
             "tools": [],
         }
 
     if path.is_dir():
-        compose_file = path / "compose.yaml"
-        if not compose_file.exists():
-            compose_file = path / "compose.yml"
-        if not compose_file.exists():
+        flow_file = path / "flow.yaml"
+        if not flow_file.exists():
+            flow_file = path / "flow.yml"
+        if not flow_file.exists():
             return None
 
-        content = compose_file.read_text(encoding="utf-8")
+        content = flow_file.read_text(encoding="utf-8")
         data = _parse_yaml(content)
         metadata = data.get("metadata", {})
 
         return {
             "name": metadata.get("name", path.name),
-            "category": "compose",
+            "category": "flow",
             "description": metadata.get("description", ""),
             "tags": metadata.get("tags", []),
             "files": _collect_files(path, category_dir),
-            "primary_file": compose_file.relative_to(category_dir).as_posix(),
+            "primary_file": flow_file.relative_to(category_dir).as_posix(),
             "primary_content": content,
             "multi_file": True,
             "difficulty": "advanced",
-            "features": ["compose"],
+            "features": ["flow"],
             "tools": [],
         }
 
@@ -310,19 +310,19 @@ def build_catalog() -> list[dict]:
                         catalog.append(entry)
                         seen_names.add(entry["name"])
 
-        elif category == "compose":
-            # Top-level compose.yaml
-            top_compose = category_dir / "compose.yaml"
-            if top_compose.exists():
-                entry = _build_compose_entry(top_compose, category_dir)
+        elif category == "flow":
+            # Top-level flow.yaml
+            top_flow = category_dir / "flow.yaml"
+            if top_flow.exists():
+                entry = _build_flow_entry(top_flow, category_dir)
                 if entry and entry["name"] not in seen_names:
                     catalog.append(entry)
                     seen_names.add(entry["name"])
 
-            # Sub-directory compose examples
+            # Sub-directory flow examples
             for d in sorted(category_dir.iterdir()):
                 if d.is_dir() and d.name not in ("roles",) and d.name not in SKIP_NAMES:
-                    entry = _build_compose_entry(d, category_dir)
+                    entry = _build_flow_entry(d, category_dir)
                     if entry and entry["name"] not in seen_names:
                         catalog.append(entry)
                         seen_names.add(entry["name"])

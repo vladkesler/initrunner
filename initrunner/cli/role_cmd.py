@@ -30,7 +30,7 @@ def validate(
     if kind == "Pipeline":
         console.print(
             "[red]Error:[/red] kind: Pipeline has been removed.\n"
-            "Use Team for one-shot multi-agent workflows, or Compose for long-running services."
+            "Use Team for one-shot multi-agent workflows, or Flow for multi-agent orchestration."
         )
         raise typer.Exit(1)
     if kind == "Team":

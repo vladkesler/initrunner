@@ -16,7 +16,7 @@
 		{ href: '/agents', label: 'Agents', icon: Blocks }
 	];
 	const orchChildren = [
-		{ href: '/compose', label: 'Compose', icon: Workflow },
+		{ href: '/flows', label: 'Flows', icon: Workflow },
 		{ href: '/teams', label: 'Teams', icon: Users }
 	];
 	const midItems = [
@@ -35,7 +35,7 @@
 	});
 
 	const orchChildActive = $derived(
-		page.url.pathname.startsWith('/compose') || page.url.pathname.startsWith('/teams')
+		page.url.pathname.startsWith('/flows') || page.url.pathname.startsWith('/teams')
 	);
 
 	$effect(() => {

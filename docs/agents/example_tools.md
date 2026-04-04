@@ -467,13 +467,13 @@ triggers:
 
 ---
 
-## Compose Orchestration
+## Flow Orchestration
 
-Compose connects multiple agents into a pipeline. Each service runs in its own daemon thread, and `DelegateSink` routes outputs between services via in-memory queues.
+Flow connects multiple agents into a pipeline. Each agent runs in its own daemon thread, and `DelegateSink` routes outputs between agents via in-memory queues.
 
 ```yaml
 apiVersion: initrunner/v1
-kind: Compose
+kind: Flow
 metadata:
   name: ci-pipeline
   description: >
@@ -481,7 +481,7 @@ metadata:
     a build analyzer diagnoses failures, and a notifier sends Slack alerts
     and updates GitHub commit status.
 spec:
-  services:
+  agents:
     webhook-receiver:
       role: roles/webhook-receiver.yaml
       sink:
@@ -490,7 +490,7 @@ spec:
 
     build-analyzer:
       role: roles/build-analyzer.yaml
-      depends_on:
+      needs:
         - webhook-receiver
       sink:
         type: delegate
@@ -498,7 +498,7 @@ spec:
 
     notifier:
       role: roles/notifier.yaml
-      depends_on:
+      needs:
         - build-analyzer
       restart:
         condition: on-failure
@@ -506,11 +506,11 @@ spec:
         delay_seconds: 5
 ```
 
-> Three services form a pipeline: `webhook-receiver` → `build-analyzer` → `notifier`. Each `sink` routes the agent's output to the next service's input queue. `depends_on` controls startup order. `restart` with `condition: on-failure` auto-restarts the notifier up to 3 times if it crashes.
+> Three agents form a pipeline: `webhook-receiver` → `build-analyzer` → `notifier`. Each `sink` routes the agent's output to the next agent's input queue. `needs` controls startup order. `restart` with `condition: on-failure` auto-restarts the notifier up to 3 times if it crashes.
 
 ```bash
-initrunner compose validate examples/compose/ci-pipeline/compose.yaml
-initrunner compose up examples/compose/ci-pipeline/compose.yaml
+initrunner flow validate examples/flows/ci-pipeline/flow.yaml
+initrunner flow up examples/flows/ci-pipeline/flow.yaml
 ```
 
 ---
@@ -548,4 +548,4 @@ tools:
 - Full example: [`examples/roles/csv-analyst/`](../../examples/roles/csv-analyst/)
 - Reference: [tools.md — Tool Types](tools.md#tool-types)
 
-- Full example: [`examples/compose/ci-pipeline/`](../examples/compose/ci-pipeline/)
+- Full example: [`examples/flows/ci-pipeline/`](../examples/flows/ci-pipeline/)

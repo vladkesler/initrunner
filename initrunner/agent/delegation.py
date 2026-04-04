@@ -166,7 +166,7 @@ class InlineInvoker:
                         load_role,
                         resolve_role_model,
                     )
-                    from initrunner.compose.orchestrator import apply_shared_memory
+                    from initrunner.flow.orchestrator import apply_shared_memory
 
                     _load_dotenv(self._role_path.parent)
                     role = load_role(self._role_path)

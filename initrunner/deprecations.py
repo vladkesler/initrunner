@@ -1,4 +1,4 @@
-"""Centralized deprecation registry for role, compose, and team YAML schemas."""
+"""Centralized deprecation registry for role, flow, and team YAML schemas."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ REMOVED_FIELD_MESSAGE_MAX_MEMORIES: str = (
 
 class SchemaKind(StrEnum):
     ROLE = "role"
-    COMPOSE = "compose"
+    FLOW = "Flow"
+    COMPOSE = "Compose"  # kept for detection of old compose files
     TEAM = "team"
 
 
@@ -87,7 +88,7 @@ _RULES: list[DeprecationRule] = [
     ),
     DeprecationRule(
         id="DEP004",
-        kind=frozenset({SchemaKind.COMPOSE, SchemaKind.TEAM}),
+        kind=frozenset({SchemaKind.FLOW, SchemaKind.TEAM}),
         field_path="spec.shared_memory.store_backend",
         since=None,
         severity="error",
@@ -96,7 +97,7 @@ _RULES: list[DeprecationRule] = [
     ),
     DeprecationRule(
         id="DEP005",
-        kind=frozenset({SchemaKind.COMPOSE, SchemaKind.TEAM}),
+        kind=frozenset({SchemaKind.FLOW, SchemaKind.TEAM}),
         field_path="spec.shared_documents.store_backend",
         since=None,
         severity="error",
@@ -208,27 +209,69 @@ def validate_role_dict(
     return role, hits
 
 
-def validate_compose_dict(
+def _check_compose_hard_break(raw: dict) -> None:
+    """Raise if *raw* uses the removed ``kind: Compose`` schema.
+
+    Detects ``kind: Compose``, ``spec.services``, and ``depends_on`` inside
+    agent configs and gives a clear migration message.
+    """
+    hints: list[str] = []
+
+    if raw.get("kind") == "Compose":
+        hints.append("kind: Compose -> kind: Flow")
+
+    spec = raw.get("spec")
+    if isinstance(spec, dict) and "services" in spec:
+        hints.append("spec.services -> spec.agents")
+        # Check for depends_on inside service configs
+        services = spec["services"]
+        if isinstance(services, dict):
+            for _name, svc in services.items():
+                if isinstance(svc, dict) and "depends_on" in svc:
+                    hints.append("depends_on -> needs (inside each agent config)")
+                    break
+
+    if hints:
+        renames = "; ".join(hints)
+        raise ValueError(
+            f"kind: Compose has been renamed to kind: Flow. "
+            f"Rename the following fields: {renames}. "
+            f"See docs/orchestration/flow.md"
+        )
+
+
+def validate_flow_dict(
     raw: dict,
-) -> tuple[Any, list[DeprecationHit]]:  # Any = ComposeDefinition (lazy)
-    """Apply deprecations, reject errors, validate compose schema."""
+) -> tuple[Any, list[DeprecationHit]]:  # Any = FlowDefinition (lazy)
+    """Apply deprecations, reject errors, validate flow schema.
+
+    Also detects the removed ``kind: Compose`` format and raises a clear
+    migration error.
+    """
     from pydantic import ValidationError
 
-    migrated, hits = apply_deprecations(raw, SchemaKind.COMPOSE)
+    # Hard-break: reject old compose format with actionable message
+    _check_compose_hard_break(raw)
+
+    migrated, hits = apply_deprecations(raw, SchemaKind.FLOW)
 
     errors = [h for h in hits if h.severity == "error"]
     if errors:
         msgs = "\n".join(f"  {h.id}: {h.message}" for h in errors)
         raise ValueError(f"Deprecated fields:\n{msgs}")
 
-    from initrunner.compose.schema import ComposeDefinition
+    from initrunner.flow.schema import FlowDefinition
 
     try:
-        compose = ComposeDefinition.model_validate(migrated)
+        flow = FlowDefinition.model_validate(migrated)
     except ValidationError as exc:
         raise ValueError(str(exc)) from exc
 
-    return compose, hits
+    return flow, hits
+
+
+# Backward-compatible alias (used by dashboard until Phase 5)
+validate_compose_dict = validate_flow_dict
 
 
 def validate_team_dict(

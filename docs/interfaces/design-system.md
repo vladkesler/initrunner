@@ -252,13 +252,13 @@ Sharp corners (0px). Focus state: `focus:border-accent-primary/40 focus:shadow-[
 
 Active item uses a background tint (`bg-accent-primary/10 text-accent-primary`) instead of the traditional border-left indicator. A faint lime gradient line decorates the top of the sidebar's right edge.
 
-**Collapsible groups**: The sidebar supports collapsible nav groups (e.g. "Orchestration" containing Compose and Teams). The group header is a `<button>` with a `ChevronRight` indicator that rotates 90deg when open. When a child route is active, the group is pinned open (toggle is inert) and the group header receives `text-accent-primary` without background tint, while the active child gets the full `bg-accent-primary/10 text-accent-primary` treatment. Children are indented via a `ml-3` (12px) wrapper. Open/closed state persists to localStorage via `safeGet`/`safeSet`.
+**Collapsible groups**: The sidebar supports collapsible nav groups (e.g. "Orchestration" containing Flows and Teams). The group header is a `<button>` with a `ChevronRight` indicator that rotates 90deg when open. When a child route is active, the group is pinned open (toggle is inert) and the group header receives `text-accent-primary` without background tint, while the active child gets the full `bg-accent-primary/10 text-accent-primary` treatment. Children are indented via a `ml-3` (12px) wrapper. Open/closed state persists to localStorage via `safeGet`/`safeSet`.
 
 **Collapsed flyout**: In icon-only mode (48px width), groups render as a single icon button. On hover or focus, a sharp flyout (`border-edge bg-surface-1 shadow-lg`) appears with a mono uppercase section header (`text-[11px] tracking-[0.12em]`) and child links. Focus management keeps the flyout open while focus moves between its children and closes on blur outside.
 
 ### Agent Picker
 
-Inline searchable dropdown for selecting agents in compose and team builders (`AgentPicker.svelte`). Sharp-cornered trigger and dropdown panel. Trigger shows selected agent name + model pill badge when set; when unset, shows `noneLabel` if provided (e.g. "Generate placeholder"), otherwise the `placeholder` text, with a chevron. Dropdown panel (`role="listbox"`, `tabindex="0"`): search input at top, scrollable agent list with name (mono 13px), description (12px faint, truncated), model pill (mono 10px), and up to 3 feature pills with "+N" overflow. Highlight: `bg-accent-primary/[0.06]`. Selected: left border accent + tinted background. Keyboard: arrow keys navigate, Enter selects, Escape closes. Click-outside closes via window click handler.
+Inline searchable dropdown for selecting agents in flow and team builders (`AgentPicker.svelte`). Sharp-cornered trigger and dropdown panel. Trigger shows selected agent name + model pill badge when set; when unset, shows `noneLabel` if provided (e.g. "Generate placeholder"), otherwise the `placeholder` text, with a chevron. Dropdown panel (`role="listbox"`, `tabindex="0"`): search input at top, scrollable agent list with name (mono 13px), description (12px faint, truncated), model pill (mono 10px), and up to 3 feature pills with "+N" overflow. Highlight: `bg-accent-primary/[0.06]`. Selected: left border accent + tinted background. Keyboard: arrow keys navigate, Enter selects, Escape closes. Click-outside closes via window click handler.
 
 ### Command Palette
 
@@ -296,7 +296,7 @@ Deterministic identity avatar for conversation thread turns (`SeedAvatar.svelte`
 
 **Background**: `161618` (surface-1) so ring patterns sit on matching ground.
 
-**Seeding**: User turns seed from `"You"`. Agent turns seed from the agent name (regular runs), active service name (compose), or active persona name (team). In compose/team streaming, the avatar swaps to reflect the currently active sub-agent.
+**Seeding**: User turns seed from `"You"`. Agent turns seed from the agent name (regular runs), active agent name (flow), or active persona name (team). In flow/team streaming, the avatar swaps to reflect the currently active sub-agent.
 
 **Scope**: Only used in `ConversationThread`. Not used in nav, launchpad, agent cards, or other surfaces.
 

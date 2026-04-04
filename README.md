@@ -57,10 +57,10 @@ Run `initrunner run --list` for the full catalog. The model is auto-detected fro
 | `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer with shared memory | Team |
 | `codebase-analyst` | Index your repo, chat about architecture, learns patterns across sessions | Agent (RAG) |
 | `web-researcher` | Search the web and produce structured briefings with citations | Agent |
-| `content-pipeline` | Topic researcher, writer, editor/fact-checker via webhook or cron | Compose |
+| `content-pipeline` | Topic researcher, writer, editor/fact-checker via webhook or cron | Flow |
 | `telegram-assistant` | Telegram bot with memory and web search | Agent (Daemon) |
 | `email-agent` | Monitors inbox, triages messages, drafts replies, alerts Slack on urgent mail | Agent (Daemon) |
-| `support-desk` | Sense-routed intake: auto-routes to researcher, responder, or escalator | Compose |
+| `support-desk` | Sense-routed intake: auto-routes to researcher, responder, or escalator | Flow |
 | `memory-assistant` | Personal assistant that remembers across sessions | Agent |
 
 RAG starters auto-ingest on first run. Just `cd` into your project:
@@ -253,10 +253,10 @@ Chain agents together. One agent's output feeds into the next. Sense routing aut
 
 ```yaml
 apiVersion: initrunner/v1
-kind: Compose
+kind: Flow
 metadata: { name: email-chain }
 spec:
-  services:
+  agents:
     inbox-watcher:
       role: roles/inbox-watcher.yaml
       sink: { type: delegate, target: triager }
@@ -267,7 +267,7 @@ spec:
     responder: { role: roles/responder.yaml }
 ```
 
-Run with `initrunner compose up compose.yaml`. See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md).
+Run with `initrunner flow up flow.yaml`. See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md).
 
 ## User interfaces
 
@@ -281,7 +281,7 @@ pip install "initrunner[dashboard]"
 initrunner dashboard                  # opens http://localhost:8100
 ```
 
-Run agents, build compositions visually, and dig through audit trails. Also available as a native desktop window (`initrunner desktop`). See [Dashboard docs](docs/interfaces/dashboard.md).
+Run agents, build flows visually, and dig through audit trails. Also available as a native desktop window (`initrunner desktop`). See [Dashboard docs](docs/interfaces/dashboard.md).
 
 ## Everything else
 
@@ -308,7 +308,7 @@ initrunner/
   agent/        Role schema, loader, executor, 28 self-registering tools
   authz.py      InitGuard ABAC policy engine integration
   runner/       Single-shot, REPL, autonomous, daemon execution modes
-  compose/      Multi-agent orchestration via compose.yaml
+  flow/         Multi-agent orchestration via flow.yaml
   triggers/     Cron, file watcher, webhook, heartbeat, Telegram, Discord
   stores/       Document + memory stores (LanceDB, zvec)
   ingestion/    Extract -> chunk -> embed -> store pipeline
@@ -341,7 +341,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/) for the agent framework, Pydanti
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
 | Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Compose](docs/orchestration/agent_composer.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
+| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Security | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
@@ -350,7 +350,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/) for the agent framework, Pydanti
 ## Examples
 
 ```bash
-initrunner examples list               # 60+ agents, teams, and compose projects
+initrunner examples list               # 60+ agents, teams, and flow projects
 initrunner examples copy code-reviewer # copy to current directory
 ```
 

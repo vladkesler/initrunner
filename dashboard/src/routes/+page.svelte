@@ -8,17 +8,17 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Plus, BookOpen, Stethoscope, Activity, CheckCircle, Timer, AlertTriangle, ArrowUpRight, Workflow, Users, ExternalLink, TrendingDown, TrendingUp } from 'lucide-svelte';
 	import CapabilityGlyph from '$lib/components/agents/CapabilityGlyph.svelte';
-	import { fetchComposeList } from '$lib/api/compose';
+	import { fetchFlowList } from '$lib/api/flow';
 	import { fetchTeamList } from '$lib/api/teams';
 	import { getBuilderOptions, getStarters, type BuilderOptions, type StarterInfo } from '$lib/api/builder';
-	import type { ComposeSummary, TeamSummary } from '$lib/api/types';
+	import type { FlowSummary, TeamSummary } from '$lib/api/types';
 	import { toast } from '$lib/stores/toast.svelte';
 	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
 	import StarterCard from '$lib/components/ui/StarterCard.svelte';
 	import CapabilityChips from '$lib/components/ui/CapabilityChips.svelte';
 
 	let agents = $state<AgentSummary[]>([]);
-	let composes = $state<ComposeSummary[]>([]);
+	let flows = $state<FlowSummary[]>([]);
 	let teams = $state<TeamSummary[]>([]);
 	let recentAudit = $state<AuditRecord[]>([]);
 	let stats = $state<AuditStats | null>(null);
@@ -28,7 +28,7 @@
 	let starters = $state<StarterInfo[]>([]);
 
 	const errorAgents = $derived(agents.filter((a) => a.error));
-	const isEmpty = $derived(agents.length === 0 && composes.length === 0 && teams.length === 0);
+	const isEmpty = $derived(agents.length === 0 && flows.length === 0 && teams.length === 0);
 	const agentIdByName = $derived(new Map(agents.map((a) => [a.name, a.id])));
 	const agentByName = $derived(new Map(agents.map((a) => [a.name, a])));
 
@@ -116,16 +116,16 @@
 		try {
 			const [a, c, t, audit, s, health, opts, st] = await Promise.all([
 				listAgents(),
-				fetchComposeList().catch(() => [] as ComposeSummary[]),
+				fetchFlowList().catch(() => [] as FlowSummary[]),
 				fetchTeamList().catch(() => [] as TeamSummary[]),
-				queryAudit({ limit: 10, exclude_trigger_types: ['compose', 'delegate', 'team'] }),
+				queryAudit({ limit: 10, exclude_trigger_types: ['flow', 'delegate', 'team'] }),
 				fetchAuditStats(),
 				request<HealthStatus>('/api/health'),
 				getBuilderOptions().catch(() => null as BuilderOptions | null),
 				getStarters().catch(() => ({ starters: [] }))
 			]);
 			agents = a;
-			composes = c;
+			flows = c;
 			teams = t;
 			recentAudit = audit;
 			stats = s;
@@ -253,11 +253,11 @@
 						New Agent
 					</a>
 					<a
-						href="/compose/new"
+						href="/flows/new"
 						class="flex items-center gap-2 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-5 py-2 text-[13px] font-medium text-accent-primary transition-[background-color] duration-150 hover:bg-accent-primary/20"
 					>
 						<Workflow size={14} />
-						New Compose
+						New Flow
 					</a>
 					<a
 						href="/teams/new"
@@ -402,30 +402,30 @@
 				{/if}
 
 				<!-- Orchestration (in left column, below fleet) -->
-				{#if composes.length > 0 || teams.length > 0}
+				{#if flows.length > 0 || teams.length > 0}
 					<div class="glow-cyan mt-6 p-4">
 						<h2 class="mb-4 font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-fg-faint">
 							Orchestration
 						</h2>
 						<div class="space-y-5">
-							{#if composes.length > 0}
+							{#if flows.length > 0}
 								<div>
 									<div class="mb-2 flex items-baseline justify-between">
-										<h3 class="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-accent-secondary">Compositions</h3>
-										<a href="/compose" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
+										<h3 class="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-accent-secondary">Flows</h3>
+										<a href="/flows" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
 									</div>
 									<div class="space-y-1.5">
-										{#each composes.slice(0, 2) as compose, i}
+										{#each flows.slice(0, 2) as flow, i}
 											<a
-												href="/compose/{compose.id}"
+												href="/flows/{flow.id}"
 												class="card-surface flex items-center justify-between bg-surface-1 px-4 py-3 transition-[border-color,background-color] duration-150 hover:bg-accent-secondary/[0.03] animate-fade-in-up"
 												style="animation-delay: {i * 40}ms"
 											>
 												<div class="flex items-center gap-2.5">
 													<Workflow size={14} class="shrink-0 text-accent-secondary" />
-													<span class="font-mono text-[13px] text-fg-muted">{compose.name}</span>
+													<span class="font-mono text-[13px] text-fg-muted">{flow.name}</span>
 												</div>
-												<span class="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-2 py-0.5 font-mono text-[10px] text-accent-secondary">{compose.service_count} svc</span>
+												<span class="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-2 py-0.5 font-mono text-[10px] text-accent-secondary">{flow.agent_count} agents</span>
 											</a>
 										{/each}
 									</div>

@@ -168,7 +168,7 @@ Rules for tool functions:
 1. **Return `str`** — tool results are always strings.
 2. **Use type annotations** — PydanticAI builds the parameter schema from annotations.
 3. **Write a docstring** — it becomes the tool description the LLM reads.
-4. **Sync by default** — The CLI uses sync execution. PydanticAI auto-wraps sync tools with `run_in_executor`. For compose orchestration and API streaming, async tool closures are used automatically when available (see [Async Tool Builders](#async-tool-builders) for built-in tools).
+4. **Sync by default** — The CLI uses sync execution. PydanticAI auto-wraps sync tools with `run_in_executor`. For flow orchestration and API streaming, async tool closures are used automatically when available (see [Async Tool Builders](#async-tool-builders) for built-in tools).
 
 ```python
 def get_weather(city: str, units: str = "metric") -> str:
@@ -444,11 +444,11 @@ The config dict from the YAML is validated against the plugin's `config_class` u
 
 ## Async Tool Builders
 
-Built-in tools can register async closures for use in compose orchestration and API streaming, where an asyncio event loop is available. This avoids thread-pool overhead for I/O-bound operations and enables concurrency via `asyncio.gather`.
+Built-in tools can register async closures for use in flow orchestration and API streaming, where an asyncio event loop is available. This avoids thread-pool overhead for I/O-bound operations and enables concurrency via `asyncio.gather`.
 
 ### How It Works
 
-The `ToolBuildContext.prefer_async` flag is set to `True` when agents are built for compose services or the API layer. Tool builders check this flag and register either sync or async closures:
+The `ToolBuildContext.prefer_async` flag is set to `True` when agents are built for flow agents or the API layer. Tool builders check this flag and register either sync or async closures:
 
 ```python
 @register_tool("my_http_tool", MyHttpToolConfig)

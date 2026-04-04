@@ -656,7 +656,7 @@ Now that you've built a complete agent, explore more of what InitRunner can do:
 - **Pre-built templates**: Run three dev workflow agents (PR review, changelog, CI explainer) in 10 minutes — see [Templates Tutorial](template-tutorial.md)
 - **More tools**: [git](../agents/tools.md), [shell](../agents/tools.md), [sql](../agents/tools.md), [http](../agents/tools.md), [slack](../agents/tools.md), [MCP servers](../agents/tools.md), and [custom tools](../agents/tool_creation.md)
 - **Multi-agent delegation**: Have agents call other agents — see [Delegation](../orchestration/delegation.md)
-- **Compose pipelines**: Orchestrate multiple agents with `compose.yaml` — see [Agent Composer](../orchestration/agent_composer.md)
+- **Flow pipelines**: Orchestrate multiple agents with `flow.yaml` — see [Flow](../orchestration/flow.md)
 - **API server**: Expose agents as OpenAI-compatible endpoints with `initrunner run <role> --serve` -- see [API Server](../interfaces/server.md)
 - **Role generation**: Scaffold new agents with `initrunner new` or generate them from descriptions with `initrunner new "description"` — see [Role Generation](../agents/role_generation.md)
 - **Not sure what you need?** Map goals to config fields -- see [Choosing Features](choosing-features.md)

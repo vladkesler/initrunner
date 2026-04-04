@@ -135,41 +135,41 @@ async def test_stream_run_sse_structured_output_fallback(_mock_run_result, _mock
     assert last["data"]["success"] is True
 
 
-# ── stream_compose_run_sse ───────────────────────────────────────────────
+# ── stream_flow_run_sse ──────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_stream_compose_run_sse_awaits_future():
-    """stream_compose_run_sse must await the executor future."""
-    from initrunner.dashboard.streaming import stream_compose_run_sse
+async def test_stream_flow_run_sse_awaits_future():
+    """stream_flow_run_sse must await the executor future."""
+    from initrunner.dashboard.streaming import stream_flow_run_sse
 
     gate = threading.Event()
 
-    compose_result = MagicMock()
-    compose_result.output = "done"
-    compose_result.output_mode = "last"
-    compose_result.final_service_name = "svc-1"
-    compose_result.steps = []
-    compose_result.total_tokens_in = 1
-    compose_result.total_tokens_out = 1
-    compose_result.total_duration_ms = 10
-    compose_result.success = True
-    compose_result.error = None
-    compose_result.entry_messages = None
+    flow_result = MagicMock()
+    flow_result.output = "done"
+    flow_result.output_mode = "last"
+    flow_result.final_agent_name = "agent-1"
+    flow_result.steps = []
+    flow_result.total_tokens_in = 1
+    flow_result.total_tokens_out = 1
+    flow_result.total_duration_ms = 10
+    flow_result.success = True
+    flow_result.error = None
+    flow_result.entry_messages = None
 
-    async def slow_compose(*a, **kw):
+    async def slow_flow(*a, **kw):
         await asyncio.sleep(0.05)
         gate.set()
-        return compose_result
+        return flow_result
 
     with patch(
-        "initrunner.services.compose.run_compose_once_async",
-        side_effect=slow_compose,
+        "initrunner.services.flow.run_flow_once_async",
+        side_effect=slow_flow,
     ):
-        compose_def = MagicMock()
+        flow_def = MagicMock()
 
         async def run():
-            return [e async for e in stream_compose_run_sse(compose_def, Path("/tmp"), "hello")]
+            return [e async for e in stream_flow_run_sse(flow_def, Path("/tmp"), "hello")]
 
         async def release():
             await asyncio.sleep(0.05)

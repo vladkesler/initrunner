@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from initrunner.agent.schema.role import RoleDefinition
-from initrunner.compose.schema import ComposeDefinition
+from initrunner.flow.schema import FlowDefinition
 from initrunner.team.schema import TeamDefinition
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
@@ -14,7 +14,7 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 _ALL_YAMLS = sorted(EXAMPLES_DIR.rglob("*.yaml"))
 
 _ROLE_YAMLS = []
-_COMPOSE_YAMLS = []
+_FLOW_YAMLS = []
 _TEAM_YAMLS = []
 _SUITE_YAMLS = []
 
@@ -28,8 +28,8 @@ for _p in _ALL_YAMLS:
         continue
     if _data.get("apiVersion", "").startswith("initguard/"):
         continue
-    if _data.get("kind") == "Compose":
-        _COMPOSE_YAMLS.append(_p)
+    if _data.get("kind") == "Flow":
+        _FLOW_YAMLS.append(_p)
     elif _data.get("kind") == "Team":
         _TEAM_YAMLS.append(_p)
     elif _data.get("kind") == "TestSuite":
@@ -66,13 +66,13 @@ def test_role_skills_resolve(path: Path) -> None:
     assert len(resolved) == len(role.spec.skills)
 
 
-@pytest.mark.parametrize("path", _COMPOSE_YAMLS, ids=[_rel(p) for p in _COMPOSE_YAMLS])
-def test_compose_yaml_validates(path: Path) -> None:
+@pytest.mark.parametrize("path", _FLOW_YAMLS, ids=[_rel(p) for p in _FLOW_YAMLS])
+def test_flow_yaml_validates(path: Path) -> None:
     with open(path) as f:
         data = yaml.safe_load(f)
-    compose = ComposeDefinition.model_validate(data)
-    assert compose.metadata.name
-    assert len(compose.spec.services) >= 1
+    flow = FlowDefinition.model_validate(data)
+    assert flow.metadata.name
+    assert len(flow.spec.agents) >= 1
 
 
 @pytest.mark.parametrize("path", _TEAM_YAMLS, ids=[_rel(p) for p in _TEAM_YAMLS])

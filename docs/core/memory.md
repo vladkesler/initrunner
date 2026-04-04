@@ -533,7 +533,7 @@ Override with `store_path` in the memory config. The directory is created automa
 
 Multiple agents can share a single memory database, allowing one agent's `remember()` calls to be visible to another agent's `recall()`. There are two mechanisms:
 
-- **Compose**: set `spec.shared_memory.enabled: true` in a compose definition to give all services a common store. See [Agent Composer: Shared Memory](../orchestration/agent_composer.md#shared-memory).
+- **Flow**: set `spec.shared_memory.enabled: true` in a flow definition to give all agents a common store. See [Flow: Shared Memory](../orchestration/flow.md#shared-memory).
 - **Delegation**: set `shared_memory.store_path` on a delegate tool to share memory between inline sub-agents. See [Delegation: Shared Memory](../orchestration/delegation.md#shared-memory).
 
 Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same LanceDB store directory.

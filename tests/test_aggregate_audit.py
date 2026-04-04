@@ -92,39 +92,39 @@ class TestExcludeTriggerTypes:
 
 
 # ---------------------------------------------------------------------------
-# Compose aggregate audit row
+# Flow aggregate audit row
 # ---------------------------------------------------------------------------
 
 
-class TestComposeAggregateAudit:
-    """ComposeOrchestrator.run_once() logs an aggregate audit row."""
+class TestFlowAggregateAudit:
+    """FlowOrchestrator.run_once() logs an aggregate audit row."""
 
     def test_aggregate_row_logged(self, tmp_path):
-        from initrunner.compose.orchestrator import ComposeRunResult, ServiceStepResult
+        from initrunner.flow.orchestrator import AgentStepResult, FlowRunResult
 
         audit_logger = MagicMock()
         orch = MagicMock()
         orch._audit_logger = audit_logger
-        orch._compose = MagicMock()
-        orch._compose.metadata.name = "test-compose"
+        orch._flow = MagicMock()
+        orch._flow.metadata.name = "test-flow"
 
-        from initrunner.compose.orchestrator import ComposeOrchestrator
+        from initrunner.flow.orchestrator import FlowOrchestrator
 
-        result = ComposeRunResult(
+        result = FlowRunResult(
             output="done",
             output_mode="single",
-            final_service_name="consumer",
-            compose_run_id="cid-123",
+            final_agent_name="consumer",
+            flow_run_id="cid-123",
             steps=[
-                ServiceStepResult(
-                    service_name="producer",
+                AgentStepResult(
+                    agent_name="producer",
                     tokens_in=10,
                     tokens_out=5,
                     duration_ms=100,
                     tool_calls=2,
                 ),
-                ServiceStepResult(
-                    service_name="consumer",
+                AgentStepResult(
+                    agent_name="consumer",
                     tokens_in=20,
                     tokens_out=10,
                     duration_ms=200,
@@ -138,13 +138,13 @@ class TestComposeAggregateAudit:
         )
 
         # Call the _log_aggregate method directly
-        ComposeOrchestrator._log_aggregate(orch, "cid-123", "test prompt", result)
+        FlowOrchestrator._log_aggregate(orch, "cid-123", "test prompt", result)
 
         audit_logger.log.assert_called_once()
         record = audit_logger.log.call_args[0][0]
         assert record.run_id == "cid-123"
-        assert record.agent_name == "test-compose"
-        assert record.trigger_type == "compose_run"
+        assert record.agent_name == "test-flow"
+        assert record.trigger_type == "flow_run"
         assert record.model == "multi"
         assert record.provider == "multi"
         assert record.tokens_in == 30
@@ -155,18 +155,18 @@ class TestComposeAggregateAudit:
 
         metadata = json.loads(record.trigger_metadata)
         assert metadata["scope"] == "aggregate"
-        assert metadata["compose_run_id"] == "cid-123"
-        assert metadata["compose_name"] == "test-compose"
+        assert metadata["flow_run_id"] == "cid-123"
+        assert metadata["flow_name"] == "test-flow"
 
     def test_no_audit_logger_skips(self):
-        from initrunner.compose.orchestrator import ComposeOrchestrator, ComposeRunResult
+        from initrunner.flow.orchestrator import FlowOrchestrator, FlowRunResult
 
         orch = MagicMock()
         orch._audit_logger = None
 
-        result = ComposeRunResult(output="", output_mode="none", final_service_name=None)
+        result = FlowRunResult(output="", output_mode="none", final_agent_name=None)
         # Should not raise
-        ComposeOrchestrator._log_aggregate(orch, "cid", "prompt", result)
+        FlowOrchestrator._log_aggregate(orch, "cid", "prompt", result)
 
 
 # ---------------------------------------------------------------------------
@@ -252,24 +252,24 @@ class TestTeamAggregateAudit:
 
 
 class TestDashboardAuditWiring:
-    """Dashboard compose/team stream routes pass audit_logger."""
+    """Dashboard flow/team stream routes pass audit_logger."""
 
-    def test_compose_stream_passes_audit_logger(self):
+    def test_flow_stream_passes_audit_logger(self):
         with (
             patch("initrunner.dashboard.routers.runs._audit_logger") as mock_al,
-            patch("initrunner.dashboard.streaming.stream_compose_run_sse") as mock_stream,
+            patch("initrunner.dashboard.streaming.stream_flow_run_sse") as mock_stream,
         ):
             mock_al.return_value = MagicMock()
             mock_stream.return_value = iter([])
 
             from importlib import import_module
 
-            mod = import_module("initrunner.dashboard.routers.compose")
-            # Verify that stream_compose_run_sse is called with audit_logger kwarg
+            mod = import_module("initrunner.dashboard.routers.flow")
+            # Verify that stream_flow_run_sse is called with audit_logger kwarg
             # by checking the source -- the actual endpoint requires full ASGI setup
             import inspect
 
-            source = inspect.getsource(mod.stream_compose_run)
+            source = inspect.getsource(mod.stream_flow_run)
             assert "audit_logger=" in source
 
     def test_team_stream_passes_audit_logger(self):

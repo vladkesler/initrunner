@@ -1,4 +1,4 @@
-"""FastAPI dependency injection -- role cache, compose cache, team cache, and audit logger."""
+"""FastAPI dependency injection -- role cache, flow cache, team cache, and audit logger."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from initrunner.dashboard.config import DashboardSettings
 
 if TYPE_CHECKING:
     from initrunner.services.discovery import (  # noqa: F401
-        DiscoveredCompose,
+        DiscoveredFlow,
         DiscoveredRole,
         DiscoveredTeam,
     )
@@ -70,25 +70,25 @@ class RoleCache(_YamlFileCache["DiscoveredRole"]):
         super().__init__(settings, discover_roles_sync)
 
 
-class ComposeCache(_YamlFileCache["DiscoveredCompose"]):
-    """In-memory cache mapping opaque IDs to discovered compose definitions."""
+class FlowCache(_YamlFileCache["DiscoveredFlow"]):
+    """In-memory cache mapping opaque IDs to discovered flow definitions."""
 
     def __init__(self, settings: DashboardSettings) -> None:
-        from initrunner.services.discovery import discover_composes_sync
+        from initrunner.services.discovery import discover_flows_sync
 
-        super().__init__(settings, discover_composes_sync)
+        super().__init__(settings, discover_flows_sync)
 
-    def refresh_one(self, compose_id: str, path: Path) -> None:
-        """Re-load a single compose file from disk into the cache."""
-        from initrunner.compose.loader import load_compose
-        from initrunner.services.discovery import DiscoveredCompose
+    def refresh_one(self, flow_id: str, path: Path) -> None:
+        """Re-load a single flow file from disk into the cache."""
+        from initrunner.flow.loader import load_flow
+        from initrunner.services.discovery import DiscoveredFlow
 
         try:
-            comp = load_compose(path)
-            self._cache[compose_id] = DiscoveredCompose(path=path, compose=comp)
+            comp = load_flow(path)
+            self._cache[flow_id] = DiscoveredFlow(path=path, flow=comp)
         except Exception as exc:
-            _logger.warning("Failed to reload compose %s: %s", compose_id, exc)
-            self._cache[compose_id] = DiscoveredCompose(path=path, error=str(exc))
+            _logger.warning("Failed to reload flow %s: %s", flow_id, exc)
+            self._cache[flow_id] = DiscoveredFlow(path=path, error=str(exc))
 
 
 class TeamCache(_YamlFileCache["DiscoveredTeam"]):
@@ -143,7 +143,7 @@ class SkillCache(_YamlFileCache["DiscoveredSkillFull"]):
 # -- Convenience aliases used by routers ---------------------------------------
 
 _role_id = _file_id
-_compose_id = _file_id
+_flow_id = _file_id
 _team_id = _file_id
 _skill_id = _file_id
 
@@ -156,9 +156,9 @@ def get_role_cache() -> RoleCache:
     raise RuntimeError("RoleCache not initialized")
 
 
-def get_compose_cache() -> ComposeCache:
+def get_flow_cache() -> FlowCache:
     """Dependency placeholder -- overridden in app factory."""
-    raise RuntimeError("ComposeCache not initialized")
+    raise RuntimeError("FlowCache not initialized")
 
 
 def get_team_cache() -> TeamCache:

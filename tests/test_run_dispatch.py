@@ -24,10 +24,10 @@ def agent_yaml(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def compose_yaml(tmp_path: Path) -> Path:
-    p = tmp_path / "compose.yaml"
+def flow_yaml(tmp_path: Path) -> Path:
+    p = tmp_path / "flow.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Compose\nmetadata:\n  name: t\nspec:\n  services: {}\n"
+        "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: t\nspec:\n  agents: {}\n"
     )
     return p
 
@@ -71,19 +71,19 @@ class TestBotValidation:
 
 
 class TestKindFlagValidation:
-    def test_compose_rejects_prompt(self, compose_yaml):
-        result = runner.invoke(app, ["run", str(compose_yaml), "-p", "hello"])
+    def test_flow_rejects_prompt(self, flow_yaml):
+        result = runner.invoke(app, ["run", str(flow_yaml), "-p", "hello"])
         assert result.exit_code == 1
         assert "--prompt" in result.output
-        assert "Compose" in result.output
+        assert "Flow" in result.output
 
-    def test_compose_rejects_daemon(self, compose_yaml):
-        result = runner.invoke(app, ["run", str(compose_yaml), "--daemon"])
+    def test_flow_rejects_daemon(self, flow_yaml):
+        result = runner.invoke(app, ["run", str(flow_yaml), "--daemon"])
         assert result.exit_code == 1
         assert "--daemon" in result.output
 
-    def test_compose_rejects_serve(self, compose_yaml):
-        result = runner.invoke(app, ["run", str(compose_yaml), "--serve"])
+    def test_flow_rejects_serve(self, flow_yaml):
+        result = runner.invoke(app, ["run", str(flow_yaml), "--serve"])
         assert result.exit_code == 1
         assert "--serve" in result.output
 
@@ -93,10 +93,10 @@ class TestKindFlagValidation:
         assert "Agent" in result.output
 
 
-class TestComposeDispatch:
-    def test_compose_yaml_dispatches(self, compose_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_compose") as mock_dispatch:
-            result = runner.invoke(app, ["run", str(compose_yaml)])
+class TestFlowDispatch:
+    def test_flow_yaml_dispatches(self, flow_yaml):
+        with patch("initrunner.cli.run_cmd._dispatch_flow") as mock_dispatch:
+            result = runner.invoke(app, ["run", str(flow_yaml)])
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once()

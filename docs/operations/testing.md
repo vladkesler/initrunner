@@ -303,7 +303,7 @@ Tests for async execution use `pytest-asyncio`:
 
 | Test File | Coverage |
 |-----------|----------|
-| `tests/test_compose_graph.py` | Graph-based compose execution: fan-out parallelism, fan-in join ordering, callbacks, failure isolation |
+| `tests/test_flow_graph.py` | Graph-based flow execution: fan-out parallelism, fan-in join ordering, callbacks, failure isolation |
 | `tests/test_executor_async.py` | `execute_run_async`, `execute_run_stream_async`, async retry logic, `prefer_async` tool building |
 | `tests/test_signal_async.py` | Async signal handler, double-Ctrl-C force exit |
 

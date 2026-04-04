@@ -1,6 +1,6 @@
 # Agent Policy Engine
 
-InitRunner uses [initguard](https://github.com/initrunner/initguard) as an embedded **agent-as-principal** policy engine. Agents get their own identity derived from role metadata, and the engine governs what tools an agent can use and which agents it can delegate to -- across all execution paths (CLI, compose, daemon, API, pipeline).
+InitRunner uses [initguard](https://github.com/initrunner/initguard) as an embedded **agent-as-principal** policy engine. Agents get their own identity derived from role metadata, and the engine governs what tools an agent can use and which agents it can delegate to -- across all execution paths (CLI, flow, daemon, API, pipeline).
 
 The engine runs in-process with no sidecar, no network round-trips, and sub-millisecond policy evaluation.
 
@@ -52,7 +52,7 @@ The `team:<name>` role is only added when `metadata.team` is set. The `tags` att
 The agent principal is set per-run via a ContextVar in the executor:
 
 - **CLI/daemon**: `_enter_agent_context(role)` is called at the top of `execute_run()` / `execute_run_stream()` / `execute_run_async()` / `execute_run_stream_async()`, and reset in `finally`.
-- **Compose**: Each service's agent run goes through the executor, so the principal is automatically scoped.
+- **Flow**: Each agent's run goes through the executor, so the principal is automatically scoped.
 - **Pipeline**: Inline steps go through the executor. MCP steps construct a lightweight `Metadata` from the step name.
 
 The `PolicyEngine` instance is loaded once per process (immutable, thread-safe). Only the agent principal ContextVar changes per run.
@@ -79,9 +79,9 @@ When an agent delegates to a remote agent via `McpInvoker`, only the target agen
 
 This is an explicit limitation: remote delegation policy can only match on the target name, not on team/tags/author.
 
-### Compose Delegation
+### Flow Delegation
 
-`DelegateSink` routes agent output between compose services. The policy check uses **role metadata** (from loaded role YAML), not the compose service key.
+`DelegateSink` routes agent output between flow agents. The policy check uses **role metadata** (from loaded role YAML), not the flow agent key.
 
 ## Agent Tool Policy
 
@@ -132,7 +132,7 @@ Defines expected attributes for principals and resources. Used for lint validati
 
 The `principal_id` field in audit records tracks trigger source identity (e.g., `telegram:12345`, `webhook:github`). This is independent of agent principals and is preserved across all execution paths.
 
-Delegation policy denials in compose are logged as `policy_denied` audit events via the `DelegateSink` audit buffer.
+Delegation policy denials in flow are logged as `policy_denied` audit events via the `DelegateSink` audit buffer.
 
 ## Docker
 

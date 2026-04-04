@@ -16,7 +16,7 @@ app = typer.Typer(help="Browse and copy bundled examples.")
 def examples_list(
     category: Annotated[
         str | None,
-        typer.Option("--category", "-c", help="Filter by category: role, compose, skill"),
+        typer.Option("--category", "-c", help="Filter by category: role, flow, skill"),
     ] = None,
     tag: Annotated[
         str | None,

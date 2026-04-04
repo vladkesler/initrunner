@@ -5,7 +5,7 @@
 		{ label: 'RAG', icon: Database, href: 'https://www.initrunner.ai/docs/rag-quickstart', external: true },
 		{ label: 'Memory', icon: Brain, href: 'https://www.initrunner.ai/docs/memory', external: true },
 		{ label: 'Triggers', icon: Zap, href: 'https://www.initrunner.ai/docs/triggers', external: true },
-		{ label: 'Compose', icon: Workflow, href: '/compose/new', external: false },
+		{ label: 'Flows', icon: Workflow, href: '/flows/new', external: false },
 		{ label: 'Teams', icon: Users, href: '/teams/new', external: false },
 	];
 </script>

@@ -78,7 +78,7 @@ def apply_shared_stores(
 ) -> None:
     """Patch a synthesized role with shared memory and/or shared document stores."""
     if shared_mem_path:
-        from initrunner.compose.orchestrator import apply_shared_memory
+        from initrunner.flow.orchestrator import apply_shared_memory
 
         apply_shared_memory(role, shared_mem_path, team.spec.shared_memory.max_memories)
 

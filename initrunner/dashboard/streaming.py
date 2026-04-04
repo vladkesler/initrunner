@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from initrunner.agent.executor import RunResult
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger
-    from initrunner.compose.schema import ComposeDefinition
+    from initrunner.flow.schema import FlowDefinition
     from initrunner.team.schema import TeamDefinition
 
 _logger = logging.getLogger(__name__)
@@ -155,37 +155,35 @@ async def stream_run_sse(
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
 
 
-async def stream_compose_run_sse(
-    compose: ComposeDefinition,
+async def stream_flow_run_sse(
+    flow: FlowDefinition,
     base_dir: Path,
     prompt: str,
     *,
     audit_logger: AuditLogger | None = None,
     message_history: list[ModelMessage] | None = None,
 ) -> AsyncIterator[str]:
-    """SSE generator yielding service_start/service_complete/result/error events.
+    """SSE generator yielding agent_start/agent_complete/result/error events.
 
-    Runs compose graph directly as an async task (no thread pool hop).
+    Runs flow graph directly as an async task (no thread pool hop).
     Callbacks push progress events to an ``asyncio.Queue``.
     """
-    from initrunner.services.compose import run_compose_once_async
+    from initrunner.services.flow import run_flow_once_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
-    def on_service_start(name: str) -> None:
+    def on_agent_start(name: str) -> None:
         try:
-            event_queue.put_nowait(
-                f"data: {json.dumps({'type': 'service_start', 'data': name})}\n\n"
-            )
+            event_queue.put_nowait(f"data: {json.dumps({'type': 'agent_start', 'data': name})}\n\n")
         except asyncio.QueueFull:
             pass
 
-    def on_service_complete(name: str, result: RunResult) -> None:
+    def on_agent_complete(name: str, result: RunResult) -> None:
         evt = json.dumps(
             {
-                "type": "service_complete",
+                "type": "agent_complete",
                 "data": {
-                    "service_name": name,
+                    "agent_name": name,
                     "output": result.output[:500],
                     "duration_ms": result.duration_ms,
                     "tokens_in": result.tokens_in,
@@ -200,25 +198,25 @@ async def stream_compose_run_sse(
         except asyncio.QueueFull:
             pass
 
-    async def _run_compose():
+    async def _run_flow():
         try:
-            return await run_compose_once_async(
-                compose,
+            return await run_flow_once_async(
+                flow,
                 base_dir,
                 prompt,
                 message_history=message_history,
                 audit_logger=audit_logger,
-                on_service_start=on_service_start,
-                on_service_complete=on_service_complete,
+                on_agent_start=on_agent_start,
+                on_agent_complete=on_agent_complete,
             )
         finally:
             event_queue.put_nowait(None)
 
-    compose_task = asyncio.create_task(_run_compose())
+    flow_task = asyncio.create_task(_run_flow())
 
     # Forward progress events as SSE
     heartbeat_counter = 0
-    while not compose_task.done():
+    while not flow_task.done():
         try:
             event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
             if event is None:
@@ -240,24 +238,24 @@ async def stream_compose_run_sse(
 
     # Emit final result or error
     try:
-        compose_result = await compose_task
+        flow_result = await flow_task
 
-        # Serialize entry service message history
+        # Serialize entry agent message history
         serialized_history = None
-        if compose_result.entry_messages and compose_result.success:
+        if flow_result.entry_messages and flow_result.success:
             from pydantic_ai.messages import ModelMessagesTypeAdapter
 
             serialized_history = ModelMessagesTypeAdapter.dump_json(
-                compose_result.entry_messages
+                flow_result.entry_messages
             ).decode("utf-8")
 
         payload = {
-            "output": compose_result.output,
-            "output_mode": compose_result.output_mode,
-            "final_service_name": compose_result.final_service_name,
+            "output": flow_result.output,
+            "output_mode": flow_result.output_mode,
+            "final_agent_name": flow_result.final_agent_name,
             "steps": [
                 {
-                    "service_name": s.service_name,
+                    "agent_name": s.agent_name,
                     "output": s.output,
                     "tokens_in": s.tokens_in,
                     "tokens_out": s.tokens_out,
@@ -267,19 +265,19 @@ async def stream_compose_run_sse(
                     "success": s.success,
                     "error": s.error,
                 }
-                for s in compose_result.steps
+                for s in flow_result.steps
             ],
-            "tokens_in": compose_result.total_tokens_in,
-            "tokens_out": compose_result.total_tokens_out,
-            "total_tokens": compose_result.total_tokens_in + compose_result.total_tokens_out,
-            "duration_ms": compose_result.total_duration_ms,
-            "success": compose_result.success,
-            "error": compose_result.error,
+            "tokens_in": flow_result.total_tokens_in,
+            "tokens_out": flow_result.total_tokens_out,
+            "total_tokens": flow_result.total_tokens_in + flow_result.total_tokens_out,
+            "duration_ms": flow_result.total_duration_ms,
+            "success": flow_result.success,
+            "error": flow_result.error,
             "message_history": serialized_history,
         }
         yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
     except Exception as exc:
-        _logger.exception("Error during compose SSE streaming")
+        _logger.exception("Error during flow SSE streaming")
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
 
 

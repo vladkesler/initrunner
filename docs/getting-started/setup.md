@@ -164,7 +164,7 @@ If the dashboard is not installed, a tip to install it is shown instead.
 
 When selecting intent 8 (`from-example`), the wizard enters a separate flow:
 
-1. Displays a numbered table of bundled examples (roles, compose files, skills)
+1. Displays a numbered table of bundled examples (roles, flow files, skills)
 2. User selects an example by number or name
 3. Example files are copied to the current directory
 4. **No provider/key/model/role-generation steps** -- the example includes everything

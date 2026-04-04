@@ -17,8 +17,8 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 
 | Command | Description |
 |---------|-------------|
-| `initrunner run` | Run an agent (ephemeral or from role file), team, compose, or pipeline |
-| `initrunner run <PATH>` | Run an agent from a role file, team, compose, or pipeline (auto-detected from YAML kind) |
+| `initrunner run` | Run an agent (ephemeral or from role file), team, flow, or pipeline |
+| `initrunner run <PATH>` | Run an agent from a role file, team, flow, or pipeline (auto-detected from YAML kind) |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
 | `initrunner new [description]` | Create a new agent via conversational builder |
@@ -43,17 +43,17 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner skill new [name]` | Scaffold a new skill directory |
 | `initrunner skill validate <path>` | Validate a skill definition |
 | `initrunner skill list` | List available skills |
-| `initrunner compose new <name>` | Scaffold a new compose project directory |
-| `initrunner compose up <compose.yaml>` | Run compose orchestration (foreground) |
-| `initrunner compose validate <compose.yaml>` | Validate a compose definition |
-| `initrunner compose install <compose.yaml>` | Install systemd user unit |
-| `initrunner compose uninstall <name>` | Remove systemd unit |
-| `initrunner compose start <name>` | Start systemd service |
-| `initrunner compose stop <name>` | Stop systemd service |
-| `initrunner compose restart <name>` | Restart systemd service |
-| `initrunner compose status <name>` | Show systemd service status |
-| `initrunner compose logs <name>` | Show journald logs |
-| `initrunner compose events` | Query delegate routing events |
+| `initrunner flow new <name>` | Scaffold a new flow project directory |
+| `initrunner flow up <flow.yaml>` | Run flow orchestration (foreground) |
+| `initrunner flow validate <flow.yaml>` | Validate a flow definition |
+| `initrunner flow install <flow.yaml>` | Install systemd user unit |
+| `initrunner flow uninstall <name>` | Remove systemd unit |
+| `initrunner flow start <name>` | Start systemd service |
+| `initrunner flow stop <name>` | Stop systemd service |
+| `initrunner flow restart <name>` | Restart systemd service |
+| `initrunner flow status <name>` | Show systemd service status |
+| `initrunner flow logs <name>` | Show journald logs |
+| `initrunner flow events` | Query delegate routing events |
 | `initrunner mcp list-tools <PATH>` | List tools from MCP servers in a role |
 | `initrunner mcp serve <PATH>...` | Expose agents as an MCP server |
 | `initrunner login` | Log in to InitHub (browser auth) or OCI registry |
@@ -68,7 +68,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner hub info <PACKAGE>` | (deprecated) Show InitHub package details |
 | `initrunner --version` | Print version |
 
-> **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a compose file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
+> **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a flow file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
 
 ## No-subcommand behavior
 
@@ -94,7 +94,7 @@ In non-TTY contexts (piped input), the help text is printed.
 
 Synopsis: `initrunner run [PATH] [OPTIONS]`
 
-The path argument is optional when `--sense` is used. The `run` command auto-detects the YAML kind (Agent, Team, Compose, Pipeline) and dispatches accordingly.
+The path argument is optional when `--sense` is used. The `run` command auto-detects the YAML kind (Agent, Team, Flow, Pipeline) and dispatches accordingly.
 
 | Flag | Description |
 |------|-------------|
@@ -319,33 +319,33 @@ Synopsis: `initrunner mcp serve PATHS... [OPTIONS]`
 
 See [MCP Gateway](../interfaces/mcp-gateway.md) for transport details, client configuration, pass-through mode, and usage examples.
 
-## Compose new options
+## Flow new options
 
-Scaffold a compose project directory with `compose.yaml` and stub role files.
+Scaffold a flow project directory with `flow.yaml` and stub role files.
 
 ```bash
-initrunner compose new my-pipeline                          # default: 3-service pipeline
-initrunner compose new desk --pattern route --shared-memory # support-desk style routing
-initrunner compose new spread --pattern fan-out --services 5
+initrunner flow new my-pipeline                          # default: 3-agent pipeline
+initrunner flow new desk --pattern route --shared-memory # support-desk style routing
+initrunner flow new spread --pattern fan-out --agents 5
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--pattern TEXT` | Compose pattern: `pipeline` (default), `fan-out`, `route` |
-| `--services INT` | Number of services (default: `3`). Pipeline min 2, fan-out min 3, route is fixed |
-| `--shared-memory` | Enable shared memory store across all services |
+| `--pattern TEXT` | Flow pattern: `pipeline` (default), `fan-out`, `route` |
+| `--agents INT` | Number of agents (default: `3`). Pipeline min 2, fan-out min 3, route is fixed |
+| `--shared-memory` | Enable shared memory store across all agents |
 | `--provider TEXT` | Model provider for generated roles (auto-detected if omitted) |
 | `--model TEXT` | Model name for generated roles |
 | `--output PATH` | Parent directory for the project (default: `.`) |
 | `--force`, `-f` | Overwrite existing directory |
 | `--list-patterns` | Show available patterns and exit |
 
-## Compose events options
+## Flow events options
 
 | Flag | Description |
 |------|-------------|
-| `--source TEXT` | Filter by source service |
-| `--target TEXT` | Filter by target service |
+| `--source TEXT` | Filter by source agent |
+| `--target TEXT` | Filter by target agent |
 | `--status TEXT` | Filter by status (`delivered`, `dropped`, `filtered`, `error`) |
 | `--run-id TEXT` | Filter by source run ID |
 | `--since TEXT` | Start timestamp (ISO 8601) |

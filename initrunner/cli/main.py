@@ -8,8 +8,8 @@ import typer
 
 from initrunner.cli._helpers import console
 from initrunner.cli.audit_cmd import app as audit_app
-from initrunner.cli.compose_cmd import app as compose_app
 from initrunner.cli.examples_cmd import app as examples_app
+from initrunner.cli.flow_cmd import app as flow_app
 from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
@@ -179,7 +179,7 @@ app.command(rich_help_panel="Run & Test")(configure)
 # --- Interfaces ---
 app.command(rich_help_panel="Interfaces")(dashboard)
 app.command(rich_help_panel="Interfaces")(desktop)
-app.add_typer(compose_app, name="compose", rich_help_panel="Interfaces")
+app.add_typer(flow_app, name="flow", rich_help_panel="Interfaces")
 app.add_typer(mcp_app, name="mcp", rich_help_panel="Interfaces")
 
 # --- Package Registry ---
