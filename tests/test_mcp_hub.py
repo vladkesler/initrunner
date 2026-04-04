@@ -4,20 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from initrunner.agent.schema.security import ToolSandboxConfig
 from initrunner.agent.schema.tools import McpToolConfig
 from initrunner.services.mcp_hub import (
-    AgentRef,
-    McpServerEntry,
     _server_identity_hash,
     aggregate_mcp_servers,
     find_server,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -26,7 +26,9 @@ _logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
-_REGISTRY_PATH = Path(__file__).resolve().parent.parent.parent / "mcp" / "_registry_data" / "catalog.json"
+_REGISTRY_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "mcp" / "_registry_data" / "catalog.json"
+)
 
 
 # ---------------------------------------------------------------------------

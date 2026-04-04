@@ -35,7 +35,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.4**: `--autopilot` flag for multi-step autonomous triggers, README restructured around security and autonomy. See the [Changelog](CHANGELOG.md).
+> **v2026.4.5**: MCP Hub dashboard with server discovery, playground, and topology canvas. Compose renamed to Flow. Electric Charcoal v2 visual redesign. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -372,4 +372,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.4</sub></p>
+<p align="center"><sub>v2026.4.5</sub></p>

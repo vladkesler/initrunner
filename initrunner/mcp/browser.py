@@ -74,9 +74,7 @@ def _run_ab(args: list[str], config: BrowserMCPConfig) -> str:
                 cmd_retry += ["--headed"]
             cmd_retry += args
             try:
-                stdout, stderr, rc = run_subprocess_text(
-                    cmd_retry, timeout=config.timeout_seconds
-                )
+                stdout, stderr, rc = run_subprocess_text(cmd_retry, timeout=config.timeout_seconds)
             except SubprocessTimeout:
                 return f"Error: command timed out after {config.timeout_seconds}s"
             except Exception as exc:
@@ -84,7 +82,7 @@ def _run_ab(args: list[str], config: BrowserMCPConfig) -> str:
             if rc != 0:
                 err_msg = stderr.strip() or stdout.strip() or "command failed"
                 return f"Error: {err_msg}"
-            return (stdout.strip() or "(no output)")[:config.max_output_bytes]
+            return (stdout.strip() or "(no output)")[: config.max_output_bytes]
         return f"Error: {err_msg}"
 
     return truncate_output(stdout, config.max_output_bytes)
