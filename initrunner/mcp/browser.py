@@ -65,6 +65,26 @@ def _run_ab(args: list[str], config: BrowserMCPConfig) -> str:
 
     if rc != 0:
         err_msg = stderr.strip() or stdout.strip() or "command failed"
+        # Auto-retry with --no-sandbox when Chrome fails due to sandbox restrictions
+        if "No usable sandbox" in err_msg or "no-sandbox" in err_msg:
+            cmd_retry = [binary, "--args", "--no-sandbox"]
+            if config.session_name:
+                cmd_retry += ["--session-name", config.session_name]
+            if not config.headless:
+                cmd_retry += ["--headed"]
+            cmd_retry += args
+            try:
+                stdout, stderr, rc = run_subprocess_text(
+                    cmd_retry, timeout=config.timeout_seconds
+                )
+            except SubprocessTimeout:
+                return f"Error: command timed out after {config.timeout_seconds}s"
+            except Exception as exc:
+                return f"Error: failed to run agent-browser: {exc}"
+            if rc != 0:
+                err_msg = stderr.strip() or stdout.strip() or "command failed"
+                return f"Error: {err_msg}"
+            return (stdout.strip() or "(no output)")[:config.max_output_bytes]
         return f"Error: {err_msg}"
 
     return truncate_output(stdout, config.max_output_bytes)

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Compass, Blocks, Workflow, Users, Sparkles, ScanEye, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { getMcpHealthSummary } from '$lib/api/mcp';
+	import { onMount } from 'svelte';
 
 	let { collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void } = $props();
 
@@ -17,8 +19,22 @@
 	];
 
 	const operateItems = [
+		{ href: '/mcp', label: 'MCP Hub', icon: Cable },
 		{ href: '/audit', label: 'Audit', icon: ScanEye }
 	];
+
+	let mcpUnhealthy = $state(0);
+
+	onMount(() => {
+		const poll = () => {
+			getMcpHealthSummary()
+				.then((s) => { mcpUnhealthy = s.unhealthy; })
+				.catch(() => { /* ignore */ });
+		};
+		poll();
+		const id = setInterval(poll, 30_000);
+		return () => clearInterval(id);
+	});
 
 	const homeActive = $derived(isActive('/'));
 	const sysActive = $derived(isActive('/system'));
@@ -91,7 +107,7 @@
 			{@const active = isActive(item.href)}
 			<a
 				href={item.href}
-				class="group flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
+				class="group relative flex items-center gap-2.5 border-l-2 px-2.5 py-2.5 text-[13px] transition-[color,background-color,border-color] duration-150
 					{active
 						? 'border-accent-primary text-fg'
 						: 'border-transparent text-fg-faint hover:bg-gradient-to-r hover:from-accent-primary-wash hover:to-transparent hover:text-fg-muted'}"
@@ -100,6 +116,9 @@
 				<item.icon size={15} strokeWidth={1.5} />
 				{#if !collapsed}
 					<span>{item.label}</span>
+				{/if}
+				{#if item.href === '/mcp' && mcpUnhealthy > 0}
+					<span class="status-dot absolute right-2 top-1/2 -translate-y-1/2" style="background: var(--color-fail)"></span>
 				{/if}
 			</a>
 		{/each}

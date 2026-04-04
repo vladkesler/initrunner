@@ -625,3 +625,69 @@ export interface TeamSaveResponse {
 	next_steps: string[];
 	team_id: string;
 }
+
+// -- MCP Hub ------------------------------------------------------------------
+
+export interface McpAgentRef {
+	agent_name: string;
+	agent_id: string;
+	role_path: string;
+	tool_filter: string[];
+	tool_exclude: string[];
+	tool_prefix: string | null;
+}
+
+export interface McpServer {
+	server_id: string;
+	display_name: string;
+	transport: 'stdio' | 'sse' | 'streamable-http';
+	command: string | null;
+	args: string[];
+	url: string | null;
+	agent_refs: McpAgentRef[];
+	health_status: 'healthy' | 'degraded' | 'unhealthy' | null;
+	health_checked_at: string | null;
+}
+
+export interface McpTool {
+	name: string;
+	description: string;
+	input_schema: Record<string, unknown>;
+}
+
+export interface McpHealthResult {
+	server_id: string;
+	status: 'healthy' | 'degraded' | 'unhealthy';
+	latency_ms: number;
+	tool_count: number;
+	error: string | null;
+	checked_at: string;
+}
+
+export interface McpPlaygroundResult {
+	tool_name: string;
+	output: string;
+	duration_ms: number;
+	success: boolean;
+	error: string | null;
+}
+
+export interface McpRegistryEntry {
+	name: string;
+	display_name: string;
+	description: string;
+	category: string;
+	transport: string;
+	command: string | null;
+	args: string[];
+	url: string | null;
+	install_hint: string;
+	homepage: string;
+	tags: string[];
+}
+
+export interface McpHealthSummary {
+	total: number;
+	healthy: number;
+	unhealthy: number;
+}

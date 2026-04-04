@@ -56,6 +56,7 @@ Onboarding surface designed to reduce time-to-first-agent:
 - **Top agents**: bar chart of the 5 most-used agents (by run count)
 - **Recent activity**: compact timeline of last 10 runs
 - **Orchestration**: section header grouping the Flows and Teams cards (appears when either exists)
+- **MCP Servers**: health summary card showing healthy/unhealthy/unchecked server counts with a link to `/mcp` (appears when MCP servers are configured)
 
 ### Agents (`/agents`)
 
@@ -255,6 +256,46 @@ Filterable table of all agent runs with analytics.
 - **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, and error details
 - **Export**: download filtered results as JSON or CSV
 
+### MCP Hub (`/mcp`)
+
+Visual management center for MCP servers configured across all agents. Four tabs:
+
+**Servers tab** -- aggregated view of every MCP server declared in any agent's `tools:` config.
+
+- Servers are deduplicated by connection identity (transport, command, args, url, cwd, headers, env keys). Two agents pointing at the same `npx @modelcontextprotocol/server-filesystem /tmp` show as one server entry with two agent refs.
+- Each server card shows: display name (from `config.summary()`), transport badge (`stdio`/`sse`/`streamable-http`), health dot (green/amber/red/gray), and agent chips linking to `/agents/{id}`.
+- Click to expand: lazy-loads the full tool list via introspection (`fastmcp.Client.list_tools()`). Each tool shows name, description, and a "Test" button that jumps to the Playground with that server+tool pre-selected.
+- Filter bar: transport type pills, text search across server names and agent names.
+- "Check Health" button triggers on-demand health checks for all servers.
+
+**Discover tab** -- curated registry of popular MCP servers shipped as static JSON.
+
+- Categories: filesystem, database, web, developer, productivity, communication.
+- Each card: name, description, category badge, transport indicator, copyable install command.
+- "Add to Agent" copies a ready-to-paste `tools:` YAML snippet to the clipboard.
+- Client-side search and category filtering.
+
+**Playground tab** -- execute any MCP tool in isolation without an LLM agent.
+
+- Cascading pickers: select server, then select tool (tool list loaded on server selection).
+- Auto-generated form from the tool's `inputSchema` JSON Schema (string/number/boolean/enum fields, required markers).
+- Execute button calls the tool directly via `build_transport()` + `fastmcp.Client.call_tool()`. Sandbox rules from the originating role are enforced (command allowlist, env scrubbing).
+- Response viewer: syntax-highlighted JSON output, timing badge, success/error indicator, copy button.
+- History sidebar: recent calls stored in localStorage (max 50, FIFO). Click to replay with the same arguments.
+
+**Canvas tab** -- @xyflow/svelte topology visualization of MCP server-agent relationships.
+
+- Two-column layout: MCP servers on the left, agents on the right.
+- Animated lime edges (`oklch(0.91 0.20 128)`) connect servers to consuming agents.
+- Draggable nodes with position persistence to localStorage.
+- "Auto-arrange" resets to default two-tier layout.
+- "Export YAML" copies all server configs as a `tools:` section to the clipboard.
+- Double-click an agent node to navigate to `/agents/{id}`.
+
+**Sidebar**: MCP Hub appears in the "Operate" section (between Skills and Audit). A red status dot appears on the nav item when any MCP server is unhealthy (polled every 30 seconds via `/api/mcp/health-summary`).
+
+**Launchpad widget**: when MCP servers exist, the Launchpad home page shows a health summary card with healthy/unhealthy/unchecked counts and a link to `/mcp`.
+
 ### System (`/system`)
 
 Four sections:
@@ -329,6 +370,12 @@ initrunner dashboard
   |      /api/skills/{id}      DELETE delete skill (blocks if resource files exist)
   |      /api/skills/{id}/content GET raw SKILL.md content for editor
   |      /api/skills/{id}/content PUT validate-then-save skill content
+  |      /api/mcp/servers      GET   list deduplicated MCP servers across all agents
+  |      /api/mcp/servers/{id}/tools GET introspect server tools (with inputSchema)
+  |      /api/mcp/servers/{id}/health POST on-demand health check
+  |      /api/mcp/playground/call POST execute single MCP tool call
+  |      /api/mcp/registry     GET   curated MCP server catalog
+  |      /api/mcp/health-summary GET  aggregate health for sidebar badge
   |      /api/runs             POST  execute single run
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
@@ -917,6 +964,126 @@ Schema-only validation of team YAML.
 ### `POST /api/team-builder/save`
 
 Write team YAML to disk. Returns `path`, `valid`, `issues[]`, `next_steps[]`, and `team_id`. Returns 409 if the file already exists and `force` is false.
+
+### `GET /api/mcp/servers`
+
+Returns all MCP servers configured across all discovered agents, deduplicated by connection identity (transport + command + args + url + cwd + headers + env keys).
+
+```json
+[
+  {
+    "server_id": "a1b2c3d4e5f6",
+    "display_name": "mcp: stdio npx",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    "url": null,
+    "agent_refs": [
+      {
+        "agent_name": "file-reader",
+        "agent_id": "abc123def456",
+        "role_path": "/agents/file-reader/role.yaml",
+        "tool_filter": ["read_file", "list_directory"],
+        "tool_exclude": [],
+        "tool_prefix": null
+      }
+    ],
+    "health_status": "healthy",
+    "health_checked_at": "2026-04-04T12:00:00+00:00"
+  }
+]
+```
+
+### `GET /api/mcp/servers/{server_id}/tools`
+
+Introspects an MCP server and returns its tools with full JSON Schema input definitions. Connects to the server via `build_transport()` with the originating role's sandbox config enforced.
+
+```json
+[
+  {
+    "name": "read_file",
+    "description": "Read a file from the filesystem",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "File path to read"}
+      },
+      "required": ["path"]
+    }
+  }
+]
+```
+
+### `POST /api/mcp/servers/{server_id}/health`
+
+Runs an on-demand health check against a server. Connects, calls `list_tools()` with a 5-second timeout, and measures latency. Results are cached for 30 seconds.
+
+```json
+{
+  "server_id": "a1b2c3d4e5f6",
+  "status": "healthy",
+  "latency_ms": 234,
+  "tool_count": 8,
+  "error": null,
+  "checked_at": "2026-04-04T12:00:00+00:00"
+}
+```
+
+Status values: `"healthy"` (< 3s), `"degraded"` (3-5s), `"unhealthy"` (timeout or error).
+
+### `POST /api/mcp/playground/call`
+
+Executes a single MCP tool call without an LLM agent. Connects to the server, calls the tool with the provided arguments, and returns the raw result. Sandbox rules from the originating role are enforced.
+
+Request:
+```json
+{
+  "server_id": "a1b2c3d4e5f6",
+  "tool_name": "read_file",
+  "arguments": {"path": "/tmp/example.txt"}
+}
+```
+
+Response:
+```json
+{
+  "tool_name": "read_file",
+  "output": "file contents here...",
+  "duration_ms": 45,
+  "success": true,
+  "error": null
+}
+```
+
+### `GET /api/mcp/registry`
+
+Returns the curated MCP server catalog (static JSON shipped with InitRunner).
+
+```json
+[
+  {
+    "name": "filesystem",
+    "display_name": "Filesystem",
+    "description": "Read, write, and search files on the local filesystem.",
+    "category": "filesystem",
+    "transport": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/root"],
+    "url": null,
+    "install_hint": "npx -y @modelcontextprotocol/server-filesystem /path/to/root",
+    "homepage": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+    "tags": ["files", "read", "write", "search"]
+  }
+]
+```
+
+### `GET /api/mcp/health-summary`
+
+Aggregate health counts for the sidebar badge. Uses the 30-second TTL cache, so unchecked servers show as neither healthy nor unhealthy.
+
+```json
+{"total": 3, "healthy": 2, "unhealthy": 0}
+```
 
 ### `GET /api/health`
 

@@ -3,8 +3,9 @@
 	import { listAgents } from '$lib/api/agents';
 	import { queryAudit } from '$lib/api/audit';
 	import { fetchAuditStats } from '$lib/api/system';
+	import { getMcpHealthSummary } from '$lib/api/mcp';
 	import { request } from '$lib/api/client';
-	import type { AgentSummary, AuditRecord, AuditStats, HealthStatus } from '$lib/api/types';
+	import type { AgentSummary, AuditRecord, AuditStats, HealthStatus, McpHealthSummary } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Plus, BookOpen, Stethoscope, AlertTriangle, ArrowUpRight, Workflow, Users, ExternalLink, TrendingDown, TrendingUp } from 'lucide-svelte';
 	import CapabilityGlyph from '$lib/components/agents/CapabilityGlyph.svelte';
@@ -27,6 +28,7 @@
 	let loading = $state(true);
 	let builderOptions = $state<BuilderOptions | null>(null);
 	let starters = $state<StarterInfo[]>([]);
+	let mcpHealth = $state<McpHealthSummary | null>(null);
 
 	const errorAgents = $derived(agents.filter((a) => a.error));
 	const isEmpty = $derived(agents.length === 0 && flows.length === 0 && teams.length === 0);
@@ -115,7 +117,7 @@
 
 	onMount(async () => {
 		try {
-			const [a, c, t, audit, s, health, opts, st] = await Promise.all([
+			const [a, c, t, audit, s, health, opts, st, mh] = await Promise.all([
 				listAgents(),
 				fetchFlowList().catch(() => [] as FlowSummary[]),
 				fetchTeamList().catch(() => [] as TeamSummary[]),
@@ -123,7 +125,8 @@
 				fetchAuditStats(),
 				request<HealthStatus>('/api/health'),
 				getBuilderOptions().catch(() => null as BuilderOptions | null),
-				getStarters().catch(() => ({ starters: [] }))
+				getStarters().catch(() => ({ starters: [] })),
+				getMcpHealthSummary().catch(() => null as McpHealthSummary | null)
 			]);
 			agents = a;
 			flows = c;
@@ -133,6 +136,7 @@
 			version = health.version;
 			builderOptions = opts;
 			starters = st.starters;
+			mcpHealth = mh;
 		} catch {
 			toast.error('Failed to connect to API server');
 		} finally {
@@ -430,6 +434,34 @@
 											</a>
 										{/each}
 									</div>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- MCP Health -->
+				{#if mcpHealth && mcpHealth.total > 0}
+					<div class="mt-6 border border-edge bg-surface-1 p-4">
+						<div class="mb-3 flex items-baseline justify-between">
+							<h2 class="section-label">MCP Servers</h2>
+							<a href="/mcp" class="text-[12px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted">View all</a>
+						</div>
+						<div class="flex items-center gap-4">
+							<div class="flex items-center gap-2">
+								<span class="status-dot" style="background: var(--color-ok)"></span>
+								<span class="font-mono text-[13px] text-fg-muted">{mcpHealth.healthy} healthy</span>
+							</div>
+							{#if mcpHealth.unhealthy > 0}
+								<div class="flex items-center gap-2">
+									<span class="status-dot" style="background: var(--color-fail)"></span>
+									<span class="font-mono text-[13px] text-fg-muted">{mcpHealth.unhealthy} unhealthy</span>
+								</div>
+							{/if}
+							{#if mcpHealth.total - mcpHealth.healthy - mcpHealth.unhealthy > 0}
+								<div class="flex items-center gap-2">
+									<span class="status-dot" style="background: var(--color-fg-faint)"></span>
+									<span class="font-mono text-[13px] text-fg-muted">{mcpHealth.total - mcpHealth.healthy - mcpHealth.unhealthy} unchecked</span>
 								</div>
 							{/if}
 						</div>
