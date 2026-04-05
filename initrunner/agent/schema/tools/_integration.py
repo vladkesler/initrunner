@@ -23,6 +23,7 @@ class McpToolConfig(ToolConfigBase):
     tool_prefix: str | None = None
     max_retries: int = 1
     timeout_seconds: int | None = None
+    defer: bool = False
 
     @model_validator(mode="after")
     def _validate_transport_fields(self) -> McpToolConfig:
@@ -35,7 +36,11 @@ class McpToolConfig(ToolConfigBase):
         return self
 
     def summary(self) -> str:
-        return f"mcp: {self.transport} {self.command or self.url or ''}"
+        if self.command:
+            label = " ".join([self.command, *self.args])
+        else:
+            label = self.url or ""
+        return f"mcp: {self.transport} {label}"
 
 
 class ApiParameter(BaseModel):

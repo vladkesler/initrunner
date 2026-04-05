@@ -952,6 +952,7 @@ class McpAgentRefResponse(BaseModel):
     tool_filter: list[str] = []
     tool_exclude: list[str] = []
     tool_prefix: str | None = None
+    defer: bool = False
 
 
 class McpServerResponse(BaseModel):
@@ -964,6 +965,7 @@ class McpServerResponse(BaseModel):
     agent_refs: list[McpAgentRefResponse] = []
     health_status: str | None = None
     health_checked_at: str | None = None
+    cache_age_seconds: float | None = None
 
 
 class McpToolResponse(BaseModel):

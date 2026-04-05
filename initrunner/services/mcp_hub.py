@@ -30,6 +30,7 @@ class AgentRef:
     tool_filter: list[str] = field(default_factory=list)
     tool_exclude: list[str] = field(default_factory=list)
     tool_prefix: str | None = None
+    defer: bool = False
 
 
 @dataclass
@@ -104,6 +105,7 @@ def aggregate_mcp_servers(role_cache: RoleCache) -> list[McpServerEntry]:
                 tool_filter=list(tool_cfg.tool_filter),
                 tool_exclude=list(tool_cfg.tool_exclude),
                 tool_prefix=tool_cfg.tool_prefix,
+                defer=tool_cfg.defer,
             )
 
             if sid in servers:

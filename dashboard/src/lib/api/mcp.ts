@@ -38,3 +38,7 @@ export function getMcpRegistry(): Promise<McpRegistryEntry[]> {
 export function getMcpHealthSummary(): Promise<McpHealthSummary> {
 	return request('/api/mcp/health-summary');
 }
+
+export function invalidateMcpCache(serverId: string): Promise<{ invalidated: boolean }> {
+	return request(`/api/mcp/servers/${serverId}/cache`, { method: 'DELETE' });
+}
