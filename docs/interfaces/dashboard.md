@@ -63,9 +63,11 @@ Onboarding surface designed to reduce time-to-first-agent:
 Two views, toggled in the header bar:
 
 - **Flow view** (default, desktop): Interactive SvelteFlow canvas. Agents render as draggable nodes organized into category sections (Reactive, Intelligence, Skilled, Cognitive, Connected, Equipped, Other). Each node shows the agent name, model, description, capability glyph, and a hero icon matching its primary feature. Category labels separate the sections. Canvas supports pan, zoom, minimap, and an auto-arrange button. Node positions persist to localStorage. On mobile (< 1024px), falls back to list view automatically.
-- **List view**: Sortable table with status dot, name, description, model, and capability glyph columns. Each row has a trash icon (visible on hover) to delete the agent with a name-typing confirmation dialog.
+- **List view**: Sortable table with status dot, name, description, model, and capability glyph columns. Each row has a **Play** button (visible on hover) to quick-run the agent, and a trash icon to delete with a name-typing confirmation dialog.
 
 A toolbar above the canvas (or list) provides search, capability filter buttons (All, Equipped, Reactive, Intelligence, Connected, Skilled, Cognitive, Errored), a result count, and the view toggle. The **Cognitive** filter shows agents with non-default reasoning patterns (todo_driven, plan_execute, reflexion) or autonomy configuration. In flow view, filtering dims non-matching nodes instead of hiding them. Click any node/row to open the detail view.
+
+**Quick Run**: clicking the Play button on any agent (in either view) opens a slide-over drawer on the right side with an embedded RunPanel. The drawer uses the same pattern as the audit detail drawer (fixed backdrop + panel, Escape to close). This lets users run agents without navigating away from the list page.
 
 ### New Agent (`/agents/new`)
 
@@ -102,11 +104,12 @@ Header with agent name, model badge, and status indicator. A **Delete** button o
 
 **Trigger panel**: for agents with triggers configured, an operational status panel appears between the stats bar and tabs. Each trigger shows its type, config summary, fire count, success rate (color-coded), average duration, last fired time (relative), and next check time (for cron and heartbeat triggers). Last errors are shown in a collapsed section. Stats are derived from the audit trail via `GET /api/agents/{id}/trigger-stats`. The static trigger listing in the Config tab is preserved as a fallback. Fire counts are aggregated per trigger type (v1 limitation: multiple triggers of the same type share aggregated stats).
 
-Six tabs below the trigger panel:
+Tabs below the trigger panel:
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Prompt input with SSE streaming output. Deterministic Rings avatars (seeded from agent name) identify each turn. Token breakdown, tool call names, and duration after completion. Multi-turn message history. |
+| **Run** (default) | Split view: conversation stream on the left, **tool activity panel** + **token meter** on the right. Prompt input with SSE streaming output. Deterministic Rings avatars (seeded from agent name) identify each turn. Tool calls appear in real-time in the right panel as they start and complete, with status dots (lime=running, green=ok, red=error), tool names, and durations. Token meter shows budget frame before streaming, "streaming..." during output, then snaps to exact token counts, cost (via genai-prices), and budget progress bar on completion. Multi-turn message history. The sidebar collapses to a stacked layout below 900px. |
+| **Timeline** | Gantt-style timeline of trigger-initiated runs over the last 24 hours (only shown for agents with triggers). Swim lanes dynamically assigned from overlap detection. Bars color-coded by outcome (green=success, red=error). Hover tooltips show trigger type, duration, token count, and cost. Stats strip above the chart with run count, success rate, total tokens, avg duration, and total cost. Auto-refreshes every 30 seconds. Data from `GET /api/agents/{id}/timeline`. |
 | **History** | Audit log filtered to this agent. |
 | **Memory** | Memory items and conversation sessions (shown when agent has `memory` config). Filter by type, consolidate memories. |
 | **Ingest** | Document management for RAG agents (shown when agent has `ingest` config). See below. |
@@ -164,13 +167,14 @@ The Route pattern defaults to **Sense** (with a lime "Recommended" badge). When 
 
 ### Flow Detail (`/flows/{id}`)
 
-Tabbed detail page with a stats bar and five tabs. A **Delete** button in the header opens a confirmation dialog requiring the flow name to be typed. Deleting removes only the `flow.yaml` file (referenced role files are not affected) and redirects to the flow list.
+Tabbed detail page with a stats bar and six tabs. A **Delete** button in the header opens a confirmation dialog requiring the flow name to be typed. Deleting removes only the `flow.yaml` file (referenced role files are not affected) and redirects to the flow list.
 
 **Stats bar** (4 cards): total events, delivery rate %, agent count, issue count (non-delivered events). Delivery rate is color-coded green/yellow/red.
 
 | Tab | Contents |
 |-----|----------|
 | **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active agent name identify each turn (avatar swaps during streaming as agents execute). The entry agent (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Agent-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal agent shows output directly, fan-out shows per-agent trace expanded. Collapsible pipeline trace under each response shows per-agent name, duration, tokens, and output preview. Message history scoped to entry agent for multi-turn conversations. |
+| **Timeline** | Gantt-style timeline of aggregate flow runs over the last 24 hours. Same component as agent timeline (dynamic swim lanes, auto-refresh, stats strip). Queries `trigger_type="flow_run"` from the audit trail. Cost hidden for multi-model flows (`model="multi"`). Data from `GET /api/flows/{id}/timeline`. |
 | **Graph** | SvelteFlow canvas showing the agent DAG. Agents are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `needs` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
 | **Events** | Delegation event table filtered by `flow_name`. Columns: status (color-coded dot with glow), source, target, routing (method + score from sense/keyword routing, lime for keyword matches, cyan for LLM tiebreaks), time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
 | **Config** | Collapsible per-agent sections showing sink (strategy, targets, queue size, timeout, circuit breaker), trigger, restart policy, health check, needs, and environment count. When sink strategy is `sense` or `keyword`, an inline explanation appears below the strategy field. Shared memory/documents badges. |
@@ -209,12 +213,13 @@ The team-level model selector supports the same provider options as agent creati
 
 ### Team Detail (`/teams/{id}`)
 
-Tabbed detail page with four tabs. A **Delete** button in the header opens a confirmation dialog requiring the team name to be typed. Deleting removes the team YAML file and redirects to the teams list.
+Tabbed detail page with five tabs. A **Delete** button in the header opens a confirmation dialog requiring the team name to be typed. Deleting removes the team YAML file and redirects to the teams list.
 
 | Tab | Contents |
 |-----|----------|
 | **Pipeline** (default) | Strategy-aware visualization. Sequential shows a vertical chain of persona cards with handoff arrows; parallel shows a fan-out/fan-in layout. Cards display persona name, model override badge, tool count, duration, and token counts. Cards animate through states: idle, active (pulsing dot), pending, complete (checkmark), error (X). |
 | **Run** | Chat interface for running prompts through the team. Deterministic Rings avatars seeded from the active persona name identify each turn. Active persona indicator matches the pipeline visualization. Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
+| **Timeline** | Gantt-style timeline of aggregate team runs over the last 24 hours. Same component as agent timeline (dynamic swim lanes, auto-refresh, stats strip). Queries `trigger_type="team_run"` from the audit trail. Cost hidden for mixed-model teams (`model="multi"`). Data from `GET /api/teams/{id}/timeline`. |
 | **Config** | Collapsible sections: model, strategy (with handoff_max_chars), guardrails, shared memory, shared documents, tools, observability. |
 | **Editor** | YAML editor with live validation, in-place save, and copy. Warns when name changes (affects team ID). |
 
@@ -333,6 +338,7 @@ initrunner dashboard
   |      /api/agents/{id}/yaml GET   raw YAML file
   |      /api/agents/{id}      DELETE delete agent YAML and evict from cache
   |      /api/agents/{id}/trigger-stats GET per-trigger-type operational stats
+  |      /api/agents/{id}/timeline GET timeline entries + stats for Gantt view
   |      /api/builder/templates GET   templates, providers, options
   |      /api/builder/seed     POST  generate YAML from template/description/blank
   |      /api/builder/validate POST  validate YAML text
@@ -348,6 +354,7 @@ initrunner dashboard
   |      /api/flows/{id}/yaml   PUT  save edited flow YAML
   |      /api/flows/{id}        DELETE delete flow YAML and evict from cache
   |      /api/flows/{id}/run/stream POST streaming flow run (SSE)
+  |      /api/flows/{id}/timeline GET timeline entries + stats for Gantt view
   |      /api/flow-builder/options GET patterns, agents, providers
   |      /api/flow-builder/seed POST generate flow YAML
   |      /api/flow-builder/validate POST schema-only validation
@@ -358,6 +365,7 @@ initrunner dashboard
   |      /api/teams/{id}/yaml PUT   save edited team YAML
   |      /api/teams/{id}      DELETE delete team YAML and evict from cache
   |      /api/teams/{id}/run/stream POST streaming team run (SSE)
+  |      /api/teams/{id}/timeline GET timeline entries + stats for Gantt view
   |      /api/team-builder/options GET strategies, providers
   |      /api/team-builder/seed POST generate team YAML
   |      /api/team-builder/validate POST schema validation
@@ -405,8 +413,10 @@ Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stre
 
 | Event type | Payload |
 |------------|---------|
+| `usage` | Budget limits, model name, provider (emitted once before streaming starts) |
 | `token` | String chunk of model output |
-| `result` | Full `RunResponse` with token counts, tool calls, duration |
+| `tool_event` | Tool call lifecycle: `{tool_name, status, phase, error_summary, duration_ms}`. Emitted at start (`phase="start"`, `status="running"`) and completion (`phase="complete"`, `status="ok"` or `"error"`). Exception-safe: a start event always gets a matching complete event. |
+| `result` | Full `RunResponse` with token counts, tool calls, duration, and `cost` (USD estimate via genai-prices) |
 | `error` | Error message string |
 
 ## Desktop App

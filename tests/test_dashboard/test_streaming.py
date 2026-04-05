@@ -42,6 +42,10 @@ def _mock_role():
     role.spec.output.type = "text"
     role.spec.memory = None
     role.spec.session = None
+    role.spec.guardrails.max_tokens_per_run = 50000
+    role.spec.guardrails.total_tokens_limit = None
+    role.spec.model.name = "test-model"
+    role.spec.model.provider = "openai"
     return role
 
 

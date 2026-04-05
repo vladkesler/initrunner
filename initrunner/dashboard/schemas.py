@@ -1015,3 +1015,41 @@ class McpHealthSummaryResponse(BaseModel):
     total: int
     healthy: int
     unhealthy: int
+
+
+# -- Timeline -----------------------------------------------------------------
+
+
+class TimelineCostResponse(BaseModel):
+    total_cost_usd: float
+
+
+class TimelineEntryResponse(BaseModel):
+    run_id: str
+    start_time: str
+    end_time: str
+    duration_ms: int
+    status: Literal["success", "error"]
+    trigger_type: str | None = None
+    trigger_metadata: dict | None = None
+    tokens_in: int = 0
+    tokens_out: int = 0
+    total_tokens: int = 0
+    tool_calls: int = 0
+    cost: TimelineCostResponse | None = None
+
+
+class TimelineStatsResponse(BaseModel):
+    total_runs: int = 0
+    success_count: int = 0
+    error_count: int = 0
+    success_rate: float = 0.0
+    total_tokens: int = 0
+    avg_duration_ms: int = 0
+    max_duration_ms: int = 0
+    total_cost_usd: float | None = None
+
+
+class TimelineResponse(BaseModel):
+    entries: list[TimelineEntryResponse]
+    stats: TimelineStatsResponse

@@ -375,7 +375,9 @@ Each trigger displays:
 
 Stats are derived from the audit trail. No additional runtime state is required. The Config tab preserves the static trigger configuration listing as a fallback.
 
-**Limitation (v1)**: stats are aggregated per `trigger_type`. If an agent has two triggers of the same type (e.g. two cron schedules), their stats are combined.
+**Timeline tab**: agents with triggers also get a **Timeline** tab showing a Gantt-style chart of runs over the last 24 hours. Bars are color-coded by outcome (green=success, red=error) and swim lanes are dynamically assigned when runs overlap in time. Hover tooltips show trigger type, duration, token count, and estimated cost. A stats strip above the chart summarizes total runs, success rate, token consumption, average duration, and total cost. The timeline auto-refreshes every 30 seconds and is powered by `GET /api/agents/{id}/timeline`, which queries the audit trail with lightweight column selection (no prompt/output payloads). Start times are derived from `timestamp - duration_ms` since the audit log records completion time.
+
+**Limitation (v1)**: stats are aggregated per `trigger_type`. If an agent has two triggers of the same type (e.g. two cron schedules), their stats are combined. The timeline only shows completed runs -- currently executing runs are not visible until they finish.
 
 ## Telegram Trigger
 

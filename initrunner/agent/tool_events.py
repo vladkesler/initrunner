@@ -16,12 +16,13 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ToolEvent:
-    """Represents a completed tool call."""
+    """Represents a tool call lifecycle event."""
 
     tool_name: str
-    status: str  # "ok" or "error"
+    status: str  # "running", "ok", or "error"
     error_summary: str | None
     duration_ms: int
+    phase: str = "complete"  # "start" or "complete"
 
 
 # ---------------------------------------------------------------------------
@@ -112,19 +113,50 @@ class ObservableToolset(AbstractToolset[Any]):
         if callback is None:
             return await self._inner.call_tool(name, tool_args, ctx, tool)
 
-        start = time.monotonic()
-        result = await self._inner.call_tool(name, tool_args, ctx, tool)
-        duration_ms = int((time.monotonic() - start) * 1000)
-
-        error_summary = _is_error_result(result)
-        event = ToolEvent(
-            tool_name=name,
-            status="error" if error_summary else "ok",
-            error_summary=error_summary,
-            duration_ms=duration_ms,
-        )
         try:
-            callback(event)
+            callback(
+                ToolEvent(
+                    tool_name=name,
+                    status="running",
+                    error_summary=None,
+                    duration_ms=0,
+                    phase="start",
+                )
+            )
+        except Exception:
+            pass  # callback failures must not crash agent runs
+
+        start = time.monotonic()
+        try:
+            result = await self._inner.call_tool(name, tool_args, ctx, tool)
+        except Exception as exc:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            try:
+                callback(
+                    ToolEvent(
+                        tool_name=name,
+                        status="error",
+                        error_summary=str(exc)[:120],
+                        duration_ms=duration_ms,
+                        phase="complete",
+                    )
+                )
+            except Exception:
+                pass
+            raise
+
+        duration_ms = int((time.monotonic() - start) * 1000)
+        error_summary = _is_error_result(result)
+        try:
+            callback(
+                ToolEvent(
+                    tool_name=name,
+                    status="error" if error_summary else "ok",
+                    error_summary=error_summary,
+                    duration_ms=duration_ms,
+                    phase="complete",
+                )
+            )
         except Exception:
             pass  # callback failures must not crash agent runs
 

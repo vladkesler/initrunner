@@ -10,7 +10,8 @@ import type {
 	FlowValidateResponse,
 	DelegateEvent,
 	AgentStepResponse,
-	SlotAssignment
+	SlotAssignment,
+	TimelineResponse
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -169,4 +170,16 @@ export function streamFlowRun(
 		});
 
 	return controller;
+}
+
+export function fetchFlowTimeline(
+	flowId: string,
+	since?: string,
+	until?: string
+): Promise<TimelineResponse> {
+	const params = new URLSearchParams();
+	if (since) params.set('since', since);
+	if (until) params.set('until', until);
+	const qs = params.toString();
+	return request(`/api/flows/${flowId}/timeline${qs ? `?${qs}` : ''}`);
 }

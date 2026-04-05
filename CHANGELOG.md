@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026.4.7] - 2026-04-05
+
+### Added
+- **Live tool activity panel** -- agent Run tab now shows a split view with real-time tool call events streamed via SSE alongside token output. Each tool call shows start/complete lifecycle with status dots, tool names, durations, and error summaries. Exception-safe: a start event always gets a matching complete event, even if the tool raises
+- **Token/cost meter** -- horizontal bar below the tool activity panel showing budget frame before streaming, exact token counts and USD cost estimate (via genai-prices) on completion. Budget progress bar when guardrails set a token limit
+- **Timeline view** -- Gantt-style chart on a new Timeline tab showing runs over the last 24 hours. Available on agents (with triggers), flows, and teams. Swim lanes dynamically assigned from overlap detection, bars color-coded by outcome, hover tooltips with trigger type/duration/tokens/cost. Stats strip with run count, success rate, and total cost. Auto-refreshes every 30s. Cost derived per-row from stored audit model/provider (hidden for multi-model flows/teams). New endpoints: `GET /api/agents/{id}/timeline`, `GET /api/flows/{id}/timeline`, `GET /api/teams/{id}/timeline`
+- **Quick-run drawer** -- Play button on agent list rows and flow canvas nodes opens a slide-over drawer for running agents without leaving the list page
+- **Cost estimation** (`initrunner/dashboard/pricing.py`) -- uses PydanticAI's `RequestUsage` with `genai-prices.calc_price()` for per-run cost estimation across 10 providers
+
 ## [2026.4.6] - 2026-04-05
 
 ### Added

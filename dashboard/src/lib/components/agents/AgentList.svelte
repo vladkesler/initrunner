@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { AgentSummary } from '$lib/api/types';
 	import { goto } from '$app/navigation';
-	import { Trash2 } from 'lucide-svelte';
+	import { Play, Trash2 } from 'lucide-svelte';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';
 
-	let { agents, onDelete }: { agents: AgentSummary[]; onDelete?: (agent: AgentSummary) => void } = $props();
+	let { agents, onDelete, onRun }: { agents: AgentSummary[]; onDelete?: (agent: AgentSummary) => void; onRun?: (agent: AgentSummary) => void } = $props();
 </script>
 
 {#if agents.length === 0}
@@ -23,6 +23,7 @@
 				<th class="section-label hidden px-3 py-2 text-left md:table-cell">Description</th>
 				<th class="section-label px-3 py-2 text-left">Model</th>
 				<th class="section-label w-20 px-3 py-2 text-right">Capabilities</th>
+				{#if onRun}<th class="w-10 px-2 py-2"></th>{/if}
 				{#if onDelete}<th class="w-10 px-2 py-2"></th>{/if}
 			</tr>
 		</thead>
@@ -60,6 +61,17 @@
 								<CapabilityGlyph features={agent.features} size="md" />
 							</div>
 						</td>
+						{#if onRun}
+							<td class="w-10 px-2 py-2">
+								<button
+									class="flex items-center justify-center rounded-[2px] p-1 text-fg-faint opacity-0 transition-all duration-150 hover:bg-accent-primary/10 hover:text-accent-primary group-hover:opacity-100"
+									onclick={(e) => { e.stopPropagation(); onRun(agent); }}
+									aria-label="Run {agent.name}"
+								>
+									<Play size={13} />
+								</button>
+							</td>
+						{/if}
 						{#if onDelete}
 							<td class="w-10 px-2 py-2">
 								<button

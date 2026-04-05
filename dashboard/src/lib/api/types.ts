@@ -58,6 +58,12 @@ export interface RunRequest {
 	message_history?: string | null;
 }
 
+export interface CostData {
+	input_cost_usd: number;
+	output_cost_usd: number;
+	total_cost_usd: number;
+}
+
 export interface RunResponse {
 	run_id: string;
 	output: string;
@@ -70,6 +76,7 @@ export interface RunResponse {
 	success: boolean;
 	error: string | null;
 	message_history?: string | null;
+	cost?: CostData | null;
 }
 
 /** Fields ConversationThread actually renders from a run result. */
@@ -121,8 +128,24 @@ export interface HealthStatus {
 	version: string;
 }
 
+export interface ToolEventData {
+	tool_name: string;
+	status: 'running' | 'ok' | 'error';
+	phase: 'start' | 'complete';
+	error_summary: string | null;
+	duration_ms: number;
+}
+
+export interface UsageData {
+	budget: { max_tokens: number | null; total_limit: number | null };
+	model: string | null;
+	provider: string | null;
+}
+
 export type SSEEvent =
 	| { type: 'token'; data: string }
+	| { type: 'tool_event'; data: ToolEventData }
+	| { type: 'usage'; data: UsageData }
 	| { type: 'result'; data: RunResponse }
 	| { type: 'error'; data: string };
 
@@ -692,4 +715,41 @@ export interface McpHealthSummary {
 	total: number;
 	healthy: number;
 	unhealthy: number;
+}
+
+// -- Timeline -----------------------------------------------------------------
+
+export interface TimelineCost {
+	total_cost_usd: number;
+}
+
+export interface TimelineEntry {
+	run_id: string;
+	start_time: string;
+	end_time: string;
+	duration_ms: number;
+	status: 'success' | 'error';
+	trigger_type: string | null;
+	trigger_metadata: Record<string, unknown> | null;
+	tokens_in: number;
+	tokens_out: number;
+	total_tokens: number;
+	tool_calls: number;
+	cost: TimelineCost | null;
+}
+
+export interface TimelineStats {
+	total_runs: number;
+	success_count: number;
+	error_count: number;
+	success_rate: number;
+	total_tokens: number;
+	avg_duration_ms: number;
+	max_duration_ms: number;
+	total_cost_usd: number | null;
+}
+
+export interface TimelineResponse {
+	entries: TimelineEntry[];
+	stats: TimelineStats;
 }

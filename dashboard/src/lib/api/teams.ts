@@ -14,7 +14,8 @@ import type {
 	IngestDocument,
 	IngestSummary,
 	IngestSSEEvent,
-	IngestStats
+	IngestStats,
+	TimelineResponse
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -274,4 +275,16 @@ export function streamTeamIngest(
 			}
 		});
 	return controller;
+}
+
+export function fetchTeamTimeline(
+	teamId: string,
+	since?: string,
+	until?: string
+): Promise<TimelineResponse> {
+	const params = new URLSearchParams();
+	if (since) params.set('since', since);
+	if (until) params.set('until', until);
+	const qs = params.toString();
+	return request(`/api/teams/${teamId}/timeline${qs ? `?${qs}` : ''}`);
 }

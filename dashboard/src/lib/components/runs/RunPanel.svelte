@@ -1,10 +1,23 @@
 <script lang="ts">
 	import { streamRun } from '$lib/api/runs';
-	import type { RunResponse, ThreadMessage } from '$lib/api/types';
+	import type { RunResponse, ThreadMessage, ToolEventData, UsageData } from '$lib/api/types';
+	import type { Snippet } from 'svelte';
 	import ConversationThread from './ConversationThread.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
-	let { agentId, agentName = 'Agent', onRunCompleted, blockedReason = null }: { agentId: string; agentName?: string; onRunCompleted?: () => void; blockedReason?: string | null } = $props();
+	let {
+		agentId,
+		agentName = 'Agent',
+		onRunCompleted,
+		blockedReason = null,
+		sidebar
+	}: {
+		agentId: string;
+		agentName?: string;
+		onRunCompleted?: () => void;
+		blockedReason?: string | null;
+		sidebar?: Snippet<[{ toolEvents: ToolEventData[]; usage: UsageData | null; result: RunResponse | null; running: boolean }]>;
+	} = $props();
 
 	let prompt = $state('');
 	let messages: ThreadMessage[] = $state([]);
@@ -13,12 +26,18 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 
+	// Sidebar state
+	let toolEvents: ToolEventData[] = $state([]);
+	let usage: UsageData | null = $state(null);
+	let lastResult: RunResponse | null = $state(null);
+
 	function handleRun() {
 		if (!prompt.trim() || running || blockedReason) return;
 
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
 		prompt = '';
+		lastResult = null;
 
 		// Append user turn and empty assistant turn
 		messages = [
@@ -40,6 +59,14 @@
 						content: messages[assistantIdx].content + text
 					};
 				},
+				onToolEvent(event) {
+					if (requestVersion !== currentVersion) return;
+					toolEvents = [...toolEvents, event];
+				},
+				onUsage(u) {
+					if (requestVersion !== currentVersion) return;
+					usage = u;
+				},
 				onResult(r: RunResponse) {
 					if (requestVersion !== currentVersion) return;
 					messages[assistantIdx] = {
@@ -51,6 +78,7 @@
 					if (r.success && r.message_history) {
 						messageHistory = r.message_history;
 					}
+					lastResult = r;
 					running = false;
 					controller = null;
 					onRunCompleted?.();
@@ -90,6 +118,9 @@
 		messages = [];
 		messageHistory = null;
 		prompt = '';
+		toolEvents = [];
+		usage = null;
+		lastResult = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -101,11 +132,23 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const hasSidebar = $derived(!!sidebar);
 </script>
 
-<div class="flex flex-1 flex-col gap-3">
-	<!-- Thread -->
-	<ConversationThread {messages} />
+<div class="flex flex-1 flex-col gap-3 {hasSidebar ? 'run-panel-split' : ''}">
+	{#if hasSidebar}
+		<!-- Split view: conversation left, sidebar right -->
+		<div class="grid min-h-0 flex-1 gap-3 run-panel-grid">
+			<div class="min-h-0 overflow-hidden">
+				<ConversationThread {messages} />
+			</div>
+			<div class="flex min-h-0 flex-col gap-0">
+				{@render sidebar!({ toolEvents, usage, result: lastResult, running })}
+			</div>
+		</div>
+	{:else}
+		<ConversationThread {messages} />
+	{/if}
 
 	<!-- Input area -->
 	<div class="flex flex-col gap-1.5">
@@ -154,3 +197,15 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.run-panel-grid {
+		grid-template-columns: 1fr 320px;
+	}
+
+	@media (max-width: 900px) {
+		.run-panel-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

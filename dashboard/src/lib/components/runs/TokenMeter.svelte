@@ -1,0 +1,82 @@
+<script lang="ts">
+	import type { RunResponse, UsageData } from '$lib/api/types';
+
+	let {
+		usage = null,
+		result = null,
+		running = false
+	}: {
+		usage?: UsageData | null;
+		result?: RunResponse | null;
+		running?: boolean;
+	} = $props();
+
+	const hasResult = $derived(result !== null && result !== undefined);
+	const hasBudget = $derived(
+		usage?.budget?.max_tokens != null || usage?.budget?.total_limit != null
+	);
+	const budgetMax = $derived(
+		usage?.budget?.total_limit ?? usage?.budget?.max_tokens ?? null
+	);
+	const budgetPercent = $derived.by(() => {
+		if (!budgetMax || !hasResult) return null;
+		return Math.min(100, Math.round((result!.total_tokens / budgetMax) * 100));
+	});
+
+	function formatCost(usd: number): string {
+		if (usd < 0.01) return `$${usd.toFixed(4)}`;
+		return `$${usd.toFixed(2)}`;
+	}
+</script>
+
+<div class="border-t border-edge bg-surface-1 px-3 py-2">
+	{#if hasResult}
+		<!-- Final values -->
+		<div class="flex items-center gap-3">
+			<span class="font-mono text-[12px] text-fg" style="font-variant-numeric: tabular-nums">
+				{result!.tokens_in.toLocaleString()} in / {result!.tokens_out.toLocaleString()} out
+			</span>
+			{#if result!.cost}
+				<span class="font-mono text-[12px] text-fg-muted" style="font-variant-numeric: tabular-nums">
+					{formatCost(result!.cost.total_cost_usd)}
+				</span>
+			{/if}
+		</div>
+		{#if hasBudget && budgetPercent !== null}
+			<div class="mt-1.5 flex items-center gap-2">
+				<div class="h-1 flex-1 bg-surface-3">
+					<div
+						class="h-full bg-accent-primary transition-[width] duration-300"
+						style="width: {budgetPercent}%"
+					></div>
+				</div>
+				<span class="font-mono text-[11px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+					{budgetPercent}%
+				</span>
+			</div>
+		{/if}
+	{:else if running}
+		<!-- Streaming state -->
+		<div class="flex items-center gap-2">
+			<div class="h-0.5 w-4 bg-accent-primary"></div>
+			<span class="text-[12px] text-fg-faint">streaming...</span>
+			{#if usage?.model}
+				<span class="ml-auto font-mono text-[11px] text-fg-faint">{usage.model}</span>
+			{/if}
+		</div>
+	{:else if usage}
+		<!-- Pre-run: show budget frame -->
+		<div class="flex items-center gap-2 text-[12px] text-fg-faint">
+			{#if usage.model}
+				<span class="font-mono">{usage.model}</span>
+			{/if}
+			{#if budgetMax}
+				<span class="font-mono" style="font-variant-numeric: tabular-nums">
+					budget: {budgetMax.toLocaleString()} tokens
+				</span>
+			{/if}
+		</div>
+	{:else}
+		<span class="text-[12px] text-fg-faint">Run an agent to see metrics</span>
+	{/if}
+</div>
