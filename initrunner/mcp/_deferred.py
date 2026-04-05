@@ -128,9 +128,7 @@ class DeferredMcpToolset(AbstractToolset[Any]):
                     parameters_json_schema=t.inputSchema,
                     metadata={
                         "meta": t.meta,
-                        "annotations": (
-                            t.annotations.model_dump() if t.annotations else None
-                        ),
+                        "annotations": (t.annotations.model_dump() if t.annotations else None),
                         "output_schema": t.outputSchema or None,
                     },
                 )
