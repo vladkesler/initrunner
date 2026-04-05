@@ -574,6 +574,159 @@ def _embed_and_store_urls(
     )
 
 
+def _setup_embedder_and_check_model(
+    config: IngestConfig,
+    provider: str,
+    db_path: Path,
+    *,
+    force: bool = False,
+) -> tuple[Embedder, str]:
+    """Create embedder, detect model changes, wipe+restore if forced.
+
+    Must be called inside the per-db ingestion lock.
+    """
+    from initrunner.ingestion.manifest import read_manifest, serialize_manifest
+
+    embed_provider = config.embeddings.provider or provider
+    embedder = create_embedder(
+        embed_provider,
+        config.embeddings.model,
+        base_url=config.embeddings.base_url,
+        api_key_env=config.embeddings.api_key_env,
+    )
+
+    current_identity = compute_model_identity(
+        embed_provider, config.embeddings.model, config.embeddings.base_url
+    )
+    if db_path.exists():
+        from initrunner.stores.base import EmbeddingModelChangedError
+        from initrunner.stores.lance_store import wipe_document_store
+
+        saved_manifest_json: str | None = None
+        with create_document_store(config.store_backend, db_path) as check_store:
+            stored_identity = check_store.read_store_meta("embedding_model")
+            if stored_identity is not None and stored_identity != current_identity:
+                manifest = read_manifest(check_store)
+                if manifest:
+                    saved_manifest_json = serialize_manifest(manifest)
+
+        if stored_identity is None:
+            logging.getLogger(__name__).warning(
+                "No embedding model recorded in store. Recording '%s' for future change detection.",
+                current_identity,
+            )
+            with create_document_store(config.store_backend, db_path) as rec_store:
+                rec_store.write_store_meta("embedding_model", current_identity)
+        elif stored_identity != current_identity:
+            if force:
+                logging.getLogger(__name__).warning(
+                    "Embedding model changed from %s to %s. "
+                    "Wiping store and re-ingesting all documents.",
+                    stored_identity,
+                    current_identity,
+                )
+                wipe_document_store(db_path)
+                if saved_manifest_json:
+                    with create_document_store(config.store_backend, db_path) as fresh_store:
+                        fresh_store.write_store_meta("managed_sources", saved_manifest_json)
+            else:
+                raise EmbeddingModelChangedError(
+                    f"Embedding model changed from {stored_identity} to {current_identity}. "
+                    "Run with --force to wipe the store and re-ingest."
+                )
+
+    return embedder, current_identity
+
+
+def _run_file_pipeline(
+    files: list[Path],
+    config: IngestConfig,
+    embedder: Embedder,
+    db_path: Path,
+    stack: ExitStack,
+    store: DocumentStore | None,
+    stats: IngestStats,
+    now: str,
+    file_metadata: dict[str, str],
+    *,
+    force: bool,
+    max_file_size_mb: float,
+    max_total_ingest_mb: float,
+    progress_callback: Callable[[Path, FileStatus], None] | None,
+    purge_resolved_sources: set[str] | None,
+) -> tuple[DocumentStore | None, set[str]]:
+    """Classify, extract, chunk, embed, store files. Returns (store, file_resolved_sources)."""
+    to_process, file_resolved_sources = _classify_files(
+        files,
+        file_metadata,
+        stats,
+        force=force,
+        max_file_size_mb=max_file_size_mb,
+        max_total_ingest_mb=max_total_ingest_mb,
+        progress_callback=progress_callback,
+    )
+
+    file_chunks = _extract_and_chunk(to_process, config, stats, progress_callback)
+
+    if file_chunks:
+        store = _embed_and_store(
+            file_chunks,
+            embedder,
+            config,
+            db_path,
+            now,
+            stats,
+            file_resolved_sources,
+            progress_callback,
+            stack=stack,
+            purge_resolved_sources=purge_resolved_sources,
+        )
+    elif not to_process and file_resolved_sources and purge_resolved_sources is not None:
+        # All skipped/errored -- still need to purge deleted files
+        if db_path.exists():
+            store = stack.enter_context(create_document_store(config.store_backend, db_path))
+            _purge_deleted(store, purge_resolved_sources)
+
+    return store, file_resolved_sources
+
+
+def _run_url_pipeline(
+    urls: list[str],
+    config: IngestConfig,
+    embedder: Embedder,
+    db_path: Path,
+    stack: ExitStack,
+    store: DocumentStore | None,
+    stats: IngestStats,
+    now: str,
+    file_metadata: dict[str, str],
+    *,
+    force: bool,
+    progress_callback: Callable[[Path, FileStatus], None] | None,
+) -> DocumentStore | None:
+    """Classify, chunk, embed, store URLs. Returns (possibly new) store."""
+    url_to_process, _url_resolved = _classify_urls(
+        urls, file_metadata, stats, force=force, progress_callback=progress_callback
+    )
+
+    if url_to_process:
+        url_chunked = _chunk_urls(url_to_process, config, stats, progress_callback)
+        if url_chunked:
+            store = _embed_and_store_urls(
+                url_chunked,
+                embedder,
+                config,
+                db_path,
+                now,
+                stats,
+                progress_callback,
+                existing_store=store,
+                stack=stack,
+            )
+
+    return store
+
+
 def _execute_ingest_core(
     files: list[Path],
     urls: list[str],
@@ -604,8 +757,6 @@ def _execute_ingest_core(
     """
     from opentelemetry import trace  # type: ignore[import-not-found]
 
-    from initrunner.ingestion.manifest import read_manifest, serialize_manifest
-
     tracer = trace.get_tracer("initrunner")
 
     stats = IngestStats()
@@ -624,125 +775,48 @@ def _execute_ingest_core(
         raise RuntimeError(f"Ingestion already in progress for {db_path}")
 
     try:
-        # Embed setup
-        embed_provider = config.embeddings.provider or provider
-        embedder = create_embedder(
-            embed_provider,
-            config.embeddings.model,
-            base_url=config.embeddings.base_url,
-            api_key_env=config.embeddings.api_key_env,
+        embedder, current_identity = _setup_embedder_and_check_model(
+            config, provider, db_path, force=force
         )
-
-        # --- Model change detection ---
-        current_identity = compute_model_identity(
-            embed_provider, config.embeddings.model, config.embeddings.base_url
-        )
-        if db_path.exists():
-            from initrunner.stores.base import EmbeddingModelChangedError
-            from initrunner.stores.lance_store import wipe_document_store
-
-            saved_manifest_json: str | None = None
-            with create_document_store(config.store_backend, db_path) as check_store:
-                stored_identity = check_store.read_store_meta("embedding_model")
-                # Preserve manifest before potential wipe
-                if stored_identity is not None and stored_identity != current_identity:
-                    manifest = read_manifest(check_store)
-                    if manifest:
-                        saved_manifest_json = serialize_manifest(manifest)
-
-            if stored_identity is None:
-                # Legacy store -- record current identity, don't wipe
-                logging.getLogger(__name__).warning(
-                    "No embedding model recorded in store. "
-                    "Recording '%s' for future change detection.",
-                    current_identity,
-                )
-                with create_document_store(config.store_backend, db_path) as rec_store:
-                    rec_store.write_store_meta("embedding_model", current_identity)
-            elif stored_identity != current_identity:
-                if force:
-                    logging.getLogger(__name__).warning(
-                        "Embedding model changed from %s to %s. "
-                        "Wiping store and re-ingesting all documents.",
-                        stored_identity,
-                        current_identity,
-                    )
-                    wipe_document_store(db_path)
-                    # Restore managed source manifest to fresh store
-                    if saved_manifest_json:
-                        with create_document_store(config.store_backend, db_path) as fresh_store:
-                            fresh_store.write_store_meta("managed_sources", saved_manifest_json)
-                else:
-                    raise EmbeddingModelChangedError(
-                        f"Embedding model changed from {stored_identity} to {current_identity}. "
-                        "Run with --force to wipe the store and re-ingest."
-                    )
 
         now = datetime.now(UTC).isoformat()
-
         file_metadata = _read_file_hashes(config.store_backend, db_path)
 
-        # --- File pipeline ---
-        file_resolved_sources: set[str] = set()
         with ExitStack() as stack:
             store: DocumentStore | None = None
 
             if files:
-                to_process, file_resolved_sources = _classify_files(
+                store, _file_resolved = _run_file_pipeline(
                     files,
-                    file_metadata,
+                    config,
+                    embedder,
+                    db_path,
+                    stack,
+                    store,
                     stats,
+                    now,
+                    file_metadata,
                     force=force,
                     max_file_size_mb=max_file_size_mb,
                     max_total_ingest_mb=max_total_ingest_mb,
                     progress_callback=progress_callback,
+                    purge_resolved_sources=purge_resolved_sources,
                 )
 
-                file_chunks = _extract_and_chunk(to_process, config, stats, progress_callback)
-
-                if file_chunks:
-                    store = _embed_and_store(
-                        file_chunks,
-                        embedder,
-                        config,
-                        db_path,
-                        now,
-                        stats,
-                        file_resolved_sources,
-                        progress_callback,
-                        stack=stack,
-                        purge_resolved_sources=purge_resolved_sources,
-                    )
-                elif (
-                    not to_process and file_resolved_sources and purge_resolved_sources is not None
-                ):
-                    # All skipped/errored -- still need to purge deleted files
-                    if db_path.exists():
-                        store = stack.enter_context(
-                            create_document_store(config.store_backend, db_path)
-                        )
-                        _purge_deleted(store, purge_resolved_sources)
-
-            # --- URL pipeline ---
             if urls:
-                url_to_process, _url_resolved = _classify_urls(
-                    urls, file_metadata, stats, force=force, progress_callback=progress_callback
+                store = _run_url_pipeline(
+                    urls,
+                    config,
+                    embedder,
+                    db_path,
+                    stack,
+                    store,
+                    stats,
+                    now,
+                    file_metadata,
+                    force=force,
+                    progress_callback=progress_callback,
                 )
-
-                if url_to_process:
-                    url_chunked = _chunk_urls(url_to_process, config, stats, progress_callback)
-                    if url_chunked:
-                        store = _embed_and_store_urls(
-                            url_chunked,
-                            embedder,
-                            config,
-                            db_path,
-                            now,
-                            stats,
-                            progress_callback,
-                            existing_store=store,
-                            stack=stack,
-                        )
 
             # Record the embedding model identity after successful ingestion
             if db_path.exists() and (stats.new or stats.updated or force):
