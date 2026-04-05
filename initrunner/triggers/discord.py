@@ -9,6 +9,7 @@ import re
 import threading
 from collections.abc import Callable
 
+from initrunner._async import run_sync
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import DiscordTriggerConfig
 from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
@@ -181,7 +182,7 @@ class DiscordAdapter(ChannelAdapter):
 
         self._stop_event.clear()
         self._ready.clear()
-        asyncio.run(run_bot())
+        run_sync(run_bot())
 
     def stop(self) -> None:
         self._stop_event.set()

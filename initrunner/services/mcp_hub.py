@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from initrunner._async import run_sync
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.security import ToolSandboxConfig
@@ -164,4 +165,4 @@ def introspect_server_sync(
                 for t in mcp_tools
             ]
 
-    return asyncio.run(_fetch())
+    return run_sync(_fetch())

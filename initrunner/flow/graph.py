@@ -22,6 +22,7 @@ from pydantic_graph.beta import GraphBuilder, StepContext
 from pydantic_graph.beta.id_types import ForkID, NodeID
 from pydantic_graph.beta.join import reduce_list_append
 
+from initrunner._async import run_sync
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
 
@@ -653,11 +654,7 @@ def run_flow_graph_sync(
     **kwargs,
 ) -> tuple[dict[str, AgentRef], str, int, bool]:
     """Synchronous wrapper for ``run_flow_graph_async``."""
-
-    async def _run():
-        return await run_flow_graph_async(flow, services, prompt, **kwargs)
-
-    return anyio.run(_run)
+    return run_sync(run_flow_graph_async(flow, services, prompt, **kwargs))
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ from pydantic_graph.beta import GraphBuilder, StepContext
 from pydantic_graph.beta.id_types import ForkID, NodeID
 from pydantic_graph.beta.join import reduce_list_append
 
+from initrunner._async import run_sync
 from initrunner._ids import generate_id
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
@@ -695,8 +696,4 @@ def run_team_graph_sync(
     **kwargs: Any,
 ) -> TeamResult:
     """Synchronous wrapper for ``run_team_graph_async``."""
-
-    async def _run():
-        return await run_team_graph_async(team, task, **kwargs)
-
-    return anyio.run(_run)
+    return run_sync(run_team_graph_async(team, task, **kwargs))
