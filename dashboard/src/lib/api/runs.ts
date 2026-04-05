@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { RunRequest, RunResponse, SSEEvent } from './types';
+import type { RunRequest, RunResponse, SSEEvent, ToolEventData, UsageData } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -16,6 +16,8 @@ export function streamRun(
 		onToken: (text: string) => void;
 		onResult: (result: RunResponse) => void;
 		onError: (error: string) => void;
+		onToolEvent?: (event: ToolEventData) => void;
+		onUsage?: (usage: UsageData) => void;
 	}
 ): AbortController {
 	const controller = new AbortController();
@@ -52,6 +54,10 @@ export function streamRun(
 						const event: SSEEvent = JSON.parse(line.slice(6));
 						if (event.type === 'token') {
 							callbacks.onToken(event.data);
+						} else if (event.type === 'tool_event') {
+							callbacks.onToolEvent?.(event.data);
+						} else if (event.type === 'usage') {
+							callbacks.onUsage?.(event.data);
 						} else if (event.type === 'result') {
 							gotTerminal = true;
 							callbacks.onResult(event.data);

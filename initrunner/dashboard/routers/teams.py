@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
@@ -18,6 +19,8 @@ from initrunner.dashboard.schemas import (
     TeamSummary,
     TeamYamlSaveRequest,
     TeamYamlSaveResponse,
+    TimelineResponse,
+    TimelineStatsResponse,
 )
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -242,3 +245,57 @@ async def delete_team(
         raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
     cache.evict(team_id)
     return DeleteResponse(id=team_id, path=str(path))
+
+
+@router.get("/{team_id}/timeline")
+async def get_team_timeline(
+    team_id: str,
+    cache: Annotated[TeamCache, Depends(get_team_cache)],
+    since: str | None = None,
+    until: str | None = None,
+    limit: int = 500,
+) -> TimelineResponse:
+    from datetime import timedelta
+
+    from initrunner.config import get_audit_db_path
+    from initrunner.dashboard._timeline import build_timeline_response
+
+    dt = cache.get(team_id)
+    if dt is None:
+        raise HTTPException(status_code=404, detail="Team not found")
+    if dt.team is None:
+        return TimelineResponse(entries=[], stats=TimelineStatsResponse())
+
+    team_name = dt.team.metadata.name
+
+    now = datetime.now(UTC)
+    if until is None:
+        until = now.isoformat()
+    if since is None:
+        since = (now - timedelta(hours=24)).isoformat()
+
+    from initrunner.audit.logger import AuditLogger
+
+    def _query():
+        al = AuditLogger(get_audit_db_path())
+        try:
+            return (
+                al.timeline_query(
+                    agent_name=team_name,
+                    trigger_type="team_run",
+                    since=since,
+                    until=until,
+                    limit=limit,
+                ),
+                al.timeline_stats(
+                    agent_name=team_name,
+                    trigger_type="team_run",
+                    since=since,
+                    until=until,
+                ),
+            )
+        finally:
+            al.close()
+
+    rows, stats_dict = await asyncio.to_thread(_query)
+    return build_timeline_response(rows, stats_dict)

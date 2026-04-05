@@ -22,7 +22,7 @@ def test_run_sync_no_loop():
 @pytest.mark.anyio
 async def test_run_sync_inside_running_loop():
     """run_sync() offloads to a worker thread when called inside a running loop."""
-    result = await anyio.to_thread.run_sync(lambda: run_sync(_double(7)))
+    result = await anyio.to_thread.run_sync(lambda: run_sync(_double(7)))  # type: ignore[unresolved-attribute]
     assert result == 14
 
 
@@ -38,7 +38,7 @@ async def test_sync_wrapper_from_async_context():
     ):
         from initrunner.flow.graph import run_flow_graph_sync
 
-        result = await anyio.to_thread.run_sync(
+        result = await anyio.to_thread.run_sync(  # type: ignore[unresolved-attribute]
             lambda: run_flow_graph_sync(None, {}, "test")  # type: ignore[arg-type]
         )
         assert result == sentinel

@@ -20,9 +20,11 @@
 	let {
 		agents,
 		dimmedIds = new Set<string>(),
+		onRun,
 	}: {
 		agents: AgentSummary[];
 		dimmedIds?: Set<string>;
+		onRun?: (agent: AgentSummary) => void;
 	} = $props();
 
 	// ── Categories & layout ───────────────────────────────────────────
@@ -110,7 +112,7 @@
 					id: agent.id,
 					type: 'agent',
 					position: saved ?? { x: col * COL_PITCH, y: cursorY + row * ROW_PITCH },
-					data: { agent },
+					data: { agent, onRun },
 					connectable: false,
 				});
 			}

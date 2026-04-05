@@ -45,6 +45,19 @@ def _build_result_payload(
         trimmed = trim_message_history(new_messages, max_history)
         serialized_history = ModelMessagesTypeAdapter.dump_json(trimmed).decode("utf-8")
 
+    # Cost estimation
+    cost = None
+    model_spec = role.spec.model
+    if model_spec and model_spec.name and model_spec.provider:
+        from initrunner.dashboard.pricing import estimate_cost
+
+        cost = estimate_cost(
+            result.tokens_in,
+            result.tokens_out,
+            model_spec.name,
+            model_spec.provider,
+        )
+
     return {
         "run_id": result.run_id,
         "output": result.output,
@@ -57,6 +70,7 @@ def _build_result_payload(
         "success": result.success,
         "error": result.error,
         "message_history": serialized_history,
+        "cost": cost,
     }
 
 
@@ -173,6 +187,24 @@ async def stream_run_sse(
             yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
         return
 
+    # Emit initial usage event with budget + model info
+    guardrails = role.spec.guardrails
+    model_spec = role.spec.model
+    usage_payload = json.dumps(
+        {
+            "type": "usage",
+            "data": {
+                "budget": {
+                    "max_tokens": guardrails.max_tokens_per_run if guardrails else None,
+                    "total_limit": guardrails.total_tokens_limit if guardrails else None,
+                },
+                "model": model_spec.name if model_spec else None,
+                "provider": model_spec.provider if model_spec else None,
+            },
+        }
+    )
+    yield f"data: {usage_payload}\n\n"
+
     def on_token(chunk: str) -> None:
         formatted = f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
         try:
@@ -181,6 +213,27 @@ async def stream_run_sse(
             pass  # loop closed -- stream tearing down
 
     def run_stream():
+        from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
+
+        def on_tool_event(event) -> None:
+            evt = json.dumps(
+                {
+                    "type": "tool_event",
+                    "data": {
+                        "tool_name": event.tool_name,
+                        "status": event.status,
+                        "phase": event.phase,
+                        "error_summary": event.error_summary,
+                        "duration_ms": event.duration_ms,
+                    },
+                }
+            )
+            try:
+                loop.call_soon_threadsafe(token_queue.put_nowait, f"data: {evt}\n\n")
+            except RuntimeError:
+                pass
+
+        cb_token = set_tool_event_callback(on_tool_event)
         try:
             return execute_run_stream_sync(
                 agent,
@@ -191,6 +244,7 @@ async def stream_run_sse(
                 message_history=message_history,
             )
         finally:
+            reset_tool_event_callback(cb_token)
             loop.call_soon_threadsafe(token_queue.put_nowait, None)
 
     stream_task = loop.run_in_executor(None, run_stream)

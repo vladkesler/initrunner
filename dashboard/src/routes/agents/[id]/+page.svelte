@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats } from '$lib/api/agents';
+	import { getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats, fetchTimeline } from '$lib/api/agents';
 	import { fetchAuditStats } from '$lib/api/system';
 	import type { AgentDetail, AuditStats, TriggerStat } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
@@ -17,6 +17,9 @@
 	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
 	import TriggerPanel from '$lib/components/agents/TriggerPanel.svelte';
 	import RunPanel from '$lib/components/runs/RunPanel.svelte';
+	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
+	import TimelineView from '$lib/components/agents/TimelineView.svelte';
 	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
 	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
 	import IngestTab from '$lib/components/agents/IngestTab.svelte';
@@ -107,7 +110,7 @@
 		// Restore saved tab
 		try {
 			const saved = localStorage.getItem(tabKey);
-			if (saved && ['run', 'history', 'memory', 'ingest', 'config', 'editor'].includes(saved)) {
+			if (saved && ['run', 'timeline', 'history', 'memory', 'ingest', 'config', 'editor'].includes(saved)) {
 				activeTab = saved;
 			}
 		} catch {
@@ -290,6 +293,15 @@
 					<Play size={13} />
 					Run
 				</TabsTrigger>
+				{#if detail.triggers.length > 0}
+					<TabsTrigger
+						value="timeline"
+						class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
+					>
+						<Activity size={13} />
+						Timeline
+					</TabsTrigger>
+				{/if}
 				<TabsTrigger
 					value="history"
 					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
@@ -328,8 +340,19 @@
 			</TabsList>
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
-				<RunPanel agentId={agentId} agentName={detail.name} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }} />
+				<RunPanel agentId={agentId} agentName={detail.name} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }}>
+					{#snippet sidebar({ toolEvents, usage, result, running })}
+						<ToolActivityPanel events={toolEvents} />
+						<TokenMeter {usage} {result} {running} />
+					{/snippet}
+				</RunPanel>
 			</TabsContent>
+
+			{#if detail.triggers.length > 0}
+				<TabsContent value="timeline" class="min-h-0 flex-1 pt-4">
+					<TimelineView fetchData={() => fetchTimeline(agentId)} refreshKey={runVersion} />
+				</TabsContent>
+			{/if}
 
 			<TabsContent value="history" class="min-h-0 flex-1 pt-4">
 				<HistoryTab agentName={detail.name} refreshKey={runVersion} />

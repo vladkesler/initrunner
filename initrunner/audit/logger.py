@@ -686,6 +686,102 @@ class AuditLogger:
                 )
         return results
 
+    def timeline_query(
+        self,
+        *,
+        agent_name: str,
+        since: str,
+        until: str,
+        trigger_type: str | None = None,
+        limit: int = 500,
+    ) -> list[dict]:
+        """Lightweight timeline entries for Gantt rendering, ordered ASC."""
+        if trigger_type is not None:
+            sql = """\
+                SELECT run_id, agent_name, timestamp, duration_ms,
+                       success, error, trigger_type, trigger_metadata,
+                       tokens_in, tokens_out, total_tokens, tool_calls,
+                       model, provider
+                FROM audit_log
+                WHERE agent_name = ? AND trigger_type = ?
+                      AND timestamp >= ? AND timestamp <= ?
+                ORDER BY timestamp ASC LIMIT ?
+            """
+            params = (agent_name, trigger_type, since, until, limit)
+        else:
+            sql = """\
+                SELECT run_id, agent_name, timestamp, duration_ms,
+                       success, error, trigger_type, trigger_metadata,
+                       tokens_in, tokens_out, total_tokens, tool_calls,
+                       model, provider
+                FROM audit_log
+                WHERE agent_name = ? AND timestamp >= ? AND timestamp <= ?
+                ORDER BY timestamp ASC LIMIT ?
+            """
+            params = (agent_name, since, until, limit)
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def timeline_stats(
+        self,
+        *,
+        agent_name: str,
+        since: str,
+        until: str,
+        trigger_type: str | None = None,
+    ) -> dict:
+        """Aggregate stats for the timeline view."""
+        if trigger_type is not None:
+            sql = """\
+                SELECT
+                    COUNT(*) AS total_runs,
+                    COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0) AS success_count,
+                    COALESCE(SUM(CASE WHEN NOT success THEN 1 ELSE 0 END), 0) AS error_count,
+                    COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                    COALESCE(AVG(duration_ms), 0) AS avg_duration_ms,
+                    COALESCE(MAX(duration_ms), 0) AS max_duration_ms
+                FROM audit_log
+                WHERE agent_name = ? AND trigger_type = ?
+                      AND timestamp >= ? AND timestamp <= ?
+            """
+            params = (agent_name, trigger_type, since, until)
+        else:
+            sql = """\
+                SELECT
+                    COUNT(*) AS total_runs,
+                    COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0) AS success_count,
+                    COALESCE(SUM(CASE WHEN NOT success THEN 1 ELSE 0 END), 0) AS error_count,
+                    COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                    COALESCE(AVG(duration_ms), 0) AS avg_duration_ms,
+                    COALESCE(MAX(duration_ms), 0) AS max_duration_ms
+                FROM audit_log
+                WHERE agent_name = ? AND timestamp >= ? AND timestamp <= ?
+            """
+            params = (agent_name, since, until)
+        with self._lock:
+            row = self._conn.execute(sql, params).fetchone()
+        if not row or row["total_runs"] == 0:
+            return {
+                "total_runs": 0,
+                "success_count": 0,
+                "error_count": 0,
+                "success_rate": 0.0,
+                "total_tokens": 0,
+                "avg_duration_ms": 0,
+                "max_duration_ms": 0,
+            }
+        total = row["total_runs"]
+        return {
+            "total_runs": total,
+            "success_count": row["success_count"],
+            "error_count": row["error_count"],
+            "success_rate": round(row["success_count"] / total * 100.0, 1),
+            "total_tokens": row["total_tokens"],
+            "avg_duration_ms": int(row["avg_duration_ms"]),
+            "max_duration_ms": row["max_duration_ms"],
+        }
+
     def _prune_locked(self, retention_days: int = 90, max_records: int = 100_000) -> int:
         """Core prune logic. Caller must hold self._lock."""
         deleted = 0

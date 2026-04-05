@@ -7,6 +7,7 @@
 		fetchFlowYaml,
 		fetchFlowEvents,
 		fetchFlowStats,
+		fetchFlowTimeline,
 		deleteFlow
 	} from '$lib/api/flow';
 	import type { FlowDetail, FlowStats, DelegateEvent } from '$lib/api/types';
@@ -23,6 +24,7 @@
 	import EventsTab from '$lib/components/flow/EventsTab.svelte';
 	import ConfigPanel from '$lib/components/flow/ConfigPanel.svelte';
 	import EditorTab from '$lib/components/flow/EditorTab.svelte';
+	import TimelineView from '$lib/components/agents/TimelineView.svelte';
 	import {
 		ArrowLeft,
 		Activity,
@@ -47,6 +49,7 @@
 	let statsLoading = $state(true);
 	let eventsLoading = $state(true);
 	let deleteDialogOpen = $state(false);
+	let runVersion = $state(0);
 
 	const flowId = $derived(page.params.id ?? '');
 
@@ -100,7 +103,7 @@
 		// Restore saved tab
 		try {
 			const saved = localStorage.getItem(tabKey);
-			if (saved && ['run', 'graph', 'events', 'config', 'editor'].includes(saved)) {
+			if (saved && ['run', 'timeline', 'graph', 'events', 'config', 'editor'].includes(saved)) {
 				activeTab = saved;
 			}
 		} catch {
@@ -253,6 +256,13 @@
 					Run
 				</TabsTrigger>
 				<TabsTrigger
+					value="timeline"
+					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
+				>
+					<Activity size={13} />
+					Timeline
+				</TabsTrigger>
+				<TabsTrigger
 					value="graph"
 					class="gap-1.5 rounded-none bg-transparent px-4 py-2 font-mono text-[13px] text-fg-faint transition-[color] duration-150 hover:text-fg-muted data-active:bg-transparent data-active:text-fg data-active:after:bg-accent-primary dark:data-active:bg-transparent dark:data-active:border-transparent"
 				>
@@ -284,6 +294,7 @@
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
 				<RunPanel {flowId} {detail} onRunCompleted={async () => {
+					runVersion++;
 					const [s, e] = await Promise.allSettled([
 						fetchFlowStats(flowId),
 						fetchFlowEvents(flowId)
@@ -291,6 +302,10 @@
 					if (s.status === 'fulfilled') stats = s.value;
 					if (e.status === 'fulfilled') events = e.value;
 				}} />
+			</TabsContent>
+
+			<TabsContent value="timeline" class="min-h-0 flex-1 pt-4">
+				<TimelineView fetchData={() => fetchFlowTimeline(flowId)} refreshKey={runVersion} />
 			</TabsContent>
 
 			<TabsContent value="graph" class="min-h-0 flex-1 pt-4">

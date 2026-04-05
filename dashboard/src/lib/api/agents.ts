@@ -9,6 +9,7 @@ import type {
 	MemoryItem,
 	SessionDetail,
 	SessionSummary,
+	TimelineResponse,
 	TriggerStat
 } from './types';
 
@@ -164,4 +165,16 @@ export function streamIngest(
 			}
 		});
 	return controller;
+}
+
+export function fetchTimeline(
+	agentId: string,
+	since?: string,
+	until?: string
+): Promise<TimelineResponse> {
+	const params = new URLSearchParams();
+	if (since) params.set('since', since);
+	if (until) params.set('until', until);
+	const qs = params.toString();
+	return request(`/api/agents/${agentId}/timeline${qs ? `?${qs}` : ''}`);
 }

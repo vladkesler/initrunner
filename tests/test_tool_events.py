@@ -120,11 +120,18 @@ class TestObservableToolset:
         finally:
             reset_tool_event_callback(token)
 
-        assert len(events) == 1
+        assert len(events) == 2
+        # Start event
         assert events[0].tool_name == "tool_a"
-        assert events[0].status == "ok"
-        assert events[0].error_summary is None
-        assert events[0].duration_ms >= 0
+        assert events[0].status == "running"
+        assert events[0].phase == "start"
+        assert events[0].duration_ms == 0
+        # Complete event
+        assert events[1].tool_name == "tool_a"
+        assert events[1].status == "ok"
+        assert events[1].phase == "complete"
+        assert events[1].error_summary is None
+        assert events[1].duration_ms >= 0
 
     @pytest.mark.anyio
     async def test_callback_receives_error_event(self):
@@ -137,9 +144,12 @@ class TestObservableToolset:
         finally:
             reset_tool_event_callback(token)
 
-        assert len(events) == 1
-        assert events[0].status == "error"
-        assert events[0].error_summary == "Error: connection refused"
+        assert len(events) == 2
+        assert events[0].status == "running"
+        assert events[0].phase == "start"
+        assert events[1].status == "error"
+        assert events[1].phase == "complete"
+        assert events[1].error_summary == "Error: connection refused"
 
     @pytest.mark.anyio
     async def test_callback_exception_does_not_propagate(self):

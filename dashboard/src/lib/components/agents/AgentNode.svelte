@@ -3,11 +3,12 @@
 	import type { AgentSummary } from '$lib/api/types';
 	import { goto } from '$app/navigation';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';
-	import { Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle } from 'lucide-svelte';
+	import { Play, Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle } from 'lucide-svelte';
 
-	let { data, selected, dragging }: NodeProps<{ agent: AgentSummary }> = $props();
+	let { data, selected, dragging }: NodeProps<{ agent: AgentSummary; onRun?: (agent: AgentSummary) => void }> = $props();
 
 	const agent = $derived(data.agent);
+	const onRun = $derived(data.onRun);
 
 	const heroIcon = $derived.by(() => {
 		if (agent.features.includes('triggers')) return Zap;
@@ -24,10 +25,15 @@
 	function handleClick() {
 		if (!dragging) goto(`/agents/${agent.id}`);
 	}
+
+	function handleRun(e: MouseEvent) {
+		e.stopPropagation();
+		onRun?.(agent);
+	}
 </script>
 
 <div
-	class="w-[240px] cursor-pointer bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
+	class="group w-[240px] cursor-pointer bg-surface-1 p-3 transition-[border-color,box-shadow] duration-200
 		{hasError ? 'card-surface-error' : 'card-surface'}
 		{selected ? 'active-border' : ''}"
 	onclick={handleClick}
@@ -46,6 +52,15 @@
 			<AlertTriangle size={11} class="shrink-0 text-fail" />
 		{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-1">
+			{#if onRun}
+				<button
+					class="flex items-center justify-center rounded-[2px] p-0.5 text-fg-faint opacity-0 transition-all duration-150 hover:bg-accent-primary/10 hover:text-accent-primary group-hover:opacity-100"
+					onclick={handleRun}
+					aria-label="Run {agent.name}"
+				>
+					<Play size={12} />
+				</button>
+			{/if}
 			{#if agent.features.includes('tool_search')}
 				<span class="rounded-full border border-accent-secondary/20 bg-accent-secondary/10 px-1 py-0.5 font-mono text-[9px] text-accent-secondary">search</span>
 			{/if}

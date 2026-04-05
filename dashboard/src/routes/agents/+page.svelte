@@ -4,6 +4,7 @@
 	import type { AgentSummary } from '$lib/api/types';
 	import AgentList from '$lib/components/agents/AgentList.svelte';
 	import AgentFlowCanvas from '$lib/components/agents/AgentFlowCanvas.svelte';
+	import QuickRunDrawer from '$lib/components/runs/QuickRunDrawer.svelte';
 	import CapabilityFilterBar from '$lib/components/agents/CapabilityFilterBar.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -22,6 +23,11 @@
 	let searchEl: HTMLInputElement | undefined = $state();
 	let isMobile = $state(false);
 	let pendingDelete: AgentSummary | null = $state(null);
+	let drawerAgent: { id: string; name: string } | null = $state(null);
+
+	function openQuickRun(agent: AgentSummary) {
+		drawerAgent = { id: agent.id, name: agent.name };
+	}
 
 	const isFiltering = $derived(activeFilter !== 'all' || query.trim().length > 0);
 
@@ -154,7 +160,7 @@
 
 		<!-- Canvas -->
 		<div class="min-h-0 flex-1" style:width="100%">
-			<AgentFlowCanvas {agents} {dimmedIds} />
+			<AgentFlowCanvas {agents} {dimmedIds} onRun={openQuickRun} />
 		</div>
 	</div>
 {:else}
@@ -225,7 +231,7 @@
 					<button class="mt-2 text-[13px] text-fg-faint hover:text-fg-muted" onclick={clearFilters}>Clear filters</button>
 				</div>
 			{:else}
-				<AgentList agents={results} onDelete={(agent) => (pendingDelete = agent)} />
+				<AgentList agents={results} onDelete={(agent) => (pendingDelete = agent)} onRun={openQuickRun} />
 			{/if}
 		{/if}
 	</div>
@@ -244,4 +250,12 @@
 			onCancel={() => (pendingDelete = null)}
 		/>
 	{/if}
+{/if}
+
+{#if drawerAgent}
+	<QuickRunDrawer
+		agentId={drawerAgent.id}
+		agentName={drawerAgent.name}
+		onClose={() => (drawerAgent = null)}
+	/>
 {/if}

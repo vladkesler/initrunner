@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -29,6 +30,8 @@ from initrunner.dashboard.schemas import (
     HealthCheckDetail,
     RestartDetail,
     SinkDetail,
+    TimelineResponse,
+    TimelineStatsResponse,
 )
 
 router = APIRouter(prefix="/api/flows", tags=["flows"])
@@ -354,3 +357,57 @@ async def delete_flow(
         raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
     flow_cache.evict(flow_id)
     return DeleteResponse(id=flow_id, path=str(path))
+
+
+@router.get("/{flow_id}/timeline")
+async def get_flow_timeline(
+    flow_id: str,
+    flow_cache: Annotated[FlowCache, Depends(get_flow_cache)],
+    since: str | None = None,
+    until: str | None = None,
+    limit: int = 500,
+) -> TimelineResponse:
+    from datetime import timedelta
+
+    from initrunner.config import get_audit_db_path
+    from initrunner.dashboard._timeline import build_timeline_response
+
+    dc = flow_cache.get(flow_id)
+    if dc is None:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    if dc.flow is None:
+        return TimelineResponse(entries=[], stats=TimelineStatsResponse())
+
+    flow_name = dc.flow.metadata.name
+
+    now = datetime.now(UTC)
+    if until is None:
+        until = now.isoformat()
+    if since is None:
+        since = (now - timedelta(hours=24)).isoformat()
+
+    from initrunner.audit.logger import AuditLogger
+
+    def _query():
+        al = AuditLogger(get_audit_db_path())
+        try:
+            return (
+                al.timeline_query(
+                    agent_name=flow_name,
+                    trigger_type="flow_run",
+                    since=since,
+                    until=until,
+                    limit=limit,
+                ),
+                al.timeline_stats(
+                    agent_name=flow_name,
+                    trigger_type="flow_run",
+                    since=since,
+                    until=until,
+                ),
+            )
+        finally:
+            al.close()
+
+    rows, stats_dict = await asyncio.to_thread(_query)
+    return build_timeline_response(rows, stats_dict)

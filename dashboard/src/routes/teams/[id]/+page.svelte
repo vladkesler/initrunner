@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml, deleteTeam } from '$lib/api/teams';
+	import { fetchTeamDetail, fetchTeamYaml, validateTeam, saveTeamYaml, deleteTeam, fetchTeamTimeline } from '$lib/api/teams';
 	import type { TeamDetail } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
 	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
@@ -17,7 +17,8 @@
 	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import { ArrowLeft, Play, GitBranch, Brain, Database, Settings, FileCode, Trash2 } from 'lucide-svelte';
+	import { ArrowLeft, Play, GitBranch, Activity, Brain, Database, Settings, FileCode, Trash2 } from 'lucide-svelte';
+	import TimelineView from '$lib/components/agents/TimelineView.svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
 
 	let detail: TeamDetail | null = $state(null);
@@ -26,6 +27,7 @@
 	let loading = $state(true);
 	let loadError = $state(false);
 	let deleteDialogOpen = $state(false);
+	let runVersion = $state(0);
 
 	const teamId = $derived(page.params.id ?? '');
 
@@ -33,12 +35,13 @@
 	const tabKey = $derived(`team-tab-${teamId}`);
 	let activeTab = $state('pipeline');
 
-	const tabs = ['pipeline', 'run', 'memory', 'ingest', 'config', 'editor'] as const;
+	const tabs = ['pipeline', 'run', 'timeline', 'memory', 'ingest', 'config', 'editor'] as const;
 	type Tab = (typeof tabs)[number];
 
 	const tabMeta: Record<Tab, { label: string; icon: typeof Play }> = {
 		pipeline: { label: 'Pipeline', icon: GitBranch },
 		run: { label: 'Run', icon: Play },
+		timeline: { label: 'Timeline', icon: Activity },
 		memory: { label: 'Memory', icon: Brain },
 		ingest: { label: 'Ingest', icon: Database },
 		config: { label: 'Config', icon: Settings },
@@ -145,7 +148,9 @@
 						<PersonaPipeline {detail} />
 					</div>
 				{:else if activeTab === 'run'}
-					<TeamRunPanel teamId={teamId} {detail} />
+					<TeamRunPanel teamId={teamId} {detail} onRunCompleted={() => { runVersion++; }} />
+				{:else if activeTab === 'timeline'}
+					<TimelineView fetchData={() => fetchTeamTimeline(teamId)} refreshKey={runVersion} />
 				{:else if activeTab === 'memory'}
 					<TeamMemoryTab teamId={teamId} hasMemory={!!(detail.shared_memory as Record<string, unknown>)?.enabled} />
 				{:else if activeTab === 'ingest'}
