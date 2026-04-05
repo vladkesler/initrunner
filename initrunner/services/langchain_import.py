@@ -13,8 +13,18 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 
-from initrunner.services._sidecar_common import DEFAULT_BLOCKED_MODULES
-from initrunner.services._sidecar_common import validate_sidecar_imports as validate_sidecar_imports
+from initrunner.services._sidecar_common import (
+    DEFAULT_BLOCKED_MODULES,
+    _assemble_sidecar_source,
+    _extract_imports,
+    _get_call_name,
+    _get_keyword_value,
+    _get_number_value,
+    _get_string_value,
+)
+from initrunner.services._sidecar_common import (
+    validate_sidecar_imports as validate_sidecar_imports,
+)
 
 # ---------------------------------------------------------------------------
 # Known LangChain tool class -> InitRunner tool type mapping
@@ -177,47 +187,8 @@ class LangChainImport:
 
 
 # ---------------------------------------------------------------------------
-# AST extraction helpers
+# Model config extraction
 # ---------------------------------------------------------------------------
-
-
-def _get_string_value(node: ast.expr) -> str | None:
-    """Extract a string constant from an AST node."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    # Handle f-strings or JoinedStr -- skip
-    return None
-
-
-def _get_number_value(node: ast.expr) -> float | int | None:
-    """Extract a numeric constant from an AST node."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, int | float):
-        return node.value
-    return None
-
-
-def _get_keyword_value(call: ast.Call, name: str) -> ast.expr | None:
-    """Find a keyword argument by name in a Call node."""
-    for kw in call.keywords:
-        if kw.arg == name:
-            return kw.value
-    return None
-
-
-def _get_call_name(node: ast.Call) -> str | None:
-    """Get the full dotted name of a Call (e.g. 'create_agent', 'init_chat_model')."""
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        parts = []
-        current: ast.expr = node.func
-        while isinstance(current, ast.Attribute):
-            parts.append(current.attr)
-            current = current.value
-        if isinstance(current, ast.Name):
-            parts.append(current.id)
-        return ".".join(reversed(parts))
-    return None
 
 
 def _extract_model_config(
@@ -521,23 +492,6 @@ def _extract_state_schema(tree: ast.Module) -> dict[str, str]:
     return fields
 
 
-def _extract_imports(tree: ast.Module) -> list[str]:
-    """Collect all import statements as source text."""
-    imports: list[str] = []
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    imports.append(f"import {alias.name} as {alias.asname}")
-                else:
-                    imports.append(f"import {alias.name}")
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            names = ", ".join(f"{a.name} as {a.asname}" if a.asname else a.name for a in node.names)
-            imports.append(f"from {module} import {names}")
-    return imports
-
-
 def _detect_unsupported(tree: ast.Module) -> list[str]:
     """Detect unsupported LangChain features and return warning messages."""
     warnings: list[str] = []
@@ -611,6 +565,9 @@ def _detect_unsupported(tree: ast.Module) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+_LC_PREFIXES = ("langchain", "langgraph", "langsmith")
+
+
 def build_sidecar_module(lc_import: LangChainImport) -> str | None:
     """Assemble extracted @tool functions into a standalone Python module.
 
@@ -619,33 +576,12 @@ def build_sidecar_module(lc_import: LangChainImport) -> str | None:
     if not lc_import.custom_tools:
         return None
 
-    parts: list[str] = [
-        '"""Custom tools extracted from LangChain agent."""',
-        "",
-    ]
-
-    # Include non-LangChain imports from the original source that the tools
-    # might need.  Filter out langchain/langgraph framework imports.
-    _lc_prefixes = ("langchain", "langgraph", "langsmith")
-    relevant_imports = [
-        imp
-        for imp in lc_import.raw_imports
-        if not any(
-            imp.lstrip().startswith(f"from {p}") or imp.lstrip().startswith(f"import {p}")
-            for p in _lc_prefixes
-        )
-    ]
-    if relevant_imports:
-        parts.extend(relevant_imports)
-        parts.append("")
-
-    # Add each tool function
-    for tool_def in lc_import.custom_tools:
-        parts.append("")
-        parts.append(tool_def.source.rstrip())
-        parts.append("")
-
-    return "\n".join(parts)
+    return _assemble_sidecar_source(
+        framework_label="LangChain",
+        framework_prefixes=_LC_PREFIXES,
+        raw_imports=lc_import.raw_imports,
+        tool_sources=[t.source for t in lc_import.custom_tools],
+    )
 
 
 # validate_sidecar_imports is imported from _sidecar_common at the top of this module

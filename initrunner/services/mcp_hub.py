@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from initrunner._async import run_sync
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.security import ToolSandboxConfig
@@ -30,6 +31,7 @@ class AgentRef:
     tool_filter: list[str] = field(default_factory=list)
     tool_exclude: list[str] = field(default_factory=list)
     tool_prefix: str | None = None
+    defer: bool = False
 
 
 @dataclass
@@ -104,6 +106,7 @@ def aggregate_mcp_servers(role_cache: RoleCache) -> list[McpServerEntry]:
                 tool_filter=list(tool_cfg.tool_filter),
                 tool_exclude=list(tool_cfg.tool_exclude),
                 tool_prefix=tool_cfg.tool_prefix,
+                defer=tool_cfg.defer,
             )
 
             if sid in servers:
@@ -162,4 +165,4 @@ def introspect_server_sync(
                 for t in mcp_tools
             ]
 
-    return asyncio.run(_fetch())
+    return run_sync(_fetch())

@@ -192,6 +192,7 @@ tools:
 | `tool_prefix` | `str \| null` | `null` | Prefix added to all tool names (e.g., `"remote"` turns `read_file` into `remote_read_file`). |
 | `max_retries` | `int` | `1` | Retry count on tool failures. |
 | `timeout` | `int \| null` | `null` | Connection timeout in seconds. |
+| `defer` | `bool` | `false` | Defer MCP server connection until first tool call. Uses cached tool schemas for faster agent startup. |
 
 ### Transport Types
 
@@ -263,6 +264,25 @@ tools:
       - dangerous_tool
       - admin_reset
 ```
+
+**Deferred loading for faster startup:**
+
+When an agent has several MCP servers but only uses some of them per run, `defer: true` avoids spawning all server processes at startup. Tool schemas are cached locally after the first connection, and subsequent startups serve from cache until the tool is actually called.
+
+```yaml
+tools:
+  - type: mcp
+    transport: stdio
+    command: npx
+    args: ["-y", "@anthropic/mcp-server-filesystem"]
+    defer: true
+  - type: mcp
+    transport: sse
+    url: https://mcp.example.com/sse
+    defer: true
+```
+
+The schema cache lives in `~/.initrunner/cache/mcp/` (respects `INITRUNNER_HOME` and `XDG_DATA_HOME`). If the live server's tool schemas change, InitRunner logs a warning on the next connection and updates the cache automatically.
 
 ### CLI Introspection
 

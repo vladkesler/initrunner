@@ -635,6 +635,7 @@ export interface McpAgentRef {
 	tool_filter: string[];
 	tool_exclude: string[];
 	tool_prefix: string | null;
+	defer: boolean;
 }
 
 export interface McpServer {
@@ -647,6 +648,7 @@ export interface McpServer {
 	agent_refs: McpAgentRef[];
 	health_status: 'healthy' | 'degraded' | 'unhealthy' | null;
 	health_checked_at: string | null;
+	cache_age_seconds: number | null;
 }
 
 export interface McpTool {

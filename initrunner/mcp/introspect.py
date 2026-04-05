@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
+from initrunner._async import run_sync
 from initrunner.agent.schema.tools import McpToolConfig
 
 
@@ -52,4 +52,4 @@ def _list_tools_for_config(config: McpToolConfig, role_dir: Path) -> list[tuple[
             mcp_tools = await client.list_tools()
             return [(t.name, t.description or "") for t in mcp_tools]
 
-    return asyncio.run(_fetch())
+    return run_sync(_fetch())

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { McpServer, McpTool } from '$lib/api/types';
-	import { getMcpServerTools, checkMcpServerHealth } from '$lib/api/mcp';
-	import { ChevronDown, ChevronRight, Play, RefreshCw } from 'lucide-svelte';
+	import { getMcpServerTools, checkMcpServerHealth, invalidateMcpCache } from '$lib/api/mcp';
+	import { ChevronDown, ChevronRight, Play, RefreshCw, Trash2 } from 'lucide-svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 
 	let {
@@ -53,10 +53,34 @@
 		}
 	}
 
+	let cacheInvalidating = $state(false);
+
+	async function invalidateCache(e: MouseEvent) {
+		e.stopPropagation();
+		cacheInvalidating = true;
+		try {
+			await invalidateMcpCache(server.server_id);
+			server.cache_age_seconds = null;
+		} catch {
+			/* ignore */
+		} finally {
+			cacheInvalidating = false;
+		}
+	}
+
 	function testTool(e: MouseEvent, toolName: string) {
 		e.stopPropagation();
 		openPlayground(server.server_id, toolName);
 	}
+
+	function formatCacheAge(seconds: number): string {
+		if (seconds < 60) return `${Math.round(seconds)}s ago`;
+		if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+		if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+		return `${Math.round(seconds / 86400)}d ago`;
+	}
+
+	let hasDeferredRef = $derived(server.agent_refs.some((r) => r.defer));
 
 	const transportColors: Record<string, string> = {
 		stdio: 'border-accent-secondary-muted text-accent-secondary',
@@ -110,13 +134,31 @@
 			{#each server.agent_refs as ref}
 				<a
 					href="/agents/{ref.agent_id}"
-					class="rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-fg-faint transition-colors hover:border-accent-primary-dim/40 hover:text-fg-muted"
+					class="flex items-center gap-1 rounded-full border border-edge bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-fg-faint transition-colors hover:border-accent-primary-dim/40 hover:text-fg-muted"
 					title={ref.role_path}
 				>
 					{ref.agent_name}
+					{#if ref.defer}
+						<span class="rounded-full border border-warn/30 px-1 text-[9px] text-warn">deferred</span>
+					{/if}
 				</a>
 			{/each}
 		</div>
+
+		<!-- Cache age + invalidate -->
+		{#if server.cache_age_seconds != null}
+			<span class="font-mono text-[10px] text-fg-faint" title="Schema cache age">
+				cached {formatCacheAge(server.cache_age_seconds)}
+			</span>
+			<button
+				class="shrink-0 rounded-[2px] border border-edge p-1 text-fg-faint transition-colors hover:border-warn hover:text-warn"
+				onclick={invalidateCache}
+				disabled={cacheInvalidating}
+				title="Invalidate schema cache"
+			>
+				<Trash2 size={10} />
+			</button>
+		{/if}
 
 		<!-- Health check button -->
 		<button

@@ -22,6 +22,7 @@ from pydantic_graph.beta import GraphBuilder, StepContext
 from pydantic_graph.beta.id_types import ForkID, NodeID
 from pydantic_graph.beta.join import reduce_list_append
 
+from initrunner._async import run_sync
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
 
@@ -104,6 +105,36 @@ _AgentRef = AgentRef
 
 
 # ---------------------------------------------------------------------------
+# Topology containers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _TopologyInfo:
+    """Computed delegation topology (pure data, no builder dependency)."""
+
+    topology_index: dict[str, int]
+    delegation_edges: dict[str, list[str]]
+    reverse_edges: dict[str, list[str]]
+    strategies: dict[str, str]
+    entry_name: str
+    reachable: set[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _GraphNodes:
+    """All nodes registered on the graph builder."""
+
+    steps: dict[str, object]
+    fan_in_targets: set[str]
+    joins: dict[str, object]
+    join_transforms: dict[str, object]
+    terminal_services: set[str]
+    terminal_joins: dict[str, object]
+    terminal_join_transforms: dict[str, object]
+
+
+# ---------------------------------------------------------------------------
 # Daemon ingress
 # ---------------------------------------------------------------------------
 
@@ -120,18 +151,13 @@ class _RunRequest:
 # ---------------------------------------------------------------------------
 
 
-def build_flow_graph(
+def _compute_topology(
     flow: FlowDefinition,
     agent_refs: dict[str, AgentRef],
-):
-    """Build a pydantic-graph from flow agent topology.
-
-    Returns the built ``Graph`` object ready for ``await graph.run(...)``.
-    """
-    # Compute topology index (YAML declaration order)
+) -> _TopologyInfo:
+    """Compute delegation topology: edges, strategies, entry point, reachable set."""
     topology_index: dict[str, int] = {name: i for i, name in enumerate(flow.spec.agents)}
 
-    # Compute delegation edges and reverse edges
     delegation_edges: dict[str, list[str]] = {}
     reverse_edges: dict[str, list[str]] = {}
     strategies: dict[str, str] = {}
@@ -145,19 +171,17 @@ def build_flow_graph(
         targets = (
             config.sink.target if isinstance(config.sink.target, list) else [config.sink.target]
         )
-        reachable = [t for t in targets if t in agent_refs]
-        delegation_edges[name] = reachable
+        reachable_targets = [t for t in targets if t in agent_refs]
+        delegation_edges[name] = reachable_targets
         strategies[name] = config.sink.strategy
-        for t in reachable:
+        for t in reachable_targets:
             reverse_edges.setdefault(t, []).append(name)
 
-    # Find entry agent
     entry_name = next(
         (name for name in flow.spec.agents if name in agent_refs and name not in reverse_edges),
         next(iter(agent_refs)),
     )
 
-    # BFS to find reachable agents from entry
     reachable: set[str] = set()
     frontier = [entry_name]
     while frontier:
@@ -169,34 +193,38 @@ def build_flow_graph(
             if target not in reachable:
                 frontier.append(target)
 
-    # Build graph -- all steps produce DelegationEnvelope, results read from refs
-    builder = GraphBuilder(
-        name=flow.metadata.name,
-        state_type=type(None),
-        deps_type=FlowGraphDeps,
-        input_type=DelegationEnvelope,
-        output_type=DelegationEnvelope,
+    return _TopologyInfo(
+        topology_index=topology_index,
+        delegation_edges=delegation_edges,
+        reverse_edges=reverse_edges,
+        strategies=strategies,
+        entry_name=entry_name,
+        reachable=reachable,
     )
 
-    # Create steps for each reachable agent
+
+def _create_graph_nodes(
+    builder: GraphBuilder,
+    topo: _TopologyInfo,
+) -> _GraphNodes:
+    """Create step, join, and transform nodes for all reachable agents."""
     steps: dict[str, object] = {}
-    for name in reachable:
-        idx = topology_index.get(name, 0)
+    for name in topo.reachable:
+        idx = topo.topology_index.get(name, 0)
         step_fn = _make_agent_step(name, idx)
         step = builder.step(node_id=NodeID(name))(step_fn)
         steps[name] = step
 
     # Detect fan-in targets (multiple incoming delegation edges)
     fan_in_targets: set[str] = set()
-    for target, sources in reverse_edges.items():
-        incoming = [s for s in sources if s in reachable]
+    for target, sources in topo.reverse_edges.items():
+        incoming = [s for s in sources if s in topo.reachable]
         if len(incoming) > 1:
             fan_in_targets.add(target)
 
     # Create joins for fan-in targets
     joins: dict[str, object] = {}
     join_transforms: dict[str, object] = {}
-
     for target in fan_in_targets:
         join = builder.join(
             reducer=reduce_list_append,
@@ -204,27 +232,24 @@ def build_flow_graph(
             node_id=NodeID(f"_join_{target}"),
         )
         joins[target] = join
-
-        # Sort-transform step: sorts by topology index, concatenates, wraps in envelope
         transform_fn = _make_join_transform(target)
         transform = builder.step(node_id=NodeID(f"_transform_{target}"))(transform_fn)
         join_transforms[target] = transform
 
     # Identify terminal agents (no outgoing delegation)
     terminal_services: set[str] = set()
-    for name in reachable:
-        targets = delegation_edges.get(name, [])
-        if not [t for t in targets if t in reachable]:
+    for name in topo.reachable:
+        targets = topo.delegation_edges.get(name, [])
+        if not [t for t in targets if t in topo.reachable]:
             terminal_services.add(name)
 
     # Identify fan-out sources whose ALL targets are terminal (need a terminal join)
-    # This prevents branches from independently hitting End before siblings finish
     terminal_joins: dict[str, object] = {}
     terminal_join_transforms: dict[str, object] = {}
-    for name in reachable:
-        targets = delegation_edges.get(name, [])
-        reachable_targets = [t for t in targets if t in reachable]
-        strategy = strategies.get(name, "all")
+    for name in topo.reachable:
+        targets = topo.delegation_edges.get(name, [])
+        reachable_targets = [t for t in targets if t in topo.reachable]
+        strategy = topo.strategies.get(name, "all")
         if (
             len(reachable_targets) > 1
             and strategy == "all"
@@ -241,82 +266,114 @@ def build_flow_graph(
             transform = builder.step(node_id=NodeID(f"_terminal_transform_{name}"))(transform_fn)
             terminal_join_transforms[name] = transform
 
-    # Wire start -> entry
-    builder.add(builder.edge_from(builder.start_node).to(steps[entry_name]))
+    return _GraphNodes(
+        steps=steps,
+        fan_in_targets=fan_in_targets,
+        joins=joins,
+        join_transforms=join_transforms,
+        terminal_services=terminal_services,
+        terminal_joins=terminal_joins,
+        terminal_join_transforms=terminal_join_transforms,
+    )
+
+
+def _wire_graph_edges(
+    builder: GraphBuilder,
+    topo: _TopologyInfo,
+    nodes: _GraphNodes,
+    agent_refs: dict[str, AgentRef],
+) -> None:
+    """Wire all edges: start, agent outputs, joins, terminals."""
+    # Start -> entry
+    builder.add(builder.edge_from(builder.start_node).to(nodes.steps[topo.entry_name]))
 
     # Wire edges for each agent
-    for name in reachable:
-        targets = delegation_edges.get(name, [])
-        reachable_targets = [t for t in targets if t in reachable]
+    for name in topo.reachable:
+        targets = topo.delegation_edges.get(name, [])
+        reachable_targets = [t for t in targets if t in topo.reachable]
 
         if not reachable_targets:
-            # Terminal agent -> end (or -> terminal join if part of a fan-out)
-            # Direct terminal-to-end wiring is handled below per-agent
-            pass  # wired after fan-out logic
-            continue
+            continue  # terminal -- wired below
 
-        strategy = strategies.get(name, "all")
+        strategy = topo.strategies.get(name, "all")
 
         if len(reachable_targets) == 1:
-            # Single target -- direct edge
             target = reachable_targets[0]
-            dest = joins[target] if target in fan_in_targets else steps[target]
-            builder.add(builder.edge_from(steps[name]).to(dest))
+            dest = nodes.joins[target] if target in nodes.fan_in_targets else nodes.steps[target]
+            builder.add(builder.edge_from(nodes.steps[name]).to(dest))
         elif strategy == "all":
-            # Fan-out: broadcast to all targets
             fork_id = ForkID(f"fork_{name}")
 
             def _make_broadcast(
                 targets_=reachable_targets,
-                joins_=joins,
-                fan_in_=fan_in_targets,
+                joins_=nodes.joins,
+                fan_in_=nodes.fan_in_targets,
+                steps_=nodes.steps,
             ):
                 def _broadcast(ep):
                     paths = []
                     for t in targets_:
-                        dest = joins_[t] if t in fan_in_ else steps[t]
+                        dest = joins_[t] if t in fan_in_ else steps_[t]
                         paths.append(ep.to(dest))
                     return paths
 
                 return _broadcast
 
             builder.add(
-                builder.edge_from(steps[name]).broadcast(_make_broadcast(), fork_id=fork_id)
+                builder.edge_from(nodes.steps[name]).broadcast(_make_broadcast(), fork_id=fork_id)
             )
         else:
-            # Keyword/sense routing -- Decision node
-            _wire_routing_decision(builder, steps, name, reachable_targets, strategy, agent_refs)
+            _wire_routing_decision(
+                builder, nodes.steps, name, reachable_targets, strategy, agent_refs
+            )
 
     # Wire fan-in join -> transform -> target step
-    for target in fan_in_targets:
-        builder.add(builder.edge_from(joins[target]).to(join_transforms[target]))
-        builder.add(builder.edge_from(join_transforms[target]).to(steps[target]))
+    for target in nodes.fan_in_targets:
+        builder.add(builder.edge_from(nodes.joins[target]).to(nodes.join_transforms[target]))
+        builder.add(builder.edge_from(nodes.join_transforms[target]).to(nodes.steps[target]))
 
     # Wire terminal joins -> transform -> end
-    for source_name, join in terminal_joins.items():
-        transform = terminal_join_transforms[source_name]
+    for source_name, join in nodes.terminal_joins.items():
+        transform = nodes.terminal_join_transforms[source_name]
         builder.add(builder.edge_from(join).to(transform))
         builder.add(builder.edge_from(transform).to(builder.end_node))
 
     # Wire remaining terminal agents directly to end
-    # (those not part of a fan-out terminal join)
     fan_out_terminal_services: set[str] = set()
-    for source_name in terminal_joins:
-        targets = delegation_edges.get(source_name, [])
-        fan_out_terminal_services.update(t for t in targets if t in reachable)
+    for source_name in nodes.terminal_joins:
+        targets = topo.delegation_edges.get(source_name, [])
+        fan_out_terminal_services.update(t for t in targets if t in topo.reachable)
 
-    for name in terminal_services:
+    for name in nodes.terminal_services:
         if name in fan_out_terminal_services:
-            # Route to the terminal join of the parent fan-out source
-            for source_name, join in terminal_joins.items():
-                source_targets = delegation_edges.get(source_name, [])
+            for source_name, join in nodes.terminal_joins.items():
+                source_targets = topo.delegation_edges.get(source_name, [])
                 if name in source_targets:
-                    builder.add(builder.edge_from(steps[name]).to(join))
+                    builder.add(builder.edge_from(nodes.steps[name]).to(join))
                     break
         else:
-            builder.add(builder.edge_from(steps[name]).to(builder.end_node))
+            builder.add(builder.edge_from(nodes.steps[name]).to(builder.end_node))
 
-    return builder.build(), entry_name
+
+def build_flow_graph(
+    flow: FlowDefinition,
+    agent_refs: dict[str, AgentRef],
+):
+    """Build a pydantic-graph from flow agent topology.
+
+    Returns the built ``Graph`` object ready for ``await graph.run(...)``.
+    """
+    topo = _compute_topology(flow, agent_refs)
+    builder = GraphBuilder(
+        name=flow.metadata.name,
+        state_type=type(None),
+        deps_type=FlowGraphDeps,
+        input_type=DelegationEnvelope,
+        output_type=DelegationEnvelope,
+    )
+    nodes = _create_graph_nodes(builder, topo)
+    _wire_graph_edges(builder, topo, nodes, agent_refs)
+    return builder.build(), topo.entry_name
 
 
 def _wire_routing_decision(builder, steps, source_name, targets, strategy, agent_refs):
@@ -653,11 +710,7 @@ def run_flow_graph_sync(
     **kwargs,
 ) -> tuple[dict[str, AgentRef], str, int, bool]:
     """Synchronous wrapper for ``run_flow_graph_async``."""
-
-    async def _run():
-        return await run_flow_graph_async(flow, services, prompt, **kwargs)
-
-    return anyio.run(_run)
+    return run_sync(run_flow_graph_async(flow, services, prompt, **kwargs))
 
 
 # ---------------------------------------------------------------------------

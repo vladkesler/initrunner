@@ -8,6 +8,7 @@ import os
 import threading
 from collections.abc import Callable
 
+from initrunner._async import run_sync
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import TelegramTriggerConfig
 from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
@@ -28,6 +29,7 @@ class TelegramAdapter(ChannelAdapter):
     def __init__(self, config: TelegramTriggerConfig) -> None:
         self._config = config
         self._stop_event = threading.Event()
+        self._ready = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._bot: object | None = None  # telegram.Bot, set during start()
 
@@ -104,9 +106,11 @@ class TelegramAdapter(ChannelAdapter):
             if app.updater is None:
                 raise RuntimeError("Telegram updater not initialized")
             await app.updater.start_polling()
+            self._ready.set()
             _logger.info("Telegram bot started polling")
             while not self._stop_event.is_set():
                 await asyncio.sleep(1)
+            self._ready.clear()
             if app.updater is None:
                 raise RuntimeError("Telegram updater not initialized")
             await app.updater.stop()
@@ -114,19 +118,22 @@ class TelegramAdapter(ChannelAdapter):
             await app.shutdown()
 
         self._stop_event.clear()
-        asyncio.run(run_bot())
+        self._ready.clear()
+        run_sync(run_bot())
 
     def stop(self) -> None:
         self._stop_event.set()
 
     def send(self, target: str, text: str) -> None:
-        if self._loop is None or self._bot is None:
+        if not self._ready.is_set():
             return
         try:
+            loop = self._loop
+            assert loop is not None  # guarded by _ready event
             for chunk in _chunk_text(text, _TELEGRAM_MAX_MESSAGE):
                 future = asyncio.run_coroutine_threadsafe(
                     self._bot.send_message(chat_id=int(target), text=chunk),  # type: ignore[union-attr]
-                    self._loop,
+                    loop,
                 )
                 future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
         except Exception:

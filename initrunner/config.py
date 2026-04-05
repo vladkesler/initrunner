@@ -65,5 +65,9 @@ def get_bundles_cache_dir() -> Path:
     return get_home_dir() / "cache" / "bundles"
 
 
+def get_mcp_cache_dir() -> Path:
+    return get_home_dir() / "cache" / "mcp"
+
+
 def get_hub_auth_path() -> Path:
     return get_home_dir() / "hub-auth.json"

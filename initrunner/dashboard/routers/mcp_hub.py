@@ -37,6 +37,7 @@ _REGISTRY_PATH = (
 
 
 def _entry_to_response(entry) -> McpServerResponse:
+    from initrunner.mcp._cache import cache_age_seconds, cache_key
     from initrunner.mcp.health import _health_cache
 
     health_status: str | None = None
@@ -46,6 +47,12 @@ def _entry_to_response(entry) -> McpServerResponse:
         result, _ts = cached
         health_status = result.status
         health_checked_at = result.checked_at
+
+    # Cache age for the resolved transport identity.
+    try:
+        age = cache_age_seconds(cache_key(entry.config, entry.role_dir))
+    except Exception:
+        age = None
 
     return McpServerResponse(
         server_id=entry.server_id,
@@ -62,11 +69,13 @@ def _entry_to_response(entry) -> McpServerResponse:
                 tool_filter=r.tool_filter,
                 tool_exclude=r.tool_exclude,
                 tool_prefix=r.tool_prefix,
+                defer=r.defer,
             )
             for r in entry.agent_refs
         ],
         health_status=health_status,
         health_checked_at=health_checked_at,
+        cache_age_seconds=age,
     )
 
 
@@ -161,6 +170,19 @@ async def playground_call(
         success=result.success,
         error=result.error,
     )
+
+
+@router.delete("/servers/{server_id}/cache")
+async def invalidate_server_cache(
+    server_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> dict[str, bool]:
+    from initrunner.mcp._cache import cache_key, invalidate_cache
+
+    entry = await asyncio.to_thread(_find_or_404, server_id, role_cache)
+    key = cache_key(entry.config, entry.role_dir)
+    removed = invalidate_cache(key)
+    return {"invalidated": removed}
 
 
 @router.get("/registry")

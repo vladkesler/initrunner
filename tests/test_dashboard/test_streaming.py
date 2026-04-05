@@ -1,6 +1,6 @@
 """Regression tests for dashboard SSE streaming -- sentinel/future race.
 
-The four ``stream_*_sse`` helpers in ``initrunner/dashboard/streaming.py``
+The five ``stream_*_sse`` helpers in ``initrunner/dashboard/streaming.py``
 push a ``None`` sentinel from a ``finally`` block *before* the executor
 future is marked done.  If the consumer reads the sentinel and then calls
 ``.result()`` synchronously, it hits ``InvalidStateError``.  The fix is to
@@ -274,3 +274,126 @@ async def test_stream_ingest_sse_awaits_future():
     last = _parse_last_data_event(results)
     assert last["type"] == "result", f"Expected result event, got: {last}"
     assert last["data"]["new"] == 1
+
+
+# ── stream_team_ingest_sse ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_stream_team_ingest_sse_awaits_future():
+    """stream_team_ingest_sse must await the executor future."""
+    from initrunner.dashboard.streaming import stream_team_ingest_sse
+
+    gate = threading.Event()
+
+    ingest_stats = MagicMock()
+    ingest_stats.new = 2
+    ingest_stats.updated = 1
+    ingest_stats.skipped = 0
+    ingest_stats.errored = 0
+    ingest_stats.total_chunks = 8
+    ingest_stats.file_results = []
+
+    def slow_ingest(*a, **kw):
+        gate.wait(timeout=5)
+        return ingest_stats
+
+    from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
+
+    team_def = MagicMock()
+    team_def.metadata.name = "test-team"
+    team_def.spec.shared_documents.store_path = None
+    team_def.spec.shared_documents.store_backend = "lancedb"
+    team_def.spec.shared_documents.sources = []
+    team_def.spec.shared_documents.embeddings = EmbeddingConfig()
+    team_def.spec.shared_documents.chunking = ChunkingConfig()
+    team_def.spec.model = None
+
+    with patch(
+        "initrunner.ingestion.pipeline.run_ingest",
+        side_effect=slow_ingest,
+    ):
+
+        async def run():
+            return [e async for e in stream_team_ingest_sse(team_def, Path("/tmp"))]
+
+        async def release():
+            await asyncio.sleep(0.05)
+            gate.set()
+
+        results, _ = await asyncio.gather(run(), release())
+
+    last = _parse_last_data_event(results)
+    assert last["type"] == "result", f"Expected result event, got: {last}"
+    assert last["data"]["new"] == 2
+
+
+# ── _sse_pump ───────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_sse_pump_yields_events_and_result():
+    """_sse_pump yields queued events then a result event."""
+    from initrunner.dashboard.streaming import _sse_pump
+
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def _work():
+        queue.put_nowait('data: {"type": "token", "data": "hi"}\n\n')
+        queue.put_nowait(None)
+        return {"answer": 42}
+
+    task = asyncio.create_task(_work())
+    await asyncio.sleep(0)  # let task run
+
+    events = [e async for e in _sse_pump(queue, task, lambda r: r, "test error")]
+
+    assert events[0] == 'data: {"type": "token", "data": "hi"}\n\n'
+    last = json.loads(events[-1].removeprefix("data: ").strip())
+    assert last["type"] == "result"
+    assert last["data"]["answer"] == 42
+
+
+@pytest.mark.asyncio
+async def test_sse_pump_yields_error_on_exception():
+    """_sse_pump yields an error event when the work future raises."""
+    from initrunner.dashboard.streaming import _sse_pump
+
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def _work():
+        queue.put_nowait(None)
+        raise RuntimeError("boom")
+
+    task = asyncio.create_task(_work())
+    await asyncio.sleep(0)
+
+    events = [e async for e in _sse_pump(queue, task, lambda r: r, "test error")]
+
+    last = json.loads(events[-1].removeprefix("data: ").strip())
+    assert last["type"] == "error"
+    assert "boom" in last["data"]
+
+
+@pytest.mark.asyncio
+async def test_sse_pump_yields_error_on_build_result_failure():
+    """_sse_pump yields an error event when build_result raises."""
+    from initrunner.dashboard.streaming import _sse_pump
+
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def _work():
+        queue.put_nowait(None)
+        return "ok"
+
+    task = asyncio.create_task(_work())
+    await asyncio.sleep(0)
+
+    def bad_build(_raw: object) -> dict:
+        raise ValueError("build failed")
+
+    events = [e async for e in _sse_pump(queue, task, bad_build, "test error")]
+
+    last = json.loads(events[-1].removeprefix("data: ").strip())
+    assert last["type"] == "error"
+    assert "build failed" in last["data"]

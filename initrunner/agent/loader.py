@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -233,6 +235,132 @@ def _create_agent(
     return Agent(_build_model(role.spec.model), **kwargs)  # type: ignore[arg-type]
 
 
+# ---------------------------------------------------------------------------
+# build_agent helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_capabilities(role: RoleDefinition) -> list | None:
+    """Load PydanticAI capabilities, inject fallbacks, add input guard if configured."""
+    capabilities = None
+    if role.spec.capabilities:
+        from pydantic_ai.agent.spec import (
+            load_capability_from_nested_spec,  # type: ignore[import-not-found]
+        )
+
+        caps = [
+            load_capability_from_nested_spec(s.model_dump(mode="json"))
+            for s in role.spec.capabilities
+        ]
+        capabilities = caps
+
+        _inject_local_fallbacks(caps)
+        validate_capability_tool_conflicts(role)
+
+        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
+        if "Thinking" in cap_names and role.spec.reasoning is not None:
+            logger.warning(
+                "Both a Thinking capability and spec.reasoning are declared. "
+                "Thinking controls model-level extended thinking; "
+                "spec.reasoning controls InitRunner orchestration patterns "
+                "(react, reflexion, etc.). These are orthogonal but may cause confusion.",
+            )
+        if "MCP" in cap_names and any(t.type == "mcp" for t in role.spec.tools):
+            logger.warning(
+                "Both an MCP capability and an 'mcp' tool are declared. "
+                "The MCP capability is PydanticAI's native MCP integration; "
+                "the 'mcp' tool is InitRunner's tool-registry MCP wrapper. "
+                "Both will be active -- ensure this is intentional.",
+            )
+
+    content = role.spec.security.content
+    _has_input_guard = (
+        content.blocked_input_patterns
+        or content.profanity_filter
+        or content.llm_classifier_enabled
+        or content.max_prompt_length != 50_000
+    )
+    if _has_input_guard:
+        from initrunner.agent.capabilities import InputGuardCapability
+
+        auto_guard = InputGuardCapability(policy=content)
+        capabilities = [auto_guard] + (capabilities or [])
+
+    return capabilities
+
+
+@dataclass(frozen=True, slots=True)
+class _AutoToolsResult:
+    """Result of auto-skill and tool-search setup."""
+
+    extra_toolsets: list
+    prompt_addendum: str
+    prepare_tools: Callable | None
+
+
+def _build_auto_tools(
+    role: RoleDefinition,
+    role_dir: Path | None,
+    explicit_paths: set[Path],
+    extra_skill_dirs: list[Path] | None,
+) -> _AutoToolsResult:
+    """Build auto-skill and tool-search toolsets (already wrapped with wrap_observable)."""
+    extra_toolsets: list = []
+    prompt_addendum = ""
+    prepare_tools = None
+
+    auto_skill_activated: set[str] = set()
+    if role.spec.auto_skills.enabled:
+        from initrunner.agent.auto_skills import (
+            build_activate_skill_toolset,
+            build_catalog_prompt,
+            discover_skills,
+        )
+
+        discovered = discover_skills(
+            role_dir=role_dir,
+            extra_dirs=extra_skill_dirs,
+            max_skills=role.spec.auto_skills.max_skills,
+            exclude_paths=explicit_paths,
+        )
+        if discovered:
+            from initrunner.agent.tool_events import wrap_observable
+
+            prompt_addendum += f"\n\n{build_catalog_prompt(discovered)}"
+            ts = build_activate_skill_toolset(discovered, auto_skill_activated)
+            extra_toolsets.append(wrap_observable(ts))
+
+    if role.spec.tool_search.enabled:
+        from initrunner.agent.tools.tool_search import (
+            ToolSearchManager,
+            build_tool_search_toolset,
+        )
+
+        ts_config = role.spec.tool_search
+        manager = ToolSearchManager(
+            always_available=ts_config.always_available,
+            max_results=ts_config.max_results,
+            threshold=ts_config.threshold,
+        )
+        from initrunner.agent.tool_events import wrap_observable
+
+        extra_toolsets.append(wrap_observable(build_tool_search_toolset(manager)))
+        prepare_tools = manager.prepare_tools_callback
+        prompt_addendum += (
+            "\n\nIMPORTANT: You have many tools available beyond what you currently see. "
+            "Most are hidden to save context. When no visible tool obviously fits the "
+            "user's request, ALWAYS call `search_tools` before saying you cannot do "
+            "something (e.g. search_tools('send slack message'), search_tools('read csv')). "
+            "Matching tools will then become available for you to call."
+        )
+
+    return _AutoToolsResult(
+        extra_toolsets=extra_toolsets,
+        prompt_addendum=prompt_addendum,
+        prepare_tools=prepare_tools,
+    )
+
+
 def build_agent(
     role: RoleDefinition,
     role_dir: Path | None = None,
@@ -252,11 +380,11 @@ def build_agent(
         role = _set_model(role, ModelConfig(**role.spec.model.model_dump()))  # type: ignore[union-attr]
     _validate_provider(role)
     _validate_reasoning(role)
+
     system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
         role, role_dir, extra_skill_dirs
     )
 
-    # Resolve output type: explicit param wins, then role config, then str default
     if output_type is None:
         from initrunner.agent.output import resolve_output_type
 
@@ -266,106 +394,11 @@ def build_agent(
 
     toolsets = build_toolsets(all_tools, role, role_dir=role_dir, prefer_async=prefer_async)
 
-    # PydanticAI capabilities — native NamedSpec only
-    capabilities = None
-    if role.spec.capabilities:
-        from pydantic_ai.agent.spec import (
-            load_capability_from_nested_spec,  # type: ignore[import-not-found]
-        )
+    capabilities = _build_capabilities(role)
 
-        caps = [
-            load_capability_from_nested_spec(s.model_dump(mode="json"))
-            for s in role.spec.capabilities
-        ]
-        capabilities = caps
-
-        # Auto-inject local fallbacks for capabilities that lack them.
-        # WebFetch has no default local in PydanticAI and WebFetchTool is not
-        # supported by any model's builtin list, so it always needs a local.
-        _inject_local_fallbacks(caps)
-
-        # Defensive: catch conflicts that slipped past load_role / dashboard validation.
-        validate_capability_tool_conflicts(role)
-
-        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
-        if "Thinking" in cap_names and role.spec.reasoning is not None:
-            logger.warning(
-                "Both a Thinking capability and spec.reasoning are declared. "
-                "Thinking controls model-level extended thinking; "
-                "spec.reasoning controls InitRunner orchestration patterns "
-                "(react, reflexion, etc.). These are orthogonal but may cause confusion.",
-            )
-        if "MCP" in cap_names and any(t.type == "mcp" for t in role.spec.tools):
-            logger.warning(
-                "Both an MCP capability and an 'mcp' tool are declared. "
-                "The MCP capability is PydanticAI's native MCP integration; "
-                "the 'mcp' tool is InitRunner's tool-registry MCP wrapper. "
-                "Both will be active -- ensure this is intentional.",
-            )
-
-    # Auto-construct guardrail capabilities from security.content config.
-    # The InputGuardCapability fires in ``before_run`` (both streaming and
-    # non-streaming) and raises ContentBlockedError to abort blocked runs.
-    content = role.spec.security.content
-    _has_input_guard = (
-        content.blocked_input_patterns
-        or content.profanity_filter
-        or content.llm_classifier_enabled
-        or content.max_prompt_length != 50_000
-    )
-    if _has_input_guard:
-        from initrunner.agent.capabilities import InputGuardCapability
-
-        auto_guard = InputGuardCapability(policy=content)
-        capabilities = [auto_guard] + (capabilities or [])
-
-    # Auto-discovered skills — progressive disclosure via activate_skill tool
-    auto_skill_activated: set[str] = set()
-    if role.spec.auto_skills.enabled:
-        from initrunner.agent.auto_skills import (
-            build_activate_skill_toolset,
-            build_catalog_prompt,
-            discover_skills,
-        )
-
-        discovered = discover_skills(
-            role_dir=role_dir,
-            extra_dirs=extra_skill_dirs,
-            max_skills=role.spec.auto_skills.max_skills,
-            exclude_paths=explicit_paths,
-        )
-        if discovered:
-            from initrunner.agent.tool_events import wrap_observable
-
-            system_prompt = f"{system_prompt}\n\n{build_catalog_prompt(discovered)}"
-            ts = build_activate_skill_toolset(discovered, auto_skill_activated)
-            toolsets.append(wrap_observable(ts))
-
-    # Tool search meta-tool — hides tools behind BM25 search to reduce context
-    prepare_tools = None
-    if role.spec.tool_search.enabled:
-        from initrunner.agent.tools.tool_search import (
-            ToolSearchManager,
-            build_tool_search_toolset,
-        )
-
-        ts_config = role.spec.tool_search
-        manager = ToolSearchManager(
-            always_available=ts_config.always_available,
-            max_results=ts_config.max_results,
-            threshold=ts_config.threshold,
-        )
-        from initrunner.agent.tool_events import wrap_observable
-
-        toolsets.append(wrap_observable(build_tool_search_toolset(manager)))
-        prepare_tools = manager.prepare_tools_callback
-        system_prompt += (
-            "\n\nIMPORTANT: You have many tools available beyond what you currently see. "
-            "Most are hidden to save context. When no visible tool obviously fits the "
-            "user's request, ALWAYS call `search_tools` before saying you cannot do "
-            "something (e.g. search_tools('send slack message'), search_tools('read csv')). "
-            "Matching tools will then become available for you to call."
-        )
+    auto = _build_auto_tools(role, role_dir, explicit_paths, extra_skill_dirs)
+    toolsets.extend(auto.extra_toolsets)
+    system_prompt += auto.prompt_addendum
 
     instrument = None
     if role.spec.observability is not None:
@@ -379,7 +412,7 @@ def build_agent(
         toolsets,
         output_type,
         instrument=instrument,
-        prepare_tools=prepare_tools,
+        prepare_tools=auto.prepare_tools,
         capabilities=capabilities,
     )
 

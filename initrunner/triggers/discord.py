@@ -9,6 +9,7 @@ import re
 import threading
 from collections.abc import Callable
 
+from initrunner._async import run_sync
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import DiscordTriggerConfig
 from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
@@ -73,6 +74,7 @@ class DiscordAdapter(ChannelAdapter):
     def __init__(self, config: DiscordTriggerConfig) -> None:
         self._config = config
         self._stop_event = threading.Event()
+        self._ready = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._client: object | None = None  # discord.Client, set during start()
 
@@ -97,6 +99,10 @@ class DiscordAdapter(ChannelAdapter):
         intents.message_content = True
         client = discord.Client(intents=intents)
         self._client = client
+
+        @client.event
+        async def on_ready() -> None:
+            self._ready.set()
 
         @client.event
         async def on_message(message: discord.Message) -> None:
@@ -166,6 +172,7 @@ class DiscordAdapter(ChannelAdapter):
             async def wait_stop():
                 while not stop_event.is_set():
                     await asyncio.sleep(1)
+                self._ready.clear()
                 await client.close()
 
             async with client:
@@ -174,13 +181,14 @@ class DiscordAdapter(ChannelAdapter):
                 await asyncio.gather(client.start(token), stop_task)
 
         self._stop_event.clear()
-        asyncio.run(run_bot())
+        self._ready.clear()
+        run_sync(run_bot())
 
     def stop(self) -> None:
         self._stop_event.set()
 
     def send(self, target: str, text: str) -> None:
-        if self._loop is None or self._client is None:
+        if not self._ready.is_set():
             return
         try:
             client = self._client
@@ -192,7 +200,14 @@ class DiscordAdapter(ChannelAdapter):
                 for chunk in _chunk_text(text, _DISCORD_MAX_MESSAGE):
                     await ch.send(chunk)
 
-            future = asyncio.run_coroutine_threadsafe(_send_to_channel(), self._loop)
-            future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
+            coro = _send_to_channel()
+            try:
+                loop = self._loop
+                assert loop is not None  # guarded by _ready event
+                future = asyncio.run_coroutine_threadsafe(coro, loop)
+                future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
+            except Exception:
+                coro.close()
+                raise
         except Exception:
             _logger.warning("Failed to send Discord message to %s", target, exc_info=True)

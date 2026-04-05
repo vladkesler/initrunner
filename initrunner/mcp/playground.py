@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from initrunner._async import run_sync
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -84,6 +86,6 @@ def execute_tool_sync(
     timeout_seconds: int = 30,
 ) -> PlaygroundResult:
     """Sync wrapper for single MCP tool execution."""
-    return asyncio.run(
+    return run_sync(
         _execute(config, tool_name, arguments, role_dir, sandbox, timeout_seconds=timeout_seconds)
     )

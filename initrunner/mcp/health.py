@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from initrunner._async import run_sync
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -86,7 +88,7 @@ def check_health_sync(
             if (time.monotonic() - ts) < _CACHE_TTL_S:
                 return result
 
-    result = asyncio.run(_check(config, role_dir, sandbox))
+    result = run_sync(_check(config, role_dir, sandbox))
 
     if server_id:
         _health_cache[server_id] = (result, time.monotonic())
