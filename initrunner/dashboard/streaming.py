@@ -7,7 +7,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
@@ -82,8 +82,8 @@ def _build_ingest_payload(stats: IngestStats | None) -> dict:
 
 async def _sse_pump(
     queue: asyncio.Queue[str | None],
-    work: asyncio.Future[object],
-    build_result: Callable[[object], dict],
+    work: asyncio.Future[Any],
+    build_result: Callable[[Any], dict],
     error_context: str,
 ) -> AsyncIterator[str]:
     """Drain *queue* with heartbeats, await *work*, emit result.
@@ -262,8 +262,8 @@ async def stream_flow_run_sse(
 
     flow_task = asyncio.create_task(_run_flow())
 
-    def _build(raw: object) -> dict:
-        flow_result = raw  # type: ignore[assignment]
+    def _build(raw: Any) -> dict:
+        flow_result = raw
 
         serialized_history = None
         if flow_result.entry_messages and flow_result.success:
@@ -364,8 +364,8 @@ async def stream_team_run_sse(
 
     team_task = asyncio.create_task(_run_team())
 
-    def _build(raw: object) -> dict:
-        team_result = raw  # type: ignore[assignment]
+    def _build(raw: Any) -> dict:
+        team_result = raw
 
         step_entries = []
         for i, (name, res) in enumerate(

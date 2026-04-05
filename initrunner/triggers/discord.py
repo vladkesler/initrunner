@@ -202,7 +202,9 @@ class DiscordAdapter(ChannelAdapter):
 
             coro = _send_to_channel()
             try:
-                future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                loop = self._loop
+                assert loop is not None  # guarded by _ready event
+                future = asyncio.run_coroutine_threadsafe(coro, loop)
                 future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
             except Exception:
                 coro.close()

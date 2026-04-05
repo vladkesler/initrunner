@@ -128,10 +128,12 @@ class TelegramAdapter(ChannelAdapter):
         if not self._ready.is_set():
             return
         try:
+            loop = self._loop
+            assert loop is not None  # guarded by _ready event
             for chunk in _chunk_text(text, _TELEGRAM_MAX_MESSAGE):
                 future = asyncio.run_coroutine_threadsafe(
                     self._bot.send_message(chat_id=int(target), text=chunk),  # type: ignore[union-attr]
-                    self._loop,
+                    loop,
                 )
                 future.add_done_callback(lambda f, t=target: _log_async_error(f, t))
         except Exception:
