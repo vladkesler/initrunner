@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,11 +16,17 @@ if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.audit.logger import AuditLogger
     from initrunner.flow.schema import FlowDefinition
+    from initrunner.ingestion.pipeline import IngestStats
     from initrunner.team.schema import TeamDefinition
 
 _logger = logging.getLogger(__name__)
 _TOKEN_QUEUE_MAX = 65536
 _HEARTBEAT_INTERVAL = 10  # heartbeat every ~1s (10 * 0.1s timeout)
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
 
 
 def _build_result_payload(
@@ -52,6 +58,71 @@ def _build_result_payload(
         "error": result.error,
         "message_history": serialized_history,
     }
+
+
+def _build_ingest_payload(stats: IngestStats | None) -> dict:
+    """Build the SSE result payload dict from ingestion stats."""
+    return {
+        "new": stats.new if stats else 0,
+        "updated": stats.updated if stats else 0,
+        "skipped": stats.skipped if stats else 0,
+        "errored": stats.errored if stats else 0,
+        "total_chunks": stats.total_chunks if stats else 0,
+        "file_results": [
+            {
+                "path": str(r.path),
+                "status": str(r.status),
+                "chunks": r.chunks,
+                "error": r.error,
+            }
+            for r in (stats.file_results if stats else [])
+        ],
+    }
+
+
+async def _sse_pump(
+    queue: asyncio.Queue[str | None],
+    work: asyncio.Future[object],
+    build_result: Callable[[object], dict],
+    error_context: str,
+) -> AsyncIterator[str]:
+    """Drain *queue* with heartbeats, await *work*, emit result.
+
+    All items on the queue must be pre-formatted SSE ``data: ...\\n\\n``
+    strings; ``None`` is the sentinel.  The pump yields them verbatim.
+    """
+    heartbeat_counter = 0
+    while not work.done():
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=0.1)
+            if event is None:
+                break
+            yield event
+            heartbeat_counter = 0
+        except TimeoutError:
+            heartbeat_counter += 1
+            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
+                yield ": heartbeat\n\n"
+                heartbeat_counter = 0
+
+    while not queue.empty():
+        event = queue.get_nowait()
+        if event is None:
+            break
+        yield event
+
+    try:
+        raw = await work
+        payload = build_result(raw)
+        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+    except Exception as exc:
+        _logger.exception(error_context)
+        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# Public SSE generators
+# ---------------------------------------------------------------------------
 
 
 async def stream_run_sse(
@@ -103,8 +174,9 @@ async def stream_run_sse(
         return
 
     def on_token(chunk: str) -> None:
+        formatted = f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
         try:
-            loop.call_soon_threadsafe(token_queue.put_nowait, chunk)
+            loop.call_soon_threadsafe(token_queue.put_nowait, formatted)
         except RuntimeError:
             pass  # loop closed -- stream tearing down
 
@@ -123,36 +195,12 @@ async def stream_run_sse(
 
     stream_task = loop.run_in_executor(None, run_stream)
 
-    # Forward tokens as SSE events
-    heartbeat_counter = 0
-    while not stream_task.done():
-        try:
-            token = await asyncio.wait_for(token_queue.get(), timeout=0.1)
-            if token is None:
-                break
-            yield f"data: {json.dumps({'type': 'token', 'data': token})}\n\n"
-            heartbeat_counter = 0
-        except TimeoutError:
-            heartbeat_counter += 1
-            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
+    def _build(raw: object) -> dict:
+        result, new_messages = raw  # type: ignore[misc]
+        return _build_result_payload(result, new_messages, role)
 
-    # Drain remaining tokens
-    while not token_queue.empty():
-        token = token_queue.get_nowait()
-        if token is None:
-            break
-        yield f"data: {json.dumps({'type': 'token', 'data': token})}\n\n"
-
-    # Emit final result or error
-    try:
-        result, new_messages = await stream_task
-        payload = _build_result_payload(result, new_messages, role)
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-    except Exception as exc:
-        _logger.exception("Error during SSE streaming")
-        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+    async for event in _sse_pump(token_queue, stream_task, _build, "Error during SSE streaming"):
+        yield event
 
 
 async def stream_flow_run_sse(
@@ -214,33 +262,9 @@ async def stream_flow_run_sse(
 
     flow_task = asyncio.create_task(_run_flow())
 
-    # Forward progress events as SSE
-    heartbeat_counter = 0
-    while not flow_task.done():
-        try:
-            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-            if event is None:
-                break
-            yield event
-            heartbeat_counter = 0
-        except TimeoutError:
-            heartbeat_counter += 1
-            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
+    def _build(raw: object) -> dict:
+        flow_result = raw  # type: ignore[assignment]
 
-    # Drain remaining events
-    while not event_queue.empty():
-        event = event_queue.get_nowait()
-        if event is None:
-            break
-        yield event
-
-    # Emit final result or error
-    try:
-        flow_result = await flow_task
-
-        # Serialize entry agent message history
         serialized_history = None
         if flow_result.entry_messages and flow_result.success:
             from pydantic_ai.messages import ModelMessagesTypeAdapter
@@ -249,7 +273,7 @@ async def stream_flow_run_sse(
                 flow_result.entry_messages
             ).decode("utf-8")
 
-        payload = {
+        return {
             "output": flow_result.output,
             "output_mode": flow_result.output_mode,
             "final_agent_name": flow_result.final_agent_name,
@@ -275,10 +299,9 @@ async def stream_flow_run_sse(
             "error": flow_result.error,
             "message_history": serialized_history,
         }
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-    except Exception as exc:
-        _logger.exception("Error during flow SSE streaming")
-        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+    async for event in _sse_pump(event_queue, flow_task, _build, "Error during flow SSE streaming"):
+        yield event
 
 
 async def stream_team_run_sse(
@@ -341,33 +364,9 @@ async def stream_team_run_sse(
 
     team_task = asyncio.create_task(_run_team())
 
-    # Forward progress events as SSE
-    heartbeat_counter = 0
-    while not team_task.done():
-        try:
-            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-            if event is None:
-                break
-            yield event
-            heartbeat_counter = 0
-        except TimeoutError:
-            heartbeat_counter += 1
-            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
+    def _build(raw: object) -> dict:
+        team_result = raw  # type: ignore[assignment]
 
-    # Drain remaining events
-    while not event_queue.empty():
-        event = event_queue.get_nowait()
-        if event is None:
-            break
-        yield event
-
-    # Emit final result or error
-    try:
-        team_result = await team_task
-
-        # Build steps with optional metadata (round_num, step_kind)
         step_entries = []
         for i, (name, res) in enumerate(
             zip(team_result.agent_names, team_result.agent_results, strict=True)
@@ -393,7 +392,7 @@ async def stream_team_run_sse(
                 entry["max_rounds"] = meta.max_rounds
             step_entries.append(entry)
 
-        payload = {
+        return {
             "team_run_id": team_result.team_run_id,
             "output": team_result.final_output,
             "steps": step_entries,
@@ -404,10 +403,9 @@ async def stream_team_run_sse(
             "success": team_result.success,
             "error": team_result.error,
         }
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-    except Exception as exc:
-        _logger.exception("Error during team SSE streaming")
-        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
+
+    async for event in _sse_pump(event_queue, team_task, _build, "Error during team SSE streaming"):
+        yield event
 
 
 async def stream_ingest_sse(
@@ -443,50 +441,10 @@ async def stream_ingest_sse(
 
     ingest_task = loop.run_in_executor(None, run_ingest)
 
-    heartbeat_counter = 0
-    while not ingest_task.done():
-        try:
-            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-            if event is None:
-                break
-            yield event
-            heartbeat_counter = 0
-        except TimeoutError:
-            heartbeat_counter += 1
-            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
-
-    # Drain remaining events
-    while not event_queue.empty():
-        event = event_queue.get_nowait()
-        if event is None:
-            break
+    async for event in _sse_pump(
+        event_queue, ingest_task, _build_ingest_payload, "Error during ingest SSE streaming"
+    ):
         yield event
-
-    # Emit final result or error
-    try:
-        stats = await ingest_task
-        payload = {
-            "new": stats.new if stats else 0,
-            "updated": stats.updated if stats else 0,
-            "skipped": stats.skipped if stats else 0,
-            "errored": stats.errored if stats else 0,
-            "total_chunks": stats.total_chunks if stats else 0,
-            "file_results": [
-                {
-                    "path": str(r.path),
-                    "status": str(r.status),
-                    "chunks": r.chunks,
-                    "error": r.error,
-                }
-                for r in (stats.file_results if stats else [])
-            ],
-        }
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-    except Exception as exc:
-        _logger.exception("Error during ingest SSE streaming")
-        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
 
 
 async def stream_team_ingest_sse(
@@ -537,45 +495,7 @@ async def stream_team_ingest_sse(
 
     ingest_task = loop.run_in_executor(None, run)
 
-    heartbeat_counter = 0
-    while not ingest_task.done():
-        try:
-            event = await asyncio.wait_for(event_queue.get(), timeout=0.1)
-            if event is None:
-                break
-            yield event
-            heartbeat_counter = 0
-        except TimeoutError:
-            heartbeat_counter += 1
-            if heartbeat_counter >= _HEARTBEAT_INTERVAL:
-                yield ": heartbeat\n\n"
-                heartbeat_counter = 0
-
-    while not event_queue.empty():
-        event = event_queue.get_nowait()
-        if event is None:
-            break
+    async for event in _sse_pump(
+        event_queue, ingest_task, _build_ingest_payload, "Error during team ingest SSE streaming"
+    ):
         yield event
-
-    try:
-        stats = await ingest_task
-        payload = {
-            "new": stats.new if stats else 0,  # type: ignore[unresolved-attribute]
-            "updated": stats.updated if stats else 0,  # type: ignore[unresolved-attribute]
-            "skipped": stats.skipped if stats else 0,  # type: ignore[unresolved-attribute]
-            "errored": stats.errored if stats else 0,  # type: ignore[unresolved-attribute]
-            "total_chunks": stats.total_chunks if stats else 0,  # type: ignore[unresolved-attribute]
-            "file_results": [
-                {
-                    "path": str(r.path),
-                    "status": str(r.status),
-                    "chunks": r.chunks,
-                    "error": r.error,
-                }
-                for r in (stats.file_results if stats else [])  # type: ignore[unresolved-attribute]
-            ],
-        }
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-    except Exception as exc:
-        _logger.exception("Error during team ingest SSE streaming")
-        yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"

@@ -13,7 +13,17 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 
-from initrunner.services._sidecar_common import validate_sidecar_imports as validate_sidecar_imports
+from initrunner.services._sidecar_common import (
+    _assemble_sidecar_source,
+    _extract_imports,
+    _get_call_name,
+    _get_keyword_value,
+    _get_number_value,
+    _get_string_value,
+)
+from initrunner.services._sidecar_common import (
+    validate_sidecar_imports as validate_sidecar_imports,
+)
 
 # Re-export so callers can import from here
 __all__ = [
@@ -152,44 +162,6 @@ class PydanticAIImport:
 # ---------------------------------------------------------------------------
 # AST extraction helpers
 # ---------------------------------------------------------------------------
-
-
-def _get_string_value(node: ast.expr) -> str | None:
-    """Extract a string constant from an AST node."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    return None
-
-
-def _get_number_value(node: ast.expr) -> float | int | None:
-    """Extract a numeric constant from an AST node."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, int | float):
-        return node.value
-    return None
-
-
-def _get_keyword_value(call: ast.Call, name: str) -> ast.expr | None:
-    """Find a keyword argument by name in a Call node."""
-    for kw in call.keywords:
-        if kw.arg == name:
-            return kw.value
-    return None
-
-
-def _get_call_name(node: ast.Call) -> str | None:
-    """Get the full dotted name of a Call (e.g. 'Agent', 'OpenAIModel')."""
-    if isinstance(node.func, ast.Name):
-        return node.func.id
-    if isinstance(node.func, ast.Attribute):
-        parts: list[str] = []
-        current: ast.expr = node.func
-        while isinstance(current, ast.Attribute):
-            parts.append(current.attr)
-            current = current.value
-        if isinstance(current, ast.Name):
-            parts.append(current.id)
-        return ".".join(reversed(parts))
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -690,28 +662,6 @@ def _extract_usage_limits(tree: ast.Module) -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
-# Import extraction
-# ---------------------------------------------------------------------------
-
-
-def _extract_imports(tree: ast.Module) -> list[str]:
-    """Collect all import statements as source text."""
-    imports: list[str] = []
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    imports.append(f"import {alias.name} as {alias.asname}")
-                else:
-                    imports.append(f"import {alias.name}")
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            names = ", ".join(f"{a.name} as {a.asname}" if a.asname else a.name for a in node.names)
-            imports.append(f"from {module} import {names}")
-    return imports
-
-
-# ---------------------------------------------------------------------------
 # Unsupported feature detection
 # ---------------------------------------------------------------------------
 
@@ -812,31 +762,12 @@ def build_sidecar_module(pai_import: PydanticAIImport) -> str | None:
     if not pai_import.custom_tools:
         return None
 
-    parts: list[str] = [
-        '"""Custom tools extracted from PydanticAI agent."""',
-        "",
-    ]
-
-    # Include non-PydanticAI imports from the original source
-    relevant_imports = [
-        imp
-        for imp in pai_import.raw_imports
-        if not any(
-            imp.lstrip().startswith(f"from {p}") or imp.lstrip().startswith(f"import {p}")
-            for p in _PAI_PREFIXES
-        )
-    ]
-    if relevant_imports:
-        parts.extend(relevant_imports)
-        parts.append("")
-
-    # Add each tool function
-    for tool_def in pai_import.custom_tools:
-        parts.append("")
-        parts.append(tool_def.source.rstrip())
-        parts.append("")
-
-    return "\n".join(parts)
+    return _assemble_sidecar_source(
+        framework_label="PydanticAI",
+        framework_prefixes=_PAI_PREFIXES,
+        raw_imports=pai_import.raw_imports,
+        tool_sources=[t.source for t in pai_import.custom_tools],
+    )
 
 
 # ---------------------------------------------------------------------------
