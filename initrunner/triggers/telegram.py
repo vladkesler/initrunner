@@ -28,6 +28,7 @@ class TelegramAdapter(ChannelAdapter):
     def __init__(self, config: TelegramTriggerConfig) -> None:
         self._config = config
         self._stop_event = threading.Event()
+        self._ready = threading.Event()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._bot: object | None = None  # telegram.Bot, set during start()
 
@@ -104,9 +105,11 @@ class TelegramAdapter(ChannelAdapter):
             if app.updater is None:
                 raise RuntimeError("Telegram updater not initialized")
             await app.updater.start_polling()
+            self._ready.set()
             _logger.info("Telegram bot started polling")
             while not self._stop_event.is_set():
                 await asyncio.sleep(1)
+            self._ready.clear()
             if app.updater is None:
                 raise RuntimeError("Telegram updater not initialized")
             await app.updater.stop()
@@ -114,13 +117,14 @@ class TelegramAdapter(ChannelAdapter):
             await app.shutdown()
 
         self._stop_event.clear()
+        self._ready.clear()
         asyncio.run(run_bot())
 
     def stop(self) -> None:
         self._stop_event.set()
 
     def send(self, target: str, text: str) -> None:
-        if self._loop is None or self._bot is None:
+        if not self._ready.is_set():
             return
         try:
             for chunk in _chunk_text(text, _TELEGRAM_MAX_MESSAGE):

@@ -137,6 +137,7 @@ class TestTelegramAdapterSend:
 
         adapter._bot = mock_bot
         adapter._loop = mock_loop
+        adapter._ready.set()
 
         tg_rcts = "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe"
         with patch(tg_rcts, return_value=mock_future) as mock_rcts:
@@ -155,6 +156,7 @@ class TestTelegramAdapterSend:
 
         adapter._bot = mock_bot
         adapter._loop = mock_loop
+        adapter._ready.set()
 
         long_text = "x" * 5000  # exceeds 4096 limit
 
@@ -170,6 +172,7 @@ class TestTelegramAdapterSend:
         adapter = TelegramAdapter(TelegramTriggerConfig())
         adapter._bot = MagicMock()
         adapter._loop = MagicMock()
+        adapter._ready.set()
 
         with patch(
             "initrunner.triggers.telegram.asyncio.run_coroutine_threadsafe",
@@ -199,6 +202,7 @@ class TestDiscordAdapterSend:
 
         adapter._client = mock_client
         adapter._loop = mock_loop
+        adapter._ready.set()
 
         dc_rcts = "initrunner.triggers.discord.asyncio.run_coroutine_threadsafe"
         with patch(dc_rcts, return_value=mock_future) as mock_rcts:
@@ -206,6 +210,8 @@ class TestDiscordAdapterSend:
 
         mock_rcts.assert_called_once()
         mock_future.add_done_callback.assert_called_once()
+        # Close the unscheduled coroutine to silence "never awaited" warning
+        mock_rcts.call_args[0][0].close()
 
     def test_send_never_raises(self):
         from initrunner.triggers.discord import DiscordAdapter
@@ -213,6 +219,7 @@ class TestDiscordAdapterSend:
         adapter = DiscordAdapter(DiscordTriggerConfig())
         adapter._client = MagicMock()
         adapter._loop = MagicMock()
+        adapter._ready.set()
 
         with patch(
             "initrunner.triggers.discord.asyncio.run_coroutine_threadsafe",

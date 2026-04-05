@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import threading
 import time
@@ -111,14 +112,24 @@ class SpawnPool:
         return [self._tasks[tid] for tid in task_ids if tid in self._tasks]
 
     def await_any(self, task_ids: list[str], timeout: float | None = None) -> SpawnedTask | None:
-        """Block until any one task completes."""
+        """Block until any one task completes, or *timeout* seconds elapse."""
+        deadline = time.monotonic() + timeout if timeout is not None else None
         while True:
             for tid in task_ids:
                 task = self._tasks.get(tid)
                 if task and task.status != "running":
                     return task
-            # Brief sleep to avoid busy-wait
-            time.sleep(0.05)
+            if deadline is not None and time.monotonic() >= deadline:
+                return None
+            futures = [self._futures[tid] for tid in task_ids if tid in self._futures]
+            if not futures:
+                return None  # No known tasks to wait on
+            remaining = (deadline - time.monotonic()) if deadline is not None else 0.25
+            concurrent.futures.wait(
+                futures,
+                timeout=min(max(remaining, 0), 0.25),
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
 
     def cancel(self, task_id: str) -> bool:
         """Cancel a running task."""

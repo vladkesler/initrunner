@@ -104,16 +104,16 @@ def _do_extract_text(
     except Exception as exc:
         return f"Error: could not open PDF: {exc}"
 
-    total = doc.page_count
-    page_indices = _parse_page_spec(page_spec, total)
-    if isinstance(page_indices, str):
+    try:
+        total = doc.page_count
+        page_indices = _parse_page_spec(page_spec, total)
+        if isinstance(page_indices, str):
+            return page_indices
+
+        if len(page_indices) > max_pages:
+            page_indices = page_indices[:max_pages]
+    finally:
         doc.close()
-        return page_indices
-
-    if len(page_indices) > max_pages:
-        page_indices = page_indices[:max_pages]
-
-    doc.close()
 
     try:
         text = pymupdf4llm.to_markdown(str(resolved), pages=page_indices)
@@ -148,9 +148,11 @@ def _do_extract_metadata(
     except Exception as exc:
         return f"Error: could not open PDF: {exc}"
 
-    meta = doc.metadata or {}
-    page_count = doc.page_count
-    doc.close()
+    try:
+        meta = doc.metadata or {}
+        page_count = doc.page_count
+    finally:
+        doc.close()
 
     lines = [
         f"**File:** {path_display}",

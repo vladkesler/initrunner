@@ -264,6 +264,69 @@ class TestExtractPdfMetadata:
 
 
 # ---------------------------------------------------------------------------
+# Resource cleanup on error
+# ---------------------------------------------------------------------------
+
+
+class TestPdfExtractResourceCleanup:
+    def test_extract_text_closes_doc_on_page_count_error(self, tmp_path: Path):
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake")
+
+        with (
+            patch("initrunner.agent.tools.pdf_extract.validate_path_within") as mock_validate,
+            patch("initrunner._compat.require_ingest"),
+            patch.dict("sys.modules", {"pymupdf4llm": MagicMock(), "pymupdf": MagicMock()}),
+        ):
+            import sys
+
+            mock_pymupdf = sys.modules["pymupdf"]
+            mock_doc_instance = MagicMock()
+            type(mock_doc_instance).page_count = property(
+                lambda self: (_ for _ in ()).throw(RuntimeError("corrupt"))
+            )
+            mock_pymupdf.open.return_value = mock_doc_instance
+            mock_validate.return_value = (None, pdf_file)
+
+            config = PdfExtractToolConfig(root_path=str(tmp_path))
+            toolset = build_pdf_extract_toolset(config, _make_ctx())
+            fn = toolset.tools["extract_pdf_text"].function
+
+            with pytest.raises(RuntimeError, match="corrupt"):
+                fn(path="test.pdf")
+
+            mock_doc_instance.close.assert_called_once()
+
+    def test_extract_metadata_closes_doc_on_error(self, tmp_path: Path):
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake")
+
+        with (
+            patch("initrunner.agent.tools.pdf_extract.validate_path_within") as mock_validate,
+            patch.dict("sys.modules", {"pymupdf": MagicMock()}),
+        ):
+            import sys
+
+            mock_pymupdf = sys.modules["pymupdf"]
+            mock_doc_instance = MagicMock()
+            type(mock_doc_instance).page_count = property(
+                lambda self: (_ for _ in ()).throw(RuntimeError("corrupt"))
+            )
+            mock_doc_instance.metadata = {}
+            mock_pymupdf.open.return_value = mock_doc_instance
+            mock_validate.return_value = (None, pdf_file)
+
+            config = PdfExtractToolConfig(root_path=str(tmp_path))
+            toolset = build_pdf_extract_toolset(config, _make_ctx())
+            fn = toolset.tools["extract_pdf_metadata"].function
+
+            with pytest.raises(RuntimeError, match="corrupt"):
+                fn(path="test.pdf")
+
+            mock_doc_instance.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 

@@ -278,8 +278,21 @@ class McpInvoker:
             with httpx.Client(timeout=self._timeout) as client:
                 resp = client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
-                data = resp.json()
-                return data["choices"][0]["message"]["content"]
+                try:
+                    data = resp.json()
+                except ValueError:
+                    return (
+                        f"{_ERROR_PREFIX} Non-JSON response from agent "
+                        f"'{self._agent_name}': {resp.text[:200]}"
+                    )
+                try:
+                    content = data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError):
+                    return (
+                        f"{_ERROR_PREFIX} Malformed response from agent "
+                        f"'{self._agent_name}': {resp.text[:200]}"
+                    )
+                return content
         except httpx.TimeoutException:
             return (
                 f"{_ERROR_PREFIX} Connection timed out to agent '{self._agent_name}' "

@@ -276,6 +276,102 @@ class TestMcpInvoker:
         )
         assert invoker._base_url == "http://agent:8000"
 
+    def test_non_json_response(self):
+        invoker = McpInvoker(
+            base_url="http://agent:8000",
+            agent_name="agent",
+            timeout=30,
+        )
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.side_effect = ValueError("No JSON")
+        mock_response.text = "plain text body"
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_cls.return_value = mock_client
+
+            result = invoker.invoke("hello")
+
+        assert "[DELEGATION ERROR]" in result
+        assert "Non-JSON response" in result
+
+    def test_malformed_response_missing_choices(self):
+        invoker = McpInvoker(
+            base_url="http://agent:8000",
+            agent_name="agent",
+            timeout=30,
+        )
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {}
+        mock_response.text = "{}"
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_cls.return_value = mock_client
+
+            result = invoker.invoke("hello")
+
+        assert "[DELEGATION ERROR]" in result
+        assert "Malformed response" in result
+
+    def test_malformed_response_empty_choices(self):
+        invoker = McpInvoker(
+            base_url="http://agent:8000",
+            agent_name="agent",
+            timeout=30,
+        )
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {"choices": []}
+        mock_response.text = '{"choices": []}'
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_cls.return_value = mock_client
+
+            result = invoker.invoke("hello")
+
+        assert "[DELEGATION ERROR]" in result
+        assert "Malformed response" in result
+
+    def test_malformed_response_missing_content(self):
+        invoker = McpInvoker(
+            base_url="http://agent:8000",
+            agent_name="agent",
+            timeout=30,
+        )
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {}}]}
+        mock_response.text = '{"choices": [{"message": {}}]}'
+
+        with patch("httpx.Client") as mock_client_cls:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_cls.return_value = mock_client
+
+            result = invoker.invoke("hello")
+
+        assert "[DELEGATION ERROR]" in result
+        assert "Malformed response" in result
+
 
 class TestInlineInvokerSharedMemory:
     def test_shared_memory_patches_sub_agent(self, tmp_path):
