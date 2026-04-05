@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026.4.6] - 2026-04-05
+
+### Added
+- **Deferred MCP tool loading** -- `defer: true` on MCP tool config defers server connections until first tool call, serving cached schemas in the meantime. Schema cache in `~/.initrunner/cache/mcp/` with atomic writes, drift detection, and auto-warnings. Dashboard shows deferred badges and cache age with cache invalidation endpoint
+
+### Changed
+- **Unified sync-to-async bridge** -- replaced 8 scattered `asyncio.run()`/`anyio.run()` call sites with the single `run_sync()` helper backed by `anyio.run()`. Safe inside compose/daemon mode (detects running event loops, offloads to worker threads). `anyio>=4` added as explicit dependency
+- **Decomposed oversized functions** -- split `build_flow_graph()` (197->15 lines), `build_agent()` (172->40 lines), and `_execute_ingest_core()` (185->45 lines) into focused helpers with explicit data flow via frozen dataclasses
+- **Extracted SSE pump and shared AST helpers** -- common SSE heartbeat/drain/error logic consolidated into `_sse_pump()` async generator. 5 duplicated AST helpers moved to `services/_sidecar_common.py`
+
+### Fixed
+- **PDF resource leak** -- `pymupdf` document wrapped in `try/finally` so `doc.close()` runs even when page/metadata access raises
+- **Delegation response parsing** -- response JSON and structure validated before accessing nested keys; specific error messages instead of misleading "Failed to reach agent"
+- **Spawn timeout hang** -- `await_any` uses deadline + `concurrent.futures.wait`; returns `None` immediately for unknown task IDs instead of looping forever
+- **Trigger send race** -- Telegram/Discord `send()` gated on `threading.Event` set only when bot is fully operational, closing the race where `send()` hit a half-initialized loop
+
 ## [2026.4.5] - 2026-04-04
 
 ### Added
