@@ -134,17 +134,24 @@ def build_schema_reference() -> str:
         sink_items.append((type_name, cls))
     sections.append(_typed_items("Sinks (spec.sinks list)", sink_items))
 
-    # Optional sections (names only, no field details)
+    # Optional sections -- field-level references
+    from initrunner.agent.schema.autonomy import AutonomyConfig
+    from initrunner.agent.schema.ingestion import IngestConfig
+    from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.observability import ObservabilityConfig
+    from initrunner.agent.schema.reasoning import ReasoningConfig
+    from initrunner.agent.schema.security import SecurityPolicy
+
     sections.append(
         "# Optional spec sections (include only if needed):\n"
-        "#   spec.ingest -- RAG document ingestion (sources, chunking, embeddings)\n"
-        "#   spec.memory -- episodic, semantic, procedural memory\n"
-        "#   spec.reasoning -- pattern: react|reflexion|todo_driven|plan_execute\n"
-        "#   spec.autonomy -- continuation behavior for long-running agents\n"
-        "#   spec.security -- content policy, sandbox, auth\n"
-        "#   spec.observability -- OpenTelemetry tracing\n"
         "# Omit sections that use defaults. The output will be minimized automatically."
     )
+    sections.append(_format_model_fields("Ingest (spec.ingest)", IngestConfig))
+    sections.append(_format_model_fields("Memory (spec.memory)", MemoryConfig))
+    sections.append(_format_model_fields("Reasoning (spec.reasoning)", ReasoningConfig))
+    sections.append(_format_model_fields("Autonomy (spec.autonomy)", AutonomyConfig))
+    sections.append(_format_model_fields("Security (spec.security)", SecurityPolicy))
+    sections.append(_format_model_fields("Observability (spec.observability)", ObservabilityConfig))
 
     return "\n\n".join(sections)
 

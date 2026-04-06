@@ -75,3 +75,60 @@ class TestCanonicalizePresenceSignificant:
         role = _make_role(memory=MemoryConfig(max_sessions=5))
         parsed = yaml.safe_load(canonicalize_role_yaml(role))
         assert parsed["spec"]["memory"]["max_sessions"] == 5
+
+
+# ---------------------------------------------------------------------------
+# _detect_provider -- precedence tests
+# ---------------------------------------------------------------------------
+
+
+class TestDetectProvider:
+    """_detect_provider should respect the canonical precedence contract."""
+
+    def test_run_yaml_overrides_env_vars(self, monkeypatch):
+        """run.yaml provider wins over env-var auto-detection."""
+        from unittest.mock import patch
+
+        from initrunner.services.roles import _detect_provider
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("openai", "gpt-5-mini", None, None, "run_yaml"),
+        ):
+            assert _detect_provider() == "openai"
+
+    def test_env_detection_used_when_no_run_yaml(self, monkeypatch):
+        """Falls back to env auto-detection when run.yaml has no provider."""
+        from unittest.mock import patch
+
+        from initrunner.services.roles import _detect_provider
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("anthropic", "claude-sonnet-4-6", None, None, "auto_detected"),
+        ):
+            assert _detect_provider() == "anthropic"
+
+    def test_defaults_to_openai_when_nothing_configured(self):
+        """Returns 'openai' when detect_default_model finds nothing."""
+        from unittest.mock import patch
+
+        from initrunner.services.roles import _detect_provider
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("", "", None, None, "none"),
+        ):
+            assert _detect_provider() == "openai"
+
+    def test_initrunner_model_env_takes_top_priority(self, monkeypatch):
+        """INITRUNNER_MODEL env var wins over everything."""
+        from unittest.mock import patch
+
+        from initrunner.services.roles import _detect_provider
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("google", "gemini-2.5-flash", None, None, "initrunner_model_env"),
+        ):
+            assert _detect_provider() == "google"

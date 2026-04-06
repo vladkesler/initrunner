@@ -37,6 +37,7 @@ from initrunner.dashboard.schemas import (
     ValidateRequest,
     ValidationIssueResponse,
 )
+from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
 
 _logger = logging.getLogger(__name__)
 
@@ -67,68 +68,6 @@ def _issues_to_response(issues: list) -> list[ValidationIssueResponse]:
         ValidationIssueResponse(field=i.field, message=i.message, severity=i.severity)
         for i in issues
     ]
-
-
-def _rewrite_model_block(
-    yaml_text: str,
-    *,
-    provider: str | None = None,
-    name: str | None = None,
-    base_url: str | None = None,
-    api_key_env: str | None = None,
-) -> str:
-    """Replace or inject fields in the spec.model block.
-
-    Scoped by indentation: enters the block when ``  model:`` is found
-    (spec-level indent) and exits when indentation returns to that level
-    or above.  ``provider:`` and ``name:`` lines are *replaced* in-place;
-    ``base_url`` and ``api_key_env`` are *injected* after the ``name:`` line.
-    """
-    lines = yaml_text.split("\n")
-    result: list[str] = []
-    in_model = False
-    model_indent = 0
-    injected = False
-
-    for line in lines:
-        stripped = line.lstrip()
-
-        # Detect entry into spec.model block
-        if not in_model and stripped == "model:" and line.startswith("  model:"):
-            in_model = True
-            model_indent = len(line) - len(stripped)
-            result.append(line)
-            continue
-
-        # Inside model block -- check if we've exited (indentation <= model key)
-        if in_model and stripped and not stripped.startswith("#"):
-            current_indent = len(line) - len(stripped)
-            if current_indent <= model_indent:
-                in_model = False
-
-        if in_model:
-            field_indent = " " * (len(line) - len(stripped))
-            # Replace provider: line
-            if provider is not None and stripped.startswith("provider:"):
-                result.append(f"{field_indent}provider: {provider}")
-                continue
-            # Replace name: line, then inject trailing fields
-            if stripped.startswith("name:"):
-                if name is not None:
-                    result.append(f"{field_indent}name: {name}")
-                else:
-                    result.append(line)
-                if not injected:
-                    if base_url is not None:
-                        result.append(f"{field_indent}base_url: {base_url}")
-                    if api_key_env is not None:
-                        result.append(f"{field_indent}api_key_env: {api_key_env}")
-                    injected = True
-                continue
-
-        result.append(line)
-
-    return "\n".join(result)
 
 
 # ---------------------------------------------------------------------------

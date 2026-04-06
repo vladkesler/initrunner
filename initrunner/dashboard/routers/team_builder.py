@@ -65,7 +65,7 @@ async def seed_team(body: TeamSeedRequest) -> TeamSeedResponse:
         # Load starter YAML and rewrite model block
         if not body.starter_slug:
             raise HTTPException(status_code=400, detail="starter_slug is required for mode=starter")
-        from initrunner.dashboard.routers.builder import _rewrite_model_block
+        from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
         from initrunner.services.starters import resolve_starter_path
         from initrunner.templates import _default_model_name
 

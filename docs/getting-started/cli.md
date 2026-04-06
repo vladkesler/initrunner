@@ -259,8 +259,8 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--list-templates` | Show available templates and exit |
 | `--blank` | Start from a minimal blank template |
 | `--langchain PATH` | Import from a LangChain Python file (see [LangChain Import](langchain-import.md)) |
-| `--provider TEXT` | Model provider (auto-detected if omitted) |
-| `--model TEXT` | Model name (uses provider default if omitted) |
+| `--provider TEXT` | Model provider (resolved from `INITRUNNER_MODEL` env, `run.yaml`, or API key detection if omitted) |
+| `--model TEXT` | Model name (resolved from `run.yaml` or provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
 | `--force` | Overwrite existing file without prompting |
 | `--no-refine` | Skip the interactive refinement loop |

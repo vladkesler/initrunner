@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026.4.9] - 2026-04-07
+
+### Fixed
+- **`init new` ignores saved provider config** -- now respects `run.yaml` via the canonical precedence (`INITRUNNER_MODEL` > `run.yaml` > env auto-detect > fallback). Previously picked Anthropic if `ANTHROPIC_API_KEY` existed, even with a stale key
+- **Custom endpoints broken in CLI builder** -- `base_url` and `api_key_env` from `run.yaml` are now threaded through the builder and injected into generated YAML, fixing OpenRouter and other custom-endpoint setups
+- **401 errors show raw tracebacks** -- authentication failures now print actionable guidance (`initrunner setup` or `--provider`) instead of a PydanticAI stack trace
+- **Missing SDK shows `pip` instructions** -- provider SDK check now runs early in `init new` with `uv`-friendly install message
+- **Builder emits empty optional sections** -- `memory: {}`, `ingest: {}`, etc. when asked to add features. Schema reference now includes field-level details for all optional sections (memory, ingest, reasoning, autonomy, security, observability)
+- **Builder confuses RAG with memory** -- prompt now distinguishes RAG (`ingest` with `sources`) from memory (cross-session agent state) and guides the LLM accordingly
+- **Broad exception catch skips refinement** -- narrowed seed-phase error handler to `ModelHTTPError` only, fixing a regression where any exception silently exited before the refinement loop
+- **Budget daily reset test timezone bug** -- test used `date.today()` (local time) but tracker uses UTC; fails when local date is ahead of UTC
+
+### Changed
+- **`rewrite_model_block` extracted to shared module** -- moved from `dashboard/routers/builder.py` to `services/agent_builder.py` for reuse by CLI builder
+
 ## [2026.4.8] - 2026-04-06
 
 ### Added

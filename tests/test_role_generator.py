@@ -53,10 +53,13 @@ class TestBuildSchemaReference:
 
     def test_contains_optional_sections(self):
         result = build_schema_reference()
-        assert "ingest" in result
-        assert "memory" in result
-        assert "reasoning" in result
-        assert "autonomy" in result
+        assert "Ingest (spec.ingest)" in result
+        assert "Required: sources" in result
+        assert "Memory (spec.memory)" in result
+        assert "Reasoning (spec.reasoning)" in result
+        assert "Autonomy (spec.autonomy)" in result
+        assert "Security (spec.security)" in result
+        assert "Observability (spec.observability)" in result
 
     def test_no_default_values_exposed(self):
         """Schema reference must not expose default values that cause over-specification."""

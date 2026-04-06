@@ -15,6 +15,27 @@ if TYPE_CHECKING:
     from initrunner.services.agent_builder import BuilderSession, TurnResult
 
 
+def _handle_builder_error(exc: Exception, provider: str, *, fatal: bool = True) -> bool:
+    """Handle LLM errors from the builder agent.
+
+    Returns ``True`` if the error was recognized and a message was printed,
+    ``False`` otherwise (caller should fall back to generic handling).
+    """
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    if isinstance(exc, ModelHTTPError):
+        if exc.status_code == 401:
+            console.print(
+                f"[red]Authentication failed[/red] for provider [bold]{provider}[/bold].\n"
+                "Your API key is missing or invalid.\n\n"
+                "Fix: run [bold]initrunner setup[/bold] or pass [bold]--provider <name>[/bold]."
+            )
+        else:
+            console.print(f"[red]Model API error ({exc.status_code}):[/red] {exc}")
+        return True
+    return False
+
+
 def new(
     description: Annotated[str | None, typer.Argument(help="Agent description")] = None,
     from_source: Annotated[
@@ -62,9 +83,10 @@ def new(
         console.print("\n[dim]Usage: initrunner new --template <name>[/dim]")
         raise typer.Exit(0)
 
-    from initrunner.agent.loader import _load_dotenv
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    from initrunner.agent.loader import _load_dotenv, detect_default_model
     from initrunner.services.agent_builder import BuilderSession
-    from initrunner.services.roles import _detect_provider
 
     _load_dotenv(Path.cwd())
 
@@ -86,9 +108,18 @@ def new(
         )
         raise typer.Exit(1)
 
-    # --- Resolve provider ---
-    if provider is None:
-        provider = _detect_provider()
+    # --- Resolve provider/model defaults ---
+    # Precedence: CLI flags > INITRUNNER_MODEL env > run.yaml > env auto-detect
+    base_url: str | None = None
+    api_key_env: str | None = None
+    if provider is None or model is None:
+        d_prov, d_model, d_base_url, d_api_key_env, _src = detect_default_model()
+        if provider is None:
+            provider = d_prov or "openai"
+        if model is None and d_model:
+            model = d_model
+        base_url = d_base_url
+        api_key_env = d_api_key_env
 
     # --- Scaffold shortcuts (non-YAML templates) ---
     if template == "tool":
@@ -113,10 +144,23 @@ def new(
             pydantic_ai,
             provider,
             model,
+            base_url=base_url,
+            api_key_env=api_key_env,
         )
     except (ValueError, FileNotFoundError, OSError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
+    except ModelHTTPError as e:
+        _handle_builder_error(e, provider)
+        raise typer.Exit(1) from None
+
+    # Inject base_url/api_key_env into generated YAML
+    if base_url:
+        from initrunner.services.agent_builder import rewrite_model_block
+
+        session.yaml_text = rewrite_model_block(
+            session.yaml_text, base_url=base_url, api_key_env=api_key_env
+        )
 
     # --- Show initial result ---
     _display_turn(turn, session)
@@ -134,7 +178,9 @@ def new(
 
     # --- Refinement loop ---
     if not no_refine:
-        turn = _refinement_loop(session, turn, provider, model)
+        turn = _refinement_loop(
+            session, turn, provider, model, base_url=base_url, api_key_env=api_key_env
+        )
         if turn is None:
             # User quit
             console.print("[dim]Discarded.[/dim]")
@@ -185,6 +231,9 @@ def _seed_session(
     pydantic_ai: str | None,
     provider: str,
     model: str | None,
+    *,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> TurnResult:
     """Resolve seed mode and execute it. Returns the initial TurnResult."""
 
@@ -197,23 +246,34 @@ def _seed_session(
     if from_source is not None:
         return _seed_from_source(session, from_source, provider, model)
 
+    # LLM-backed seeds below -- verify SDK is installed for the provider
+    from initrunner._compat import require_provider
+
+    require_provider(provider)
+
     if langchain is not None:
         lc_path = Path(langchain)
         if not lc_path.exists():
             raise FileNotFoundError(f"LangChain file not found: {lc_path}")
         with console.status("Importing LangChain agent..."):
-            return session.seed_from_langchain(lc_path, provider, model)
+            return session.seed_from_langchain(
+                lc_path, provider, model, base_url=base_url, api_key_env=api_key_env
+            )
 
     if pydantic_ai is not None:
         pai_path = Path(pydantic_ai)
         if not pai_path.exists():
             raise FileNotFoundError(f"PydanticAI file not found: {pai_path}")
         with console.status("Importing PydanticAI agent..."):
-            return session.seed_from_pydanticai(pai_path, provider, model)
+            return session.seed_from_pydanticai(
+                pai_path, provider, model, base_url=base_url, api_key_env=api_key_env
+            )
 
     if description is not None:
         with console.status("Generating..."):
-            return session.seed_description(description, provider, model)
+            return session.seed_description(
+                description, provider, model, base_url=base_url, api_key_env=api_key_env
+            )
 
     # No seed -- interactive: ask LLM what to build
     with console.status("Generating..."):
@@ -222,6 +282,8 @@ def _seed_session(
             "Start by asking clarifying questions.",
             provider,
             model,
+            base_url=base_url,
+            api_key_env=api_key_env,
         )
 
 
@@ -274,8 +336,13 @@ def _refinement_loop(
     turn: TurnResult,
     provider: str,
     model: str | None,
+    *,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> TurnResult | None:
     """Interactive refinement loop. Returns final TurnResult or None if user quit."""
+    from pydantic_ai.exceptions import ModelHTTPError
+
     while True:
         try:
             user_input = console.input('\n[bold]Refine[/bold] (empty to save, "quit" to discard): ')
@@ -292,10 +359,23 @@ def _refinement_loop(
 
         with console.status("Refining..."):
             try:
-                turn = session.refine(user_input, provider, model)
+                turn = session.refine(
+                    user_input, provider, model, base_url=base_url, api_key_env=api_key_env
+                )
+            except ModelHTTPError as e:
+                _handle_builder_error(e, provider, fatal=False)
+                continue
             except Exception as e:
                 console.print(f"[red]Error during refinement:[/red] {e}")
                 continue
+
+        # Inject base_url/api_key_env into refined YAML
+        if base_url:
+            from initrunner.services.agent_builder import rewrite_model_block
+
+            session.yaml_text = rewrite_model_block(
+                session.yaml_text, base_url=base_url, api_key_env=api_key_env
+            )
 
         _display_turn(turn, session)
 

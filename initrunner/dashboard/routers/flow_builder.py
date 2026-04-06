@@ -103,7 +103,7 @@ async def seed_flow(
     if req.mode == "starter":
         if not req.starter_slug:
             raise HTTPException(status_code=400, detail="starter_slug is required for mode=starter")
-        from initrunner.dashboard.routers.builder import _rewrite_model_block
+        from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
         from initrunner.services.starters import resolve_starter_path
 
         path = resolve_starter_path(req.starter_slug)

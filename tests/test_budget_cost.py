@@ -64,7 +64,7 @@ class TestDaemonTokenTrackerCostBudget:
 
     def test_cost_budget_daily_reset(self) -> None:
         """Daily cost resets when date changes."""
-        from datetime import date
+        from datetime import UTC, datetime, timedelta
 
         tracker = DaemonTokenTracker(
             lifetime_budget=None,
@@ -80,10 +80,8 @@ class TestDaemonTokenTrackerCostBudget:
 
         assert tracker.daily_cost_consumed == 0.011
 
-        # Simulate date change
-        from datetime import timedelta
-
-        tracker.last_reset_date = date.today() - timedelta(days=1)
+        # Simulate date change (use UTC to match tracker internals)
+        tracker.last_reset_date = datetime.now(UTC).date() - timedelta(days=1)
 
         # check_before_run should reset daily counters
         allowed, _reason = tracker.check_before_run()

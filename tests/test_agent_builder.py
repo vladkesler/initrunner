@@ -637,3 +637,23 @@ class TestGenerateRoleWrapper:
         result = generate_role("a simple chatbot", provider="openai")
         assert "test-agent" in result
         assert "apiVersion" in result
+
+
+# ---------------------------------------------------------------------------
+# Builder prompt content
+# ---------------------------------------------------------------------------
+
+
+class TestBuilderPromptContent:
+    def test_ingest_guidance_present(self):
+        """Builder prompt must warn that ingest requires sources."""
+        from initrunner.services.agent_builder import _BUILDER_SYSTEM_PROMPT
+
+        assert "ingest: {{}}" in _BUILDER_SYSTEM_PROMPT
+        assert "sources" in _BUILDER_SYSTEM_PROMPT
+
+    def test_memory_guidance_present(self):
+        """Builder prompt must explain that memory: {} is valid."""
+        from initrunner.services.agent_builder import _BUILDER_SYSTEM_PROMPT
+
+        assert "memory: {{}}" in _BUILDER_SYSTEM_PROMPT
