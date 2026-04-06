@@ -27,6 +27,7 @@ from initrunner.agent.loader import (
 )
 from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.tool_events import ToolEvent
 from initrunner.audit.logger import AuditLogger
 from initrunner.flow.schema import FlowAgentConfig, FlowDefinition, SharedDocumentsConfig
 from initrunner.sinks.dispatcher import SinkDispatcher, build_sink
@@ -187,10 +188,12 @@ class FlowOrchestrator:
         *,
         audit_logger: AuditLogger | None = None,
         max_agent_workers: int | None = None,
+        on_tool_event: Callable[[str, ToolEvent], None] | None = None,
     ) -> None:
         self._flow = flow
         self._base_dir = base_dir
         self._audit_logger = audit_logger
+        self._on_tool_event = on_tool_event
         self._members: dict[str, FlowMember] = {}
         self._failed_members: dict[str, str] = {}
 
@@ -333,6 +336,7 @@ class FlowOrchestrator:
         timeout_seconds: float = 300,
         on_service_start: Callable[[str], None] | None = None,
         on_service_complete: Callable[[str, RunResult], None] | None = None,
+        on_tool_event: Callable[[str, ToolEvent], None] | None = None,
     ) -> FlowRunResult:
         """Run a single prompt through the flow graph synchronously."""
         from initrunner._ids import generate_id
@@ -354,6 +358,7 @@ class FlowOrchestrator:
             on_service_complete=on_service_complete,
             one_shot=True,
             flow_run_id=flow_run_id,
+            on_tool_event=on_tool_event or self._on_tool_event,
         )
 
         result = self._collect_results(entry, total_ms, timed_out=timed_out)
@@ -370,6 +375,7 @@ class FlowOrchestrator:
         timeout_seconds: float = 300,
         on_service_start: Callable[[str], None] | None = None,
         on_service_complete: Callable[[str, RunResult], None] | None = None,
+        on_tool_event: Callable[[str, ToolEvent], None] | None = None,
     ) -> FlowRunResult:
         """Run a single prompt through the flow graph asynchronously."""
         from initrunner._ids import generate_id
@@ -391,6 +397,7 @@ class FlowOrchestrator:
             on_service_complete=on_service_complete,
             one_shot=True,
             flow_run_id=flow_run_id,
+            on_tool_event=on_tool_event or self._on_tool_event,
         )
 
         result = self._collect_results(entry, total_ms, timed_out=timed_out)
@@ -408,7 +415,7 @@ class FlowOrchestrator:
 
         self._build_members()
         self._shutdown, self._daemon_thread = start_daemon(
-            self._flow, self._members, self._audit_logger
+            self._flow, self._members, self._audit_logger, self._on_tool_event
         )
 
     def stop(self) -> None:
@@ -616,11 +623,14 @@ def run_flow(
     base_dir: Path,
     *,
     audit_logger: AuditLogger | None = None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> None:
     """Run a flow orchestration (foreground, Ctrl+C to stop)."""
     stop = threading.Event()
 
-    orchestrator = FlowOrchestrator(flow, base_dir, audit_logger=audit_logger)
+    orchestrator = FlowOrchestrator(
+        flow, base_dir, audit_logger=audit_logger, on_tool_event=on_tool_event
+    )
 
     console.print(f"[bold]Flow[/bold] -- {flow.metadata.name} ({len(flow.spec.agents)} agents)")
 

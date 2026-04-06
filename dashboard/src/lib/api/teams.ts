@@ -15,7 +15,8 @@ import type {
 	IngestSummary,
 	IngestSSEEvent,
 	IngestStats,
-	TimelineResponse
+	TimelineResponse,
+	ToolEventData
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -99,6 +100,7 @@ export function streamTeamRun(
 	callbacks: {
 		onPersonaStart?: (name: string) => void;
 		onPersonaComplete?: (step: PersonaStepResponse) => void;
+		onToolEvent?: (data: ToolEventData) => void;
 		onResult?: (result: TeamRunResponse) => void;
 		onError?: (error: string) => void;
 	}
@@ -139,6 +141,8 @@ export function streamTeamRun(
 							callbacks.onPersonaStart?.(event.data);
 						} else if (event.type === 'persona_complete') {
 							callbacks.onPersonaComplete?.(event.data);
+						} else if (event.type === 'tool_event') {
+							callbacks.onToolEvent?.(event.data);
 						} else if (event.type === 'result') {
 							callbacks.onResult?.(event.data);
 						} else if (event.type === 'error') {

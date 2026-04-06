@@ -21,6 +21,11 @@ from initrunner._async import run_sync
 from initrunner._ids import generate_id
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
+from initrunner.agent.tool_events import (
+    ToolEvent,
+    reset_tool_event_callback,
+    set_tool_event_callback,
+)
 from initrunner.team.prompts import build_agent_prompt, build_parallel_prompt
 from initrunner.team.results import StepMetadata, TeamResult, accumulate_result
 from initrunner.team.roles import persona_to_role
@@ -60,6 +65,7 @@ class TeamGraphDeps:
     shared_mem_path: str | None
     shared_doc_path: str | None
     task: str  # original task prompt
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -139,17 +145,26 @@ def _make_sequential_persona_step(persona_name: str, index: int):
         # Execute with persona environment
         from initrunner.agent.loader import build_agent
 
-        with persona_env(persona.environment):
-            agent = build_agent(role, role_dir=deps.team_dir)
-            result, _ = await execute_run_async(
-                agent,
-                role,
-                prompt,
-                audit_logger=deps.audit_logger,
-                model_override=deps.dry_run_model,
-                trigger_type="team",
-                trigger_metadata=trigger_metadata,
+        cb_token = None
+        if deps.on_tool_event:
+            cb_token = set_tool_event_callback(
+                lambda event, _name=persona_name: deps.on_tool_event(_name, event)
             )
+        try:
+            with persona_env(persona.environment):
+                agent = build_agent(role, role_dir=deps.team_dir)
+                result, _ = await execute_run_async(
+                    agent,
+                    role,
+                    prompt,
+                    audit_logger=deps.audit_logger,
+                    model_override=deps.dry_run_model,
+                    trigger_type="team",
+                    trigger_metadata=trigger_metadata,
+                )
+        finally:
+            if cb_token is not None:
+                reset_tool_event_callback(cb_token)
 
         # Accumulate to team result
         if state.team_result:
@@ -245,16 +260,25 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
 
         from initrunner.agent.loader import build_agent
 
-        agent = build_agent(role, role_dir=deps.team_dir)
-        result, _ = await execute_run_async(
-            agent,
-            role,
-            prompt,
-            audit_logger=deps.audit_logger,
-            model_override=deps.dry_run_model,
-            trigger_type="team",
-            trigger_metadata=trigger_metadata,
-        )
+        cb_token = None
+        if deps.on_tool_event:
+            cb_token = set_tool_event_callback(
+                lambda event, _name=persona_name: deps.on_tool_event(_name, event)
+            )
+        try:
+            agent = build_agent(role, role_dir=deps.team_dir)
+            result, _ = await execute_run_async(
+                agent,
+                role,
+                prompt,
+                audit_logger=deps.audit_logger,
+                model_override=deps.dry_run_model,
+                trigger_type="team",
+                trigger_metadata=trigger_metadata,
+            )
+        finally:
+            if cb_token is not None:
+                reset_tool_event_callback(cb_token)
 
         # Callback
         if deps.on_persona_complete:
@@ -336,6 +360,7 @@ async def run_team_graph_async(
     dry_run_model: Any | None = None,
     on_persona_start: Callable[[str], None] | None = None,
     on_persona_complete: Callable[[str, RunResult], None] | None = None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> TeamResult:
     """Run a team through a pydantic-graph, returning TeamResult."""
     from initrunner.agent.loader import _load_dotenv
@@ -367,6 +392,7 @@ async def run_team_graph_async(
             shared_mem_path=shared_mem_path,
             shared_doc_path=shared_doc_path,
             task=task,
+            on_tool_event=on_tool_event,
         )
 
         if team.spec.strategy == "parallel":
@@ -552,16 +578,25 @@ async def _run_debate_persona(
 
     from initrunner.agent.loader import build_agent
 
-    agent = build_agent(role, role_dir=deps.team_dir)
-    run_result, _ = await execute_run_async(
-        agent,
-        role,
-        prompt,
-        audit_logger=deps.audit_logger,
-        model_override=deps.dry_run_model,
-        trigger_type="team",
-        trigger_metadata=trigger_metadata,
-    )
+    cb_token = None
+    if deps.on_tool_event:
+        cb_token = set_tool_event_callback(
+            lambda event, _name=display_name: deps.on_tool_event(_name, event)
+        )
+    try:
+        agent = build_agent(role, role_dir=deps.team_dir)
+        run_result, _ = await execute_run_async(
+            agent,
+            role,
+            prompt,
+            audit_logger=deps.audit_logger,
+            model_override=deps.dry_run_model,
+            trigger_type="team",
+            trigger_metadata=trigger_metadata,
+        )
+    finally:
+        if cb_token is not None:
+            reset_tool_event_callback(cb_token)
 
     accumulate_result(
         result,
@@ -623,16 +658,23 @@ async def _run_synthesis(
 
     from initrunner.agent.loader import build_agent
 
-    agent = build_agent(role, role_dir=deps.team_dir)
-    run_result, _ = await execute_run_async(
-        agent,
-        role,
-        prompt,
-        audit_logger=deps.audit_logger,
-        model_override=deps.dry_run_model,
-        trigger_type="team",
-        trigger_metadata=trigger_metadata,
-    )
+    cb_token = None
+    if deps.on_tool_event:
+        cb_token = set_tool_event_callback(lambda event: deps.on_tool_event("synthesis", event))
+    try:
+        agent = build_agent(role, role_dir=deps.team_dir)
+        run_result, _ = await execute_run_async(
+            agent,
+            role,
+            prompt,
+            audit_logger=deps.audit_logger,
+            model_override=deps.dry_run_model,
+            trigger_type="team",
+            trigger_metadata=trigger_metadata,
+        )
+    finally:
+        if cb_token is not None:
+            reset_tool_event_callback(cb_token)
 
     accumulate_result(
         result,
@@ -695,5 +737,9 @@ def run_team_graph_sync(
     task: str,
     **kwargs: Any,
 ) -> TeamResult:
-    """Synchronous wrapper for ``run_team_graph_async``."""
+    """Synchronous wrapper for ``run_team_graph_async``.
+
+    Accepts all keyword arguments of ``run_team_graph_async`` including
+    ``on_tool_event``.
+    """
     return run_sync(run_team_graph_async(team, task, **kwargs))

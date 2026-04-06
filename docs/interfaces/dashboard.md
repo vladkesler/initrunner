@@ -415,7 +415,7 @@ Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stre
 |------------|---------|
 | `usage` | Budget limits, model name, provider (emitted once before streaming starts) |
 | `token` | String chunk of model output |
-| `tool_event` | Tool call lifecycle: `{tool_name, status, phase, error_summary, duration_ms}`. Emitted at start (`phase="start"`, `status="running"`) and completion (`phase="complete"`, `status="ok"` or `"error"`). Exception-safe: a start event always gets a matching complete event. |
+| `tool_event` | Tool call lifecycle: `{tool_name, status, phase, error_summary, duration_ms, agent_name?}`. Emitted at start (`phase="start"`, `status="running"`) and completion (`phase="complete"`, `status="ok"` or `"error"`). Exception-safe: a start event always gets a matching complete event. In flow and team streams, `agent_name` identifies the originating agent/persona (debate rounds include the round number, e.g. `"alpha (round 2)"`). |
 | `result` | Full `RunResponse` with token counts, tool calls, duration, and `cost` (USD estimate via genai-prices) |
 | `error` | Error message string |
 
@@ -845,6 +845,7 @@ Run a single prompt through the flow pipeline via SSE. Uses the real orchestrato
 SSE events:
 - `agent_start` -- agent name about to execute
 - `agent_complete` -- per-agent result (name, output preview, duration, tokens, success)
+- `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating flow agent (same schema as single-agent `tool_event`)
 - `result` -- final `FlowRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, and entry agent `message_history`
 - `error` -- error string
 
@@ -932,6 +933,7 @@ Run a prompt through the team via SSE.
 SSE events:
 - `persona_start` -- persona name about to execute
 - `persona_complete` -- per-persona result (name, output preview, duration, tokens, success)
+- `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating persona (debate rounds include the round, e.g. `"alpha (round 2)"`; synthesis step uses `"synthesis"`)
 - `result` -- final `TeamRunResponse` with output, steps, and aggregate tokens
 - `error` -- error string
 

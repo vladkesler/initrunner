@@ -256,6 +256,57 @@ class TestRunFlowGraph:
         assert "consumer" in completes
 
     @patch("initrunner.flow.graph.execute_run_async")
+    def test_tool_event_callback_fires(self, mock_exec):
+        """on_tool_event callback fires with agent name during graph execution."""
+        from initrunner.agent.tool_events import ToolEvent, get_tool_event_callback
+
+        captured_callbacks = {}
+
+        async def _exec(agent, role, prompt, **kwargs):
+            name = role.metadata.name
+            cb = get_tool_event_callback()
+            if cb is not None:
+                captured_callbacks[name] = cb
+                cb(ToolEvent(name, "ok", None, 100))
+            return _make_run_result("done"), []
+
+        mock_exec.side_effect = _exec
+
+        data = _make_flow_data()
+        flow = FlowDefinition.model_validate(data)
+
+        from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.flow.orchestrator import FlowAgentConfig, FlowMember
+
+        services = {}
+        for name in ["producer", "consumer"]:
+            role = RoleDefinition.model_validate(_make_role_data(name))
+            services[name] = FlowMember(
+                name=name,
+                role=role,
+                agent=MagicMock(),
+                config=FlowAgentConfig(role=f"roles/{name}.yaml"),
+            )
+
+        tool_events = []
+
+        def on_tool_event(agent_name, event):
+            tool_events.append((agent_name, event))
+
+        run_flow_graph_sync(
+            flow,
+            services,
+            "hello",
+            entry_service="producer",
+            on_tool_event=on_tool_event,
+        )
+
+        assert len(tool_events) >= 2
+        agent_names = [name for name, _ in tool_events]
+        assert "producer" in agent_names
+        assert "consumer" in agent_names
+
+    @patch("initrunner.flow.graph.execute_run_async")
     def test_agent_failure_isolation(self, mock_exec):
         """Failed agent produces empty output, doesn't crash others."""
 

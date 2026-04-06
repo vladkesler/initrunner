@@ -274,3 +274,40 @@ class TestFormatToolEvent:
         assert "fetch_url" in formatted
         assert "error" in formatted
         assert "500ms" in formatted
+
+
+class TestFormatToolEventPrefixed:
+    def test_ok_event_prefixed(self):
+        from initrunner.runner.display import _format_tool_event_prefixed
+
+        event = ToolEvent("search_web", "ok", None, 1523)
+        formatted = _format_tool_event_prefixed("producer", event)
+        assert "[producer]" in formatted
+        assert "search_web" in formatted
+        assert "ok" in formatted
+        assert "1523ms" in formatted
+
+    def test_error_event_prefixed(self):
+        from initrunner.runner.display import _format_tool_event_prefixed
+
+        event = ToolEvent("search_web", "error", "Error: timed out", 15023)
+        formatted = _format_tool_event_prefixed("consumer", event)
+        assert "[consumer]" in formatted
+        assert "search_web" in formatted
+        assert "error" in formatted
+        assert "Error: timed out" in formatted
+
+    def test_start_phase_prefixed(self):
+        from initrunner.runner.display import _format_tool_event_prefixed
+
+        event = ToolEvent("fetch_url", "running", None, 0, phase="start")
+        formatted = _format_tool_event_prefixed("agent-1", event)
+        assert "[agent-1]" in formatted
+        assert "fetch_url" in formatted
+        assert "running..." in formatted
+
+    def test_printer_factory(self):
+        from initrunner.runner.display import _make_prefixed_tool_event_printer
+
+        printer = _make_prefixed_tool_event_printer()
+        assert callable(printer)

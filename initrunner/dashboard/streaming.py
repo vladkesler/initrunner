@@ -300,6 +300,25 @@ async def stream_flow_run_sse(
         except asyncio.QueueFull:
             pass
 
+    def on_tool_event(agent_name: str, event: object) -> None:
+        evt = json.dumps(
+            {
+                "type": "tool_event",
+                "data": {
+                    "agent_name": agent_name,
+                    "tool_name": event.tool_name,  # type: ignore[union-attr]
+                    "status": event.status,  # type: ignore[union-attr]
+                    "phase": event.phase,  # type: ignore[union-attr]
+                    "error_summary": event.error_summary,  # type: ignore[union-attr]
+                    "duration_ms": event.duration_ms,  # type: ignore[union-attr]
+                },
+            }
+        )
+        try:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
+            pass
+
     async def _run_flow():
         try:
             return await run_flow_once_async(
@@ -310,6 +329,7 @@ async def stream_flow_run_sse(
                 audit_logger=audit_logger,
                 on_agent_start=on_agent_start,
                 on_agent_complete=on_agent_complete,
+                on_tool_event=on_tool_event,
             )
         finally:
             event_queue.put_nowait(None)
@@ -403,6 +423,25 @@ async def stream_team_run_sse(
         except asyncio.QueueFull:
             pass
 
+    def on_tool_event(agent_name: str, event: object) -> None:
+        evt = json.dumps(
+            {
+                "type": "tool_event",
+                "data": {
+                    "agent_name": agent_name,
+                    "tool_name": event.tool_name,  # type: ignore[union-attr]
+                    "status": event.status,  # type: ignore[union-attr]
+                    "phase": event.phase,  # type: ignore[union-attr]
+                    "error_summary": event.error_summary,  # type: ignore[union-attr]
+                    "duration_ms": event.duration_ms,  # type: ignore[union-attr]
+                },
+            }
+        )
+        try:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
+            pass
+
     async def _run_team():
         try:
             return await run_team_graph_async(
@@ -412,6 +451,7 @@ async def stream_team_run_sse(
                 audit_logger=audit_logger,
                 on_persona_start=on_persona_start,
                 on_persona_complete=on_persona_complete,
+                on_tool_event=on_tool_event,
             )
         finally:
             event_queue.put_nowait(None)

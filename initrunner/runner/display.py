@@ -187,6 +187,33 @@ def _make_tool_event_printer() -> Callable[[ToolEvent], None]:
     return _on_event
 
 
+def _format_tool_event_prefixed(agent_name: str, event: ToolEvent) -> str:
+    """Format a ToolEvent with an agent/persona name prefix."""
+    if event.phase == "start":
+        return (
+            f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: running...[/dim]"
+        )
+    if event.status == "ok":
+        return (
+            f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: "
+            f"[green]ok[/green] ({event.duration_ms}ms)[/dim]"
+        )
+    summary = f" - {event.error_summary}" if event.error_summary else ""
+    return (
+        f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: "
+        f"[red]error[/red]{summary} ({event.duration_ms}ms)[/dim]"
+    )
+
+
+def _make_prefixed_tool_event_printer() -> Callable[[str, ToolEvent], None]:
+    """Return a callback that prints agent-prefixed tool events to the console."""
+
+    def _on_event(agent_name: str, event: ToolEvent) -> None:
+        console.print(_format_tool_event_prefixed(agent_name, event))
+
+    return _on_event
+
+
 def _display_result_plain(result: RunResult) -> None:
     """Write plain-text output to stdout, stats/errors to stderr."""
     if result.success:

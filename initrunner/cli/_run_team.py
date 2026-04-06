@@ -92,6 +92,10 @@ def _run_team(
         if strategy == "parallel"
         else "[dim]Running team pipeline...[/dim]"
     )
+    from initrunner.runner.display import _make_prefixed_tool_event_printer
+
+    tool_printer = _make_prefixed_tool_event_printer()
+
     with console.status(status_text) as status:
         result = run_team_dispatch(
             team,
@@ -100,6 +104,7 @@ def _run_team(
             audit_logger=audit_logger,
             dry_run_model=dry_run_model,
             on_persona_start=lambda name: status.update(f"[dim]Running persona: {name}...[/dim]"),
+            on_tool_event=tool_printer,
         )
 
     _display_team_result(result)

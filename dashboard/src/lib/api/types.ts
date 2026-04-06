@@ -129,6 +129,7 @@ export interface HealthStatus {
 }
 
 export interface ToolEventData {
+	agent_name?: string;
 	tool_name: string;
 	status: 'running' | 'ok' | 'error';
 	phase: 'start' | 'complete';
@@ -542,6 +543,7 @@ export interface TeamThreadMessage {
 export type TeamSSEEvent =
 	| { type: 'persona_start'; data: string }
 	| { type: 'persona_complete'; data: PersonaStepResponse }
+	| { type: 'tool_event'; data: ToolEventData }
 	| { type: 'result'; data: TeamRunResponse }
 	| { type: 'error'; data: string };
 

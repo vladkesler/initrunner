@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail } from '$lib/api/types';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
+	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
@@ -13,6 +14,7 @@
 	let running = $state(false);
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
+	let toolEvents: ToolEventData[] = $state([]);
 
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
@@ -127,6 +129,10 @@
 				onPersonaComplete(step: PersonaStepResponse) {
 					activeSet = new Set([...activeSet].filter((n) => n !== step.persona_name));
 				},
+				onToolEvent(data: ToolEventData) {
+					if (requestVersion !== currentVersion) return;
+					toolEvents = [...toolEvents, data];
+				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
 					debateMode = false;
@@ -175,6 +181,7 @@
 		requestVersion++;
 		messages = [];
 		prompt = '';
+		toolEvents = [];
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -186,9 +193,25 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const hasSidebar = $derived(toolEvents.length > 0);
 </script>
 
-<div class="flex flex-1 flex-col gap-3">
+{#snippet conversationThread()}
+<ConversationThread
+	messages={threadMessages}
+	emptyText="Send a prompt to run it through the team"
+	assistantLabel="Team"
+>
+	{#snippet messageFooter({ msg, index })}
+		{@const teamMsg = messages[index]}
+		{#if teamMsg?.role === 'assistant' && teamMsg.result?.steps}
+			<PersonaTrace steps={teamMsg.result.steps} />
+		{/if}
+	{/snippet}
+</ConversationThread>
+{/snippet}
+
+<div class="flex min-h-0 flex-1 flex-col gap-3">
 	<!-- Active persona indicator (non-debate) -->
 	{#if activePersona && !debateMode}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
@@ -202,19 +225,18 @@
 		</div>
 	{/if}
 
-	<!-- Thread -->
-	<ConversationThread
-		messages={threadMessages}
-		emptyText="Send a prompt to run it through the team"
-		assistantLabel="Team"
-	>
-		{#snippet messageFooter({ msg, index })}
-			{@const teamMsg = messages[index]}
-			{#if teamMsg?.role === 'assistant' && teamMsg.result?.steps}
-				<PersonaTrace steps={teamMsg.result.steps} />
-			{/if}
-		{/snippet}
-	</ConversationThread>
+	{#if hasSidebar}
+		<div class="grid min-h-0 flex-1 gap-3 overflow-hidden team-panel-grid">
+			<div class="min-h-0 overflow-hidden">
+				{@render conversationThread()}
+			</div>
+			<div class="flex min-h-0 flex-col overflow-hidden">
+				<ToolActivityPanel events={toolEvents} />
+			</div>
+		</div>
+	{:else}
+		{@render conversationThread()}
+	{/if}
 
 	<!-- Input area -->
 	<div class="flex flex-col gap-1.5">
@@ -263,3 +285,15 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.team-panel-grid {
+		grid-template-columns: 1fr 320px;
+	}
+
+	@media (max-width: 900px) {
+		.team-panel-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

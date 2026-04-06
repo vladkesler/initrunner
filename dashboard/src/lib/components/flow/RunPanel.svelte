@@ -5,9 +5,11 @@
 		FlowThreadMessage,
 		FlowDetail,
 		AgentStepResponse,
-		ThreadMessage
+		ThreadMessage,
+		ToolEventData
 	} from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
+	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
 	import AgentTrace from './AgentTrace.svelte';
 	import PipelineStepper from './PipelineStepper.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
@@ -29,6 +31,7 @@
 	let running = $state(false);
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
+	let toolEvents: ToolEventData[] = $state([]);
 
 	// Pipeline progress tracking
 	let completedAgents = $state<string[]>([]);
@@ -104,6 +107,10 @@
 					activeAgents = new Set([...activeAgents].filter((n) => n !== step.agent_name));
 					completedAgents = [...completedAgents, step.agent_name];
 				},
+				onToolEvent(data: ToolEventData) {
+					if (requestVersion !== currentVersion) return;
+					toolEvents = [...toolEvents, data];
+				},
 				onResult(r: FlowRunResponse) {
 					if (requestVersion !== currentVersion) return;
 					if (flowTimer) { clearInterval(flowTimer); flowTimer = null; }
@@ -163,6 +170,7 @@
 		prompt = '';
 		completedAgents = [];
 		activeAgents = new Set();
+		toolEvents = [];
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -174,39 +182,54 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const hasSidebar = $derived(toolEvents.length > 0);
 </script>
 
-<div class="flex flex-1 flex-col gap-3">
-	<!-- Thread -->
-	<ConversationThread
-		messages={threadMessages}
-		emptyText="Send a prompt to run it through the flow"
-		assistantLabel="Flow"
-	>
-		{#snippet messageHeader({ msg })}
-			{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeAgents.size > 0 || completedAgents.length > 0)}
-				<PipelineStepper
-					agents={detail.agents.map((a) => a.name)}
-					{completedAgents}
-					{activeAgents}
-					elapsed={flowElapsed}
-				/>
-			{:else}
-				<div class="flex items-center gap-2">
-					<SeedAvatar seed={msg.identityLabel ?? 'Flow'} spinning={msg.status === 'streaming'} />
-					<span class="section-label">
-						{msg.identityLabel ?? 'Flow'}
-					</span>
-				</div>
-			{/if}
-		{/snippet}
-		{#snippet messageFooter({ msg, index })}
-			{@const flowMsg = messages[index]}
-			{#if flowMsg?.role === 'assistant' && flowMsg.result?.steps}
-				<AgentTrace steps={flowMsg.result.steps} />
-			{/if}
-		{/snippet}
-	</ConversationThread>
+{#snippet conversationThread()}
+<ConversationThread
+	messages={threadMessages}
+	emptyText="Send a prompt to run it through the flow"
+	assistantLabel="Flow"
+>
+	{#snippet messageHeader({ msg })}
+		{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeAgents.size > 0 || completedAgents.length > 0)}
+			<PipelineStepper
+				agents={detail.agents.map((a) => a.name)}
+				{completedAgents}
+				{activeAgents}
+				elapsed={flowElapsed}
+			/>
+		{:else}
+			<div class="flex items-center gap-2">
+				<SeedAvatar seed={msg.identityLabel ?? 'Flow'} spinning={msg.status === 'streaming'} />
+				<span class="section-label">
+					{msg.identityLabel ?? 'Flow'}
+				</span>
+			</div>
+		{/if}
+	{/snippet}
+	{#snippet messageFooter({ msg, index })}
+		{@const flowMsg = messages[index]}
+		{#if flowMsg?.role === 'assistant' && flowMsg.result?.steps}
+			<AgentTrace steps={flowMsg.result.steps} />
+		{/if}
+	{/snippet}
+</ConversationThread>
+{/snippet}
+
+<div class="flex min-h-0 flex-1 flex-col gap-3">
+	{#if hasSidebar}
+		<div class="grid min-h-0 flex-1 gap-3 overflow-hidden flow-panel-grid">
+			<div class="min-h-0 overflow-hidden">
+				{@render conversationThread()}
+			</div>
+			<div class="flex min-h-0 flex-col overflow-hidden">
+				<ToolActivityPanel events={toolEvents} />
+			</div>
+		</div>
+	{:else}
+		{@render conversationThread()}
+	{/if}
 
 	<!-- Input area -->
 	<div class="flex flex-col gap-1.5">
@@ -255,3 +278,15 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.flow-panel-grid {
+		grid-template-columns: 1fr 320px;
+	}
+
+	@media (max-width: 900px) {
+		.flow-panel-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>

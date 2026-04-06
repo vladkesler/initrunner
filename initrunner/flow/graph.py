@@ -25,6 +25,11 @@ from pydantic_graph.beta.join import reduce_list_append
 from initrunner._async import run_sync
 from initrunner._log import get_logger
 from initrunner.agent.executor import RunResult, execute_run_async
+from initrunner.agent.tool_events import (
+    ToolEvent,
+    reset_tool_event_callback,
+    set_tool_event_callback,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -84,6 +89,7 @@ class FlowGraphDeps:
     on_service_complete: Callable[[str, RunResult], None] | None
     entry_service: str
     flow_run_id: str = ""
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None
 
 
 @dataclass
@@ -506,6 +512,11 @@ def _make_agent_step(service_name: str, topology_index: int):
         if parent_ctx is not None and otel_context is not None:
             ctx_token = otel_context.attach(parent_ctx)
 
+        cb_token = None
+        if deps.on_tool_event:
+            cb_token = set_tool_event_callback(
+                lambda event, _name=service_name: deps.on_tool_event(_name, event)
+            )
         try:
             msg_history = envelope.message_history if service_name == deps.entry_service else None
             result, new_messages = await execute_run_async(
@@ -518,6 +529,8 @@ def _make_agent_step(service_name: str, topology_index: int):
                 trigger_metadata=trigger_metadata,
             )
         finally:
+            if cb_token is not None:
+                reset_tool_event_callback(cb_token)
             if ctx_token is not None and otel_context is not None:
                 otel_context.detach(ctx_token)
 
@@ -655,6 +668,7 @@ async def run_flow_graph_async(
     on_service_complete: Callable[[str, RunResult], None] | None = None,
     one_shot: bool = True,
     flow_run_id: str = "",
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> tuple[dict[str, AgentRef], str, int, bool]:
     """Run the flow graph asynchronously.
 
@@ -684,6 +698,7 @@ async def run_flow_graph_async(
         on_service_complete=on_service_complete,
         entry_service=entry_name,
         flow_run_id=flow_run_id,
+        on_tool_event=on_tool_event,
     )
 
     timed_out = False
@@ -723,6 +738,7 @@ async def _daemon_main(
     services: dict,
     audit_logger: AuditLogger | None,
     shutdown_event: threading.Event,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> None:
     """Main daemon loop: poll ingress queue, spawn graph runs."""
     loop = asyncio.get_running_loop()
@@ -746,6 +762,7 @@ async def _daemon_main(
             on_service_start=None,
             on_service_complete=None,
             entry_service=req.entry,
+            on_tool_event=on_tool_event,
         )
         try:
             await graph.run(state=None, deps=deps, inputs=envelope)
@@ -793,12 +810,13 @@ def start_daemon(
     flow: FlowDefinition,
     services: dict,
     audit_logger: AuditLogger | None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> tuple[threading.Event, threading.Thread]:
     """Start daemon in a background thread. Returns (shutdown_event, thread)."""
     shutdown = threading.Event()
 
     def _run():
-        anyio.run(partial(_daemon_main, flow, services, audit_logger, shutdown))
+        anyio.run(partial(_daemon_main, flow, services, audit_logger, shutdown, on_tool_event))
 
     thread = threading.Thread(target=_run, daemon=True, name="flow-daemon")
     thread.start()

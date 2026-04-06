@@ -282,6 +282,14 @@ Prior outputs are wrapped in `<prior-agent-output>` XML tags with an explicit in
 
 ## Observability
 
+### Real-time tool activity
+
+The CLI and dashboard show live tool-call events during team execution. Each event is prefixed with the persona name so you can tell which agent is calling which tool. In debate mode the prefix includes the round number (e.g. `alpha (round 2)`); the synthesis step uses `synthesis`.
+
+The dashboard streams `tool_event` SSE messages with an `agent_name` field, and the Tool Activity panel renders them alongside the conversation thread.
+
+### OpenTelemetry tracing
+
 Configure OpenTelemetry tracing for the team run. The runner initializes the `TracerProvider` before any persona executes and shuts it down in a `finally` block.
 
 ```yaml
