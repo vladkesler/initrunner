@@ -25,7 +25,7 @@
 	}
 </script>
 
-<div class="flex h-full flex-col border border-edge bg-surface-1">
+<div class="flex h-full max-h-[calc(100dvh-20rem)] flex-col border border-edge bg-surface-1">
 	<div class="border-b border-edge px-3 py-2">
 		<span class="section-label">Tool Activity</span>
 	</div>

@@ -223,7 +223,7 @@
 			<div class="min-h-0 overflow-hidden">
 				{@render conversationThread()}
 			</div>
-			<div class="flex min-h-0 max-h-[calc(100dvh-32rem)] flex-col gap-0">
+			<div class="flex min-h-0 flex-col gap-0">
 				<ToolActivityPanel events={toolEvents} />
 			</div>
 		</div>
