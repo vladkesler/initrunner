@@ -108,11 +108,18 @@ Refine (empty to save, "quit" to discard):
 - Type `quit` or `q` to discard without saving
 - Use `--no-refine` to skip the loop entirely
 
-The refinement LLM has the full schema reference and tool registry, so it can add tools, triggers, memory, and other features by name.
+The refinement LLM has the full schema reference and tool registry, so it can add tools, triggers, memory, ingest, reasoning, autonomy, security, and observability sections by name. The schema reference includes field-level details for all sections, so the LLM knows which fields are required (e.g. `sources` for ingest) and which can be omitted for defaults.
 
 ## Provider Auto-Detection
 
-When `--provider` is omitted, InitRunner checks for available API keys in the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) and uses the first provider found. Falls back to `openai`.
+When `--provider` is omitted, `initrunner new` resolves the builder model using the standard precedence:
+
+1. `INITRUNNER_MODEL` env var
+2. `~/.initrunner/run.yaml` (saved by `initrunner setup`)
+3. API key env-var auto-detection (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.)
+4. Falls back to `openai`
+
+If your saved `run.yaml` specifies a provider, that provider is used even if other API keys exist in the environment. Custom endpoint fields (`base_url`, `api_key_env`) from `run.yaml` are also injected into the generated YAML, so OpenRouter and other custom-endpoint setups work out of the box.
 
 ## Post-Creation Output
 
