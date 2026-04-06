@@ -258,8 +258,21 @@ Filterable table of all agent runs with analytics.
 
 - **Stats strip**: aggregate totals (runs, success rate, tokens, avg duration) for the current filter
 - **Filters**: agent name, trigger type, date range (since/until), all/failures toggle
-- **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, and error details
+- **Cost column**: per-run estimated USD cost (computed from tokens + model/provider via `genai-prices`). Shows `N/A` for unsupported models.
+- **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, cost, and error details
 - **Export**: download filtered results as JSON or CSV
+
+### Cost (`/cost`)
+
+Dedicated cost analytics page for spend visibility across agents and models.
+
+- **Summary strip**: fixed period totals (today, this week, this month, all time) that do not change with the range selector
+- **Period selector**: 7d / 30d / 90d trailing UTC windows. Controls the chart and both breakdown tables below.
+- **Spend chart**: pure SVG bar chart showing daily spend. Lime bars on charcoal, hover tooltip with date, cost, and run count. Zero-cost days show thin placeholder bars. All-null data shows an empty state message.
+- **By Agent table**: per-agent breakdown with runs, tokens in/out, avg cost per run, and total cost. Rows link to agent detail when an exact unique agent name match exists.
+- **By Model table**: per-model/provider breakdown. Provider shown as a cyan pill badge.
+
+Cost values are `null` (displayed as "N/A") when `genai-prices` lacks pricing data for a model/provider.
 
 ### MCP Hub (`/mcp`)
 
@@ -767,6 +780,17 @@ Per-agent cost breakdown. Query parameters: `agent_name`, `since`, `until`.
 ### `GET /api/cost/daily`
 
 Daily cost time series. Query parameters: `days` (default 30, max 365), `agent_name`.
+
+### `GET /api/cost/by-model`
+
+Cost breakdown grouped by model and provider. Query parameters: `since`, `until`.
+
+```json
+[
+  {"model": "gpt-4o", "provider": "openai", "run_count": 142, "tokens_in": 890200, "tokens_out": 312400, "total_cost_usd": 4.82},
+  {"model": "claude-sonnet-4-20250514", "provider": "anthropic", "run_count": 38, "tokens_in": 210500, "tokens_out": 95300, "total_cost_usd": 1.22}
+]
+```
 
 ### `GET /api/providers`
 

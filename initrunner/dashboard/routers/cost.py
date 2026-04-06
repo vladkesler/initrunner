@@ -10,6 +10,7 @@ from initrunner.dashboard.schemas import (
     AgentCostResponse,
     CostSummaryResponse,
     DailyCostResponse,
+    ModelCostResponse,
 )
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
@@ -110,3 +111,30 @@ async def get_cost_daily(
         ]
 
     return await asyncio.to_thread(_query)
+
+
+@router.get("/by-model")
+async def get_cost_by_model(
+    since: str | None = Query(None, description="ISO 8601 datetime"),
+    until: str | None = Query(None, description="ISO 8601 datetime"),
+) -> list[ModelCostResponse]:
+    from initrunner.config import get_audit_db_path
+    from initrunner.services.cost import cost_by_model_sync
+
+    entries = await asyncio.to_thread(
+        cost_by_model_sync,
+        since=since,
+        until=until,
+        audit_db=get_audit_db_path(),
+    )
+    return [
+        ModelCostResponse(
+            model=e.model,
+            provider=e.provider,
+            run_count=e.run_count,
+            tokens_in=e.tokens_in,
+            tokens_out=e.tokens_out,
+            total_cost_usd=e.total_cost_usd,
+        )
+        for e in entries
+    ]

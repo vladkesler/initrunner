@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { Search, Blocks, ScanEye, Cpu, Compass, Plus, Users, Workflow } from 'lucide-svelte';
+	import { Search, Blocks, ScanEye, Receipt, Cpu, Compass, Plus, Users, Workflow } from 'lucide-svelte';
 	import { listAgents } from '$lib/api/agents';
 	import { fetchFlowList } from '$lib/api/flow';
 	import { fetchTeamList } from '$lib/api/teams';
@@ -30,6 +30,7 @@
 		{ id: 'nav-agents', label: 'Agents', href: '/agents', icon: Blocks, group: 'Pages' },
 		{ id: 'nav-flows', label: 'Flows', href: '/flows', icon: Workflow, group: 'Pages' },
 		{ id: 'nav-audit', label: 'Audit', href: '/audit', icon: ScanEye, group: 'Pages' },
+		{ id: 'nav-cost', label: 'Cost', href: '/cost', icon: Receipt, group: 'Pages' },
 		{ id: 'nav-teams', label: 'Teams', href: '/teams', icon: Users, group: 'Pages' },
 		{ id: 'nav-system', label: 'System', href: '/system', icon: Cpu, group: 'Pages' },
 		{ id: 'action-new', label: 'New Agent', href: '/agents/new', icon: Plus, group: 'Actions' },

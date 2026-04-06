@@ -140,6 +140,20 @@ spec:
 
 Either limit being hit will pause the daemon.
 
+## Dashboard UI
+
+The `/cost` page in the dashboard provides visual cost analytics.
+
+- **Summary strip** at the top shows today, this week, this month, and all-time spend totals. These values are fixed and do not change with the time range selector.
+- **Period selector** (7d / 30d / 90d) controls the chart and both breakdown tables below.
+- **Spend chart** shows daily cost as a bar chart. Hover any bar for date, cost, and run count.
+- **By Agent table** breaks down cost per agent with runs, tokens, avg cost/run, and total. Rows link to the agent detail page.
+- **By Model table** breaks down cost per model/provider combination.
+
+The audit log (`/audit`) also shows a per-run cost column and includes cost in the detail drawer.
+
+All cost values show `N/A` when pricing data is unavailable for a model/provider.
+
 ## Dashboard API
 
 The dashboard exposes cost analytics via REST endpoints.
@@ -149,6 +163,7 @@ The dashboard exposes cost analytics via REST endpoints.
 | `GET /api/cost/summary` | Today/week/month/all-time totals, top agents, daily trend |
 | `GET /api/cost/by-agent` | Per-agent cost breakdown. Filters: `since`, `until`, `agent_name` |
 | `GET /api/cost/daily` | Daily cost time series. Params: `days` (default 30), `agent_name` |
+| `GET /api/cost/by-model` | Cost grouped by model/provider. Filters: `since`, `until` |
 
 ## How Cost is Calculated
 

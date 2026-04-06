@@ -35,6 +35,13 @@ async def query_audit(
         audit_db=get_audit_db_path(),
         exclude_trigger_types=exclude_trigger_types,
     )
+
+    from initrunner.pricing import estimate_cost
+
+    def _cost(r: object) -> float | None:
+        result = estimate_cost(r.tokens_in, r.tokens_out, r.model, r.provider)  # type: ignore[union-attr]
+        return result["total_cost_usd"] if result else None
+
     return [
         AuditRecordResponse(
             run_id=r.run_id,
@@ -52,6 +59,7 @@ async def query_audit(
             success=r.success,
             error=r.error,
             trigger_type=r.trigger_type,
+            cost_usd=_cost(r),
         )
         for r in records
     ]

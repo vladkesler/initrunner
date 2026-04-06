@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CostData, UsageData } from '$lib/api/types';
+	import { formatCost } from '$lib/utils/format';
 
 	interface ResultMetrics {
 		tokens_in: number;
@@ -30,10 +31,6 @@
 		return Math.min(100, Math.round((result!.total_tokens / budgetMax) * 100));
 	});
 
-	function formatCost(usd: number): string {
-		if (usd < 0.01) return `$${usd.toFixed(4)}`;
-		return `$${usd.toFixed(2)}`;
-	}
 </script>
 
 <div class="border-t border-edge bg-surface-1 px-3 py-2">

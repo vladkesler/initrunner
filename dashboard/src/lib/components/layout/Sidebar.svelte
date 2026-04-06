@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Receipt, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
 	import { getMcpHealthSummary } from '$lib/api/mcp';
 	import { onMount } from 'svelte';
 
@@ -20,7 +20,8 @@
 
 	const operateItems = [
 		{ href: '/mcp', label: 'MCP Hub', icon: Cable },
-		{ href: '/audit', label: 'Audit', icon: ScanEye }
+		{ href: '/audit', label: 'Audit', icon: ScanEye },
+		{ href: '/cost', label: 'Cost', icon: Receipt }
 	];
 
 	let mcpUnhealthy = $state(0);

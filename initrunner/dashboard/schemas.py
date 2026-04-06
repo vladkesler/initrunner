@@ -99,6 +99,7 @@ class AuditRecordResponse(BaseModel):
     success: bool
     error: str | None = None
     trigger_type: str | None = None
+    cost_usd: float | None = None
 
 
 class ProviderResponse(BaseModel):
@@ -1047,6 +1048,15 @@ class CostSummaryResponse(BaseModel):
     all_time: float | None
     top_agents: list[AgentCostResponse]
     daily_trend: list[DailyCostResponse]
+
+
+class ModelCostResponse(BaseModel):
+    model: str
+    provider: str
+    run_count: int
+    tokens_in: int
+    tokens_out: int
+    total_cost_usd: float | None
 
 
 # ---------------------------------------------------------------------------

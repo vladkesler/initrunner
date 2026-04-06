@@ -116,6 +116,7 @@ export interface AuditRecord {
 	success: boolean;
 	error: string | null;
 	trigger_type: string | null;
+	cost_usd: number | null;
 }
 
 export interface Provider {
@@ -756,4 +757,39 @@ export interface TimelineStats {
 export interface TimelineResponse {
 	entries: TimelineEntry[];
 	stats: TimelineStats;
+}
+
+// -- Cost Analytics -----------------------------------------------------------
+
+export interface CostSummary {
+	today: number | null;
+	this_week: number | null;
+	this_month: number | null;
+	all_time: number | null;
+	top_agents: AgentCost[];
+	daily_trend: DailyCost[];
+}
+
+export interface AgentCost {
+	agent_name: string;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
+	avg_cost_per_run: number | null;
+}
+
+export interface DailyCost {
+	date: string;
+	run_count: number;
+	total_cost_usd: number | null;
+}
+
+export interface ModelCost {
+	model: string;
+	provider: string;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
 }
