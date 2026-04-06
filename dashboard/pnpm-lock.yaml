@@ -38,8 +38,8 @@ importers:
         specifier: ^4.0.9
         version: 4.0.9
       bits-ui:
-        specifier: ^2.16.4
-        version: 2.16.4(@internationalized/date@3.12.0)(@sveltejs/kit@2.56.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.1)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)
+        specifier: ^2.17.2
+        version: 2.17.2(@internationalized/date@3.12.0)(@sveltejs/kit@2.56.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.1)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -419,8 +419,8 @@ packages:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
 
-  bits-ui@2.16.4:
-    resolution: {integrity: sha512-76dKbW0DGplG7qnVM3kljE2CmCXqh9tj9OfVo0DvC/ZGRkZNJ/auU/aQnMKBxDnSqRvsz2mZBccBkUKyF4/SoQ==}
+  bits-ui@2.17.2:
+    resolution: {integrity: sha512-Xbmrlf3ft/5RtMgUL/uam+rcrWYM4LoIGosklV34iSE6GGsPFWgaivzzX60rnWjWlG5F7ZuXXZ4iag949UekMA==}
     engines: {node: '>=20'}
     peerDependencies:
       '@internationalized/date': ^3.8.1
@@ -1073,7 +1073,7 @@ snapshots:
 
   axobject-query@4.1.0: {}
 
-  bits-ui@2.16.4(@internationalized/date@3.12.0)(@sveltejs/kit@2.56.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.1)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1):
+  bits-ui@2.17.2(@internationalized/date@3.12.0)(@sveltejs/kit@2.56.1(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.55.1)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1)(typescript@5.9.3)(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(jiti@2.6.1)))(svelte@5.55.1):
     dependencies:
       '@floating-ui/core': 1.7.5
       '@floating-ui/dom': 1.7.6
