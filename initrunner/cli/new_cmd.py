@@ -121,15 +121,6 @@ def new(
         base_url = d_base_url
         api_key_env = d_api_key_env
 
-    # --- Verify SDK is installed for the resolved provider ---
-    from initrunner._compat import require_provider
-
-    try:
-        require_provider(provider)
-    except RuntimeError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
     # --- Scaffold shortcuts (non-YAML templates) ---
     if template == "tool":
         _scaffold_tool(output, provider)
@@ -254,6 +245,11 @@ def _seed_session(
 
     if from_source is not None:
         return _seed_from_source(session, from_source, provider, model)
+
+    # LLM-backed seeds below -- verify SDK is installed for the provider
+    from initrunner._compat import require_provider
+
+    require_provider(provider)
 
     if langchain is not None:
         lc_path = Path(langchain)
