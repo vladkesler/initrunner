@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AuditRecord } from '$lib/api/types';
 	import { X, CheckCircle, XCircle, Copy } from 'lucide-svelte';
+	import { formatCost } from '$lib/utils/format';
 
 	let { record, onClose }: { record: AuditRecord; onClose: () => void } = $props();
 
@@ -82,6 +83,10 @@
 					<div class="font-mono text-[13px] text-fg-muted">
 						{record.tokens_in.toLocaleString()} in / {record.tokens_out.toLocaleString()} out
 					</div>
+				</div>
+				<div>
+					<div class="mb-1 section-label">Cost</div>
+					<div class="font-mono text-[13px] text-fg-muted">{formatCost(record.cost_usd)}</div>
 				</div>
 				<div>
 					<div class="mb-1 section-label">Duration</div>

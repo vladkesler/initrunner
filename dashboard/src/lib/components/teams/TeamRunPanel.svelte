@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail } from '$lib/api/types';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData, UsageData } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
+	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
@@ -13,6 +15,9 @@
 	let running = $state(false);
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
+	let toolEvents: ToolEventData[] = $state([]);
+	let usage: UsageData | null = $state(null);
+	let lastTeamResult: TeamRunResponse | null = $state(null);
 
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
@@ -100,6 +105,9 @@
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
 		prompt = '';
+		toolEvents = [];
+		usage = null;
+		lastTeamResult = null;
 
 		messages = [
 			...messages,
@@ -127,6 +135,14 @@
 				onPersonaComplete(step: PersonaStepResponse) {
 					activeSet = new Set([...activeSet].filter((n) => n !== step.persona_name));
 				},
+				onToolEvent(data: ToolEventData) {
+					if (requestVersion !== currentVersion) return;
+					toolEvents = [...toolEvents, data];
+				},
+				onUsage(u: UsageData) {
+					if (requestVersion !== currentVersion) return;
+					usage = u;
+				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
 					debateMode = false;
@@ -138,6 +154,7 @@
 						activePersona: null,
 						result: r
 					};
+					lastTeamResult = r;
 					running = false;
 					controller = null;
 					onRunCompleted?.();
@@ -175,6 +192,9 @@
 		requestVersion++;
 		messages = [];
 		prompt = '';
+		toolEvents = [];
+		usage = null;
+		lastTeamResult = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -186,6 +206,7 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const showPanel = $derived(running || toolEvents.length > 0 || lastTeamResult != null);
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
@@ -195,14 +216,8 @@
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-[2px] bg-accent-primary"></span>
 			Running {activePersona}...
 		</div>
-	{:else if running}
-		<div class="flex items-center gap-2 text-[12px] text-fg-faint">
-			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-fg-faint"></span>
-			Starting team run...
-		</div>
 	{/if}
 
-	<!-- Thread -->
 	<ConversationThread
 		messages={threadMessages}
 		emptyText="Send a prompt to run it through the team"
@@ -215,6 +230,13 @@
 			{/if}
 		{/snippet}
 	</ConversationThread>
+
+	{#if showPanel}
+		<div class="h-48 shrink-0">
+			<ToolActivityPanel events={toolEvents} />
+		</div>
+		<TokenMeter {usage} result={lastTeamResult} {running} />
+	{/if}
 
 	<!-- Input area -->
 	<div class="flex flex-col gap-1.5">

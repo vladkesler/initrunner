@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026.4.8] - 2026-04-06
+
+### Added
+- **Cost tracking and budget enforcement** -- per-run USD cost estimation using `genai-prices`, `max_cost_usd` budget guardrail that halts runs exceeding threshold, cost column in audit records
+- **Cost analytics page** -- dedicated `/cost` dashboard page with sortable tables for per-agent, per-model, and per-day cost breakdowns
+- **Unified bottom panel with cost** -- agent, flow, and team run views share one bottom panel showing token counts, cost, and tool activity
+- **Usage SSE event for flow/team streams** -- `usage` event emitted on stream completion with token counts and cost, matching the agent stream contract
+- **Real-time tool event visibility for flows and teams** -- tool call start/complete events streamed via SSE for flow and team runs, not just standalone agents
+
+### Fixed
+- **Tool activity sidebar layout** -- flow and team panels now use CSS grid with bounded max-height to prevent overflow
+
 ## [2026.4.7] - 2026-04-05
 
 ### Added

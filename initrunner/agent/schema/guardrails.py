@@ -22,6 +22,10 @@ class Guardrails(BaseModel):
     daemon_token_budget: Annotated[int, Field(gt=0)] | None = None
     daemon_daily_token_budget: Annotated[int, Field(gt=0)] | None = None
 
+    # Cumulative cost budgets (USD)
+    daemon_daily_cost_budget: Annotated[float, Field(gt=0)] | None = None
+    daemon_weekly_cost_budget: Annotated[float, Field(gt=0)] | None = None
+
     # Autonomous mode limits
     max_iterations: Annotated[int, Field(gt=0)] = 10
     autonomous_token_budget: Annotated[int, Field(gt=0)] | None = None

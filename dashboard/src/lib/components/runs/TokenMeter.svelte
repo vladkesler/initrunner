@@ -1,5 +1,13 @@
 <script lang="ts">
-	import type { RunResponse, UsageData } from '$lib/api/types';
+	import type { CostData, UsageData } from '$lib/api/types';
+	import { formatCost } from '$lib/utils/format';
+
+	interface ResultMetrics {
+		tokens_in: number;
+		tokens_out: number;
+		total_tokens: number;
+		cost?: CostData | null;
+	}
 
 	let {
 		usage = null,
@@ -7,7 +15,7 @@
 		running = false
 	}: {
 		usage?: UsageData | null;
-		result?: RunResponse | null;
+		result?: ResultMetrics | null;
 		running?: boolean;
 	} = $props();
 
@@ -23,10 +31,6 @@
 		return Math.min(100, Math.round((result!.total_tokens / budgetMax) * 100));
 	});
 
-	function formatCost(usd: number): string {
-		if (usd < 0.01) return `$${usd.toFixed(4)}`;
-		return `$${usd.toFixed(2)}`;
-	}
 </script>
 
 <div class="border-t border-edge bg-surface-1 px-3 py-2">
@@ -76,7 +80,5 @@
 				</span>
 			{/if}
 		</div>
-	{:else}
-		<span class="text-[12px] text-fg-faint">Run an agent to see metrics</span>
 	{/if}
 </div>

@@ -270,9 +270,34 @@ async def stream_flow_run_sse(
     Runs flow graph directly as an async task (no thread pool hop).
     Callbacks push progress events to an ``asyncio.Queue``.
     """
+    from initrunner.agent.loader import load_role, resolve_role_model
     from initrunner.services.flow import run_flow_once_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    # Resolve models to determine if cost estimation is possible
+    resolved_models: set[tuple[str, str]] = set()
+    for agent_config in flow.spec.agents.values():
+        try:
+            role = resolve_role_model(load_role(base_dir / agent_config.role), base_dir)
+            if role.spec.model and role.spec.model.name and role.spec.model.provider:
+                resolved_models.add((role.spec.model.provider, role.spec.model.name))
+        except Exception:
+            pass
+    flow_model = resolved_models.pop() if len(resolved_models) == 1 else None
+
+    # Emit usage event with model info (matches agent stream pattern)
+    usage_payload = json.dumps(
+        {
+            "type": "usage",
+            "data": {
+                "budget": {"max_tokens": None, "total_limit": None},
+                "model": flow_model[1] if flow_model else None,
+                "provider": flow_model[0] if flow_model else None,
+            },
+        }
+    )
+    yield f"data: {usage_payload}\n\n"
 
     def on_agent_start(name: str) -> None:
         try:
@@ -300,6 +325,25 @@ async def stream_flow_run_sse(
         except asyncio.QueueFull:
             pass
 
+    def on_tool_event(agent_name: str, event: object) -> None:
+        evt = json.dumps(
+            {
+                "type": "tool_event",
+                "data": {
+                    "agent_name": agent_name,
+                    "tool_name": event.tool_name,  # type: ignore[union-attr]
+                    "status": event.status,  # type: ignore[union-attr]
+                    "phase": event.phase,  # type: ignore[union-attr]
+                    "error_summary": event.error_summary,  # type: ignore[union-attr]
+                    "duration_ms": event.duration_ms,  # type: ignore[union-attr]
+                },
+            }
+        )
+        try:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
+            pass
+
     async def _run_flow():
         try:
             return await run_flow_once_async(
@@ -310,6 +354,7 @@ async def stream_flow_run_sse(
                 audit_logger=audit_logger,
                 on_agent_start=on_agent_start,
                 on_agent_complete=on_agent_complete,
+                on_tool_event=on_tool_event,
             )
         finally:
             event_queue.put_nowait(None)
@@ -327,10 +372,22 @@ async def stream_flow_run_sse(
                 flow_result.entry_messages
             ).decode("utf-8")
 
+        cost = None
+        if flow_model:
+            from initrunner.dashboard.pricing import estimate_cost
+
+            cost = estimate_cost(
+                flow_result.total_tokens_in,
+                flow_result.total_tokens_out,
+                flow_model[1],
+                flow_model[0],
+            )
+
         return {
             "output": flow_result.output,
             "output_mode": flow_result.output_mode,
             "final_agent_name": flow_result.final_agent_name,
+            "cost": cost,
             "steps": [
                 {
                     "agent_name": s.agent_name,
@@ -373,6 +430,41 @@ async def stream_team_run_sse(
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
+    # Resolve team model for cost estimation (null if any persona overrides)
+    team_model: tuple[str, str] | None = None
+    team_budget: int | None = None
+    try:
+        personas = team.spec.personas
+        if hasattr(personas, "values") and callable(personas.values):
+            has_overrides = any(getattr(p, "model", None) is not None for p in personas.values())
+        else:
+            has_overrides = True
+        model = team.spec.model
+        if (
+            not has_overrides
+            and model is not None
+            and isinstance(getattr(model, "name", None), str)
+            and isinstance(getattr(model, "provider", None), str)
+        ):
+            team_model = (model.provider, model.name)
+        guardrails = team.spec.guardrails
+        budget_val = getattr(guardrails, "team_token_budget", None)
+        if isinstance(budget_val, int):
+            team_budget = budget_val
+    except (AttributeError, TypeError):
+        pass
+    usage_payload = json.dumps(
+        {
+            "type": "usage",
+            "data": {
+                "budget": {"max_tokens": None, "total_limit": team_budget},
+                "model": team_model[1] if team_model else None,
+                "provider": team_model[0] if team_model else None,
+            },
+        }
+    )
+    yield f"data: {usage_payload}\n\n"
+
     def on_persona_start(name: str) -> None:
         try:
             event_queue.put_nowait(
@@ -403,6 +495,25 @@ async def stream_team_run_sse(
         except asyncio.QueueFull:
             pass
 
+    def on_tool_event(agent_name: str, event: object) -> None:
+        evt = json.dumps(
+            {
+                "type": "tool_event",
+                "data": {
+                    "agent_name": agent_name,
+                    "tool_name": event.tool_name,  # type: ignore[union-attr]
+                    "status": event.status,  # type: ignore[union-attr]
+                    "phase": event.phase,  # type: ignore[union-attr]
+                    "error_summary": event.error_summary,  # type: ignore[union-attr]
+                    "duration_ms": event.duration_ms,  # type: ignore[union-attr]
+                },
+            }
+        )
+        try:
+            event_queue.put_nowait(f"data: {evt}\n\n")
+        except asyncio.QueueFull:
+            pass
+
     async def _run_team():
         try:
             return await run_team_graph_async(
@@ -412,6 +523,7 @@ async def stream_team_run_sse(
                 audit_logger=audit_logger,
                 on_persona_start=on_persona_start,
                 on_persona_complete=on_persona_complete,
+                on_tool_event=on_tool_event,
             )
         finally:
             event_queue.put_nowait(None)
@@ -446,6 +558,17 @@ async def stream_team_run_sse(
                 entry["max_rounds"] = meta.max_rounds
             step_entries.append(entry)
 
+        cost = None
+        if team_model:
+            from initrunner.dashboard.pricing import estimate_cost
+
+            cost = estimate_cost(
+                team_result.total_tokens_in,
+                team_result.total_tokens_out,
+                team_model[1],
+                team_model[0],
+            )
+
         return {
             "team_run_id": team_result.team_run_id,
             "output": team_result.final_output,
@@ -456,6 +579,7 @@ async def stream_team_run_sse(
             "duration_ms": team_result.total_duration_ms,
             "success": team_result.success,
             "error": team_result.error,
+            "cost": cost,
         }
 
     async for event in _sse_pump(event_queue, team_task, _build, "Error during team SSE streaming"):

@@ -396,6 +396,10 @@ anyio task group (parallel branches via Fork/Join)
 
 `run_once()` builds the graph and runs it synchronously via `anyio.run()`. The graph engine handles parallelism natively -- fan-out branches execute concurrently as anyio tasks. Each step calls `execute_run_async()` for native async agent execution.
 
+### Real-time tool activity
+
+Both one-shot and daemon modes stream live tool-call events. In the CLI, each tool event is printed with the agent name prefix (e.g. `[producer] tool search_web: ok (123ms)`). In the dashboard, `tool_event` SSE messages include an `agent_name` field and the Tool Activity panel renders them alongside the conversation. Fan-out branches can interleave tool events from multiple agents concurrently.
+
 ### Daemon Mode
 
 `start()` spawns a background thread running an anyio event loop. Trigger events (cron, webhook, file watcher) are enqueued to a bounded `threading.Queue(maxsize=32)` -- trigger threads block when the queue is full, providing backpressure. A dispatcher task polls the ingress queue and spawns independent graph runs for each event.

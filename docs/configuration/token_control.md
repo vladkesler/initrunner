@@ -38,6 +38,8 @@ spec:
 | `session_token_budget` | `int > 0 \| null` | `null` | Cumulative total token budget for a REPL session. |
 | `daemon_token_budget` | `int > 0 \| null` | `null` | Lifetime total token budget for a daemon process. |
 | `daemon_daily_token_budget` | `int > 0 \| null` | `null` | Daily total token budget for a daemon process (resets at UTC midnight). |
+| `daemon_daily_cost_budget` | `float > 0 \| null` | `null` | Daily USD cost budget for daemon (resets at UTC midnight). |
+| `daemon_weekly_cost_budget` | `float > 0 \| null` | `null` | Weekly USD cost budget for daemon (resets on ISO week boundary). |
 
 When a field is `null` (or omitted), no limit is enforced for that dimension.
 
@@ -165,9 +167,25 @@ On startup, the daemon displays configured budgets:
 Daemon mode -- agent: my-agent
   Lifetime token budget: 2,000,000
   Daily token budget: 200,000
-  Token budgets reset on process restart.
+  Daily cost budget: $5.00
+  Weekly cost budget: $25.00
+  Budgets reset on process restart.
   2 trigger(s) active. Press Ctrl+C to stop.
 ```
+
+### Cost Budgets (`daemon_daily_cost_budget`, `daemon_weekly_cost_budget`)
+
+USD-based cost limits for daemon and bot modes. Cost is estimated after each run using `genai-prices` and accumulated alongside token counters.
+
+```yaml
+guardrails:
+  daemon_daily_cost_budget: 5.00
+  daemon_weekly_cost_budget: 25.00
+```
+
+At startup, pricing availability is validated for the role's model. If pricing data is unavailable, the daemon exits with an error rather than silently disabling cost enforcement.
+
+See [cost-tracking.md](../core/cost-tracking.md) for the full cost tracking system, CLI commands, and estimation.
 
 ## Visibility
 
@@ -241,7 +259,7 @@ spec:
 
 ### Production Daemon
 
-A cron-triggered daemon with both lifetime and daily budgets:
+A cron-triggered daemon with token and cost budgets:
 
 ```yaml
 spec:
@@ -252,6 +270,8 @@ spec:
     max_request_limit: 50
     daemon_token_budget: 5000000
     daemon_daily_token_budget: 500000
+    daemon_daily_cost_budget: 10.00
+    daemon_weekly_cost_budget: 50.00
   triggers:
     - type: cron
       schedule: "*/15 * * * *"
@@ -280,4 +300,4 @@ spec:
 
 ---
 
-See also: [security.md](../security/security.md) for content policies and sandboxing, [tools.md](../agents/tools.md) for tool-specific limits, [audit.md](../core/audit.md) for querying token usage history.
+See also: [cost-tracking.md](../core/cost-tracking.md) for cost analytics and estimation, [security.md](../security/security.md) for content policies and sandboxing, [tools.md](../agents/tools.md) for tool-specific limits, [audit.md](../core/audit.md) for querying token usage history.

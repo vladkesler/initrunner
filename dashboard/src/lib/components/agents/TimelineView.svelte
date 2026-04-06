@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { TimelineResponse, TimelineEntry } from '$lib/api/types';
 	import { Activity } from 'lucide-svelte';
+	import { formatCost } from '$lib/utils/format';
 
 	let { fetchData, refreshKey = 0 }: { fetchData: () => Promise<TimelineResponse>; refreshKey?: number } = $props();
 
@@ -129,11 +130,6 @@
 		return `${(ms / 60000).toFixed(1)}m`;
 	}
 
-	function formatCost(usd: number): string {
-		if (usd === 0) return '$0';
-		if (usd < 0.01) return `$${usd.toFixed(4)}`;
-		return `$${usd.toFixed(2)}`;
-	}
 
 	function formatTrigger(type: string | null): string {
 		if (!type) return 'manual';

@@ -35,6 +35,10 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner plugins` | List discovered tool plugins |
 | `initrunner audit prune` | Prune old audit records |
 | `initrunner audit export` | Export audit records as JSON or CSV |
+| `initrunner cost report` | Cost breakdown by agent (filters: `--agent`, `--since`, `--until`) |
+| `initrunner cost summary` | Overall cost summary (today/week/month/all-time, top agents) |
+| `initrunner cost by-model` | Cost breakdown by model and provider |
+| `initrunner cost estimate <PATH>` | Estimate per-run cost from a role YAML |
 | `initrunner memory clear <PATH>` | Clear agent memory store |
 | `initrunner memory export <PATH>` | Export memories to JSON |
 | `initrunner memory import <PATH> <file>` | Import memories from JSON |

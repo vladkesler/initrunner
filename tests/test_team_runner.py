@@ -1124,6 +1124,71 @@ class TestDebateStrategy:
         assert "bravo (round 2)" in starts
         assert "synthesis" in starts
 
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_tool_event_callback_sequential(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        """on_tool_event fires with persona name during sequential execution."""
+        from initrunner.agent.tool_events import ToolEvent, get_tool_event_callback
+
+        team = _make_team(strategy="sequential")
+        mock_build.return_value = MagicMock()
+
+        async def _side_effect(*a, **kw):
+            cb = get_tool_event_callback()
+            if cb is not None:
+                cb(ToolEvent("test_tool", "ok", None, 50))
+            return _ok_result("r1", "output")
+
+        mock_exec.side_effect = _side_effect
+
+        tool_events = []
+        result = run_team_dispatch(
+            team,
+            "task",
+            team_dir=tmp_path,
+            on_tool_event=lambda name, event: tool_events.append((name, event)),
+        )
+
+        assert result.success is True
+        agent_names = [name for name, _ in tool_events]
+        assert "alpha" in agent_names
+        assert "bravo" in agent_names
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.team.graph.execute_run_async")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_tool_event_callback_debate_uses_display_name(
+        self, mock_dotenv, mock_exec, mock_build, tmp_path
+    ):
+        """on_tool_event fires with round-qualified name during debate execution."""
+        from initrunner.agent.tool_events import ToolEvent, get_tool_event_callback
+
+        team = _make_team(strategy="debate")
+        team.spec.debate.max_rounds = 1
+        mock_build.return_value = MagicMock()
+
+        async def _side_effect(*a, **kw):
+            cb = get_tool_event_callback()
+            if cb is not None:
+                cb(ToolEvent("test_tool", "ok", None, 50))
+            return _ok_result("r1", "output")
+
+        mock_exec.side_effect = _side_effect
+
+        tool_events = []
+        result = run_team_dispatch(
+            team,
+            "task",
+            team_dir=tmp_path,
+            on_tool_event=lambda name, event: tool_events.append((name, event)),
+        )
+
+        assert result.success is True
+        agent_names = [name for name, _ in tool_events]
+        # Debate uses display_name with round number
+        assert any("(round 1)" in name for name in agent_names)
+
 
 class TestBackwardCompat:
     @patch("initrunner.agent.loader.build_agent")

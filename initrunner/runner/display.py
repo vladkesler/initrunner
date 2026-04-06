@@ -151,8 +151,22 @@ def _display_daemon_header(
         console.print(
             f"  Daily token budget: [cyan]{guardrails.daemon_daily_token_budget:,}[/cyan]"  # type: ignore[union-attr]
         )
-    if guardrails.daemon_token_budget or guardrails.daemon_daily_token_budget:  # type: ignore[union-attr]
-        console.print("[dim]  Token budgets reset on process restart.[/dim]")
+    if guardrails.daemon_daily_cost_budget is not None:  # type: ignore[union-attr]
+        console.print(
+            f"  Daily cost budget: [cyan]${guardrails.daemon_daily_cost_budget:.2f}[/cyan]"  # type: ignore[union-attr]
+        )
+    if guardrails.daemon_weekly_cost_budget is not None:  # type: ignore[union-attr]
+        console.print(
+            f"  Weekly cost budget: [cyan]${guardrails.daemon_weekly_cost_budget:.2f}[/cyan]"  # type: ignore[union-attr]
+        )
+    has_budgets = (
+        guardrails.daemon_token_budget  # type: ignore[union-attr]
+        or guardrails.daemon_daily_token_budget  # type: ignore[union-attr]
+        or guardrails.daemon_daily_cost_budget  # type: ignore[union-attr]
+        or guardrails.daemon_weekly_cost_budget  # type: ignore[union-attr]
+    )
+    if has_budgets:
+        console.print("[dim]  Budgets reset on process restart.[/dim]")
     if autonomous_trigger_types:
         console.print(
             f"  Autonomous triggers: [cyan]{', '.join(sorted(autonomous_trigger_types))}[/cyan]"
@@ -183,6 +197,31 @@ def _make_tool_event_printer() -> Callable[[ToolEvent], None]:
 
     def _on_event(event: ToolEvent) -> None:
         console.print(_format_tool_event(event))
+
+    return _on_event
+
+
+def _format_tool_event_prefixed(agent_name: str, event: ToolEvent) -> str:
+    """Format a ToolEvent with an agent/persona name prefix."""
+    if event.phase == "start":
+        return f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: running...[/dim]"
+    if event.status == "ok":
+        return (
+            f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: "
+            f"[green]ok[/green] ({event.duration_ms}ms)[/dim]"
+        )
+    summary = f" - {event.error_summary}" if event.error_summary else ""
+    return (
+        f"[dim]  [{agent_name}] tool [bold]{event.tool_name}[/bold]: "
+        f"[red]error[/red]{summary} ({event.duration_ms}ms)[/dim]"
+    )
+
+
+def _make_prefixed_tool_event_printer() -> Callable[[str, ToolEvent], None]:
+    """Return a callback that prints agent-prefixed tool events to the console."""
+
+    def _on_event(agent_name: str, event: ToolEvent) -> None:
+        console.print(_format_tool_event_prefixed(agent_name, event))
 
     return _on_event
 

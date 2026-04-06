@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { AuditRecord } from '$lib/api/types';
+	import { formatCost } from '$lib/utils/format';
 
 	let {
 		records,
@@ -50,6 +51,7 @@
 				{/if}
 				<th class="section-label hidden px-3 py-2 text-left lg:table-cell">Prompt</th>
 				<th class="section-label w-20 px-3 py-2 text-right">Tokens</th>
+				<th class="section-label w-20 px-3 py-2 text-right">Cost</th>
 				<th class="section-label w-24 px-3 py-2 text-right">Duration</th>
 				<th class="section-label hidden px-3 py-2 text-left md:table-cell">Model</th>
 			</tr>
@@ -85,6 +87,9 @@
 					</td>
 					<td class="w-20 px-3 py-2 text-right font-mono text-[13px] text-fg-faint" style="font-variant-numeric: tabular-nums">
 						{record.total_tokens.toLocaleString()}
+					</td>
+					<td class="w-20 px-3 py-2 text-right font-mono text-[13px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+						{formatCost(record.cost_usd)}
 					</td>
 					<td class="w-24 px-3 py-2 text-right font-mono text-[13px] text-fg-faint" style="font-variant-numeric: tabular-nums">
 						{record.duration_ms}ms

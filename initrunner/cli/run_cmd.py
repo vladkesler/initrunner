@@ -285,6 +285,7 @@ def _handle_save(role_file: Path, save_dir: Path) -> None:
 def _dispatch_flow(flow_file: Path, audit_db: Path | None, no_audit: bool) -> None:
     """Run a flow file (foreground)."""
     from initrunner.flow.loader import FlowLoadError
+    from initrunner.runner.display import _make_prefixed_tool_event_printer
     from initrunner.services.flow import load_flow_sync, run_flow_sync
 
     try:
@@ -296,7 +297,12 @@ def _dispatch_flow(flow_file: Path, audit_db: Path | None, no_audit: bool) -> No
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     try:
-        run_flow_sync(flow, flow_file.parent, audit_logger=audit_logger)
+        run_flow_sync(
+            flow,
+            flow_file.parent,
+            audit_logger=audit_logger,
+            on_tool_event=_make_prefixed_tool_event_printer(),
+        )
     finally:
         if audit_logger is not None:
             audit_logger.close()

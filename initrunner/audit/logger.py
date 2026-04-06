@@ -782,6 +782,101 @@ class AuditLogger:
             "max_duration_ms": row["max_duration_ms"],
         }
 
+    # ------------------------------------------------------------------
+    # Cost aggregate queries
+    # ------------------------------------------------------------------
+
+    def _cost_filters(
+        self,
+        agent_name: str | None,
+        since: str | None,
+        until: str | None,
+    ) -> tuple[str, list[object]]:
+        filters: list[tuple[str, object]] = [
+            (clause, val)
+            for clause, val in [
+                ("agent_name = ?", agent_name),
+                ("timestamp >= ?", since),
+                ("timestamp <= ?", until),
+            ]
+            if val is not None
+        ]
+        return _build_where(filters)
+
+    def cost_by_agent(
+        self,
+        *,
+        agent_name: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict]:
+        """Aggregate token usage grouped by agent, model, and provider.
+
+        Ordered by total token volume descending (proxy for cost).
+        """
+        where, params = self._cost_filters(agent_name, since, until)
+        sql = f"""\
+            SELECT agent_name, model, provider,
+                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
+                   COUNT(*)                      AS run_count
+            FROM audit_log {where}
+            GROUP BY agent_name, model, provider
+            ORDER BY SUM(tokens_in + tokens_out) DESC
+        """
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def cost_by_day(
+        self,
+        *,
+        agent_name: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict]:
+        """Aggregate token usage grouped by calendar day, model, and provider.
+
+        Ordered by date ascending.
+        """
+        where, params = self._cost_filters(agent_name, since, until)
+        sql = f"""\
+            SELECT date(timestamp) AS date, model, provider,
+                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
+                   COUNT(*)                      AS run_count
+            FROM audit_log {where}
+            GROUP BY date(timestamp), model, provider
+            ORDER BY date(timestamp) ASC
+        """
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def cost_by_model(
+        self,
+        *,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict]:
+        """Aggregate token usage grouped by model and provider.
+
+        Ordered by total token volume descending.
+        """
+        where, params = self._cost_filters(None, since, until)
+        sql = f"""\
+            SELECT model, provider,
+                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
+                   COUNT(*)                      AS run_count
+            FROM audit_log {where}
+            GROUP BY model, provider
+            ORDER BY SUM(tokens_in + tokens_out) DESC
+        """
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
     def _prune_locked(self, retention_days: int = 90, max_records: int = 100_000) -> int:
         """Core prune logic. Caller must hold self._lock."""
         deleted = 0

@@ -1,22 +1,21 @@
 <script lang="ts">
 	import { streamRun } from '$lib/api/runs';
 	import type { RunResponse, ThreadMessage, ToolEventData, UsageData } from '$lib/api/types';
-	import type { Snippet } from 'svelte';
 	import ConversationThread from './ConversationThread.svelte';
+	import ToolActivityPanel from './ToolActivityPanel.svelte';
+	import TokenMeter from './TokenMeter.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let {
 		agentId,
 		agentName = 'Agent',
 		onRunCompleted,
-		blockedReason = null,
-		sidebar
+		blockedReason = null
 	}: {
 		agentId: string;
 		agentName?: string;
 		onRunCompleted?: () => void;
 		blockedReason?: string | null;
-		sidebar?: Snippet<[{ toolEvents: ToolEventData[]; usage: UsageData | null; result: RunResponse | null; running: boolean }]>;
 	} = $props();
 
 	let prompt = $state('');
@@ -26,7 +25,6 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 
-	// Sidebar state
 	let toolEvents: ToolEventData[] = $state([]);
 	let usage: UsageData | null = $state(null);
 	let lastResult: RunResponse | null = $state(null);
@@ -37,9 +35,9 @@
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
 		prompt = '';
+		toolEvents = [];
 		lastResult = null;
 
-		// Append user turn and empty assistant turn
 		messages = [
 			...messages,
 			{ role: 'user', content: userPrompt, status: 'complete', identityLabel: 'You' },
@@ -74,7 +72,6 @@
 						status: 'complete',
 						result: r
 					};
-					// Only advance history on success
 					if (r.success && r.message_history) {
 						messageHistory = r.message_history;
 					}
@@ -102,12 +99,10 @@
 		controller = null;
 		running = false;
 
-		// Mark last assistant message as interrupted (keep partial content)
 		const lastIdx = messages.length - 1;
 		if (lastIdx >= 0 && messages[lastIdx].role === 'assistant' && messages[lastIdx].status === 'streaming') {
 			messages[lastIdx] = { ...messages[lastIdx], status: 'interrupted' };
 		}
-		// messageHistory stays unchanged -- next turn resumes from last complete exchange
 	}
 
 	function handleNewConversation() {
@@ -132,22 +127,17 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
-	const hasSidebar = $derived(!!sidebar);
+	const showPanel = $derived(running || toolEvents.length > 0 || lastResult != null);
 </script>
 
-<div class="flex flex-1 flex-col gap-3 {hasSidebar ? 'run-panel-split' : ''}">
-	{#if hasSidebar}
-		<!-- Split view: conversation left, sidebar right -->
-		<div class="grid min-h-0 flex-1 gap-3 run-panel-grid">
-			<div class="min-h-0 overflow-hidden">
-				<ConversationThread {messages} />
-			</div>
-			<div class="flex min-h-0 flex-col gap-0">
-				{@render sidebar!({ toolEvents, usage, result: lastResult, running })}
-			</div>
+<div class="flex flex-1 flex-col gap-3">
+	<ConversationThread {messages} />
+
+	{#if showPanel}
+		<div class="h-48 shrink-0">
+			<ToolActivityPanel events={toolEvents} />
 		</div>
-	{:else}
-		<ConversationThread {messages} />
+		<TokenMeter {usage} result={lastResult} {running} />
 	{/if}
 
 	<!-- Input area -->
@@ -197,15 +187,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.run-panel-grid {
-		grid-template-columns: 1fr 320px;
-	}
-
-	@media (max-width: 900px) {
-		.run-panel-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>

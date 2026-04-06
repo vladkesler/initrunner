@@ -73,9 +73,27 @@ def run_bot(
     # State
     conversations = ConversationStore()
     guardrails = role.spec.guardrails
+
+    # Validate pricing availability if cost budgets are configured
+    if guardrails.daemon_daily_cost_budget or guardrails.daemon_weekly_cost_budget:
+        from initrunner.pricing import estimate_cost
+
+        _model = role.spec.model.name if role.spec.model else ""
+        _provider = role.spec.model.provider if role.spec.model else ""
+        if estimate_cost(1, 1, _model, _provider) is None:
+            console.print(
+                f"[red]Error:[/red] Cannot enforce cost budget: "
+                f"no pricing data for {_provider}:{_model}."
+            )
+            raise typer.Exit(1)
+
     tracker = DaemonTokenTracker(
         lifetime_budget=guardrails.daemon_token_budget,
         daily_budget=guardrails.daemon_daily_token_budget,
+        daily_cost_budget=guardrails.daemon_daily_cost_budget,
+        weekly_cost_budget=guardrails.daemon_weekly_cost_budget,
+        model=role.spec.model.name if role.spec.model else "",
+        provider=role.spec.model.provider if role.spec.model else "",
     )
     stop = threading.Event()
 
@@ -157,7 +175,7 @@ def run_bot(
             if clarify_token is not None:
                 reset_clarify_callback(clarify_token)
 
-        tracker.record_usage(result.total_tokens)
+        tracker.record_usage(result.tokens_in, result.tokens_out)
 
         # Reply to originating channel
         if event.reply_fn is not None and result.output:

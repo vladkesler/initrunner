@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from initrunner.agent.tool_events import ToolEvent
     from initrunner.audit.logger import AuditLogger
     from initrunner.flow.orchestrator import FlowRunResult
     from initrunner.flow.schema import FlowDefinition
@@ -25,11 +26,12 @@ def run_flow_sync(
     base_dir: Path,
     *,
     audit_logger: AuditLogger | None = None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> None:
     """Run a flow orchestration (sync, blocking)."""
     from initrunner.flow.orchestrator import run_flow
 
-    run_flow(flow, base_dir, audit_logger=audit_logger)
+    run_flow(flow, base_dir, audit_logger=audit_logger, on_tool_event=on_tool_event)
 
 
 def run_flow_once_sync(
@@ -41,6 +43,7 @@ def run_flow_once_sync(
     audit_logger: AuditLogger | None = None,
     on_agent_start: Callable[[str], None] | None = None,
     on_agent_complete: Callable | None = None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> FlowRunResult:
     """Run a single prompt through a flow graph (sync)."""
     from initrunner.flow.orchestrator import FlowOrchestrator
@@ -51,6 +54,7 @@ def run_flow_once_sync(
         message_history=message_history,
         on_service_start=on_agent_start,
         on_service_complete=on_agent_complete,
+        on_tool_event=on_tool_event,
     )
 
 
@@ -63,6 +67,7 @@ async def run_flow_once_async(
     audit_logger: AuditLogger | None = None,
     on_agent_start: Callable[[str], None] | None = None,
     on_agent_complete: Callable | None = None,
+    on_tool_event: Callable[[str, ToolEvent], None] | None = None,
 ) -> FlowRunResult:
     """Run a single prompt through a flow graph (async).
 
@@ -76,6 +81,7 @@ async def run_flow_once_async(
         message_history=message_history,
         on_service_start=on_agent_start,
         on_service_complete=on_agent_complete,
+        on_tool_event=on_tool_event,
     )
 
 

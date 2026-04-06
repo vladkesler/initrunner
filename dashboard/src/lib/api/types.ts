@@ -116,6 +116,7 @@ export interface AuditRecord {
 	success: boolean;
 	error: string | null;
 	trigger_type: string | null;
+	cost_usd: number | null;
 }
 
 export interface Provider {
@@ -129,6 +130,7 @@ export interface HealthStatus {
 }
 
 export interface ToolEventData {
+	agent_name?: string;
 	tool_name: string;
 	status: 'running' | 'ok' | 'error';
 	phase: 'start' | 'complete';
@@ -289,6 +291,7 @@ export interface FlowRunResponse {
 	success: boolean;
 	error: string | null;
 	message_history: string | null;
+	cost?: CostData | null;
 }
 
 export interface FlowThreadMessage {
@@ -528,6 +531,7 @@ export interface TeamRunResponse {
 	duration_ms: number;
 	success: boolean;
 	error: string | null;
+	cost?: CostData | null;
 }
 
 export interface TeamThreadMessage {
@@ -542,6 +546,7 @@ export interface TeamThreadMessage {
 export type TeamSSEEvent =
 	| { type: 'persona_start'; data: string }
 	| { type: 'persona_complete'; data: PersonaStepResponse }
+	| { type: 'tool_event'; data: ToolEventData }
 	| { type: 'result'; data: TeamRunResponse }
 	| { type: 'error'; data: string };
 
@@ -752,4 +757,39 @@ export interface TimelineStats {
 export interface TimelineResponse {
 	entries: TimelineEntry[];
 	stats: TimelineStats;
+}
+
+// -- Cost Analytics -----------------------------------------------------------
+
+export interface CostSummary {
+	today: number | null;
+	this_week: number | null;
+	this_month: number | null;
+	all_time: number | null;
+	top_agents: AgentCost[];
+	daily_trend: DailyCost[];
+}
+
+export interface AgentCost {
+	agent_name: string;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
+	avg_cost_per_run: number | null;
+}
+
+export interface DailyCost {
+	date: string;
+	run_count: number;
+	total_cost_usd: number | null;
+}
+
+export interface ModelCost {
+	model: string;
+	provider: string;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
 }

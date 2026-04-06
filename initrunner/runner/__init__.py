@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from initrunner.runner.autonomous import run_autonomous
 from initrunner.runner.bot import run_bot
-from initrunner.runner.budget import DaemonTokenTracker
 from initrunner.runner.daemon import run_daemon
 from initrunner.runner.interactive import run_interactive
 from initrunner.runner.single import run_single, run_single_stream
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
     from initrunner.stores.base import MemoryStoreBase
 
 __all__ = [
-    "DaemonTokenTracker",
     "maybe_prune_sessions",
     "run_autonomous",
     "run_bot",

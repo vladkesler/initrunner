@@ -17,8 +17,6 @@
 	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
 	import TriggerPanel from '$lib/components/agents/TriggerPanel.svelte';
 	import RunPanel from '$lib/components/runs/RunPanel.svelte';
-	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
-	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
 	import TimelineView from '$lib/components/agents/TimelineView.svelte';
 	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
 	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
@@ -340,12 +338,7 @@
 			</TabsList>
 
 			<TabsContent value="run" class="min-h-0 flex-1 pt-4">
-				<RunPanel agentId={agentId} agentName={detail.name} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }}>
-					{#snippet sidebar({ toolEvents, usage, result, running })}
-						<ToolActivityPanel events={toolEvents} />
-						<TokenMeter {usage} {result} {running} />
-					{/snippet}
-				</RunPanel>
+				<RunPanel agentId={agentId} agentName={detail.name} blockedReason={detail.error ?? detail.provider_warning ?? null} onRunCompleted={() => { runVersion++; refreshStats(); }} />
 			</TabsContent>
 
 			{#if detail.triggers.length > 0}

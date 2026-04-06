@@ -45,7 +45,7 @@
 						<span class="status-dot mt-1.5 {statusColor(event.status)}"></span>
 						<div class="min-w-0 flex-1">
 							<div class="flex items-baseline justify-between gap-2">
-								<span class="truncate font-mono text-[12px] text-fg">{event.tool_name}</span>
+								<span class="truncate font-mono text-[12px] text-fg">{#if event.agent_name}<span class="text-fg-muted">{event.agent_name}</span>{' \u203A '}{/if}{event.tool_name}</span>
 								{#if event.phase === 'complete'}
 									<span class="shrink-0 font-mono text-[11px] text-fg-faint" style="font-variant-numeric: tabular-nums">
 										{formatDuration(event.duration_ms)}

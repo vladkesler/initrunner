@@ -16,6 +16,8 @@ spec:
     session_token_budget: 500000    # cumulative budget for REPL session
     daemon_token_budget: 1000000    # cumulative budget for daemon lifetime
     daemon_daily_token_budget: 100000  # daily budget for daemon mode
+    daemon_daily_cost_budget: 5.00    # daily USD cost budget for daemon
+    daemon_weekly_cost_budget: 25.00  # weekly USD cost budget for daemon
 ```
 
 ## Field reference
@@ -31,6 +33,8 @@ spec:
 | `session_token_budget` | int | *null* | Cumulative token budget for REPL session (warns at 80%) |
 | `daemon_token_budget` | int | *null* | Lifetime token budget for daemon process |
 | `daemon_daily_token_budget` | int | *null* | Daily token budget for daemon (resets at UTC midnight) |
+| `daemon_daily_cost_budget` | float | *null* | Daily USD cost budget for daemon (resets at UTC midnight) |
+| `daemon_weekly_cost_budget` | float | *null* | Weekly USD cost budget for daemon (resets on ISO week change) |
 | `max_iterations` | int | `10` | Maximum iterations in autonomous mode |
 | `autonomous_token_budget` | int | *null* | Cumulative token budget for autonomous run |
 | `autonomous_timeout_seconds` | int | *null* | Wall-clock timeout for autonomous run |
@@ -54,5 +58,6 @@ Token usage is tracked per-run in the audit log and displayed in the CLI.
 - **Per-run limits** (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) enforce hard stops on individual agent executions.
 - **Session budgets** (`session_token_budget`) track cumulative usage across REPL turns and warn at 80% consumption.
 - **Daemon budgets** (`daemon_token_budget`, `daemon_daily_token_budget`) protect long-running daemons from unbounded spend. The daily budget resets at UTC midnight.
+- **Cost budgets** (`daemon_daily_cost_budget`, `daemon_weekly_cost_budget`) enforce USD spend limits using `genai-prices`. Requires a supported model/provider.
 
-See [token_control.md](token_control.md) for advanced token budget configuration and monitoring.
+See [token_control.md](token_control.md) for advanced token budget configuration and monitoring, and [cost-tracking.md](../core/cost-tracking.md) for cost analytics and estimation.

@@ -108,7 +108,7 @@ Tabs below the trigger panel:
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Split view: conversation stream on the left, **tool activity panel** + **token meter** on the right. Prompt input with SSE streaming output. Deterministic Rings avatars (seeded from agent name) identify each turn. Tool calls appear in real-time in the right panel as they start and complete, with status dots (lime=running, green=ok, red=error), tool names, and durations. Token meter shows budget frame before streaming, "streaming..." during output, then snaps to exact token counts, cost (via genai-prices), and budget progress bar on completion. Multi-turn message history. The sidebar collapses to a stacked layout below 900px. |
+| **Run** (default) | Vertical stack: conversation stream, **tool activity panel** (fixed 192px, scrolls internally), **token meter** with cost. Prompt input with SSE streaming output. Deterministic Rings avatars (seeded from agent name) identify each turn. Tool calls appear in real-time as they start and complete, with status dots (lime=running, green=ok, red=error), tool names, and durations. Token meter shows budget frame before streaming, "streaming..." during output, then snaps to exact token counts, cost (via genai-prices), and budget progress bar on completion. Multi-turn message history. The bottom panel appears during a run or when results exist, and resets at the start of each new run. Same layout across agent, flow, and team Run tabs. |
 | **Timeline** | Gantt-style timeline of trigger-initiated runs over the last 24 hours (only shown for agents with triggers). Swim lanes dynamically assigned from overlap detection. Bars color-coded by outcome (green=success, red=error). Hover tooltips show trigger type, duration, token count, and cost. Stats strip above the chart with run count, success rate, total tokens, avg duration, and total cost. Auto-refreshes every 30 seconds. Data from `GET /api/agents/{id}/timeline`. |
 | **History** | Audit log filtered to this agent. |
 | **Memory** | Memory items and conversation sessions (shown when agent has `memory` config). Filter by type, consolidate memories. |
@@ -173,7 +173,7 @@ Tabbed detail page with a stats bar and six tabs. A **Delete** button in the hea
 
 | Tab | Contents |
 |-----|----------|
-| **Run** (default) | Chat interface for running prompts through the pipeline. Deterministic Rings avatars seeded from the active agent name identify each turn (avatar swaps during streaming as agents execute). The entry agent (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Agent-level progress shown during execution ("Running step-2..."). Output mode adapts to topology: single terminal agent shows output directly, fan-out shows per-agent trace expanded. Collapsible pipeline trace under each response shows per-agent name, duration, tokens, and output preview. Message history scoped to entry agent for multi-turn conversations. |
+| **Run** (default) | Chat interface for running prompts through the pipeline. Same bottom-panel layout as agent runs: conversation thread, fixed-height tool activity panel showing per-agent tool calls in real time (prefixed with agent name), and token meter with cost estimation (shown when all agents share one model, `null` for mixed-model flows). Deterministic Rings avatars seeded from the active agent name identify each turn (avatar swaps during streaming as agents execute). The entry agent (first with no incoming delegation edges) receives the prompt; delegation flows through the chain via real orchestrator wiring (shared memory, routing strategies, audit events). Agent-level progress shown during execution via pipeline stepper. Collapsible pipeline trace under each response shows per-agent name, duration, tokens, and output preview. Message history scoped to entry agent for multi-turn conversations. |
 | **Timeline** | Gantt-style timeline of aggregate flow runs over the last 24 hours. Same component as agent timeline (dynamic swim lanes, auto-refresh, stats strip). Queries `trigger_type="flow_run"` from the audit trail. Cost hidden for multi-model flows (`model="multi"`). Data from `GET /api/flows/{id}/timeline`. |
 | **Graph** | SvelteFlow canvas showing the agent DAG. Agents are custom nodes (240px) with capability icons (trigger, health check, circuit breaker, sink). Layout uses topological tiering by `needs` (falls back to `sink.targets` when no dependencies exist). Delegation edges are solid lime (animated), dependency edges are dashed muted (hidden when a delegation edge covers the same pair). Minimap, auto-arrange, and localStorage position persistence. Click a node to inspect, double-click to navigate to the linked agent. |
 | **Events** | Delegation event table filtered by `flow_name`. Columns: status (color-coded dot with glow), source, target, routing (method + score from sense/keyword routing, lime for keyword matches, cyan for LLM tiebreaks), time, run ID. Six status filters: delivered, dropped, filtered, error, policy_denied, circuit_open. |
@@ -218,7 +218,7 @@ Tabbed detail page with five tabs. A **Delete** button in the header opens a con
 | Tab | Contents |
 |-----|----------|
 | **Pipeline** (default) | Strategy-aware visualization. Sequential shows a vertical chain of persona cards with handoff arrows; parallel shows a fan-out/fan-in layout. Cards display persona name, model override badge, tool count, duration, and token counts. Cards animate through states: idle, active (pulsing dot), pending, complete (checkmark), error (X). |
-| **Run** | Chat interface for running prompts through the team. Deterministic Rings avatars seeded from the active persona name identify each turn. Active persona indicator matches the pipeline visualization. Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
+| **Run** | Chat interface for running prompts through the team. Same bottom-panel layout as agent runs: conversation thread, fixed-height tool activity panel showing per-persona tool calls in real time (debate rounds include the round number, e.g. `alpha (round 2)`), and token meter with cost estimation (shown when all personas share one model, `null` when any persona overrides). Deterministic Rings avatars seeded from the active persona name identify each turn. Active persona indicator shown when a persona is executing (non-debate mode). Collapsible persona trace shows per-persona name, duration, tokens, and output preview. |
 | **Timeline** | Gantt-style timeline of aggregate team runs over the last 24 hours. Same component as agent timeline (dynamic swim lanes, auto-refresh, stats strip). Queries `trigger_type="team_run"` from the audit trail. Cost hidden for mixed-model teams (`model="multi"`). Data from `GET /api/teams/{id}/timeline`. |
 | **Config** | Collapsible sections: model, strategy (with handoff_max_chars), guardrails, shared memory, shared documents, tools, observability. |
 | **Editor** | YAML editor with live validation, in-place save, and copy. Warns when name changes (affects team ID). |
@@ -258,8 +258,21 @@ Filterable table of all agent runs with analytics.
 
 - **Stats strip**: aggregate totals (runs, success rate, tokens, avg duration) for the current filter
 - **Filters**: agent name, trigger type, date range (since/until), all/failures toggle
-- **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, and error details
+- **Cost column**: per-run estimated USD cost (computed from tokens + model/provider via `genai-prices`). Shows `N/A` for unsupported models.
+- **Detail drawer**: click any row to see full prompt, full output, all tool call names, trigger type, run ID, cost, and error details
 - **Export**: download filtered results as JSON or CSV
+
+### Cost (`/cost`)
+
+Dedicated cost analytics page for spend visibility across agents and models.
+
+- **Summary strip**: fixed period totals (today, this week, this month, all time) that do not change with the range selector
+- **Period selector**: 7d / 30d / 90d trailing UTC windows. Controls the chart and both breakdown tables below.
+- **Spend chart**: pure SVG bar chart showing daily spend. Lime bars on charcoal, hover tooltip with date, cost, and run count. Zero-cost days show thin placeholder bars. All-null data shows an empty state message.
+- **By Agent table**: per-agent breakdown with runs, tokens in/out, avg cost per run, and total cost. Rows link to agent detail when an exact unique agent name match exists.
+- **By Model table**: per-model/provider breakdown. Provider shown as a cyan pill badge.
+
+Cost values are `null` (displayed as "N/A") when `genai-prices` lacks pricing data for a model/provider.
 
 ### MCP Hub (`/mcp`)
 
@@ -388,6 +401,9 @@ initrunner dashboard
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
   |      /api/audit/stats      GET   aggregate audit statistics
+  |      /api/cost/summary     GET   cost summary (today/week/month/all-time)
+  |      /api/cost/by-agent    GET   per-agent cost breakdown
+  |      /api/cost/daily       GET   daily cost time series
   |      /api/providers        GET   detected providers
   |      /api/providers/status GET   all providers with config status
   |      /api/providers/save-key POST save API key to ~/.initrunner/.env
@@ -415,7 +431,7 @@ Agent runs use SSE (Server-Sent Events). Single-agent runs use `execute_run_stre
 |------------|---------|
 | `usage` | Budget limits, model name, provider (emitted once before streaming starts) |
 | `token` | String chunk of model output |
-| `tool_event` | Tool call lifecycle: `{tool_name, status, phase, error_summary, duration_ms}`. Emitted at start (`phase="start"`, `status="running"`) and completion (`phase="complete"`, `status="ok"` or `"error"`). Exception-safe: a start event always gets a matching complete event. |
+| `tool_event` | Tool call lifecycle: `{tool_name, status, phase, error_summary, duration_ms, agent_name?}`. Emitted at start (`phase="start"`, `status="running"`) and completion (`phase="complete"`, `status="ok"` or `"error"`). Exception-safe: a start event always gets a matching complete event. In flow and team streams, `agent_name` identifies the originating agent/persona (debate rounds include the round number, e.g. `"alpha (round 2)"`). |
 | `result` | Full `RunResponse` with token counts, tool calls, duration, and `cost` (USD estimate via genai-prices) |
 | `error` | Error message string |
 
@@ -736,6 +752,46 @@ Aggregate statistics over audit records. Query parameters: `agent_name`, `since`
 }
 ```
 
+### `GET /api/cost/summary`
+
+Cost summary with time period breakdowns, top agents, and daily trend.
+
+```json
+{
+  "today": 1.23,
+  "this_week": 8.45,
+  "this_month": 32.10,
+  "all_time": 156.78,
+  "top_agents": [
+    {"agent_name": "code-reviewer", "run_count": 350, "tokens_in": 890200, "tokens_out": 312400, "total_cost_usd": 4.82, "avg_cost_per_run": 0.0138}
+  ],
+  "daily_trend": [
+    {"date": "2026-04-05", "run_count": 42, "total_cost_usd": 1.23}
+  ]
+}
+```
+
+Values are `null` when pricing is unavailable for the model/provider.
+
+### `GET /api/cost/by-agent`
+
+Per-agent cost breakdown. Query parameters: `agent_name`, `since`, `until`.
+
+### `GET /api/cost/daily`
+
+Daily cost time series. Query parameters: `days` (default 30, max 365), `agent_name`.
+
+### `GET /api/cost/by-model`
+
+Cost breakdown grouped by model and provider. Query parameters: `since`, `until`.
+
+```json
+[
+  {"model": "gpt-4o", "provider": "openai", "run_count": 142, "tokens_in": 890200, "tokens_out": 312400, "total_cost_usd": 4.82},
+  {"model": "claude-sonnet-4-20250514", "provider": "anthropic", "run_count": 38, "tokens_in": 210500, "tokens_out": 95300, "total_cost_usd": 1.22}
+]
+```
+
 ### `GET /api/providers`
 
 Returns detected providers.
@@ -843,9 +899,11 @@ Run a single prompt through the flow pipeline via SSE. Uses the real orchestrato
 ```
 
 SSE events:
+- `usage` -- model name, provider, and budget (emitted once before the run starts; budget is `{max_tokens: null, total_limit: null}` for flows)
 - `agent_start` -- agent name about to execute
 - `agent_complete` -- per-agent result (name, output preview, duration, tokens, success)
-- `result` -- final `FlowRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, and entry agent `message_history`
+- `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating flow agent (same schema as single-agent `tool_event`)
+- `result` -- final `FlowRunResponse` with `output`, `output_mode` (single/multiple/none), `steps[]`, aggregate tokens, entry agent `message_history`, and `cost` (estimated when all agents share one model, `null` for mixed-model flows)
 - `error` -- error string
 
 ### `GET /api/flow-builder/options`
@@ -930,9 +988,11 @@ Run a prompt through the team via SSE.
 ```
 
 SSE events:
+- `usage` -- model name, provider, and budget (emitted once before the run starts; `total_limit` is `team_token_budget` when set)
 - `persona_start` -- persona name about to execute
 - `persona_complete` -- per-persona result (name, output preview, duration, tokens, success)
-- `result` -- final `TeamRunResponse` with output, steps, and aggregate tokens
+- `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating persona (debate rounds include the round, e.g. `"alpha (round 2)"`; synthesis step uses `"synthesis"`)
+- `result` -- final `TeamRunResponse` with output, steps, aggregate tokens, and `cost` (estimated when all personas share one model, `null` when any persona overrides)
 - `error` -- error string
 
 ### `GET /api/team-builder/options`

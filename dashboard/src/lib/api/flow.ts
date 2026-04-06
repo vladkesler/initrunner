@@ -11,7 +11,9 @@ import type {
 	DelegateEvent,
 	AgentStepResponse,
 	SlotAssignment,
-	TimelineResponse
+	TimelineResponse,
+	ToolEventData,
+	UsageData
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -118,6 +120,8 @@ export function streamFlowRun(
 	callbacks: {
 		onAgentStart: (name: string) => void;
 		onAgentComplete: (step: AgentStepResponse) => void;
+		onToolEvent?: (data: ToolEventData) => void;
+		onUsage?: (data: UsageData) => void;
 		onResult: (result: FlowRunResponse) => void;
 		onError: (error: string) => void;
 	}
@@ -155,6 +159,8 @@ export function streamFlowRun(
 						const event = JSON.parse(line.slice(6));
 						if (event.type === 'agent_start') callbacks.onAgentStart(event.data);
 						else if (event.type === 'agent_complete') callbacks.onAgentComplete(event.data);
+						else if (event.type === 'tool_event') callbacks.onToolEvent?.(event.data);
+						else if (event.type === 'usage') callbacks.onUsage?.(event.data);
 						else if (event.type === 'result') callbacks.onResult(event.data);
 						else if (event.type === 'error') callbacks.onError(event.data);
 					} catch {
