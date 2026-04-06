@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData } from '$lib/api/types';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData, UsageData } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
 	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
@@ -16,6 +16,7 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 	let toolEvents: ToolEventData[] = $state([]);
+	let usage: UsageData | null = $state(null);
 	let lastTeamResult: TeamRunResponse | null = $state(null);
 
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
@@ -105,6 +106,7 @@
 		const userPrompt = prompt.trim();
 		prompt = '';
 		toolEvents = [];
+		usage = null;
 		lastTeamResult = null;
 
 		messages = [
@@ -136,6 +138,10 @@
 				onToolEvent(data: ToolEventData) {
 					if (requestVersion !== currentVersion) return;
 					toolEvents = [...toolEvents, data];
+				},
+				onUsage(u: UsageData) {
+					if (requestVersion !== currentVersion) return;
+					usage = u;
 				},
 				onResult(r: TeamRunResponse) {
 					if (requestVersion !== currentVersion) return;
@@ -187,6 +193,7 @@
 		messages = [];
 		prompt = '';
 		toolEvents = [];
+		usage = null;
 		lastTeamResult = null;
 	}
 
@@ -228,7 +235,7 @@
 		<div class="h-48 shrink-0">
 			<ToolActivityPanel events={toolEvents} />
 		</div>
-		<TokenMeter result={lastTeamResult} {running} />
+		<TokenMeter {usage} result={lastTeamResult} {running} />
 	{/if}
 
 	<!-- Input area -->

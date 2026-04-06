@@ -286,6 +286,19 @@ async def stream_flow_run_sse(
             pass
     flow_model = resolved_models.pop() if len(resolved_models) == 1 else None
 
+    # Emit usage event with model info (matches agent stream pattern)
+    usage_payload = json.dumps(
+        {
+            "type": "usage",
+            "data": {
+                "budget": {"max_tokens": None, "total_limit": None},
+                "model": flow_model[1] if flow_model else None,
+                "provider": flow_model[0] if flow_model else None,
+            },
+        }
+    )
+    yield f"data: {usage_payload}\n\n"
+
     def on_agent_start(name: str) -> None:
         try:
             event_queue.put_nowait(f"data: {json.dumps({'type': 'agent_start', 'data': name})}\n\n")
@@ -418,10 +431,41 @@ async def stream_team_run_sse(
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
 
     # Resolve team model for cost estimation (null if any persona overrides)
-    has_overrides = any(p.model is not None for p in team.spec.personas.values())
     team_model: tuple[str, str] | None = None
-    if not has_overrides and team.spec.model and team.spec.model.name and team.spec.model.provider:
-        team_model = (team.spec.model.provider, team.spec.model.name)
+    team_budget: int | None = None
+    try:
+        personas = team.spec.personas
+        if hasattr(personas, "values") and callable(personas.values):
+            has_overrides = any(
+                getattr(p, "model", None) is not None for p in personas.values()
+            )
+        else:
+            has_overrides = True
+        model = team.spec.model
+        if (
+            not has_overrides
+            and model is not None
+            and isinstance(getattr(model, "name", None), str)
+            and isinstance(getattr(model, "provider", None), str)
+        ):
+            team_model = (model.provider, model.name)
+        guardrails = team.spec.guardrails
+        budget_val = getattr(guardrails, "team_token_budget", None)
+        if isinstance(budget_val, int):
+            team_budget = budget_val
+    except (AttributeError, TypeError):
+        pass
+    usage_payload = json.dumps(
+        {
+            "type": "usage",
+            "data": {
+                "budget": {"max_tokens": None, "total_limit": team_budget},
+                "model": team_model[1] if team_model else None,
+                "provider": team_model[0] if team_model else None,
+            },
+        }
+    )
+    yield f"data: {usage_payload}\n\n"
 
     def on_persona_start(name: str) -> None:
         try:

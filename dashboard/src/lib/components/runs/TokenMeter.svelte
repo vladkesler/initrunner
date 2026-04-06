@@ -83,7 +83,5 @@
 				</span>
 			{/if}
 		</div>
-	{:else}
-		<span class="text-[12px] text-fg-faint">Run an agent to see metrics</span>
 	{/if}
 </div>

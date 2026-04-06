@@ -6,7 +6,8 @@
 		FlowDetail,
 		AgentStepResponse,
 		ThreadMessage,
-		ToolEventData
+		ToolEventData,
+		UsageData
 	} from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
@@ -33,6 +34,7 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 	let toolEvents: ToolEventData[] = $state([]);
+	let usage: UsageData | null = $state(null);
 	let lastFlowResult: FlowRunResponse | null = $state(null);
 
 	// Pipeline progress tracking
@@ -76,6 +78,7 @@
 		const userPrompt = prompt.trim();
 		prompt = '';
 		toolEvents = [];
+		usage = null;
 		lastFlowResult = null;
 
 		messages = [
@@ -114,6 +117,10 @@
 				onToolEvent(data: ToolEventData) {
 					if (requestVersion !== currentVersion) return;
 					toolEvents = [...toolEvents, data];
+				},
+				onUsage(u: UsageData) {
+					if (requestVersion !== currentVersion) return;
+					usage = u;
 				},
 				onResult(r: FlowRunResponse) {
 					if (requestVersion !== currentVersion) return;
@@ -176,6 +183,7 @@
 		completedAgents = [];
 		activeAgents = new Set();
 		toolEvents = [];
+		usage = null;
 		lastFlowResult = null;
 	}
 
@@ -226,7 +234,7 @@
 		<div class="h-48 shrink-0">
 			<ToolActivityPanel events={toolEvents} />
 		</div>
-		<TokenMeter result={lastFlowResult} {running} />
+		<TokenMeter {usage} result={lastFlowResult} {running} />
 	{/if}
 
 	<!-- Input area -->
