@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.20.0",
+    "@sveltejs/kit": "^2.56.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tailwindcss/vite": "^4.1.0",
     "@types/js-yaml": "^4.0.9",
