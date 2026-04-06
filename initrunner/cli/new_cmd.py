@@ -346,6 +346,7 @@ def _refinement_loop(
 ) -> TurnResult | None:
     """Interactive refinement loop. Returns final TurnResult or None if user quit."""
     from pydantic_ai.exceptions import ModelHTTPError
+
     while True:
         try:
             user_input = console.input('\n[bold]Refine[/bold] (empty to save, "quit" to discard): ')
