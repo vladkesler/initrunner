@@ -182,53 +182,43 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
-	const hasSidebar = $derived(toolEvents.length > 0);
 </script>
 
-{#snippet conversationThread()}
-<ConversationThread
-	messages={threadMessages}
-	emptyText="Send a prompt to run it through the flow"
-	assistantLabel="Flow"
->
-	{#snippet messageHeader({ msg })}
-		{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeAgents.size > 0 || completedAgents.length > 0)}
-			<PipelineStepper
-				agents={detail.agents.map((a) => a.name)}
-				{completedAgents}
-				{activeAgents}
-				elapsed={flowElapsed}
-			/>
-		{:else}
-			<div class="flex items-center gap-2">
-				<SeedAvatar seed={msg.identityLabel ?? 'Flow'} spinning={msg.status === 'streaming'} />
-				<span class="section-label">
-					{msg.identityLabel ?? 'Flow'}
-				</span>
-			</div>
-		{/if}
-	{/snippet}
-	{#snippet messageFooter({ msg, index })}
-		{@const flowMsg = messages[index]}
-		{#if flowMsg?.role === 'assistant' && flowMsg.result?.steps}
-			<AgentTrace steps={flowMsg.result.steps} />
-		{/if}
-	{/snippet}
-</ConversationThread>
-{/snippet}
-
 <div class="flex flex-1 flex-col gap-3">
-	{#if hasSidebar}
-		<div class="grid min-h-0 flex-1 gap-3" style="grid-template-columns: 1fr 320px">
-			<div class="min-h-0 overflow-hidden">
-				{@render conversationThread()}
-			</div>
-			<div class="flex min-h-0 flex-col gap-0">
-				<ToolActivityPanel events={toolEvents} />
-			</div>
+	<ConversationThread
+		messages={threadMessages}
+		emptyText="Send a prompt to run it through the flow"
+		assistantLabel="Flow"
+	>
+		{#snippet messageHeader({ msg })}
+			{#if msg.role === 'assistant' && msg.status === 'streaming' && (activeAgents.size > 0 || completedAgents.length > 0)}
+				<PipelineStepper
+					agents={detail.agents.map((a) => a.name)}
+					{completedAgents}
+					{activeAgents}
+					elapsed={flowElapsed}
+				/>
+			{:else}
+				<div class="flex items-center gap-2">
+					<SeedAvatar seed={msg.identityLabel ?? 'Flow'} spinning={msg.status === 'streaming'} />
+					<span class="section-label">
+						{msg.identityLabel ?? 'Flow'}
+					</span>
+				</div>
+			{/if}
+		{/snippet}
+		{#snippet messageFooter({ msg, index })}
+			{@const flowMsg = messages[index]}
+			{#if flowMsg?.role === 'assistant' && flowMsg.result?.steps}
+				<AgentTrace steps={flowMsg.result.steps} />
+			{/if}
+		{/snippet}
+	</ConversationThread>
+
+	{#if running || toolEvents.length > 0}
+		<div class="h-48 shrink-0">
+			<ToolActivityPanel events={toolEvents} />
 		</div>
-	{:else}
-		{@render conversationThread()}
 	{/if}
 
 	<!-- Input area -->

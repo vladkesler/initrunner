@@ -193,23 +193,7 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
-	const hasSidebar = $derived(toolEvents.length > 0);
 </script>
-
-{#snippet conversationThread()}
-<ConversationThread
-	messages={threadMessages}
-	emptyText="Send a prompt to run it through the team"
-	assistantLabel="Team"
->
-	{#snippet messageFooter({ msg, index })}
-		{@const teamMsg = messages[index]}
-		{#if teamMsg?.role === 'assistant' && teamMsg.result?.steps}
-			<PersonaTrace steps={teamMsg.result.steps} />
-		{/if}
-	{/snippet}
-</ConversationThread>
-{/snippet}
 
 <div class="flex flex-1 flex-col gap-3">
 	<!-- Active persona indicator (non-debate) -->
@@ -225,17 +209,23 @@
 		</div>
 	{/if}
 
-	{#if hasSidebar}
-		<div class="grid min-h-0 flex-1 gap-3" style="grid-template-columns: 1fr 320px">
-			<div class="min-h-0 overflow-hidden">
-				{@render conversationThread()}
-			</div>
-			<div class="flex min-h-0 flex-col gap-0">
-				<ToolActivityPanel events={toolEvents} />
-			</div>
+	<ConversationThread
+		messages={threadMessages}
+		emptyText="Send a prompt to run it through the team"
+		assistantLabel="Team"
+	>
+		{#snippet messageFooter({ msg, index })}
+			{@const teamMsg = messages[index]}
+			{#if teamMsg?.role === 'assistant' && teamMsg.result?.steps}
+				<PersonaTrace steps={teamMsg.result.steps} />
+			{/if}
+		{/snippet}
+	</ConversationThread>
+
+	{#if running || toolEvents.length > 0}
+		<div class="h-48 shrink-0">
+			<ToolActivityPanel events={toolEvents} />
 		</div>
-	{:else}
-		{@render conversationThread()}
 	{/if}
 
 	<!-- Input area -->
