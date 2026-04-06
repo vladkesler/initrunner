@@ -270,9 +270,21 @@ async def stream_flow_run_sse(
     Runs flow graph directly as an async task (no thread pool hop).
     Callbacks push progress events to an ``asyncio.Queue``.
     """
+    from initrunner.agent.loader import load_role, resolve_role_model
     from initrunner.services.flow import run_flow_once_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    # Resolve models to determine if cost estimation is possible
+    resolved_models: set[tuple[str, str]] = set()
+    for agent_config in flow.spec.agents.values():
+        try:
+            role = resolve_role_model(load_role(base_dir / agent_config.role), base_dir)
+            if role.spec.model and role.spec.model.name and role.spec.model.provider:
+                resolved_models.add((role.spec.model.provider, role.spec.model.name))
+        except Exception:
+            pass
+    flow_model = resolved_models.pop() if len(resolved_models) == 1 else None
 
     def on_agent_start(name: str) -> None:
         try:
@@ -347,10 +359,22 @@ async def stream_flow_run_sse(
                 flow_result.entry_messages
             ).decode("utf-8")
 
+        cost = None
+        if flow_model:
+            from initrunner.dashboard.pricing import estimate_cost
+
+            cost = estimate_cost(
+                flow_result.total_tokens_in,
+                flow_result.total_tokens_out,
+                flow_model[1],
+                flow_model[0],
+            )
+
         return {
             "output": flow_result.output,
             "output_mode": flow_result.output_mode,
             "final_agent_name": flow_result.final_agent_name,
+            "cost": cost,
             "steps": [
                 {
                     "agent_name": s.agent_name,
@@ -392,6 +416,12 @@ async def stream_team_run_sse(
     from initrunner.team.graph import run_team_graph_async
 
     event_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_TOKEN_QUEUE_MAX)
+
+    # Resolve team model for cost estimation (null if any persona overrides)
+    has_overrides = any(p.model is not None for p in team.spec.personas.values())
+    team_model: tuple[str, str] | None = None
+    if not has_overrides and team.spec.model and team.spec.model.name and team.spec.model.provider:
+        team_model = (team.spec.model.provider, team.spec.model.name)
 
     def on_persona_start(name: str) -> None:
         try:
@@ -486,6 +516,17 @@ async def stream_team_run_sse(
                 entry["max_rounds"] = meta.max_rounds
             step_entries.append(entry)
 
+        cost = None
+        if team_model:
+            from initrunner.dashboard.pricing import estimate_cost
+
+            cost = estimate_cost(
+                team_result.total_tokens_in,
+                team_result.total_tokens_out,
+                team_model[1],
+                team_model[0],
+            )
+
         return {
             "team_run_id": team_result.team_run_id,
             "output": team_result.final_output,
@@ -496,6 +537,7 @@ async def stream_team_run_sse(
             "duration_ms": team_result.total_duration_ms,
             "success": team_result.success,
             "error": team_result.error,
+            "cost": cost,
         }
 
     async for event in _sse_pump(event_queue, team_task, _build, "Error during team SSE streaming"):

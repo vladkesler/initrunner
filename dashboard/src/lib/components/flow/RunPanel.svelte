@@ -10,6 +10,7 @@
 	} from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
 	import AgentTrace from './AgentTrace.svelte';
 	import PipelineStepper from './PipelineStepper.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
@@ -32,6 +33,7 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 	let toolEvents: ToolEventData[] = $state([]);
+	let lastFlowResult: FlowRunResponse | null = $state(null);
 
 	// Pipeline progress tracking
 	let completedAgents = $state<string[]>([]);
@@ -73,6 +75,8 @@
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
 		prompt = '';
+		toolEvents = [];
+		lastFlowResult = null;
 
 		messages = [
 			...messages,
@@ -125,6 +129,7 @@
 					if (r.success && r.message_history) {
 						messageHistory = r.message_history;
 					}
+					lastFlowResult = r;
 					running = false;
 					controller = null;
 					onRunCompleted?.();
@@ -171,6 +176,7 @@
 		completedAgents = [];
 		activeAgents = new Set();
 		toolEvents = [];
+		lastFlowResult = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -182,6 +188,7 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const showPanel = $derived(running || toolEvents.length > 0 || lastFlowResult != null);
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
@@ -215,10 +222,11 @@
 		{/snippet}
 	</ConversationThread>
 
-	{#if running || toolEvents.length > 0}
+	{#if showPanel}
 		<div class="h-48 shrink-0">
 			<ToolActivityPanel events={toolEvents} />
 		</div>
+		<TokenMeter result={lastFlowResult} {running} />
 	{/if}
 
 	<!-- Input area -->

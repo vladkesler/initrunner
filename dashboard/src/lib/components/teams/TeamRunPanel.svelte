@@ -3,6 +3,7 @@
 	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData } from '$lib/api/types';
 	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
 	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
 	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
@@ -15,6 +16,7 @@
 	let controller: AbortController | null = $state(null);
 	let requestVersion = $state(0);
 	let toolEvents: ToolEventData[] = $state([]);
+	let lastTeamResult: TeamRunResponse | null = $state(null);
 
 	/** Adapt TeamThreadMessage[] to ThreadMessage[] for ConversationThread. */
 	const threadMessages = $derived<ThreadMessage[]>(
@@ -102,6 +104,8 @@
 		const currentVersion = requestVersion;
 		const userPrompt = prompt.trim();
 		prompt = '';
+		toolEvents = [];
+		lastTeamResult = null;
 
 		messages = [
 			...messages,
@@ -144,6 +148,7 @@
 						activePersona: null,
 						result: r
 					};
+					lastTeamResult = r;
 					running = false;
 					controller = null;
 					onRunCompleted?.();
@@ -182,6 +187,7 @@
 		messages = [];
 		prompt = '';
 		toolEvents = [];
+		lastTeamResult = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -193,6 +199,7 @@
 
 	const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac');
 	const hasMessages = $derived(messages.length > 0);
+	const showPanel = $derived(running || toolEvents.length > 0 || lastTeamResult != null);
 </script>
 
 <div class="flex flex-1 flex-col gap-3">
@@ -201,11 +208,6 @@
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
 			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-[2px] bg-accent-primary"></span>
 			Running {activePersona}...
-		</div>
-	{:else if running}
-		<div class="flex items-center gap-2 text-[12px] text-fg-faint">
-			<span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-fg-faint"></span>
-			Starting team run...
 		</div>
 	{/if}
 
@@ -222,10 +224,11 @@
 		{/snippet}
 	</ConversationThread>
 
-	{#if running || toolEvents.length > 0}
+	{#if showPanel}
 		<div class="h-48 shrink-0">
 			<ToolActivityPanel events={toolEvents} />
 		</div>
+		<TokenMeter result={lastTeamResult} {running} />
 	{/if}
 
 	<!-- Input area -->

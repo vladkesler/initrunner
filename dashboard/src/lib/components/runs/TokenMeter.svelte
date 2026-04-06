@@ -1,5 +1,12 @@
 <script lang="ts">
-	import type { RunResponse, UsageData } from '$lib/api/types';
+	import type { CostData, UsageData } from '$lib/api/types';
+
+	interface ResultMetrics {
+		tokens_in: number;
+		tokens_out: number;
+		total_tokens: number;
+		cost?: CostData | null;
+	}
 
 	let {
 		usage = null,
@@ -7,7 +14,7 @@
 		running = false
 	}: {
 		usage?: UsageData | null;
-		result?: RunResponse | null;
+		result?: ResultMetrics | null;
 		running?: boolean;
 	} = $props();
 

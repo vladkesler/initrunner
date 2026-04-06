@@ -290,6 +290,7 @@ export interface FlowRunResponse {
 	success: boolean;
 	error: string | null;
 	message_history: string | null;
+	cost?: CostData | null;
 }
 
 export interface FlowThreadMessage {
@@ -529,6 +530,7 @@ export interface TeamRunResponse {
 	duration_ms: number;
 	success: boolean;
 	error: string | null;
+	cost?: CostData | null;
 }
 
 export interface TeamThreadMessage {
