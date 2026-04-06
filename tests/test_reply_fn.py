@@ -83,6 +83,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = None
         role.spec.memory = None
@@ -114,6 +116,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = None
         role.spec.memory = None
@@ -145,6 +149,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = None
         role.spec.memory = None
@@ -186,6 +192,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = AutonomyConfig()
         role.spec.memory = None
@@ -227,6 +235,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = AutonomyConfig()
         role.spec.memory = None
@@ -265,6 +275,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = AutonomyConfig()
         role.spec.memory = None
@@ -296,6 +308,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = None  # No autonomy config
         role.spec.memory = None
@@ -330,6 +344,8 @@ class TestReplyFnInDaemon:
         role = MagicMock()
         role.spec.guardrails.daemon_token_budget = None
         role.spec.guardrails.daemon_daily_token_budget = None
+        role.spec.guardrails.daemon_daily_cost_budget = None
+        role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.triggers = []
         role.spec.autonomy = AutonomyConfig()
         role.spec.memory = None

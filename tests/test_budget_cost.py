@@ -11,7 +11,7 @@ class TestDaemonTokenTrackerCostBudget:
     def test_no_cost_budget_backward_compat(self) -> None:
         """Tracker works without cost budgets (token-only mode)."""
         tracker = DaemonTokenTracker(lifetime_budget=1000, daily_budget=500)
-        allowed, reason = tracker.check_before_run()
+        allowed, _reason = tracker.check_before_run()
         assert allowed is True
         tracker.record_usage(100, 50)
         assert tracker.total_consumed == 150
@@ -40,6 +40,7 @@ class TestDaemonTokenTrackerCostBudget:
         # Now check should fail
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "cost budget" in reason.lower()
 
     def test_weekly_cost_budget_enforcement(self) -> None:
@@ -58,6 +59,7 @@ class TestDaemonTokenTrackerCostBudget:
 
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "weekly" in reason.lower()
 
     def test_cost_budget_daily_reset(self) -> None:
@@ -84,7 +86,7 @@ class TestDaemonTokenTrackerCostBudget:
         tracker.last_reset_date = date.today() - timedelta(days=1)
 
         # check_before_run should reset daily counters
-        allowed, reason = tracker.check_before_run()
+        allowed, _reason = tracker.check_before_run()
         assert allowed is True
         assert tracker.daily_cost_consumed == 0.0
 
@@ -124,6 +126,7 @@ class TestDaemonTokenTrackerCostBudget:
         # Token budget exceeded, cost budget not
         allowed, reason = tracker.check_before_run()
         assert allowed is False
+        assert reason is not None
         assert "Daily budget exhausted" in reason
 
     def test_record_usage_new_signature(self) -> None:

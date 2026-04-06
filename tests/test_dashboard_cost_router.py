@@ -41,9 +41,7 @@ class TestCostByModel:
                 total_cost_usd=None,
             ),
         ]
-        with patch(
-            "initrunner.services.cost.cost_by_model_sync", return_value=entries
-        ):
+        with patch("initrunner.services.cost.cost_by_model_sync", return_value=entries):
             resp = client.get("/api/cost/by-model")
         assert resp.status_code == 200
         data = resp.json()
@@ -53,9 +51,7 @@ class TestCostByModel:
         assert data[1]["total_cost_usd"] is None
 
     def test_passes_since_until(self, client: TestClient):
-        with patch(
-            "initrunner.services.cost.cost_by_model_sync", return_value=[]
-        ) as mock_fn:
+        with patch("initrunner.services.cost.cost_by_model_sync", return_value=[]) as mock_fn:
             resp = client.get(
                 "/api/cost/by-model",
                 params={"since": "2026-01-01T00:00:00", "until": "2026-04-01T00:00:00"},
@@ -66,9 +62,7 @@ class TestCostByModel:
         assert call_kwargs["until"] == "2026-04-01T00:00:00"
 
     def test_empty_result(self, client: TestClient):
-        with patch(
-            "initrunner.services.cost.cost_by_model_sync", return_value=[]
-        ):
+        with patch("initrunner.services.cost.cost_by_model_sync", return_value=[]):
             resp = client.get("/api/cost/by-model")
         assert resp.status_code == 200
         assert resp.json() == []

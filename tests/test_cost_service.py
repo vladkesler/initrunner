@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from initrunner.audit.logger import AuditLogger
 from initrunner.services.cost import (
-    AgentCostEntry,
-    CostReport,
     cost_by_model_sync,
     cost_report_sync,
     cost_summary_sync,

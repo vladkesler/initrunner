@@ -514,9 +514,8 @@ def _make_agent_step(service_name: str, topology_index: int):
 
         cb_token = None
         if deps.on_tool_event:
-            cb_token = set_tool_event_callback(
-                lambda event, _name=service_name: deps.on_tool_event(_name, event)
-            )
+            _cb = deps.on_tool_event
+            cb_token = set_tool_event_callback(lambda event, _name=service_name: _cb(_name, event))
         try:
             msg_history = envelope.message_history if service_name == deps.entry_service else None
             result, new_messages = await execute_run_async(

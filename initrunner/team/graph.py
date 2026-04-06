@@ -147,9 +147,8 @@ def _make_sequential_persona_step(persona_name: str, index: int):
 
         cb_token = None
         if deps.on_tool_event:
-            cb_token = set_tool_event_callback(
-                lambda event, _name=persona_name: deps.on_tool_event(_name, event)
-            )
+            _cb = deps.on_tool_event
+            cb_token = set_tool_event_callback(lambda event, _name=persona_name: _cb(_name, event))
         try:
             with persona_env(persona.environment):
                 agent = build_agent(role, role_dir=deps.team_dir)
@@ -262,9 +261,8 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
 
         cb_token = None
         if deps.on_tool_event:
-            cb_token = set_tool_event_callback(
-                lambda event, _name=persona_name: deps.on_tool_event(_name, event)
-            )
+            _cb = deps.on_tool_event
+            cb_token = set_tool_event_callback(lambda event, _name=persona_name: _cb(_name, event))
         try:
             agent = build_agent(role, role_dir=deps.team_dir)
             result, _ = await execute_run_async(
@@ -580,9 +578,8 @@ async def _run_debate_persona(
 
     cb_token = None
     if deps.on_tool_event:
-        cb_token = set_tool_event_callback(
-            lambda event, _name=display_name: deps.on_tool_event(_name, event)
-        )
+        _cb = deps.on_tool_event
+        cb_token = set_tool_event_callback(lambda event, _name=display_name: _cb(_name, event))
     try:
         agent = build_agent(role, role_dir=deps.team_dir)
         run_result, _ = await execute_run_async(
@@ -660,7 +657,8 @@ async def _run_synthesis(
 
     cb_token = None
     if deps.on_tool_event:
-        cb_token = set_tool_event_callback(lambda event: deps.on_tool_event("synthesis", event))
+        _cb = deps.on_tool_event
+        cb_token = set_tool_event_callback(lambda event: _cb("synthesis", event))
     try:
         agent = build_agent(role, role_dir=deps.team_dir)
         run_result, _ = await execute_run_async(

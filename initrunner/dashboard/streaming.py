@@ -436,9 +436,7 @@ async def stream_team_run_sse(
     try:
         personas = team.spec.personas
         if hasattr(personas, "values") and callable(personas.values):
-            has_overrides = any(
-                getattr(p, "model", None) is not None for p in personas.values()
-            )
+            has_overrides = any(getattr(p, "model", None) is not None for p in personas.values())
         else:
             has_overrides = True
         model = team.spec.model

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -63,7 +62,14 @@ class TestCostByAgent:
         with AuditLogger(audit_db) as logger:
             _insert_record(logger, agent_name="a", model="gpt-4o", tokens_in=100, tokens_out=50)
             _insert_record(logger, agent_name="a", model="gpt-4o", tokens_in=200, tokens_out=100)
-            _insert_record(logger, agent_name="b", model="claude-sonnet-4-20250514", provider="anthropic", tokens_in=50, tokens_out=25)
+            _insert_record(
+                logger,
+                agent_name="b",
+                model="claude-sonnet-4-20250514",
+                provider="anthropic",
+                tokens_in=50,
+                tokens_out=25,
+            )
 
             rows = logger.cost_by_agent()
             assert len(rows) == 2
@@ -143,7 +149,12 @@ class TestCostByModel:
         with AuditLogger(audit_db) as logger:
             _insert_record(logger, model="gpt-4o", provider="openai", tokens_in=100)
             _insert_record(logger, model="gpt-4o", provider="openai", tokens_in=200)
-            _insert_record(logger, model="claude-sonnet-4-20250514", provider="anthropic", tokens_in=500)
+            _insert_record(
+                logger,
+                model="claude-sonnet-4-20250514",
+                provider="anthropic",
+                tokens_in=500,
+            )
 
             rows = logger.cost_by_model()
             assert len(rows) == 2
