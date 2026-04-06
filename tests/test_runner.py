@@ -8,7 +8,8 @@ from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
-from initrunner.runner import DaemonTokenTracker, run_autonomous, run_single, run_single_stream
+from initrunner.runner import run_autonomous, run_single, run_single_stream
+from initrunner.runner.budget import DaemonTokenTracker
 
 
 def _make_role(
@@ -65,7 +66,7 @@ class TestDaemonTokenTracker:
 
     def test_lifetime_budget_enforced(self):
         tracker = DaemonTokenTracker(lifetime_budget=100, daily_budget=None)
-        tracker.record_usage(100)
+        tracker.record_usage(60, 40)
         allowed, reason = tracker.check_before_run()
         assert allowed is False
         assert reason is not None
@@ -73,7 +74,7 @@ class TestDaemonTokenTracker:
 
     def test_daily_budget_enforced(self):
         tracker = DaemonTokenTracker(lifetime_budget=None, daily_budget=50)
-        tracker.record_usage(50)
+        tracker.record_usage(30, 20)
         allowed, reason = tracker.check_before_run()
         assert allowed is False
         assert reason is not None
@@ -81,7 +82,7 @@ class TestDaemonTokenTracker:
 
     def test_daily_reset(self):
         tracker = DaemonTokenTracker(lifetime_budget=None, daily_budget=50)
-        tracker.record_usage(50)
+        tracker.record_usage(30, 20)
 
         # Simulate day change
         tracker.last_reset_date = date(2020, 1, 1)
@@ -92,14 +93,14 @@ class TestDaemonTokenTracker:
 
     def test_record_usage_accumulates(self):
         tracker = DaemonTokenTracker(lifetime_budget=1000, daily_budget=500)
-        tracker.record_usage(100)
-        tracker.record_usage(200)
+        tracker.record_usage(60, 40)
+        tracker.record_usage(120, 80)
         assert tracker.total_consumed == 300
         assert tracker.daily_consumed == 300
 
     def test_lifetime_exhaustion_blocks_even_after_daily_reset(self):
         tracker = DaemonTokenTracker(lifetime_budget=100, daily_budget=200)
-        tracker.record_usage(100)
+        tracker.record_usage(60, 40)
         # Simulate day change
         tracker.last_reset_date = date(2020, 1, 1)
         allowed, reason = tracker.check_before_run()

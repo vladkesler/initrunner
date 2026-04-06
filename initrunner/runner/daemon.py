@@ -75,9 +75,28 @@ class DaemonRunner:
         self._concurrency_semaphore = threading.Semaphore(self._MAX_CONCURRENT)
 
         guardrails = role.spec.guardrails
+
+        # Validate pricing availability if cost budgets are configured
+        if guardrails.daemon_daily_cost_budget or guardrails.daemon_weekly_cost_budget:
+            from initrunner.pricing import estimate_cost
+
+            model_name = role.spec.model.name if role.spec.model else ""
+            provider_name = role.spec.model.provider if role.spec.model else ""
+            if estimate_cost(1, 1, model_name, provider_name) is None:
+                raise RuntimeError(
+                    f"Cannot enforce cost budget: no pricing data "
+                    f"for {provider_name}:{model_name}. "
+                    "Remove cost budget from guardrails or "
+                    "use a supported model/provider."
+                )
+
         self._tracker = DaemonTokenTracker(
             lifetime_budget=guardrails.daemon_token_budget,
             daily_budget=guardrails.daemon_daily_token_budget,
+            daily_cost_budget=guardrails.daemon_daily_cost_budget,
+            weekly_cost_budget=guardrails.daemon_weekly_cost_budget,
+            model=role.spec.model.name if role.spec.model else "",
+            provider=role.spec.model.provider if role.spec.model else "",
         )
 
         self._schedule_queue = None
@@ -245,7 +264,9 @@ class DaemonRunner:
                     trigger_metadata=event.metadata or {},
                     message_history=prior_history,
                 )
-                self._tracker.record_usage(auto_result.total_tokens)
+                self._tracker.record_usage(
+                    auto_result.total_tokens_in, auto_result.total_tokens_out
+                )
 
                 # Store updated conversation history
                 if conv_key and auto_result.final_messages:
@@ -322,7 +343,7 @@ class DaemonRunner:
                 finally:
                     reset_tool_event_callback(cb_token)
 
-                self._tracker.record_usage(result.total_tokens)
+                self._tracker.record_usage(result.tokens_in, result.tokens_out)
 
                 # Reply first, post-process after
                 if event.reply_fn is not None and result.output:

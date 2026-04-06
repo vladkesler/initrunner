@@ -103,6 +103,7 @@ Detailed docs live in `docs/`. Key references:
 | OCI distribution & bundles | `docs/core/oci-distribution.md` |
 | Discord bot quickstart | `docs/getting-started/discord.md` |
 | Telegram bot quickstart | `docs/getting-started/telegram.md` |
+| Cost tracking & budgets | `docs/core/cost-tracking.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |

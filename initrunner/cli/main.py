@@ -140,6 +140,7 @@ def main(
 # Command registrations — plain functions from *_cmd modules
 # ---------------------------------------------------------------------------
 
+from initrunner.cli.cost_cmd import app as cost_app  # noqa: E402
 from initrunner.cli.dashboard_cmd import dashboard  # noqa: E402
 from initrunner.cli.desktop_cmd import desktop  # noqa: E402
 from initrunner.cli.doctor_cmd import doctor  # noqa: E402
@@ -200,6 +201,7 @@ app.command(rich_help_panel="Agent Internals")(plugins)
 app.add_typer(skill_app, name="skill", rich_help_panel="Agent Internals")
 app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
 app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")
+app.add_typer(cost_app, name="cost", rich_help_panel="Agent Internals")
 
 # --- Deprecated (hidden from help) ---
 app.add_typer(hub_app, name="hub", hidden=True)

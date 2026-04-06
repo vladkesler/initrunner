@@ -388,6 +388,9 @@ initrunner dashboard
   |      /api/runs/stream      POST  streaming run (SSE)
   |      /api/audit            GET   query audit records
   |      /api/audit/stats      GET   aggregate audit statistics
+  |      /api/cost/summary     GET   cost summary (today/week/month/all-time)
+  |      /api/cost/by-agent    GET   per-agent cost breakdown
+  |      /api/cost/daily       GET   daily cost time series
   |      /api/providers        GET   detected providers
   |      /api/providers/status GET   all providers with config status
   |      /api/providers/save-key POST save API key to ~/.initrunner/.env
@@ -735,6 +738,35 @@ Aggregate statistics over audit records. Query parameters: `agent_name`, `since`
   ]
 }
 ```
+
+### `GET /api/cost/summary`
+
+Cost summary with time period breakdowns, top agents, and daily trend.
+
+```json
+{
+  "today": 1.23,
+  "this_week": 8.45,
+  "this_month": 32.10,
+  "all_time": 156.78,
+  "top_agents": [
+    {"agent_name": "code-reviewer", "run_count": 350, "tokens_in": 890200, "tokens_out": 312400, "total_cost_usd": 4.82, "avg_cost_per_run": 0.0138}
+  ],
+  "daily_trend": [
+    {"date": "2026-04-05", "run_count": 42, "total_cost_usd": 1.23}
+  ]
+}
+```
+
+Values are `null` when pricing is unavailable for the model/provider.
+
+### `GET /api/cost/by-agent`
+
+Per-agent cost breakdown. Query parameters: `agent_name`, `since`, `until`.
+
+### `GET /api/cost/daily`
+
+Daily cost time series. Query parameters: `days` (default 30, max 365), `agent_name`.
 
 ### `GET /api/providers`
 
