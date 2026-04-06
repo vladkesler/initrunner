@@ -211,7 +211,7 @@
 </ConversationThread>
 {/snippet}
 
-<div class="flex min-h-0 flex-1 flex-col gap-3">
+<div class="flex flex-1 flex-col gap-3">
 	<!-- Active persona indicator (non-debate) -->
 	{#if activePersona && !debateMode}
 		<div class="flex items-center gap-2 text-[12px] text-accent-primary">
@@ -226,11 +226,11 @@
 	{/if}
 
 	{#if hasSidebar}
-		<div class="grid min-h-0 flex-1 gap-3 overflow-hidden team-panel-grid">
-			<div class="min-h-0 overflow-hidden">
+		<div class="flex min-h-0 flex-1 gap-3">
+			<div class="min-h-0 min-w-0 flex-1 overflow-hidden">
 				{@render conversationThread()}
 			</div>
-			<div class="flex min-h-0 flex-col overflow-hidden">
+			<div class="flex w-80 shrink-0 flex-col overflow-hidden">
 				<ToolActivityPanel events={toolEvents} />
 			</div>
 		</div>
@@ -285,15 +285,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.team-panel-grid {
-		grid-template-columns: 1fr 320px;
-	}
-
-	@media (max-width: 900px) {
-		.team-panel-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>

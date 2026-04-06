@@ -217,13 +217,13 @@
 </ConversationThread>
 {/snippet}
 
-<div class="flex min-h-0 flex-1 flex-col gap-3">
+<div class="flex flex-1 flex-col gap-3">
 	{#if hasSidebar}
-		<div class="grid min-h-0 flex-1 gap-3 overflow-hidden flow-panel-grid">
-			<div class="min-h-0 overflow-hidden">
+		<div class="flex min-h-0 flex-1 gap-3">
+			<div class="min-h-0 min-w-0 flex-1 overflow-hidden">
 				{@render conversationThread()}
 			</div>
-			<div class="flex min-h-0 flex-col overflow-hidden">
+			<div class="flex w-80 shrink-0 flex-col overflow-hidden">
 				<ToolActivityPanel events={toolEvents} />
 			</div>
 		</div>
@@ -278,15 +278,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.flow-panel-grid {
-		grid-template-columns: 1fr 320px;
-	}
-
-	@media (max-width: 900px) {
-		.flow-panel-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>
