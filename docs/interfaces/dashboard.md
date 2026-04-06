@@ -843,6 +843,7 @@ Run a single prompt through the flow pipeline via SSE. Uses the real orchestrato
 ```
 
 SSE events:
+- `usage` -- model name, provider, and budget (emitted once before the run starts; budget is `{max_tokens: null, total_limit: null}` for flows)
 - `agent_start` -- agent name about to execute
 - `agent_complete` -- per-agent result (name, output preview, duration, tokens, success)
 - `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating flow agent (same schema as single-agent `tool_event`)
@@ -931,6 +932,7 @@ Run a prompt through the team via SSE.
 ```
 
 SSE events:
+- `usage` -- model name, provider, and budget (emitted once before the run starts; `total_limit` is `team_token_budget` when set)
 - `persona_start` -- persona name about to execute
 - `persona_complete` -- per-persona result (name, output preview, duration, tokens, success)
 - `tool_event` -- per-tool call lifecycle with `agent_name` identifying the originating persona (debate rounds include the round, e.g. `"alpha (round 2)"`; synthesis step uses `"synthesis"`)
