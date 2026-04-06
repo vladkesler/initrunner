@@ -606,7 +606,7 @@ spec:
 
 def test_rewrite_model_block_replace():
     """Replacing provider and name in the model block."""
-    from initrunner.dashboard.routers.builder import _rewrite_model_block
+    from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
 
     result = _rewrite_model_block(
         _SAMPLE_YAML, provider="anthropic", name="claude-sonnet-4-20250514"
@@ -619,7 +619,7 @@ def test_rewrite_model_block_replace():
 
 def test_rewrite_model_block_inject():
     """Injecting base_url and api_key_env after the name line."""
-    from initrunner.dashboard.routers.builder import _rewrite_model_block
+    from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
 
     result = _rewrite_model_block(
         _SAMPLE_YAML,
@@ -635,7 +635,7 @@ def test_rewrite_model_block_inject():
 
 def test_rewrite_model_block_replace_and_inject():
     """Replace provider/name and inject base_url in one call."""
-    from initrunner.dashboard.routers.builder import _rewrite_model_block
+    from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
 
     result = _rewrite_model_block(
         _SAMPLE_YAML,
@@ -650,7 +650,7 @@ def test_rewrite_model_block_replace_and_inject():
 
 def test_rewrite_model_block_scoped():
     """Does not touch provider/name fields outside the model block."""
-    from initrunner.dashboard.routers.builder import _rewrite_model_block
+    from initrunner.services.agent_builder import rewrite_model_block as _rewrite_model_block
 
     yaml_with_other_provider = """\
 apiVersion: initrunner/v1

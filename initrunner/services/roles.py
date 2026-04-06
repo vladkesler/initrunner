@@ -500,10 +500,14 @@ _SECTION_EXPLAINERS: dict[str, _ExplainerFn] = {
 
 
 def _detect_provider() -> str:
-    """Auto-detect which provider has an API key available."""
-    from initrunner.services.providers import detect_provider_and_model
+    """Auto-detect which provider has an API key available.
 
-    detected = detect_provider_and_model()
-    if detected is not None:
-        return detected.provider
+    Uses the canonical precedence: INITRUNNER_MODEL env > run.yaml > env-var
+    auto-detect > fallback to ``"openai"``.
+    """
+    from initrunner.agent.loader import detect_default_model
+
+    prov, _name, _base_url, _api_key_env, source = detect_default_model()
+    if source != "none":
+        return prov
     return "openai"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import textwrap
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
@@ -297,3 +297,144 @@ class TestZeroArg:
         lines = result.output.split("\n")
         command_lines = [line.strip() for line in lines if line.strip().startswith("create ")]
         assert len(command_lines) == 0
+
+
+# ---------------------------------------------------------------------------
+# Provider/model resolution -- run.yaml precedence
+# ---------------------------------------------------------------------------
+
+
+class TestProviderResolution:
+    """init new should respect run.yaml over env-var auto-detection."""
+
+    def test_run_yaml_overrides_env_detection(self, tmp_path, monkeypatch):
+        """run.yaml provider takes precedence over higher-priority env vars."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-stale-key")
+        monkeypatch.delenv("INITRUNNER_MODEL", raising=False)
+
+        # Patch detect_default_model to simulate run.yaml returning openai
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("openai", "gpt-5-mini", None, None, "run_yaml"),
+        ):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+            )
+        assert result.exit_code == 0
+        content = output.read_text()
+        assert "openai" in content
+
+    def test_cli_flags_override_run_yaml(self, tmp_path, monkeypatch):
+        """Explicit --provider flag overrides run.yaml."""
+        monkeypatch.delenv("INITRUNNER_MODEL", raising=False)
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=("openai", "gpt-5-mini", None, None, "run_yaml"),
+        ):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                [
+                    "new",
+                    "--blank",
+                    "--provider",
+                    "anthropic",
+                    "--output",
+                    str(output),
+                    "--no-refine",
+                ],
+            )
+        assert result.exit_code == 0
+        content = output.read_text()
+        assert "anthropic" in content
+
+    def test_base_url_injected_into_yaml(self, tmp_path, monkeypatch):
+        """base_url from run.yaml is injected into generated YAML."""
+        monkeypatch.delenv("INITRUNNER_MODEL", raising=False)
+
+        with patch(
+            "initrunner.agent.loader.detect_default_model",
+            return_value=(
+                "openai",
+                "gpt-5-mini",
+                "https://openrouter.ai/api/v1",
+                "OPENROUTER_API_KEY",
+                "run_yaml",
+            ),
+        ):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+            )
+        assert result.exit_code == 0
+        content = output.read_text()
+        assert "https://openrouter.ai/api/v1" in content
+        assert "OPENROUTER_API_KEY" in content
+
+
+# ---------------------------------------------------------------------------
+# 401 error handling
+# ---------------------------------------------------------------------------
+
+
+class TestAuthErrorHandling:
+    """401 errors should show clear guidance, not raw tracebacks."""
+
+    def test_seed_401_shows_auth_message(self, tmp_path, monkeypatch):
+        """A 401 during seed shows authentication guidance."""
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        monkeypatch.delenv("INITRUNNER_MODEL", raising=False)
+
+        session, _ = _mock_builder_session()
+        session.seed_description.side_effect = ModelHTTPError(
+            status_code=401, model_name="test-model", body=None
+        )
+
+        with (
+            patch("initrunner.services.agent_builder.BuilderSession", return_value=session),
+            patch(
+                "initrunner.agent.loader.detect_default_model",
+                return_value=("openai", "gpt-5-mini", None, None, "run_yaml"),
+            ),
+        ):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "a chatbot", "--output", str(output), "--no-refine"],
+            )
+        assert result.exit_code == 1
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "authentication failed" in plain.lower()
+        assert "initrunner setup" in plain
+
+    def test_seed_other_http_error_shows_status(self, tmp_path, monkeypatch):
+        """Non-401 HTTP errors show the status code."""
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        monkeypatch.delenv("INITRUNNER_MODEL", raising=False)
+
+        session, _ = _mock_builder_session()
+        session.seed_description.side_effect = ModelHTTPError(
+            status_code=429, model_name="test-model", body=None
+        )
+
+        with (
+            patch("initrunner.services.agent_builder.BuilderSession", return_value=session),
+            patch(
+                "initrunner.agent.loader.detect_default_model",
+                return_value=("openai", "gpt-5-mini", None, None, "run_yaml"),
+            ),
+        ):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "a chatbot", "--output", str(output), "--no-refine"],
+            )
+        assert result.exit_code == 1
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "429" in plain

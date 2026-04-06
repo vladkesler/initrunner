@@ -77,8 +77,8 @@ Model resolution follows this order (highest to lowest):
 
 1. `--model` CLI flag / `INITRUNNER_MODEL` env var
 2. Role YAML `spec.model` (with alias resolution)
-3. `run.yaml` defaults (ephemeral mode only)
-4. Auto-detection (ephemeral mode only)
+3. `run.yaml` defaults (ephemeral mode and `new`/`flow new`/`doctor`)
+4. API key env-var auto-detection
 
 The `--dry-run` flag operates at a different layer: the agent is built with the real model (alias/override applied), then `TestModel` replaces it at runner execution time.
 

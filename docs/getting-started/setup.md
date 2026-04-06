@@ -253,7 +253,7 @@ api_key_env: OPENROUTER_API_KEY
 | `personality` | string | *null* | Custom system prompt |
 | `name` | string | `ephemeral` | Agent name |
 
-This file is loaded by `initrunner run` to pre-configure the ephemeral session.
+This file is loaded by `initrunner run` (ephemeral mode), `initrunner new`, `flow new`, and `doctor` to resolve the default provider and model. CLI flags (`--provider`, `--model`) override these defaults when specified.
 
 ### Generated Role
 
