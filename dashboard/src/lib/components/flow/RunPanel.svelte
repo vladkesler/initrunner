@@ -219,11 +219,11 @@
 
 <div class="flex flex-1 flex-col gap-3">
 	{#if hasSidebar}
-		<div class="flex min-h-0 flex-1 gap-3">
-			<div class="min-h-0 min-w-0 flex-1 overflow-hidden">
+		<div class="grid min-h-0 flex-1 gap-3" style="grid-template-columns: 1fr 320px">
+			<div class="min-h-0 overflow-hidden">
 				{@render conversationThread()}
 			</div>
-			<div class="flex w-80 shrink-0 flex-col overflow-hidden">
+			<div class="flex min-h-0 flex-col gap-0">
 				<ToolActivityPanel events={toolEvents} />
 			</div>
 		</div>
