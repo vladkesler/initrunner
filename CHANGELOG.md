@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Behavior changes
+- **`ingest.auto: true` is now the default; auto-ingest refreshes stale indices.** Roles with an `ingest:` block now auto-index on every `initrunner run` if any source files have been added, modified, or removed since the last indexing pass. The previous behavior (auto-ingest only on the first run, opt-in via `ingest.auto: true`) is gone. To preserve the old manual workflow, set `ingest.auto: false` in the role YAML. The cheap stale check uses an mtime fast-path (heuristic; defeated by timestamp-preserving copies like `cp -p` -- run `initrunner ingest <role> --force` for an authoritative rebuild). Existing URLs are not re-fetched on auto runs to avoid per-run network traffic; new URLs added to the YAML are picked up automatically; `initrunner ingest <role>` (manual) still refreshes URL contents
+
+### Fixed (alongside the auto-ingest default flip)
+- **URLs were re-fetched on every `run_ingest` call** -- `_classify_urls` now accepts a `skip_existing_urls` flag (set by the auto-ingest path) so URLs already in the store are not re-fetched. The manual `initrunner ingest` path keeps the old refresh behavior
+- **Deleting the last source file did not purge it** -- `_execute_ingest_core` now runs the purge step unconditionally when `purge_resolved_sources` is provided, even if the resolved file list is empty. Previously the early return at the top of the function bypassed `_purge_deleted` entirely, leaving orphaned chunks in the store
+- **Embedding-model changes were invisible when no source files changed** -- the new `compute_stale_ingest_plan` reads the stored `embedding_model` identity in the same lock-free pass it uses for file metadata, so an `embeddings.model` swap with otherwise-unchanged sources now triggers the same `EmbeddingModelChangedError` + `--force` hint as a manual run. Legacy stores from before identity tracking are detected and self-heal on the next `initrunner run`
+
 ### Added
 - **Pre-flight YAML validation on every run** -- `initrunner run`, `flow up`, and `flow install` now validate role/team/flow YAML against the schema before any skill resolution, model resolution, or API call. Errors render as a Rich panel showing per-field paths (e.g. `spec.model.provider`), 1-based line/column for syntax errors, and inline fix suggestions derived from Pydantic's stable error type API. Warning-level issues stay silent on the run path so successful runs are uncluttered
 - **Recursive flow validation** -- `flow up`, `flow install`, and `flow validate` now walk every role file referenced by a flow's `spec.agents` and validate each one. Issues from a referenced role surface with `agents.<name>.` field prefixes so you can tell which referenced file is broken

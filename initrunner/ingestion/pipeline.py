@@ -292,11 +292,17 @@ def _classify_urls(
     *,
     force: bool,
     progress_callback: Callable[[Path, FileStatus], None] | None,
+    skip_existing_urls: bool = False,
 ) -> tuple[list[tuple[str, FileStatus, str]], set[str]]:
     """Classify URLs as NEW, UPDATED, SKIPPED, or ERROR.
 
     Fetches each URL, computes content hash on the extracted markdown, and
     compares against the stored hash for incremental skip.
+
+    When ``skip_existing_urls`` is ``True``, URLs already present in
+    ``file_metadata`` are recorded as SKIPPED *without* fetching them. The
+    auto-ingest path uses this to avoid per-run network calls; the manual
+    ``initrunner ingest`` path leaves it ``False`` so URLs get refreshed.
 
     Returns (to_process, resolved_url_sources) where each to_process entry
     is (url, status, extracted_markdown_text).
@@ -309,6 +315,16 @@ def _classify_urls(
 
     for url in urls:
         resolved_sources.add(url)
+
+        # Auto-mode fast-path: existing URLs are not refetched. New URLs
+        # added to the YAML still get processed below.
+        if skip_existing_urls and url in file_metadata:
+            result = FileResult(path=Path(url), status=FileStatus.SKIPPED)
+            stats.file_results.append(result)
+            stats.skipped += 1
+            if progress_callback:
+                progress_callback(Path(url), FileStatus.SKIPPED)
+            continue
 
         # Per-domain rate limiting
         domain = urlparse(url).hostname or ""
@@ -703,10 +719,16 @@ def _run_url_pipeline(
     *,
     force: bool,
     progress_callback: Callable[[Path, FileStatus], None] | None,
+    skip_existing_urls: bool = False,
 ) -> DocumentStore | None:
     """Classify, chunk, embed, store URLs. Returns (possibly new) store."""
     url_to_process, _url_resolved = _classify_urls(
-        urls, file_metadata, stats, force=force, progress_callback=progress_callback
+        urls,
+        file_metadata,
+        stats,
+        force=force,
+        progress_callback=progress_callback,
+        skip_existing_urls=skip_existing_urls,
     )
 
     if url_to_process:
@@ -739,6 +761,7 @@ def _execute_ingest_core(
     max_file_size_mb: float = 0,
     max_total_ingest_mb: float = 0,
     purge_resolved_sources: set[str] | None = None,
+    skip_existing_urls: bool = False,
 ) -> IngestStats:
     """Shared pipeline core: lock, embedder, model check, classify, embed, store, purge.
 
@@ -754,13 +777,19 @@ def _execute_ingest_core(
         max_total_ingest_mb: Skip once cumulative size exceeds this (0 = no limit).
         purge_resolved_sources: If a set, purge file sources not in the set.
             If ``None``, skip purging entirely (used by managed-source additions).
+        skip_existing_urls: If True, URLs already present in the store are
+            skipped without fetching. Used by the auto-ingest path to avoid
+            per-run network calls.
     """
     from opentelemetry import trace  # type: ignore[import-not-found]
 
     tracer = trace.get_tracer("initrunner")
 
     stats = IngestStats()
-    if not files and not urls:
+    # A purge-only call (e.g. the user deleted every source file) still has
+    # work to do: drop the orphaned rows. Don't return early in that case.
+    purge_only = not files and not urls and purge_resolved_sources is not None
+    if not files and not urls and not purge_only:
         return stats
 
     db_path = _get_store_path(agent_name, config.store_path)
@@ -816,7 +845,19 @@ def _execute_ingest_core(
                     file_metadata,
                     force=force,
                     progress_callback=progress_callback,
+                    skip_existing_urls=skip_existing_urls,
                 )
+
+            # Purge orphaned file rows even when no files were resolved
+            # (handles "user removed every source"). _run_file_pipeline
+            # already handles purge when at least one file is present, so
+            # this branch only fires when files == [].
+            if purge_resolved_sources is not None and not files and db_path.exists():
+                if store is None:
+                    store = stack.enter_context(
+                        create_document_store(config.store_backend, db_path)
+                    )
+                _purge_deleted(store, purge_resolved_sources)
 
             # Record the embedding model identity after successful ingestion
             if db_path.exists() and (stats.new or stats.updated or force):
@@ -881,8 +922,14 @@ def run_ingest(
     progress_callback: Callable[[Path, FileStatus], None] | None = None,
     max_file_size_mb: float = 0,
     max_total_ingest_mb: float = 0,
+    skip_existing_urls: bool = False,
 ) -> IngestStats:
-    """Run the full ingestion pipeline synchronously. Returns IngestStats."""
+    """Run the full ingestion pipeline synchronously. Returns IngestStats.
+
+    When ``skip_existing_urls`` is True, URLs already present in the store
+    are skipped without fetching. Used by the auto-ingest path; the manual
+    ``initrunner ingest`` command leaves it False so URLs get refreshed.
+    """
     all_files, all_urls = resolve_full_sources(config, agent_name, base_dir=base_dir)
     all_resolved = {str(p) for p in all_files}
 
@@ -897,6 +944,7 @@ def run_ingest(
         max_file_size_mb=max_file_size_mb,
         max_total_ingest_mb=max_total_ingest_mb,
         purge_resolved_sources=all_resolved,
+        skip_existing_urls=skip_existing_urls,
     )
 
 

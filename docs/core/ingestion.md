@@ -332,34 +332,42 @@ search_documents("error handling", source="./docs/api-reference.md")
 
 If no documents have been ingested, the tool returns a message directing the user to run `initrunner ingest`.
 
-## Auto-Ingest on First Run
+## Automatic Index Refresh
 
-Roles with `ingest.auto: true` automatically index documents the first time you run them. No separate `initrunner ingest` step needed:
+Roles with an `ingest:` block auto-index on every `initrunner run` if sources have changed since the last indexing pass. No separate `initrunner ingest` step is needed for the common edit-and-run workflow:
 
 ```yaml
 spec:
   ingest:
-    auto: true
     sources: ["./**/*.py", "./**/*.md"]
 ```
 
 ```bash
 cd ~/myproject
 initrunner run my-agent.yaml -i
-# First run: "Indexed 1842 chunks (127 files)."
-# Second run: skips ingestion, store already populated
+# First run:  Indexing... → "Indexed 127 new, 0 updated (1842 chunks)"
+# Second run: silent (nothing changed)
+# After editing src/main.py:
+#             Indexing... → "Indexed 0 new, 1 updated (14 chunks)"
 ```
 
-**How it works:**
-- Auto-ingest fires only when the document store has zero indexed chunks.
-- Subsequent runs skip ingestion entirely (instant startup).
-- Common junk directories (`node_modules`, `.venv`, `__pycache__`, `.git`, `dist`, `build`) are auto-excluded from glob results.
-- Bundled starters resolve glob patterns from your current working directory, not the starter's install location.
-- If the embedding model changed since the last ingest, the run aborts with guidance to run `initrunner ingest <role> --force`.
+**What triggers a refresh:**
+- New files matching the `sources:` globs
+- Modified files (mtime moved AND content hash differs)
+- Removed files (their chunks are purged from the store)
+- New URLs added to the YAML
+- An embedding-model change (the run aborts with `initrunner ingest <role> --force` guidance)
 
-**Bundled starters with auto-ingest:** `codebase-analyst`, `rag-agent`, `helpdesk`.
+**What does NOT trigger a refresh:**
+- Existing URLs already in the store. Auto mode never re-fetches a URL it has already indexed -- this avoids per-run network latency, possible rate limits, and silent outbound traffic on every run. To refresh URL contents, run `initrunner ingest <role>` manually.
 
-To force a re-index after code changes: `initrunner ingest <role> --force`.
+**Mtime fast-path heuristic:** when a file's stored mtime matches the current mtime, the cheap stale check assumes the content is unchanged and skips hashing it. Tools that preserve timestamps (`cp -p`, `rsync -a`, `tar -p`, `untar`) can defeat this -- run `initrunner ingest <role> --force` for an authoritative rebuild in those cases.
+
+**Daemon mode caveat:** in `--daemon` mode the index is built once at startup. Triggers firing later do not re-index. Restart the daemon (or run `initrunner ingest <role>`) to refresh while it's running.
+
+**Common junk directories** (`node_modules`, `.venv`, `__pycache__`, `.git`, `dist`, `build`) are auto-excluded from glob results. Bundled starters resolve glob patterns from your current working directory, not the starter's install location.
+
+**Opt-out:** set `ingest.auto: false` in the role YAML if you prefer the old manual workflow. The `initrunner ingest <role>` command remains the way to do explicit, authoritative rebuilds (and the only way to refresh URL content in auto-managed roles); add `--force` to wipe and rebuild from scratch.
 
 ## Zero-Config Ingestion with `run --ingest`
 

@@ -102,7 +102,6 @@ spec:
     - type: think
     - type: datetime
   ingest:
-    auto: true
     sources:
       - "./**/*.py"
       - "./**/*.js"

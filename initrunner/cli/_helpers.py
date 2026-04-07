@@ -586,6 +586,64 @@ def ephemeral_context(
                 audit_logger.close()
 
 
+def _maybe_auto_ingest(role: RoleDefinition, role_file: Path) -> None:
+    """Run auto-ingest before agent execution if sources are stale.
+
+    No-op when no ``ingest:`` block is configured, when ``ingest.auto`` is
+    False, or when nothing has changed since the last indexing pass. Catches
+    :class:`EmbeddingModelChangedError` and exits with a hint pointing at
+    ``initrunner ingest --force``.
+    """
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+    from initrunner.services.ingest import (
+        compute_stale_ingest_plan,
+        run_auto_ingest,
+    )
+    from initrunner.stores.base import EmbeddingModelChangedError
+
+    plan = compute_stale_ingest_plan(role, role_file)
+    if plan is None:
+        return
+
+    def _do_ingest(progress_callback):
+        try:
+            return run_auto_ingest(role, role_file, progress_callback=progress_callback)
+        except EmbeddingModelChangedError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            console.print(f"[dim]Run: initrunner ingest {role_file} --force[/dim]")
+            raise typer.Exit(1) from None
+
+    if plan.progress_total > 0:
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            ptask = progress.add_task("Indexing", total=plan.progress_total)
+
+            def _on_progress(path: Path, status: object) -> None:
+                progress.update(
+                    ptask,
+                    advance=1,
+                    description=f"[{ingest_status_color(status)}]{path.name}",
+                )
+
+            stats = _do_ingest(_on_progress)
+    else:
+        # Purge-only or legacy-identity-record run -- no items to iterate,
+        # no progress bar to show. The pipeline still runs (purge or
+        # identity write).
+        stats = _do_ingest(None)
+
+    if stats.new or stats.updated:
+        console.print(
+            f"[green]Indexed[/green] {stats.new} new, "
+            f"{stats.updated} updated ({stats.total_chunks} chunks)"
+        )
+
+
 @contextmanager
 def command_context(
     role_file: Path,
@@ -596,6 +654,7 @@ def command_context(
     with_sinks: bool = False,
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
+    dry_run: bool = False,
 ):
     """Context manager for agent setup and resource cleanup.
 
@@ -626,6 +685,16 @@ def command_context(
             sink_dispatcher = SinkDispatcher(role.spec.sinks, role, role_dir=role_file.parent)
 
         try:
+            # Auto-ingest hook: shared by all `initrunner run` execution
+            # modes (single-shot, REPL, autonomous, serve, daemon, bot).
+            # Runs after tracing/audit/memory are set up so ingest spans
+            # land under the active TracerProvider. Skipped for dry-run
+            # (TestModel) so test models don't trigger embedding API calls.
+            # The surrounding finally still cleans up if the helper exits
+            # via typer.Exit on EmbeddingModelChangedError.
+            if not dry_run:
+                _maybe_auto_ingest(role, role_file)
+
             yield role, agent, audit_logger, memory_store, sink_dispatcher
         finally:
             if audit_logger is not None:

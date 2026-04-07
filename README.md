@@ -63,7 +63,7 @@ Run `initrunner run --list` for the full catalog. The model is auto-detected fro
 | `support-desk` | Sense-routed intake: auto-routes to researcher, responder, or escalator | Flow |
 | `memory-assistant` | Personal assistant that remembers across sessions | Agent |
 
-RAG starters auto-ingest on first run. Just `cd` into your project:
+RAG starters auto-index on every run; `initrunner run` picks up new and edited files automatically. Just `cd` into your project:
 
 ```bash
 cd ~/myproject
@@ -242,7 +242,7 @@ spec:
 ```
 
 ```bash
-initrunner run role.yaml -i   # auto-ingests on first run, memory + search ready
+initrunner run role.yaml -i   # auto-indexes new/changed files, memory + search ready
 ```
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
