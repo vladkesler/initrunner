@@ -208,11 +208,104 @@ Suggestions are suppressed when stdout is not a TTY (piped output) and when
 using `--format json` or `--format text`, so machine-readable output stays
 clean.
 
+## Pre-flight YAML validation
+
+Every `initrunner run`, `flow up`, and `flow install` command validates the
+YAML against the schema **before** any skill resolution, model resolution,
+or API call. If a role, team, or flow has a syntax or schema error, the
+command exits with a Rich panel showing exactly what's wrong -- you do not
+get a stack trace, and no API requests are sent.
+
+```console
+$ initrunner run role.yaml -p "hello"
+╭─────────────────── Invalid agent.yaml -- role.yaml ───────────────────────╮
+│                                                                            │
+│  1 error                                                                   │
+│                                                                            │
+│  [ERROR] spec.model.provider                                               │
+│    Input should be a valid string                                          │
+│    Fix: expected a string; check for missing quotes or a stray number      │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+```
+
+The panel shows one row per issue with:
+
+- **Severity label** (`[ERROR]`, `[WARN]`, `[INFO]`).
+- **Field path** -- dotted path into the YAML (e.g. `spec.model.provider`,
+  `metadata.name`). For YAML syntax errors, also includes 1-based line and
+  column (e.g. `yaml (line 14, col 3)`).
+- **Message** -- the underlying Pydantic or YAML parser message.
+- **Fix hint** -- a short suggestion derived from Pydantic's error type
+  (`string_type`, `missing`, `union_tag_invalid`, etc.) or from the
+  validator that produced the issue.
+
+The same panel renders identically from `initrunner validate`, `initrunner
+flow validate`, the run pre-flight, and the dashboard editor's validation
+endpoint -- they all share one services-layer validator.
+
+### Recursive flow validation
+
+Flow files reference other role files via `spec.agents.<name>.role`. The
+pre-flight walks every referenced role file and validates each one. Issues
+from a nested role surface with an `agents.<name>.` field prefix so you can
+tell which referenced file is broken without opening each one.
+
+```console
+$ initrunner flow up flow.yaml
+╭─────────────────── Invalid flow.yaml -- flow.yaml ────────────────────────╮
+│  1 error                                                                   │
+│                                                                            │
+│  [ERROR] agents.worker.spec.model.provider                                 │
+│    Input should be a valid string                                          │
+│    Fix: expected a string; check for missing quotes or a stray number      │
+╰────────────────────────────────────────────────────────────────────────────╯
+```
+
+### Run path stays quiet on warnings
+
+The validators emit advisory warnings (e.g. "System prompt is very short")
+and info-level recommendations on most real roles. To keep successful runs
+uncluttered, the run pre-flight only renders the panel when there are
+**errors**. Warning-only files run normally without any extra output.
+
+The `validate` command still shows everything, errors and warnings alike,
+so you can audit a role manually.
+
+## First-run API key prompt
+
+If `initrunner run` detects that no API key is configured for the role's
+provider, it prompts for one inline instead of forcing you to round-trip
+through `initrunner setup`:
+
+```console
+$ initrunner run examples/roles/hello-world.yaml -p "say hi"
+No API key found for openai. Enter your openai API key (or press Ctrl-C
+and run initrunner setup for full configuration):
+OPENAI_API_KEY: ********
+Saved to /home/alice/.initrunner/.env
+[run continues normally]
+```
+
+The key is persisted to `~/.initrunner/.env` (with file mode `0600`) and
+set in the current process so the run continues without restarting. If
+the home directory is not writable, the key is still set for the current
+run and a warning is printed.
+
+The prompt is gated on `stdin` and `stdout` both being TTYs, so
+non-interactive sessions (CI, piped input, redirected output) keep the
+original `API key not found` error and exit with code 1. This means
+scripted callers fail fast instead of hanging on a hidden prompt.
+
+Press Ctrl-C, Ctrl-D, or hit Enter on an empty input to skip the prompt
+and fall through to the original error.
+
 ## Error hints
 
-Most CLI error messages include a `Hint:` line with the likely fix -- for
-example, the correct command to run, a missing YAML section to add, or a
-doc page to check. These appear automatically after `Error:` output.
+Most CLI error messages outside the YAML pre-flight (provider not found,
+missing API key, missing skill directory, etc.) include a `Hint:` line
+with the likely fix -- for example, the correct command to run or a doc
+page to check.
 
 ## Validate options
 
@@ -221,6 +314,12 @@ Synopsis: `initrunner validate <PATH> [OPTIONS]`
 | Flag | Description |
 |------|-------------|
 | `--explain` | Print a plain-language explanation of each configured section |
+
+`initrunner validate` runs the same pre-flight as the run path and prints
+the same Rich panel for any errors or warnings, then -- when validation is
+clean -- displays a configuration table showing the role's metadata, model,
+tools, skills, triggers, ingest, memory, sinks, and provider status. Exits
+non-zero on any error.
 
 `--explain` walks through the role and prints one panel per section (Role,
 Model, Output, Tools, Skills, Capabilities, Triggers, Sinks, Ingest, Memory,
@@ -238,6 +337,9 @@ Role Explanation: memory-assistant
  ...
 Valid
 ```
+
+For deeper checks (deprecation rules, spec version status), run `initrunner
+doctor --role <PATH>` -- see [Deprecations](../operations/deprecations.md).
 
 ## Ingest options
 
@@ -264,8 +366,30 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--output PATH` | Output file path (default: `role.yaml`) |
 | `--force` | Overwrite existing file without prompting |
 | `--no-refine` | Skip the interactive refinement loop |
+| `--run PROMPT` | After creating, immediately execute the agent with `PROMPT`. Bypasses the post-creation confirmation. |
+| `--no-run` | Skip the post-creation `Run it now?` confirmation. |
 
 Without any seed, starts an interactive conversation where the LLM asks what to build.
+
+### Run it now?
+
+When the builder generates an agent from a description (or via the refinement loop), it asks the LLM for a tailored test prompt alongside the YAML. After saving, if stdin is interactive and the role is a runnable one-shot (no triggers, no ingest required, valid YAML), `initrunner new` prints a confirmation:
+
+```
+Run it now with prompt: 'explain what `^[a-z]+$` matches'? [Y/n]
+```
+
+Press Enter to execute. The agent runs through the same code path as `initrunner run role.yaml -p '...'`, so output, streaming, and audit logging all behave identically.
+
+The confirmation is skipped when:
+- `--run PROMPT` was given (the prompt is used directly, no question asked)
+- `--no-run` was given
+- the role has triggers or an `ingest` block (use `initrunner run --daemon` or `initrunner ingest` first)
+- the saved YAML is invalid
+- no tailored prompt was produced (e.g. blank/template seeds without refinement)
+- stdin is not a TTY (piped input, CI, etc.)
+
+`--run` and `--no-run` are mutually exclusive.
 
 ### Examples
 
@@ -287,6 +411,12 @@ initrunner new --langchain my_agent.py
 
 # Fully interactive (no seed)
 initrunner new
+
+# One-liner: generate and immediately execute with a fixed test prompt
+initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
+
+# CI/scripted: never prompt, just write the file
+initrunner new "a regex explainer" --no-run
 ```
 
 ## Setup options

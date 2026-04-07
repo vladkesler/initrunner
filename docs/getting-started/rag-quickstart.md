@@ -28,13 +28,15 @@ spec:
       - "./my-docs/**/*.txt"
 ```
 
-## Step 2: Ingest your documents
+## Step 2: Run the agent (auto-indexes on first run)
 
 ```bash
-initrunner ingest role.yaml
+initrunner run role.yaml -i
 ```
 
-This extracts text, splits it into chunks, generates embeddings, and stores vectors locally. A `search_documents` tool is auto-registered on your agent.
+The first run extracts text, splits it into chunks, generates embeddings, and stores vectors locally. A `search_documents` tool is auto-registered on your agent. Subsequent runs only re-index files that have changed since the last pass; you don't need a separate `initrunner ingest` step for the edit-and-run workflow.
+
+To force a full rebuild (e.g. after switching embedding providers), use `initrunner ingest role.yaml --force`.
 
 ## Embedding API Key
 
@@ -55,11 +57,11 @@ This extracts text, splits it into chunks, generates embeddings, and stores vect
 # Single question
 initrunner run role.yaml -p "How do I authenticate?"
 
-# Interactive chat
+# Interactive chat (already covered in Step 2)
 initrunner run role.yaml -i
 ```
 
-The agent calls `search_documents` behind the scenes to find relevant chunks from your docs.
+The agent calls `search_documents` behind the scenes to find relevant chunks from your docs. If you add or edit files between runs, the next `initrunner run` picks up the changes automatically.
 
 ## Local RAG with Ollama
 
@@ -89,10 +91,9 @@ spec:
       model: nomic-embed-text
 ```
 
-Then ingest and run:
+Then run -- the first run auto-indexes:
 
 ```bash
-initrunner ingest role.yaml
 initrunner run role.yaml -i
 ```
 

@@ -312,6 +312,51 @@ def handle_api_key(
             )
 
 
+def prompt_inline_api_key(env_var: str, provider: str) -> bool:
+    """Prompt for an API key inline, persist it, return True on success.
+
+    Used by ``load_and_build_or_exit`` to recover from a missing-key error
+    on first run, so the user doesn't have to ctrl-C and round-trip
+    through ``initrunner setup``.
+
+    Returns ``False`` (no prompt) when stdin or stdout is not a TTY, when
+    the user enters an empty key, or on Ctrl-C/Ctrl-D.  The caller should
+    fall through to the existing error path in those cases.
+    """
+    from rich.prompt import Prompt
+
+    from initrunner.services.setup import save_env_key
+
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+
+    console.print(
+        f"[yellow]No API key found for {provider}.[/yellow] "
+        f"Enter your {provider} API key (or press Ctrl-C and run "
+        f"[bold]initrunner setup[/bold] for full configuration):"
+    )
+    try:
+        api_key = Prompt.ask(env_var, password=True, console=console).strip()
+    except (KeyboardInterrupt, EOFError):
+        return False
+    if not api_key:
+        return False
+
+    # Set in-process before persisting so the retry succeeds even if disk
+    # write fails.  save_env_key already returns None on PermissionError /
+    # OSError, so we just check the return value.
+    os.environ[env_var] = api_key
+    saved_to = save_env_key(env_var, api_key)
+    if saved_to:
+        console.print(f"[green]Saved to[/green] [cyan]{saved_to}[/cyan]")
+    else:
+        console.print(
+            "[yellow]Warning:[/yellow] Could not persist key to disk. "
+            "It will work for this run only."
+        )
+    return True
+
+
 def install_extra(extra: str) -> bool:
     """Best-effort install of an initrunner extra. Returns True on success."""
     import shutil
@@ -399,27 +444,39 @@ def detect_yaml_kind(path: Path) -> str:
     Defaults to ``"Agent"`` on any failure.
 
     Raises ``typer.Exit(1)`` if the file uses the removed ``kind: Compose``.
+    Thin CLI wrapper around :func:`initrunner.services.yaml_validation.detect_yaml_kind`
+    that converts the pure-Python exception into a printed error and exit.
     """
-    import yaml
+    from initrunner.services.yaml_validation import (
+        InvalidComposeKindError,
+    )
+    from initrunner.services.yaml_validation import (
+        detect_yaml_kind as _detect,
+    )
 
     try:
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        if isinstance(data, dict):
-            kind = data.get("kind", "Agent")
-            if kind == "Compose":
-                console.print(
-                    "[red]Error:[/red] kind: Compose has been renamed to kind: Flow. "
-                    "Also rename spec.services to spec.agents and depends_on to needs. "
-                    "See docs/orchestration/flow.md"
-                )
-                raise typer.Exit(1)
-            return kind
-    except typer.Exit:
-        raise
-    except Exception:
-        pass
-    return "Agent"
+        return _detect(path)
+    except InvalidComposeKindError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
+
+
+def preflight_validate_or_exit(path: Path) -> None:
+    """Validate *path* against its YAML schema and exit on errors.
+
+    Used by every CLI run path (``run``, ``flow up``) as a pre-flight
+    check before any agent build or API call.  Stays silent on
+    warning-only files -- the ``validate`` command shows warnings, but
+    the run path does not, to keep successful runs free of advisory
+    noise.
+    """
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
+
+    _, kind, issues = validate_yaml_file(path)
+    if any(i.severity == "error" for i in issues):
+        console.print(render_validation_panel(path, kind, issues))
+        raise typer.Exit(1)
 
 
 def resolve_run_target(target: Path) -> tuple[Path, str]:
@@ -465,21 +522,39 @@ def load_and_build_or_exit(
     model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
-    from initrunner.agent.loader import RoleLoadError
+    from initrunner.agent.loader import MissingApiKeyError, RoleLoadError
     from initrunner.services.execution import build_agent_sync
 
-    try:
+    def _build():
         return build_agent_sync(
             role_file,
             extra_skill_dirs=extra_skill_dirs,
             model_override=model_override,
         )
-    except RoleLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print(
-            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
-        )
-        raise typer.Exit(1) from None
+
+    prompted = False
+    while True:
+        try:
+            return _build()
+        except MissingApiKeyError as e:
+            if not prompted and prompt_inline_api_key(e.env_var, e.provider):
+                prompted = True
+                continue
+            # Prompt skipped (non-TTY), declined (empty/Ctrl-C), or this is
+            # the post-prompt retry.  Print the original missing-key
+            # message verbatim.  We deliberately omit the "run initrunner
+            # validate" hint here: validate checks YAML schema and would
+            # say the role is fine.  The error text from _build_model()
+            # already tells the user exactly what to do (export the env
+            # var).
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+        except RoleLoadError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            console.print(
+                f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+            )
+            raise typer.Exit(1) from None
 
 
 def resolve_model_override(model_flag: str | None) -> str | None:
@@ -574,6 +649,64 @@ def ephemeral_context(
                 audit_logger.close()
 
 
+def _maybe_auto_ingest(role: RoleDefinition, role_file: Path) -> None:
+    """Run auto-ingest before agent execution if sources are stale.
+
+    No-op when no ``ingest:`` block is configured, when ``ingest.auto`` is
+    False, or when nothing has changed since the last indexing pass. Catches
+    :class:`EmbeddingModelChangedError` and exits with a hint pointing at
+    ``initrunner ingest --force``.
+    """
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+
+    from initrunner.services.ingest import (
+        compute_stale_ingest_plan,
+        run_auto_ingest,
+    )
+    from initrunner.stores.base import EmbeddingModelChangedError
+
+    plan = compute_stale_ingest_plan(role, role_file)
+    if plan is None:
+        return
+
+    def _do_ingest(progress_callback):
+        try:
+            return run_auto_ingest(role, role_file, progress_callback=progress_callback)
+        except EmbeddingModelChangedError as exc:
+            console.print(f"[red]Error:[/red] {exc}")
+            console.print(f"[dim]Run: initrunner ingest {role_file} --force[/dim]")
+            raise typer.Exit(1) from None
+
+    if plan.progress_total > 0:
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            console=console,
+        ) as progress:
+            ptask = progress.add_task("Indexing", total=plan.progress_total)
+
+            def _on_progress(path: Path, status: object) -> None:
+                progress.update(
+                    ptask,
+                    advance=1,
+                    description=f"[{ingest_status_color(status)}]{path.name}",
+                )
+
+            stats = _do_ingest(_on_progress)
+    else:
+        # Purge-only or legacy-identity-record run -- no items to iterate,
+        # no progress bar to show. The pipeline still runs (purge or
+        # identity write).
+        stats = _do_ingest(None)
+
+    if stats.new or stats.updated:
+        console.print(
+            f"[green]Indexed[/green] {stats.new} new, "
+            f"{stats.updated} updated ({stats.total_chunks} chunks)"
+        )
+
+
 @contextmanager
 def command_context(
     role_file: Path,
@@ -584,6 +717,7 @@ def command_context(
     with_sinks: bool = False,
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
+    dry_run: bool = False,
 ):
     """Context manager for agent setup and resource cleanup.
 
@@ -614,6 +748,16 @@ def command_context(
             sink_dispatcher = SinkDispatcher(role.spec.sinks, role, role_dir=role_file.parent)
 
         try:
+            # Auto-ingest hook: shared by all `initrunner run` execution
+            # modes (single-shot, REPL, autonomous, serve, daemon, bot).
+            # Runs after tracing/audit/memory are set up so ingest spans
+            # land under the active TracerProvider. Skipped for dry-run
+            # (TestModel) so test models don't trigger embedding API calls.
+            # The surrounding finally still cleans up if the helper exits
+            # via typer.Exit on EmbeddingModelChangedError.
+            if not dry_run:
+                _maybe_auto_ingest(role, role_file)
+
             yield role, agent, audit_logger, memory_store, sink_dispatcher
         finally:
             if audit_logger is not None:

@@ -24,6 +24,8 @@ def validate(
 ) -> None:
     """Validate a role definition file."""
     from initrunner.cli._helpers import detect_yaml_kind, resolve_role_path
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
 
     role_file = resolve_role_path(role_file)
     kind = detect_yaml_kind(role_file)
@@ -37,18 +39,11 @@ def validate(
         _validate_team(role_file)
         return
 
-    from initrunner.agent.loader import RoleLoadError
-    from initrunner.services.discovery import load_role_sync
-
-    try:
-        role = load_role_sync(role_file)
-    except RoleLoadError as e:
-        console.print(f"[red]Invalid:[/red] {e}")
-        console.print(
-            "[dim]Hint:[/dim] Check YAML syntax and field names."
-            " See [bold]docs/getting-started/choosing-features.md[/bold]."
-        )
-        raise typer.Exit(1) from None
+    role, _kind, issues = validate_yaml_file(role_file)
+    if issues:
+        console.print(render_validation_panel(role_file, "Agent", issues))
+    if any(i.severity == "error" for i in issues) or role is None:
+        raise typer.Exit(1)
 
     if explain:
         from rich.panel import Panel
@@ -359,13 +354,14 @@ def _update_role_yaml(role_path: Path, provider: str, model: str) -> None:
 
 def _validate_team(team_file: Path) -> None:
     """Validate a team definition file and display its info."""
-    from initrunner.team.loader import TeamLoadError, load_team
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
 
-    try:
-        team = load_team(team_file)
-    except TeamLoadError as e:
-        console.print(f"[red]Invalid:[/red] {e}")
-        raise typer.Exit(1) from None
+    team, _kind, issues = validate_yaml_file(team_file)
+    if issues:
+        console.print(render_validation_panel(team_file, "Team", issues))
+    if any(i.severity == "error" for i in issues) or team is None:
+        raise typer.Exit(1)
 
     table = Table(title=f"Team: {team.metadata.name}")
     table.add_column("Field", style="cyan")

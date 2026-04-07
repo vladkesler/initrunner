@@ -353,7 +353,7 @@ Each persona run is logged to the audit trail with:
 - **Token budget exceeded (parallel)**: checked after all runs complete.
 - **Team timeout (sequential)**: checked before each persona.
 - **Team timeout (parallel)**: single global deadline. Unfinished futures are cancelled.
-- **Invalid YAML**: validation errors reported at load time.
+- **Invalid YAML**: validation errors are caught by the run pre-flight before any persona executes. Schema and syntax errors render as a Rich panel with field paths and 1-based line numbers (see [Pre-flight YAML validation](../getting-started/cli.md#pre-flight-yaml-validation)).
 
 ## Comparison with Other Multi-Agent Approaches
 

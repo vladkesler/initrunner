@@ -14,6 +14,7 @@ from initrunner.services.agent_builder import (
     BuilderSession,
     TurnResult,
     ValidationIssue,
+    _extract_test_prompt,
     _strip_yaml_fences,
     _validate_yaml,
     build_next_steps,
@@ -657,3 +658,83 @@ class TestBuilderPromptContent:
         from initrunner.services.agent_builder import _BUILDER_SYSTEM_PROMPT
 
         assert "memory: {{}}" in _BUILDER_SYSTEM_PROMPT
+
+    def test_test_prompt_marker_instruction_present(self):
+        """Builder prompt must instruct the LLM to emit a `Test prompt:` line."""
+        from initrunner.services.agent_builder import _BUILDER_SYSTEM_PROMPT
+
+        assert "Test prompt:" in _BUILDER_SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# _extract_test_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestExtractTestPrompt:
+    def test_parses_marker_and_strips_line(self):
+        explanation = (
+            "This agent fetches news.\nTest prompt: summarize today's headlines\nIt is concise."
+        )
+        prompt, cleaned = _extract_test_prompt(explanation)
+        assert prompt == "summarize today's headlines"
+        # Line is removed; surrounding text remains.
+        assert "summarize today's headlines" not in cleaned
+        assert "This agent fetches news." in cleaned
+        assert "It is concise." in cleaned
+
+    def test_strips_double_quotes(self):
+        prompt, _ = _extract_test_prompt('Test prompt: "say hi to the user"')
+        assert prompt == "say hi to the user"
+
+    def test_strips_single_quotes(self):
+        prompt, _ = _extract_test_prompt("Test prompt: 'explain regex'")
+        assert prompt == "explain regex"
+
+    def test_case_insensitive(self):
+        prompt, _ = _extract_test_prompt("test PROMPT: hello there")
+        assert prompt == "hello there"
+
+    def test_no_marker_returns_none(self):
+        explanation = "Just a plain explanation with no marker."
+        prompt, cleaned = _extract_test_prompt(explanation)
+        assert prompt is None
+        assert cleaned == explanation
+
+    def test_empty_marker_returns_none(self):
+        # `Test prompt:` followed by only whitespace shouldn't even match the
+        # regex (the `(.+?)` requires at least one non-whitespace char).
+        prompt, cleaned = _extract_test_prompt("Test prompt:   \nrest")
+        assert prompt is None
+        assert cleaned == "Test prompt:   \nrest"
+
+    def test_make_turn_result_populates_test_prompt(self):
+        session = BuilderSession()
+        session._yaml_text = _VALID_YAML
+        turn = session._make_turn_result(
+            "Generated a chatbot.\nTest prompt: tell me a joke\nReady to use."
+        )
+        assert turn.test_prompt == "tell me a joke"
+        # The marker line is stripped from the surfaced explanation.
+        assert "Test prompt" not in turn.explanation
+        assert "Generated a chatbot." in turn.explanation
+
+    def test_make_turn_result_no_marker_yields_none(self):
+        session = BuilderSession()
+        session._yaml_text = _VALID_YAML
+        turn = session._make_turn_result("Started from blank template. Refine as needed.")
+        assert turn.test_prompt is None
+        assert turn.explanation == "Started from blank template. Refine as needed."
+
+    def test_seed_description_propagates_test_prompt(self):
+        """End-to-end: an LLM response with the marker reaches TurnResult.test_prompt."""
+        response = (
+            "Here is your news bot.\n"
+            "Test prompt: what's the top story today?\n\n"
+            f"```yaml\n{_VALID_YAML}```"
+        )
+        with patch("initrunner.services.agent_builder.BuilderSession._get_agent") as mock_get:
+            mock_get.return_value = _make_fake_agent(response)
+            session = BuilderSession()
+            turn = session.seed_description("a news bot", "openai")
+        assert turn.test_prompt == "what's the top story today?"

@@ -17,17 +17,26 @@ runner = CliRunner()
 def agent_yaml(tmp_path: Path) -> Path:
     p = tmp_path / "role.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: t\n"
-        "spec:\n  role: test\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
+        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: test-agent\n"
+        "spec:\n  role: You are a helpful assistant.\n"
+        "  model:\n    provider: openai\n    name: gpt-5-mini\n"
     )
     return p
 
 
 @pytest.fixture
 def flow_yaml(tmp_path: Path) -> Path:
+    # Pre-flight recurses into referenced role files, so write a real role too.
+    role = tmp_path / "worker.yaml"
+    role.write_text(
+        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: worker\n"
+        "spec:\n  role: You are a worker.\n"
+        "  model:\n    provider: openai\n    name: gpt-5-mini\n"
+    )
     p = tmp_path / "flow.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: t\nspec:\n  agents: {}\n"
+        "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: test-flow\n"
+        "spec:\n  agents:\n    worker:\n      role: worker.yaml\n"
     )
     return p
 
@@ -36,7 +45,9 @@ def flow_yaml(tmp_path: Path) -> Path:
 def team_yaml(tmp_path: Path) -> Path:
     p = tmp_path / "team.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Team\nmetadata:\n  name: t\nspec:\n  personas: {}\n"
+        "apiVersion: initrunner/v1\nkind: Team\nmetadata:\n  name: test-team\n"
+        "spec:\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
+        '  personas:\n    alpha: "first persona"\n    bravo: "second persona"\n'
     )
     return p
 
@@ -220,6 +231,81 @@ class TestTriggerHint:
             result = runner.invoke(app, ["run", str(agent_yaml)])
 
         assert "--daemon" in result.output
+
+
+class TestInlineApiKeyPrompt:
+    def test_inline_prompt_recovers_through_run_command(self, agent_yaml, tmp_path, monkeypatch):
+        """End-to-end retry path: missing API key triggers the inline
+        prompt helper, the key is set in env, and ``command_context()``
+        yields cleanly on the second build attempt.
+
+        This guards against regressions where a future change to
+        ``command_context()`` accidentally breaks when ``load_and_build``
+        succeeds on its second call rather than its first.
+
+        The TTY gate inside ``prompt_inline_api_key`` is exhaustively
+        covered by ``tests/test_cli_inline_setup.py``.  CliRunner replaces
+        ``sys.stdin`` during ``invoke``, so monkey-patching ``isatty``
+        before the call doesn't apply to the swapped object.  We sidestep
+        that by stubbing the helper directly -- the integration test's
+        purpose is the retry path through ``command_context()``, not the
+        TTY check.
+        """
+        import os as _os
+
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+            "XAI_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path / "home"))
+
+        from initrunner.config import get_home_dir
+
+        get_home_dir.cache_clear()
+
+        def stub_prompt(env_var, provider):
+            from initrunner.services.setup import save_env_key
+
+            _os.environ[env_var] = "sk-test-inline"
+            save_env_key(env_var, "sk-test-inline")
+            return True
+
+        mock_run = MagicMock(return_value=(MagicMock(), None))
+        with (
+            patch(
+                "initrunner.cli._helpers.prompt_inline_api_key",
+                side_effect=stub_prompt,
+            ) as prompt_spy,
+            patch("initrunner.runner.run_single", mock_run),
+            patch("initrunner.runner.run_single_stream", mock_run),
+            patch("initrunner.cli._run_agent._run_formatted", mock_run),
+        ):
+            result = runner.invoke(
+                app,
+                ["run", str(agent_yaml), "-p", "hello", "--no-audit"],
+            )
+
+        get_home_dir.cache_clear()
+
+        assert result.exit_code == 0, f"output={result.output}\nexception={result.exception}"
+        prompt_spy.assert_called_once()
+        env_var, provider = prompt_spy.call_args[0]
+        assert env_var == "OPENAI_API_KEY"
+        assert provider == "openai"
+
+        # command_context() must have yielded -- the runner mock would
+        # never be called otherwise.
+        assert mock_run.called
+
+        env_file = tmp_path / "home" / ".env"
+        assert env_file.is_file()
+        assert "sk-test-inline" in env_file.read_text()
 
 
 class TestOldCommandsRemoved:

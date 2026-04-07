@@ -1,5 +1,30 @@
 # Changelog
 
+## [2026.4.10] - 2026-04-07
+
+### Behavior changes
+- **`ingest.auto: true` is now the default; auto-ingest refreshes stale indices.** Roles with an `ingest:` block now auto-index on every `initrunner run` if any source files have been added, modified, or removed since the last indexing pass. The previous behavior (auto-ingest only on the first run, opt-in via `ingest.auto: true`) is gone. To preserve the old manual workflow, set `ingest.auto: false` in the role YAML. The cheap stale check uses an mtime fast-path (heuristic; defeated by timestamp-preserving copies like `cp -p` -- run `initrunner ingest <role> --force` for an authoritative rebuild). Existing URLs are not re-fetched on auto runs to avoid per-run network traffic; new URLs added to the YAML are picked up automatically; `initrunner ingest <role>` (manual) still refreshes URL contents
+
+### Fixed (alongside the auto-ingest default flip)
+- **URLs were re-fetched on every `run_ingest` call** -- `_classify_urls` now accepts a `skip_existing_urls` flag (set by the auto-ingest path) so URLs already in the store are not re-fetched. The manual `initrunner ingest` path keeps the old refresh behavior
+- **Deleting the last source file did not purge it** -- `_execute_ingest_core` now runs the purge step unconditionally when `purge_resolved_sources` is provided, even if the resolved file list is empty. Previously the early return at the top of the function bypassed `_purge_deleted` entirely, leaving orphaned chunks in the store
+- **Embedding-model changes were invisible when no source files changed** -- the new `compute_stale_ingest_plan` reads the stored `embedding_model` identity in the same lock-free pass it uses for file metadata, so an `embeddings.model` swap with otherwise-unchanged sources now triggers the same `EmbeddingModelChangedError` + `--force` hint as a manual run. Legacy stores from before identity tracking are detected and self-heal on the next `initrunner run`
+
+### Added
+- **Inline API key prompt on first run** -- `initrunner run` now detects a missing provider API key and prompts for one inline (in interactive terminals only) instead of forcing a round-trip through `initrunner setup`. The key is persisted to `~/.initrunner/.env` (mode `0600`) and set in the running process so the same command continues without restarting. Non-interactive sessions (CI, piped stdin, redirected stdout) keep the original `API key not found` error and exit code 1, so scripted callers fail fast. New `MissingApiKeyError(RoleLoadError)` carries the env var and provider so the CLI catches it specifically; every existing `except RoleLoadError` site is unchanged
+- **Pre-flight YAML validation on every run** -- `initrunner run`, `flow up`, and `flow install` now validate role/team/flow YAML against the schema before any skill resolution, model resolution, or API call. Errors render as a Rich panel showing per-field paths (e.g. `spec.model.provider`), 1-based line/column for syntax errors, and inline fix suggestions derived from Pydantic's stable error type API. Warning-level issues stay silent on the run path so successful runs are uncluttered
+- **Recursive flow validation** -- `flow up`, `flow install`, and `flow validate` now walk every role file referenced by a flow's `spec.agents` and validate each one. Issues from a referenced role surface with `agents.<name>.` field prefixes so you can tell which referenced file is broken
+- **`services/yaml_validation.py`** -- single CLI-facing entry point `validate_yaml_file(path)` that detects kind, dispatches to the right per-kind validator, and returns `(definition, kind, issues)`. Pure: never prints, never exits
+
+### Fixed
+- **Latent dashboard bug: schema errors collapsed to a single `field="schema"` issue** -- the editor's `_validate_yaml` was catching `ValueError` from `validate_role_dict` (which wraps Pydantic's `ValidationError`) and bucketing all schema errors into one issue. Now follows `__cause__` via the new `unwrap_pydantic_error` helper so per-field issues reach both the dashboard editor and the CLI panel. Fix applies to role, team, and flow validators
+- **`initrunner validate` matched the old plain-text error format** -- now produces the same Rich panel as the run pre-flight, with severity labels, field paths, and fix hints. The success-table path is unchanged
+- **PyYAML mark line/column was 0-based on display** -- syntax errors now show 1-based line/column matching editor and traceback conventions
+
+### Changed
+- **`detect_yaml_kind` moved from `cli/_helpers.py` to `services/yaml_validation.py`** -- the CLI helper is now a thin wrapper that catches `InvalidComposeKindError` and converts to a printed exit. Backward-compatible re-export preserved
+- **Flow validation moved from `dashboard/validation.py` to `services/flow_validation.py`** -- the dashboard module is now a 4-line shim that converts service `ValidationIssue` to the API's `ValidationIssueResponse`. Routers untouched
+
 ## [2026.4.9] - 2026-04-07
 
 ### Fixed

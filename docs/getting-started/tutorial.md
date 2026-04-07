@@ -62,7 +62,7 @@ initrunner run role.yaml -p "What can you help me with?"
 
 The agent responds based on its system prompt. Without tools, it can only answer from its training data — it can't actually fetch web pages yet.
 
-> **Troubleshooting:** If you get an API key error, make sure your key is set in the environment (`OPENAI_API_KEY`) or configured via `initrunner setup`. If the provider SDK is missing, install it with `pip install initrunner[all-models]` or the specific extra (e.g., `pip install initrunner[anthropic]`).
+> **First-run API key prompt:** If no API key is configured for the role's provider, `initrunner run` will prompt for one inline (in interactive terminals) and persist it to `~/.initrunner/.env` before continuing. You can also export it manually (`export OPENAI_API_KEY=...`) or run `initrunner setup` for full guided configuration. In non-interactive contexts (CI, piped stdin) the prompt is skipped and the original error is shown so scripted callers fail fast. If the provider SDK is missing, install it with `pip install initrunner[all-models]` or the specific extra (e.g., `pip install initrunner[anthropic]`).
 
 ## Step 2: Interactive Mode — Chatting With Your Agent
 
@@ -422,14 +422,11 @@ spec:
     max_iterations: 5
 ```
 
-Validate, then index the reports:
+Validate the role:
 
 ```bash
 initrunner validate role.yaml
-initrunner ingest role.yaml
 ```
-
-The ingestion pipeline reads all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local LanceDB vector database. This auto-registers a `search_documents(query)` tool for the agent.
 
 Now query your report history:
 
@@ -437,11 +434,11 @@ Now query your report history:
 initrunner run role.yaml -p "When did I last check example.com? What did the page contain?"
 ```
 
-The agent searches the indexed reports and answers with specific dates and content from your timestamped files.
+The first run extracts text from all `.md` files matching the glob pattern, chunks them, generates embeddings, and stores them in a local LanceDB vector database. This auto-registers a `search_documents(query)` tool for the agent. The agent then answers with specific dates and content from your timestamped files.
 
-When you add new reports (from monitoring runs), re-run `initrunner ingest role.yaml` to update the index. For more on RAG patterns, see [Ingestion Pipeline](../core/ingestion.md) and [RAG Guide](../core/rag-guide.md).
+When you add or edit reports between runs, the next `initrunner run` picks up the changes automatically -- no separate `initrunner ingest` step needed. For an authoritative rebuild (e.g. after switching embedding models), use `initrunner ingest role.yaml --force`. For more on RAG patterns, see [Ingestion Pipeline](../core/ingestion.md) and [RAG Guide](../core/rag-guide.md).
 
-> **Troubleshooting:** If search returns nothing, make sure you ran `initrunner ingest role.yaml` after creating the reports. If results seem off, check that your report files have substantive content for the embeddings to index.
+> **Troubleshooting:** If search returns nothing, check that your report files have substantive content for the embeddings to index. If you suspect a stale index, run `initrunner ingest role.yaml --force` to wipe and rebuild.
 
 ## Step 7: Scheduled Monitoring — Triggers and Daemon Mode
 
@@ -564,7 +561,7 @@ Or daily at 9am:
 
 For more on triggers and daemon mode, see [Triggers](../core/triggers.md) and [Sinks](../orchestration/sinks.md).
 
-> **Troubleshooting:** If the trigger never fires, double-check the cron syntax — `* * * * *` means every minute. If the daemon exits immediately, run `initrunner validate role.yaml` to check for YAML errors.
+> **Troubleshooting:** If the trigger never fires, double-check the cron syntax — `* * * * *` means every minute. YAML syntax and schema errors are caught by the run pre-flight before the daemon starts and surface as a Rich panel pointing at the bad field. If you see one, fix the highlighted field and try again.
 
 ## The Complete Agent
 

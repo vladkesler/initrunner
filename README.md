@@ -35,7 +35,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.9**: `init new` respects saved provider config, builder knows RAG vs memory, 401 errors show actionable guidance. See the [Changelog](CHANGELOG.md).
+> **v2026.4.10**: pre-flight YAML validation, auto-ingest of stale RAG sources on every run, `initrunner new --run` to go from prompt to output in one command, and an inline API-key prompt on first run. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -63,7 +63,7 @@ Run `initrunner run --list` for the full catalog. The model is auto-detected fro
 | `support-desk` | Sense-routed intake: auto-routes to researcher, responder, or escalator | Flow |
 | `memory-assistant` | Personal assistant that remembers across sessions | Agent |
 
-RAG starters auto-ingest on first run. Just `cd` into your project:
+RAG starters auto-index on every run; `initrunner run` picks up new and edited files automatically. Just `cd` into your project:
 
 ```bash
 cd ~/myproject
@@ -73,7 +73,12 @@ initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
 ### Build your own
 
 ```bash
-initrunner new "a research assistant that summarizes papers"  # generates a role.yaml
+initrunner new "a research assistant that summarizes papers"
+# generates role.yaml, then asks: "Run it now with prompt: '...'? [Y/n]"
+
+initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
+# one-liner: generate and execute in a single command
+
 initrunner run --ingest ./docs/    # or skip YAML entirely, just chat with your docs
 ```
 
@@ -242,7 +247,7 @@ spec:
 ```
 
 ```bash
-initrunner run role.yaml -i   # auto-ingests on first run, memory + search ready
+initrunner run role.yaml -i   # auto-indexes new/changed files, memory + search ready
 ```
 
 See [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
@@ -401,4 +406,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.9</sub></p>
+<p align="center"><sub>v2026.4.10</sub></p>

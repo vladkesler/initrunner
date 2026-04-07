@@ -10,8 +10,8 @@ if TYPE_CHECKING:
 
 from initrunner.services._yaml_validation import (
     ValidationIssue,
-    extract_pydantic_errors,
     parse_yaml_text,
+    unwrap_pydantic_error,
 )
 
 
@@ -132,11 +132,8 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
 
     try:
         team, _hits = validate_team_dict(raw)
-    except ValueError as exc:
-        issues.append(ValidationIssue(field="deprecation", message=str(exc), severity="error"))
-        return None, issues
     except Exception as exc:
-        issues.extend(extract_pydantic_errors(exc))
+        issues.extend(unwrap_pydantic_error(exc))
         return None, issues
 
     # Cross-field warnings

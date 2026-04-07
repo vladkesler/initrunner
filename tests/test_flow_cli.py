@@ -98,6 +98,7 @@ class TestFlowUp:
         from initrunner.flow.schema import FlowDefinition
 
         flow_file = _write_flow(tmp_path)
+        _write_roles(tmp_path)  # pre-flight recurses into referenced roles
         mock_flow = MagicMock(spec=FlowDefinition)
         mock_load.return_value = mock_flow
         mock_audit.return_value = None
@@ -128,6 +129,7 @@ class TestFlowInstall:
         from initrunner.flow.systemd import UnitInfo
 
         flow_file = _write_flow(tmp_path)
+        _write_roles(tmp_path)  # pre-flight recurses into referenced roles
         unit_path = tmp_path / "initrunner-test-flow.service"
         mock_install.return_value = UnitInfo(
             unit_name="initrunner-test-flow.service",
@@ -158,6 +160,7 @@ class TestFlowInstall:
         from initrunner.flow.systemd import UnitInfo
 
         flow_file = _write_flow(tmp_path)
+        _write_roles(tmp_path)
         mock_install.return_value = UnitInfo(
             unit_name="initrunner-test-flow.service",
             unit_path=tmp_path / "unit.service",
@@ -176,6 +179,7 @@ class TestFlowInstall:
         from initrunner.flow.systemd import UnitInfo
 
         flow_file = _write_flow(tmp_path)
+        _write_roles(tmp_path)
         mock_install.return_value = UnitInfo(
             unit_name="initrunner-test-flow.service",
             unit_path=tmp_path / "unit.service",
@@ -193,6 +197,7 @@ class TestFlowInstall:
         from initrunner.flow.systemd import UnitInfo
 
         flow_file = _write_flow(tmp_path)
+        _write_roles(tmp_path)
         mock_install.return_value = UnitInfo(
             unit_name="initrunner-test-flow.service",
             unit_path=tmp_path / "unit.service",

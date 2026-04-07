@@ -39,7 +39,21 @@ All current rules are error-severity with no automatic migration. Fix the YAML m
 
 ## Checking Your Role
 
-Run `doctor --role` to check a role file for deprecation issues, schema errors, and spec version status:
+Three commands surface schema and deprecation problems, each tuned to a different workflow:
+
+| Command | What it catches | When to use |
+|---|---|---|
+| `initrunner run <PATH>` | Syntax errors, schema errors, deprecation errors -- anything that would block the run. Renders a Rich panel with field paths, line numbers, and fix hints, then exits **before any API call** | Every run -- pre-flight is automatic |
+| `initrunner validate <PATH>` | Same as the run pre-flight, plus warnings and info-level recommendations. On a clean role, also shows the configuration table | Auditing a role you just edited |
+| `initrunner doctor --role <PATH>` | Deprecation rules table, spec version drift, and (with `--fix`) automatic migration | Upgrading roles between InitRunner releases |
+
+Schema errors from the run pre-flight and `validate` show per-field paths
+(e.g. `spec.model.provider`) thanks to the shared `unwrap_pydantic_error`
+helper that follows Pydantic's `ValidationError` through the deprecation
+wrapper. Deprecation rule failures (DEP001..DEP005) appear with `field:
+deprecation`.
+
+Run `doctor --role` for the deprecation table view:
 
 ```bash
 initrunner doctor --role role.yaml

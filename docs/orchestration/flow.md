@@ -524,13 +524,13 @@ The flow definition **owns** the embedding configuration for the shared store. W
 
 ### `flow validate`
 
-Validates a flow definition file and checks that all referenced role files exist.
+Validates a flow definition file, checks that every referenced role file exists on disk, and recursively validates each referenced role against the agent schema.
 
 ```bash
 initrunner flow validate flow.yaml
 ```
 
-Displays a table of agents with their roles, sinks, dependencies, and restart policies. Exits with code 1 if validation fails or any role file is missing.
+On a clean flow, displays a table of agents with their roles, sinks, dependencies, and restart policies. On any error (flow schema, missing role file, or invalid referenced role), exits with code 1 and renders a Rich panel showing each issue. Issues from nested role files surface with `agents.<name>.` field prefixes so you can tell which referenced file is broken without opening each one. The same recursive pre-flight runs automatically before `flow up` and `flow install` -- see [Pre-flight YAML validation](../getting-started/cli.md#pre-flight-yaml-validation).
 
 ### `flow up`
 
@@ -885,7 +885,8 @@ Flow definitions are validated at load time with Pydantic. The following checks 
 - **Unknown agent references**: `needs` entries and delegate `target` values must reference agents defined in the same flow file.
 - **Self-references**: An agent cannot depend on itself or delegate to itself.
 - **Cycle detection**: Kahn's algorithm detects cycles in both the dependency graph (`needs`) and the delegate graph (`sink.target`). A cycle in either graph is a validation error.
-- **Role file existence**: `flow validate` checks that each agent's role file exists on disk.
+- **Role file existence**: `flow validate`, `flow up`, and `flow install` all check that each agent's role file exists on disk.
+- **Recursive role validation**: every referenced role YAML is loaded and validated against the agent schema. Per-field errors from a nested role surface with an `agents.<name>.` field prefix.
 
 ### Example Errors
 

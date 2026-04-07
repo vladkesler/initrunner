@@ -10,6 +10,20 @@ from initrunner.cli.main import app
 
 runner = CliRunner()
 
+# Minimal valid role YAML used by tests that mock load_and_build but still
+# need to clear the run-path pre-flight YAML validation step.
+_DUMMY_VALID_ROLE_YAML = textwrap.dedent("""\
+    apiVersion: initrunner/v1
+    kind: Agent
+    metadata:
+      name: dummy
+    spec:
+      role: You are a helpful assistant.
+      model:
+        provider: openai
+        name: gpt-5-mini
+""")
+
 
 class TestVersion:
     def test_version(self):
@@ -105,7 +119,7 @@ class TestRun:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")  # won't be read due to mock
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)  # mocked load_and_build
 
         # Use --format rich to force buffered panel path (CliRunner is non-TTY)
         result = runner.invoke(
@@ -123,7 +137,7 @@ class TestRun:
     def test_role_and_sense_mutually_exclusive(self, tmp_path):
         """Providing both a role file and --sense should error."""
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
         result = runner.invoke(app, ["run", str(role_file), "--sense", "-p", "hello"])
         assert result.exit_code == 1
         assert "mutually exclusive" in result.output
@@ -143,7 +157,7 @@ class TestRun:
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         cand = RoleCandidate(
             path=role_file,
@@ -195,7 +209,7 @@ class TestRun:
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         cand = RoleCandidate(
             path=role_file,
@@ -235,7 +249,7 @@ class TestRun:
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         cand = RoleCandidate(
             path=role_file,
@@ -261,7 +275,7 @@ class TestRun:
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         cand = RoleCandidate(
             path=role_file,
@@ -309,7 +323,7 @@ class TestRunStreaming:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -339,7 +353,7 @@ class TestRunStreaming:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = False
@@ -370,7 +384,7 @@ class TestRunStreaming:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -404,7 +418,7 @@ class TestRunStreaming:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -438,7 +452,7 @@ class TestRunStreaming:
         mock_autonomous.return_value = auto_result
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -477,7 +491,7 @@ class TestRunOutputFormat:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app, ["run", str(role_file), "-p", "hello", "--format", "json", "--no-audit"]
@@ -501,7 +515,7 @@ class TestRunOutputFormat:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app, ["run", str(role_file), "-p", "hello", "--format", "text", "--no-audit"]
@@ -528,7 +542,7 @@ class TestRunOutputFormat:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = False
@@ -556,7 +570,7 @@ class TestRunOutputFormat:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -581,7 +595,7 @@ class TestRunOutputFormat:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
@@ -596,7 +610,7 @@ class TestRunOutputFormat:
     def test_format_json_with_interactive_errors(self, tmp_path):
         """--format json with -i should be rejected."""
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app,
@@ -608,7 +622,7 @@ class TestRunOutputFormat:
     def test_format_text_with_autonomous_errors(self, tmp_path):
         """--format text with -a should be rejected."""
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app,
@@ -620,7 +634,7 @@ class TestRunOutputFormat:
     def test_format_invalid_errors(self, tmp_path):
         """Unknown format value should be rejected."""
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app,
@@ -636,7 +650,7 @@ class TestRunOutputFormat:
         role = self._mock_role()
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         with (
             patch("initrunner.agent.loader.load_and_build", return_value=(role, MagicMock())),
@@ -1182,7 +1196,7 @@ class TestResolveRolePathInstalled:
         from initrunner.cli._helpers import resolve_role_path
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
         assert resolve_role_path(role_file) == role_file
 
     def test_local_dir_takes_precedence(self, tmp_path):
@@ -1246,7 +1260,7 @@ class TestResolveRolePathInstalled:
         roles_dir.mkdir(parents=True)
         role_dir = roles_dir / "hub__alice__code-reviewer"
         role_dir.mkdir()
-        (role_dir / "role.yaml").write_text("dummy")
+        (role_dir / "role.yaml").write_text(_DUMMY_VALID_ROLE_YAML)
 
         manifest_path = roles_dir / "registry.json"
         manifest_path.write_text(
@@ -1386,7 +1400,7 @@ class TestSuggestNext:
         )
 
         role_file = tmp_path / "role.yaml"
-        role_file.write_text("dummy")
+        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
 
         result = runner.invoke(
             app, ["run", str(role_file), "-p", "hello", "--format", "json", "--no-audit"]
@@ -1566,13 +1580,14 @@ class TestErrorHints:
         assert result.exit_code == 1
         assert "Hint" in result.output
 
-    def test_role_load_failure_hint(self, tmp_path):
-        """Malformed role YAML should show a hint pointing to validate."""
+    def test_role_load_failure_renders_validation_panel(self, tmp_path):
+        """Malformed role YAML should show the structured validation panel."""
         role_file = tmp_path / "role.yaml"
         role_file.write_text("not: valid: yaml: content")
         result = runner.invoke(app, ["run", str(role_file), "-p", "hello", "--no-audit"])
         assert result.exit_code == 1
-        assert "Hint" in result.output
+        assert "Invalid" in result.output
+        assert "ERROR" in result.output
 
     def test_memory_no_config_hint(self, tmp_path):
         """Missing memory config should show a hint."""

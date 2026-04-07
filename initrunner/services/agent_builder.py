@@ -13,12 +13,17 @@ changes.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from initrunner.role_generator import build_schema_reference
-from initrunner.services._yaml_validation import ValidationIssue, parse_yaml_text
+from initrunner.services._yaml_validation import (
+    ValidationIssue,
+    parse_yaml_text,
+    unwrap_pydantic_error,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
@@ -45,6 +50,7 @@ class TurnResult:
     yaml_text: str  # Full current YAML
     issues: list[ValidationIssue]  # Validation results
     import_warnings: list[str] = field(default_factory=list)  # Lossy import warnings
+    test_prompt: str | None = None  # Tailored test prompt extracted from explanation
 
     @property
     def ready(self) -> bool:
@@ -78,7 +84,7 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
     try:
         role, _hits = validate_role_dict(raw)
     except Exception as e:
-        issues.append(ValidationIssue(field="schema", message=str(e), severity="error"))
+        issues.extend(unwrap_pydantic_error(e))
         return None, issues
 
     # Cross-field reasoning validation
@@ -155,6 +161,30 @@ def _strip_yaml_fences(text: str) -> str:
     return text
 
 
+_TEST_PROMPT_RE = re.compile(
+    r"^[ \t]*test prompt:[ \t]*(\S[^\r\n]*?)[ \t]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _extract_test_prompt(explanation: str) -> tuple[str | None, str]:
+    """Pull a ``Test prompt: ...`` line out of explanation text.
+
+    Returns ``(test_prompt, explanation_without_line)``. Outer quotes wrapping
+    the prompt are stripped. If no marker line is present, or the prompt is
+    empty/whitespace after stripping, returns ``(None, explanation)`` with the
+    explanation untouched.
+    """
+    match = _TEST_PROMPT_RE.search(explanation)
+    if not match:
+        return None, explanation
+    prompt = match.group(1).strip().strip("\"'").strip()
+    if not prompt:
+        return None, explanation
+    cleaned = (explanation[: match.start()] + explanation[match.end() :]).strip()
+    return prompt, cleaned
+
+
 def build_tool_summary() -> str:
     """Generate a concise tool summary (delegates to shared implementation)."""
     from initrunner.role_generator import build_tool_summary as _shared
@@ -203,6 +233,11 @@ You are an expert InitRunner agent builder. You produce minimal role.yaml files.
 
 Rules:
 - Output a brief explanation followed by the YAML in a fenced ```yaml block.
+- In your explanation (BEFORE the YAML block), include a single line of the form \
+`Test prompt: <one short, concrete prompt that exercises this agent>`. \
+Make it specific to the agent's task -- not "hello". \
+Omit the line if the agent is daemon-only (triggers + no useful one-shot mode) \
+or needs ingestion before being useful.
 - metadata.name must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (lowercase, hyphens only).
 - Always include metadata.spec_version: 2.
 - spec.role is the system prompt -- write a focused one for the agent's task.
@@ -447,11 +482,13 @@ class BuilderSession:
     # -- Internal helpers ----------------------------------------------------
 
     def _make_turn_result(self, explanation: str) -> TurnResult:
+        test_prompt, cleaned = _extract_test_prompt(explanation)
         return TurnResult(
-            explanation=explanation,
+            explanation=cleaned,
             yaml_text=self._yaml_text,
             issues=self.issues,
             import_warnings=list(self.import_warnings),
+            test_prompt=test_prompt,
         )
 
     def _extract_yaml_from_response(self, text: str) -> tuple[str, str]:

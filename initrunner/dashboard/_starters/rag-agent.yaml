@@ -24,7 +24,6 @@ spec:
     - Use read_file to view a full document when the search snippet is not
       enough context
   ingest:
-    auto: true
     sources:
       - ./docs/**/*.md
     chunking:

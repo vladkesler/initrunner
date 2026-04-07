@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -12,7 +13,13 @@ from rich.syntax import Syntax
 from initrunner.cli._helpers import console
 
 if TYPE_CHECKING:
+    from initrunner.agent.schema.role import RoleDefinition
     from initrunner.services.agent_builder import BuilderSession, TurnResult
+
+
+def _stdin_is_interactive() -> bool:
+    """Indirection over ``sys.stdin.isatty()`` so tests can monkeypatch it."""
+    return sys.stdin.isatty()
 
 
 def _handle_builder_error(exc: Exception, provider: str, *, fatal: bool = True) -> bool:
@@ -36,6 +43,80 @@ def _handle_builder_error(exc: Exception, provider: str, *, fatal: bool = True) 
     return False
 
 
+def _dispatch_run(yaml_path: Path, prompt: str) -> None:
+    """Run the freshly-created agent via the canonical ``initrunner run`` path."""
+    from initrunner.cli._run_agent import _run_agent
+
+    _run_agent(
+        role_file=yaml_path,
+        prompt=prompt,
+        interactive=False,
+        autonomous=False,
+        max_iterations=None,
+        resume=False,
+        dry_run=False,
+        audit_db=None,
+        no_audit=False,
+        skill_dir=None,
+        attach=None,
+        report=None,
+        report_template="default",
+        output_format="auto",
+        no_stream=False,
+        model=None,
+    )
+
+
+def _offer_post_create_run(
+    *,
+    yaml_path: Path,
+    role: RoleDefinition | None,
+    valid: bool,
+    test_prompt: str | None,
+    run_prompt: str | None,
+    no_run: bool,
+) -> None:
+    """After ``new`` writes the YAML, optionally execute the agent in one shot.
+
+    Gating order (each branch is a hard return):
+
+    1. ``--run TEXT`` -- explicit scripting path. Dispatches with that prompt
+       regardless of TTY, validity, or role kind. The loader surfaces any
+       errors the same way ``initrunner run`` would.
+    2. ``--no-run`` -- explicit opt-out.
+    3. The save was invalid -- don't implicitly run broken YAML.
+    4. The role isn't a runnable one-shot (has triggers, or needs ingestion).
+       Daemon agents have a separate ``--daemon`` path; ingest-required
+       agents need ``initrunner ingest`` first. Both are already covered by
+       the printed "Next steps" guidance.
+    5. The builder didn't produce a tailored test prompt (e.g. blank seed
+       without refinement). We promised tailored, so we don't fall back to
+       a generic prompt -- explicit ``--run`` still works.
+    6. Stdin isn't interactive -- don't surprise pipes/CI.
+    7. Confirm with the user, then dispatch.
+    """
+    if run_prompt is not None:
+        _dispatch_run(yaml_path, run_prompt)
+        return
+    if no_run:
+        return
+    if not valid:
+        return
+    if role is None:
+        return
+    if role.spec.triggers:
+        return
+    if role.spec.ingest:
+        return
+    if test_prompt is None:
+        return
+    if not _stdin_is_interactive():
+        return
+    if not typer.confirm(f"\nRun it now with prompt: {test_prompt!r}?", default=True):
+        return
+    _dispatch_run(yaml_path, test_prompt)
+
+
 def new(
     description: Annotated[str | None, typer.Argument(help="Agent description")] = None,
     from_source: Annotated[
@@ -57,6 +138,14 @@ def new(
     output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing file")] = False,
     no_refine: Annotated[bool, typer.Option("--no-refine", help="Skip refinement loop")] = False,
+    run: Annotated[
+        str | None,
+        typer.Option("--run", metavar="PROMPT", help="Execute the new agent with this prompt"),
+    ] = None,
+    no_run: Annotated[
+        bool,
+        typer.Option("--no-run", help="Skip the post-creation 'Run it now?' prompt"),
+    ] = False,
 ) -> None:
     """Create a new agent role via conversational builder.
 
@@ -106,6 +195,10 @@ def new(
             "[red]Error:[/red] Specify at most one of:"
             " DESCRIPTION, --from, --template, --blank, --langchain, --pydantic-ai"
         )
+        raise typer.Exit(1)
+
+    if run is not None and no_run:
+        console.print("[red]Error:[/red] --run and --no-run are mutually exclusive.")
         raise typer.Exit(1)
 
     # --- Resolve provider/model defaults ---
@@ -219,6 +312,15 @@ def new(
     console.print("\n[bold]Next steps:[/bold]")
     for step in result.next_steps:
         console.print(f"  {step}")
+
+    _offer_post_create_run(
+        yaml_path=result.yaml_path,
+        role=session.role,
+        valid=result.valid,
+        test_prompt=turn.test_prompt,
+        run_prompt=run,
+        no_run=no_run,
+    )
 
 
 def _seed_session(

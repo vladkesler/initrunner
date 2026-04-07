@@ -135,8 +135,9 @@ class TestRunSave:
     def test_save_non_starter_fails(self, tmp_path: Path):
         role_file = tmp_path / "role.yaml"
         role_file.write_text(
-            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: t\n"
-            "spec:\n  role: test\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
+            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: test-agent\n"
+            "spec:\n  role: You are a helpful assistant.\n"
+            "  model:\n    provider: openai\n    name: gpt-5-mini\n"
         )
         save_dir = tmp_path / "out"
         result = runner.invoke(app, ["run", str(role_file), "--save", str(save_dir)])
