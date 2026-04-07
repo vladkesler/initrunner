@@ -312,6 +312,51 @@ def handle_api_key(
             )
 
 
+def prompt_inline_api_key(env_var: str, provider: str) -> bool:
+    """Prompt for an API key inline, persist it, return True on success.
+
+    Used by ``load_and_build_or_exit`` to recover from a missing-key error
+    on first run, so the user doesn't have to ctrl-C and round-trip
+    through ``initrunner setup``.
+
+    Returns ``False`` (no prompt) when stdin or stdout is not a TTY, when
+    the user enters an empty key, or on Ctrl-C/Ctrl-D.  The caller should
+    fall through to the existing error path in those cases.
+    """
+    from rich.prompt import Prompt
+
+    from initrunner.services.setup import save_env_key
+
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+
+    console.print(
+        f"[yellow]No API key found for {provider}.[/yellow] "
+        f"Enter your {provider} API key (or press Ctrl-C and run "
+        f"[bold]initrunner setup[/bold] for full configuration):"
+    )
+    try:
+        api_key = Prompt.ask(env_var, password=True, console=console).strip()
+    except (KeyboardInterrupt, EOFError):
+        return False
+    if not api_key:
+        return False
+
+    # Set in-process before persisting so the retry succeeds even if disk
+    # write fails.  save_env_key already returns None on PermissionError /
+    # OSError, so we just check the return value.
+    os.environ[env_var] = api_key
+    saved_to = save_env_key(env_var, api_key)
+    if saved_to:
+        console.print(f"[green]Saved to[/green] [cyan]{saved_to}[/cyan]")
+    else:
+        console.print(
+            "[yellow]Warning:[/yellow] Could not persist key to disk. "
+            "It will work for this run only."
+        )
+    return True
+
+
 def install_extra(extra: str) -> bool:
     """Best-effort install of an initrunner extra. Returns True on success."""
     import shutil
@@ -477,21 +522,39 @@ def load_and_build_or_exit(
     model_override: str | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
-    from initrunner.agent.loader import RoleLoadError
+    from initrunner.agent.loader import MissingApiKeyError, RoleLoadError
     from initrunner.services.execution import build_agent_sync
 
-    try:
+    def _build():
         return build_agent_sync(
             role_file,
             extra_skill_dirs=extra_skill_dirs,
             model_override=model_override,
         )
-    except RoleLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        console.print(
-            f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
-        )
-        raise typer.Exit(1) from None
+
+    prompted = False
+    while True:
+        try:
+            return _build()
+        except MissingApiKeyError as e:
+            if not prompted and prompt_inline_api_key(e.env_var, e.provider):
+                prompted = True
+                continue
+            # Prompt skipped (non-TTY), declined (empty/Ctrl-C), or this is
+            # the post-prompt retry.  Print the original missing-key
+            # message verbatim.  We deliberately omit the "run initrunner
+            # validate" hint here: validate checks YAML schema and would
+            # say the role is fine.  The error text from _build_model()
+            # already tells the user exactly what to do (export the env
+            # var).
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
+        except RoleLoadError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            console.print(
+                f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
+            )
+            raise typer.Exit(1) from None
 
 
 def resolve_model_override(model_flag: str | None) -> str | None:

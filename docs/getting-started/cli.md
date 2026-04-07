@@ -272,6 +272,34 @@ uncluttered, the run pre-flight only renders the panel when there are
 The `validate` command still shows everything, errors and warnings alike,
 so you can audit a role manually.
 
+## First-run API key prompt
+
+If `initrunner run` detects that no API key is configured for the role's
+provider, it prompts for one inline instead of forcing you to round-trip
+through `initrunner setup`:
+
+```console
+$ initrunner run examples/roles/hello-world.yaml -p "say hi"
+No API key found for openai. Enter your openai API key (or press Ctrl-C
+and run initrunner setup for full configuration):
+OPENAI_API_KEY: ********
+Saved to /home/alice/.initrunner/.env
+[run continues normally]
+```
+
+The key is persisted to `~/.initrunner/.env` (with file mode `0600`) and
+set in the current process so the run continues without restarting. If
+the home directory is not writable, the key is still set for the current
+run and a warning is printed.
+
+The prompt is gated on `stdin` and `stdout` both being TTYs, so
+non-interactive sessions (CI, piped input, redirected output) keep the
+original `API key not found` error and exit with code 1. This means
+scripted callers fail fast instead of hanging on a hidden prompt.
+
+Press Ctrl-C, Ctrl-D, or hit Enter on an empty input to skip the prompt
+and fall through to the original error.
+
 ## Error hints
 
 Most CLI error messages outside the YAML pre-flight (provider not found,

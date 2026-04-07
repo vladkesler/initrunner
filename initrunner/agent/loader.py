@@ -25,6 +25,20 @@ class RoleLoadError(Exception):
     """Raised when a role definition cannot be loaded or validated."""
 
 
+class MissingApiKeyError(RoleLoadError):
+    """Raised when a role's provider has no API key in env or dotenv.
+
+    Carries the env var name and provider so the CLI can prompt for the
+    key inline instead of forcing the user to round-trip through
+    ``initrunner setup``.
+    """
+
+    def __init__(self, env_var: str, provider: str, message: str):
+        super().__init__(message)
+        self.env_var = env_var
+        self.provider = provider
+
+
 def load_role(path: Path) -> RoleDefinition:
     """Read a YAML file and validate it as a RoleDefinition."""
     from initrunner.deprecations import validate_role_dict
@@ -66,10 +80,14 @@ def _build_model(model_config: ModelConfig):
     if not model_config.needs_custom_provider():
         env_var = model_config.api_key_env or _PROVIDER_API_KEY_ENVS.get(model_config.provider)
         if env_var and not os.environ.get(env_var):
-            raise RoleLoadError(
-                f"API key not found. Set the {env_var} environment variable:\n"
-                f"  export {env_var}=your-key-here\n"
-                f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
+            raise MissingApiKeyError(
+                env_var=env_var,
+                provider=model_config.provider,
+                message=(
+                    f"API key not found. Set the {env_var} environment variable:\n"
+                    f"  export {env_var}=your-key-here\n"
+                    f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
+                ),
             )
         provider = model_config.provider
         # Default OpenAI to the Responses API. It is a superset of Chat
@@ -90,9 +108,13 @@ def _build_model(model_config: ModelConfig):
     elif model_config.api_key_env:
         api_key = os.environ.get(model_config.api_key_env)
         if not api_key:
-            raise RoleLoadError(
-                f"Environment variable '{model_config.api_key_env}' is not set "
-                f"(required by model config)"
+            raise MissingApiKeyError(
+                env_var=model_config.api_key_env,
+                provider=model_config.provider,
+                message=(
+                    f"Environment variable '{model_config.api_key_env}' is not set "
+                    f"(required by model config)"
+                ),
             )
     else:
         api_key = None

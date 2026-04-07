@@ -62,7 +62,7 @@ initrunner run role.yaml -p "What can you help me with?"
 
 The agent responds based on its system prompt. Without tools, it can only answer from its training data — it can't actually fetch web pages yet.
 
-> **Troubleshooting:** If you get an API key error, make sure your key is set in the environment (`OPENAI_API_KEY`) or configured via `initrunner setup`. If the provider SDK is missing, install it with `pip install initrunner[all-models]` or the specific extra (e.g., `pip install initrunner[anthropic]`).
+> **First-run API key prompt:** If no API key is configured for the role's provider, `initrunner run` will prompt for one inline (in interactive terminals) and persist it to `~/.initrunner/.env` before continuing. You can also export it manually (`export OPENAI_API_KEY=...`) or run `initrunner setup` for full guided configuration. In non-interactive contexts (CI, piped stdin) the prompt is skipped and the original error is shown so scripted callers fail fast. If the provider SDK is missing, install it with `pip install initrunner[all-models]` or the specific extra (e.g., `pip install initrunner[anthropic]`).
 
 ## Step 2: Interactive Mode — Chatting With Your Agent
 
