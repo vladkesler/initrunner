@@ -564,7 +564,7 @@ Or daily at 9am:
 
 For more on triggers and daemon mode, see [Triggers](../core/triggers.md) and [Sinks](../orchestration/sinks.md).
 
-> **Troubleshooting:** If the trigger never fires, double-check the cron syntax — `* * * * *` means every minute. If the daemon exits immediately, run `initrunner validate role.yaml` to check for YAML errors.
+> **Troubleshooting:** If the trigger never fires, double-check the cron syntax — `* * * * *` means every minute. YAML syntax and schema errors are caught by the run pre-flight before the daemon starts and surface as a Rich panel pointing at the bad field. If you see one, fix the highlighted field and try again.
 
 ## The Complete Agent
 

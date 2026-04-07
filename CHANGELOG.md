@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Pre-flight YAML validation on every run** -- `initrunner run`, `flow up`, and `flow install` now validate role/team/flow YAML against the schema before any skill resolution, model resolution, or API call. Errors render as a Rich panel showing per-field paths (e.g. `spec.model.provider`), 1-based line/column for syntax errors, and inline fix suggestions derived from Pydantic's stable error type API. Warning-level issues stay silent on the run path so successful runs are uncluttered
+- **Recursive flow validation** -- `flow up`, `flow install`, and `flow validate` now walk every role file referenced by a flow's `spec.agents` and validate each one. Issues from a referenced role surface with `agents.<name>.` field prefixes so you can tell which referenced file is broken
+- **`services/yaml_validation.py`** -- single CLI-facing entry point `validate_yaml_file(path)` that detects kind, dispatches to the right per-kind validator, and returns `(definition, kind, issues)`. Pure: never prints, never exits
+
+### Fixed
+- **Latent dashboard bug: schema errors collapsed to a single `field="schema"` issue** -- the editor's `_validate_yaml` was catching `ValueError` from `validate_role_dict` (which wraps Pydantic's `ValidationError`) and bucketing all schema errors into one issue. Now follows `__cause__` via the new `unwrap_pydantic_error` helper so per-field issues reach both the dashboard editor and the CLI panel. Fix applies to role, team, and flow validators
+- **`initrunner validate` matched the old plain-text error format** -- now produces the same Rich panel as the run pre-flight, with severity labels, field paths, and fix hints. The success-table path is unchanged
+- **PyYAML mark line/column was 0-based on display** -- syntax errors now show 1-based line/column matching editor and traceback conventions
+
+### Changed
+- **`detect_yaml_kind` moved from `cli/_helpers.py` to `services/yaml_validation.py`** -- the CLI helper is now a thin wrapper that catches `InvalidComposeKindError` and converts to a printed exit. Backward-compatible re-export preserved
+- **Flow validation moved from `dashboard/validation.py` to `services/flow_validation.py`** -- the dashboard module is now a 4-line shim that converts service `ValidationIssue` to the API's `ValidationIssueResponse`. Routers untouched
+
 ## [2026.4.9] - 2026-04-07
 
 ### Fixed

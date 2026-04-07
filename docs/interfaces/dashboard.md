@@ -585,7 +585,7 @@ Response includes `yaml_text`, `explanation`, `issues[]`, `ready` (true when no 
 
 ### `POST /api/builder/validate`
 
-Validate YAML text against the role schema. Performs Pydantic schema validation, cross-field reasoning checks (e.g. `todo_driven` requires a `todo` tool, `reflexion` requires `reflection_rounds > 0`), and emits recommendation-level `info` issues (e.g. think tool recommended for reflexion). Issues have severity `error`, `warning`, or `info`.
+Validate YAML text against the role schema. Performs Pydantic schema validation, cross-field reasoning checks (e.g. `todo_driven` requires a `todo` tool, `reflexion` requires `reflection_rounds > 0`), and emits recommendation-level `info` issues (e.g. think tool recommended for reflexion). Issues have severity `error`, `warning`, or `info` and a per-field `field` path (e.g. `spec.model.provider`, `metadata.name`). The endpoint shares its underlying validator with the CLI run pre-flight, so the dashboard editor and `initrunner run` always agree on what counts as a valid role.
 
 ```json
 {"yaml_text": "apiVersion: initrunner/v1\n..."}
@@ -932,7 +932,7 @@ Response includes `flow_yaml`, `role_yamls` (placeholder roles only), `issues[]`
 
 ### `POST /api/flow-builder/validate`
 
-Schema-only validation of flow YAML. Does not check that role files exist on disk.
+Schema-only validation of flow YAML. Returns per-field issues with `field`, `message`, and `severity`. Does not check that role files exist on disk -- the CLI's `flow validate` and `flow up` commands run a recursive pre-flight that does check existence and validates each referenced role file (issues prefixed with `agents.<name>.`). Shares its underlying validator with the CLI via `services/flow_validation.py`.
 
 ### `POST /api/flow-builder/save`
 
@@ -1029,7 +1029,7 @@ Response includes `yaml_text`, `explanation`, `issues[]`, and `ready`.
 
 ### `POST /api/team-builder/validate`
 
-Schema-only validation of team YAML.
+Schema-only validation of team YAML. Returns per-field issues with `field`, `message`, and `severity`. Shares its underlying validator with the CLI run pre-flight via `services/team_builder.py:validate_team_yaml`.
 
 ### `POST /api/team-builder/save`
 

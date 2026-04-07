@@ -17,17 +17,26 @@ runner = CliRunner()
 def agent_yaml(tmp_path: Path) -> Path:
     p = tmp_path / "role.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: t\n"
-        "spec:\n  role: test\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
+        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: test-agent\n"
+        "spec:\n  role: You are a helpful assistant.\n"
+        "  model:\n    provider: openai\n    name: gpt-5-mini\n"
     )
     return p
 
 
 @pytest.fixture
 def flow_yaml(tmp_path: Path) -> Path:
+    # Pre-flight recurses into referenced role files, so write a real role too.
+    role = tmp_path / "worker.yaml"
+    role.write_text(
+        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: worker\n"
+        "spec:\n  role: You are a worker.\n"
+        "  model:\n    provider: openai\n    name: gpt-5-mini\n"
+    )
     p = tmp_path / "flow.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: t\nspec:\n  agents: {}\n"
+        "apiVersion: initrunner/v1\nkind: Flow\nmetadata:\n  name: test-flow\n"
+        "spec:\n  agents:\n    worker:\n      role: worker.yaml\n"
     )
     return p
 
@@ -36,7 +45,9 @@ def flow_yaml(tmp_path: Path) -> Path:
 def team_yaml(tmp_path: Path) -> Path:
     p = tmp_path / "team.yaml"
     p.write_text(
-        "apiVersion: initrunner/v1\nkind: Team\nmetadata:\n  name: t\nspec:\n  personas: {}\n"
+        "apiVersion: initrunner/v1\nkind: Team\nmetadata:\n  name: test-team\n"
+        "spec:\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
+        '  personas:\n    alpha: "first persona"\n    bravo: "second persona"\n'
     )
     return p
 

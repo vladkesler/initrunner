@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from initrunner.cli._helpers import console, create_audit_logger
+from initrunner.cli._helpers import console, create_audit_logger, preflight_validate_or_exit
 from initrunner.cli._options import AuditDbOption, NoAuditOption
 
 app = typer.Typer(help="Multi-agent flow orchestration.")
@@ -84,17 +84,14 @@ def flow_validate(
     flow_file: Annotated[Path, typer.Argument(help="Path to flow YAML")],
 ) -> None:
     """Validate a flow definition file."""
-    from initrunner.flow.loader import FlowLoadError
-    from initrunner.services.flow import load_flow_sync
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
 
-    try:
-        flow = load_flow_sync(flow_file)
-    except FlowLoadError as e:
-        console.print(f"[red]Invalid:[/red] {e}")
-        console.print(
-            "[dim]Hint:[/dim] Run [bold]initrunner validate[/bold] on each agent role individually."
-        )
-        raise typer.Exit(1) from None
+    flow, kind, issues = validate_yaml_file(flow_file)
+    if issues:
+        console.print(render_validation_panel(flow_file, kind, issues))
+    if any(i.severity == "error" for i in issues) or flow is None:
+        raise typer.Exit(1)
 
     table = Table(title=f"Flow: {flow.metadata.name}")
     table.add_column("Agent", style="cyan")
@@ -110,24 +107,7 @@ def flow_validate(
         table.add_row(name, agent.role, sink_str, needs_str, restart_str)
 
     console.print(table)
-
-    # Validate role file references
-    base_dir = flow_file.parent
-    all_valid = True
-    for name, agent in flow.spec.agents.items():
-        role_path = base_dir / agent.role
-        if not role_path.exists():
-            console.print(f"[red]Error:[/red] Role file not found for '{name}': {role_path}")
-            console.print(
-                "[dim]Hint:[/dim] Check that role paths in flow.yaml"
-                " are relative to the flow file directory."
-            )
-            all_valid = False
-
-    if all_valid:
-        console.print("[green]Valid[/green]")
-    else:
-        raise typer.Exit(1)
+    console.print("[green]Valid[/green]")
 
 
 @app.command("up")
@@ -140,6 +120,8 @@ def flow_up(
     from initrunner.flow.loader import FlowLoadError
     from initrunner.runner.display import _make_prefixed_tool_event_printer
     from initrunner.services.flow import load_flow_sync, run_flow_sync
+
+    preflight_validate_or_exit(flow_file)
 
     try:
         flow = load_flow_sync(flow_file)
@@ -271,6 +253,8 @@ def flow_install(
         generate_env_template,
         install_unit,
     )
+
+    preflight_validate_or_exit(flow_file)
 
     try:
         flow = load_flow(flow_file)

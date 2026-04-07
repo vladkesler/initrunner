@@ -208,11 +208,76 @@ Suggestions are suppressed when stdout is not a TTY (piped output) and when
 using `--format json` or `--format text`, so machine-readable output stays
 clean.
 
+## Pre-flight YAML validation
+
+Every `initrunner run`, `flow up`, and `flow install` command validates the
+YAML against the schema **before** any skill resolution, model resolution,
+or API call. If a role, team, or flow has a syntax or schema error, the
+command exits with a Rich panel showing exactly what's wrong -- you do not
+get a stack trace, and no API requests are sent.
+
+```console
+$ initrunner run role.yaml -p "hello"
+╭─────────────────── Invalid agent.yaml -- role.yaml ───────────────────────╮
+│                                                                            │
+│  1 error                                                                   │
+│                                                                            │
+│  [ERROR] spec.model.provider                                               │
+│    Input should be a valid string                                          │
+│    Fix: expected a string; check for missing quotes or a stray number      │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+```
+
+The panel shows one row per issue with:
+
+- **Severity label** (`[ERROR]`, `[WARN]`, `[INFO]`).
+- **Field path** -- dotted path into the YAML (e.g. `spec.model.provider`,
+  `metadata.name`). For YAML syntax errors, also includes 1-based line and
+  column (e.g. `yaml (line 14, col 3)`).
+- **Message** -- the underlying Pydantic or YAML parser message.
+- **Fix hint** -- a short suggestion derived from Pydantic's error type
+  (`string_type`, `missing`, `union_tag_invalid`, etc.) or from the
+  validator that produced the issue.
+
+The same panel renders identically from `initrunner validate`, `initrunner
+flow validate`, the run pre-flight, and the dashboard editor's validation
+endpoint -- they all share one services-layer validator.
+
+### Recursive flow validation
+
+Flow files reference other role files via `spec.agents.<name>.role`. The
+pre-flight walks every referenced role file and validates each one. Issues
+from a nested role surface with an `agents.<name>.` field prefix so you can
+tell which referenced file is broken without opening each one.
+
+```console
+$ initrunner flow up flow.yaml
+╭─────────────────── Invalid flow.yaml -- flow.yaml ────────────────────────╮
+│  1 error                                                                   │
+│                                                                            │
+│  [ERROR] agents.worker.spec.model.provider                                 │
+│    Input should be a valid string                                          │
+│    Fix: expected a string; check for missing quotes or a stray number      │
+╰────────────────────────────────────────────────────────────────────────────╯
+```
+
+### Run path stays quiet on warnings
+
+The validators emit advisory warnings (e.g. "System prompt is very short")
+and info-level recommendations on most real roles. To keep successful runs
+uncluttered, the run pre-flight only renders the panel when there are
+**errors**. Warning-only files run normally without any extra output.
+
+The `validate` command still shows everything, errors and warnings alike,
+so you can audit a role manually.
+
 ## Error hints
 
-Most CLI error messages include a `Hint:` line with the likely fix -- for
-example, the correct command to run, a missing YAML section to add, or a
-doc page to check. These appear automatically after `Error:` output.
+Most CLI error messages outside the YAML pre-flight (provider not found,
+missing API key, missing skill directory, etc.) include a `Hint:` line
+with the likely fix -- for example, the correct command to run or a doc
+page to check.
 
 ## Validate options
 
@@ -221,6 +286,12 @@ Synopsis: `initrunner validate <PATH> [OPTIONS]`
 | Flag | Description |
 |------|-------------|
 | `--explain` | Print a plain-language explanation of each configured section |
+
+`initrunner validate` runs the same pre-flight as the run path and prints
+the same Rich panel for any errors or warnings, then -- when validation is
+clean -- displays a configuration table showing the role's metadata, model,
+tools, skills, triggers, ingest, memory, sinks, and provider status. Exits
+non-zero on any error.
 
 `--explain` walks through the role and prints one panel per section (Role,
 Model, Output, Tools, Skills, Capabilities, Triggers, Sinks, Ingest, Memory,
@@ -238,6 +309,9 @@ Role Explanation: memory-assistant
  ...
 Valid
 ```
+
+For deeper checks (deprecation rules, spec version status), run `initrunner
+doctor --role <PATH>` -- see [Deprecations](../operations/deprecations.md).
 
 ## Ingest options
 

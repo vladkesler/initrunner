@@ -18,7 +18,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from initrunner.role_generator import build_schema_reference
-from initrunner.services._yaml_validation import ValidationIssue, parse_yaml_text
+from initrunner.services._yaml_validation import (
+    ValidationIssue,
+    parse_yaml_text,
+    unwrap_pydantic_error,
+)
 
 if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage
@@ -78,7 +82,7 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
     try:
         role, _hits = validate_role_dict(raw)
     except Exception as e:
-        issues.append(ValidationIssue(field="schema", message=str(e), severity="error"))
+        issues.extend(unwrap_pydantic_error(e))
         return None, issues
 
     # Cross-field reasoning validation

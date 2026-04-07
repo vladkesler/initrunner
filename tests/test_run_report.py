@@ -75,6 +75,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
+            patch("initrunner.cli.run_cmd.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:
@@ -106,6 +107,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
+            patch("initrunner.cli.run_cmd.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:
@@ -137,6 +139,7 @@ class TestExportReportCLI:
         report_file = tmp_path / "report.md"
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
+            patch("initrunner.cli.run_cmd.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             result = runner.invoke(
@@ -160,6 +163,7 @@ class TestExportReportCLI:
         """--report-template without --report must error."""
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
+            patch("initrunner.cli.run_cmd.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             result = runner.invoke(
@@ -184,6 +188,7 @@ class TestExportReportCLI:
 
         with (
             patch("initrunner.cli.run_cmd.resolve_run_target", _passthrough_run_target),
+            patch("initrunner.cli.run_cmd.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             with patch("initrunner.runner.run_single") as mock_run:

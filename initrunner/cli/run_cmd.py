@@ -12,6 +12,7 @@ from initrunner.cli._helpers import (
     command_context,
     console,
     create_audit_logger,
+    preflight_validate_or_exit,
     resolve_model_override,
     resolve_run_target,
     resolve_skill_dirs,
@@ -734,6 +735,12 @@ def run(
             " and --bot are only supported for Agent targets."
         )
         raise typer.Exit(1)
+
+    # --- Pre-flight YAML validation: catch syntax/schema errors before any
+    #     skill resolution, model resolution, or API calls.  Covers all
+    #     downstream dispatches (Agent/Team/Flow, serve/bot/daemon).  Runs
+    #     after the cheap flag checks above so flag errors fire first.
+    preflight_validate_or_exit(role_file)
 
     # --- Kind-based dispatch ---
     if kind == "Team":

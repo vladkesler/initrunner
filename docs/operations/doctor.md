@@ -89,6 +89,8 @@ Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.
 
 When `--role` is provided, `doctor` runs schema and deprecation checks on the role file before the quickstart smoke test. This catches common issues like removed fields, invalid YAML, and schema errors.
 
+> The same YAML schema checks also run automatically as a pre-flight before every `initrunner run`, `flow up`, and `flow install` -- see [Pre-flight YAML validation](../getting-started/cli.md#pre-flight-yaml-validation). `doctor` is the right tool when you want the deprecation rule table and spec-version drift report; the run pre-flight is the right tool when you just want to know whether your edited role will start.
+
 ```bash
 initrunner doctor --role role.yaml
 ```

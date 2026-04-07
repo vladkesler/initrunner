@@ -399,27 +399,39 @@ def detect_yaml_kind(path: Path) -> str:
     Defaults to ``"Agent"`` on any failure.
 
     Raises ``typer.Exit(1)`` if the file uses the removed ``kind: Compose``.
+    Thin CLI wrapper around :func:`initrunner.services.yaml_validation.detect_yaml_kind`
+    that converts the pure-Python exception into a printed error and exit.
     """
-    import yaml
+    from initrunner.services.yaml_validation import (
+        InvalidComposeKindError,
+    )
+    from initrunner.services.yaml_validation import (
+        detect_yaml_kind as _detect,
+    )
 
     try:
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        if isinstance(data, dict):
-            kind = data.get("kind", "Agent")
-            if kind == "Compose":
-                console.print(
-                    "[red]Error:[/red] kind: Compose has been renamed to kind: Flow. "
-                    "Also rename spec.services to spec.agents and depends_on to needs. "
-                    "See docs/orchestration/flow.md"
-                )
-                raise typer.Exit(1)
-            return kind
-    except typer.Exit:
-        raise
-    except Exception:
-        pass
-    return "Agent"
+        return _detect(path)
+    except InvalidComposeKindError as exc:
+        console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from None
+
+
+def preflight_validate_or_exit(path: Path) -> None:
+    """Validate *path* against its YAML schema and exit on errors.
+
+    Used by every CLI run path (``run``, ``flow up``) as a pre-flight
+    check before any agent build or API call.  Stays silent on
+    warning-only files -- the ``validate`` command shows warnings, but
+    the run path does not, to keep successful runs free of advisory
+    noise.
+    """
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
+
+    _, kind, issues = validate_yaml_file(path)
+    if any(i.severity == "error" for i in issues):
+        console.print(render_validation_panel(path, kind, issues))
+        raise typer.Exit(1)
 
 
 def resolve_run_target(target: Path) -> tuple[Path, str]:
