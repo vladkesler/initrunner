@@ -73,7 +73,12 @@ initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
 ### Build your own
 
 ```bash
-initrunner new "a research assistant that summarizes papers"  # generates a role.yaml
+initrunner new "a research assistant that summarizes papers"
+# generates role.yaml, then asks: "Run it now with prompt: '...'? [Y/n]"
+
+initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
+# one-liner: generate and execute in a single command
+
 initrunner run --ingest ./docs/    # or skip YAML entirely, just chat with your docs
 ```
 

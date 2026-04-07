@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
 from initrunner.cli.main import app
+from initrunner.services.agent_builder import PostCreateResult, TurnResult
 
 runner = CliRunner()
 
@@ -438,3 +439,291 @@ class TestAuthErrorHandling:
         assert result.exit_code == 1
         plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
         assert "429" in plain
+
+
+# ---------------------------------------------------------------------------
+# Post-creation "Run it now?" offer (--run / --no-run)
+# ---------------------------------------------------------------------------
+
+
+def _mock_session_for_offer(
+    *,
+    test_prompt: str | None,
+    valid: bool = True,
+    triggers=None,
+    ingest=None,
+):
+    """Build a mocked BuilderSession that produces a controlled TurnResult/PostCreateResult.
+
+    Used by the post-creation offer tests so we don't depend on the real
+    blank-template flow when we need to simulate a tailored test_prompt or a
+    role with triggers/ingest.
+    """
+    turn = TurnResult(
+        explanation="Generated.",
+        yaml_text=_VALID_YAML,
+        issues=[],
+        test_prompt=test_prompt,
+    )
+
+    role = MagicMock()
+    role.metadata.name = "test-agent"
+    role.spec.triggers = triggers
+    role.spec.ingest = ingest
+
+    session = MagicMock()
+    session.seed_blank.return_value = turn
+    session.seed_template.return_value = turn
+    session.seed_description.return_value = turn
+    session.seed_from_file.return_value = turn
+    session.seed_from_example.return_value = turn
+    session.omitted_assets = []
+    session.import_warnings = []
+    session.yaml_text = _VALID_YAML
+    session.role = role
+
+    def _save(path, force=False):
+        # Materialize the file so existence checks downstream don't surprise us.
+        path.write_text(_VALID_YAML)
+        return PostCreateResult(
+            yaml_path=path,
+            valid=valid,
+            issues=[],
+            next_steps=[f"initrunner run {path} -p 'hello'"],
+            omitted_assets=[],
+        )
+
+    session.save.side_effect = _save
+    return session
+
+
+class TestPostCreateRunOffer:
+    """Coverage for the new ``--run``/``--no-run`` flow on ``initrunner new``."""
+
+    def test_run_and_no_run_are_mutually_exclusive(self, tmp_path):
+        output = tmp_path / "role.yaml"
+        result = runner.invoke(
+            app,
+            [
+                "new",
+                "--blank",
+                "--output",
+                str(output),
+                "--no-refine",
+                "--run",
+                "hello",
+                "--no-run",
+            ],
+        )
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output.lower()
+
+    def test_explicit_run_dispatches_regardless_of_tty(self, tmp_path, monkeypatch):
+        """`--run TEXT` is the scripting path: bypasses TTY and tailored-prompt gates."""
+        calls: dict = {}
+
+        def fake_run_agent(**kwargs):
+            calls.update(kwargs)
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        # Prove the explicit path bypasses the TTY check.
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: False)
+
+        output = tmp_path / "role.yaml"
+        result = runner.invoke(
+            app,
+            [
+                "new",
+                "--blank",
+                "--output",
+                str(output),
+                "--no-refine",
+                "--run",
+                "what is 2+2",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert calls.get("prompt") == "what is 2+2"
+        assert calls.get("role_file") == output
+        assert calls.get("output_format") == "auto"
+        assert calls.get("interactive") is False
+        assert calls.get("autonomous") is False
+
+    def test_no_run_skips_dispatch(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        output = tmp_path / "role.yaml"
+        result = runner.invoke(
+            app,
+            ["new", "--blank", "--output", str(output), "--no-refine", "--no-run"],
+        )
+        assert result.exit_code == 0, result.output
+        assert called is False
+        assert "Run it now" not in result.output
+
+    def test_interactive_accept_dispatches_with_tailored_prompt(self, tmp_path, monkeypatch):
+        calls: dict = {}
+
+        def fake_run_agent(**kwargs):
+            calls.update(kwargs)
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        session = _mock_session_for_offer(test_prompt="say hi to the user")
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+                input="y\n",
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" in result.output
+        assert "say hi to the user" in result.output
+        assert calls.get("prompt") == "say hi to the user"
+        assert calls.get("role_file") == output
+
+    def test_interactive_decline_skips_dispatch(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        session = _mock_session_for_offer(test_prompt="say hi")
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+                input="n\n",
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" in result.output
+        assert called is False
+
+    def test_non_interactive_stdin_skips_offer(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: False)
+
+        session = _mock_session_for_offer(test_prompt="say hi")
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" not in result.output
+        assert called is False
+
+    def test_no_tailored_prompt_skips_offer(self, tmp_path, monkeypatch):
+        """Blank seed has no LLM call -> no tailored prompt -> no offer."""
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        output = tmp_path / "role.yaml"
+        # Real blank flow -- no mocking. test_prompt is None for blank seeds.
+        result = runner.invoke(
+            app,
+            ["new", "--blank", "--output", str(output), "--no-refine"],
+            input="y\n",
+        )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" not in result.output
+        assert called is False
+
+    def test_role_with_triggers_skips_offer(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        session = _mock_session_for_offer(
+            test_prompt="say hi",
+            triggers=[MagicMock()],  # Truthy non-empty list.
+        )
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+                input="y\n",
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" not in result.output
+        assert called is False
+
+    def test_role_with_ingest_skips_offer(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        session = _mock_session_for_offer(
+            test_prompt="say hi",
+            ingest=MagicMock(),  # Truthy.
+        )
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+                input="y\n",
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" not in result.output
+        assert called is False
+
+    def test_invalid_save_skips_offer(self, tmp_path, monkeypatch):
+        called = False
+
+        def fake_run_agent(**kwargs):
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr("initrunner.cli._run_agent._run_agent", fake_run_agent)
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+
+        session = _mock_session_for_offer(test_prompt="say hi", valid=False)
+        with patch("initrunner.services.agent_builder.BuilderSession", return_value=session):
+            output = tmp_path / "role.yaml"
+            result = runner.invoke(
+                app,
+                ["new", "--blank", "--output", str(output), "--no-refine"],
+                input="y\n",
+            )
+        assert result.exit_code == 0, result.output
+        assert "Run it now" not in result.output
+        assert called is False

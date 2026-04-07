@@ -338,8 +338,30 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--output PATH` | Output file path (default: `role.yaml`) |
 | `--force` | Overwrite existing file without prompting |
 | `--no-refine` | Skip the interactive refinement loop |
+| `--run PROMPT` | After creating, immediately execute the agent with `PROMPT`. Bypasses the post-creation confirmation. |
+| `--no-run` | Skip the post-creation `Run it now?` confirmation. |
 
 Without any seed, starts an interactive conversation where the LLM asks what to build.
+
+### Run it now?
+
+When the builder generates an agent from a description (or via the refinement loop), it asks the LLM for a tailored test prompt alongside the YAML. After saving, if stdin is interactive and the role is a runnable one-shot (no triggers, no ingest required, valid YAML), `initrunner new` prints a confirmation:
+
+```
+Run it now with prompt: 'explain what `^[a-z]+$` matches'? [Y/n]
+```
+
+Press Enter to execute. The agent runs through the same code path as `initrunner run role.yaml -p '...'`, so output, streaming, and audit logging all behave identically.
+
+The confirmation is skipped when:
+- `--run PROMPT` was given (the prompt is used directly, no question asked)
+- `--no-run` was given
+- the role has triggers or an `ingest` block (use `initrunner run --daemon` or `initrunner ingest` first)
+- the saved YAML is invalid
+- no tailored prompt was produced (e.g. blank/template seeds without refinement)
+- stdin is not a TTY (piped input, CI, etc.)
+
+`--run` and `--no-run` are mutually exclusive.
 
 ### Examples
 
@@ -361,6 +383,12 @@ initrunner new --langchain my_agent.py
 
 # Fully interactive (no seed)
 initrunner new
+
+# One-liner: generate and immediately execute with a fixed test prompt
+initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
+
+# CI/scripted: never prompt, just write the file
+initrunner new "a regex explainer" --no-run
 ```
 
 ## Setup options
