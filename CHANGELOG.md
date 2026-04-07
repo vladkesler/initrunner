@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2026.4.10] - 2026-04-07
 
 ### Behavior changes
 - **`ingest.auto: true` is now the default; auto-ingest refreshes stale indices.** Roles with an `ingest:` block now auto-index on every `initrunner run` if any source files have been added, modified, or removed since the last indexing pass. The previous behavior (auto-ingest only on the first run, opt-in via `ingest.auto: true`) is gone. To preserve the old manual workflow, set `ingest.auto: false` in the role YAML. The cheap stale check uses an mtime fast-path (heuristic; defeated by timestamp-preserving copies like `cp -p` -- run `initrunner ingest <role> --force` for an authoritative rebuild). Existing URLs are not re-fetched on auto runs to avoid per-run network traffic; new URLs added to the YAML are picked up automatically; `initrunner ingest <role>` (manual) still refreshes URL contents

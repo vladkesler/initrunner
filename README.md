@@ -35,7 +35,7 @@ initrunner run code-review-team -p "Review the latest commit" # multi-perspectiv
 
 15 curated starters, 60+ examples, or define your own.
 
-> **v2026.4.9**: `init new` respects saved provider config, builder knows RAG vs memory, 401 errors show actionable guidance. See the [Changelog](CHANGELOG.md).
+> **v2026.4.10**: pre-flight YAML validation, auto-ingest of stale RAG sources on every run, `initrunner new --run` to go from prompt to output in one command, and an inline API-key prompt on first run. See the [Changelog](CHANGELOG.md).
 
 ## Quickstart
 
@@ -406,4 +406,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.9</sub></p>
+<p align="center"><sub>v2026.4.10</sub></p>
