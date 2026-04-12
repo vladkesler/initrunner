@@ -208,9 +208,9 @@ def build_a2a_app(
 
     storage: InMemoryStorage[list[ModelMessage]] = InMemoryStorage()
     broker = InMemoryBroker()
-    worker = InitRunnerWorker(  # type: ignore[call-arg]  # broker/storage from Worker base
-        broker=broker,
-        storage=storage,
+    worker = InitRunnerWorker(  # type: ignore[unknown-argument]  # broker/storage from Worker base
+        broker=broker,  # type: ignore[unknown-argument]
+        storage=storage,  # type: ignore[unknown-argument]
         agent=agent,
         role=role,
         audit_logger=audit_logger,
