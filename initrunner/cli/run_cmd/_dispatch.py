@@ -91,6 +91,7 @@ def _dispatch_daemon(
     model: str | None,
     *,
     autopilot: bool = False,
+    budget_timezone: str | None = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
@@ -106,6 +107,8 @@ def _dispatch_daemon(
         extra_skill_dirs=extra_skill_dirs,
         model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        if budget_timezone is not None:
+            role.spec.guardrails.budget_timezone = budget_timezone
         run_daemon(
             agent,
             role,
@@ -127,6 +130,8 @@ def _dispatch_bot(
     no_audit: bool,
     skill_dir: Path | None,
     model: str | None,
+    *,
+    budget_timezone: str | None = None,
 ) -> None:
     """Launch an agent as a Telegram or Discord bot."""
     from initrunner.runner import run_bot
@@ -141,6 +146,8 @@ def _dispatch_bot(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        if budget_timezone is not None:
+            role.spec.guardrails.budget_timezone = budget_timezone
         run_bot(
             agent,
             role,

@@ -106,7 +106,16 @@ class DaemonRunner:
             weekly_cost_budget=guardrails.daemon_weekly_cost_budget,
             model=role.spec.model.name if role.spec.model else "",
             provider=role.spec.model.provider if role.spec.model else "",
+            timezone=guardrails.budget_timezone,
         )
+
+        # Restore persisted budget state
+        if audit_logger is not None:
+            from initrunner.runner.budget import BudgetSnapshot
+
+            saved = audit_logger.load_budget_state(role.metadata.name)
+            if saved is not None:
+                self._tracker.restore(BudgetSnapshot.from_dict(saved))
 
         self._schedule_queue = None
         self._scheduling_toolset = None
@@ -313,6 +322,12 @@ class DaemonRunner:
                     self._tracker.record_usage(result.total_tokens_in, result.total_tokens_out)  # type: ignore[union-attr]
                 else:
                     self._tracker.record_usage(result.tokens_in, result.tokens_out)  # type: ignore[union-attr]
+
+                # Persist budget state after each attempt
+                if self._audit_logger is not None:
+                    self._audit_logger.save_budget_state(
+                        role.metadata.name, self._tracker.snapshot().to_dict()
+                    )
 
                 if result.success:
                     break
@@ -589,10 +604,29 @@ class DaemonRunner:
 
         old_triggers_key = _triggers_key(self._role.spec.triggers)
         new_triggers_key = _triggers_key(new_role.spec.triggers)
+        old_guardrails = self._role.spec.guardrails
 
         with self._agent_role_lock:
             self._role = new_role
             self._agent = new_agent
+
+        # Update budget tracker if limits or timezone changed
+        new_g = new_role.spec.guardrails
+        budget_fields = (
+            "daemon_token_budget",
+            "daemon_daily_token_budget",
+            "daemon_daily_cost_budget",
+            "daemon_weekly_cost_budget",
+            "budget_timezone",
+        )
+        if any(getattr(new_g, f) != getattr(old_guardrails, f) for f in budget_fields):
+            self._tracker.update_limits(
+                lifetime_budget=new_g.daemon_token_budget,
+                daily_budget=new_g.daemon_daily_token_budget,
+                daily_cost_budget=new_g.daemon_daily_cost_budget,
+                weekly_cost_budget=new_g.daemon_weekly_cost_budget,
+                timezone=new_g.budget_timezone,
+            )
 
         # Recompute autonomous trigger types
         new_auto_types: set[str] = set()

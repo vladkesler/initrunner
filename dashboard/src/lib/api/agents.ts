@@ -2,6 +2,7 @@ import { request, ApiError } from './client';
 import type {
 	AgentDetail,
 	AgentSummary,
+	BudgetProgress,
 	IngestDocument,
 	IngestSSEEvent,
 	IngestStats,
@@ -62,6 +63,10 @@ export function deleteAgent(id: string): Promise<{ id: string; path: string }> {
 
 export function getAgentTriggerStats(agentId: string): Promise<TriggerStat[]> {
 	return request(`/api/agents/${agentId}/trigger-stats`);
+}
+
+export function fetchBudgetProgress(agentId: string): Promise<BudgetProgress> {
+	return request(`/api/agents/${agentId}/budget-progress`);
 }
 
 // -- Ingestion ----------------------------------------------------------------

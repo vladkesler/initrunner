@@ -144,12 +144,36 @@ export interface UsageData {
 	provider: string | null;
 }
 
+export interface CostUpdateData {
+	estimated_tokens_out: number;
+	estimated_output_cost_usd: number | null;
+}
+
 export type SSEEvent =
 	| { type: 'token'; data: string }
 	| { type: 'tool_event'; data: ToolEventData }
 	| { type: 'usage'; data: UsageData }
+	| { type: 'cost_update'; data: CostUpdateData }
 	| { type: 'result'; data: RunResponse }
 	| { type: 'error'; data: string };
+
+// -- Budget Progress ----------------------------------------------------------
+
+export interface BudgetGauge {
+	consumed: number;
+	limit: number;
+	percent: number;
+	warning_level: 'ok' | 'warning_80' | 'warning_95' | 'exhausted';
+}
+
+export interface BudgetProgress {
+	daily_tokens: BudgetGauge | null;
+	daily_cost: BudgetGauge | null;
+	weekly_cost: BudgetGauge | null;
+	lifetime_tokens: BudgetGauge | null;
+	timezone: string;
+	last_updated: string | null;
+}
 
 // -- Trigger Stats ------------------------------------------------------------
 

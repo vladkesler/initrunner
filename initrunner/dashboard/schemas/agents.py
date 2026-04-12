@@ -9,6 +9,8 @@ from initrunner.dashboard.schemas._common import ItemSummary, SkillRef
 __all__ = [
     "AgentDetail",
     "AgentSummary",
+    "BudgetGauge",
+    "BudgetProgressResponse",
     "RunRequest",
     "RunResponse",
 ]
@@ -59,6 +61,22 @@ class AgentDetail(BaseModel):
     tool_search: dict | None = None  # ToolSearchConfig serialised (when enabled)
     # runtime readiness
     provider_warning: str | None = None
+
+
+class BudgetGauge(BaseModel):
+    consumed: float
+    limit: float
+    percent: float
+    warning_level: str  # "ok" | "warning_80" | "warning_95" | "exhausted"
+
+
+class BudgetProgressResponse(BaseModel):
+    daily_tokens: BudgetGauge | None = None
+    daily_cost: BudgetGauge | None = None
+    weekly_cost: BudgetGauge | None = None
+    lifetime_tokens: BudgetGauge | None = None
+    timezone: str = "UTC"
+    last_updated: str | None = None
 
 
 class RunRequest(BaseModel):

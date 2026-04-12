@@ -1,6 +1,5 @@
 """Tests for runner/runner.py: DaemonTokenTracker, run_single, run_autonomous."""
 
-from datetime import date
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.executor import RunResult
@@ -85,7 +84,7 @@ class TestDaemonTokenTracker:
         tracker.record_usage(30, 20)
 
         # Simulate day change
-        tracker.last_reset_date = date(2020, 1, 1)
+        tracker.last_reset_date = "2020-01-01"
         allowed, _reason = tracker.check_before_run()
         assert allowed is True
         # After reset, daily_consumed is the 1-token reservation from check_before_run
@@ -102,7 +101,7 @@ class TestDaemonTokenTracker:
         tracker = DaemonTokenTracker(lifetime_budget=100, daily_budget=200)
         tracker.record_usage(60, 40)
         # Simulate day change
-        tracker.last_reset_date = date(2020, 1, 1)
+        tracker.last_reset_date = "2020-01-01"
         allowed, reason = tracker.check_before_run()
         assert allowed is False
         assert reason is not None

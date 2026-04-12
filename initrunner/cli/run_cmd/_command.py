@@ -108,6 +108,14 @@ def run(
     autopilot: Annotated[
         bool, typer.Option("--autopilot", help="Daemon mode with all triggers autonomous")
     ] = False,
+    budget_timezone: Annotated[
+        str | None,
+        typer.Option(
+            "--budget-timezone",
+            help="IANA timezone for daily budget reset (e.g. America/New_York)",
+            rich_help_panel="Daemon Options",
+        ),
+    ] = None,
     # --- Serve options ---
     host: Annotated[
         str, typer.Option(help="Host to bind to", rich_help_panel="Serve Options")
@@ -340,6 +348,13 @@ def run(
         )
         raise typer.Exit(1)
 
+    if budget_timezone and not (daemon_mode or autopilot or bot):
+        console.print(
+            "[red]Error:[/red] --budget-timezone is only valid"
+            " with --daemon, --autopilot, or --bot."
+        )
+        raise typer.Exit(1)
+
     # --- Pre-flight YAML validation: catch syntax/schema errors before any
     #     skill resolution, model resolution, or API calls.  Covers all
     #     downstream dispatches (Agent/Team/Flow, serve/bot/daemon).  Runs
@@ -380,12 +395,19 @@ def run(
             no_audit,
             skill_dir,
             effective_model,
+            budget_timezone=budget_timezone,
         )
         return
 
     if daemon_mode or autopilot:
         _dispatch_daemon(
-            role_file, audit_db, no_audit, skill_dir, effective_model, autopilot=autopilot
+            role_file,
+            audit_db,
+            no_audit,
+            skill_dir,
+            effective_model,
+            autopilot=autopilot,
+            budget_timezone=budget_timezone,
         )
         return
 

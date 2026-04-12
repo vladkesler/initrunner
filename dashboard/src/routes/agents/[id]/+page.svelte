@@ -22,6 +22,7 @@
 	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
 	import IngestTab from '$lib/components/agents/IngestTab.svelte';
 	import EditorTab from '$lib/components/agents/EditorTab.svelte';
+	import BudgetProgressBar from '$lib/components/agents/BudgetProgressBar.svelte';
 	import {
 		AlertTriangle,
 		ArrowLeft,
@@ -272,6 +273,11 @@
 		<!-- Trigger status panel -->
 		{#if triggerStats.length > 0}
 			<TriggerPanel stats={triggerStats} />
+		{/if}
+
+		<!-- Budget progress -->
+		{#if detail.guardrails?.daemon_token_budget || detail.guardrails?.daemon_daily_token_budget || detail.guardrails?.daemon_daily_cost_budget || detail.guardrails?.daemon_weekly_cost_budget}
+			<BudgetProgressBar agentId={agentId} />
 		{/if}
 
 		<!-- Tabs -->

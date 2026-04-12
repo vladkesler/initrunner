@@ -107,12 +107,31 @@ spec:
 
 ### Behavior
 
-- Cost is estimated after each run using `genai-prices` and accumulated in-memory.
-- Daily cost resets at UTC midnight (same as `daemon_daily_token_budget`).
-- Weekly cost resets when the ISO week number changes.
-- At 80% consumption, a warning is logged.
+- Cost is estimated after each run using `genai-prices` and accumulated in the tracker.
+- Daily cost resets at midnight in the configured `budget_timezone` (default UTC).
+- Weekly cost resets when the ISO year-week changes.
+- Warnings are logged at 80% and 95% consumption.
 - When the budget is exhausted, further trigger executions are skipped.
-- Both counters reset on process restart.
+- Budget counters are **persisted** to the audit database after each run. Restarting a daemon or bot restores the counters, so spend tracking survives process restarts.
+
+### Budget Timezone
+
+By default, daily and weekly resets use UTC. Configure `budget_timezone` to use a different IANA timezone:
+
+```yaml
+spec:
+  guardrails:
+    daemon_daily_cost_budget: 5.00
+    budget_timezone: "America/New_York"
+```
+
+Or override from the CLI:
+
+```bash
+initrunner run role.yaml --daemon --budget-timezone America/New_York
+```
+
+The `--budget-timezone` flag is valid with `--daemon`, `--autopilot`, and `--bot`.
 
 ### Startup Validation
 
@@ -142,6 +161,8 @@ Either limit being hit will pause the daemon.
 
 ## Dashboard UI
 
+### Cost analytics page
+
 The `/cost` page in the dashboard provides visual cost analytics.
 
 - **Summary strip** at the top shows today, this week, this month, and all-time spend totals. These values are fixed and do not change with the time range selector.
@@ -154,6 +175,14 @@ The audit log (`/audit`) also shows a per-run cost column and includes cost in t
 
 All cost values show `N/A` when pricing data is unavailable for a model/provider.
 
+### Live cost during streaming
+
+When streaming a run from the dashboard, the TokenMeter shows a running estimated output cost (prefixed with `~`). The estimate uses a character-to-token heuristic (`chars / 4`) and is corrected by the final `result` event. Input cost is unknown mid-stream and is only shown in the final total.
+
+### Budget progress bar
+
+Agent detail pages show a budget progress bar for any daemon agent with cost or token budgets configured. Each configured budget (daily tokens, daily cost, weekly cost, lifetime tokens) gets a gauge showing current consumption, limit, and percentage. Colors: green (< 80%), yellow (80-95%), red (> 95% or exhausted). The bar auto-refreshes every 30 seconds.
+
 ## Dashboard API
 
 The dashboard exposes cost analytics via REST endpoints.
@@ -164,6 +193,7 @@ The dashboard exposes cost analytics via REST endpoints.
 | `GET /api/cost/by-agent` | Per-agent cost breakdown. Filters: `since`, `until`, `agent_name` |
 | `GET /api/cost/daily` | Daily cost time series. Params: `days` (default 30), `agent_name` |
 | `GET /api/cost/by-model` | Cost grouped by model/provider. Filters: `since`, `until` |
+| `GET /api/agents/{id}/budget-progress` | Live budget gauges (consumed/limit/percent/warning_level) per budget type |
 
 ## How Cost is Calculated
 

@@ -151,6 +151,26 @@ INSERT INTO security_events (timestamp, event_type, agent_name, details, source_
 VALUES (?, ?, ?, ?, ?, ?);
 """
 
+_CREATE_BUDGET_STATE_TABLE = """\
+CREATE TABLE IF NOT EXISTS budget_state (
+    agent_name TEXT PRIMARY KEY,
+    total_consumed INTEGER NOT NULL DEFAULT 0,
+    daily_consumed INTEGER NOT NULL DEFAULT 0,
+    daily_cost_consumed REAL NOT NULL DEFAULT 0.0,
+    weekly_cost_consumed REAL NOT NULL DEFAULT 0.0,
+    last_reset_date TEXT NOT NULL,
+    last_weekly_reset TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
+_UPSERT_BUDGET_STATE = """\
+INSERT OR REPLACE INTO budget_state (
+    agent_name, total_consumed, daily_consumed, daily_cost_consumed,
+    weekly_cost_consumed, last_reset_date, last_weekly_reset, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+"""
+
 _CREATE_DELEGATE_EVENTS_TABLE = """\
 CREATE TABLE IF NOT EXISTS delegate_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -357,6 +377,7 @@ class AuditLogger:
             self._conn.execute(_CREATE_TABLE)
             self._conn.execute(_CREATE_SECURITY_EVENTS_TABLE)
             self._conn.execute(_CREATE_DELEGATE_EVENTS_TABLE)
+            self._conn.execute(_CREATE_BUDGET_STATE_TABLE)
             _migrate_add_trigger_columns(self._conn)
             _migrate_add_principal_column(self._conn)
             _migrate_add_compose_name_column(self._conn)
@@ -425,6 +446,50 @@ class AuditLogger:
             ),
             error_label="audit record",
         )
+
+    # -- budget state persistence --------------------------------------------
+
+    def save_budget_state(self, agent_name: str, state: dict) -> None:
+        """Persist daemon budget counters. Never raises."""
+        from datetime import UTC, datetime
+
+        self._execute_insert_locked(
+            _UPSERT_BUDGET_STATE,
+            (
+                agent_name,
+                state["total_consumed"],
+                state["daily_consumed"],
+                state["daily_cost_consumed"],
+                state["weekly_cost_consumed"],
+                state["last_reset_date"],
+                state["last_weekly_reset"],
+                datetime.now(UTC).isoformat(),
+            ),
+            error_label="budget state",
+            auto_prune=False,
+        )
+
+    def load_budget_state(self, agent_name: str) -> dict | None:
+        """Load persisted budget counters. Returns None if missing or on error."""
+        try:
+            with self._lock:
+                row = self._conn.execute(
+                    "SELECT * FROM budget_state WHERE agent_name = ?",
+                    (agent_name,),
+                ).fetchone()
+            if row is None:
+                return None
+            return {
+                "total_consumed": row["total_consumed"],
+                "daily_consumed": row["daily_consumed"],
+                "daily_cost_consumed": row["daily_cost_consumed"],
+                "weekly_cost_consumed": row["weekly_cost_consumed"],
+                "last_reset_date": row["last_reset_date"],
+                "last_weekly_reset": row["last_weekly_reset"],
+            }
+        except Exception as e:
+            logger.error("Failed to load budget state for %s: %s", agent_name, e)
+            return None
 
     def _query_table(
         self,

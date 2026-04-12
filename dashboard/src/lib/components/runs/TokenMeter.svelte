@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CostData, UsageData } from '$lib/api/types';
+	import type { CostData, CostUpdateData, UsageData } from '$lib/api/types';
 	import { formatCost } from '$lib/utils/format';
 
 	interface ResultMetrics {
@@ -12,11 +12,13 @@
 	let {
 		usage = null,
 		result = null,
-		running = false
+		running = false,
+		costUpdate = null
 	}: {
 		usage?: UsageData | null;
 		result?: ResultMetrics | null;
 		running?: boolean;
+		costUpdate?: CostUpdateData | null;
 	} = $props();
 
 	const hasResult = $derived(result !== null && result !== undefined);
@@ -60,10 +62,21 @@
 			</div>
 		{/if}
 	{:else if running}
-		<!-- Streaming state -->
+		<!-- Streaming state with live cost estimate -->
 		<div class="flex items-center gap-2">
 			<div class="h-0.5 w-4 bg-accent-primary"></div>
-			<span class="text-[12px] text-fg-faint">streaming...</span>
+			{#if costUpdate}
+				<span class="font-mono text-[12px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+					~{costUpdate.estimated_tokens_out.toLocaleString()} tokens out
+				</span>
+				{#if costUpdate.estimated_output_cost_usd != null}
+					<span class="font-mono text-[12px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+						~{formatCost(costUpdate.estimated_output_cost_usd)}
+					</span>
+				{/if}
+			{:else}
+				<span class="text-[12px] text-fg-faint">streaming...</span>
+			{/if}
 			{#if usage?.model}
 				<span class="ml-auto font-mono text-[11px] text-fg-faint">{usage.model}</span>
 			{/if}

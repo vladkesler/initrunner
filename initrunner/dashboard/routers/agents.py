@@ -12,6 +12,7 @@ from initrunner.dashboard.deps import RoleCache, SkillCache, get_role_cache, get
 from initrunner.dashboard.schemas import (
     AgentDetail,
     AgentSummary,
+    BudgetProgressResponse,
     DeleteResponse,
     ItemSummary,
     SkillRef,
@@ -334,3 +335,60 @@ async def get_timeline(
 
     rows, stats_dict = await asyncio.to_thread(_query)
     return build_timeline_response(rows, stats_dict)
+
+
+@router.get("/{agent_id}/budget-progress")
+async def get_budget_progress(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+) -> BudgetProgressResponse:
+    from initrunner.audit.logger import AuditLogger
+    from initrunner.config import get_audit_db_path
+    from initrunner.dashboard.schemas import BudgetGauge
+    from initrunner.runner.budget import BudgetSnapshot
+
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if dr.role is None:
+        return BudgetProgressResponse()
+
+    guardrails = dr.role.spec.guardrails
+    tz = guardrails.budget_timezone
+
+    def _load():
+        al = AuditLogger(get_audit_db_path())
+        try:
+            return al.load_budget_state(dr.role.metadata.name)  # type: ignore[union-attr]
+        finally:
+            al.close()
+
+    saved = await asyncio.to_thread(_load)
+
+    if saved is not None:
+        snap = BudgetSnapshot.from_dict(saved).with_resets(tz)
+        gauges = snap.to_progress(guardrails)
+    else:
+        # No persisted state -- build zero-consumed snapshot for gauge computation
+        snap = BudgetSnapshot(
+            total_consumed=0,
+            daily_consumed=0,
+            daily_cost_consumed=0.0,
+            weekly_cost_consumed=0.0,
+            last_reset_date="",
+            last_weekly_reset="",
+        )
+        gauges = snap.to_progress(guardrails)
+
+    # Convert raw dicts to BudgetGauge models (or None)
+    def _to_gauge(d: dict | None) -> BudgetGauge | None:
+        return BudgetGauge(**d) if d else None
+
+    return BudgetProgressResponse(
+        daily_tokens=_to_gauge(gauges["daily_tokens"]),
+        daily_cost=_to_gauge(gauges["daily_cost"]),
+        weekly_cost=_to_gauge(gauges["weekly_cost"]),
+        lifetime_tokens=_to_gauge(gauges["lifetime_tokens"]),
+        timezone=tz,
+        last_updated=saved.get("updated_at") if saved else None,
+    )

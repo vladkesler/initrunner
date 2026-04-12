@@ -19,6 +19,8 @@ from initrunner.dashboard.schemas._common import (
 from initrunner.dashboard.schemas.agents import (
     AgentDetail,
     AgentSummary,
+    BudgetGauge,
+    BudgetProgressResponse,
     RunRequest,
     RunResponse,
 )
@@ -161,6 +163,8 @@ __all__ = [
     # audit
     "AuditRecordResponse",
     "AuditStatsResponse",
+    "BudgetGauge",
+    "BudgetProgressResponse",
     # builder
     "BuilderOptionsResponse",
     "CostSummaryResponse",
