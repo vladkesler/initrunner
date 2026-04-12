@@ -224,7 +224,10 @@ class TestTriggerHint:
             yield mock_role, MagicMock(), None, None, None
 
         with (
-            patch("initrunner.cli.run_cmd._command.resolve_run_target", return_value=(agent_yaml, "Agent")),
+            patch(
+                "initrunner.cli.run_cmd._command.resolve_run_target",
+                return_value=(agent_yaml, "Agent"),
+            ),
             patch("initrunner.cli._run_agent.command_context", _ctx),
             patch("initrunner.runner.run_interactive"),
         ):
