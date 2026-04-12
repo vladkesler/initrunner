@@ -279,7 +279,7 @@ class TestInlineApiKeyPrompt:
         mock_run = MagicMock(return_value=(MagicMock(), None))
         with (
             patch(
-                "initrunner.cli._helpers.prompt_inline_api_key",
+                "initrunner.cli._helpers._context.prompt_inline_api_key",
                 side_effect=stub_prompt,
             ) as prompt_spy,
             patch("initrunner.runner.run_single", mock_run),
