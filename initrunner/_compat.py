@@ -25,6 +25,7 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "telegram": ("telegram", "python-telegram-bot"),
     "discord": ("discord", "discord.py"),
     "webview": ("desktop", "pywebview"),
+    "fasta2a": ("a2a", "pydantic-ai-slim[a2a]"),
 }
 
 
@@ -128,6 +129,11 @@ def require_ingest(package: str) -> None:
     """Check that a heavy ingest dependency is importable, or raise with install hint."""
     pip_name = _INGEST_PACKAGES.get(package, package)
     require_extra(package, extra="ingest", pip_name=pip_name)
+
+
+def require_a2a() -> None:
+    """Check that fasta2a is importable, or raise with install hint."""
+    require_extra("fasta2a", extra="a2a", pip_name="pydantic-ai-slim[a2a]")
 
 
 def is_dashboard_available() -> bool:

@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from initrunner.cli._helpers import console
+from initrunner.cli.a2a_cmd import app as a2a_app
 from initrunner.cli.audit_cmd import app as audit_app
 from initrunner.cli.examples_cmd import app as examples_app
 from initrunner.cli.flow_cmd import app as flow_app
@@ -180,6 +181,7 @@ app.command(rich_help_panel="Run & Test")(configure)
 # --- Interfaces ---
 app.command(rich_help_panel="Interfaces")(dashboard)
 app.command(rich_help_panel="Interfaces")(desktop)
+app.add_typer(a2a_app, name="a2a", rich_help_panel="Interfaces")
 app.add_typer(flow_app, name="flow", rich_help_panel="Interfaces")
 app.add_typer(mcp_app, name="mcp", rich_help_panel="Interfaces")
 

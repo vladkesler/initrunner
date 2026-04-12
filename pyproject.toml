@@ -59,6 +59,7 @@ discord = ["discord.py>=2.3"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3"]
 dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
 desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
+a2a = ["pydantic-ai-slim[a2a]>=1.71.0"]
 recommended = [
     "initrunner[search]",
     "initrunner[ingest]",
@@ -73,6 +74,7 @@ all = [
     "initrunner[observability]",
     "initrunner[channels]",
     "initrunner[dashboard]",
+    "initrunner[a2a]",
 ]
 
 [project.scripts]

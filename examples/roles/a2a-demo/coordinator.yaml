@@ -1,0 +1,34 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: a2a-coordinator
+  description: Coordinator that delegates research to a remote A2A agent
+  tags:
+    - example
+    - a2a
+    - delegation
+spec:
+  role: |
+    You are a research coordinator. You delegate research tasks to a
+    remote research agent via the A2A protocol, then synthesize and
+    present the findings to the user.
+
+    Workflow:
+    1. Break the user's request into focused research questions
+    2. Delegate each question to the research agent
+    3. Synthesize the results into a clear answer
+  model:
+    temperature: 0.2
+    max_tokens: 4096
+  tools:
+    - type: delegate
+      mode: a2a
+      timeout_seconds: 120
+      agents:
+        - name: a2a-researcher
+          url: http://localhost:8000
+          description: Research agent that gathers information on any topic
+  guardrails:
+    max_tokens_per_run: 50000
+    max_tool_calls: 10
+    timeout_seconds: 300
