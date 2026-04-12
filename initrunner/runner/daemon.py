@@ -6,6 +6,7 @@ import json
 import logging
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -14,8 +15,9 @@ from pydantic_ai import Agent
 
 if TYPE_CHECKING:
     from initrunner.agent.clarify import ClarifyCallback
+    from initrunner.agent.executor_models import AutonomousResult
 
-from initrunner.agent.executor import RunResult, execute_run, execute_run_stream
+from initrunner.agent.executor import ErrorCategory, RunResult, execute_run, execute_run_stream
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner._conversations import ConversationStore
@@ -32,6 +34,13 @@ from initrunner.stores.base import MemoryStoreBase
 from initrunner.triggers.base import TriggerEvent
 
 _logger = logging.getLogger(__name__)
+
+# Error categories eligible for daemon-level run retry.
+# TIMEOUT is excluded: sync timeouts don't cancel the underlying model call,
+# so retrying creates duplicate in-flight provider requests.
+_DAEMON_RETRYABLE = frozenset(
+    {ErrorCategory.RATE_LIMIT, ErrorCategory.SERVER_ERROR, ErrorCategory.CONNECTION}
+)
 
 
 @dataclass
@@ -110,6 +119,15 @@ class DaemonRunner:
         self._pending_clarifications: dict[str, PendingClarification] = {}
         self._pending_lock = threading.Lock()
 
+        # Circuit breaker (per-daemon = per-provider)
+        cb_config = guardrails.circuit_breaker
+        if cb_config is not None:
+            from initrunner.runner.circuit_breaker import CircuitBreaker
+
+            self._circuit_breaker: CircuitBreaker | None = CircuitBreaker(cb_config)
+        else:
+            self._circuit_breaker = None
+
     def run(self) -> None:
         """Start the daemon: set up triggers, handle events, block until stopped."""
         from initrunner.triggers.dispatcher import TriggerDispatcher
@@ -186,6 +204,16 @@ class DaemonRunner:
                     pending.event.set()
                     return
 
+        # Circuit breaker check (before semaphore to avoid wasting slots)
+        if self._circuit_breaker is not None:
+            cb_allowed, cb_reason = self._circuit_breaker.allow_request()
+            if not cb_allowed:
+                console.print(
+                    f"\n[yellow]Circuit breaker -- skipping trigger "
+                    f"({event.trigger_type}): {cb_reason}[/yellow]"
+                )
+                return
+
         if not self._concurrency_semaphore.acquire(blocking=False):
             console.print(
                 f"\n[yellow]Max concurrent triggers ({self._MAX_CONCURRENT}) reached — "
@@ -199,7 +227,7 @@ class DaemonRunner:
             self._concurrency_semaphore.release()
 
     def _on_trigger_inner(self, event: TriggerEvent) -> None:
-        """Process a single trigger event."""
+        """Process a single trigger event with retry and circuit breaker."""
         from initrunner.agent.schema.autonomy import AutonomyConfig
 
         # Snapshot agent/role under lock so in-flight runs are unaffected by reload
@@ -251,42 +279,74 @@ class DaemonRunner:
         with self._in_flight_cond:
             self._in_flight_count += 1
         try:
-            if use_autonomous:
-                auto_result = run_autonomous(
-                    agent,
-                    role,
-                    event.prompt,
-                    audit_logger=self._audit_logger,
-                    sink_dispatcher=self._sink_dispatcher,
-                    memory_store=self._memory_store,
-                    extra_toolsets=extra_ts if extra_ts else None,
-                    trigger_type=event.trigger_type,
-                    trigger_metadata=event.metadata or {},
-                    message_history=prior_history,
-                )
-                self._tracker.record_usage(
-                    auto_result.total_tokens_in, auto_result.total_tokens_out
+            # -- Retry loop --------------------------------------------------
+            retry_policy = role.spec.guardrails.retry_policy
+            max_attempts = retry_policy.max_attempts
+
+            result: RunResult | AutonomousResult | None = None
+            new_messages: list = []
+
+            for attempt in range(max_attempts):
+                if attempt > 0:
+                    delay = min(
+                        retry_policy.backoff_base_seconds * (2 ** (attempt - 1)),
+                        retry_policy.backoff_max_seconds,
+                    )
+                    _logger.info(
+                        "Retry %d/%d for trigger %s in %.1fs",
+                        attempt + 1,
+                        max_attempts,
+                        event.trigger_type,
+                        delay,
+                    )
+                    console.print(
+                        f"[yellow]  Retry {attempt}/{max_attempts - 1} in {delay:.1f}s...[/yellow]"
+                    )
+                    time.sleep(delay)
+
+                result, new_messages = self._execute_single(
+                    agent, role, event, extra_ts, prior_history, use_autonomous
                 )
 
-                # Store updated conversation history
-                if conv_key and auto_result.final_messages:
+                # Record usage per attempt (failed attempts still burn tokens)
+                if use_autonomous:
+                    self._tracker.record_usage(result.total_tokens_in, result.total_tokens_out)  # type: ignore[union-attr]
+                else:
+                    self._tracker.record_usage(result.tokens_in, result.tokens_out)  # type: ignore[union-attr]
+
+                if result.success:
+                    break
+                if result.error_category not in _DAEMON_RETRYABLE:
+                    break
+
+            assert result is not None  # at least one iteration always runs
+
+            # -- Circuit breaker (one record per trigger fire) ----------------
+            if self._circuit_breaker is not None:
+                if result.success:
+                    transition = self._circuit_breaker.record_success()
+                elif result.error_category is not None:
+                    transition = self._circuit_breaker.record_failure(result.error_category)
+                else:
+                    transition = None
+                if transition is not None:
+                    self._audit_circuit_transition(transition, role)
+
+            # -- Post-processing with final result ----------------------------
+            if use_autonomous:
+                if conv_key and result.final_messages:  # type: ignore[union-attr]
                     from initrunner.agent.history import reduce_history
 
                     self._conversations.put(
                         conv_key,
-                        reduce_history(auto_result.final_messages, autonomy_config, role),
+                        reduce_history(result.final_messages, autonomy_config, role),  # type: ignore[union-attr]
                     )
 
-                # Reply to originating channel (messaging triggers)
                 if event.reply_fn is not None:
                     if conv_key is not None:
-                        # Conversational: send only the final output
-                        reply_text = auto_result.final_output
+                        reply_text = result.final_output  # type: ignore[union-attr]
                     else:
-                        # Non-conversational (scheduled, etc.): join all outputs
-                        reply_text = "\n\n".join(
-                            r.output for r in auto_result.iterations if r.output
-                        )
+                        reply_text = "\n\n".join(r.output for r in result.iterations if r.output)  # type: ignore[union-attr]
                     if reply_text:
                         try:
                             event.reply_fn(reply_text)
@@ -297,58 +357,9 @@ class DaemonRunner:
                                 exc_info=True,
                             )
             else:
-                from initrunner.agent.tool_events import (
-                    reset_tool_event_callback,
-                    set_tool_event_callback,
-                )
-                from initrunner.runner.display import _make_tool_event_printer
-
-                cb_token = set_tool_event_callback(_make_tool_event_printer())
-                use_stream = sys.stdout.isatty() and role.spec.output.type == "text"
-
-                try:
-                    if use_stream:
-                        out = console.file
-
-                        def on_token(chunk: str) -> None:
-                            out.write(chunk)
-                            out.flush()
-
-                        result, new_messages = execute_run_stream(
-                            agent,
-                            role,
-                            event.prompt,
-                            audit_logger=self._audit_logger,
-                            message_history=prior_history,
-                            trigger_type=event.trigger_type,
-                            trigger_metadata=event.metadata or {},
-                            extra_toolsets=extra_ts if extra_ts else None,
-                            principal_id=event.principal_id,
-                            on_token=on_token,
-                        )
-                        out.write("\n")
-                        out.flush()
-                    else:
-                        result, new_messages = execute_run(
-                            agent,
-                            role,
-                            event.prompt,
-                            audit_logger=self._audit_logger,
-                            message_history=prior_history,
-                            trigger_type=event.trigger_type,
-                            trigger_metadata=event.metadata or {},
-                            extra_toolsets=extra_ts if extra_ts else None,
-                            principal_id=event.principal_id,
-                        )
-                finally:
-                    reset_tool_event_callback(cb_token)
-
-                self._tracker.record_usage(result.tokens_in, result.tokens_out)
-
-                # Reply first, post-process after
-                if event.reply_fn is not None and result.output:
+                if event.reply_fn is not None and result.output:  # type: ignore[union-attr]
                     try:
-                        event.reply_fn(result.output)
+                        event.reply_fn(result.output)  # type: ignore[union-attr]
                     except Exception:
                         _logger.warning(
                             "Failed to deliver reply for trigger %s",
@@ -356,14 +367,14 @@ class DaemonRunner:
                             exc_info=True,
                         )
 
+                use_stream = sys.stdout.isatty() and role.spec.output.type == "text"
                 if use_stream and result.success:
-                    _display_stream_stats(result)
+                    _display_stream_stats(result)  # type: ignore[arg-type]
                 else:
-                    _display_result(result)
-                self._dispatch_sink(result, event)
-                self._capture_episode(result, event)
+                    _display_result(result)  # type: ignore[arg-type]
+                self._dispatch_sink(result, event)  # type: ignore[arg-type]
+                self._capture_episode(result, event)  # type: ignore[arg-type]
 
-                # Store updated conversation history
                 if conv_key and new_messages:
                     from initrunner.agent.history import reduce_history
 
@@ -379,6 +390,93 @@ class DaemonRunner:
             with self._in_flight_cond:
                 self._in_flight_count -= 1
                 self._in_flight_cond.notify_all()
+
+    def _execute_single(
+        self,
+        agent: Agent,
+        role: RoleDefinition,
+        event: TriggerEvent,
+        extra_ts: list,
+        prior_history: list | None,
+        use_autonomous: bool,
+    ) -> tuple[RunResult | AutonomousResult, list]:
+        """Execute a single run attempt (autonomous or standard)."""
+        if use_autonomous:
+            auto_result = run_autonomous(
+                agent,
+                role,
+                event.prompt,
+                audit_logger=self._audit_logger,
+                sink_dispatcher=self._sink_dispatcher,
+                memory_store=self._memory_store,
+                extra_toolsets=extra_ts if extra_ts else None,
+                trigger_type=event.trigger_type,
+                trigger_metadata=event.metadata or {},
+                message_history=prior_history,
+            )
+            return auto_result, auto_result.final_messages or []
+
+        from initrunner.agent.tool_events import (
+            reset_tool_event_callback,
+            set_tool_event_callback,
+        )
+        from initrunner.runner.display import _make_tool_event_printer
+
+        cb_token = set_tool_event_callback(_make_tool_event_printer())
+        use_stream = sys.stdout.isatty() and role.spec.output.type == "text"
+
+        try:
+            if use_stream:
+                out = console.file
+
+                def on_token(chunk: str) -> None:
+                    out.write(chunk)
+                    out.flush()
+
+                result, new_messages = execute_run_stream(
+                    agent,
+                    role,
+                    event.prompt,
+                    audit_logger=self._audit_logger,
+                    message_history=prior_history,
+                    trigger_type=event.trigger_type,
+                    trigger_metadata=event.metadata or {},
+                    extra_toolsets=extra_ts if extra_ts else None,
+                    principal_id=event.principal_id,
+                    on_token=on_token,
+                )
+                out.write("\n")
+                out.flush()
+            else:
+                result, new_messages = execute_run(
+                    agent,
+                    role,
+                    event.prompt,
+                    audit_logger=self._audit_logger,
+                    message_history=prior_history,
+                    trigger_type=event.trigger_type,
+                    trigger_metadata=event.metadata or {},
+                    extra_toolsets=extra_ts if extra_ts else None,
+                    principal_id=event.principal_id,
+                )
+        finally:
+            reset_tool_event_callback(cb_token)
+
+        return result, new_messages
+
+    def _audit_circuit_transition(
+        self,
+        transition: object,
+        role: RoleDefinition,
+    ) -> None:
+        """Log a circuit breaker state transition as a security event."""
+        if self._audit_logger is None:
+            return
+        self._audit_logger.log_security_event(
+            event_type=f"circuit_{transition.new_state.value}",  # type: ignore[union-attr]
+            agent_name=role.metadata.name,
+            details=f"Circuit breaker {transition.old_state.value} -> {transition.new_state.value}",  # type: ignore[union-attr]
+        )
 
     def _make_daemon_clarify_callback(
         self,
@@ -505,6 +603,17 @@ class DaemonRunner:
 
         # Rebuild scheduling if autonomy config changed
         self._setup_scheduling()
+
+        # Update circuit breaker if config changed
+        new_cb_config = new_role.spec.guardrails.circuit_breaker
+        old_cb_config = self._circuit_breaker._config if self._circuit_breaker is not None else None
+        if new_cb_config != old_cb_config:
+            if new_cb_config is not None:
+                from initrunner.runner.circuit_breaker import CircuitBreaker
+
+                self._circuit_breaker = CircuitBreaker(new_cb_config)
+            else:
+                self._circuit_breaker = None
 
         # Restart dispatcher if trigger config changed
         if old_triggers_key != new_triggers_key:

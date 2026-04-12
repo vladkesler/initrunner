@@ -41,6 +41,7 @@ from .executor_auth import (
 )
 from .executor_models import (  # noqa: F401
     AutonomousResult,
+    ErrorCategory,
     RunResult,
     TokenBudgetStatus,
     check_token_budget,
@@ -186,6 +187,7 @@ def _execute_orchestrated(
             except ContentBlockedError as e:
                 result.success = False
                 result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,
@@ -256,6 +258,7 @@ async def _execute_orchestrated_async(
             except ContentBlockedError as e:
                 result.success = False
                 result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
             except (
                 ModelHTTPError,
                 UsageLimitExceeded,

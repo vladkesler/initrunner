@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class ErrorCategory(StrEnum):
+    """Structured error classification for retry and circuit breaker decisions."""
+
+    TIMEOUT = "timeout"
+    RATE_LIMIT = "rate_limit"
+    SERVER_ERROR = "server_error"
+    AUTH = "auth"
+    CONNECTION = "connection"
+    USAGE_LIMIT = "usage_limit"
+    CONTENT_BLOCKED = "content_blocked"
+    UNKNOWN = "unknown"
 
 
 @dataclass
@@ -16,6 +30,7 @@ class RunResult:
     duration_ms: int = 0
     success: bool = True
     error: str | None = None
+    error_category: ErrorCategory | None = None
     tool_call_names: list[str] = field(default_factory=list)
 
 
@@ -34,6 +49,7 @@ class AutonomousResult:
     iteration_count: int = 0
     success: bool = True
     error: str | None = None
+    error_category: ErrorCategory | None = None
     final_messages: list | None = None
 
 
