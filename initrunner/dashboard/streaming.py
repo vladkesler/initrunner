@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time as _time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -190,6 +191,8 @@ async def stream_run_sse(
     # Emit initial usage event with budget + model info
     guardrails = role.spec.guardrails
     model_spec = role.spec.model
+    model_name = model_spec.name if model_spec else ""
+    provider_name = model_spec.provider if model_spec else ""
     usage_payload = json.dumps(
         {
             "type": "usage",
@@ -198,19 +201,51 @@ async def stream_run_sse(
                     "max_tokens": guardrails.max_tokens_per_run if guardrails else None,
                     "total_limit": guardrails.total_tokens_limit if guardrails else None,
                 },
-                "model": model_spec.name if model_spec else None,
-                "provider": model_spec.provider if model_spec else None,
+                "model": model_name or None,
+                "provider": provider_name or None,
             },
         }
     )
     yield f"data: {usage_payload}\n\n"
 
+    # Running cost estimation state
+    _char_count = 0
+    _last_cost_ts = 0.0
+    _COST_UPDATE_INTERVAL = 1.0
+
     def on_token(chunk: str) -> None:
+        nonlocal _char_count, _last_cost_ts
         formatted = f"data: {json.dumps({'type': 'token', 'data': chunk})}\n\n"
         try:
             loop.call_soon_threadsafe(token_queue.put_nowait, formatted)
         except RuntimeError:
             pass  # loop closed -- stream tearing down
+
+        # Throttled cost estimation
+        _char_count += len(chunk)
+        now = _time.monotonic()
+        if now - _last_cost_ts >= _COST_UPDATE_INTERVAL:
+            _last_cost_ts = now
+            est_out = _char_count // 4
+            cost_usd = None
+            if model_name and provider_name:
+                from initrunner.dashboard.pricing import estimate_cost
+
+                c = estimate_cost(0, est_out, model_name, provider_name)
+                cost_usd = c["total_cost_usd"] if c else None
+            evt = json.dumps(
+                {
+                    "type": "cost_update",
+                    "data": {
+                        "estimated_tokens_out": est_out,
+                        "estimated_output_cost_usd": cost_usd,
+                    },
+                }
+            )
+            try:
+                loop.call_soon_threadsafe(token_queue.put_nowait, f"data: {evt}\n\n")
+            except RuntimeError:
+                pass
 
     def run_stream():
         from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback

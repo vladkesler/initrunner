@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { RunRequest, RunResponse, SSEEvent, ToolEventData, UsageData } from './types';
+import type { CostUpdateData, RunRequest, RunResponse, SSEEvent, ToolEventData, UsageData } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -18,6 +18,7 @@ export function streamRun(
 		onError: (error: string) => void;
 		onToolEvent?: (event: ToolEventData) => void;
 		onUsage?: (usage: UsageData) => void;
+		onCostUpdate?: (data: CostUpdateData) => void;
 	}
 ): AbortController {
 	const controller = new AbortController();
@@ -58,6 +59,8 @@ export function streamRun(
 							callbacks.onToolEvent?.(event.data);
 						} else if (event.type === 'usage') {
 							callbacks.onUsage?.(event.data);
+						} else if (event.type === 'cost_update') {
+							callbacks.onCostUpdate?.(event.data);
 						} else if (event.type === 'result') {
 							gotTerminal = true;
 							callbacks.onResult(event.data);

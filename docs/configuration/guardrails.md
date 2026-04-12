@@ -18,6 +18,15 @@ spec:
     daemon_daily_token_budget: 100000  # daily budget for daemon mode
     daemon_daily_cost_budget: 5.00    # daily USD cost budget for daemon
     daemon_weekly_cost_budget: 25.00  # weekly USD cost budget for daemon
+
+    # Daemon resilience
+    retry_policy:
+      max_attempts: 3                # retry failed runs up to 3 times
+      backoff_base_seconds: 2.0      # exponential backoff base
+      backoff_max_seconds: 30.0      # backoff cap
+    circuit_breaker:
+      failure_threshold: 5           # open circuit after 5 failures
+      reset_timeout_seconds: 60      # try again after 60s
 ```
 
 ## Field reference
@@ -38,6 +47,37 @@ spec:
 | `max_iterations` | int | `10` | Maximum iterations in autonomous mode |
 | `autonomous_token_budget` | int | *null* | Cumulative token budget for autonomous run |
 | `autonomous_timeout_seconds` | int | *null* | Wall-clock timeout for autonomous run |
+| `retry_policy` | object | `{max_attempts: 1}` | Daemon-level retry policy (see below) |
+| `circuit_breaker` | object | *null* | Circuit breaker config (see below) |
+
+## Daemon resilience
+
+When a trigger fires and the agent run fails with a transient provider error (rate limit, 5xx, connection failure), the daemon can retry the entire run with exponential backoff. A circuit breaker tracks failures across trigger fires and stops dispatching when the provider is unhealthy.
+
+### Retry policy
+
+| Field | Type | Default | Range | Description |
+|-------|------|---------|-------|-------------|
+| `max_attempts` | int | `1` | 1-5 | Total attempts per trigger fire (1 = no retry) |
+| `backoff_base_seconds` | float | `2.0` | 0.5-30 | Base delay for exponential backoff |
+| `backoff_max_seconds` | float | `30.0` | 1-300 | Maximum backoff delay |
+
+Retries only fire for provider-transient errors: HTTP 429 (rate limit), HTTP 5xx (server error), and connection failures. Timeouts, auth errors, content blocks, and usage limits are not retried.
+
+**Side effects**: daemon retry re-executes the entire agent run, including tool calls. Enable retry only for idempotent roles or when failures occur before tool execution (provider-level errors).
+
+### Circuit breaker
+
+| Field | Type | Default | Range | Description |
+|-------|------|---------|-------|-------------|
+| `failure_threshold` | int | `5` | 1-100 | Failures before circuit opens |
+| `reset_timeout_seconds` | int | `60` | 10-3600 | Seconds before half-open probe |
+
+The circuit breaker tracks provider health across trigger fires (not retry attempts). Only provider errors trip the breaker: rate limits, server errors, connection failures, and auth errors (401/403). Application-level errors (content blocks, usage limits) are ignored.
+
+State machine: `CLOSED -> OPEN` after threshold failures, `OPEN -> HALF_OPEN` after reset timeout, `HALF_OPEN -> CLOSED` on probe success or `HALF_OPEN -> OPEN` on probe failure. State transitions are logged as security audit events (`circuit_open`, `circuit_half_open`, `circuit_closed`).
+
+Set `circuit_breaker: null` (default) to disable.
 
 ## Autonomous guardrails
 

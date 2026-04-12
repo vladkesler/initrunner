@@ -1,0 +1,65 @@
+"""Shared CLI helpers: error handling, role loading, and context management."""
+
+from initrunner.cli._helpers._console import console
+from initrunner.cli._helpers._context import (
+    _maybe_auto_ingest,
+    _no_memory_role,
+    check_ollama_running,
+    command_context,
+    create_audit_logger,
+    ephemeral_context,
+    handle_api_key,
+    load_and_build_or_exit,
+    prompt_inline_api_key,
+)
+from initrunner.cli._helpers._display import (
+    _NextContext,
+    display_sense_result,
+    ingest_status_color,
+    install_extra,
+    prompt_model_selection,
+    suggest_next,
+)
+from initrunner.cli._helpers._resolve import (
+    _apply_model_override,
+    detect_yaml_kind,
+    load_role_or_exit,
+    preflight_validate_or_exit,
+    prepare_starter,
+    resolve_memory_path,
+    resolve_model_override,
+    resolve_role_path,
+    resolve_role_paths,
+    resolve_run_target,
+    resolve_skill_dirs,
+)
+
+__all__ = [
+    "_NextContext",
+    "_apply_model_override",
+    "_maybe_auto_ingest",
+    "_no_memory_role",
+    "check_ollama_running",
+    "command_context",
+    "console",
+    "create_audit_logger",
+    "detect_yaml_kind",
+    "display_sense_result",
+    "ephemeral_context",
+    "handle_api_key",
+    "ingest_status_color",
+    "install_extra",
+    "load_and_build_or_exit",
+    "load_role_or_exit",
+    "preflight_validate_or_exit",
+    "prepare_starter",
+    "prompt_inline_api_key",
+    "prompt_model_selection",
+    "resolve_memory_path",
+    "resolve_model_override",
+    "resolve_role_path",
+    "resolve_role_paths",
+    "resolve_run_target",
+    "resolve_skill_dirs",
+    "suggest_next",
+]

@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import httpx
+
     from initrunner.agent.schema.base import Metadata
 
 logger = logging.getLogger(__name__)
@@ -127,6 +129,16 @@ def check_delegation_policy(
 # ---------------------------------------------------------------------------
 
 
+def _resolve_env_headers(headers_env: dict[str, str]) -> dict[str, str]:
+    """Resolve header values from environment variables."""
+    headers: dict[str, str] = {}
+    for header_name, env_var in headers_env.items():
+        value = os.environ.get(env_var, "")
+        if value:
+            headers[header_name] = value
+    return headers
+
+
 class AgentInvoker(Protocol):
     def invoke(self, prompt: str) -> str: ...
 
@@ -241,13 +253,7 @@ class McpInvoker:
         self._source_metadata = source_metadata
 
     def _resolve_headers(self) -> dict[str, str]:
-        """Resolve header values from environment variables."""
-        headers: dict[str, str] = {}
-        for header_name, env_var in self._headers_env.items():
-            value = os.environ.get(env_var, "")
-            if value:
-                headers[header_name] = value
-        return headers
+        return _resolve_env_headers(self._headers_env)
 
     def invoke(self, prompt: str) -> str:
         import httpx
@@ -305,3 +311,190 @@ class McpInvoker:
             )
         except Exception as e:
             return f"{_ERROR_PREFIX} Failed to reach agent '{self._agent_name}': {e}"
+
+
+class A2AInvoker:
+    """Invoke a remote agent via the A2A (Agent-to-Agent) protocol.
+
+    Uses JSON-RPC ``message/send`` and ``tasks/get`` methods as defined by
+    the A2A protocol v0.3.0 / FastA2A 0.6.0.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        agent_name: str,
+        timeout: int,
+        headers_env: dict[str, str] | None = None,
+        source_metadata: Metadata | None = None,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._agent_name = agent_name
+        self._timeout = timeout
+        self._headers_env = headers_env or {}
+        self._source_metadata = source_metadata
+
+    def _resolve_headers(self) -> dict[str, str]:
+        return _resolve_env_headers(self._headers_env)
+
+    def invoke(self, prompt: str) -> str:
+        import uuid
+
+        import httpx
+
+        # Policy check: name-only (no target metadata for remote agents)
+        if self._source_metadata is not None:
+            if not check_delegation_policy(self._source_metadata, self._agent_name):
+                logger.warning(
+                    "Delegation denied by policy: %s -> %s (A2A)",
+                    self._source_metadata.name,
+                    self._agent_name,
+                )
+                return (
+                    f"{_ERROR_PREFIX} Delegation denied by policy: "
+                    f"{self._source_metadata.name} -> {self._agent_name}"
+                )
+
+        headers = self._resolve_headers()
+        headers["Content-Type"] = "application/json"
+
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "user",
+                    "parts": [{"kind": "text", "text": prompt}],
+                    "kind": "message",
+                    "messageId": str(uuid.uuid4()),
+                }
+            },
+        }
+
+        try:
+            with httpx.Client(timeout=self._timeout) as client:
+                resp = client.post(self._base_url, json=payload, headers=headers)
+                resp.raise_for_status()
+                try:
+                    data = resp.json()
+                except ValueError:
+                    return (
+                        f"{_ERROR_PREFIX} Non-JSON response from A2A agent "
+                        f"'{self._agent_name}': {resp.text[:200]}"
+                    )
+
+                # JSON-RPC error
+                if "error" in data:
+                    err = data["error"]
+                    msg = err.get("message", "unknown error") if isinstance(err, dict) else err
+                    return (
+                        f"{_ERROR_PREFIX} A2A JSON-RPC error from agent '{self._agent_name}': {msg}"
+                    )
+
+                result = data.get("result", {})
+                state = result.get("status", {}).get("state", "")
+
+                if state == "completed":
+                    return self._extract_text(result)
+                elif state == "failed":
+                    return f"{_ERROR_PREFIX} A2A task failed for agent '{self._agent_name}'"
+                elif state in ("rejected", "canceled", "auth-required", "input-required"):
+                    return f"{_ERROR_PREFIX} A2A task {state} for agent '{self._agent_name}'"
+                elif state in ("submitted", "working"):
+                    task_id = result.get("id")
+                    if not task_id:
+                        return (
+                            f"{_ERROR_PREFIX} A2A task has no ID for polling "
+                            f"(agent '{self._agent_name}')"
+                        )
+                    return self._poll_until_complete(client, task_id, headers)
+                else:
+                    return (
+                        f"{_ERROR_PREFIX} Unexpected A2A state '{state}' "
+                        f"from agent '{self._agent_name}'"
+                    )
+        except httpx.TimeoutException:
+            return (
+                f"{_ERROR_PREFIX} Connection timed out to A2A agent "
+                f"'{self._agent_name}' at {self._base_url}"
+            )
+        except httpx.HTTPStatusError as e:
+            return (
+                f"{_ERROR_PREFIX} HTTP {e.response.status_code} from A2A agent "
+                f"'{self._agent_name}': {e.response.text[:200]}"
+            )
+        except Exception as e:
+            return f"{_ERROR_PREFIX} Failed to reach A2A agent '{self._agent_name}': {e}"
+
+    def _poll_until_complete(
+        self,
+        client: httpx.Client,
+        task_id: str,
+        headers: dict[str, str],
+    ) -> str:
+        """Poll ``tasks/get`` until the task reaches a terminal state."""
+        import time
+
+        deadline = time.monotonic() + self._timeout
+        delay = 0.5
+
+        while time.monotonic() < deadline:
+            time.sleep(delay)
+            payload = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tasks/get",
+                "params": {"id": task_id},
+            }
+            try:
+                resp = client.post(self._base_url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as e:
+                return f"{_ERROR_PREFIX} Error polling A2A task for agent '{self._agent_name}': {e}"
+
+            if "error" in data:
+                err = data["error"]
+                msg = err.get("message", "unknown error") if isinstance(err, dict) else err
+                return f"{_ERROR_PREFIX} A2A poll error from agent '{self._agent_name}': {msg}"
+
+            result = data.get("result", {})
+            state = result.get("status", {}).get("state", "")
+
+            if state == "completed":
+                return self._extract_text(result)
+            elif state == "failed":
+                return f"{_ERROR_PREFIX} A2A task failed for agent '{self._agent_name}'"
+            elif state in ("rejected", "canceled", "auth-required", "input-required"):
+                return f"{_ERROR_PREFIX} A2A task {state} for agent '{self._agent_name}'"
+
+            delay = min(delay * 1.5, 5.0)
+
+        return (
+            f"{_ERROR_PREFIX} A2A task timed out for agent '{self._agent_name}' (task_id={task_id})"
+        )
+
+    def _extract_text(self, task_result: dict) -> str:
+        """Extract text from A2A task artifacts, falling back to history."""
+        import json as _json
+
+        artifacts = task_result.get("artifacts", [])
+        texts: list[str] = []
+        for artifact in artifacts:
+            for part in artifact.get("parts", []):
+                if part.get("kind") == "text":
+                    texts.append(part["text"])
+                elif part.get("kind") == "data":
+                    texts.append(_json.dumps(part.get("data", {})))
+        if texts:
+            return "\n".join(texts)
+
+        # Fallback: last agent message in task history
+        for msg in reversed(task_result.get("history", [])):
+            if msg.get("role") == "agent":
+                for part in msg.get("parts", []):
+                    if part.get("kind") == "text":
+                        return part["text"]
+
+        return f"{_ERROR_PREFIX} No output from A2A agent '{self._agent_name}'"

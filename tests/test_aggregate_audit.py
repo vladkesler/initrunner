@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
 # ---------------------------------------------------------------------------
@@ -253,6 +255,10 @@ class TestTeamAggregateAudit:
 
 class TestDashboardAuditWiring:
     """Dashboard flow/team stream routes pass audit_logger."""
+
+    @pytest.fixture(autouse=True)
+    def _require_fastapi(self):
+        pytest.importorskip("fastapi", reason="dashboard extras not installed")
 
     def test_flow_stream_passes_audit_logger(self):
         with (

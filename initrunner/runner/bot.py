@@ -94,7 +94,17 @@ def run_bot(
         weekly_cost_budget=guardrails.daemon_weekly_cost_budget,
         model=role.spec.model.name if role.spec.model else "",
         provider=role.spec.model.provider if role.spec.model else "",
+        timezone=guardrails.budget_timezone,
     )
+
+    # Restore persisted budget state
+    if audit_logger is not None:
+        from initrunner.runner.budget import BudgetSnapshot
+
+        saved = audit_logger.load_budget_state(role.metadata.name)
+        if saved is not None:
+            tracker.restore(BudgetSnapshot.from_dict(saved))
+
     stop = threading.Event()
 
     # Clarification state
@@ -176,6 +186,10 @@ def run_bot(
                 reset_clarify_callback(clarify_token)
 
         tracker.record_usage(result.tokens_in, result.tokens_out)
+
+        # Persist budget state
+        if audit_logger is not None:
+            audit_logger.save_budget_state(role.metadata.name, tracker.snapshot().to_dict())
 
         # Reply to originating channel
         if event.reply_fn is not None and result.output:

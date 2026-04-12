@@ -3,8 +3,24 @@
 from __future__ import annotations
 
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class RetryPolicy(BaseModel):
+    """Daemon-level retry policy for failed runs."""
+
+    max_attempts: Annotated[int, Field(ge=1, le=5)] = 1
+    backoff_base_seconds: Annotated[float, Field(ge=0.5, le=30.0)] = 2.0
+    backoff_max_seconds: Annotated[float, Field(ge=1.0, le=300.0)] = 30.0
+
+
+class CircuitBreakerConfig(BaseModel):
+    """Per-daemon circuit breaker to stop wasting triggers against a broken provider."""
+
+    failure_threshold: Annotated[int, Field(ge=1, le=100)] = 5
+    reset_timeout_seconds: Annotated[int, Field(ge=10, le=3600)] = 60
 
 
 class Guardrails(BaseModel):
@@ -26,10 +42,26 @@ class Guardrails(BaseModel):
     daemon_daily_cost_budget: Annotated[float, Field(gt=0)] | None = None
     daemon_weekly_cost_budget: Annotated[float, Field(gt=0)] | None = None
 
+    # Timezone for daily/weekly budget resets (IANA, e.g. "America/New_York")
+    budget_timezone: str = "UTC"
+
     # Autonomous mode limits
     max_iterations: Annotated[int, Field(gt=0)] = 10
     autonomous_token_budget: Annotated[int, Field(gt=0)] | None = None
     autonomous_timeout_seconds: Annotated[int, Field(gt=0)] | None = None
+
+    # Daemon resilience
+    retry_policy: RetryPolicy = RetryPolicy()
+    circuit_breaker: CircuitBreakerConfig | None = None
+
+    @field_validator("budget_timezone")
+    @classmethod
+    def _validate_budget_timezone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (KeyError, ZoneInfoNotFoundError) as exc:
+            raise ValueError(f"Invalid IANA timezone: {v!r}") from exc
+        return v
 
     @model_validator(mode="after")
     def _derive_request_limit(self) -> Guardrails:

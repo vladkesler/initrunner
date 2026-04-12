@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { streamRun } from '$lib/api/runs';
-	import type { RunResponse, ThreadMessage, ToolEventData, UsageData } from '$lib/api/types';
+	import type { CostUpdateData, RunResponse, ThreadMessage, ToolEventData, UsageData } from '$lib/api/types';
 	import ConversationThread from './ConversationThread.svelte';
 	import ToolActivityPanel from './ToolActivityPanel.svelte';
 	import TokenMeter from './TokenMeter.svelte';
@@ -28,6 +28,7 @@
 	let toolEvents: ToolEventData[] = $state([]);
 	let usage: UsageData | null = $state(null);
 	let lastResult: RunResponse | null = $state(null);
+	let costUpdate: CostUpdateData | null = $state(null);
 
 	function handleRun() {
 		if (!prompt.trim() || running || blockedReason) return;
@@ -37,6 +38,7 @@
 		prompt = '';
 		toolEvents = [];
 		lastResult = null;
+		costUpdate = null;
 
 		messages = [
 			...messages,
@@ -64,6 +66,10 @@
 				onUsage(u) {
 					if (requestVersion !== currentVersion) return;
 					usage = u;
+				},
+				onCostUpdate(data) {
+					if (requestVersion !== currentVersion) return;
+					costUpdate = data;
 				},
 				onResult(r: RunResponse) {
 					if (requestVersion !== currentVersion) return;
@@ -116,6 +122,7 @@
 		toolEvents = [];
 		usage = null;
 		lastResult = null;
+		costUpdate = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -137,7 +144,7 @@
 		<div class="h-48 shrink-0">
 			<ToolActivityPanel events={toolEvents} />
 		</div>
-		<TokenMeter {usage} result={lastResult} {running} />
+		<TokenMeter {usage} result={lastResult} {running} {costUpdate} />
 	{/if}
 
 	<!-- Input area -->

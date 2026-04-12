@@ -336,6 +336,23 @@ spec:
 
 Hot-reload requires a `role_path` -- it is automatically enabled when running `initrunner run role.yaml --daemon`. Ephemeral roles (e.g. from `initrunner run`) do not support hot-reload.
 
+### Resilience (retry + circuit breaker)
+
+Failed trigger runs can be retried with exponential backoff, and a circuit breaker stops dispatching when the provider is down. Configure both in `spec.guardrails`:
+
+```yaml
+spec:
+  guardrails:
+    retry_policy:
+      max_attempts: 3
+      backoff_base_seconds: 2.0
+    circuit_breaker:
+      failure_threshold: 5
+      reset_timeout_seconds: 60
+```
+
+See [Guardrails](../configuration/guardrails.md#daemon-resilience) for the full field reference and behavior details.
+
 ### Signal Handling
 
 The daemon installs handlers for `SIGINT` (Ctrl+C) and `SIGTERM`:

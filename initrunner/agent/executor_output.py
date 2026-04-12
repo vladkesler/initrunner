@@ -14,7 +14,7 @@ from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
-from .executor_models import RunResult
+from .executor_models import ErrorCategory, RunResult
 
 _logger = logging.getLogger(__name__)
 
@@ -75,12 +75,29 @@ def _handle_run_error(
     result.success = False
     if isinstance(exc, ModelHTTPError):
         result.error = f"Model API error: {exc}"
+        if exc.status_code == 429:
+            result.error_category = ErrorCategory.RATE_LIMIT
+        elif exc.status_code in {401, 403}:
+            result.error_category = ErrorCategory.AUTH
+        elif exc.status_code in {500, 502, 503, 504}:
+            result.error_category = ErrorCategory.SERVER_ERROR
+        else:
+            result.error_category = ErrorCategory.UNKNOWN
     elif isinstance(exc, UsageLimitExceeded):
         result.error = f"Usage limit exceeded: {exc}"
-    elif isinstance(exc, TimeoutError) and not str(exc) and timeout_seconds is not None:
-        result.error = f"TimeoutError: Run timed out after {int(timeout_seconds)}s"
+        result.error_category = ErrorCategory.USAGE_LIMIT
+    elif isinstance(exc, TimeoutError):
+        result.error_category = ErrorCategory.TIMEOUT
+        if not str(exc) and timeout_seconds is not None:
+            result.error = f"TimeoutError: Run timed out after {int(timeout_seconds)}s"
+        else:
+            result.error = f"TimeoutError: {exc}"
+    elif isinstance(exc, (ConnectionError, OSError)):
+        result.error = f"{type(exc).__name__}: {exc}"
+        result.error_category = ErrorCategory.CONNECTION
     else:
         result.error = f"{type(exc).__name__}: {exc}"
+        result.error_category = ErrorCategory.UNKNOWN
     if partial_output:
         result.output = partial_output
 

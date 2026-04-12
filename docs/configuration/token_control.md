@@ -37,11 +37,14 @@ spec:
 | `timeout_seconds` | `int > 0` | `300` | Wall-clock timeout for a single run (5 minutes). |
 | `session_token_budget` | `int > 0 \| null` | `null` | Cumulative total token budget for a REPL session. |
 | `daemon_token_budget` | `int > 0 \| null` | `null` | Lifetime total token budget for a daemon process. |
-| `daemon_daily_token_budget` | `int > 0 \| null` | `null` | Daily total token budget for a daemon process (resets at UTC midnight). |
-| `daemon_daily_cost_budget` | `float > 0 \| null` | `null` | Daily USD cost budget for daemon (resets at UTC midnight). |
-| `daemon_weekly_cost_budget` | `float > 0 \| null` | `null` | Weekly USD cost budget for daemon (resets on ISO week boundary). |
+| `daemon_daily_token_budget` | `int > 0 \| null` | `null` | Daily total token budget for a daemon process (resets at midnight in `budget_timezone`). |
+| `daemon_daily_cost_budget` | `float > 0 \| null` | `null` | Daily USD cost budget for daemon (resets at midnight in `budget_timezone`). |
+| `daemon_weekly_cost_budget` | `float > 0 \| null` | `null` | Weekly USD cost budget for daemon (resets on ISO year-week boundary). |
+| `budget_timezone` | `string` | `"UTC"` | IANA timezone for daily/weekly budget resets (e.g. `America/New_York`). |
 
 When a field is `null` (or omitted), no limit is enforced for that dimension.
+
+Budget counters are persisted to the audit database after each run, so they survive daemon/bot restarts. The `--budget-timezone` CLI flag overrides the YAML value.
 
 ## Per-Run Limits
 

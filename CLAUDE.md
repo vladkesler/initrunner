@@ -113,6 +113,7 @@ Detailed docs live in `docs/`. Key references:
 | Dashboard (web UI) | `docs/interfaces/dashboard.md` |
 | Dashboard design system | `docs/interfaces/design-system.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
+| A2A server (agent-to-agent) | `docs/interfaces/a2a.md` |
 | Testing guide | `docs/operations/testing.md` |
 | Docker sandbox | `docs/security/docker-sandbox.md` |
 | Agent policy (initguard) | `docs/security/agent-policy.md` |

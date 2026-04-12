@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026.4.11] - 2026-04-12
+
+### Added
+- **A2A server** -- expose any agent as an A2A (agent-to-agent protocol) server via `initrunner a2a serve role.yaml`. `InitRunnerWorker` routes through the executor so audit logging, retries, budget enforcement, and output processing all work. Multi-turn context is preserved across requests via task storage. Outbound delegation uses the new `A2AInvoker` (JSON-RPC `message/send` with polling, timeout, env-based header resolution, and policy checks). Delegate tools gain `mode: "a2a"` alongside the existing `inline` and `mcp` modes. New `[a2a]` install extra (`fasta2a`, `uvicorn`, `starlette`)
+- **Daemon retry policy** -- triggers can retry failed runs with exponential backoff. Configure via `spec.guardrails.retry_policy: { max_attempts: 3, backoff_seconds: 5 }`. Per-attempt usage is recorded; one audit record per trigger fire. Structured error classification (`ErrorCategory` enum) drives retry-vs-fail decisions
+- **Circuit breaker** -- daemon triggers trip a circuit breaker when the provider is unhealthy. Configure via `spec.guardrails.circuit_breaker: { failure_threshold: 5, reset_timeout_seconds: 300 }`. Thread-safe state machine (closed/open/half-open) with audit events on state transitions
+- **Persistent budget counters** -- daemon daily and weekly token/cost counters now survive restarts. On startup, the daemon queries the audit log for spend since the last reset boundary and restores the counters. `BudgetSnapshot` dataclass carries the serialized state
+- **Real-time cost visibility** -- daemon run output now shows USD cost alongside token counts. Dashboard agent detail page includes a `BudgetProgressBar` component. SSE `usage` events carry cost for flows and teams
+- **Timezone-aware budget resets** -- `budget_timezone` guardrail (default `"UTC"`) controls when daily/weekly cost counters reset. Uses `ZoneInfo` for correct DST handling
+
+### Changed
+- **README redesigned** -- opening paragraph and structure rewritten to lead with the execution story (chat -> autonomous -> daemon -> autopilot) instead of "YAML-first AI agent platform." New sections: "One file, four modes," "Agents that learn" (consolidation story), "Security is config, not plumbing" (structured around *why* each layer exists), "Cost control" (USD budgets). Removed "Why InitRunner" section and feature-count marketing copy. zh-CN and ja translations updated to match
+- **`cli/run_cmd.py` split into `cli/run_cmd/` package** -- `_command.py` (main run command), `_dispatch.py` (mode dispatch), `_sensing.py` (intent sensing), `_starters.py` (starter catalog), `_validate.py` (pre-flight validation). No public API changes
+- **`cli/_helpers.py` split into `cli/_helpers/` package** -- `_context.py`, `_display.py`, `_resolve.py`, `_console.py`. No public API changes
+- **`dashboard/schemas.py` split into `dashboard/schemas/` package** -- per-domain modules (`agents.py`, `audit.py`, `builder.py`, `cost.py`, `flow.py`, `ingest.py`, `mcp.py`, `memory.py`, `skills.py`, `system.py`, `team.py`). Re-exports preserved in `__init__.py`
+
+### Fixed
+- **`test_flow_stream_passes_audit_logger` failed without dashboard extras** -- added `pytest.importorskip("fastapi")` guard to `TestDashboardAuditWiring`
+- **`test_reply_fn_called_with_output` failed after timezone support** -- all `DaemonRunner` test mocks now set `budget_timezone = "UTC"` on guardrails
+- **`tests/test_run_dispatch.py` lint failure** -- reformatted line exceeding 100-char limit
+
 ## [2026.4.10] - 2026-04-07
 
 ### Behavior changes

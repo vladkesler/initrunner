@@ -343,7 +343,7 @@ class TestSdkInstall:
         recorded_console = Console(file=buf, no_color=True)
 
         with (
-            patch("initrunner.cli._helpers.console", recorded_console),
+            patch("initrunner.cli._helpers._display.console", recorded_console),
             patch("shutil.which", return_value=None),
             patch(
                 "subprocess.run",

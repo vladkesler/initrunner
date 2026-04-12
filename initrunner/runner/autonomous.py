@@ -10,6 +10,7 @@ from pydantic_ai.models import Model
 
 from initrunner.agent.executor import (
     AutonomousResult,
+    ErrorCategory,
     RunResult,
     check_token_budget,
     execute_run,
@@ -43,6 +44,16 @@ def _build_autonomous_result(
 ) -> AutonomousResult:
     """Build the final AutonomousResult from accumulated iteration data."""
     final_output = iterations[-1].output if iterations else ""
+
+    # Derive error_category from the autonomous exit reason.
+    error_category: ErrorCategory | None = None
+    if final_status == "error" and iterations:
+        error_category = iterations[-1].error_category
+    elif final_status == "timeout":
+        error_category = ErrorCategory.TIMEOUT
+    elif final_status == "budget_exceeded":
+        error_category = ErrorCategory.USAGE_LIMIT
+
     return AutonomousResult(
         run_id=autonomous_run_id,
         iterations=iterations,
@@ -57,6 +68,7 @@ def _build_autonomous_result(
         iteration_count=len(iterations),
         success=final_status in ("completed", "max_iterations"),
         error=error_msg,
+        error_category=error_category,
     )
 
 

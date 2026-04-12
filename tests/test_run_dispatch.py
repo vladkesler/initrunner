@@ -106,7 +106,7 @@ class TestKindFlagValidation:
 
 class TestFlowDispatch:
     def test_flow_yaml_dispatches(self, flow_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_flow") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_flow") as mock_dispatch:
             result = runner.invoke(app, ["run", str(flow_yaml)])
 
         assert result.exit_code == 0
@@ -137,7 +137,7 @@ class TestPipelineKindRejected:
 
 class TestDaemonFlag:
     def test_daemon_flag_dispatches(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_daemon") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_daemon") as mock_dispatch:
             result = runner.invoke(app, ["run", str(agent_yaml), "--daemon"])
 
         assert result.exit_code == 0
@@ -148,7 +148,7 @@ class TestDaemonFlag:
 
 class TestAutopilotFlag:
     def test_autopilot_dispatches_to_daemon(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_daemon") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_daemon") as mock_dispatch:
             result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot"])
 
         assert result.exit_code == 0
@@ -172,7 +172,7 @@ class TestAutopilotFlag:
 
     def test_autopilot_with_daemon_is_redundant_safe(self, agent_yaml):
         """--autopilot --daemon should not error (redundant but valid)."""
-        with patch("initrunner.cli.run_cmd._dispatch_daemon") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_daemon") as mock_dispatch:
             result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--daemon"])
 
         assert result.exit_code == 0
@@ -187,7 +187,7 @@ class TestAutopilotFlag:
 
 class TestServeFlag:
     def test_serve_flag_dispatches(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_serve") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_serve") as mock_dispatch:
             result = runner.invoke(app, ["run", str(agent_yaml), "--serve"])
 
         assert result.exit_code == 0
@@ -196,7 +196,7 @@ class TestServeFlag:
 
 class TestBotFlag:
     def test_bot_flag_dispatches(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._dispatch_bot") as mock_dispatch:
+        with patch("initrunner.cli.run_cmd._command._dispatch_bot") as mock_dispatch:
             result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "telegram"])
 
         assert result.exit_code == 0
@@ -224,7 +224,10 @@ class TestTriggerHint:
             yield mock_role, MagicMock(), None, None, None
 
         with (
-            patch("initrunner.cli.run_cmd.resolve_run_target", return_value=(agent_yaml, "Agent")),
+            patch(
+                "initrunner.cli.run_cmd._command.resolve_run_target",
+                return_value=(agent_yaml, "Agent"),
+            ),
             patch("initrunner.cli._run_agent.command_context", _ctx),
             patch("initrunner.runner.run_interactive"),
         ):
@@ -279,7 +282,7 @@ class TestInlineApiKeyPrompt:
         mock_run = MagicMock(return_value=(MagicMock(), None))
         with (
             patch(
-                "initrunner.cli._helpers.prompt_inline_api_key",
+                "initrunner.cli._helpers._context.prompt_inline_api_key",
                 side_effect=stub_prompt,
             ) as prompt_spy,
             patch("initrunner.runner.run_single", mock_run),

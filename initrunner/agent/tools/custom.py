@@ -191,7 +191,7 @@ def build_delegate_toolset(
     ctx: ToolBuildContext,
 ) -> FunctionToolset:
     """Build delegate tools: one tool per agent ref (delegate_to_{name})."""
-    from initrunner.agent.delegation import InlineInvoker, McpInvoker
+    from initrunner.agent.delegation import A2AInvoker, InlineInvoker, McpInvoker
 
     role_dir = ctx.role_dir
     toolset = FunctionToolset()
@@ -209,12 +209,20 @@ def build_delegate_toolset(
                 if not sp.is_absolute() and role_dir is not None:
                     sp = (role_dir / sp).resolve()
                 sm_path = str(sp)
-            invoker: InlineInvoker | McpInvoker = InlineInvoker(
+            invoker: InlineInvoker | McpInvoker | A2AInvoker = InlineInvoker(
                 role_path.resolve(),
                 max_depth=config.max_depth,
                 timeout=config.timeout_seconds,
                 shared_memory_path=sm_path,
                 shared_max_memories=sm.max_memories if sm else 1000,
+                source_metadata=ctx.role.metadata,
+            )
+        elif config.mode == "a2a":
+            invoker = A2AInvoker(
+                base_url=agent_ref.url,  # type: ignore[arg-type]
+                agent_name=agent_ref.name,
+                timeout=config.timeout_seconds,
+                headers_env=agent_ref.headers_env,
                 source_metadata=ctx.role.metadata,
             )
         else:
@@ -230,7 +238,7 @@ def build_delegate_toolset(
         _invoker = invoker
         _desc = agent_ref.description or f"Delegate task to the {agent_ref.name} agent"
 
-        def _make_tool(inv: InlineInvoker | McpInvoker, desc: str, name: str) -> None:
+        def _make_tool(inv: InlineInvoker | McpInvoker | A2AInvoker, desc: str, name: str) -> None:
             def delegate_fn(prompt: str) -> str:
                 return inv.invoke(prompt)
 

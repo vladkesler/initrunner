@@ -81,7 +81,7 @@ class TestDaemonTokenTrackerCostBudget:
         assert tracker.daily_cost_consumed == 0.011
 
         # Simulate date change (use UTC to match tracker internals)
-        tracker.last_reset_date = datetime.now(UTC).date() - timedelta(days=1)
+        tracker.last_reset_date = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
 
         # check_before_run should reset daily counters
         allowed, _reason = tracker.check_before_run()

@@ -114,7 +114,7 @@ class DelegateSharedMemory(BaseModel):
 class DelegateToolConfig(ToolConfigBase):
     type: Literal["delegate"] = "delegate"
     agents: list[DelegateAgentRef]
-    mode: Literal["inline", "mcp"] = "inline"
+    mode: Literal["inline", "mcp", "a2a"] = "inline"
     max_depth: int = 3
     timeout_seconds: int = 120
     shared_memory: DelegateSharedMemory | None = None
@@ -124,8 +124,8 @@ class DelegateToolConfig(ToolConfigBase):
         for agent in self.agents:
             if self.mode == "inline" and not agent.role_file:
                 raise ValueError(f"Inline mode requires 'role_file' on agent '{agent.name}'")
-            if self.mode == "mcp" and not agent.url:
-                raise ValueError(f"MCP mode requires 'url' on agent '{agent.name}'")
+            if self.mode in ("mcp", "a2a") and not agent.url:
+                raise ValueError(f"{self.mode.upper()} mode requires 'url' on agent '{agent.name}'")
         return self
 
     def summary(self) -> str:
