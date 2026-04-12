@@ -1,12 +1,17 @@
 """Tests for A2A (Agent-to-Agent protocol): compat, invoker, schema, server, CLI."""
 
+from __future__ import annotations
+
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fasta2a.schema import TaskSendParams, TextPart  # type: ignore[import-not-found]
 
-from initrunner.agent.delegation import A2AInvoker, reset_context
+fasta2a = pytest.importorskip("fasta2a", reason="a2a extras not installed")
+
+from fasta2a.schema import TaskSendParams, TextPart  # type: ignore[import-not-found]  # noqa: E402
+
+from initrunner.agent.delegation import A2AInvoker, reset_context  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
