@@ -17,12 +17,14 @@ class TestEphemeralFlagValidation:
     def test_daemon_rejected(self):
         result = runner.invoke(app, ["run", "--daemon"])
         assert result.exit_code == 1
-        assert "--daemon" in result.output
+        assert "daemon" in result.output
+        assert "not supported without a role file" in result.output
 
     def test_serve_rejected(self):
         result = runner.invoke(app, ["run", "--serve"])
         assert result.exit_code == 1
-        assert "--serve" in result.output
+        assert "serve" in result.output
+        assert "not supported without a role file" in result.output
 
     def test_autonomous_rejected(self):
         result = runner.invoke(app, ["run", "-a", "-p", "hello"])
@@ -131,6 +133,57 @@ class TestListFlags:
         result = runner.invoke(app, ["run", "--list-tools"])
         assert result.exit_code == 0
         assert "Available extra tools" in result.output
+
+
+class TestExplainProfiles:
+    """--explain-profiles should show profile breakdown."""
+
+    def test_explain_profiles_shows_all_profiles(self):
+        result = runner.invoke(app, ["run", "--explain-profiles"])
+        assert result.exit_code == 0
+        assert "none" in result.output
+        assert "minimal" in result.output
+        assert "all" in result.output
+        assert "datetime" in result.output
+        assert "web_reader" in result.output
+
+    def test_explain_profiles_exits_cleanly_with_other_flags(self):
+        """--explain-profiles should exit before validation runs."""
+        result = runner.invoke(app, ["run", "--explain-profiles", "--daemon"])
+        assert result.exit_code == 0
+        assert "Tool profiles" in result.output
+
+
+class TestEphemeralSenseOnlyFlags:
+    """--confirm-role and --role-dir should error without --sense in ephemeral mode."""
+
+    def test_confirm_role_without_sense_rejected(self):
+        result = runner.invoke(app, ["run", "--confirm-role", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--confirm-role" in result.output
+        assert "--sense" in result.output
+
+    def test_role_dir_without_sense_rejected(self):
+        result = runner.invoke(app, ["run", "--role-dir", "/tmp", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--role-dir" in result.output
+        assert "--sense" in result.output
+
+
+class TestEphemeralModeSpecificFlags:
+    """Serve-only and bot-only flags should error in ephemeral mode without their parent."""
+
+    def test_api_key_without_serve_rejected(self):
+        result = runner.invoke(app, ["run", "--api-key", "secret"])
+        assert result.exit_code == 1
+        assert "--api-key" in result.output
+        assert "--serve" in result.output
+
+    def test_allowed_users_without_bot_rejected(self):
+        result = runner.invoke(app, ["run", "--allowed-users", "alice"])
+        assert result.exit_code == 1
+        assert "--allowed-users" in result.output
+        assert "--bot" in result.output
 
 
 class TestChatRemoved:

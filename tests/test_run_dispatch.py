@@ -56,22 +56,26 @@ class TestMutualExclusivity:
     def test_daemon_and_serve_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--daemon", "--serve"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--daemon" in result.output and "--serve" in result.output
 
     def test_daemon_and_autonomous_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--daemon", "-a", "-p", "hi"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--daemon" in result.output and "--autonomous" in result.output
 
     def test_serve_and_bot_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--serve", "--bot", "telegram"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--serve" in result.output and "--bot" in result.output
 
     def test_bot_and_autonomous_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "telegram", "-a", "-p", "hi"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--bot" in result.output and "--autonomous" in result.output
 
 
 class TestBotValidation:
@@ -158,17 +162,20 @@ class TestAutopilotFlag:
     def test_autopilot_and_serve_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--serve"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--autopilot" in result.output and "--serve" in result.output
 
     def test_autopilot_and_bot_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--bot", "telegram"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--autopilot" in result.output and "--bot" in result.output
 
     def test_autopilot_and_autonomous_exclusive(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "-a", "-p", "hi"])
         assert result.exit_code == 1
-        assert "exclusive" in result.output
+        assert "Cannot combine" in result.output
+        assert "--autopilot" in result.output and "--autonomous" in result.output
 
     def test_autopilot_with_daemon_is_redundant_safe(self, agent_yaml):
         """--autopilot --daemon should not error (redundant but valid)."""
@@ -182,7 +189,8 @@ class TestAutopilotFlag:
     def test_autopilot_rejected_in_ephemeral_mode(self):
         result = runner.invoke(app, ["run", "--autopilot"])
         assert result.exit_code == 1
-        assert "--autopilot" in result.output
+        assert "daemon" in result.output
+        assert "not supported without a role file" in result.output
 
 
 class TestServeFlag:
@@ -309,6 +317,56 @@ class TestInlineApiKeyPrompt:
         env_file = tmp_path / "home" / ".env"
         assert env_file.is_file()
         assert "sk-test-inline" in env_file.read_text()
+
+
+class TestModeSpecificFlagValidation:
+    """Serve-only and bot-only flags should error outside their modes."""
+
+    def test_api_key_without_serve_rejected(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--api-key", "secret", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--api-key" in result.output
+        assert "--serve" in result.output
+
+    def test_cors_origin_without_serve_rejected(self, agent_yaml):
+        result = runner.invoke(
+            app, ["run", str(agent_yaml), "--cors-origin", "http://localhost", "-p", "hi"]
+        )
+        assert result.exit_code == 1
+        assert "--cors-origin" in result.output
+        assert "--serve" in result.output
+
+    def test_allowed_users_without_bot_rejected(self, agent_yaml):
+        result = runner.invoke(
+            app, ["run", str(agent_yaml), "--allowed-users", "alice", "-p", "hi"]
+        )
+        assert result.exit_code == 1
+        assert "--allowed-users" in result.output
+        assert "--bot" in result.output
+
+    def test_allowed_user_ids_without_bot_rejected(self, agent_yaml):
+        result = runner.invoke(
+            app, ["run", str(agent_yaml), "--allowed-user-ids", "123", "-p", "hi"]
+        )
+        assert result.exit_code == 1
+        assert "--allowed-user-ids" in result.output
+        assert "--bot" in result.output
+
+
+class TestSenseOnlyFlagValidation:
+    """--confirm-role and --role-dir should error without --sense."""
+
+    def test_confirm_role_without_sense_rejected(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--confirm-role", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--confirm-role" in result.output
+        assert "--sense" in result.output
+
+    def test_role_dir_without_sense_rejected(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--role-dir", "/tmp", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--role-dir" in result.output
+        assert "--sense" in result.output
 
 
 class TestOldCommandsRemoved:

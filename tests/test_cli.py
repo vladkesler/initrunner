@@ -132,7 +132,8 @@ class TestRun:
         """Ephemeral mode should reject --daemon."""
         result = runner.invoke(app, ["run", "--daemon"])
         assert result.exit_code == 1
-        assert "--daemon" in result.output
+        assert "daemon" in result.output
+        assert "not supported without a role file" in result.output
 
     def test_role_and_sense_mutually_exclusive(self, tmp_path):
         """Providing both a role file and --sense should error."""

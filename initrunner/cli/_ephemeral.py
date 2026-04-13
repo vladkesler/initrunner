@@ -100,6 +100,19 @@ def print_list_tools() -> None:
     console.print("[dim]Usage: initrunner run --tools slack --tools git[/dim]")
 
 
+def print_explain_profiles() -> None:
+    """Print each tool profile with its included tools."""
+    console.print("[bold]Tool profiles for --tool-profile:[/bold]\n")
+    for name, tools in TOOL_PROFILES.items():
+        if not tools:
+            console.print(f"  [cyan]{name}[/cyan]: (no tools)")
+        else:
+            tool_names = ", ".join(t["type"] for t in tools)
+            console.print(f"  [cyan]{name}[/cyan]: {tool_names}")
+    console.print()
+    console.print("[dim]Usage: initrunner run --tool-profile all[/dim]")
+
+
 # ---------------------------------------------------------------------------
 # Bot helpers
 # ---------------------------------------------------------------------------
