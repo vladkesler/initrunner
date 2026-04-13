@@ -21,7 +21,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.8.0",
+    "typescript": "^6.0.2",
     "vite": "^8.0.5"
   },
   "type": "module",
