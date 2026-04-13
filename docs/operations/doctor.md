@@ -117,6 +117,29 @@ Example output with deprecation errors:
 └────────┴──────────┴───────────────────────────────────────────┴────────────┘
 ```
 
+## Security Posture Check
+
+When `--role` is provided and the role parses successfully, doctor checks the security posture:
+
+- **External triggers without security config**: Agents with webhook, telegram, or discord triggers but no `security.preset` (or custom security policy) trigger a warning. Internal triggers (cron, file_watch, heartbeat) do not.
+- **Development preset with external triggers**: Warns that rate limits and content filtering are relaxed.
+- **initguard status**: Notes whether `INITRUNNER_POLICY_DIR` is configured for agent-level policy enforcement.
+
+```
+Role is valid and up to date.
+  Warning: Security policy is at defaults. Consider adding security: {preset: public}
+  for agents with external triggers.
+```
+
+Fix: add a security preset to your role YAML:
+
+```yaml
+security:
+  preset: public
+```
+
+See [Security Presets](../security/security.md#security-presets) for preset details and override syntax.
+
 ## Quickstart Smoke Test
 
 With `--quickstart`, the doctor runs a real agent prompt after the config scan:

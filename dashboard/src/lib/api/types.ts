@@ -48,6 +48,7 @@ export interface AgentDetail {
 		max_results: number;
 		threshold: number;
 	} | null;
+	security: string | null;
 	provider_warning: string | null;
 }
 

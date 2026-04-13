@@ -12,6 +12,7 @@ from initrunner.agent.schema.memory import MemoryConfig
 from initrunner.agent.schema.observability import ObservabilityConfig
 from initrunner.agent.schema.reasoning import ReasoningConfig
 from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+from initrunner.agent.schema.security import SecurityPolicy
 from initrunner.services.roles import canonicalize_role_yaml
 
 
@@ -75,6 +76,31 @@ class TestCanonicalizePresenceSignificant:
         role = _make_role(memory=MemoryConfig(max_sessions=5))
         parsed = yaml.safe_load(canonicalize_role_yaml(role))
         assert parsed["spec"]["memory"]["max_sessions"] == 5
+
+
+class TestCanonicalizeSecurityPreset:
+    """Security preset round-trips through canonicalization in compact form."""
+
+    def test_preset_compact(self) -> None:
+        role = _make_role(security=SecurityPolicy(preset="public"))
+        parsed = yaml.safe_load(canonicalize_role_yaml(role))
+        sec = parsed["spec"]["security"]
+        assert sec["preset"] == "public"
+        assert "rate_limit" not in sec
+        assert "content" not in sec
+        assert "server" not in sec
+
+    def test_preset_with_override(self) -> None:
+        role = _make_role(
+            security=SecurityPolicy.model_validate(
+                {"preset": "public", "rate_limit": {"requests_per_minute": 100}}
+            )
+        )
+        parsed = yaml.safe_load(canonicalize_role_yaml(role))
+        sec = parsed["spec"]["security"]
+        assert sec["preset"] == "public"
+        assert sec["rate_limit"] == {"requests_per_minute": 100}
+        assert "content" not in sec
 
 
 # ---------------------------------------------------------------------------

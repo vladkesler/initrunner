@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AgentDetail } from '$lib/api/types';
 	import ConfigSection from './ConfigSection.svelte';
+	import SecurityBadge from './SecurityBadge.svelte';
 	import { Copy, Check, ExternalLink } from 'lucide-svelte';
 
 	let { detail, yaml = '' }: { detail: AgentDetail; yaml?: string } = $props();
@@ -65,6 +66,14 @@
 			<span><span class="text-fg-faint">max</span> <span class="text-fg-muted">{(model.max_tokens ?? 4096).toLocaleString()}</span></span>
 		</div>
 	</div>
+
+	<!-- Security -->
+	{#if detail.security}
+		<div class="flex items-center gap-2 pb-3">
+			<span class="section-label">Security</span>
+			<SecurityBadge level={detail.security} />
+		</div>
+	{/if}
 
 	<!-- Tools -->
 	{#if detail.tools.length > 0}

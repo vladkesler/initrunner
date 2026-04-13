@@ -126,6 +126,7 @@ def _make_detail_role(path: str, name: str, provider: str = "openai", model: str
     dr.role.spec.skills = []
     dr.role.spec.features = []
     dr.role.spec.tool_search = MagicMock(enabled=False)
+    dr.role.spec.security.effective_label = "default"
     return dr
 
 

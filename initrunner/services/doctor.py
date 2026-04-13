@@ -25,6 +25,17 @@ class ProviderDiagnosis:
 
 
 @dataclass
+class SecurityDiagnosis:
+    """Security posture summary for a role."""
+
+    preset: str | None
+    effective_label: str
+    has_external_triggers: bool
+    policy_dir_set: bool
+    warning: str | None
+
+
+@dataclass
 class RoleExtrasGap:
     """A tool, trigger, or feature that needs an uninstalled pip extra."""
 
@@ -260,6 +271,51 @@ def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
         return None
 
     return provider, env_var
+
+
+# ---------------------------------------------------------------------------
+# Security diagnosis
+# ---------------------------------------------------------------------------
+
+_EXTERNAL_INPUT_TRIGGERS = frozenset({"webhook", "telegram", "discord"})
+
+
+def diagnose_security(role: object) -> SecurityDiagnosis:
+    """Diagnose the security posture of a validated role.
+
+    Accepts a ``RoleDefinition`` (imported lazily to avoid circular imports).
+    """
+    spec = role.spec  # type: ignore[attr-defined]
+    security = spec.security
+    preset = security.preset
+    label = security.effective_label
+
+    has_external = any(
+        t.type in _EXTERNAL_INPUT_TRIGGERS
+        for t in spec.triggers  # type: ignore[attr-defined]
+    )
+
+    policy_dir_set = bool(os.environ.get("INITRUNNER_POLICY_DIR", "").strip())
+
+    warning: str | None = None
+    if label == "default" and has_external:
+        warning = (
+            "Security policy is at defaults. "
+            "Consider adding security: {preset: public} for agents with external triggers."
+        )
+    elif label == "development" and has_external:
+        warning = (
+            "Development preset relaxes rate limits and content filtering. "
+            "Review if this agent handles untrusted input."
+        )
+
+    return SecurityDiagnosis(
+        preset=preset,
+        effective_label=label,
+        has_external_triggers=has_external,
+        policy_dir_set=policy_dir_set,
+        warning=warning,
+    )
 
 
 # ---------------------------------------------------------------------------

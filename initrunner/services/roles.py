@@ -140,6 +140,14 @@ def canonicalize_role_yaml(role: RoleDefinition) -> str:
 
     data = _prune(data)
 
+    # Security: use compact_dump() to preserve preset one-liner.
+    # Without this, exclude_defaults emits both preset and all expanded
+    # sub-fields, defeating the one-line config promise.
+    if role.spec.security.preset:
+        data.setdefault("spec", {})["security"] = role.spec.security.compact_dump(
+            mode="json", exclude_none=True
+        )
+
     # Restore optional spec sections whose presence is semantically
     # significant.  Fields that default to None but were explicitly set on
     # the role may collapse to {} after exclude_defaults + _prune; re-inject

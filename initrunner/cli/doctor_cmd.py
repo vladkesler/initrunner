@@ -377,6 +377,16 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
         else:
             console.print("[green]Role is valid and up to date.[/green]")
 
+    # ----- Security posture check -----
+    if inspection.role is not None:
+        from initrunner.services.doctor import diagnose_security
+
+        sec_diag = diagnose_security(inspection.role)
+        if sec_diag.warning:
+            console.print(f"  [yellow]Warning:[/yellow] {sec_diag.warning}")
+        if sec_diag.policy_dir_set:
+            console.print("  [dim]Agent policy (initguard): configured[/dim]")
+
     # ----- Fix: role extras + spec_version -----
     if fix:
         fixed.extend(_fix_role(path, raw, yes))

@@ -887,3 +887,98 @@ class TestDoctorFixNonTTY:
 
         assert result.exit_code == 1
         assert "--yes" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Security diagnosis
+# ---------------------------------------------------------------------------
+
+
+def _make_role_with_triggers(trigger_types: list[str], preset: str | None = None):
+    """Build a minimal RoleDefinition with specified trigger types and optional security preset."""
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+    from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+    from initrunner.agent.schema.security import SecurityPolicy
+
+    triggers_raw: list[dict] = []
+    for t in trigger_types:
+        if t == "webhook":
+            triggers_raw.append({"type": "webhook", "path": "/hook"})
+        elif t == "cron":
+            triggers_raw.append({"type": "cron", "schedule": "0 * * * *", "prompt": "check"})
+        elif t == "telegram":
+            triggers_raw.append({"type": "telegram"})
+        elif t == "discord":
+            triggers_raw.append({"type": "discord"})
+
+    security = (
+        SecurityPolicy(preset=preset) if preset else SecurityPolicy()  # type: ignore[arg-type]
+    )
+
+    return RoleDefinition(
+        apiVersion=ApiVersion.V1,
+        kind=Kind.AGENT,
+        metadata=RoleMetadata(name="test-sec", spec_version=2),
+        spec=AgentSpec(
+            role="Test",
+            model=ModelConfig(provider="openai", name="gpt-4o"),
+            triggers=triggers_raw,
+            security=security,
+        ),
+    )
+
+
+class TestDiagnoseSecurity:
+    def test_warns_default_with_webhook(self) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        role = _make_role_with_triggers(["webhook"])
+        diag = diagnose_security(role)
+        assert diag.warning is not None
+        assert "defaults" in diag.warning
+
+    def test_no_warn_with_cron_only(self) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        role = _make_role_with_triggers(["cron"])
+        diag = diagnose_security(role)
+        assert diag.warning is None
+
+    def test_no_warn_with_preset(self) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        role = _make_role_with_triggers(["webhook"], preset="public")
+        diag = diagnose_security(role)
+        assert diag.warning is None
+
+    def test_warns_development_with_telegram(self) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        role = _make_role_with_triggers(["telegram"], preset="development")
+        diag = diagnose_security(role)
+        assert diag.warning is not None
+        assert "relaxes" in diag.warning
+
+    def test_policy_dir_detection(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        monkeypatch.setenv("INITRUNNER_POLICY_DIR", "  /some/path  ")
+        role = _make_role_with_triggers([])
+        diag = diagnose_security(role)
+        assert diag.policy_dir_set is True
+
+    def test_policy_dir_empty(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        monkeypatch.delenv("INITRUNNER_POLICY_DIR", raising=False)
+        role = _make_role_with_triggers([])
+        diag = diagnose_security(role)
+        assert diag.policy_dir_set is False
+
+    def test_policy_dir_whitespace_only(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_security
+
+        monkeypatch.setenv("INITRUNNER_POLICY_DIR", "   ")
+        role = _make_role_with_triggers([])
+        diag = diagnose_security(role)
+        assert diag.policy_dir_set is False

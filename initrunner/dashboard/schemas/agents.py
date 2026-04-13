@@ -59,6 +59,8 @@ class AgentDetail(BaseModel):
     skill_refs: list[SkillRef] = []
     features: list[str] = []
     tool_search: dict | None = None  # ToolSearchConfig serialised (when enabled)
+    # security posture
+    security: str | None = None
     # runtime readiness
     provider_warning: str | None = None
 
