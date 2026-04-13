@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.56.1",
+    "@sveltejs/kit": "^2.57.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@tailwindcss/vite": "^4.1.0",
     "@types/js-yaml": "^4.0.9",
@@ -17,7 +17,7 @@
     "clsx": "^2.1.1",
     "js-yaml": "^4.1.1",
     "lucide-svelte": "^1.0.1",
-    "svelte": "^5.55.1",
+    "svelte": "^5.55.3",
     "tailwind-merge": "^3.5.0",
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.1.0",
