@@ -36,27 +36,59 @@ The `main` branch is protected with rulesets requiring pull requests, passing st
 
 ## Quick Start
 
-Add a `security:` block to your `role.yaml`:
+Use a preset for common deployment scenarios:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-spec:
-  role: You are a helpful assistant.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  security:
-    content:
-      blocked_input_patterns:
-        - "ignore previous instructions"
-      pii_redaction: true
-    rate_limit:
-      requests_per_minute: 30
-      burst_size: 5
+security:
+  preset: public    # public | internal | sandbox | development
 ```
+
+Or configure individual fields:
+
+```yaml
+security:
+  content:
+    blocked_input_patterns:
+      - "ignore previous instructions"
+    pii_redaction: true
+  rate_limit:
+    requests_per_minute: 30
+    burst_size: 5
+```
+
+## Security Presets
+
+Presets expand to a full `SecurityPolicy` with sensible defaults for common deployment patterns. Override any field alongside a preset -- your values take precedence.
+
+| Preset | Rate Limit | Content | Server | Docker | Use Case |
+|--------|-----------|---------|--------|--------|----------|
+| `public` | 30 rpm, burst 5 | PII redaction, SQL/prompt/shell injection patterns blocked, 10k prompt limit, output action `block` | HTTPS required | -- | Agents exposed to untrusted input (webhooks, bots, public APIs) |
+| `internal` | 120 rpm, burst 20 | Defaults | -- | -- | Internal tools with authenticated users |
+| `sandbox` | Inherits `public` | Inherits `public` | Inherits `public` | Enabled (network=none, read-only rootfs, 256m memory) | Public agents that run untrusted code |
+| `development` | 9999 rpm | No content filtering, 500k prompt limit | -- | Disabled | Local development and testing |
+
+### Preset with overrides
+
+```yaml
+security:
+  preset: public
+  rate_limit:
+    requests_per_minute: 100   # override just this field
+```
+
+The preset provides the base configuration. Your overrides replace individual fields within each sub-section. Lists replace (not append) -- setting `blocked_input_patterns: []` clears the preset's patterns.
+
+### Doctor integration
+
+`initrunner doctor --role <file>` warns when an agent with external triggers (webhook, telegram, discord) has no security preset configured:
+
+```
+Role is valid and up to date.
+  Warning: Security policy is at defaults. Consider adding security: {preset: public}
+  for agents with external triggers.
+```
+
+Internal triggers (cron, file_watch, heartbeat) do not trigger this warning.
 
 ## SecurityPolicy Reference
 

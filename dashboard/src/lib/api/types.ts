@@ -48,6 +48,7 @@ export interface AgentDetail {
 		max_results: number;
 		threshold: number;
 	} | null;
+	security: string | null;
 	provider_warning: string | null;
 }
 
@@ -816,4 +817,14 @@ export interface ModelCost {
 	tokens_in: number;
 	tokens_out: number;
 	total_cost_usd: number | null;
+}
+
+export interface ToolCost {
+	tool_name: string;
+	usage_count: number;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
+	avg_cost_per_use: number | null;
 }

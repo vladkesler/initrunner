@@ -24,9 +24,11 @@ from initrunner.cli.run_cmd._dispatch import (
 from initrunner.cli.run_cmd._sensing import _resolve_via_sensing
 from initrunner.cli.run_cmd._starters import _handle_save, _show_starter_listing
 from initrunner.cli.run_cmd._validate import (
+    RunMode,
+    _resolve_run_mode,
     _validate_ephemeral_flags,
-    _validate_flags,
     _validate_role_only_flags,
+    _validate_universal_flags,
 )
 
 
@@ -159,7 +161,10 @@ def run(
         str | None,
         typer.Option(
             "--tool-profile",
-            help="Tool profile: minimal, all, none",
+            help=(
+                "Tool profile: none, minimal (datetime, web_reader),"
+                " all (+ search, python, filesystem, git, shell, slack)"
+            ),
             rich_help_panel="Ephemeral Mode",
         ),
     ] = None,
@@ -176,6 +181,14 @@ def run(
         typer.Option(
             "--list-tools",
             help="List available extra tool types and exit",
+            rich_help_panel="Ephemeral Mode",
+        ),
+    ] = False,
+    explain_profiles: Annotated[
+        bool,
+        typer.Option(
+            "--explain-profiles",
+            help="Show tools in each tool profile and exit",
             rich_help_panel="Ephemeral Mode",
         ),
     ] = False,
@@ -217,13 +230,45 @@ def run(
         print_list_tools()
         raise typer.Exit(0)
 
+    # --- --explain-profiles: show tool profile breakdown ---
+    if explain_profiles:
+        from initrunner.cli._ephemeral import print_explain_profiles
+
+        print_explain_profiles()
+        raise typer.Exit(0)
+
+    # --- Universal validation (before ephemeral / role branching) ---
+    mode = _resolve_run_mode(
+        daemon_mode=daemon_mode,
+        autopilot=autopilot,
+        serve_mode=serve_mode,
+        bot=bot,
+        autonomous=autonomous,
+    )
+    output_format = _validate_universal_flags(
+        mode=mode,
+        bot=bot,
+        output_format=output_format,
+        no_stream=no_stream,
+        interactive=interactive,
+        autonomous=autonomous,
+        sense=sense,
+        confirm_role=confirm_role,
+        role_dir=role_dir,
+        role_file=role_file,
+        prompt=prompt,
+        api_key=api_key,
+        cors_origin=cors_origin,
+        allowed_users=allowed_users,
+        allowed_user_ids=allowed_user_ids,
+        budget_timezone=budget_timezone,
+    )
+
     # --- No role file + no --sense: ephemeral mode ---
     if role_file is None and not sense:
         _validate_ephemeral_flags(
-            daemon_mode=daemon_mode,
-            serve_mode=serve_mode,
+            mode=mode,
             autonomous=autonomous,
-            autopilot=autopilot,
             dry_run=dry_run,
             save=save,
             skill_dir=skill_dir,
@@ -261,21 +306,6 @@ def run(
         provider=provider,
         ingest=ingest,
         list_tools=list_tools,
-    )
-
-    # --- Validate flags ---
-    output_format = _validate_flags(
-        daemon_mode=daemon_mode,
-        serve_mode=serve_mode,
-        autonomous=autonomous,
-        autopilot=autopilot,
-        bot=bot,
-        output_format=output_format,
-        no_stream=no_stream,
-        interactive=interactive,
-        sense=sense,
-        role_file=role_file,
-        prompt=prompt,
     )
 
     # --- Intent sensing ---
@@ -329,30 +359,14 @@ def run(
             invalid.append("--report")
         if sense:
             invalid.append("--sense")
-        if daemon_mode:
-            invalid.append("--daemon")
-        if autopilot:
-            invalid.append("--autopilot")
-        if serve_mode:
-            invalid.append("--serve")
-        if bot:
-            invalid.append("--bot")
+        if mode != RunMode.STANDARD:
+            invalid.append(f"--{mode.value}" if mode != RunMode.DAEMON else "--daemon/--autopilot")
         if invalid:
             console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported for Flow targets.")
             raise typer.Exit(1)
 
-    if kind not in ("Agent",) and (daemon_mode or autopilot or serve_mode or bot):
-        console.print(
-            "[red]Error:[/red] --daemon, --autopilot, --serve,"
-            " and --bot are only supported for Agent targets."
-        )
-        raise typer.Exit(1)
-
-    if budget_timezone and not (daemon_mode or autopilot or bot):
-        console.print(
-            "[red]Error:[/red] --budget-timezone is only valid"
-            " with --daemon, --autopilot, or --bot."
-        )
+    if kind not in ("Agent",) and mode != RunMode.STANDARD:
+        console.print(f"[red]Error:[/red] {mode.value} mode is only supported for Agent targets.")
         raise typer.Exit(1)
 
     # --- Pre-flight YAML validation: catch syntax/schema errors before any
@@ -371,7 +385,7 @@ def run(
         return
 
     # --- Agent mode: flag-based dispatch ---
-    if serve_mode:
+    if mode == RunMode.SERVE:
         _dispatch_serve(
             role_file,
             host,
@@ -385,7 +399,8 @@ def run(
         )
         return
 
-    if bot:
+    if mode == RunMode.BOT:
+        assert bot is not None  # guaranteed by RunMode validation
         _dispatch_bot(
             role_file,
             bot,
@@ -399,7 +414,7 @@ def run(
         )
         return
 
-    if daemon_mode or autopilot:
+    if mode == RunMode.DAEMON:
         _dispatch_daemon(
             role_file,
             audit_db,

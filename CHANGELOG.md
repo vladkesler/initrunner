@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026.4.12] - 2026-04-14
+
+### Added
+- **Security presets** -- four built-in profiles (`public`, `internal`, `sandbox`, `development`) configure content filtering, rate limits, tool restrictions, and sandbox settings in one line (`security: { preset: public }`). `--explain-profiles` flag dumps the effective tool/trigger/sandbox config for any preset
+- **Extended doctor diagnostics** -- `initrunner doctor --role` now checks MCP server health, skill resolution, custom tool imports, memory store accessibility, and trigger validity. Static checks run by default; `--deep` enables active checks (MCP connectivity, full imports, DB open). New `--flow` flag validates flow topology and runs per-agent diagnostics on all referenced roles. Dashboard exposes per-agent diagnostics via `GET /api/agents/{id}/doctor`
+- **Actionable error hints** -- CLI errors now include fix suggestions (e.g. "Run `initrunner setup` to configure a provider" instead of a raw traceback). Deprecation auto-fix offers to patch stale fields in-place
+- **Per-tool cost attribution** -- audit trail and dashboard track USD cost per tool call, not just per run. New `ToolCostTable` dashboard component shows cost breakdown by tool type
+
+### Fixed
+- **Run flag interactions validated** -- `RunMode` enum resolves mode conflicts explicitly. `--confirm-role`/`--role-dir` without `--sense`, `--api-key` without `--serve`, and `--allowed-users` without `--bot` now produce clear error messages naming the conflicting flags
+
+### Dependencies
+- pillow 12.1.1 -> 12.2.0 (security: GZIP decompression bomb)
+- pytest 9.0.2 -> 9.0.3 (security: tmpdir vulnerability)
+- softprops/action-gh-release 2 -> 3
+- pnpm/action-setup 5 -> 6
+- svelte group update
+
 ## [2026.4.11] - 2026-04-12
 
 ### Added

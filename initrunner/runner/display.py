@@ -44,6 +44,10 @@ def _display_budget_warning(status: TokenBudgetStatus, consumed: int, budget: in
             f"[yellow]Session token budget exhausted ({consumed:,}/{budget:,}). "
             f"Stopping further execution.[/yellow]"
         )
+        console.print(
+            "[dim]Hint:[/dim] Increase [bold]guardrails.session_token_budget[/bold]"
+            " in your role YAML, or start a new session."
+        )
     elif status.warning:
         pct = int(consumed / budget * 100)
         console.print(

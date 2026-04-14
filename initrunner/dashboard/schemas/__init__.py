@@ -54,6 +54,7 @@ from initrunner.dashboard.schemas.cost import (
     CostSummaryResponse,
     DailyCostResponse,
     ModelCostResponse,
+    ToolCostResponse,
 )
 from initrunner.dashboard.schemas.flow import (
     AgentStepResponse,
@@ -116,6 +117,7 @@ from initrunner.dashboard.schemas.skills import (
     SkillToolSummary,
 )
 from initrunner.dashboard.schemas.system import (
+    AgentDoctorResponse,
     DefaultModelResponse,
     DoctorCheck,
     DoctorResponse,
@@ -154,6 +156,7 @@ __all__ = [
     "AgentCostResponse",
     # agents
     "AgentDetail",
+    "AgentDoctorResponse",
     # _common
     "AgentSlotModel",
     "AgentSlotOption",
@@ -277,6 +280,7 @@ __all__ = [
     "TimelineEntryResponse",
     "TimelineResponse",
     "TimelineStatsResponse",
+    "ToolCostResponse",
     "ToolTypeResponse",
     "TopAgentResponse",
     "TriggerStatResponse",

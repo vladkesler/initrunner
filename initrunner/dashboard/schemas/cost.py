@@ -9,6 +9,7 @@ __all__ = [
     "CostSummaryResponse",
     "DailyCostResponse",
     "ModelCostResponse",
+    "ToolCostResponse",
 ]
 
 
@@ -43,3 +44,13 @@ class ModelCostResponse(BaseModel):
     tokens_in: int
     tokens_out: int
     total_cost_usd: float | None
+
+
+class ToolCostResponse(BaseModel):
+    tool_name: str
+    usage_count: int
+    run_count: int
+    tokens_in: int
+    tokens_out: int
+    total_cost_usd: float | None
+    avg_cost_per_use: float | None

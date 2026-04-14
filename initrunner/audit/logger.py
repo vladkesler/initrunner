@@ -56,6 +56,7 @@ class AuditRecord:
     trigger_type: str | None = None
     trigger_metadata: str | None = None
     principal_id: str | None = None
+    tool_names: str | None = None  # JSON-encoded list of tool names
 
     @classmethod
     def from_run(
@@ -88,6 +89,7 @@ class AuditRecord:
             trigger_type=trigger_type,
             trigger_metadata=json.dumps(trigger_metadata) if trigger_metadata else None,
             principal_id=principal_id,
+            tool_names=json.dumps(result.tool_call_names) if result.tool_call_names else None,
         )
 
 
@@ -125,8 +127,8 @@ INSERT INTO audit_log (
     run_id, agent_name, timestamp, user_prompt, model, provider,
     output, tokens_in, tokens_out, total_tokens, tool_calls,
     duration_ms, success, error, trigger_type, trigger_metadata,
-    principal_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    principal_id, tool_names
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 _CREATE_SECURITY_EVENTS_TABLE = """\
@@ -251,6 +253,14 @@ def _migrate_add_compose_name_column(conn: sqlite3.Connection) -> None:
     """Idempotent migration: add compose_name to delegate_events."""
     try:
         conn.execute("ALTER TABLE delegate_events ADD COLUMN compose_name TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
+def _migrate_add_tool_names_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add tool_names JSON column to audit_log."""
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN tool_names TEXT")
     except sqlite3.OperationalError:
         pass  # Column already exists
 
@@ -381,6 +391,7 @@ class AuditLogger:
             _migrate_add_trigger_columns(self._conn)
             _migrate_add_principal_column(self._conn)
             _migrate_add_compose_name_column(self._conn)
+            _migrate_add_tool_names_column(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -443,6 +454,7 @@ class AuditLogger:
                 record.trigger_type,
                 record.trigger_metadata,
                 record.principal_id,
+                record.tool_names,
             ),
             error_label="audit record",
         )
@@ -937,6 +949,48 @@ class AuditLogger:
             FROM audit_log {where}
             GROUP BY model, provider
             ORDER BY SUM(tokens_in + tokens_out) DESC
+        """
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
+    def cost_by_tool(
+        self,
+        *,
+        agent_name: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+    ) -> list[dict]:
+        """Aggregate token usage grouped by individual tool name.
+
+        Uses a CTE to avoid overcounting: if a tool appears N times in one
+        run, ``usage_count`` reflects N but token totals are counted once
+        per (run, tool) pair.
+        """
+        where, params = self._cost_filters(agent_name, since, until)
+        extra = "a.tool_names IS NOT NULL"
+        if where:
+            where += f" AND {extra}"
+        else:
+            where = f"WHERE {extra}"
+
+        sql = f"""\
+            WITH tool_runs AS (
+                SELECT DISTINCT a.run_id, je.value AS tool_name,
+                       a.tokens_in, a.tokens_out, a.model, a.provider,
+                       COUNT(*) OVER (PARTITION BY a.run_id, je.value) AS call_count
+                FROM audit_log a, json_each(a.tool_names) je
+                {where}
+            )
+            SELECT tool_name,
+                   COALESCE(SUM(call_count), 0) AS usage_count,
+                   COUNT(*)                      AS run_count,
+                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
+                   model, provider
+            FROM tool_runs
+            GROUP BY tool_name, model, provider
+            ORDER BY usage_count DESC
         """
         with self._lock:
             rows = self._conn.execute(sql, params).fetchall()

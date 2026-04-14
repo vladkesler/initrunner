@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from initrunner.cli._helpers import console
+from initrunner.cli._options import SkillDirOption
 
 
 def doctor(
@@ -20,6 +21,14 @@ def doctor(
     role_file: Annotated[
         Path | None, typer.Option("--role", help="Agent directory or role YAML file to test")
     ] = None,
+    flow_file: Annotated[
+        Path | None, typer.Option("--flow", help="Flow YAML file to validate")
+    ] = None,
+    deep: Annotated[
+        bool,
+        typer.Option("--deep", help="Run active checks (MCP connectivity, tool imports, DB open)"),
+    ] = False,
+    skill_dir: SkillDirOption = None,
     fix: Annotated[
         bool, typer.Option("--fix", help="Interactively repair detected issues")
     ] = False,
@@ -31,6 +40,23 @@ def doctor(
     from initrunner._compat import require_provider
     from initrunner.agent.loader import _load_dotenv
     from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
+
+    # ----- Flag interaction validation -----
+    if flow_file is not None and role_file is not None:
+        console.print("[red]Error:[/red] --flow and --role are mutually exclusive.")
+        raise typer.Exit(1)
+    if flow_file is not None and quickstart:
+        console.print("[red]Error:[/red] --flow and --quickstart are mutually exclusive.")
+        raise typer.Exit(1)
+    if flow_file is not None and fix:
+        console.print("[red]Error:[/red] --flow and --fix are mutually exclusive.")
+        raise typer.Exit(1)
+    if deep and role_file is None and flow_file is None:
+        console.print("[red]Error:[/red] --deep requires --role or --flow.")
+        raise typer.Exit(1)
+    if skill_dir is not None and role_file is None and flow_file is None:
+        console.print("[red]Error:[/red] --skill-dir requires --role or --flow.")
+        raise typer.Exit(1)
 
     if fix and not yes and not sys.stdin.isatty():
         console.print("[red]Error:[/red] --fix requires --yes in non-interactive mode.")
@@ -122,8 +148,15 @@ def doctor(
     # ----- Role Validation (when --role provided) -----
     has_role_errors = False
     if role_file is not None:
-        has_role_errors, role_fixed = _check_and_fix_role_health(role_file, fix=fix, yes=yes)
+        has_role_errors, role_fixed = _check_and_fix_role_health(
+            role_file, fix=fix, yes=yes, deep=deep, skill_dir=skill_dir
+        )
         fixed.extend(role_fixed)
+
+    # ----- Flow Validation (when --flow provided) -----
+    has_flow_errors = False
+    if flow_file is not None:
+        has_flow_errors = _check_flow_health(flow_file, deep=deep, skill_dir=skill_dir)
 
     # ----- Fix summary -----
     if fixed:
@@ -135,6 +168,9 @@ def doctor(
                 border_style="green",
             )
         )
+
+    if has_flow_errors:
+        raise typer.Exit(1)
 
     if not quickstart or has_role_errors:
         if has_role_errors:
@@ -290,7 +326,14 @@ def _fix_providers(role_file: Path | None, yes: bool) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[bool, list[str]]:
+def _check_and_fix_role_health(
+    path: Path,
+    *,
+    fix: bool,
+    yes: bool,
+    deep: bool = False,
+    skill_dir: Path | None = None,
+) -> tuple[bool, list[str]]:
     """Validate a role file, optionally fix issues.
 
     Returns ``(has_errors, list_of_fix_descriptions)``.
@@ -344,13 +387,17 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
 
         for hit in inspection.hits:
             severity_style = "red" if hit.severity == "error" else "yellow"
+            if hit.auto_fixed:
+                status_label = "[cyan]auto-fixable[/cyan]"
+            else:
+                status_label = "[red]manual fix[/red]"
             hit_table.add_row(
                 hit.id,
                 f"[{severity_style}]{hit.severity}[/{severity_style}]",
                 hit.message,
-                "[green]auto-fixed[/green]" if hit.auto_fixed else "[red]manual fix[/red]",
+                status_label,
             )
-            if hit.severity == "error":
+            if hit.severity == "error" and not hit.auto_fixed:
                 has_errors = True
 
         console.print(hit_table)
@@ -377,17 +424,57 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
         else:
             console.print("[green]Role is valid and up to date.[/green]")
 
+    # ----- Security posture check -----
+    if inspection.role is not None:
+        from initrunner.services.doctor import diagnose_security
+
+        sec_diag = diagnose_security(inspection.role)
+        if sec_diag.warning:
+            console.print(f"  [yellow]Warning:[/yellow] {sec_diag.warning}")
+        if sec_diag.policy_dir_set:
+            console.print("  [dim]Agent policy (initguard): configured[/dim]")
+
+    # ----- Extended diagnostics -----
+    if inspection.role is not None:
+        from initrunner.cli._helpers import resolve_skill_dirs
+        from initrunner.services.doctor import diagnose_role_deep
+
+        extra_dirs = resolve_skill_dirs(skill_dir)
+        diag = diagnose_role_deep(
+            inspection.role, path.parent, deep=deep, extra_skill_dirs=extra_dirs
+        )
+        _render_role_diagnostics(diag)
+
     # ----- Fix: role extras + spec_version -----
     if fix:
-        fixed.extend(_fix_role(path, raw, yes))
+        role_fixed = _fix_role(path, raw, yes)
+        fixed.extend(role_fixed)
+        # Re-inspect after fixes to update has_errors status
+        if role_fixed and has_errors:
+            try:
+                re_raw = load_raw_yaml(path, ValueError)
+                re_inspection = inspect_role_data(re_raw)
+                remaining_errors = [
+                    h for h in re_inspection.hits if h.severity == "error" and not h.auto_fixed
+                ]
+                if not remaining_errors and not re_inspection.schema_error:
+                    has_errors = False
+            except Exception:
+                pass  # keep original has_errors
 
     return has_errors, fixed
 
 
 def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
-    """Apply role-level fixes: missing extras and spec_version bump."""
+    """Apply role-level fixes: missing extras, deprecation patches, and spec_version bump."""
+    import yaml
+
     from initrunner.cli._helpers import install_extra
-    from initrunner.services.doctor import build_role_fix_plan, bump_spec_version_text
+    from initrunner.services.doctor import (
+        build_role_fix_plan,
+        bump_spec_version_text,
+        patch_deprecation_text,
+    )
 
     plan = build_role_fix_plan(raw)
     fixed: list[str] = []
@@ -399,6 +486,29 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
         ):
             if install_extra(gap.extras_name):
                 fixed.append(f"Installed initrunner[{gap.extras_name}]")
+
+    # --- Fixable deprecations (surgical text edit, preserves formatting) ---
+    applied_deprecation_fixes = False
+    for hit in plan.fixable_deprecations:
+        label = f"Fix {hit.id} ({hit.field_path}: {hit.original_value} -> "
+        if hit.id == "DEP001":
+            label += "memory.semantic.max_memories)"
+        else:
+            label += "lancedb)"
+        if yes or typer.confirm(f"{label}?", default=True):
+            try:
+                text = path.read_text(encoding="utf-8")
+                text = patch_deprecation_text(text, hit)
+                path.write_text(text, encoding="utf-8")
+                fixed.append(f"Fixed {hit.id}: {hit.field_path}")
+                applied_deprecation_fixes = True
+            except ValueError as exc:
+                console.print(f"[yellow]Warning:[/yellow] {exc}")
+
+    # After deprecation fixes, re-evaluate for spec_version bump
+    if applied_deprecation_fixes:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        plan = build_role_fix_plan(raw)
 
     # --- Spec version bump (surgical text edit, preserves formatting) ---
     if plan.can_bump_spec_version:
@@ -412,3 +522,178 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
                 console.print(f"[yellow]Warning:[/yellow] {exc}")
 
     return fixed
+
+
+# ---------------------------------------------------------------------------
+# Extended diagnostics rendering
+# ---------------------------------------------------------------------------
+
+
+def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
+    """Render a RoleDiagnostics as a Rich table."""
+    from initrunner.services.doctor import RoleDiagnostics
+
+    assert isinstance(diag, RoleDiagnostics)
+
+    # Skip if there's nothing to show
+    if (
+        not diag.mcp_servers
+        and not diag.skills
+        and not diag.custom_tools
+        and diag.memory_store is None
+        and not diag.triggers
+    ):
+        return
+
+    table = Table(title=f"{indent}Role Diagnostics")
+    table.add_column("Category", style="cyan")
+    table.add_column("Component")
+    table.add_column("Status")
+    table.add_column("Details")
+
+    for mcp in diag.mcp_servers:
+        if mcp.status == "healthy":
+            status = "[green]ok[/green]"
+            details = f"{mcp.latency_ms}ms, {mcp.tool_count} tools"
+        elif mcp.status == "degraded":
+            status = "[yellow]degraded[/yellow]"
+            details = f"{mcp.latency_ms}ms, {mcp.tool_count} tools"
+        elif mcp.status == "skipped":
+            status = "[dim]skipped[/dim]"
+            details = "use --deep to check"
+        else:
+            status = "[red]unhealthy[/red]"
+            details = mcp.error or "connection failed"
+        table.add_row("mcp", mcp.server_label, status, details)
+
+    for skill in diag.skills:
+        if skill.resolved and not skill.unmet_requirements:
+            status = "[green]ok[/green]"
+            details = str(skill.source_path)
+        elif skill.resolved:
+            status = "[yellow]warn[/yellow]"
+            n = len(skill.unmet_requirements)
+            details = f"{n} unmet: {', '.join(skill.unmet_requirements)}"
+        else:
+            status = "[red]fail[/red]"
+            details = skill.error or "not found"
+        table.add_row("skill", skill.ref, status, details)
+
+    for ct in diag.custom_tools:
+        label = ct.module
+        if ct.function:
+            label += f".{ct.function}"
+        if ct.sandbox_violation:
+            status = "[red]fail[/red]"
+            details = ct.sandbox_violation
+        elif not ct.locatable:
+            status = "[red]fail[/red]"
+            details = ct.error or "module not found"
+        elif ct.importable is False:
+            status = "[red]fail[/red]"
+            details = ct.error or "import failed"
+        elif ct.callable_found is False:
+            status = "[red]fail[/red]"
+            details = ct.error or "function not found"
+        elif ct.importable is True:
+            status = "[green]ok[/green]"
+            details = "importable"
+        else:
+            status = "[green]ok[/green]"
+            details = "locatable"
+        table.add_row("custom tool", label, status, details)
+
+    if diag.memory_store is not None:
+        ms = diag.memory_store
+        if not ms.parent_exists:
+            status = "[yellow]warn[/yellow]"
+            details = "parent directory missing"
+        elif not ms.parent_writable:
+            status = "[red]fail[/red]"
+            details = "parent directory not writable"
+        elif ms.db_opens is False:
+            status = "[red]fail[/red]"
+            details = f"DB open failed: {ms.error}"
+        elif ms.db_opens is True:
+            status = "[green]ok[/green]"
+            details = "accessible"
+        else:
+            status = "[green]ok[/green]"
+            details = "path writable"
+        table.add_row("memory", ms.store_path, status, details)
+
+    for trig in diag.triggers:
+        if trig.issues:
+            status = "[yellow]warn[/yellow]"
+            details = "; ".join(trig.issues)
+        else:
+            status = "[green]ok[/green]"
+            details = trig.label
+        table.add_row("trigger", trig.trigger_type, status, details)
+
+    console.print()
+    console.print(table)
+
+
+def _check_flow_health(path: Path, *, deep: bool = False, skill_dir: Path | None = None) -> bool:
+    """Validate a flow file and its referenced roles. Returns True if errors found."""
+    from initrunner.cli._helpers import resolve_skill_dirs
+    from initrunner.services.doctor import diagnose_flow
+
+    console.print()
+    extra_dirs = resolve_skill_dirs(skill_dir)
+
+    try:
+        diag = diagnose_flow(path, deep=deep, extra_skill_dirs=extra_dirs)
+    except Exception as exc:
+        console.print(
+            Panel(
+                f"[red]Flow validation failed:[/red] {exc}",
+                title="Flow Validation",
+                border_style="red",
+            )
+        )
+        return True
+
+    if not diag.flow_valid:
+        console.print(
+            Panel(
+                f"[red]Flow is invalid:[/red] {diag.flow_error or 'validation errors'}",
+                title="Flow Validation",
+                border_style="red",
+            )
+        )
+    else:
+        console.print("[green]Flow structure is valid.[/green]")
+
+    # Show validation issues
+    error_issues = [i for i in diag.validation_issues if i.severity == "error"]
+    warn_issues = [i for i in diag.validation_issues if i.severity == "warning"]
+    if error_issues or warn_issues:
+        issue_table = Table(title="Flow Validation Issues")
+        issue_table.add_column("Severity")
+        issue_table.add_column("Field", style="cyan")
+        issue_table.add_column("Message")
+
+        for issue in error_issues:
+            issue_table.add_row("[red]error[/red]", issue.field, issue.message)
+        for issue in warn_issues:
+            issue_table.add_row("[yellow]warning[/yellow]", issue.field, issue.message)
+
+        console.print(issue_table)
+
+    # Show missing roles
+    for agent_name in diag.missing_roles:
+        console.print(f"  [red]Missing role:[/red] agent '{agent_name}'")
+
+    # Show role parse errors
+    for agent_name, error in diag.role_errors.items():
+        console.print(f"  [red]Role error ({agent_name}):[/red] {error}")
+
+    # Per-agent diagnostics
+    for agent_name, agent_diag in diag.agent_diagnostics.items():
+        if agent_diag is not None:
+            console.print(f"\n[bold]Agent: {agent_name}[/bold]")
+            _render_role_diagnostics(agent_diag)
+
+    return not diag.flow_valid

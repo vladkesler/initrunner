@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from initrunner.dashboard.schemas._common import ProviderStatus
 
 __all__ = [
+    "AgentDoctorResponse",
     "DefaultModelResponse",
     "DoctorCheck",
     "DoctorResponse",
@@ -78,6 +79,12 @@ class SaveKeyResponse(BaseModel):
     env_var: str
     validated: bool = False
     validation_supported: bool = False
+
+
+class AgentDoctorResponse(BaseModel):
+    """Per-agent doctor diagnostics."""
+
+    role_checks: list[DoctorCheck]
 
 
 class ProviderStatusResponse(BaseModel):

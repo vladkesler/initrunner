@@ -35,7 +35,7 @@ When you save or generate a role through InitRunner (builder, templates, `initru
 | DEP004 | Flow, Team | `spec.shared_memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 | DEP005 | Flow, Team | `spec.shared_documents.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 
-All current rules are error-severity with no automatic migration. Fix the YAML manually using the guidance in the error message.
+All current rules are error-severity with automatic migration. Run `initrunner doctor --fix --role <path>` to auto-patch deprecated fields with interactive confirmation. Use `--yes` to skip prompts.
 
 ## Checking Your Role
 
@@ -63,11 +63,19 @@ Example output for a role with a deprecated field:
 
 ```
        Role Validation: my-agent (spec_version: 1, current: 2)
-┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ ID     ┃ Severity ┃ Issue                                     ┃ Status     ┃
-┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ DEP002 │ error    │ store_backend 'zvec' has been removed...  │ manual fix │
-└────────┴──────────┴───────────────────────────────────────────┴────────────┘
+┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ ID     ┃ Severity ┃ Issue                                     ┃ Status        ┃
+┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ DEP002 │ error    │ store_backend 'zvec' has been removed...  │ auto-fixable  │
+└────────┴──────────┴───────────────────────────────────────────┴───────────────┘
+```
+
+Auto-fix with `doctor --fix`:
+
+```
+$ initrunner doctor --fix --yes --role role.yaml
+  Fixed DEP002: spec.ingest.store_backend
+  Bumped spec_version to 2
 ```
 
 When the role is clean:

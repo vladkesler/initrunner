@@ -493,6 +493,11 @@ initrunner flow new spread --pattern fan-out --agents 5
 |------|-------------|
 | `--quickstart` | Run a smoke prompt to verify end-to-end connectivity |
 | `--role PATH` | Agent directory or role file to test (loads its `.env` and uses it for `--quickstart`) |
+| `--flow PATH` | Flow YAML file to validate (checks topology and all referenced roles) |
+| `--deep` | Run active checks: MCP connectivity, tool imports, DB open (requires `--role` or `--flow`) |
+| `--skill-dir PATH` | Extra skill search directory (requires `--role` or `--flow`) |
+| `--fix` | Interactively repair detected issues |
+| `--yes` / `-y` | Auto-confirm all fix prompts |
 
 See [Doctor](../operations/doctor.md) for details.
 

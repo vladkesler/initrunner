@@ -56,6 +56,32 @@ class DeprecationHit:
 
 
 # ---------------------------------------------------------------------------
+# Migration callables (called by apply_deprecations when rule matches)
+# ---------------------------------------------------------------------------
+
+
+def _migrate_max_memories_to_semantic(data: dict, field_path: str) -> None:
+    """DEP001: Move spec.memory.max_memories -> spec.memory.semantic.max_memories."""
+    memory = data.get("spec", {}).get("memory", {})
+    value = memory.pop("max_memories", None)
+    if value is not None:
+        semantic = memory.setdefault("semantic", {})
+        # Only set if not already present (existing nested value takes precedence)
+        if "max_memories" not in semantic:
+            semantic["max_memories"] = value
+
+
+def _migrate_zvec_to_lancedb(data: dict, field_path: str) -> None:
+    """DEP002-005: Replace store_backend 'zvec' with 'lancedb' at the given path."""
+    parts = field_path.split(".")
+    cursor: Any = data
+    for part in parts[:-1]:
+        cursor = cursor.get(part, {})
+    if isinstance(cursor, dict) and cursor.get(parts[-1]) == "zvec":
+        cursor[parts[-1]] = "lancedb"
+
+
+# ---------------------------------------------------------------------------
 # Rules
 # ---------------------------------------------------------------------------
 
@@ -67,6 +93,7 @@ _RULES: list[DeprecationRule] = [
         since=2,
         severity="error",
         message=REMOVED_FIELD_MESSAGE_MAX_MEMORIES,
+        migrate=_migrate_max_memories_to_semantic,
     ),
     DeprecationRule(
         id="DEP002",
@@ -76,6 +103,7 @@ _RULES: list[DeprecationRule] = [
         severity="error",
         message="store_backend 'zvec' has been removed. Use 'lancedb' instead.",
         match_value="zvec",
+        migrate=_migrate_zvec_to_lancedb,
     ),
     DeprecationRule(
         id="DEP003",
@@ -85,6 +113,7 @@ _RULES: list[DeprecationRule] = [
         severity="error",
         message="store_backend 'zvec' has been removed. Use 'lancedb' instead.",
         match_value="zvec",
+        migrate=_migrate_zvec_to_lancedb,
     ),
     DeprecationRule(
         id="DEP004",
@@ -94,6 +123,7 @@ _RULES: list[DeprecationRule] = [
         severity="error",
         message="store_backend 'zvec' has been removed. Use 'lancedb' instead.",
         match_value="zvec",
+        migrate=_migrate_zvec_to_lancedb,
     ),
     DeprecationRule(
         id="DEP005",
@@ -103,6 +133,7 @@ _RULES: list[DeprecationRule] = [
         severity="error",
         message="store_backend 'zvec' has been removed. Use 'lancedb' instead.",
         match_value="zvec",
+        migrate=_migrate_zvec_to_lancedb,
     ),
 ]
 
@@ -194,7 +225,7 @@ def validate_role_dict(
 
     migrated, hits = apply_deprecations(raw, SchemaKind.ROLE)
 
-    errors = [h for h in hits if h.severity == "error"]
+    errors = [h for h in hits if h.severity == "error" and not h.auto_fixed]
     if errors:
         msgs = "\n".join(f"  {h.id}: {h.message}" for h in errors)
         raise ValueError(f"Deprecated fields:\n{msgs}")
@@ -255,7 +286,7 @@ def validate_flow_dict(
 
     migrated, hits = apply_deprecations(raw, SchemaKind.FLOW)
 
-    errors = [h for h in hits if h.severity == "error"]
+    errors = [h for h in hits if h.severity == "error" and not h.auto_fixed]
     if errors:
         msgs = "\n".join(f"  {h.id}: {h.message}" for h in errors)
         raise ValueError(f"Deprecated fields:\n{msgs}")
@@ -282,7 +313,7 @@ def validate_team_dict(
 
     migrated, hits = apply_deprecations(raw, SchemaKind.TEAM)
 
-    errors = [h for h in hits if h.severity == "error"]
+    errors = [h for h in hits if h.severity == "error" and not h.auto_fixed]
     if errors:
         msgs = "\n".join(f"  {h.id}: {h.message}" for h in errors)
         raise ValueError(f"Deprecated fields:\n{msgs}")

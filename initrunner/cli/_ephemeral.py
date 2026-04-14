@@ -38,10 +38,18 @@ def resolve_extra_tools(extra_types: list[str]) -> list[dict]:
                     f"is not supported as an ephemeral extra tool.\n"
                     f"  Supported: {', '.join(sorted(EPHEMERAL_TOOL_DEFAULTS))}"
                 )
+                console.print(
+                    "[dim]Hint:[/dim] This tool requires a role YAML."
+                    " Create one with [bold]initrunner new[/bold]."
+                )
             else:
                 console.print(
                     f"[red]Error:[/red] Unknown tool type '{name}'.\n"
                     f"  Supported: {', '.join(sorted(EPHEMERAL_TOOL_DEFAULTS))}"
+                )
+                console.print(
+                    "[dim]Hint:[/dim] Run [bold]initrunner run --list-tools[/bold]"
+                    " to see all options."
                 )
             raise typer.Exit(1)
 
@@ -98,6 +106,19 @@ def print_list_tools() -> None:
             console.print(f"  {name}")
     console.print()
     console.print("[dim]Usage: initrunner run --tools slack --tools git[/dim]")
+
+
+def print_explain_profiles() -> None:
+    """Print each tool profile with its included tools."""
+    console.print("[bold]Tool profiles for --tool-profile:[/bold]\n")
+    for name, tools in TOOL_PROFILES.items():
+        if not tools:
+            console.print(f"  [cyan]{name}[/cyan]: (no tools)")
+        else:
+            tool_names = ", ".join(t["type"] for t in tools)
+            console.print(f"  [cyan]{name}[/cyan]: {tool_names}")
+    console.print()
+    console.print("[dim]Usage: initrunner run --tool-profile all[/dim]")
 
 
 # ---------------------------------------------------------------------------

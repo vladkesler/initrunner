@@ -165,6 +165,7 @@ class TestTriggerFields:
         result.duration_ms = 100
         result.success = True
         result.error = None
+        result.tool_call_names = []
 
         role = MagicMock()
         role.metadata.name = "agent1"
@@ -196,6 +197,7 @@ class TestTriggerFields:
         result.duration_ms = 100
         result.success = True
         result.error = None
+        result.tool_call_names = []
 
         role = MagicMock()
         role.metadata.name = "agent1"

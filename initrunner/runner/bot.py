@@ -141,6 +141,10 @@ def run_bot(
         allowed, reason = tracker.check_before_run()
         if not allowed:
             console.print(f"\n[yellow]Budget exceeded: {reason}[/yellow]")
+            console.print(
+                "[dim]Hint:[/dim] Increase budget limits in"
+                " [bold]guardrails[/bold], or wait for the daily reset."
+            )
             return
 
         console.print(f"\n[dim]Bot ({event.trigger_type}):[/dim] {event.prompt[:80]}")

@@ -180,12 +180,13 @@ def load_and_build_or_exit(
                 continue
             # Prompt skipped (non-TTY), declined (empty/Ctrl-C), or this is
             # the post-prompt retry.  Print the original missing-key
-            # message verbatim.  We deliberately omit the "run initrunner
-            # validate" hint here: validate checks YAML schema and would
-            # say the role is fine.  The error text from _build_model()
-            # already tells the user exactly what to do (export the env
-            # var).
+            # message verbatim.  The error text from _build_model()
+            # already tells the user the env var to set; add a setup hint
+            # for non-TTY users who may not know about the guided wizard.
             console.print(f"[red]Error:[/red] {e}")
+            console.print(
+                "[dim]Hint:[/dim] Run [bold]initrunner setup[/bold] for guided configuration."
+            )
             raise typer.Exit(1) from None
         except RoleLoadError as e:
             console.print(f"[red]Error:[/red] {e}")

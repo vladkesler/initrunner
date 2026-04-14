@@ -44,6 +44,7 @@ def _make_discovered_role(
         dr.role.spec.model.provider = "openai"
         dr.role.spec.model.name = "gpt-4o"
         dr.role.spec.features = ["memory", "tools"]
+        dr.role.spec.security.effective_label = "default"
     return dr
 
 

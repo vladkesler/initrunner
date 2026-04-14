@@ -34,6 +34,9 @@ def list_tools(
         results = list_mcp_tools_sync(role_file, index=index)
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            "[dim]Hint:[/dim] Check that MCP servers in the role YAML are running and reachable."
+        )
         raise typer.Exit(1) from None
 
     if not results:
@@ -102,6 +105,9 @@ def mcp_serve(
         )
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")
+        err_console.print(
+            "[dim]Hint:[/dim] Validate the role first with [bold]initrunner validate[/bold]."
+        )
         if audit_logger is not None:
             audit_logger.close()
         raise typer.Exit(1) from None

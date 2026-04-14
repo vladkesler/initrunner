@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import copy
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -11,6 +12,91 @@ from initrunner.agent._subprocess import (
     DEFAULT_SENSITIVE_ENV_PREFIXES,
     DEFAULT_SENSITIVE_ENV_SUFFIXES,
 )
+
+# ---------------------------------------------------------------------------
+# Security presets
+# ---------------------------------------------------------------------------
+
+SecurityPreset = Literal["public", "internal", "sandbox", "development"]
+
+SECURITY_PRESETS: dict[str, dict[str, Any]] = {
+    "public": {
+        "rate_limit": {"requests_per_minute": 30, "burst_size": 5},
+        "content": {
+            "max_prompt_length": 10_000,
+            "blocked_input_patterns": [
+                r"(?i)\b(union\s+select|drop\s+table|insert\s+into)\b",
+                r"(?i)(ignore\s+previous|disregard\s+above|forget\s+your)\s+(instructions|rules|prompt)",
+                r"(?i)(\||;|&&)\s*(rm|cat|curl|wget|bash|sh|nc)\b",
+            ],
+            "pii_redaction": True,
+            "output_action": "block",
+        },
+        "server": {"require_https": True},
+    },
+    "internal": {
+        "rate_limit": {"requests_per_minute": 120, "burst_size": 20},
+    },
+    "sandbox": {
+        "_extends": "public",
+        "docker": {
+            "enabled": True,
+            "network": "none",
+            "read_only_rootfs": True,
+            "memory_limit": "256m",
+            "cpu_limit": 1.0,
+        },
+    },
+    "development": {
+        "rate_limit": {"requests_per_minute": 9999, "burst_size": 9999},
+        "content": {
+            "profanity_filter": False,
+            "blocked_input_patterns": [],
+            "blocked_output_patterns": [],
+            "pii_redaction": False,
+            "max_prompt_length": 500_000,
+            "max_output_length": 500_000,
+        },
+        "docker": {"enabled": False},
+    },
+}
+
+
+def _resolve_preset_dict(name: str, _seen: set[str] | None = None) -> dict[str, Any]:
+    """Resolve a preset by name, handling ``_extends`` inheritance.
+
+    Lists replace (not append) when overriding a parent preset.
+    Raises ``ValueError`` for unknown names or circular ``_extends``.
+    """
+    if name not in SECURITY_PRESETS:
+        raise ValueError(
+            f"Unknown security preset '{name}'. Choose from: {', '.join(sorted(SECURITY_PRESETS))}"
+        )
+    seen = _seen or set()
+    if name in seen:
+        raise ValueError(f"Circular _extends in security presets: {' -> '.join(seen)} -> {name}")
+    seen.add(name)
+
+    raw = copy.deepcopy(SECURITY_PRESETS[name])
+    parent_name = raw.pop("_extends", None)
+    if parent_name is not None:
+        parent = _resolve_preset_dict(parent_name, seen)
+        return _deep_merge(parent, raw)
+    return raw
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Merge *override* into *base* with one level of dict nesting.
+
+    Scalar values and lists in *override* replace those in *base*.
+    """
+    result = dict(base)
+    for key, val in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = {**result[key], **val}
+        else:
+            result[key] = val
+    return result
 
 
 def _regex_probe_worker(pats: list[str], conn: object) -> None:
@@ -236,7 +322,11 @@ class ResourceConfig(BaseModel):
     cpu: float = 0.5
 
 
+_DEFAULT_SECURITY_POLICY: SecurityPolicy | None = None
+
+
 class SecurityPolicy(BaseModel):
+    preset: SecurityPreset | None = None
     content: ContentPolicy = ContentPolicy()
     server: ServerConfig = ServerConfig()
     rate_limit: RateLimitConfig = RateLimitConfig()
@@ -244,3 +334,64 @@ class SecurityPolicy(BaseModel):
     tools: ToolSandboxConfig = ToolSandboxConfig()
     docker: DockerSandboxConfig = DockerSandboxConfig()
     audit: AuditConfig = AuditConfig()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _apply_preset(cls, data: Any) -> Any:
+        """Expand a named preset into concrete sub-model values.
+
+        User-provided fields override preset values.  Lists replace (not
+        append).  Unknown preset names raise ``ValueError``.
+        """
+        if not isinstance(data, dict) or "preset" not in data:
+            return data
+
+        preset_name = data["preset"]
+        resolved = _resolve_preset_dict(preset_name)
+
+        merged = dict(data)
+        for key, preset_val in resolved.items():
+            if key not in merged:
+                merged[key] = preset_val
+            elif isinstance(merged[key], dict) and isinstance(preset_val, dict):
+                merged[key] = {**preset_val, **merged[key]}
+        return merged
+
+    @property
+    def effective_label(self) -> str:
+        """Return a human-readable label for this policy's posture."""
+        if self.preset:
+            return self.preset
+        global _DEFAULT_SECURITY_POLICY
+        if _DEFAULT_SECURITY_POLICY is None:
+            _DEFAULT_SECURITY_POLICY = SecurityPolicy()
+        if self == _DEFAULT_SECURITY_POLICY:
+            return "default"
+        return "custom"
+
+    def compact_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """Dump config, compacting preset fields to just ``preset`` + overrides.
+
+        When ``preset`` is set, only fields that differ from the preset's
+        resolved values are included.  Without a preset this falls back
+        to a regular ``model_dump()``.
+        """
+        if not self.preset:
+            return self.model_dump(**kwargs)
+
+        baseline = SecurityPolicy(preset=self.preset)
+        full = self.model_dump(**kwargs)
+        baseline_dump = baseline.model_dump(**kwargs)
+
+        compact: dict[str, Any] = {"preset": self.preset}
+        for key in full:
+            if key == "preset":
+                continue
+            if full[key] != baseline_dump.get(key):
+                if isinstance(full[key], dict) and isinstance(baseline_dump.get(key), dict):
+                    diff = {k: v for k, v in full[key].items() if v != baseline_dump[key].get(k)}
+                    if diff:
+                        compact[key] = diff
+                else:
+                    compact[key] = full[key]
+        return compact

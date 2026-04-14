@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchCostSummary, fetchCostByAgent, fetchCostDaily, fetchCostByModel } from '$lib/api/cost';
+	import { fetchCostSummary, fetchCostByAgent, fetchCostDaily, fetchCostByModel, fetchCostByTool } from '$lib/api/cost';
 	import { listAgents } from '$lib/api/agents';
-	import type { CostSummary, AgentCost, DailyCost, ModelCost, AgentSummary } from '$lib/api/types';
+	import type { CostSummary, AgentCost, DailyCost, ModelCost, ToolCost, AgentSummary } from '$lib/api/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import SpendChart from '$lib/components/cost/SpendChart.svelte';
 	import AgentCostTable from '$lib/components/cost/AgentCostTable.svelte';
 	import ModelCostTable from '$lib/components/cost/ModelCostTable.svelte';
+	import ToolCostTable from '$lib/components/cost/ToolCostTable.svelte';
 	import { formatCost } from '$lib/utils/format';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
@@ -19,6 +20,7 @@
 	let dailyData = $state<DailyCost[]>([]);
 	let agentData = $state<AgentCost[]>([]);
 	let modelData = $state<ModelCost[]>([]);
+	let toolData = $state<ToolCost[]>([]);
 	let loading = $state(true);
 	let rangeLoading = $state(false);
 	let period = $state<Period>('30d');
@@ -37,14 +39,16 @@
 		rangeLoading = true;
 		const since = sinceForPeriod(p);
 		try {
-			const [daily, byAgent, byModel] = await Promise.all([
+			const [daily, byAgent, byModel, byTool] = await Promise.all([
 				fetchCostDaily({ days: PERIOD_DAYS[p] }),
 				fetchCostByAgent({ since }),
 				fetchCostByModel({ since }),
+				fetchCostByTool({ since }),
 			]);
 			dailyData = daily;
 			agentData = byAgent;
 			modelData = byModel;
+			toolData = byTool;
 		} catch {
 			toast.error('Failed to load cost data');
 		} finally {
@@ -60,18 +64,20 @@
 	onMount(async () => {
 		try {
 			const since = sinceForPeriod(period);
-			const [s, a, daily, byAgent, byModel] = await Promise.all([
+			const [s, a, daily, byAgent, byModel, byTool] = await Promise.all([
 				fetchCostSummary(),
 				listAgents().catch(() => [] as AgentSummary[]),
 				fetchCostDaily({ days: PERIOD_DAYS[period] }),
 				fetchCostByAgent({ since }),
 				fetchCostByModel({ since }),
+				fetchCostByTool({ since }),
 			]);
 			summary = s;
 			agents = a;
 			dailyData = daily;
 			agentData = byAgent;
 			modelData = byModel;
+			toolData = byTool;
 		} catch {
 			toast.error('Failed to connect to API server');
 		} finally {
@@ -152,6 +158,14 @@
 				<div class="border border-edge">
 					<ModelCostTable data={modelData} />
 				</div>
+			</div>
+		</div>
+
+		<!-- Tool table (full width) -->
+		<div class:opacity-50={rangeLoading} class="transition-opacity duration-150">
+			<h2 class="section-label mb-3">By Tool</h2>
+			<div class="border border-edge">
+				<ToolCostTable data={toolData} />
 			</div>
 		</div>
 	{/if}
