@@ -11,6 +11,7 @@ from initrunner.dashboard.schemas import (
     CostSummaryResponse,
     DailyCostResponse,
     ModelCostResponse,
+    ToolCostResponse,
 )
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
@@ -135,6 +136,36 @@ async def get_cost_by_model(
             tokens_in=e.tokens_in,
             tokens_out=e.tokens_out,
             total_cost_usd=e.total_cost_usd,
+        )
+        for e in entries
+    ]
+
+
+@router.get("/by-tool")
+async def get_cost_by_tool(
+    agent_name: str | None = Query(None),
+    since: str | None = Query(None, description="ISO 8601 datetime"),
+    until: str | None = Query(None, description="ISO 8601 datetime"),
+) -> list[ToolCostResponse]:
+    from initrunner.config import get_audit_db_path
+    from initrunner.services.cost import cost_by_tool_sync
+
+    entries = await asyncio.to_thread(
+        cost_by_tool_sync,
+        agent_name=agent_name,
+        since=since,
+        until=until,
+        audit_db=get_audit_db_path(),
+    )
+    return [
+        ToolCostResponse(
+            tool_name=e.tool_name,
+            usage_count=e.usage_count,
+            run_count=e.run_count,
+            tokens_in=e.tokens_in,
+            tokens_out=e.tokens_out,
+            total_cost_usd=e.total_cost_usd,
+            avg_cost_per_use=e.avg_cost_per_use,
         )
         for e in entries
     ]

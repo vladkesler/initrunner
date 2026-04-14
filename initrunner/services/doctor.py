@@ -51,6 +51,7 @@ class RoleFixPlan:
     can_bump_spec_version: bool
     current_spec_version: int
     latest_spec_version: int
+    fixable_deprecations: list  # list[DeprecationHit] (lazy import avoids cycle)
 
 
 # ---------------------------------------------------------------------------
@@ -154,10 +155,11 @@ def build_role_fix_plan(raw_data: dict) -> RoleFixPlan:
     missing = diagnose_role_extras(raw_data)
 
     _, hits = apply_deprecations(raw_data, SchemaKind.ROLE)
+    fixable = [h for h in hits if h.auto_fixed]
+    unfixed_errors = [h for h in hits if h.severity == "error" and not h.auto_fixed]
 
-    # Spec version bump is only safe when the role validates cleanly
-    # and has no deprecation hits at all.
-    can_bump = sv < CURRENT_ROLE_SPEC_VERSION and len(hits) == 0
+    # Spec version bump is safe when the only errors are auto-fixable.
+    can_bump = sv < CURRENT_ROLE_SPEC_VERSION and len(unfixed_errors) == 0
     if can_bump:
         try:
             from initrunner.agent.schema.role import RoleDefinition
@@ -171,6 +173,7 @@ def build_role_fix_plan(raw_data: dict) -> RoleFixPlan:
         can_bump_spec_version=can_bump,
         current_spec_version=sv,
         latest_spec_version=CURRENT_ROLE_SPEC_VERSION,
+        fixable_deprecations=fixable,
     )
 
 
@@ -247,6 +250,161 @@ def bump_spec_version_text(text: str, target: int) -> str:
     new_line = f"{indent}spec_version: {target}"
     lines.insert(meta_end, new_line)
     return nl.join(lines)
+
+
+def patch_deprecation_text(text: str, hit: object) -> str:
+    """Surgically patch a single deprecation hit in raw YAML text.
+
+    *hit* is a ``DeprecationHit`` (typed as ``object`` to avoid import cycle).
+    Preserves comments, indentation, and other formatting.
+    Raises ``ValueError`` if the pattern cannot be located.
+    """
+    hit_id: str = hit.id  # type: ignore[attr-defined]
+    field_path: str = hit.field_path  # type: ignore[attr-defined]
+    if hit_id in ("DEP002", "DEP003", "DEP004", "DEP005"):
+        return _patch_store_backend_zvec(text, field_path)
+    if hit_id == "DEP001":
+        return _patch_max_memories_to_semantic(text)
+    raise ValueError(f"No text patch available for {hit_id}")
+
+
+def _patch_store_backend_zvec(text: str, field_path: str) -> str:
+    """Replace ``store_backend: zvec`` with ``store_backend: lancedb`` in the
+    correct YAML section identified by *field_path*.
+    """
+    import re
+
+    nl = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(nl)
+
+    parts = field_path.split(".")
+    section_key = parts[-2]  # e.g. "memory", "ingest", "shared_memory"
+
+    section_pattern = re.compile(rf"^(\s*){re.escape(section_key)}:\s*(?:#.*)?$")
+    for i, line in enumerate(lines):
+        m = section_pattern.match(line)
+        if not m:
+            continue
+        section_indent_len = len(m.group(1))
+        for j in range(i + 1, len(lines)):
+            stripped = lines[j].lstrip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            line_indent_len = len(lines[j]) - len(stripped)
+            if line_indent_len <= section_indent_len:
+                break  # left the section
+            if re.match(r"\s*store_backend:\s*zvec\b", lines[j]):
+                lines[j] = lines[j].replace("zvec", "lancedb", 1)
+                return nl.join(lines)
+
+    raise ValueError(f"Cannot locate store_backend: zvec in {section_key} section")
+
+
+def _patch_max_memories_to_semantic(text: str) -> str:
+    """Move ``max_memories: <N>`` under a ``semantic:`` block within ``memory:``.
+
+    Handles three cases:
+    1. No existing ``semantic:`` -- replace the line with a new block.
+    2. ``semantic:`` exists without ``max_memories`` -- insert into it.
+    3. ``semantic:`` exists with ``max_memories`` -- just remove the top-level line.
+    """
+    import re
+
+    nl = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(nl)
+
+    # Find the ``memory:`` section
+    memory_pattern = re.compile(r"^(\s*)memory:\s*(?:#.*)?$")
+    for i, line in enumerate(lines):
+        m = memory_pattern.match(line)
+        if not m:
+            continue
+        parent_indent = m.group(1)
+
+        # Detect child indentation from the first non-blank, non-comment child
+        child_indent: str | None = None
+        for ci in range(i + 1, len(lines)):
+            s = lines[ci].lstrip()
+            if s and not s.startswith("#"):
+                child_indent = lines[ci][: len(lines[ci]) - len(s)]
+                break
+        if child_indent is None:
+            break
+
+        # Find max_memories and semantic lines within the memory block
+        mm_line_idx: int | None = None
+        mm_value: str = ""
+        mm_trailing: str = ""
+        semantic_line_idx: int | None = None
+        semantic_has_max_memories = False
+
+        for j in range(i + 1, len(lines)):
+            stripped = lines[j].lstrip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            line_indent_len = len(lines[j]) - len(stripped)
+            if line_indent_len <= len(parent_indent):
+                break  # left the memory section
+
+            # Direct child: max_memories
+            mm_match = re.match(
+                rf"^{re.escape(child_indent)}max_memories:\s*(\d+)(.*?)$",
+                lines[j],
+            )
+            if mm_match:
+                mm_line_idx = j
+                mm_value = mm_match.group(1)
+                mm_trailing = mm_match.group(2)
+                continue
+
+            # Direct child: semantic
+            sem_match = re.match(
+                rf"^{re.escape(child_indent)}semantic:\s*(?:#.*)?$",
+                lines[j],
+            )
+            if sem_match:
+                semantic_line_idx = j
+                # Check if semantic already has max_memories
+                grandchild_indent = child_indent + child_indent[len(parent_indent) :]
+                for k in range(j + 1, len(lines)):
+                    gs = lines[k].lstrip()
+                    if not gs or gs.startswith("#"):
+                        continue
+                    gk_indent_len = len(lines[k]) - len(gs)
+                    if gk_indent_len <= len(child_indent):
+                        break
+                    if re.match(
+                        rf"^{re.escape(grandchild_indent)}max_memories:\s*\d+",
+                        lines[k],
+                    ):
+                        semantic_has_max_memories = True
+                        break
+
+        if mm_line_idx is None:
+            raise ValueError("Cannot locate max_memories in memory section")
+
+        grandchild_indent = child_indent + child_indent[len(parent_indent) :]
+
+        if semantic_line_idx is not None:
+            # Case 2 or 3: semantic block exists
+            del lines[mm_line_idx]
+            if not semantic_has_max_memories:
+                # Insert max_memories as first child of semantic
+                insert_idx = (
+                    semantic_line_idx + 1 if semantic_line_idx < mm_line_idx else semantic_line_idx
+                )
+                new_line = f"{grandchild_indent}max_memories: {mm_value}{mm_trailing}"
+                lines.insert(insert_idx, new_line)
+        else:
+            # Case 1: no semantic block -- replace in place
+            lines[mm_line_idx : mm_line_idx + 1] = [
+                f"{child_indent}semantic:",
+                f"{grandchild_indent}max_memories: {mm_value}{mm_trailing}",
+            ]
+
+        return nl.join(lines)
+
+    raise ValueError("Cannot locate memory section in YAML")
 
 
 def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:

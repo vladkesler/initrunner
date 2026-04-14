@@ -170,6 +170,11 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
         "[red]Error:[/red] No usable provider found. "
         "Run `initrunner setup` or set an API key environment variable."
     )
+    console.print(
+        "[dim]Hint:[/dim] Run [bold]initrunner setup[/bold], or export"
+        " [bold]OPENAI_API_KEY[/bold] / [bold]ANTHROPIC_API_KEY[/bold]"
+        " / [bold]GOOGLE_API_KEY[/bold]."
+    )
     raise typer.Exit(1)
 
 

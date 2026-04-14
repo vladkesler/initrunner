@@ -260,8 +260,8 @@ class TestDoctorRoleValidation:
         assert result.exit_code == 0
         assert "is behind" in result.output
 
-    def test_zvec_error(self, tmp_path: Path, monkeypatch):
-        """Role with zvec shows error table and exits 1."""
+    def test_zvec_shows_auto_fixable(self, tmp_path: Path, monkeypatch):
+        """Role with zvec shows auto-fixable in table and exits 0 (not a hard error)."""
         content = textwrap.dedent("""\
             apiVersion: initrunner/v1
             kind: Agent
@@ -283,11 +283,12 @@ class TestDoctorRoleValidation:
             with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
                 result = runner.invoke(app, ["doctor", "--role", str(p)])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 0
         assert "DEP002" in result.output
+        assert "auto-fixable" in result.output
 
-    def test_max_memories_error(self, tmp_path: Path, monkeypatch):
-        """Role with memory.max_memories shows error and exits 1."""
+    def test_max_memories_shows_auto_fixable(self, tmp_path: Path, monkeypatch):
+        """Role with memory.max_memories shows auto-fixable and exits 0."""
         content = textwrap.dedent("""\
             apiVersion: initrunner/v1
             kind: Agent
@@ -308,8 +309,9 @@ class TestDoctorRoleValidation:
             with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
                 result = runner.invoke(app, ["doctor", "--role", str(p)])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 0
         assert "DEP001" in result.output
+        assert "auto-fixable" in result.output
 
     def test_yaml_parse_error(self, tmp_path: Path, monkeypatch):
         """Broken YAML shows parse error and exits 1."""
@@ -323,8 +325,8 @@ class TestDoctorRoleValidation:
         assert result.exit_code == 1
         assert "Cannot read" in result.output or "Invalid YAML" in result.output
 
-    def test_error_blocks_quickstart(self, tmp_path: Path, monkeypatch):
-        """--role with errors + --quickstart exits at validation, no smoke test."""
+    def test_auto_fixable_does_not_block_quickstart(self, tmp_path: Path, monkeypatch):
+        """--role with auto-fixable deprecations + --quickstart proceeds to smoke test."""
         content = textwrap.dedent("""\
             apiVersion: initrunner/v1
             kind: Agent
@@ -346,10 +348,10 @@ class TestDoctorRoleValidation:
             with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
                 result = runner.invoke(app, ["doctor", "--role", str(p), "--quickstart"])
 
-        assert result.exit_code == 1
         assert "DEP002" in result.output
-        # Should NOT reach the smoke test
-        assert "Running quickstart" not in result.output
+        assert "auto-fixable" in result.output
+        # Auto-fixable errors should NOT block the quickstart smoke test
+        assert "Running quickstart" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -632,6 +634,105 @@ class TestBumpSpecVersionText:
 
 
 # ---------------------------------------------------------------------------
+# Text patching: patch_deprecation_text
+# ---------------------------------------------------------------------------
+
+
+class TestPatchStoreBackendZvec:
+    def test_replaces_zvec_with_lancedb(self):
+        from initrunner.services.doctor import _patch_store_backend_zvec
+
+        text = "spec:\n  ingest:\n    sources:\n      - '*.md'\n    store_backend: zvec\n"
+        result = _patch_store_backend_zvec(text, "spec.ingest.store_backend")
+        assert "store_backend: lancedb" in result
+        assert "store_backend: zvec" not in result
+
+    def test_preserves_inline_comment(self):
+        from initrunner.services.doctor import _patch_store_backend_zvec
+
+        text = "spec:\n  memory:\n    store_backend: zvec  # old backend\n"
+        result = _patch_store_backend_zvec(text, "spec.memory.store_backend")
+        assert "store_backend: lancedb  # old backend" in result
+
+    def test_raises_on_missing_section(self):
+        import pytest
+
+        from initrunner.services.doctor import _patch_store_backend_zvec
+
+        text = "spec:\n  model:\n    name: test\n"
+        with pytest.raises(ValueError, match="Cannot locate"):
+            _patch_store_backend_zvec(text, "spec.ingest.store_backend")
+
+
+class TestPatchMaxMemoriesToSemantic:
+    def test_no_existing_semantic(self):
+        from initrunner.services.doctor import _patch_max_memories_to_semantic
+
+        text = "spec:\n  memory:\n    max_memories: 500\n    store_backend: lancedb\n"
+        result = _patch_max_memories_to_semantic(text)
+        assert "max_memories: 500" in result
+        assert "semantic:" in result
+        # The max_memories should be indented under semantic
+        lines = result.split("\n")
+        sem_idx = next(i for i, l in enumerate(lines) if "semantic:" in l)
+        mm_idx = next(i for i, l in enumerate(lines) if "max_memories: 500" in l)
+        assert mm_idx == sem_idx + 1
+
+    def test_existing_semantic_without_max_memories(self):
+        from initrunner.services.doctor import _patch_max_memories_to_semantic
+
+        text = (
+            "spec:\n"
+            "  memory:\n"
+            "    max_memories: 500\n"
+            "    semantic:\n"
+            "      embedding_model: text-embedding-3-small\n"
+        )
+        result = _patch_max_memories_to_semantic(text)
+        # max_memories should be removed from top level and added under semantic
+        lines = result.split("\n")
+        # No top-level max_memories as direct child of memory
+        memory_children = [
+            l for l in lines if l.startswith("    ") and not l.startswith("      ") and l.strip()
+        ]
+        assert not any("max_memories" in c for c in memory_children)
+        # max_memories exists under semantic
+        assert any("      max_memories: 500" in l for l in lines)
+
+    def test_existing_semantic_with_max_memories(self):
+        from initrunner.services.doctor import _patch_max_memories_to_semantic
+
+        text = (
+            "spec:\n"
+            "  memory:\n"
+            "    max_memories: 500\n"
+            "    semantic:\n"
+            "      max_memories: 200\n"
+        )
+        result = _patch_max_memories_to_semantic(text)
+        # Top-level max_memories removed; existing nested 200 takes precedence
+        lines = [l for l in result.split("\n") if "max_memories" in l]
+        assert len(lines) == 1
+        assert "200" in lines[0]
+
+    def test_preserves_trailing_comment(self):
+        from initrunner.services.doctor import _patch_max_memories_to_semantic
+
+        text = "spec:\n  memory:\n    max_memories: 500  # important\n"
+        result = _patch_max_memories_to_semantic(text)
+        assert "max_memories: 500  # important" in result
+
+    def test_raises_on_missing_memory(self):
+        import pytest
+
+        from initrunner.services.doctor import _patch_max_memories_to_semantic
+
+        text = "spec:\n  model:\n    name: test\n"
+        with pytest.raises(ValueError, match="Cannot locate memory"):
+            _patch_max_memories_to_semantic(text)
+
+
+# ---------------------------------------------------------------------------
 # CLI: --fix integration tests
 # ---------------------------------------------------------------------------
 
@@ -843,8 +944,8 @@ class TestDoctorFixRole:
         assert "  role: |" in raw
         assert "    You are a helpful assistant." in raw
 
-    def test_fix_does_not_write_for_deprecation_hits(self, monkeypatch, tmp_path):
-        """--fix --role does NOT write back for deprecated fields."""
+    def test_fix_patches_deprecation_hits(self, monkeypatch, tmp_path):
+        """--fix --role auto-patches zvec -> lancedb and bumps spec_version."""
         _clear_provider_keys(monkeypatch)
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
@@ -864,15 +965,17 @@ class TestDoctorFixRole:
         """)
         p = tmp_path / "role.yaml"
         p.write_text(content)
-        original_content = p.read_text()
 
         with _PATCH_DOTENV, _PATCH_OLLAMA:
             with patch("initrunner.services.doctor.diagnose_providers", return_value=[]):
                 result = runner.invoke(app, ["doctor", "--fix", "--yes", "--role", str(p)])
 
-        # File unchanged (deprecation remains diagnostic-only)
-        assert p.read_text() == original_content
-        assert result.exit_code == 1
+        patched = p.read_text()
+        assert "store_backend: lancedb" in patched
+        assert "store_backend: zvec" not in patched
+        assert "spec_version: 2" in patched
+        assert result.exit_code == 0
+        assert "Fixed DEP002" in result.output
 
 
 class TestDoctorFixNonTTY:

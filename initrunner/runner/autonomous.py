@@ -184,6 +184,11 @@ def run_autonomous(
                 if budget_status.exceeded:
                     final_status = "budget_exceeded"
                     console.print("[yellow]Autonomous token budget exhausted.[/yellow]")
+                    console.print(
+                        "[dim]Hint:[/dim] Increase"
+                        " [bold]guardrails.autonomous_token_budget[/bold]"
+                        " or reduce [bold]max_iterations[/bold]."
+                    )
                     break
 
             # Build prompt via strategy

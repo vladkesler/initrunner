@@ -54,6 +54,7 @@ from initrunner.dashboard.schemas.cost import (
     CostSummaryResponse,
     DailyCostResponse,
     ModelCostResponse,
+    ToolCostResponse,
 )
 from initrunner.dashboard.schemas.flow import (
     AgentStepResponse,
@@ -277,6 +278,7 @@ __all__ = [
     "TimelineEntryResponse",
     "TimelineResponse",
     "TimelineStatsResponse",
+    "ToolCostResponse",
     "ToolTypeResponse",
     "TopAgentResponse",
     "TriggerStatResponse",

@@ -72,6 +72,10 @@ def run_interactive(
             console.print(
                 "[yellow]Session token budget exhausted. Stopping further execution.[/yellow]"
             )
+            console.print(
+                "[dim]Hint:[/dim] Increase [bold]guardrails.session_token_budget[/bold]"
+                " in your role YAML, or start a new session."
+            )
             break
         if budget_status.warning and session_budget is not None:
             pct = int(cumulative_tokens / session_budget * 100)

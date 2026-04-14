@@ -818,3 +818,13 @@ export interface ModelCost {
 	tokens_out: number;
 	total_cost_usd: number | null;
 }
+
+export interface ToolCost {
+	tool_name: string;
+	usage_count: number;
+	run_count: number;
+	tokens_in: number;
+	tokens_out: number;
+	total_cost_usd: number | null;
+	avg_cost_per_use: number | null;
+}

@@ -344,13 +344,17 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
 
         for hit in inspection.hits:
             severity_style = "red" if hit.severity == "error" else "yellow"
+            if hit.auto_fixed:
+                status_label = "[cyan]auto-fixable[/cyan]"
+            else:
+                status_label = "[red]manual fix[/red]"
             hit_table.add_row(
                 hit.id,
                 f"[{severity_style}]{hit.severity}[/{severity_style}]",
                 hit.message,
-                "[green]auto-fixed[/green]" if hit.auto_fixed else "[red]manual fix[/red]",
+                status_label,
             )
-            if hit.severity == "error":
+            if hit.severity == "error" and not hit.auto_fixed:
                 has_errors = True
 
         console.print(hit_table)
@@ -389,15 +393,34 @@ def _check_and_fix_role_health(path: Path, *, fix: bool, yes: bool) -> tuple[boo
 
     # ----- Fix: role extras + spec_version -----
     if fix:
-        fixed.extend(_fix_role(path, raw, yes))
+        role_fixed = _fix_role(path, raw, yes)
+        fixed.extend(role_fixed)
+        # Re-inspect after fixes to update has_errors status
+        if role_fixed and has_errors:
+            try:
+                re_raw = load_raw_yaml(path, ValueError)
+                re_inspection = inspect_role_data(re_raw)
+                remaining_errors = [
+                    h for h in re_inspection.hits if h.severity == "error" and not h.auto_fixed
+                ]
+                if not remaining_errors and not re_inspection.schema_error:
+                    has_errors = False
+            except Exception:
+                pass  # keep original has_errors
 
     return has_errors, fixed
 
 
 def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
-    """Apply role-level fixes: missing extras and spec_version bump."""
+    """Apply role-level fixes: missing extras, deprecation patches, and spec_version bump."""
+    import yaml
+
     from initrunner.cli._helpers import install_extra
-    from initrunner.services.doctor import build_role_fix_plan, bump_spec_version_text
+    from initrunner.services.doctor import (
+        build_role_fix_plan,
+        bump_spec_version_text,
+        patch_deprecation_text,
+    )
 
     plan = build_role_fix_plan(raw)
     fixed: list[str] = []
@@ -409,6 +432,29 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
         ):
             if install_extra(gap.extras_name):
                 fixed.append(f"Installed initrunner[{gap.extras_name}]")
+
+    # --- Fixable deprecations (surgical text edit, preserves formatting) ---
+    applied_deprecation_fixes = False
+    for hit in plan.fixable_deprecations:
+        label = f"Fix {hit.id} ({hit.field_path}: {hit.original_value} -> "
+        if hit.id == "DEP001":
+            label += "memory.semantic.max_memories)"
+        else:
+            label += "lancedb)"
+        if yes or typer.confirm(f"{label}?", default=True):
+            try:
+                text = path.read_text(encoding="utf-8")
+                text = patch_deprecation_text(text, hit)
+                path.write_text(text, encoding="utf-8")
+                fixed.append(f"Fixed {hit.id}: {hit.field_path}")
+                applied_deprecation_fixes = True
+            except ValueError as exc:
+                console.print(f"[yellow]Warning:[/yellow] {exc}")
+
+    # After deprecation fixes, re-evaluate for spec_version bump
+    if applied_deprecation_fixes:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        plan = build_role_fix_plan(raw)
 
     # --- Spec version bump (surgical text edit, preserves formatting) ---
     if plan.can_bump_spec_version:

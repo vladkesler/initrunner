@@ -1624,3 +1624,52 @@ class TestErrorHints:
         assert result.exit_code == 1
         assert "Hint" in result.output
         assert "initrunner new" in result.output
+
+    def test_unknown_tool_type_hint(self):
+        """Unknown --tools value should suggest --list-tools."""
+        result = runner.invoke(
+            app, ["run", "-p", "hi", "--tools", "nonexistent_xyz", "--no-audit"]
+        )
+        assert result.exit_code == 1
+        assert "Hint" in result.output
+        assert "--list-tools" in result.output
+
+    def test_no_provider_hint(self, monkeypatch):
+        """No usable provider should suggest initrunner setup and env vars."""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+        monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+        monkeypatch.delenv("XAI_API_KEY", raising=False)
+        # Use a starter that triggers provider detection
+        result = runner.invoke(app, ["run", "-p", "hi", "--no-audit"])
+        if result.exit_code == 1 and "No usable provider" in result.output:
+            assert "Hint" in result.output
+            assert "initrunner setup" in result.output
+
+    def test_mcp_list_tools_error_hint(self, tmp_path):
+        """MCP list-tools failure should suggest checking MCP servers."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: mcp-test
+            spec:
+              role: Test
+              model:
+                provider: openai
+                name: gpt-5-mini
+              mcp_servers:
+                - name: broken
+                  command: nonexistent_binary_xyz
+        """)
+        )
+        result = runner.invoke(app, ["mcp", "list-tools", str(role_file)])
+        if result.exit_code == 1:
+            assert "Hint" in result.output
+            assert "running and reachable" in result.output

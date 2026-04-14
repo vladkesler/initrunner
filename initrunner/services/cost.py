@@ -204,6 +204,71 @@ def cost_by_model_sync(
     ]
 
 
+@dataclass
+class ToolCostEntry:
+    tool_name: str
+    usage_count: int  # total number of individual tool calls
+    run_count: int  # distinct runs that used this tool
+    tokens_in: int
+    tokens_out: int
+    total_cost_usd: float | None
+    avg_cost_per_use: float | None
+
+
+def cost_by_tool_sync(
+    *,
+    agent_name: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    audit_db: Path | None = None,
+) -> list[ToolCostEntry]:
+    """Cost breakdown by tool name."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return []
+
+    with _AuditLogger(db_path) as logger:
+        rows = logger.cost_by_tool(agent_name=agent_name, since=since, until=until)
+
+    # Merge rows by tool_name (may have multiple model/provider combos)
+    from collections import defaultdict
+
+    by_tool: dict[str, dict] = defaultdict(
+        lambda: {"usage_count": 0, "run_count": 0, "tokens_in": 0, "tokens_out": 0, "costs": []}
+    )
+    for row in rows:
+        t = by_tool[row["tool_name"]]
+        t["usage_count"] += row["usage_count"]
+        t["run_count"] += row["run_count"]
+        t["tokens_in"] += row["tokens_in"]
+        t["tokens_out"] += row["tokens_out"]
+        t["costs"].append(_price_group(row))
+
+    entries = []
+    for name, data in by_tool.items():
+        total = _sum_costs(data["costs"])
+        entries.append(
+            ToolCostEntry(
+                tool_name=name,
+                usage_count=data["usage_count"],
+                run_count=data["run_count"],
+                tokens_in=data["tokens_in"],
+                tokens_out=data["tokens_out"],
+                total_cost_usd=total,
+                avg_cost_per_use=(
+                    round(total / data["usage_count"], 6)
+                    if total is not None and data["usage_count"]
+                    else None
+                ),
+            )
+        )
+    entries.sort(key=lambda e: (e.total_cost_usd is None, -(e.total_cost_usd or 0)))
+    return entries
+
+
 def cost_summary_sync(
     *,
     audit_db: Path | None = None,

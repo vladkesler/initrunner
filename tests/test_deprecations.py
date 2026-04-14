@@ -112,11 +112,12 @@ class TestApplyDeprecations:
     def test_zvec_role_ingest(self):
         data = _minimal_role_dict()
         data["spec"]["ingest"] = {"sources": ["*.md"], "store_backend": "zvec"}
-        _, hits = apply_deprecations(data, SchemaKind.ROLE)
+        migrated, hits = apply_deprecations(data, SchemaKind.ROLE)
         assert len(hits) == 1
         assert hits[0].id == "DEP002"
         assert hits[0].severity == "error"
-        assert not hits[0].auto_fixed
+        assert hits[0].auto_fixed
+        assert migrated["spec"]["ingest"]["store_backend"] == "lancedb"
 
     def test_zvec_role_memory(self):
         data = _minimal_role_dict()
@@ -193,17 +194,21 @@ class TestValidateRoleDict:
         with pytest.raises(ValueError, match="newer than the supported version"):
             validate_role_dict(data)
 
-    def test_error_hit_raises(self):
+    def test_auto_fixed_hit_does_not_raise(self):
+        """Auto-fixed deprecations (with migrate callables) should not raise."""
         data = _minimal_role_dict()
         data["spec"]["memory"] = {"max_memories": 500}
-        with pytest.raises(ValueError, match="DEP001"):
-            validate_role_dict(data)
+        role, hits = validate_role_dict(data)
+        assert any(h.id == "DEP001" and h.auto_fixed for h in hits)
+        # The migrated role should have semantic.max_memories instead
+        assert role.metadata.name == "test-agent"
 
-    def test_zvec_rejects(self):
+    def test_zvec_auto_fixed(self):
+        """zvec deprecation is auto-fixed and no longer raises."""
         data = _minimal_role_dict()
         data["spec"]["ingest"] = {"sources": ["*.md"], "store_backend": "zvec"}
-        with pytest.raises(ValueError, match="DEP002"):
-            validate_role_dict(data)
+        role, hits = validate_role_dict(data)
+        assert any(h.id == "DEP002" and h.auto_fixed for h in hits)
 
     def test_stale_version_accepted(self):
         """spec_version: 1 (stale) is accepted at runtime."""
@@ -224,10 +229,11 @@ class TestValidateFlowDict:
         assert flow.metadata.name == "test-flow"
         assert hits == []
 
-    def test_zvec_rejects(self):
+    def test_zvec_auto_fixed(self):
+        """zvec in flow is auto-fixed and no longer raises."""
         data = _minimal_flow_dict(shared_memory={"store_backend": "zvec"})
-        with pytest.raises(ValueError, match="DEP004"):
-            validate_flow_dict(data)
+        flow, hits = validate_flow_dict(data)
+        assert any(h.id == "DEP004" and h.auto_fixed for h in hits)
 
     def test_hard_break_kind_compose(self):
         """Old kind: Compose triggers a clear migration error."""
@@ -267,10 +273,11 @@ class TestValidateTeamDict:
         assert team.metadata.name == "test-team"
         assert hits == []
 
-    def test_zvec_rejects(self):
+    def test_zvec_auto_fixed(self):
+        """zvec in team is auto-fixed and no longer raises."""
         data = _minimal_team_dict(shared_documents={"store_backend": "zvec"})
-        with pytest.raises(ValueError, match="DEP005"):
-            validate_team_dict(data)
+        team, hits = validate_team_dict(data)
+        assert any(h.id == "DEP005" and h.auto_fixed for h in hits)
 
 
 # ---------------------------------------------------------------------------
@@ -322,8 +329,8 @@ class TestInspectRoleData:
 
 
 class TestLoadRoleDeprecation:
-    def test_rejects_zvec(self, tmp_path: Path):
-        from initrunner.agent.loader import RoleLoadError, load_role
+    def test_auto_fixes_zvec(self, tmp_path: Path):
+        from initrunner.agent.loader import load_role
 
         content = textwrap.dedent("""\
             apiVersion: initrunner/v1
@@ -341,8 +348,8 @@ class TestLoadRoleDeprecation:
         """)
         p = tmp_path / "role.yaml"
         p.write_text(content)
-        with pytest.raises(RoleLoadError, match="DEP002"):
-            load_role(p)
+        role = load_role(p)
+        assert role.metadata.name == "test-zvec"
 
     def test_rejects_future_version(self, tmp_path: Path):
         from initrunner.agent.loader import RoleLoadError, load_role
@@ -364,8 +371,8 @@ class TestLoadRoleDeprecation:
         with pytest.raises(RoleLoadError, match="newer than the supported version"):
             load_role(p)
 
-    def test_rejects_max_memories(self, tmp_path: Path):
-        from initrunner.agent.loader import RoleLoadError, load_role
+    def test_auto_fixes_max_memories(self, tmp_path: Path):
+        from initrunner.agent.loader import load_role
 
         content = textwrap.dedent("""\
             apiVersion: initrunner/v1
@@ -382,5 +389,5 @@ class TestLoadRoleDeprecation:
         """)
         p = tmp_path / "role.yaml"
         p.write_text(content)
-        with pytest.raises(RoleLoadError, match="DEP001"):
-            load_role(p)
+        role = load_role(p)
+        assert role.metadata.name == "test-maxmem"

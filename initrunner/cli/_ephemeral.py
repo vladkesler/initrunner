@@ -38,10 +38,18 @@ def resolve_extra_tools(extra_types: list[str]) -> list[dict]:
                     f"is not supported as an ephemeral extra tool.\n"
                     f"  Supported: {', '.join(sorted(EPHEMERAL_TOOL_DEFAULTS))}"
                 )
+                console.print(
+                    "[dim]Hint:[/dim] This tool requires a role YAML."
+                    " Create one with [bold]initrunner new[/bold]."
+                )
             else:
                 console.print(
                     f"[red]Error:[/red] Unknown tool type '{name}'.\n"
                     f"  Supported: {', '.join(sorted(EPHEMERAL_TOOL_DEFAULTS))}"
+                )
+                console.print(
+                    "[dim]Hint:[/dim] Run [bold]initrunner run --list-tools[/bold]"
+                    " to see all options."
                 )
             raise typer.Exit(1)
 
