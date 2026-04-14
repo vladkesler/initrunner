@@ -350,7 +350,7 @@ initrunner examples copy code-reviewer # copy to current directory
 
 ## Upgrading
 
-Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version issues. Add `--fix` to auto-repair. See [Deprecations](docs/operations/deprecations.md).
+Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version issues. Add `--fix` to auto-repair. Use `--flow flow.yaml` to validate an entire flow and its referenced roles. See [Deprecations](docs/operations/deprecations.md).
 
 ## Community
 
@@ -365,4 +365,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.11</sub></p>
+<p align="center"><sub>v2026.4.12</sub></p>
