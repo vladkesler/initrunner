@@ -59,18 +59,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: dashboard/package.json
-
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: dashboard/pnpm-lock.yaml
 
-      - name: Debug pnpm version
-        run: pnpm --version && which pnpm && ls -la $(dirname $(which pnpm))
+      - name: Enable corepack
+        run: corepack enable
+        working-directory: dashboard
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
