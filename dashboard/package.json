@@ -2,6 +2,7 @@
   "name": "initrunner-dashboard",
   "version": "1.42.0",
   "private": true,
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -30,8 +31,10 @@
     "@dicebear/rings": "^9.4.2",
     "@xyflow/svelte": "^1.5.2"
   },
-  "overrides": {
-    "picomatch": ">=4.0.4",
-    "cookie": ">=0.7.0"
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=4.0.4",
+      "cookie": ">=0.7.0"
+    }
   }
 }

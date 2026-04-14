@@ -42,14 +42,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: dashboard/pnpm-lock.yaml
+      - name: Enable corepack
+        run: corepack enable
+        working-directory: dashboard
       - name: Build dashboard frontend
         run: bash scripts/build-dashboard.sh
 
