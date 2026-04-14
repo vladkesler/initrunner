@@ -28,8 +28,13 @@ RUN uv build --wheel --out-dir /build/dist && \
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim
 
+# Install ca-certificates (runtime) and Docker CLI (for sandbox socket passthrough)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    DOCKER_ARCH="$(uname -m)" && \
+    curl -fsSL "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-27.5.1.tgz" \
+      | tar xz --strip-components=1 -C /usr/local/bin docker/docker && \
+    apt-get purge -y curl && apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages and scripts from builder

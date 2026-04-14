@@ -46,6 +46,7 @@ All fields under `security.docker`:
 | `memory_limit` | `str` | `"256m"` | Memory limit in Docker format (`256m`, `1g`, etc.). |
 | `cpu_limit` | `float` | `1.0` | CPU limit (fractional cores, must be > 0). |
 | `read_only_rootfs` | `bool` | `true` | Mount root filesystem as read-only. A writable `/tmp` (64MB, noexec) is added automatically. |
+| `user` | `"auto" \| str \| null` | `"auto"` | Container user. `"auto"` runs as current uid:gid when writable mounts exist. `null` runs as root. Explicit `"1000:1000"` sets a specific uid:gid. |
 | `bind_mounts` | `list[BindMount]` | `[]` | Additional bind mounts into the container. |
 | `env_passthrough` | `list[str]` | `[]` | Environment variable names to pass into the container (filtered through env scrubbing). |
 | `extra_args` | `list[str]` | `[]` | Additional `docker run` flags. Security-sensitive flags are blocked. |
@@ -164,9 +165,19 @@ When `security.docker.enabled` is `true`:
 
 All three paths reuse the existing timeout handling, output formatting, and truncation logic. `SubprocessTimeout` is raised on timeout just as in the non-Docker path.
 
+## Custom Image Requirements
+
+When using a custom `image`, the image must meet these requirements:
+
+- **Interpreter on PATH** -- The Python tool expects `python` on `PATH`. The script tool uses the configured `interpreter` (default `/bin/sh`). If the interpreter is missing, the container exits with "not found".
+- **Writable /tmp** -- When `read_only_rootfs: true` (default), a writable `/tmp` is provided as a tmpfs (64MB, noexec, nosuid). The image does not need to provide `/tmp` itself.
+- **Working directory at /work** -- The tool's working directory is bind-mounted at `/work`. Your image should not expect a specific working directory.
+- **Code mount at /code** -- Python tool code is mounted at `/code/_run.py` (read-only).
+- **No special init system needed** -- InitRunner passes `--init` (tini) automatically.
+
 ## Limitations
 
 - **Docker overhead** -- Container startup adds latency (~100-500ms per invocation depending on image and system). Not suitable for high-frequency tool calls.
-- **Image availability** -- The specified image must be pulled or available locally. Docker will pull it on first use, which can be slow.
+- **Image pre-pull** -- The image is pulled automatically at agent startup if not locally available. For large images, pre-pull with `docker pull <image>` to avoid startup delay.
 - **No GPU passthrough** -- The sandbox does not configure `--gpus`. Add `--gpus=all` via `extra_args` if needed (note: this reduces isolation).
-- **Host paths** -- Bind mount source paths must exist on the host. Relative paths resolve against the role file's directory.
+- **Host paths** -- Bind mount source paths must exist on the host. Missing sources raise an error at container start time. Relative paths resolve against the role file's directory.

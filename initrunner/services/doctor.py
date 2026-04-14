@@ -116,6 +116,16 @@ class TriggerDiagnosis:
 
 
 @dataclass
+class DockerDiagnosis:
+    """Docker sandbox readiness for a role."""
+
+    enabled: bool
+    image: str
+    daemon_available: bool
+    image_available: bool | None  # None = not checked (shallow mode)
+
+
+@dataclass
 class RoleDiagnostics:
     """Aggregated deep diagnostics for a role file."""
 
@@ -124,6 +134,7 @@ class RoleDiagnostics:
     custom_tools: list[CustomToolDiagnosis]
     memory_store: MemoryStoreDiagnosis | None
     triggers: list[TriggerDiagnosis]
+    docker: DockerDiagnosis | None = None
 
 
 @dataclass
@@ -906,6 +917,42 @@ def diagnose_triggers(role: object) -> list[TriggerDiagnosis]:
     return results
 
 
+def diagnose_docker(role: object, *, deep: bool = False) -> DockerDiagnosis | None:
+    """Check Docker sandbox readiness for a role.
+
+    Returns ``None`` if Docker is not enabled in the role's security config.
+    """
+    spec = role.spec  # type: ignore[attr-defined]
+    docker_cfg = spec.security.docker
+    if not docker_cfg.enabled:
+        return None
+
+    from initrunner.agent.docker_sandbox import check_docker_available
+
+    daemon_ok = check_docker_available()
+
+    image_ok: bool | None = None
+    if deep and daemon_ok:
+        import subprocess as _sp
+
+        try:
+            result = _sp.run(
+                ["docker", "image", "inspect", docker_cfg.image],
+                capture_output=True,
+                timeout=10,
+            )
+            image_ok = result.returncode == 0
+        except Exception:
+            image_ok = False
+
+    return DockerDiagnosis(
+        enabled=True,
+        image=docker_cfg.image,
+        daemon_available=daemon_ok,
+        image_available=image_ok,
+    )
+
+
 def diagnose_role_deep(
     role: object,
     role_dir: Path | None,
@@ -922,6 +969,7 @@ def diagnose_role_deep(
         custom_tools=diagnose_custom_tools(role, role_dir, deep=deep),
         memory_store=diagnose_memory_store(role, deep=deep),
         triggers=diagnose_triggers(role),
+        docker=diagnose_docker(role, deep=deep),
     )
 
 

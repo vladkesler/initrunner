@@ -72,16 +72,27 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
 
             from initrunner.agent.docker_sandbox import docker_run_python
 
+            # Resolve working directory: explicit config, else a temp dir
+            # that gets mounted at /work and cleaned up after execution.
+            docker_work_dir = config.working_dir
+            tmp_work: str | None = None
+            if docker_work_dir is None:
+                tmp_work = tempfile.mkdtemp(prefix="initrunner_docker_work_")
+                docker_work_dir = tmp_work
+
             try:
                 stdout, stderr, returncode = docker_run_python(
                     code,
                     docker_config,
                     timeout=config.timeout_seconds,
-                    work_dir=config.working_dir,
+                    work_dir=docker_work_dir,
                     role_dir=role_dir,
                 )
             except SubprocessTimeout as exc:
                 return str(exc)
+            finally:
+                if tmp_work is not None:
+                    shutil.rmtree(tmp_work, ignore_errors=True)
 
             return format_subprocess_output(
                 stdout, stderr, returncode=returncode, max_bytes=config.max_output_bytes

@@ -96,9 +96,10 @@ def build_toolsets(
     install_audit_hooks(role)
 
     if role.spec.security.docker.enabled:
-        from initrunner.agent.docker_sandbox import require_docker
+        from initrunner.agent.docker_sandbox import ensure_image_available, require_docker
 
         require_docker()
+        ensure_image_available(role.spec.security.docker.image)
 
     for tool in tools:
         if is_run_scoped(tool.type):
