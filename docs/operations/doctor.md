@@ -1,6 +1,6 @@
 # Doctor
 
-The `doctor` command checks your InitRunner environment — API keys, provider SDKs, and service connectivity — in a single command. With `--quickstart`, it runs a real agent prompt to verify the entire stack end-to-end.
+The `doctor` command checks your InitRunner environment -- API keys, provider SDKs, and service connectivity -- in a single command. With `--role` or `--flow`, it validates tools, skills, memory stores, triggers, and MCP servers before you run anything. With `--quickstart`, it runs a real agent prompt to verify the entire stack end-to-end.
 
 ## Quick Start
 
@@ -11,8 +11,14 @@ initrunner doctor
 # Full end-to-end smoke test (makes a real API call)
 initrunner doctor --quickstart
 
-# Test a specific role file
-initrunner doctor --quickstart --role role.yaml
+# Test a specific role file (static checks)
+initrunner doctor --role role.yaml
+
+# Active checks: connect to MCP servers, import custom tools, open memory DBs
+initrunner doctor --role role.yaml --deep
+
+# Validate a flow and all its agent roles
+initrunner doctor --flow flow.yaml
 
 # Auto-fix: install missing SDKs, missing role extras, bump spec_version
 initrunner doctor --fix --role role.yaml
@@ -27,8 +33,16 @@ initrunner doctor --fix --yes --role role.yaml
 |--------|------|---------|-------------|
 | `--quickstart` | `bool` | `false` | Run a smoke prompt to verify end-to-end connectivity. |
 | `--role` | `Path` | -- | Role file to test. Used for `.env` loading and as the agent for `--quickstart`. |
+| `--flow` | `Path` | -- | Flow YAML file to validate. Checks flow topology and runs diagnostics on all referenced roles. |
+| `--deep` | `bool` | `false` | Run active checks (MCP connectivity, tool imports, DB open). Requires `--role` or `--flow`. |
+| `--skill-dir` | `Path` | -- | Extra skill search directory. Requires `--role` or `--flow`. |
 | `--fix` | `bool` | `false` | Interactively repair detected issues (missing SDKs, extras, stale spec_version). |
 | `--yes` / `-y` | `bool` | `false` | Auto-confirm all fix prompts. Required with `--fix` in non-interactive (piped) mode. |
+
+### Flag interactions
+
+- `--flow` is mutually exclusive with `--role`, `--quickstart`, and `--fix`.
+- `--deep` and `--skill-dir` require `--role` or `--flow`.
 
 ## Config Scan
 
@@ -140,6 +154,79 @@ security:
 
 See [Security Presets](../security/security.md#security-presets) for preset details and override syntax.
 
+## Role Diagnostics
+
+When `--role` is provided and the role parses successfully, doctor runs extended diagnostics on the role's runtime dependencies. These checks catch problems that schema validation alone cannot detect.
+
+### Static checks (default)
+
+These run automatically with `--role` and have no side effects:
+
+| Category | What it checks |
+|----------|----------------|
+| **Skills** | Resolves each skill reference (role-local, `INITRUNNER_SKILL_DIR`, `~/.initrunner/skills`). Reports unmet environment variable and binary requirements. |
+| **Custom tools** | Runs `importlib.util.find_spec()` to verify the module is locatable. Validates imports against sandbox policy via AST analysis. Adds `role_dir` to `sys.path` to match runtime behavior. |
+| **Memory store** | Resolves the store path and checks the parent directory exists and is writable. A missing store is reported as info (runtime creates it on first use). |
+| **Triggers** | Validates cron expressions (via `croniter`), checks timezone validity, verifies file_watch/heartbeat paths exist (CWD-relative, matching runtime), checks Telegram/Discord token env vars are set. |
+| **MCP servers** | Listed as "skipped" in static mode (connection requires spawning processes). |
+
+### Active checks (`--deep`)
+
+With `--deep`, doctor additionally performs checks that spawn processes, open connections, or execute code:
+
+| Category | What it checks |
+|----------|----------------|
+| **MCP servers** | Connects to each MCP server via `fastmcp.Client`, lists available tools, measures latency. Reports healthy (<3s), degraded (3-5s), or unhealthy (timeout/error). Servers with `defer: true` are skipped. |
+| **Custom tools** | Full `importlib.import_module()` plus function discovery. Verifies `function` exists if specified, or that auto-discovery finds public callables. |
+| **Memory store** | Opens the LanceDB database via the store factory and closes immediately. Confirms the DB is not corrupt. |
+
+Example output:
+
+```
+                            Role Diagnostics
+┏━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
+┃ Category    ┃ Component                     ┃ Status ┃ Details            ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
+│ mcp         │ mcp: stdio initrunner-brows.. │ ok     │ 565ms, 12 tools    │
+│ skill       │ ./skills/structured-extract.. │ ok     │ /path/to/SKILL.md  │
+│ memory      │ ~/.initrunner/memory/agent..  │ ok     │ accessible         │
+│ trigger     │ heartbeat                     │ warn   │ Checklist file ... │
+└─────────────┴───────────────────────────────┴────────┴────────────────────┘
+```
+
+## Flow Validation
+
+With `--flow`, doctor validates a flow definition and all its referenced agent roles:
+
+```bash
+initrunner doctor --flow flow.yaml
+initrunner doctor --flow flow.yaml --deep
+```
+
+**What it checks:**
+
+1. **Flow structure**: Parses the flow YAML, validates agent references, checks for dependency and delegation cycles (via `validate_yaml_file()`).
+2. **Role file existence**: Verifies each agent's role file exists relative to the flow file directory.
+3. **Recursive role validation**: Runs schema and deprecation checks on each referenced role.
+4. **Per-agent diagnostics**: Runs the same Role Diagnostics checks (skills, tools, memory, triggers, MCP) on each agent's role.
+
+Example output:
+
+```
+Flow structure is valid.
+
+Agent: content-watcher
+                            Role Diagnostics
+┏━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Category ┃ Component  ┃ Status ┃ Details                              ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ trigger  │ file_watch │ warn   │ Watch path does not exist: ./drafts/ │
+└──────────┴────────────┴────────┴──────────────────────────────────────┘
+
+Agent: researcher
+  (no issues)
+```
+
 ## Quickstart Smoke Test
 
 With `--quickstart`, the doctor runs a real agent prompt after the config scan:
@@ -225,11 +312,23 @@ $ initrunner doctor --fix --yes --role role.yaml
 # ╰──────────────╯
 ```
 
+## Dashboard API
+
+The dashboard exposes per-agent doctor diagnostics via the agents API:
+
+```
+GET /api/agents/{agent_id}/doctor?deep=false
+```
+
+Returns an `AgentDoctorResponse` with `role_checks` -- a flat list of check results in the same format as the system doctor endpoint. The `agent_id` is the RoleCache's opaque hex ID (same IDs used by all other agent endpoints).
+
 ## Use Cases
 
 - **First-time setup**: Run `initrunner doctor` after `initrunner setup` to verify everything is configured.
+- **Pre-deploy validation**: `initrunner doctor --role role.yaml --deep` catches MCP connectivity issues, missing tool modules, and corrupt memory stores before you deploy.
+- **Flow pre-flight**: `initrunner doctor --flow flow.yaml` validates topology, cycles, and all referenced roles in one command.
 - **CI/CD validation**: Add `initrunner doctor --fix --yes --role role.yaml` to your CI pipeline to auto-install missing extras.
-- **Debugging**: When a role isn't working, `doctor` quickly shows whether the issue is a missing API key, missing SDK, or unreachable service.
+- **Debugging**: When a role fails at runtime, `doctor --role role.yaml` quickly shows whether the issue is a missing skill, unavailable trigger, or unreachable MCP server.
 - **Multi-provider environments**: See at a glance which providers are configured and ready.
 
 ## Exit Codes
@@ -237,4 +336,4 @@ $ initrunner doctor --fix --yes --role role.yaml
 | Code | Meaning |
 |------|---------|
 | `0` | Config scan passed (without `--quickstart`), or smoke test passed |
-| `1` | Smoke test failed, error-level role issues found, or `--fix` without `--yes` in non-interactive mode |
+| `1` | Smoke test failed, error-level role/flow issues found, flag interaction errors, or `--fix` without `--yes` in non-interactive mode |

@@ -702,13 +702,7 @@ class TestPatchMaxMemoriesToSemantic:
     def test_existing_semantic_with_max_memories(self):
         from initrunner.services.doctor import _patch_max_memories_to_semantic
 
-        text = (
-            "spec:\n"
-            "  memory:\n"
-            "    max_memories: 500\n"
-            "    semantic:\n"
-            "      max_memories: 200\n"
-        )
+        text = "spec:\n  memory:\n    max_memories: 500\n    semantic:\n      max_memories: 200\n"
         result = _patch_max_memories_to_semantic(text)
         # Top-level max_memories removed; existing nested 200 takes precedence
         lines = [l for l in result.split("\n") if "max_memories" in l]
@@ -1085,3 +1079,534 @@ class TestDiagnoseSecurity:
         role = _make_role_with_triggers([])
         diag = diagnose_security(role)
         assert diag.policy_dir_set is False
+
+
+# ---------------------------------------------------------------------------
+# Extended diagnostics helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_role_with_tools(tools_raw: list[dict], *, skills: list[str] | None = None):
+    """Build a minimal RoleDefinition with specified tools."""
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+    from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+
+    return RoleDefinition(
+        apiVersion=ApiVersion.V1,
+        kind=Kind.AGENT,
+        metadata=RoleMetadata(name="test-diag", spec_version=2),
+        spec=AgentSpec(
+            role="Test",
+            model=ModelConfig(provider="openai", name="gpt-4o"),
+            tools=tools_raw,
+            skills=skills or [],
+        ),
+    )
+
+
+def _make_role_with_memory(store_path: str | None = None):
+    """Build a minimal RoleDefinition with memory configured."""
+    from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+    from initrunner.agent.schema.memory import MemoryConfig
+    from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+
+    return RoleDefinition(
+        apiVersion=ApiVersion.V1,
+        kind=Kind.AGENT,
+        metadata=RoleMetadata(name="test-mem", spec_version=2),
+        spec=AgentSpec(
+            role="Test",
+            model=ModelConfig(provider="openai", name="gpt-4o"),
+            memory=MemoryConfig(store_path=store_path),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Extended diagnostics tests
+# ---------------------------------------------------------------------------
+
+
+class TestDiagnoseMcpServers:
+    def test_no_mcp_tools(self) -> None:
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools([])
+        result = diagnose_mcp_servers(role, None)
+        assert result == []
+
+    def test_static_mode_skips(self) -> None:
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools([{"type": "mcp", "transport": "stdio", "command": "echo"}])
+        result = diagnose_mcp_servers(role, None, deep=False)
+        assert len(result) == 1
+        assert result[0].status == "skipped"
+
+    def test_deep_deferred_skipped(self) -> None:
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools(
+            [{"type": "mcp", "transport": "stdio", "command": "echo", "defer": True}]
+        )
+        result = diagnose_mcp_servers(role, None, deep=True)
+        assert len(result) == 1
+        assert result[0].status == "skipped"
+
+    def test_deep_healthy(self) -> None:
+        from initrunner.mcp.health import McpServerHealth
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools([{"type": "mcp", "transport": "stdio", "command": "echo"}])
+        mock_health = McpServerHealth(
+            status="healthy", latency_ms=42, tool_count=3, error=None, checked_at=""
+        )
+        with patch("initrunner.mcp.health.check_health_sync", return_value=mock_health):
+            result = diagnose_mcp_servers(role, None, deep=True)
+
+        assert len(result) == 1
+        assert result[0].status == "healthy"
+        assert result[0].latency_ms == 42
+        assert result[0].tool_count == 3
+
+    def test_deep_unhealthy(self) -> None:
+        from initrunner.mcp.health import McpServerHealth
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools([{"type": "mcp", "transport": "stdio", "command": "echo"}])
+        mock_health = McpServerHealth(
+            status="unhealthy", latency_ms=5000, tool_count=0, error="timeout", checked_at=""
+        )
+        with patch("initrunner.mcp.health.check_health_sync", return_value=mock_health):
+            result = diagnose_mcp_servers(role, None, deep=True)
+
+        assert result[0].status == "unhealthy"
+        assert result[0].error == "timeout"
+
+    def test_deep_exception_caught(self) -> None:
+        from initrunner.services.doctor import diagnose_mcp_servers
+
+        role = _make_role_with_tools([{"type": "mcp", "transport": "stdio", "command": "echo"}])
+        with patch("initrunner.mcp.health.check_health_sync", side_effect=RuntimeError("boom")):
+            result = diagnose_mcp_servers(role, None, deep=True)
+
+        assert result[0].status == "unhealthy"
+        assert "boom" in result[0].error
+
+
+class TestDiagnoseSkills:
+    def test_resolved_skill(self, tmp_path) -> None:
+        from initrunner.agent.schema.role import SkillDefinition, SkillFrontmatter
+        from initrunner.agent.skills import ResolvedSkill
+        from initrunner.services.doctor import diagnose_skills
+
+        skill_def = SkillDefinition(
+            frontmatter=SkillFrontmatter(name="test-skill", description="test"),
+            prompt="body",
+        )
+        resolved = ResolvedSkill(
+            definition=skill_def,
+            source_path=tmp_path / "SKILL.md",
+            requirement_statuses=[],
+        )
+        with patch("initrunner.agent.skills.resolve_skills", return_value=[resolved]):
+            result = diagnose_skills(["test-skill"], tmp_path, None)
+
+        assert len(result) == 1
+        assert result[0].resolved is True
+        assert result[0].unmet_requirements == []
+
+    def test_unmet_requirements(self, tmp_path) -> None:
+        from initrunner.agent.schema.role import SkillDefinition, SkillFrontmatter
+        from initrunner.agent.skills import RequirementStatus, ResolvedSkill
+        from initrunner.services.doctor import diagnose_skills
+
+        skill_def = SkillDefinition(
+            frontmatter=SkillFrontmatter(name="test-skill", description="test"),
+            prompt="body",
+        )
+        resolved = ResolvedSkill(
+            definition=skill_def,
+            source_path=tmp_path / "SKILL.md",
+            requirement_statuses=[
+                RequirementStatus(name="FOO_KEY", kind="env", met=False, detail="FOO_KEY not set"),
+                RequirementStatus(name="bar", kind="bin", met=True, detail=""),
+            ],
+        )
+        with patch("initrunner.agent.skills.resolve_skills", return_value=[resolved]):
+            result = diagnose_skills(["test-skill"], tmp_path, None)
+
+        assert result[0].resolved is True
+        assert len(result[0].unmet_requirements) == 1
+        assert "FOO_KEY" in result[0].unmet_requirements[0]
+
+    def test_unresolved_skill(self) -> None:
+        from initrunner.agent.skills import SkillLoadError
+        from initrunner.services.doctor import diagnose_skills
+
+        with patch(
+            "initrunner.agent.skills.resolve_skills",
+            side_effect=SkillLoadError("not found"),
+        ):
+            result = diagnose_skills(["missing-skill"], None, None)
+
+        assert len(result) == 1
+        assert result[0].resolved is False
+        assert "not found" in result[0].error
+
+
+class TestDiagnoseCustomTools:
+    def test_locatable_static(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools([{"type": "custom", "module": "json"}])
+        result = diagnose_custom_tools(role, None, deep=False)
+        assert len(result) == 1
+        assert result[0].locatable is True
+        assert result[0].importable is None  # not attempted
+
+    def test_not_locatable(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools([{"type": "custom", "module": "nonexistent_module_xyz_123"}])
+        result = diagnose_custom_tools(role, None, deep=False)
+        assert result[0].locatable is False
+        assert "not found" in result[0].error
+
+    def test_deep_importable(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools([{"type": "custom", "module": "json"}])
+        result = diagnose_custom_tools(role, None, deep=True)
+        assert result[0].locatable is True
+        assert result[0].importable is True
+
+    def test_deep_function_found(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools([{"type": "custom", "module": "json", "function": "dumps"}])
+        result = diagnose_custom_tools(role, None, deep=True)
+        assert result[0].callable_found is True
+
+    def test_deep_function_missing(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools(
+            [{"type": "custom", "module": "json", "function": "nonexistent_func_xyz"}]
+        )
+        result = diagnose_custom_tools(role, None, deep=True)
+        assert result[0].callable_found is False
+        assert "not found" in result[0].error
+
+    def test_role_dir_added_to_path(self, tmp_path) -> None:
+        """role_dir is added to sys.path during find_spec and cleaned up after."""
+        import sys
+
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        # Create a module in tmp_path
+        (tmp_path / "my_tool.py").write_text("def hello(): pass\n")
+
+        role = _make_role_with_tools([{"type": "custom", "module": "my_tool"}])
+        result = diagnose_custom_tools(role, tmp_path, deep=False)
+        assert result[0].locatable is True
+        # sys.path should be cleaned up
+        assert str(tmp_path) not in sys.path
+
+    def test_no_custom_tools(self) -> None:
+        from initrunner.services.doctor import diagnose_custom_tools
+
+        role = _make_role_with_tools([{"type": "datetime"}])
+        result = diagnose_custom_tools(role, None)
+        assert result == []
+
+
+class TestDiagnoseMemoryStore:
+    def test_no_memory_returns_none(self) -> None:
+        from initrunner.services.doctor import diagnose_memory_store
+
+        role = _make_role_with_tools([])
+        result = diagnose_memory_store(role)
+        assert result is None
+
+    def test_parent_writable(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_memory_store
+
+        role = _make_role_with_memory(str(tmp_path / "test.lance"))
+        result = diagnose_memory_store(role)
+        assert result is not None
+        assert result.parent_exists is True
+        assert result.parent_writable is True
+        assert result.db_opens is None  # static mode
+
+    def test_parent_missing(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_memory_store
+
+        role = _make_role_with_memory(str(tmp_path / "nonexistent" / "test.lance"))
+        result = diagnose_memory_store(role)
+        assert result is not None
+        assert result.parent_exists is False
+
+    def test_deep_db_opens(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_memory_store
+
+        role = _make_role_with_memory(str(tmp_path / "test.lance"))
+        # Create the store path so deep mode attempts open
+        (tmp_path / "test.lance").mkdir()
+
+        mock_store = MagicMock()
+        with patch("initrunner.stores.factory.create_memory_store", return_value=mock_store):
+            result = diagnose_memory_store(role, deep=True)
+
+        assert result.db_opens is True
+        mock_store.close.assert_called_once()
+
+    def test_deep_db_open_fails(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_memory_store
+
+        role = _make_role_with_memory(str(tmp_path / "test.lance"))
+        (tmp_path / "test.lance").mkdir()
+
+        with patch(
+            "initrunner.stores.factory.create_memory_store",
+            side_effect=RuntimeError("corrupt"),
+        ):
+            result = diagnose_memory_store(role, deep=True)
+
+        assert result.db_opens is False
+        assert "corrupt" in result.error
+
+
+class TestDiagnoseTriggers:
+    def test_cron_valid(self) -> None:
+        from initrunner.services.doctor import diagnose_triggers
+
+        role = _make_role_with_triggers(["cron"])
+        result = diagnose_triggers(role)
+        assert len(result) == 1
+        assert result[0].trigger_type == "cron"
+        assert result[0].issues == []
+
+    def test_telegram_token_missing(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_triggers
+
+        monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+        role = _make_role_with_triggers(["telegram"])
+        result = diagnose_triggers(role)
+        assert len(result) == 1
+        assert any("TELEGRAM_BOT_TOKEN" in issue for issue in result[0].issues)
+
+    def test_telegram_token_set(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_triggers
+
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok-123")
+        role = _make_role_with_triggers(["telegram"])
+        result = diagnose_triggers(role)
+        assert result[0].issues == []
+
+    def test_discord_token_missing(self, monkeypatch) -> None:
+        from initrunner.services.doctor import diagnose_triggers
+
+        monkeypatch.delenv("DISCORD_BOT_TOKEN", raising=False)
+        role = _make_role_with_triggers(["discord"])
+        result = diagnose_triggers(role)
+        assert any("DISCORD_BOT_TOKEN" in issue for issue in result[0].issues)
+
+    def test_file_watch_paths_missing(self, tmp_path) -> None:
+        from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+        from initrunner.services.doctor import diagnose_triggers
+
+        role = RoleDefinition(
+            apiVersion=ApiVersion.V1,
+            kind=Kind.AGENT,
+            metadata=RoleMetadata(name="test-fw", spec_version=2),
+            spec=AgentSpec(
+                role="Test",
+                model=ModelConfig(provider="openai", name="gpt-4o"),
+                triggers=[{"type": "file_watch", "paths": [str(tmp_path / "nope")]}],
+            ),
+        )
+        result = diagnose_triggers(role)
+        assert any("does not exist" in issue for issue in result[0].issues)
+
+    def test_file_watch_paths_exist(self, tmp_path) -> None:
+        from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+        from initrunner.services.doctor import diagnose_triggers
+
+        watch_dir = tmp_path / "watched"
+        watch_dir.mkdir()
+        role = RoleDefinition(
+            apiVersion=ApiVersion.V1,
+            kind=Kind.AGENT,
+            metadata=RoleMetadata(name="test-fw", spec_version=2),
+            spec=AgentSpec(
+                role="Test",
+                model=ModelConfig(provider="openai", name="gpt-4o"),
+                triggers=[{"type": "file_watch", "paths": [str(watch_dir)]}],
+            ),
+        )
+        result = diagnose_triggers(role)
+        assert result[0].issues == []
+
+    def test_webhook_valid_port(self) -> None:
+        from initrunner.services.doctor import diagnose_triggers
+
+        role = _make_role_with_triggers(["webhook"])
+        result = diagnose_triggers(role)
+        # Default port 8080 is valid
+        assert result[0].issues == []
+
+
+class TestDiagnoseFlow:
+    def test_valid_flow(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_flow
+
+        # Create a minimal role file
+        role_yaml = tmp_path / "role.yaml"
+        role_yaml.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: test-agent
+              spec_version: 2
+            spec:
+              role: Test
+              model:
+                provider: openai
+                name: gpt-4o
+            """)
+        )
+        flow_yaml = tmp_path / "flow.yaml"
+        flow_yaml.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Flow
+            metadata:
+              name: test-flow
+            spec:
+              agents:
+                agent-a:
+                  role: role.yaml
+            """)
+        )
+        diag = diagnose_flow(flow_yaml)
+        assert diag.flow_valid is True
+        assert "agent-a" in diag.agent_diagnostics
+
+    def test_flow_missing_role(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_flow
+
+        flow_yaml = tmp_path / "flow.yaml"
+        flow_yaml.write_text(
+            textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Flow
+            metadata:
+              name: test-flow
+            spec:
+              agents:
+                agent-a:
+                  role: nonexistent.yaml
+            """)
+        )
+        diag = diagnose_flow(flow_yaml)
+        assert diag.flow_valid is False
+        assert "agent-a" in diag.missing_roles
+
+    def test_flow_parse_error(self, tmp_path) -> None:
+        from initrunner.services.doctor import diagnose_flow
+
+        flow_yaml = tmp_path / "flow.yaml"
+        flow_yaml.write_text("not: valid: yaml: [")
+        diag = diagnose_flow(flow_yaml)
+        assert diag.flow_valid is False
+
+
+class TestDiagnoseRoleDeep:
+    def test_aggregates_all_checks(self) -> None:
+        from initrunner.services.doctor import diagnose_role_deep
+
+        role = _make_role_with_triggers(["cron"])
+        diag = diagnose_role_deep(role, None)
+        assert isinstance(diag.mcp_servers, list)
+        assert isinstance(diag.skills, list)
+        assert isinstance(diag.custom_tools, list)
+        assert isinstance(diag.triggers, list)
+        assert len(diag.triggers) == 1
+
+
+class TestRoleDiagnosticsToChecks:
+    def test_conversion(self) -> None:
+        from initrunner.services.doctor import (
+            McpDiagnosis,
+            MemoryStoreDiagnosis,
+            RoleDiagnostics,
+            SkillDiagnosis,
+            TriggerDiagnosis,
+            role_diagnostics_to_checks,
+        )
+
+        diag = RoleDiagnostics(
+            mcp_servers=[
+                McpDiagnosis("test-mcp", "healthy", 42, 3, None),
+            ],
+            skills=[
+                SkillDiagnosis("my-skill", True, "/path", [], None),
+            ],
+            custom_tools=[],
+            memory_store=MemoryStoreDiagnosis("/store", True, True, None, None),
+            triggers=[
+                TriggerDiagnosis("cron", "cron: 0 * * * *", []),
+            ],
+        )
+        checks = role_diagnostics_to_checks(diag)
+        assert len(checks) == 4
+        assert checks[0]["status"] == "ok"
+        assert checks[0]["name"] == "mcp: test-mcp"
+
+
+# ---------------------------------------------------------------------------
+# CLI flag interaction tests
+# ---------------------------------------------------------------------------
+
+
+class TestDoctorFlagInteractions:
+    def test_role_and_flow_mutually_exclusive(self, tmp_path) -> None:
+        role = tmp_path / "role.yaml"
+        role.touch()
+        flow = tmp_path / "flow.yaml"
+        flow.touch()
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(role), "--flow", str(flow)])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output
+
+    def test_deep_requires_role_or_flow(self) -> None:
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--deep"])
+        assert result.exit_code == 1
+        assert "--deep requires" in result.output
+
+    def test_flow_and_quickstart_mutually_exclusive(self, tmp_path) -> None:
+        flow = tmp_path / "flow.yaml"
+        flow.touch()
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--flow", str(flow), "--quickstart"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output
+
+    def test_flow_and_fix_mutually_exclusive(self, tmp_path) -> None:
+        flow = tmp_path / "flow.yaml"
+        flow.touch()
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--flow", str(flow), "--fix", "--yes"])
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output

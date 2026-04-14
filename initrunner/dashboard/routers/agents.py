@@ -11,9 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not
 from initrunner.dashboard.deps import RoleCache, SkillCache, get_role_cache, get_skill_cache
 from initrunner.dashboard.schemas import (
     AgentDetail,
+    AgentDoctorResponse,
     AgentSummary,
     BudgetProgressResponse,
     DeleteResponse,
+    DoctorCheck,
     ItemSummary,
     SkillRef,
     TimelineResponse,
@@ -179,6 +181,34 @@ async def get_agent_detail(
 
     skill_refs = _resolve_skill_refs(dr, skill_cache)
     return _detail_from(agent_id, dr, skill_refs=skill_refs)
+
+
+def _run_agent_doctor(discovered, *, deep: bool) -> list[DoctorCheck]:
+    """Run extended diagnostics for a single discovered agent."""
+    from initrunner.services.doctor import diagnose_role_deep, role_diagnostics_to_checks
+
+    if discovered.role is None:
+        return [DoctorCheck(name="role", status="fail", message=discovered.error or "Invalid role")]
+
+    diag = diagnose_role_deep(
+        discovered.role,
+        discovered.path.parent,
+        deep=deep,
+    )
+    return [DoctorCheck(**c) for c in role_diagnostics_to_checks(diag)]
+
+
+@router.get("/{agent_id}/doctor")
+async def agent_doctor(
+    agent_id: str,
+    role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+    deep: bool = False,
+) -> AgentDoctorResponse:
+    dr = role_cache.get(agent_id)
+    if dr is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    checks = await asyncio.to_thread(_run_agent_doctor, dr, deep=deep)
+    return AgentDoctorResponse(role_checks=checks)
 
 
 def _resolve_skill_refs(discovered, skill_cache: SkillCache) -> list[SkillRef]:

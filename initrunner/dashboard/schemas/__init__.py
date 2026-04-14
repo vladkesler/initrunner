@@ -117,6 +117,7 @@ from initrunner.dashboard.schemas.skills import (
     SkillToolSummary,
 )
 from initrunner.dashboard.schemas.system import (
+    AgentDoctorResponse,
     DefaultModelResponse,
     DoctorCheck,
     DoctorResponse,
@@ -155,6 +156,7 @@ __all__ = [
     "AgentCostResponse",
     # agents
     "AgentDetail",
+    "AgentDoctorResponse",
     # _common
     "AgentSlotModel",
     "AgentSlotOption",
