@@ -30,8 +30,10 @@
     "@dicebear/rings": "^9.4.2",
     "@xyflow/svelte": "^1.5.2"
   },
-  "overrides": {
-    "picomatch": ">=4.0.4",
-    "cookie": ">=0.7.0"
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=4.0.4",
+      "cookie": ">=0.7.0"
+    }
   }
 }
