@@ -271,6 +271,7 @@ class DockerSandboxConfig(BaseModel):
     memory_limit: str = "256m"
     cpu_limit: Annotated[float, Field(gt=0)] = 1.0
     read_only_rootfs: bool = True
+    user: Literal["auto"] | str | None = "auto"
     bind_mounts: list[BindMount] = Field(default_factory=list)
     env_passthrough: list[str] = Field(default_factory=list)
     extra_args: list[str] = Field(default_factory=list)

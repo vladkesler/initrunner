@@ -18,6 +18,9 @@ services:
     volumes:
       # Mount custom roles here to override seeded examples:
       # - ./roles:/data/roles
+      # Uncomment to enable Docker sandbox (security.docker.enabled: true).
+      # WARNING: This gives the container full control over the host Docker daemon.
+      # - /var/run/docker.sock:/var/run/docker.sock
       - initrunner-data:/data
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

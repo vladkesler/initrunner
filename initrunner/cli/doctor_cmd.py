@@ -542,6 +542,7 @@ def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
         and not diag.custom_tools
         and diag.memory_store is None
         and not diag.triggers
+        and diag.docker is None
     ):
         return
 
@@ -630,6 +631,22 @@ def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
             status = "[green]ok[/green]"
             details = trig.label
         table.add_row("trigger", trig.trigger_type, status, details)
+
+    if diag.docker is not None:
+        dk = diag.docker
+        if not dk.daemon_available:
+            status = "[red]fail[/red]"
+            details = "Docker daemon not available"
+        elif dk.image_available is False:
+            status = "[yellow]warn[/yellow]"
+            details = f"image '{dk.image}' not pulled locally; run `docker pull {dk.image}`"
+        elif dk.image_available is True:
+            status = "[green]ok[/green]"
+            details = f"image '{dk.image}' available"
+        else:
+            status = "[green]ok[/green]"
+            details = f"daemon ready; use --deep to check image '{dk.image}'"
+        table.add_row("docker", "sandbox", status, details)
 
     console.print()
     console.print(table)

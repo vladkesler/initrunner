@@ -1021,7 +1021,7 @@ def _make_role_with_triggers(trigger_types: list[str], preset: str | None = None
         spec=AgentSpec(
             role="Test",
             model=ModelConfig(provider="openai", name="gpt-4o"),
-            triggers=triggers_raw,
+            triggers=triggers_raw,  # type: ignore[invalid-argument-type]
             security=security,
         ),
     )
@@ -1100,7 +1100,7 @@ def _make_role_with_tools(tools_raw: list[dict], *, skills: list[str] | None = N
         spec=AgentSpec(
             role="Test",
             model=ModelConfig(provider="openai", name="gpt-4o"),
-            tools=tools_raw,
+            tools=tools_raw,  # type: ignore[invalid-argument-type]
             skills=skills or [],
         ),
     )
@@ -1193,6 +1193,7 @@ class TestDiagnoseMcpServers:
             result = diagnose_mcp_servers(role, None, deep=True)
 
         assert result[0].status == "unhealthy"
+        assert result[0].error is not None
         assert "boom" in result[0].error
 
 
@@ -1254,6 +1255,7 @@ class TestDiagnoseSkills:
 
         assert len(result) == 1
         assert result[0].resolved is False
+        assert result[0].error is not None
         assert "not found" in result[0].error
 
 
@@ -1273,6 +1275,7 @@ class TestDiagnoseCustomTools:
         role = _make_role_with_tools([{"type": "custom", "module": "nonexistent_module_xyz_123"}])
         result = diagnose_custom_tools(role, None, deep=False)
         assert result[0].locatable is False
+        assert result[0].error is not None
         assert "not found" in result[0].error
 
     def test_deep_importable(self) -> None:
@@ -1298,6 +1301,7 @@ class TestDiagnoseCustomTools:
         )
         result = diagnose_custom_tools(role, None, deep=True)
         assert result[0].callable_found is False
+        assert result[0].error is not None
         assert "not found" in result[0].error
 
     def test_role_dir_added_to_path(self, tmp_path) -> None:
@@ -1360,6 +1364,7 @@ class TestDiagnoseMemoryStore:
         with patch("initrunner.stores.factory.create_memory_store", return_value=mock_store):
             result = diagnose_memory_store(role, deep=True)
 
+        assert result is not None
         assert result.db_opens is True
         mock_store.close.assert_called_once()
 
@@ -1375,7 +1380,9 @@ class TestDiagnoseMemoryStore:
         ):
             result = diagnose_memory_store(role, deep=True)
 
+        assert result is not None
         assert result.db_opens is False
+        assert result.error is not None
         assert "corrupt" in result.error
 
 
@@ -1426,7 +1433,7 @@ class TestDiagnoseTriggers:
             spec=AgentSpec(
                 role="Test",
                 model=ModelConfig(provider="openai", name="gpt-4o"),
-                triggers=[{"type": "file_watch", "paths": [str(tmp_path / "nope")]}],
+                triggers=[{"type": "file_watch", "paths": [str(tmp_path / "nope")]}],  # type: ignore[invalid-argument-type]
             ),
         )
         result = diagnose_triggers(role)
@@ -1446,7 +1453,7 @@ class TestDiagnoseTriggers:
             spec=AgentSpec(
                 role="Test",
                 model=ModelConfig(provider="openai", name="gpt-4o"),
-                triggers=[{"type": "file_watch", "paths": [str(watch_dir)]}],
+                triggers=[{"type": "file_watch", "paths": [str(watch_dir)]}],  # type: ignore[invalid-argument-type]
             ),
         )
         result = diagnose_triggers(role)

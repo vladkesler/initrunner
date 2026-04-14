@@ -120,15 +120,16 @@ def _make_script_fn(
             if err:
                 return err
 
-        # Build environment: scrubbed base + defaults + explicit params
-        env = scrub_env()
-        for key, value in _defaults.items():
-            env[key.upper()] = value
-        for key, value in kwargs.items():
-            env[key.upper()] = str(value)
-
         if _docker_config is not None and _docker_config.enabled:
             from initrunner.agent.docker_sandbox import docker_run_script
+
+            # Only pass script-specific parameters, not the full host env.
+            # env_passthrough in DockerSandboxConfig handles explicit host vars.
+            script_env: dict[str, str] = {}
+            for key, value in _defaults.items():
+                script_env[key.upper()] = value
+            for key, value in kwargs.items():
+                script_env[key.upper()] = str(value)
 
             try:
                 stdout, stderr, returncode = docker_run_script(
@@ -137,7 +138,7 @@ def _make_script_fn(
                     _docker_config,
                     timeout=_timeout,
                     work_dir=_work_dir,
-                    env=env,
+                    env=script_env,
                     role_dir=_role_dir,
                 )
             except SubprocessTimeout:
@@ -148,6 +149,13 @@ def _make_script_fn(
             return format_subprocess_output(
                 stdout, stderr, returncode=returncode, max_bytes=_max_output
             )
+
+        # Non-Docker path: scrubbed base + defaults + explicit params
+        env = scrub_env()
+        for key, value in _defaults.items():
+            env[key.upper()] = value
+        for key, value in kwargs.items():
+            env[key.upper()] = str(value)
 
         cmd = [_interpreter]
 

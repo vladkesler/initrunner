@@ -492,8 +492,8 @@ class TestInitRunnerWorker:
         mock_audit = MagicMock()
 
         worker = InitRunnerWorker(
-            broker=mock_broker,
-            storage=mock_storage,
+            broker=mock_broker,  # type: ignore[unknown-argument]
+            storage=mock_storage,  # type: ignore[unknown-argument]
             agent=mock_agent,
             role=mock_role,
             audit_logger=mock_audit,
@@ -553,8 +553,8 @@ class TestInitRunnerWorker:
         mock_storage = AsyncMock()
 
         worker = InitRunnerWorker(
-            broker=mock_broker,
-            storage=mock_storage,
+            broker=mock_broker,  # type: ignore[unknown-argument]
+            storage=mock_storage,  # type: ignore[unknown-argument]
             agent=mock_agent,
             role=mock_role,
         )

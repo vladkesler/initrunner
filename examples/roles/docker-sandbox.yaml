@@ -16,8 +16,6 @@ spec:
     Report results clearly. If something fails due to sandbox restrictions
     (network, filesystem), explain the restriction to the user.
   model:
-    provider: openai
-    name: gpt-4.1-mini
     temperature: 0.1
     max_tokens: 4096
   tools:

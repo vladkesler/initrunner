@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026.4.13] - 2026-04-14
+
+### Added
+- **Docker sandbox: container cleanup on timeout** -- timed-out containers are now killed via `docker rm -f` instead of leaking. Each container gets a unique name (`initrunner-{uuid}`) and `initrunner.managed=true` label for identification
+- **Docker sandbox: image pre-pull at startup** -- `ensure_image_available()` checks and pulls the configured image before the first tool call, with logging and clear error messages for private/offline images. Also reported in `initrunner doctor --deep`
+- **Docker sandbox: `--user` flag** -- new `user` field (`"auto" | "<uid>:<gid>" | null`, default `"auto"`) runs containers as the current user when writable mounts exist, preventing root-owned output files
+- **Docker sandbox: `--init` flag** -- tini is now always used to reap zombie processes
+- **Docker sandbox: OOM detection** -- exit code 137 now appends a clear message suggesting to increase `memory_limit`
+- **Docker sandbox: bind mount validation** -- missing source paths raise an error at container start instead of Docker silently creating empty root-owned directories
+- **Docker CLI in published image** -- the container image now includes the Docker CLI for socket-passthrough sandbox support. Docker Compose file includes a commented socket mount with security warning
+- **Multi-platform Docker image** -- CI now builds `linux/amd64` and `linux/arm64` images via QEMU
+
+### Changed
+- **Docker sandbox: script tool no longer leaks host environment** -- when Docker is enabled, only script parameter values are passed into the container. `env_passthrough` in the Docker config handles explicit host vars
+- **Docker sandbox: Python tool always mounts a working directory** -- when `working_dir` is not set, a temp dir is created, mounted at `/work`, and cleaned up after execution
+- **Example role `docker-sandbox.yaml` uses model auto-detection** -- removed hardcoded `provider: openai` / `name: gpt-4.1-mini`
+
+### Fixed
+- **16 `ty` type errors in `test_doctor.py` and `test_a2a.py`** -- added missing `None` guards and type-ignore annotations for external SDK types
+- **CI: pnpm version 9 -> 10** -- matches local dev toolchain, fixes `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH` in release/testpypi/security workflows
+
 ## [2026.4.12] - 2026-04-14
 
 ### Added

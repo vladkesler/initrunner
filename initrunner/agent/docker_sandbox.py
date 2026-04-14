@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from uuid import uuid4
 
 from initrunner.agent._subprocess import SubprocessTimeout, scrub_env
 from initrunner.agent.schema.security import DockerSandboxConfig
+
+logger = logging.getLogger(__name__)
 
 
 class DockerNotAvailableError(RuntimeError):
@@ -39,6 +44,65 @@ def require_docker() -> None:
         )
 
 
+def ensure_image_available(image: str, *, timeout: int = 300) -> None:
+    """Pull *image* if not locally available.
+
+    Raises :class:`DockerNotAvailableError` on failure with a message that
+    distinguishes private/auth images from network issues.
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "image", "inspect", image],
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return  # already available
+    except (subprocess.TimeoutExpired, OSError):
+        pass  # fall through to pull
+
+    logger.info("Pulling Docker image '%s'...", image)
+    try:
+        result = subprocess.run(
+            ["docker", "pull", image],
+            capture_output=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise DockerNotAvailableError(
+            f"Timed out pulling Docker image '{image}' after {timeout}s. "
+            f"If this is a large image, try running `docker pull {image}` manually first."
+        ) from None
+    except OSError as exc:
+        raise DockerNotAvailableError(f"Failed to pull Docker image '{image}': {exc}") from None
+
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise DockerNotAvailableError(
+            f"Failed to pull Docker image '{image}'. "
+            f"If this is a private image, run `docker pull {image}` manually first.\n"
+            f"Docker output: {stderr}"
+        )
+    logger.info("Docker image '%s' pulled successfully.", image)
+
+
+def _generate_container_name() -> str:
+    """Generate a unique container name for tracking and cleanup."""
+    return f"initrunner-{uuid4().hex[:12]}"
+
+
+def _kill_container(name: str) -> None:
+    """Best-effort kill and remove a container by name."""
+    try:
+        subprocess.run(
+            ["docker", "rm", "-f", name],
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        pass  # cleanup failure must not mask the original error
+
+
 def _resolve_mount_source(source: str, role_dir: Path | None) -> str:
     """Resolve a mount source path.
 
@@ -54,6 +118,7 @@ def _resolve_mount_source(source: str, role_dir: Path | None) -> str:
 def _build_docker_cmd(
     config: DockerSandboxConfig,
     *,
+    container_name: str | None = None,
     work_dir: str | None = None,
     extra_mounts: list[tuple[str, str, bool]] | None = None,
     interactive: bool = False,
@@ -61,7 +126,11 @@ def _build_docker_cmd(
     env: dict[str, str] | None = None,
 ) -> list[str]:
     """Build the ``docker run --rm`` command prefix (without the final command)."""
-    cmd = ["docker", "run", "--rm"]
+    cmd = ["docker", "run", "--rm", "--init"]
+
+    if container_name:
+        cmd.extend(["--name", container_name])
+    cmd.extend(["--label", "initrunner.managed=true"])
 
     cmd.extend(["--network", config.network])
     cmd.extend(["-m", config.memory_limit])
@@ -73,9 +142,24 @@ def _build_docker_cmd(
 
     cmd.extend(["--pids-limit", "256"])
 
+    # Resolve --user flag before mounts so it applies to all file operations.
+    # "auto" maps to the current uid:gid when any writable host mount exists
+    # (including the automatic /work mount). None/null = run as root.
+    has_writable_mount = work_dir is not None or any(not m.read_only for m in config.bind_mounts)
+    if config.user == "auto":
+        if has_writable_mount:
+            cmd.extend(["--user", f"{os.getuid()}:{os.getgid()}"])
+    elif config.user is not None:
+        cmd.extend(["--user", config.user])
+
     # Bind mounts from config
     for mount in config.bind_mounts:
         resolved = _resolve_mount_source(mount.source, role_dir)
+        if not Path(resolved).exists():
+            raise ValueError(
+                f"Bind mount source '{mount.source}' (resolved to '{resolved}') "
+                f"does not exist on the host."
+            )
         ro = ":ro" if mount.read_only else ""
         cmd.extend(["-v", f"{resolved}:{mount.target}{ro}"])
 
@@ -111,6 +195,17 @@ def _build_docker_cmd(
     return cmd
 
 
+def _format_oom_hint(returncode: int, stderr: str, config: DockerSandboxConfig) -> str:
+    """Append an OOM hint to *stderr* when the container was OOM-killed."""
+    if returncode == 137:
+        hint = (
+            f"\nContainer killed (OOM). "
+            f"Increase security.docker.memory_limit (current: {config.memory_limit})."
+        )
+        return stderr + hint
+    return stderr
+
+
 def docker_run_command(
     tokens: list[str],
     config: DockerSandboxConfig,
@@ -126,7 +221,8 @@ def docker_run_command(
     Raises:
         SubprocessTimeout: If the container exceeds *timeout* seconds.
     """
-    cmd = _build_docker_cmd(config, work_dir=work_dir, role_dir=role_dir)
+    name = _generate_container_name()
+    cmd = _build_docker_cmd(config, container_name=name, work_dir=work_dir, role_dir=role_dir)
     cmd.extend(tokens)
 
     try:
@@ -136,13 +232,12 @@ def docker_run_command(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
+        _kill_container(name)
         raise SubprocessTimeout(timeout) from None
 
-    return (
-        result.stdout.decode("utf-8", errors="replace"),
-        result.stderr.decode("utf-8", errors="replace"),
-        result.returncode,
-    )
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
+    return (stdout, _format_oom_hint(result.returncode, stderr, config), result.returncode)
 
 
 def docker_run_python(
@@ -163,6 +258,7 @@ def docker_run_python(
     Raises:
         SubprocessTimeout: If the container exceeds *timeout* seconds.
     """
+    name = _generate_container_name()
     tmp_dir = tempfile.mkdtemp(prefix="initrunner_docker_py_")
     try:
         code_file = Path(tmp_dir) / "_run.py"
@@ -170,6 +266,7 @@ def docker_run_python(
 
         cmd = _build_docker_cmd(
             config,
+            container_name=name,
             work_dir=work_dir,
             extra_mounts=[(tmp_dir, "/code", True)],
             role_dir=role_dir,
@@ -183,13 +280,12 @@ def docker_run_python(
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired:
+            _kill_container(name)
             raise SubprocessTimeout(timeout) from None
 
-        return (
-            result.stdout.decode("utf-8", errors="replace"),
-            result.stderr.decode("utf-8", errors="replace"),
-            result.returncode,
-        )
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
+        return (stdout, _format_oom_hint(result.returncode, stderr, config), result.returncode)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -211,8 +307,10 @@ def docker_run_script(
     Raises:
         SubprocessTimeout: If the container exceeds *timeout* seconds.
     """
+    name = _generate_container_name()
     cmd = _build_docker_cmd(
         config,
+        container_name=name,
         work_dir=work_dir,
         interactive=True,
         role_dir=role_dir,
@@ -228,10 +326,9 @@ def docker_run_script(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
+        _kill_container(name)
         raise SubprocessTimeout(timeout) from None
 
-    return (
-        result.stdout.decode("utf-8", errors="replace"),
-        result.stderr.decode("utf-8", errors="replace"),
-        result.returncode,
-    )
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    stderr = result.stderr.decode("utf-8", errors="replace")
+    return (stdout, _format_oom_hint(result.returncode, stderr, config), result.returncode)
