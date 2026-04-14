@@ -69,6 +69,21 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: dashboard/pnpm-lock.yaml
 
+      - name: Debug lockfile
+        run: |
+          pnpm --version
+          node --version
+          md5sum dashboard/pnpm-lock.yaml
+          wc -c dashboard/pnpm-lock.yaml
+          head -15 dashboard/pnpm-lock.yaml
+          echo '---TAIL---'
+          tail -5 dashboard/pnpm-lock.yaml
+          echo '---DOC SEPS---'
+          grep -n '^---\|^\.\.\.' dashboard/pnpm-lock.yaml || echo 'none'
+          echo '---BYTES---'
+          od -c dashboard/pnpm-lock.yaml | head -3
+          od -c dashboard/pnpm-lock.yaml | tail -3
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: dashboard
