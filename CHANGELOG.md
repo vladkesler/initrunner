@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026.4.14] - 2026-04-14
+
+### Security
+- **Dashboard `cookie` dep bumped from 0.6.0 to 1.1.1** -- patches GHSA advisory where malicious cookie `name`/`path`/`domain` values could inject other cookie fields. `cookie` is a transitive dep via `@sveltejs/kit`, `@sveltejs/adapter-static`, and `bits-ui`; none have bumped upstream, so we pin via `pnpm.overrides`
+
+### Fixed
+- **CI pnpm pinning** -- replaced `pnpm/action-setup@v6` with `corepack` across `security.yml`, `release.yml`, and `testpypi.yml`. The v6 action hardcodes pnpm 11 beta in its bootstrap lockfile and silently ignores both `version:` and `packageManager`, which broke every workflow that uses a pnpm 10 lockfile (`ERR_PNPM_BROKEN_LOCKFILE`). Corepack reads `packageManager` from `dashboard/package.json` directly
+
+### Changed
+- **Dashboard `packageManager` field** -- `dashboard/package.json` now pins `pnpm@10.32.1` as the canonical dev/CI version. Contributors can run `corepack enable` once to auto-pin
+
 ## [2026.4.13] - 2026-04-14
 
 ### Added
