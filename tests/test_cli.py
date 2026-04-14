@@ -1627,9 +1627,7 @@ class TestErrorHints:
 
     def test_unknown_tool_type_hint(self):
         """Unknown --tools value should suggest --list-tools."""
-        result = runner.invoke(
-            app, ["run", "-p", "hi", "--tools", "nonexistent_xyz", "--no-audit"]
-        )
+        result = runner.invoke(app, ["run", "-p", "hi", "--tools", "nonexistent_xyz", "--no-audit"])
         assert result.exit_code == 1
         assert "Hint" in result.output
         assert "--list-tools" in result.output

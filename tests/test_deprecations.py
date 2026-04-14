@@ -207,7 +207,7 @@ class TestValidateRoleDict:
         """zvec deprecation is auto-fixed and no longer raises."""
         data = _minimal_role_dict()
         data["spec"]["ingest"] = {"sources": ["*.md"], "store_backend": "zvec"}
-        role, hits = validate_role_dict(data)
+        _role, hits = validate_role_dict(data)
         assert any(h.id == "DEP002" and h.auto_fixed for h in hits)
 
     def test_stale_version_accepted(self):
@@ -232,7 +232,7 @@ class TestValidateFlowDict:
     def test_zvec_auto_fixed(self):
         """zvec in flow is auto-fixed and no longer raises."""
         data = _minimal_flow_dict(shared_memory={"store_backend": "zvec"})
-        flow, hits = validate_flow_dict(data)
+        _flow, hits = validate_flow_dict(data)
         assert any(h.id == "DEP004" and h.auto_fixed for h in hits)
 
     def test_hard_break_kind_compose(self):
@@ -276,7 +276,7 @@ class TestValidateTeamDict:
     def test_zvec_auto_fixed(self):
         """zvec in team is auto-fixed and no longer raises."""
         data = _minimal_team_dict(shared_documents={"store_backend": "zvec"})
-        team, hits = validate_team_dict(data)
+        _team, hits = validate_team_dict(data)
         assert any(h.id == "DEP005" and h.auto_fixed for h in hits)
 
 

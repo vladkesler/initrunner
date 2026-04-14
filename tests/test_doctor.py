@@ -674,8 +674,8 @@ class TestPatchMaxMemoriesToSemantic:
         assert "semantic:" in result
         # The max_memories should be indented under semantic
         lines = result.split("\n")
-        sem_idx = next(i for i, l in enumerate(lines) if "semantic:" in l)
-        mm_idx = next(i for i, l in enumerate(lines) if "max_memories: 500" in l)
+        sem_idx = next(i for i, ln in enumerate(lines) if "semantic:" in ln)
+        mm_idx = next(i for i, ln in enumerate(lines) if "max_memories: 500" in ln)
         assert mm_idx == sem_idx + 1
 
     def test_existing_semantic_without_max_memories(self):
@@ -693,11 +693,13 @@ class TestPatchMaxMemoriesToSemantic:
         lines = result.split("\n")
         # No top-level max_memories as direct child of memory
         memory_children = [
-            l for l in lines if l.startswith("    ") and not l.startswith("      ") and l.strip()
+            ln
+            for ln in lines
+            if ln.startswith("    ") and not ln.startswith("      ") and ln.strip()
         ]
         assert not any("max_memories" in c for c in memory_children)
         # max_memories exists under semantic
-        assert any("      max_memories: 500" in l for l in lines)
+        assert any("      max_memories: 500" in ln for ln in lines)
 
     def test_existing_semantic_with_max_memories(self):
         from initrunner.services.doctor import _patch_max_memories_to_semantic
@@ -705,7 +707,7 @@ class TestPatchMaxMemoriesToSemantic:
         text = "spec:\n  memory:\n    max_memories: 500\n    semantic:\n      max_memories: 200\n"
         result = _patch_max_memories_to_semantic(text)
         # Top-level max_memories removed; existing nested 200 takes precedence
-        lines = [l for l in result.split("\n") if "max_memories" in l]
+        lines = [ln for ln in result.split("\n") if "max_memories" in ln]
         assert len(lines) == 1
         assert "200" in lines[0]
 
