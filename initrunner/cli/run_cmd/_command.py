@@ -400,6 +400,7 @@ def run(
         return
 
     if mode == RunMode.BOT:
+        assert bot is not None  # guaranteed by RunMode validation
         _dispatch_bot(
             role_file,
             bot,
