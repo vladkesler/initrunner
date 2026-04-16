@@ -1,7 +1,5 @@
 # Security Hardening Guide
 
-> Looking for a one-page scan of every shipping security layer with file paths and config keys? See [Layer reference](comparison.md).
-
 InitRunner includes a unified `SecurityPolicy` configuration surface that enforces content policies, rate limiting, tool sandboxing, and audit compliance across the execution pipeline. All security features are **optional and backward-compatible** -- existing roles without a `security:` key get safe defaults with all checks disabled.
 
 ## Supply Chain Security
