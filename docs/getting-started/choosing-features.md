@@ -2,6 +2,16 @@
 
 `AgentSpec` has 19 fields but only two are required: `role` and `model`. This page maps your goals to the specific fields you need to add. For interactive setup, use `initrunner setup` ([Setup Wizard](setup.md)). For a hands-on walkthrough, see the [Tutorial](tutorial.md).
 
+## First five minutes
+
+Three primitives carry 80% of what agents do. If this is your first time, read only these:
+
+- **Agent** is the thing you configure. One `role.yaml`, one `spec:` block.
+- **Tools** are what the agent can do. Add them under `spec.tools:`.
+- **Triggers** are when it runs. Add them under `spec.triggers:`, then launch with `--daemon`.
+
+Everything below this section (memory, ingestion, reasoning, autonomy, multi-agent patterns, security hardening) is optional. Reach for it when you need it, not before.
+
 ## Every Agent Needs These
 
 ```yaml

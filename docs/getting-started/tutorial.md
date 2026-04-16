@@ -4,6 +4,16 @@ This hands-on tutorial walks you through building a **site monitor agent** — a
 
 Each step builds on the previous one and shows the **complete YAML** so you can copy-paste at any point.
 
+## The three primitives
+
+InitRunner has three moving parts. Everything else is a power-up.
+
+- **Agent** is the thing you configure. One YAML file, one `spec:` block. Step 1 below.
+- **Tools** are what the agent can do: `web_reader`, `filesystem`, `git`, `shell`, `sql`, and anything exposed by an MCP server. Step 3 below.
+- **Triggers** are when it runs: cron, webhook, file change, chat message, or nothing (run it yourself). Step 7 below.
+
+The steps between those (interactive mode, autonomous mode, memory, ingestion) are optional. Read them when you want them. A working agent does not need any of them.
+
 ## Prerequisites
 
 - **Python 3.11+** installed

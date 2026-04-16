@@ -33,6 +33,14 @@ initrunner run researcher -a -p "Audit this codebase"   # let it work alone
 initrunner run researcher --daemon                      # runs 24/7, reacts to triggers
 ```
 
+Three nouns. Learn these first:
+
+- **Agent** is the thing you configure. One YAML file, one `spec:` block.
+- **Tools** are what the agent can do. `web_reader`, `filesystem`, `git`, `shell`, `sql`, and anything exposed by an MCP server.
+- **Triggers** are when it runs. Cron, webhook, file change, chat message, or nothing (run it yourself).
+
+Everything else in this README (memory, ingestion, autonomy, multi-agent, security) is optional. Skip it until you need it.
+
 ## Quickstart
 
 ```bash
@@ -148,21 +156,13 @@ initrunner run role.yaml --daemon   # runs until Ctrl+C
 
 Six trigger types: cron, webhook, file_watch, heartbeat, telegram, discord. The daemon hot-reloads role changes without restarting and runs up to 4 triggers concurrently. See [Triggers](docs/core/triggers.md).
 
-### Autopilot
-
-`--autopilot` is `--daemon` where every trigger gets the full autonomous loop. Someone messages your Telegram bot "find me flights from NYC to London next week." In daemon mode, you get one shot at an answer. In autopilot, the agent searches, compares options, checks dates, and sends back something worth reading.
-
-```bash
-initrunner run role.yaml --autopilot
-```
-
-You can also be selective. Set `autonomous: true` on individual triggers and leave the rest single-shot:
+Pair daemon with autonomous and you get `--autopilot`: every trigger fires the full plan-execute-reflect loop instead of a single-shot reply. Use this when a Telegram message like "find me flights from NYC to London next week" should kick off real work, not a one-line answer. Or set `autonomous: true` per trigger:
 
 ```yaml
 spec:
   triggers:
     - type: telegram
-      autonomous: true          # think, research, then reply
+      autonomous: true          # research, then reply
     - type: cron
       schedule: "0 9 * * 1"
       prompt: "Generate the weekly status report."
@@ -231,6 +231,10 @@ spec:
 ```
 
 Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to calculate actual spend per model and provider. Every run logs its cost to the audit trail. The dashboard shows cost analytics across agents and time ranges. See [Cost Tracking](docs/core/cost-tracking.md).
+
+---
+
+*Everything above is the first hour. Everything below is optional: reach for it when you need it.*
 
 ## Multi-agent orchestration
 
