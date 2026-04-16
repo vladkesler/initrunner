@@ -217,7 +217,7 @@ export INITRUNNER_POLICY_DIR=./policies
 initrunner run role.yaml    # tool calls + delegation checked against policies
 ```
 
-See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md) · [Full layer reference](docs/security/comparison.md).
+See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ## Cost control
 
