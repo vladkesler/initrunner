@@ -26,7 +26,8 @@
 </p>
 
 <p align="center">
-  <strong>What's new in 2026.4.15</strong> — encrypted credential vault · HMAC-signed audit chain · bidirectional Slack adapter (Socket Mode) · one-word starter names · <a href="CHANGELOG.md#202641515---2026-04-17">full changelog</a>
+  <strong>What's new in 2026.4.15</strong><br>
+  encrypted credential vault · HMAC-signed audit chain · bidirectional Slack adapter · one-word starter names · <a href="CHANGELOG.md#202641515---2026-04-17">full changelog</a>
 </p>
 
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production.
