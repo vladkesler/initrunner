@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Team
 metadata:
-  name: code-review-team
+  name: reviewer
   description: Multi-perspective code review
 spec:
   personas:

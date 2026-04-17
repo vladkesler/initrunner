@@ -627,8 +627,8 @@ class TestNextStepsStarters:
             )
         assert result.exit_code == 0
         assert "initrunner run helpdesk" in result.output
-        assert "initrunner run code-review-team" in result.output
-        assert "initrunner run web-researcher" in result.output
+        assert "initrunner run reviewer" in result.output
+        assert "initrunner run scout" in result.output
 
 
 class TestAutoDetectProvider:

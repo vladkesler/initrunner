@@ -16,7 +16,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: email-agent
+  name: mail
   description: >
     Autonomous email assistant that monitors your inbox, triages
     messages, drafts replies, and alerts Slack on urgent mail.

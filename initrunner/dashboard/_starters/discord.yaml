@@ -14,7 +14,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: discord-assistant
+  name: discord
   description: >
     A Discord bot that searches the web, summarizes YouTube videos,
     reads shared links, and builds a living knowledge base from server

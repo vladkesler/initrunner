@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: todo-planner
+  name: tasks
   description: Autonomous planner that breaks tasks into structured todo lists with self-critique
   tags:
     - example

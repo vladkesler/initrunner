@@ -49,11 +49,11 @@ Run `initrunner run --list` for the full catalog. The model is auto-detected fro
 | Starter | What it does |
 |---------|-------------|
 | `helpdesk` | Drop your docs in, get a Q&A agent with citations and memory |
-| `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer |
-| `code-review-team` | Multi-perspective review: architect, security, maintainer |
-| `codebase-analyst` | Index a repo, chat about architecture, learns patterns across sessions |
-| `content-pipeline` | Researcher, writer, editor/fact-checker via webhook or cron |
-| `email-agent` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
+| `scholar` | 3-agent pipeline: planner, web researcher, synthesizer |
+| `reviewer` | Multi-perspective review: architect, security, maintainer |
+| `reader` | Index a repo, chat about architecture, learns patterns across sessions |
+| `writer` | Researcher, writer, editor/fact-checker via webhook or cron |
+| `mail` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
 
 ### Build your own
 
@@ -193,7 +193,7 @@ spec:
 
 ```bash
 cd ~/myproject
-initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
+initrunner run reader -i   # indexes your code, then starts Q&A
 ```
 
 The interesting part is consolidation. After each session, an LLM reads what happened and distills it into the semantic store. Facts the agent learns during a Tuesday debugging session show up when it's reviewing code on Thursday. Shared memory across flows lets teams of agents build knowledge together. See [Memory](docs/core/memory.md) · [Ingestion](docs/core/ingestion.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).

@@ -51,11 +51,11 @@ initrunner setup        # ウィザード：プロバイダー、モデル、API
 | スターター | 機能 |
 |-----------|------|
 | `helpdesk` | ドキュメントを読み込み、引用とメモリ付き Q&A エージェントを取得 |
-| `deep-researcher` | 3 エージェントパイプライン：プランナー、Web リサーチャー、シンセサイザー |
-| `code-review-team` | 多視点レビュー：アーキテクト、セキュリティ、メンテナー |
-| `codebase-analyst` | リポジトリをインデックスし、アーキテクチャについて対話、セッション間でパターンを学習 |
-| `content-pipeline` | 調査、執筆、編集/ファクトチェック（webhook または cron 経由） |
-| `email-agent` | 受信トレイを監視、メッセージを分類、返信を起草、緊急メールを Slack に通知 |
+| `scholar` | 3 エージェントパイプライン：プランナー、Web リサーチャー、シンセサイザー |
+| `reviewer` | 多視点レビュー：アーキテクト、セキュリティ、メンテナー |
+| `reader` | リポジトリをインデックスし、アーキテクチャについて対話、セッション間でパターンを学習 |
+| `writer` | 調査、執筆、編集/ファクトチェック（webhook または cron 経由） |
+| `mail` | 受信トレイを監視、メッセージを分類、返信を起草、緊急メールを Slack に通知 |
 
 ### 自分で作る
 
@@ -195,7 +195,7 @@ spec:
 
 ```bash
 cd ~/myproject
-initrunner run codebase-analyst -i   # コードをインデックスし、Q&A を開始
+initrunner run reader -i   # コードをインデックスし、Q&A を開始
 ```
 
 重要なのは統合です。各セッション後、LLM が何が起きたかを読み取り、セマンティックストアに蒸留します。火曜日のデバッグセッションで学んだ事実が、木曜日のコードレビュー時に現れます。Flow の共有メモリにより、エージェントチームが共同でナレッジを構築。[メモリ](docs/core/memory.md) · [取り込み](docs/core/ingestion.md) · [RAG クイックスタート](docs/getting-started/rag-quickstart.md) を参照。

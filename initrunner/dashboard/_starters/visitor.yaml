@@ -9,13 +9,13 @@
 #   npm i -g @modelcontextprotocol/server-filesystem
 #
 # Usage:
-#   initrunner run browser-agent -p "Go to example.com and take a screenshot"
-#   initrunner run browser-agent -i
+#   initrunner run visitor -p "Go to example.com and take a screenshot"
+#   initrunner run visitor -i
 
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: browser-agent
+  name: visitor
   description: >
     Browse the web with a real browser. Navigate pages, take screenshots,
     click buttons, fill forms, and extract text. Powered by MCP servers

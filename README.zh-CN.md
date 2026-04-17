@@ -51,11 +51,11 @@ initrunner setup        # 向导：选择提供商、模型、API 密钥
 | 入门模板 | 功能描述 |
 |---------|---------|
 | `helpdesk` | 导入你的文档，获得带引用和记忆的问答 Agent |
-| `deep-researcher` | 3-Agent 流水线：规划者、网络研究员、综合者 |
-| `code-review-team` | 多视角审查：架构师、安全专家、维护者 |
-| `codebase-analyst` | 索引你的仓库，聊架构，跨会话学习模式 |
-| `content-pipeline` | 研究、撰写、编辑/事实核查，通过 webhook 或 cron 触发 |
-| `email-agent` | 监控收件箱，分类消息，起草回复，紧急邮件通知 Slack |
+| `scholar` | 3-Agent 流水线：规划者、网络研究员、综合者 |
+| `reviewer` | 多视角审查：架构师、安全专家、维护者 |
+| `reader` | 索引你的仓库，聊架构，跨会话学习模式 |
+| `writer` | 研究、撰写、编辑/事实核查，通过 webhook 或 cron 触发 |
+| `mail` | 监控收件箱，分类消息，起草回复，紧急邮件通知 Slack |
 
 ### 创建自己的 Agent
 
@@ -195,7 +195,7 @@ spec:
 
 ```bash
 cd ~/myproject
-initrunner run codebase-analyst -i   # 索引你的代码，然后开始问答
+initrunner run reader -i   # 索引你的代码，然后开始问答
 ```
 
 关键在于整合。每次会话结束后，LLM 阅读发生了什么，并将其提炼到语义存储中。Agent 在周二调试会话中学到的事实，会在周四审查代码时出现。Flow 中的共享记忆让 Agent 团队共同积累知识。查看 [记忆](docs/core/memory.md) · [摄入](docs/core/ingestion.md) · [RAG 快速开始](docs/getting-started/rag-quickstart.md)。

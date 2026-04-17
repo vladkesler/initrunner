@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Team
 metadata:
-  name: debate-team
+  name: debate
   description: Multi-round debate on technical decisions with opposing viewpoints
   tags:
     - debate

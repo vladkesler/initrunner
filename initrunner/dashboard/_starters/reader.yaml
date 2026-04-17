@@ -5,15 +5,15 @@
 # codebase. Run in daemon mode with file-watch to stay current as code changes.
 #
 # Usage:
-#   initrunner ingest codebase-analyst.yaml     # index the codebase
-#   initrunner run codebase-analyst.yaml -i     # interactive Q&A
-#   initrunner run codebase-analyst.yaml -i --resume  # resume with memory
-#   initrunner run codebase-analyst.yaml --daemon     # watch for changes
+#   initrunner ingest reader.yaml     # index the codebase
+#   initrunner run reader.yaml -i     # interactive Q&A
+#   initrunner run reader.yaml -i --resume  # resume with memory
+#   initrunner run reader.yaml --daemon     # watch for changes
 
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: codebase-analyst
+  name: reader
   description: >
     Ingests your codebase, remembers architectural patterns across sessions,
     and answers code questions with file-level citations. File-watch trigger

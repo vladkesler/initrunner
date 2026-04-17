@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: memory-assistant
+  name: memory
   description: A personal assistant that learns and remembers across sessions
   tags:
     - example

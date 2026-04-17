@@ -47,7 +47,7 @@ def extract_text(path: Path) -> str:
     ".txt",
     ".md",
     ".rst",
-    # Source code — plain UTF-8 text, commonly ingested by codebase-analyst.
+    # Source code — plain UTF-8 text, commonly ingested by the reader starter.
     ".py",
     ".js",
     ".ts",

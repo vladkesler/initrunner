@@ -371,8 +371,8 @@ def run_setup(
     _next = [
         "  [dim]Try a starter agent:[/dim]",
         "  [bold]initrunner run helpdesk -i[/bold]              [dim]# docs Q&A[/dim]",
-        '  [bold]initrunner run code-review-team -p "..."[/bold] [dim]# code review[/dim]',
-        '  [bold]initrunner run web-researcher -p "..."[/bold]   [dim]# web research[/dim]',
+        '  [bold]initrunner run reviewer -p "..."[/bold]        [dim]# code review[/dim]',
+        '  [bold]initrunner run scout -p "..."[/bold]           [dim]# web research[/dim]',
         "",
         "  [dim]Or start a REPL:[/dim]",
         "  [bold]initrunner run -i[/bold]                       [dim]# ephemeral chat[/dim]",

@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking
+- **Starter slugs renamed to plain one-word names.** The bundled agent/team/flow starters now use short, human-readable names:
+
+  | Old | New |
+  |---|---|
+  | `browser-agent` | `visitor` |
+  | `codebase-analyst` | `reader` |
+  | `code-review-team` | `reviewer` |
+  | `debate-team` | `debate` |
+  | `discord-assistant` | `discord` |
+  | `email-agent` | `mail` |
+  | `memory-assistant` | `memory` |
+  | `plan-execute` | `planner` |
+  | `project-monitor` | `watcher` |
+  | `rag-agent` | `librarian` |
+  | `telegram-assistant` | `telegram` |
+  | `todo-planner` | `tasks` |
+  | `web-researcher` | `scout` |
+  | `ci-pipeline` | `pipeline` |
+  | `content-pipeline` | `writer` |
+  | `support-desk` | `triage` |
+
+  `helpdesk` and `scholar` are unchanged. No alias layer — update scripts and bookmarks that reference old slugs.
+- **Removed `deep-researcher` from the starter catalog.** The directory only contained a README; `STARTER_ORDER` referenced it but `list_starters()` silently skipped it. The broken entry is gone; `scholar` covers the same research-team use case.
+
 ## [2026.4.14] - 2026-04-14
 
 ### Security

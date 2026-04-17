@@ -23,7 +23,7 @@ spec:
        endpoint:
        - state: "success" or "failure"
        - description: brief status message
-       - context: "ci-pipeline/initrunner"
+       - context: "pipeline/initrunner"
 
     Always send both the Slack message and the GitHub status update.
   model:
@@ -41,7 +41,7 @@ spec:
       base_url: https://api.github.com
       headers:
         Accept: application/vnd.github.v3+json
-        User-Agent: initrunner-ci-pipeline
+        User-Agent: initrunner-pipeline
       auth:
         Authorization: "Bearer ${GITHUB_TOKEN}"
       endpoints:
@@ -73,7 +73,7 @@ spec:
             - name: context
               type: string
               required: false
-              default: "ci-pipeline/initrunner"
+              default: "pipeline/initrunner"
               description: Status context identifier
           body_template:
             state: "{state}"

@@ -60,7 +60,7 @@ class TestPrepareStarter:
         assert result is None
 
     def test_starter_with_explicit_model_returns_model(self):
-        starter_path = STARTERS_DIR / "memory-assistant.yaml"
+        starter_path = STARTERS_DIR / "memory.yaml"
         result = prepare_starter(starter_path, "anthropic:claude-sonnet-4-5-20250929")
         assert result == "anthropic:claude-sonnet-4-5-20250929"
 
@@ -68,7 +68,7 @@ class TestPrepareStarter:
         from initrunner.cli.run_config import RunConfig
         from initrunner.services.providers import DetectedProvider
 
-        starter_path = STARTERS_DIR / "memory-assistant.yaml"
+        starter_path = STARTERS_DIR / "memory.yaml"
         fake_providers = [DetectedProvider(provider="openai", model="gpt-5-mini")]
         with (
             patch(
@@ -87,14 +87,14 @@ class TestPrepareStarter:
         """Starters should prefer the user's run.yaml config over auto-detect."""
         from initrunner.cli.run_config import RunConfig
 
-        starter_path = STARTERS_DIR / "memory-assistant.yaml"
+        starter_path = STARTERS_DIR / "memory.yaml"
         cfg = RunConfig(provider="anthropic", model="claude-sonnet-4-6")
         with patch("initrunner.cli.run_config.load_run_config", return_value=cfg):
             result = prepare_starter(starter_path, None)
             assert result == "anthropic:claude-sonnet-4-6"
 
     def test_starter_with_missing_prerequisites_exits(self):
-        starter_path = STARTERS_DIR / "telegram-assistant.yaml"
+        starter_path = STARTERS_DIR / "telegram.yaml"
         with (
             patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": ""}, clear=False),
             pytest.raises(ClickExit),
@@ -121,13 +121,13 @@ class TestRunSave:
 
     def test_save_copies_single_file_starter(self, tmp_path: Path):
         save_dir = tmp_path / "my-agent"
-        result = runner.invoke(app, ["run", "memory-assistant", "--save", str(save_dir)])
+        result = runner.invoke(app, ["run", "memory", "--save", str(save_dir)])
         assert result.exit_code == 0
         assert (save_dir / "role.yaml").is_file()
 
     def test_save_copies_composite_starter(self, tmp_path: Path):
         save_dir = tmp_path / "my-pipeline"
-        result = runner.invoke(app, ["run", "ci-pipeline", "--save", str(save_dir)])
+        result = runner.invoke(app, ["run", "pipeline", "--save", str(save_dir)])
         assert result.exit_code == 0
         assert (save_dir / "flow.yaml").is_file()
         assert (save_dir / "roles").is_dir()

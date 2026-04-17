@@ -12,12 +12,12 @@
 #     - [ ] Ping database: ping -c 1 db.internal
 #
 # Usage:
-#   initrunner run project-monitor.yaml --daemon
+#   initrunner run watcher.yaml --daemon
 
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: project-monitor
+  name: watcher
   description: >
     Heartbeat-driven monitoring daemon that runs health checks from a
     markdown checklist, learns normal baselines via procedural memory,
