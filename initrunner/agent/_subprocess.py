@@ -72,6 +72,7 @@ DEFAULT_SENSITIVE_ENV_SUFFIXES = (
     "_SECRET",
     "_TOKEN",
     "_PASSWORD",
+    "_PASSPHRASE",
     "_CREDENTIAL",
     "_CREDENTIALS",
     "_API_KEY",

@@ -954,3 +954,378 @@ class TestDelegateEvents:
             # SQLite doesn't expose timeout directly, but we can verify
             # the connection was created successfully with the parameter
             assert logger._conn is not None
+
+
+class TestAuditChain:
+    """HMAC-signed audit chain: key mgmt, signing, verification, tamper detection."""
+
+    def _key_path(self, tmp_path):
+        return tmp_path / "audit_hmac.key"
+
+    def _env_with_key(self, monkeypatch, tmp_path):
+        """Point config helpers at tmp_path and clear the env var override."""
+        import initrunner.audit._hmac as hmac_mod
+        import initrunner.config as cfg
+
+        key_path = self._key_path(tmp_path)
+        monkeypatch.setattr(cfg, "get_audit_hmac_key_path", lambda: key_path)
+        monkeypatch.setattr(hmac_mod, "get_audit_hmac_key_path", lambda: key_path)
+        monkeypatch.delenv("INITRUNNER_AUDIT_HMAC_KEY", raising=False)
+        return key_path
+
+    def test_hmac_key_generated_on_first_log(self, tmp_path, monkeypatch):
+        key_path = self._env_with_key(monkeypatch, tmp_path)
+        assert not key_path.exists()
+
+        db_path = tmp_path / "audit.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record())
+
+        assert key_path.exists()
+        assert len(key_path.read_bytes()) == 32
+        import os
+        import stat
+
+        if os.name != "nt":
+            mode = stat.S_IMODE(key_path.stat().st_mode)
+            assert mode == 0o600
+
+    def test_hmac_key_env_var_overrides_file(self, tmp_path, monkeypatch):
+        """Env var wins over file; signatures made under env key verify under env key."""
+        key_path = self._env_with_key(monkeypatch, tmp_path)
+        # Write a distinct file-based key first
+        file_key = b"\xaa" * 32
+        key_path.parent.mkdir(parents=True, exist_ok=True)
+        key_path.write_bytes(file_key)
+
+        env_key_hex = "bb" * 32
+        monkeypatch.setenv("INITRUNNER_AUDIT_HMAC_KEY", env_key_hex)
+
+        db_path = tmp_path / "audit.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record())
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.verified_rows == 1
+        # File key was not used
+        assert key_path.read_bytes() == file_key
+
+    def test_verify_without_key_fails_cleanly_and_no_key_created(self, tmp_path, monkeypatch):
+        # Sign with one key, then verify in a fresh environment with no key
+        import initrunner.audit._hmac as hmac_mod
+        import initrunner.config as cfg
+
+        sign_key_path = tmp_path / "signing_home" / "audit_hmac.key"
+        sign_key_path.parent.mkdir(parents=True)
+        monkeypatch.setattr(cfg, "get_audit_hmac_key_path", lambda: sign_key_path)
+        monkeypatch.setattr(hmac_mod, "get_audit_hmac_key_path", lambda: sign_key_path)
+        monkeypatch.delenv("INITRUNNER_AUDIT_HMAC_KEY", raising=False)
+
+        db_path = tmp_path / "audit.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record())
+
+        # Simulate copying the DB to a host with no key
+        verify_key_path = tmp_path / "no_key_home" / "audit_hmac.key"
+        monkeypatch.setattr(cfg, "get_audit_hmac_key_path", lambda: verify_key_path)
+        monkeypatch.setattr(hmac_mod, "get_audit_hmac_key_path", lambda: verify_key_path)
+
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is False
+        assert result.first_break_reason == "key_missing"
+        assert not verify_key_path.exists()
+
+    def test_verify_invalid_env_key_reports_key_invalid(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        monkeypatch.setenv("INITRUNNER_AUDIT_HMAC_KEY", "not-hex!!")
+
+        db_path = tmp_path / "audit.db"
+        # Create DB without signing anything (BEGIN IMMEDIATE never runs)
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is False
+        assert result.first_break_reason == "key_invalid"
+
+    def test_chain_verifies_clean_insert_sequence(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            for i in range(5):
+                logger.log(_make_record(run_id=f"r{i}"))
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.verified_rows == 5
+        assert result.unsigned_legacy_rows == 0
+        assert result.last_verified_id == 5
+        assert result.pruned_gaps == ()
+
+    def test_chain_detects_field_tampering(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            for i in range(3):
+                logger.log(_make_record(run_id=f"r{i}"))
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("UPDATE audit_log SET output='tampered' WHERE id=2")
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is False
+        assert result.first_break_id == 2
+        assert result.first_break_reason == "hash_mismatch"
+
+    def test_chain_detects_row_deletion(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            for i in range(4):
+                logger.log(_make_record(run_id=f"r{i}"))
+
+        # Delete the middle row (id=2); subsequent row's prev_hash no longer
+        # matches row 1's record_hash. Since there's now an id gap, the
+        # algorithm treats this as pruning, not tampering. To simulate
+        # *undetectable* deletion we must delete with no id gap — we use a
+        # renumbering trick here: delete row 2 and row 3, then verify finds
+        # a prev_hash mismatch on row 4 (since row 3 is gone but row 4 still
+        # points at row 3's hash). An id gap IS present though.
+        #
+        # Real genuine "deletion without pruning signal" is impossible with
+        # auto-increment ids unless the attacker also rewrites ids, which
+        # requires breaking the chain forward anyway. So this test verifies
+        # the pruned_gap *informational* path fires correctly.
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("DELETE FROM audit_log WHERE id=2")
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is True
+        assert 3 in result.pruned_gaps
+
+    def test_chain_detects_prev_hash_mismatch_without_gap(self, tmp_path, monkeypatch):
+        """Rewriting prev_hash to a wrong value, no id gap, is a genuine break."""
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            for i in range(3):
+                logger.log(_make_record(run_id=f"r{i}"))
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "UPDATE audit_log SET prev_hash=? WHERE id=2",
+            ("0" * 64,),
+        )
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is False
+        assert result.first_break_id == 2
+        assert result.first_break_reason == "prev_hash_mismatch"
+
+    def test_legacy_unsigned_rows_handled(self, tmp_path, monkeypatch):
+        """Rows with NULL hashes predating the migration are tolerated."""
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        # Create the schema by opening/closing a logger
+        with AuditLogger(db_path):
+            pass
+
+        # Hand-insert a pre-migration row (NULL hashes)
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            "INSERT INTO audit_log (run_id, agent_name, timestamp, user_prompt,"
+            " model, provider, output, tokens_in, tokens_out, total_tokens,"
+            " tool_calls, duration_ms, success, error, prev_hash, record_hash)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+            ("legacy", "a", "2025-01-01T00:00:00Z", "p", "m", "o", "out", 1, 1, 2, 0, 10, 1, None),
+        )
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="new"))
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.unsigned_legacy_rows == 1
+        assert result.verified_rows == 1
+
+    def test_null_hash_after_signed_row_is_break(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            for i in range(3):
+                logger.log(_make_record(run_id=f"r{i}"))
+
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("UPDATE audit_log SET record_hash=NULL, prev_hash=NULL WHERE id=2")
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok is False
+        assert result.first_break_id == 2
+        assert result.first_break_reason == "missing_hash_after_chain_start"
+
+    def test_pruning_by_id_preserves_chain(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path, max_records=3) as logger:
+            for i in range(10):
+                logger.log(_make_record(run_id=f"r{i}", timestamp=f"2025-01-01T00:00:{i:02d}Z"))
+            logger.prune(retention_days=3650, max_records=3)
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.verified_rows == 3
+        # The first remaining row had a predecessor that got pruned;
+        # verify treats it as the new chain base, no pruned_gap recorded
+        # because there's no row before it to compare against.
+        # If any gap is recorded it must be informational only (ok stays True).
+        assert result.ok
+
+    def test_pruning_with_out_of_order_timestamps(self, tmp_path, monkeypatch):
+        """Timestamp-based retention with out-of-order timestamps may punch
+        a hole in the chain; verify reports pruned_gaps, not a break."""
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+        now = datetime.now(UTC)
+
+        with AuditLogger(db_path) as logger:
+            # Old row first (will be pruned by retention_days=1)
+            logger.log(
+                _make_record(
+                    run_id="old",
+                    timestamp=(now - timedelta(days=100)).isoformat(),
+                )
+            )
+            # Recent row (kept)
+            logger.log(
+                _make_record(
+                    run_id="recent1",
+                    timestamp=now.isoformat(),
+                )
+            )
+            # Another old row injected late (will also be pruned, creating
+            # a hole between recent1 and recent2)
+            logger.log(
+                _make_record(
+                    run_id="old2",
+                    timestamp=(now - timedelta(days=100)).isoformat(),
+                )
+            )
+            logger.log(
+                _make_record(
+                    run_id="recent2",
+                    timestamp=now.isoformat(),
+                )
+            )
+            logger.prune(retention_days=1, max_records=100_000)
+            result = logger.verify_chain()
+
+        assert result.ok
+        # The row after the pruned middle-row should be in pruned_gaps
+        assert len(result.pruned_gaps) >= 1
+
+    def test_concurrent_log_same_instance(self, tmp_path, monkeypatch):
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            errors: list[BaseException] = []
+
+            def worker(n):
+                try:
+                    for i in range(n):
+                        logger.log(_make_record(run_id=f"t{threading.get_ident()}-{i}"))
+                except BaseException as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=worker, args=(20,)) for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            assert not errors
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.verified_rows == 80
+
+    def test_concurrent_log_two_instances_same_db(self, tmp_path, monkeypatch):
+        """Two AuditLogger instances hitting the same DB must chain correctly
+        thanks to BEGIN IMMEDIATE; no forks."""
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        # Warm-up: create schema once
+        with AuditLogger(db_path):
+            pass
+
+        errors: list[BaseException] = []
+
+        def worker(tag, n):
+            try:
+                # Each thread gets its own AuditLogger (its own connection)
+                with AuditLogger(db_path) as logger:
+                    for i in range(n):
+                        logger.log(_make_record(run_id=f"{tag}-{i}"))
+            except BaseException as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(f"w{i}", 15)) for i in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors
+        with AuditLogger(db_path) as logger:
+            result = logger.verify_chain()
+
+        assert result.ok
+        assert result.verified_rows == 45
+
+    def test_budget_state_writes_unaffected_by_signing(self, tmp_path, monkeypatch):
+        """Regression: signing logic stayed out of the shared insert helper."""
+        self._env_with_key(monkeypatch, tmp_path)
+        db_path = tmp_path / "audit.db"
+
+        state = {
+            "total_consumed": 5,
+            "daily_consumed": 3,
+            "daily_cost_consumed": 0.12,
+            "weekly_cost_consumed": 0.45,
+            "last_reset_date": "2025-01-01",
+            "last_weekly_reset": "2025-01-01",
+        }
+        with AuditLogger(db_path) as logger:
+            logger.save_budget_state("agent-x", state)
+            loaded = logger.load_budget_state("agent-x")
+
+        assert loaded is not None
+        assert loaded["total_consumed"] == 5

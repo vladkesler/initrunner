@@ -9,7 +9,7 @@
 #   uv pip install initrunner[search]
 #
 # Usage:
-#   initrunner flow content-pipeline/             # start the pipeline
+#   initrunner flow writer/             # start the pipeline
 #   curl -X POST http://localhost:8080/topic \
 #     -H "Content-Type: application/json" \
 #     -d '{"prompt": "Write about the rise of edge computing"}'
@@ -17,7 +17,7 @@
 apiVersion: initrunner/v1
 kind: Flow
 metadata:
-  name: content-pipeline
+  name: writer
   description: >
     Topic researcher, content writer, and editor/fact-checker pipeline.
     Submit topics via webhook or let the daily cron pick from a topic queue.

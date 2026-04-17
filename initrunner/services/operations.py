@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from initrunner.agent.schema.role import RoleDefinition
-    from initrunner.audit.logger import AuditLogger, AuditRecord
+    from initrunner.audit.logger import AuditLogger, AuditRecord, ChainVerifyResult
     from initrunner.ingestion.pipeline import FileStatus, IngestStats
     from initrunner.triggers.base import TriggerEvent
     from initrunner.triggers.dispatcher import TriggerDispatcher
@@ -67,6 +67,31 @@ def audit_prune_sync(
         return 0
     with _AuditLogger(db_path) as logger:
         return logger.prune(retention_days=retention_days, max_records=max_records)
+
+
+def verify_audit_chain_sync(
+    *,
+    audit_db: Path | None = None,
+) -> ChainVerifyResult:
+    """Verify the signed audit chain end-to-end (sync)."""
+    from initrunner.audit.logger import DEFAULT_DB_PATH, ChainVerifyResult
+    from initrunner.audit.logger import AuditLogger as _AuditLogger
+
+    db_path = audit_db or DEFAULT_DB_PATH
+    if not db_path.exists():
+        return ChainVerifyResult(
+            ok=True,
+            total_rows=0,
+            unsigned_legacy_rows=0,
+            verified_rows=0,
+            last_verified_id=None,
+            last_verified_hash=None,
+            pruned_gaps=(),
+            first_break_id=None,
+            first_break_reason=None,
+        )
+    with _AuditLogger(db_path) as logger:
+        return logger.verify_chain()
 
 
 @dataclass

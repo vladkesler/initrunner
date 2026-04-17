@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: plan-execute
+  name: planner
   description: Two-phase agent that builds a complete plan first, then executes step by step
   tags:
     - example

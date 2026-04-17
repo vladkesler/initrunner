@@ -24,8 +24,11 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "better_profanity": ("safety", "better-profanity"),
     "telegram": ("telegram", "python-telegram-bot"),
     "discord": ("discord", "discord.py"),
+    "slack_sdk": ("slack", "slack-sdk"),
     "webview": ("desktop", "pywebview"),
     "fasta2a": ("a2a", "pydantic-ai-slim[a2a]"),
+    "cryptography": ("vault", "cryptography"),
+    "keyring": ("vault-keyring", "keyring"),
 }
 
 

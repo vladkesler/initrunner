@@ -7,6 +7,7 @@ from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
     DiscordTriggerConfig,
     FileWatchTriggerConfig,
+    SlackTriggerConfig,
     TelegramTriggerConfig,
 )
 from initrunner.triggers.base import (
@@ -551,3 +552,364 @@ class TestDiscordFiltering:
 
     def test_discord_channel_ids_dm_not_affected(self):
         assert self._check(is_dm=True, allowed_channels={"999"}, channel_id="888") is True
+
+
+class TestSlackFiltering:
+    """Unit tests for the Slack _check_slack_access helper."""
+
+    @staticmethod
+    def _check(**kwargs):
+        from initrunner.triggers.slack import _check_slack_access
+
+        defaults = {
+            "is_dm": False,
+            "user_id": "U100",
+            "channel_id": "C999",
+            "allowed_channels": set(),
+            "allowed_user_ids": set(),
+        }
+        defaults.update(kwargs)
+        return _check_slack_access(**defaults)  # type: ignore[invalid-argument-type]
+
+    def test_allows_all_when_no_filters(self):
+        assert self._check() is True
+
+    def test_user_id_allows_matching(self):
+        assert self._check(allowed_user_ids={"U100"}) is True
+
+    def test_user_id_rejects_wrong(self):
+        assert self._check(allowed_user_ids={"U999"}, user_id="U100") is False
+
+    def test_channel_allows_matching_guild(self):
+        assert self._check(allowed_channels={"C999"}, channel_id="C999") is True
+
+    def test_channel_rejects_wrong_guild(self):
+        assert self._check(allowed_channels={"C999"}, channel_id="C888") is False
+
+    def test_channel_filter_skipped_for_dm(self):
+        assert self._check(is_dm=True, allowed_channels={"C999"}, channel_id="C888") is True
+
+    def test_user_id_still_checked_in_dm(self):
+        assert self._check(is_dm=True, allowed_user_ids={"U1"}, user_id="U2") is False
+
+
+class TestSlackAdapterSend:
+    """Tests for SlackAdapter.send() / _send_threaded()."""
+
+    @staticmethod
+    def _adapter_ready():
+        from initrunner.triggers.slack import SlackAdapter
+
+        adapter = SlackAdapter(SlackTriggerConfig())
+        adapter._web_client = MagicMock()
+        adapter._ready.set()
+        return adapter
+
+    def test_send_noop_before_start(self):
+        from initrunner.triggers.slack import SlackAdapter
+
+        adapter = SlackAdapter(SlackTriggerConfig())
+        adapter.send("C123", "hello")  # no web client, no crash
+
+    def test_send_delegates_to_web_client(self):
+        adapter = self._adapter_ready()
+        adapter.send("C123", "hello")
+        adapter._web_client.chat_postMessage.assert_called_once_with(channel="C123", text="hello")
+
+    def test_send_public_api_never_passes_thread_ts(self):
+        """Public send() must not include thread_ts (ABC contract: target is opaque)."""
+        adapter = self._adapter_ready()
+        adapter.send("C123", "hi")
+        call_kwargs = adapter._web_client.chat_postMessage.call_args.kwargs
+        assert "thread_ts" not in call_kwargs
+
+    def test_send_threaded_includes_thread_ts(self):
+        adapter = self._adapter_ready()
+        adapter._send_threaded("C123", "1700.0001", "reply")
+        adapter._web_client.chat_postMessage.assert_called_once_with(
+            channel="C123", text="reply", thread_ts="1700.0001"
+        )
+
+    def test_send_threaded_omits_thread_ts_when_none(self):
+        adapter = self._adapter_ready()
+        adapter._send_threaded("C123", None, "top-level")
+        call_kwargs = adapter._web_client.chat_postMessage.call_args.kwargs
+        assert "thread_ts" not in call_kwargs
+
+    def test_send_chunks_long_messages(self):
+        adapter = self._adapter_ready()
+        big = "a" * 7000  # > 3000 limit, should chunk
+        adapter.send("C123", big)
+        assert adapter._web_client.chat_postMessage.call_count == 3
+
+    def test_send_never_raises_on_slack_error(self):
+        adapter = self._adapter_ready()
+        adapter._web_client.chat_postMessage.side_effect = RuntimeError("api down")
+        adapter.send("C123", "hi")  # must not raise
+
+
+class TestSlackEventRouting:
+    """Tests for SlackAdapter Socket Mode listener envelope handling."""
+
+    @staticmethod
+    def _run_listener(
+        config,
+        payload,
+        *,
+        req_type="events_api",
+        bot_user_id="UBOT",
+        expect_ack=True,
+    ):
+        """Build a minimal adapter, invoke the listener, return captured events."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        from initrunner._text import safe_substitute
+        from initrunner.triggers.base import TriggerEvent
+        from initrunner.triggers.slack import _MENTION_RE, _check_slack_access
+
+        events: list[TriggerEvent] = []
+        allowed_channels = set(config.channel_ids)
+        allowed_user_ids = set(config.allowed_user_ids)
+        respond_in_thread = config.respond_in_thread
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="slack-test")
+        acks: list[object] = []
+
+        def listener(client, req):
+            client.send_socket_mode_response(req.envelope_id)  # captured
+            if req.type != "events_api":
+                return
+            if req.payload.get("type") != "event_callback":
+                return
+            event = req.payload.get("event") or {}
+            event_type = event.get("type")
+            if event_type not in ("app_mention", "message"):
+                return
+            if event.get("bot_id"):
+                return
+            if event.get("subtype"):
+                return
+            if bot_user_id and event.get("user") == bot_user_id:
+                return
+            channel_id = event.get("channel")
+            user_id = event.get("user")
+            if not channel_id or not user_id:
+                return
+            is_dm = event.get("channel_type") == "im"
+            if event_type == "message" and not is_dm:
+                return
+            if not _check_slack_access(
+                is_dm=is_dm,
+                user_id=user_id,
+                channel_id=channel_id,
+                allowed_channels=allowed_channels,
+                allowed_user_ids=allowed_user_ids,
+            ):
+                return
+            thread_ts = event.get("thread_ts")
+            event_ts = event.get("ts")
+            if thread_ts:
+                channel_target = f"{channel_id}:{thread_ts}"
+            elif not is_dm and respond_in_thread and event_ts:
+                channel_target = f"{channel_id}:{event_ts}"
+            else:
+                channel_target = channel_id
+            text = _MENTION_RE.sub("", event.get("text") or "").strip()
+            prompt = safe_substitute(config.prompt_template, {"message": text})
+            events.append(
+                TriggerEvent(
+                    trigger_type="slack",
+                    prompt=prompt,
+                    metadata={
+                        "channel_target": channel_target,
+                        "user": user_id,
+                        "user_id": user_id,
+                        "channel_id": channel_id,
+                        "thread_ts": thread_ts or "",
+                    },
+                    principal_id=f"slack:{user_id}",
+                )
+            )
+
+        mock_req = MagicMock()
+        mock_req.type = req_type
+        mock_req.payload = payload
+        mock_req.envelope_id = "env-1"
+        mock_client = MagicMock()
+        mock_client.send_socket_mode_response = lambda env_id: acks.append(env_id)
+
+        listener(mock_client, mock_req)
+        executor.shutdown(wait=True)
+        if expect_ack:
+            assert acks == ["env-1"]
+        return events
+
+    def test_app_mention_dispatches_event(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "channel": "C999",
+                "text": "<@UBOT> hello",
+                "ts": "1700.0001",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert len(events) == 1
+        assert events[0].prompt == "hello"
+        assert events[0].principal_id == "slack:U100"
+        assert events[0].metadata["channel_target"] == "C999:1700.0001"
+
+    def test_dm_message_dispatches_event(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "message",
+                "user": "U100",
+                "channel": "D999",
+                "channel_type": "im",
+                "text": "yo",
+                "ts": "1700.0002",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert len(events) == 1
+        assert events[0].metadata["channel_target"] == "D999"  # DM, no thread
+
+    def test_in_thread_message_encodes_thread_in_target(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "channel": "C999",
+                "text": "follow-up",
+                "ts": "1700.0010",
+                "thread_ts": "1700.0001",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events[0].metadata["channel_target"] == "C999:1700.0001"
+
+    def test_non_events_api_envelope_ignored(self):
+        cfg = SlackTriggerConfig()
+        events = self._run_listener(cfg, {}, req_type="slash_commands")
+        assert events == []
+
+    def test_non_event_callback_payload_ignored(self):
+        cfg = SlackTriggerConfig()
+        events = self._run_listener(cfg, {"type": "url_verification"})
+        assert events == []
+
+    def test_bot_message_dropped(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "UBOT",  # matches bot_user_id
+                "channel": "C999",
+                "text": "loop",
+                "ts": "1700.0003",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_bot_id_flag_dropped(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "bot_id": "B1",
+                "channel": "C999",
+                "text": "loop",
+                "ts": "1700.0004",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_edited_message_dropped(self):
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "message",
+                "subtype": "message_changed",
+                "user": "U100",
+                "channel": "D999",
+                "channel_type": "im",
+                "text": "edit",
+                "ts": "1700.0005",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_non_dm_message_event_dropped(self):
+        """Raw `message` events only accepted for DMs; channel messages go through app_mention."""
+        cfg = SlackTriggerConfig()
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "message",
+                "user": "U100",
+                "channel": "C999",
+                "channel_type": "channel",
+                "text": "noise",
+                "ts": "1700.0006",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_channel_filter_applied(self):
+        cfg = SlackTriggerConfig(channel_ids=["C111"])
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "channel": "C999",
+                "text": "<@UBOT> hi",
+                "ts": "1700.0007",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_user_filter_applied(self):
+        cfg = SlackTriggerConfig(allowed_user_ids=["U1"])
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "channel": "C999",
+                "text": "<@UBOT> hi",
+                "ts": "1700.0008",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events == []
+
+    def test_respond_in_thread_false_keeps_plain_channel_target(self):
+        cfg = SlackTriggerConfig(respond_in_thread=False)
+        payload = {
+            "type": "event_callback",
+            "event": {
+                "type": "app_mention",
+                "user": "U100",
+                "channel": "C999",
+                "text": "<@UBOT> hi",
+                "ts": "1700.0009",
+            },
+        }
+        events = self._run_listener(cfg, payload)
+        assert events[0].metadata["channel_target"] == "C999"

@@ -14,7 +14,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: telegram-assistant
+  name: telegram
   description: >
     A personal AI assistant for Telegram that remembers your preferences,
     searches the web, summarizes articles, and transcribes audio. Gets

@@ -491,3 +491,76 @@ triggers:
 - **Use `channel_ids`** to restrict the bot to specific guild channels.
 - **Use `allowed_roles`** to restrict access to specific server roles. Note that DMs are automatically denied when only roles are configured.
 - **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.
+
+## Slack Trigger
+
+Responds to Slack @-mentions and DMs via [Socket Mode](https://api.slack.com/apis/socket-mode) using [slack-sdk](https://slack.dev/python-slack-sdk/). Outbound WebSocket only — no public URL, no ports opened, no request-signing.
+
+### Setup
+
+Slack Socket Mode requires **two** tokens: an app-level token to open the WebSocket, and a bot token to post replies.
+
+1. Create a Slack app at <https://api.slack.com/apps> (choose "from scratch"). Pick a name and workspace.
+2. **Basic Information → App-Level Tokens** → **Generate Token and Scopes**. Add the `connections:write` scope, give it a name, generate, and copy the `xapp-…` token. Set it:
+   ```bash
+   export SLACK_APP_TOKEN=xapp-...
+   ```
+3. **Socket Mode** → toggle **Enable Socket Mode**.
+4. **OAuth & Permissions** → under *Bot Token Scopes* add: `chat:write`, `app_mentions:read`, `im:history`, `im:read`, `im:write`.
+5. **Event Subscriptions** → toggle **Enable Events** → under *Subscribe to bot events* add **`app_mention`** and **`message.im`**. Save.
+   - Scopes alone are not enough — without event subscriptions the bot receives nothing.
+6. **Install App** → *Install to Workspace* → approve → copy the **Bot User OAuth Token** (`xoxb-…`):
+   ```bash
+   export SLACK_BOT_TOKEN=xoxb-...
+   ```
+7. Invite the bot to any channels you want it to listen in: `/invite @your-bot`.
+8. Install the optional dependency: `pip install initrunner[slack]`.
+
+```yaml
+triggers:
+  - type: slack
+    app_token_env: SLACK_APP_TOKEN     # default
+    bot_token_env: SLACK_BOT_TOKEN     # default
+    channel_ids: ["C0123456789"]       # empty = any channel where bot is @-mentioned + all DMs
+    allowed_user_ids: ["U9876543210"]  # empty = allow all
+    respond_in_thread: true            # default -- thread replies off the triggering message
+    prompt_template: "{message}"       # default
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `app_token_env` | `str` | `"SLACK_APP_TOKEN"` | Environment variable holding the app-level token (`xapp-…`) for Socket Mode. |
+| `bot_token_env` | `str` | `"SLACK_BOT_TOKEN"` | Environment variable holding the bot token (`xoxb-…`) for `chat.postMessage`. |
+| `channel_ids` | `list[str]` | `[]` | Slack channel IDs to respond in. Empty list allows any channel where the bot is @-mentioned. Does not apply to DMs. |
+| `allowed_user_ids` | `list[str]` | `[]` | Slack user IDs (`U…`) allowed to interact. Empty list allows all users. Applies to both channels and DMs. |
+| `respond_in_thread` | `bool` | `true` | When replying to a top-level channel @-mention, start a thread off the triggering message. Replies to messages already in a thread always continue that thread. |
+| `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's text (bot mention stripped). |
+| `autonomous` | `bool` | `false` | Use the autonomous loop for each message (multi-step research before replying). |
+
+### Behavior
+
+- Uses Socket Mode (outbound WebSocket) — no public URL, no request-signing.
+- Listens to two event types only: `app_mention` (@-mentions in channels) and `message.im` (DMs). Plain channel messages without a mention are ignored.
+- Drops the bot's own messages, message edits, and message deletes (any event with a `subtype`).
+- Bot @-mention is stripped from the message text before substitution.
+- Replies are automatically threaded: messages in an existing thread continue the thread; top-level channel @-mentions start a new thread off the triggering message (disable with `respond_in_thread: false`); DMs are sent as plain messages.
+- Conversation history is keyed by `channel_id:thread_ts`, so each thread gets its own isolated conversation — threads in the same channel do not share state.
+- Responses are automatically chunked at 3000 characters (well under Slack's 40000 hard limit, chosen for UX readability).
+- The trigger event includes `metadata: {"channel_target": "...", "user_id": "...", "channel_id": "...", "thread_ts": "..."}`. `channel_target` is opaque — do not parse.
+- `principal_id` is set to `slack:<user_id>`. `principal_roles` is always empty — Slack user-group mapping is not yet wired (see below).
+
+### Security
+
+- **Store both tokens securely** — use environment variables or the built-in vault (`initrunner vault set SLACK_APP_TOKEN` / `initrunner vault set SLACK_BOT_TOKEN`), never commit them.
+- **Use `allowed_user_ids`** to restrict interaction to specific people. User IDs are immutable across display-name changes.
+- **Use `channel_ids`** to restrict the bot to specific channels. DMs are unaffected by this filter.
+- **Set `daemon_daily_token_budget`** in guardrails to prevent runaway costs.
+
+### Current limitations
+
+- **No Slack user-group → `principal_roles` mapping.** Unlike Discord (which sets `principal_roles` from guild roles), the Slack adapter leaves `principal_roles` empty. Any Cedar / ABAC policy keyed on roles will treat Slack users as role-less. Wire in `usergroups.list` + scope `usergroups:read` as a follow-up if needed.
+- **No slash commands, interactive buttons, or modals.** These require the Events API + signing-secret surface, which is out of scope for the bidirectional adapter.
+- **Single-workspace install only.** No OAuth distribution flow — install the app into the workspace you want it to operate in.
+- The outbound webhook tool (`type: slack` under `tools`) is separate and unchanged — it remains the "send-only notification" path and coexists with this adapter.

@@ -13,6 +13,14 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from initrunner._log import get_logger
 from initrunner._paths import LazyPath, ensure_private_dir, secure_database
+from initrunner.audit._hmac import (
+    KeyInvalidError,
+    KeyUnavailableError,
+    canonical_serialize,
+    compute_record_hash,
+    load_hmac_key_readonly,
+    load_or_create_hmac_key,
+)
 from initrunner.audit._redact import scrub_secrets
 
 if TYPE_CHECKING:
@@ -20,6 +28,35 @@ if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
 
 logger = get_logger("audit")
+
+
+@dataclass(frozen=True)
+class ChainVerifyResult:
+    """Outcome of AuditLogger.verify_chain().
+
+    `ok` is True iff no tampering was detected. `pruned_gaps` is purely
+    informational: id gaps are expected when pruning ran and do not fail
+    verification. `first_break_*` are only set when `ok` is False.
+
+    Reason set for `first_break_reason`:
+      - "hash_mismatch"                  record_hash != recomputed
+      - "prev_hash_mismatch"             prev_hash != prior row's record_hash,
+                                         with no id gap to explain it
+      - "missing_hash_after_chain_start" NULL record_hash after a signed row
+      - "key_missing"                    no env var and no key file
+      - "key_invalid"                    env var/key file malformed
+      - "query_error"                    SQLite error reading the chain
+    """
+
+    ok: bool
+    total_rows: int
+    unsigned_legacy_rows: int
+    verified_rows: int
+    last_verified_id: int | None
+    last_verified_hash: str | None
+    pruned_gaps: tuple[int, ...]
+    first_break_id: int | None
+    first_break_reason: str | None
 
 
 @dataclass
@@ -127,8 +164,14 @@ INSERT INTO audit_log (
     run_id, agent_name, timestamp, user_prompt, model, provider,
     output, tokens_in, tokens_out, total_tokens, tool_calls,
     duration_ms, success, error, trigger_type, trigger_metadata,
-    principal_id, tool_names
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    principal_id, tool_names, prev_hash, record_hash
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+"""
+
+_SELECT_CHAIN_TIP = """\
+SELECT record_hash FROM audit_log
+WHERE record_hash IS NOT NULL
+ORDER BY id DESC LIMIT 1;
 """
 
 _CREATE_SECURITY_EVENTS_TABLE = """\
@@ -265,6 +308,19 @@ def _migrate_add_tool_names_column(conn: sqlite3.Connection) -> None:
         pass  # Column already exists
 
 
+def _migrate_add_hash_columns(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add prev_hash/record_hash columns for the signed chain.
+
+    Both columns are nullable TEXT; rows predating this migration keep NULL and
+    are reported as legacy by verify_chain().
+    """
+    for col in ("prev_hash", "record_hash"):
+        try:
+            conn.execute(f"ALTER TABLE audit_log ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+
 def _build_where(
     filters: list[tuple[str, object]],
 ) -> tuple[str, list[object]]:
@@ -321,6 +377,7 @@ def _row_to_record(row: sqlite3.Row) -> AuditRecord:
         trigger_type=row["trigger_type"],
         trigger_metadata=row["trigger_metadata"],
         principal_id=row["principal_id"],
+        tool_names=row["tool_names"],
     )
 
 
@@ -342,6 +399,7 @@ _RECORD_FIELDS = [
     "trigger_type",
     "trigger_metadata",
     "principal_id",
+    "tool_names",
 ]
 
 
@@ -376,9 +434,15 @@ class AuditLogger:
         self._auto_prune_interval = auto_prune_interval
         self._retention_days = retention_days
         self._max_records = max_records
+        self._hmac_key: bytes | None = None  # loaded lazily on first log()
         resolved_path = Path(db_path) if not isinstance(db_path, Path) else db_path
         ensure_private_dir(resolved_path.parent)
-        self._conn = sqlite3.connect(str(resolved_path), check_same_thread=False, timeout=30)
+        self._conn = sqlite3.connect(
+            str(resolved_path),
+            check_same_thread=False,
+            timeout=30,
+            isolation_level=None,  # autocommit; signing path opens BEGIN IMMEDIATE explicitly
+        )
         try:
             secure_database(resolved_path)
             self._conn.row_factory = sqlite3.Row
@@ -392,6 +456,7 @@ class AuditLogger:
             _migrate_add_principal_column(self._conn)
             _migrate_add_compose_name_column(self._conn)
             _migrate_add_tool_names_column(self._conn)
+            _migrate_add_hash_columns(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -429,35 +494,100 @@ class AuditLogger:
         except Exception as e:
             logger.error("Failed to write %s: %s", error_label, e)
 
-    def log(self, record: AuditRecord) -> None:
-        """Insert an audit record. Never raises — prints to stderr on failure."""
-        user_prompt = scrub_secrets(record.user_prompt)
-        output = scrub_secrets(record.output)
-        error = scrub_secrets(record.error) if record.error else record.error
-        self._execute_insert_locked(
-            _INSERT,
-            (
-                record.run_id,
-                record.agent_name,
-                record.timestamp,
-                user_prompt,
-                record.model,
-                record.provider,
-                output,
-                record.tokens_in,
-                record.tokens_out,
-                record.total_tokens,
-                record.tool_calls,
-                record.duration_ms,
-                record.success,
-                error,
-                record.trigger_type,
-                record.trigger_metadata,
-                record.principal_id,
-                record.tool_names,
-            ),
-            error_label="audit record",
+    def _get_hmac_key(self) -> bytes:
+        """Return the cached HMAC key, loading/creating it on first call."""
+        if self._hmac_key is None:
+            self._hmac_key = load_or_create_hmac_key()
+        return self._hmac_key
+
+    def _log_signed_locked(self, record: AuditRecord) -> None:
+        """Sign and insert one audit record inside a BEGIN IMMEDIATE transaction.
+
+        Acquires `self._lock` AND a SQLite write lock (BEGIN IMMEDIATE) so
+        concurrent processes on the same DB cannot fork the chain.
+        """
+        scrubbed = AuditRecord(
+            run_id=record.run_id,
+            agent_name=record.agent_name,
+            timestamp=record.timestamp,
+            user_prompt=scrub_secrets(record.user_prompt),
+            model=record.model,
+            provider=record.provider,
+            output=scrub_secrets(record.output),
+            tokens_in=record.tokens_in,
+            tokens_out=record.tokens_out,
+            total_tokens=record.total_tokens,
+            tool_calls=record.tool_calls,
+            duration_ms=record.duration_ms,
+            success=record.success,
+            error=scrub_secrets(record.error) if record.error else record.error,
+            trigger_type=record.trigger_type,
+            trigger_metadata=record.trigger_metadata,
+            principal_id=record.principal_id,
+            tool_names=record.tool_names,
         )
+        key = self._get_hmac_key()
+        record_dict = {f: getattr(scrubbed, f) for f in _RECORD_FIELDS}
+        serialized = canonical_serialize(record_dict, _RECORD_FIELDS)
+
+        with self._lock:
+            in_txn = False
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                in_txn = True
+                prev_row = self._conn.execute(_SELECT_CHAIN_TIP).fetchone()
+                prev_hash = prev_row["record_hash"] if prev_row else None
+                record_hash = compute_record_hash(key, prev_hash, serialized)
+                self._conn.execute(
+                    _INSERT,
+                    (
+                        scrubbed.run_id,
+                        scrubbed.agent_name,
+                        scrubbed.timestamp,
+                        scrubbed.user_prompt,
+                        scrubbed.model,
+                        scrubbed.provider,
+                        scrubbed.output,
+                        scrubbed.tokens_in,
+                        scrubbed.tokens_out,
+                        scrubbed.total_tokens,
+                        scrubbed.tool_calls,
+                        scrubbed.duration_ms,
+                        scrubbed.success,
+                        scrubbed.error,
+                        scrubbed.trigger_type,
+                        scrubbed.trigger_metadata,
+                        scrubbed.principal_id,
+                        scrubbed.tool_names,
+                        prev_hash,
+                        record_hash,
+                    ),
+                )
+                self._conn.commit()
+                in_txn = False
+                self._insert_count += 1
+                if (
+                    self._auto_prune_interval > 0
+                    and self._insert_count % self._auto_prune_interval == 0
+                ):
+                    self._prune_locked(
+                        retention_days=self._retention_days,
+                        max_records=self._max_records,
+                    )
+            except Exception:
+                if in_txn:
+                    try:
+                        self._conn.rollback()
+                    except Exception:
+                        pass
+                raise
+
+    def log(self, record: AuditRecord) -> None:
+        """Insert a signed audit record. Never raises — logs on failure."""
+        try:
+            self._log_signed_locked(record)
+        except Exception as e:
+            logger.error("Failed to write audit record: %s", e)
 
     # -- budget state persistence --------------------------------------------
 
@@ -996,6 +1126,167 @@ class AuditLogger:
             rows = self._conn.execute(sql, params).fetchall()
         return [dict(r) for r in rows]
 
+    def verify_chain(self) -> ChainVerifyResult:
+        """Walk the signed chain and verify every signed row. Never raises.
+
+        Legacy rows (NULL hashes) before the first signed row are tolerated.
+        A NULL hash after the chain has started is a break. id gaps with a
+        matching prev_hash mismatch are treated as pruning (informational).
+        """
+        try:
+            key = load_hmac_key_readonly()
+        except KeyUnavailableError:
+            return ChainVerifyResult(
+                ok=False,
+                total_rows=0,
+                unsigned_legacy_rows=0,
+                verified_rows=0,
+                last_verified_id=None,
+                last_verified_hash=None,
+                pruned_gaps=(),
+                first_break_id=None,
+                first_break_reason="key_missing",
+            )
+        except KeyInvalidError:
+            return ChainVerifyResult(
+                ok=False,
+                total_rows=0,
+                unsigned_legacy_rows=0,
+                verified_rows=0,
+                last_verified_id=None,
+                last_verified_hash=None,
+                pruned_gaps=(),
+                first_break_id=None,
+                first_break_reason="key_invalid",
+            )
+
+        select_cols = ", ".join(("id", *_RECORD_FIELDS, "prev_hash", "record_hash"))
+        sql = f"SELECT {select_cols} FROM audit_log ORDER BY id ASC"
+
+        total_rows = 0
+        legacy_rows = 0
+        verified_rows = 0
+        last_id: int | None = None
+        last_hash: str | None = None
+        pruned_gaps: list[int] = []
+        chain_started = False
+        expected_prev_hash: str | None = None
+        prev_row_id: int | None = None
+
+        with self._lock:
+            try:
+                cursor = self._conn.execute(sql)
+            except sqlite3.Error:
+                return ChainVerifyResult(
+                    ok=False,
+                    total_rows=0,
+                    unsigned_legacy_rows=0,
+                    verified_rows=0,
+                    last_verified_id=None,
+                    last_verified_hash=None,
+                    pruned_gaps=(),
+                    first_break_id=None,
+                    first_break_reason="query_error",
+                )
+
+            while True:
+                try:
+                    batch = cursor.fetchmany(500)
+                except sqlite3.Error:
+                    return ChainVerifyResult(
+                        ok=False,
+                        total_rows=total_rows,
+                        unsigned_legacy_rows=legacy_rows,
+                        verified_rows=verified_rows,
+                        last_verified_id=last_id,
+                        last_verified_hash=last_hash,
+                        pruned_gaps=tuple(pruned_gaps),
+                        first_break_id=None,
+                        first_break_reason="query_error",
+                    )
+                if not batch:
+                    break
+
+                for row in batch:
+                    total_rows += 1
+                    stored_record_hash = row["record_hash"]
+                    stored_prev_hash = row["prev_hash"]
+                    row_id = row["id"]
+
+                    if stored_record_hash is None:
+                        if chain_started:
+                            return ChainVerifyResult(
+                                ok=False,
+                                total_rows=total_rows,
+                                unsigned_legacy_rows=legacy_rows,
+                                verified_rows=verified_rows,
+                                last_verified_id=last_id,
+                                last_verified_hash=last_hash,
+                                pruned_gaps=tuple(pruned_gaps),
+                                first_break_id=row_id,
+                                first_break_reason="missing_hash_after_chain_start",
+                            )
+                        legacy_rows += 1
+                        prev_row_id = row_id
+                        continue
+
+                    if not chain_started:
+                        chain_started = True
+                        expected_prev_hash = stored_prev_hash
+
+                    id_gap = prev_row_id is not None and row_id != prev_row_id + 1
+                    if stored_prev_hash != expected_prev_hash:
+                        if id_gap:
+                            pruned_gaps.append(row_id)
+                            expected_prev_hash = stored_prev_hash
+                        else:
+                            return ChainVerifyResult(
+                                ok=False,
+                                total_rows=total_rows,
+                                unsigned_legacy_rows=legacy_rows,
+                                verified_rows=verified_rows,
+                                last_verified_id=last_id,
+                                last_verified_hash=last_hash,
+                                pruned_gaps=tuple(pruned_gaps),
+                                first_break_id=row_id,
+                                first_break_reason="prev_hash_mismatch",
+                            )
+
+                    record_dict = {f: row[f] for f in _RECORD_FIELDS}
+                    record_dict["success"] = bool(record_dict["success"])
+                    serialized = canonical_serialize(record_dict, _RECORD_FIELDS)
+                    expected_hash = compute_record_hash(key, expected_prev_hash, serialized)
+                    if expected_hash != stored_record_hash:
+                        return ChainVerifyResult(
+                            ok=False,
+                            total_rows=total_rows,
+                            unsigned_legacy_rows=legacy_rows,
+                            verified_rows=verified_rows,
+                            last_verified_id=last_id,
+                            last_verified_hash=last_hash,
+                            pruned_gaps=tuple(pruned_gaps),
+                            first_break_id=row_id,
+                            first_break_reason="hash_mismatch",
+                        )
+
+                    verified_rows += 1
+                    last_id = row_id
+                    last_hash = stored_record_hash
+                    expected_prev_hash = stored_record_hash
+                    prev_row_id = row_id
+
+        return ChainVerifyResult(
+            ok=True,
+            total_rows=total_rows,
+            unsigned_legacy_rows=legacy_rows,
+            verified_rows=verified_rows,
+            last_verified_id=last_id,
+            last_verified_hash=last_hash,
+            pruned_gaps=tuple(pruned_gaps),
+            first_break_id=None,
+            first_break_reason=None,
+        )
+
     def _prune_locked(self, retention_days: int = 90, max_records: int = 100_000) -> int:
         """Core prune logic. Caller must hold self._lock."""
         deleted = 0
@@ -1012,10 +1303,12 @@ class AuditLogger:
             self._conn.execute("DELETE FROM security_events WHERE timestamp < ?", (cutoff,))
             self._conn.execute("DELETE FROM delegate_events WHERE timestamp < ?", (cutoff,))
 
-            # Trim to max_records (keep most recent)
+            # Trim to max_records (keep most recent by insertion order).
+            # Using `id DESC` rather than `timestamp DESC` so the tail of the
+            # hash chain is preserved even if rows have out-of-order timestamps.
             cursor = self._conn.execute(
                 "DELETE FROM audit_log WHERE id NOT IN "
-                "(SELECT id FROM audit_log ORDER BY timestamp DESC LIMIT ?)",
+                "(SELECT id FROM audit_log ORDER BY id DESC LIMIT ?)",
                 (max_records,),
             )
             deleted += cursor.rowcount

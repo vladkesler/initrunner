@@ -32,32 +32,32 @@ class TestListStarters:
     def test_includes_agent_starters(self):
         slugs = {e.slug for e in list_starters()}
         assert "helpdesk" in slugs
-        assert "memory-assistant" in slugs
-        assert "rag-agent" in slugs
+        assert "memory" in slugs
+        assert "librarian" in slugs
 
     def test_includes_team_starter(self):
         slugs = {e.slug for e in list_starters()}
-        assert "code-review-team" in slugs
+        assert "reviewer" in slugs
 
     def test_includes_composite_starters(self):
         slugs = {e.slug for e in list_starters()}
-        assert "ci-pipeline" in slugs
-        assert "support-desk" in slugs
+        assert "pipeline" in slugs
+        assert "triage" in slugs
 
     def test_curated_order_preserved(self):
         starters = list_starters()
         slugs = [e.slug for e in starters]
-        # First four should be the hero starters in order
+        # First two should be the hero starters in order
         assert slugs[0] == "helpdesk"
-        assert slugs[1] == "code-review-team"
+        assert slugs[1] == "reviewer"
 
-    def test_code_review_team_is_team_kind(self):
-        entry = get_starter("code-review-team")
+    def test_reviewer_is_team_kind(self):
+        entry = get_starter("reviewer")
         assert entry is not None
         assert entry.kind == "Team"
 
     def test_composite_starters_are_flow_kind(self):
-        entry = get_starter("ci-pipeline")
+        entry = get_starter("pipeline")
         assert entry is not None
         assert entry.kind == "Flow"
 
@@ -82,7 +82,7 @@ class TestResolveStarterPath:
         assert path.name == "helpdesk.yaml"
 
     def test_resolves_composite(self):
-        path = resolve_starter_path("ci-pipeline")
+        path = resolve_starter_path("pipeline")
         assert path is not None
         assert path.is_file()
         assert path.name == "flow.yaml"
@@ -118,7 +118,7 @@ class TestDeriveFeatures:
 
 class TestCheckPrerequisites:
     def test_telegram_requires_token(self):
-        entry = get_starter("telegram-assistant")
+        entry = get_starter("telegram")
         assert entry is not None
         with (
             patch.dict(os.environ, {}, clear=True),
@@ -129,7 +129,7 @@ class TestCheckPrerequisites:
             assert len(env_errors) > 0
 
     def test_discord_requires_token(self):
-        entry = get_starter("discord-assistant")
+        entry = get_starter("discord")
         assert entry is not None
         with (
             patch.dict(os.environ, {}, clear=True),
@@ -153,18 +153,17 @@ class TestCheckPrerequisites:
         assert entry is not None
         assert "ingest" in entry.requires_extras
 
-    def test_memory_assistant_has_no_errors(self):
-        """memory-assistant needs no env vars or extras beyond base."""
-        entry = get_starter("memory-assistant")
+    def test_memory_starter_has_no_errors(self):
+        """memory starter needs no env vars or extras beyond base."""
+        entry = get_starter("memory")
         assert entry is not None
         assert len(entry.requires_env) == 0
-        # memory-assistant only needs base deps
         errors, _warnings = check_prerequisites(entry)
         env_errors = [e for e in errors if "Environment variable" in e]
         assert len(env_errors) == 0
 
     def test_telegram_requires_extras(self):
-        entry = get_starter("telegram-assistant")
+        entry = get_starter("telegram")
         assert entry is not None
         assert "telegram" in entry.requires_extras
         assert "search" in entry.requires_extras

@@ -44,7 +44,7 @@ Onboarding surface designed to reduce time-to-first-agent:
 
 - **Provider status banner**: shows which AI providers are configured (env var presence + Ollama). When no providers are configured, shows an inline key entry form (provider dropdown + API key input + "Save & Verify" button) so users can configure a provider without leaving the dashboard. Links to the provider setup guide and the System page for full provider management.
 - **Primary CTAs**: "Create an Agent" and "Read the Quickstart" (links to `https://www.initrunner.ai/docs/quickstart`).
-- **Starter template cards**: up to 6 curated single-file Agent starters from `_starters/` (helpdesk, rag-agent, memory-assistant, telegram, discord, email). Each card shows name, description, and derived feature badges (RAG, Memory, Triggers, Web, etc.). Clicking a card navigates to `/agents/new?starter={slug}`, which auto-loads the starter YAML into the editor when a provider is detected.
+- **Starter template cards**: up to 6 curated single-file Agent starters from `_starters/` (helpdesk, librarian, memory, telegram, discord, mail). Each card shows name, description, and derived feature badges (RAG, Memory, Triggers, Web, etc.). Clicking a card navigates to `/agents/new?starter={slug}`, which auto-loads the starter YAML into the editor when a provider is detected.
 - **Capability chips**: pill links to RAG, Memory, Triggers, Flow, and Teams docs/creation flows.
 - **Full documentation link**: external link to the quickstart guide.
 

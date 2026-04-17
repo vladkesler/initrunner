@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: rag-agent
+  name: librarian
   description: Knowledge base Q&A agent with document ingestion
   tags:
     - example

@@ -50,7 +50,7 @@ class TestApiKeyEnv:
         monkeypatch.delenv("NONEXISTENT_KEY", raising=False)
         from initrunner.ingestion.embeddings import _create_custom_embedder
 
-        with pytest.raises(ValueError, match=r"NONEXISTENT_KEY.*missing or empty"):
+        with pytest.raises(ValueError, match=r"NONEXISTENT_KEY"):
             _create_custom_embedder(
                 "custom", "my-model", "http://server/v1", api_key_env="NONEXISTENT_KEY"
             )

@@ -25,6 +25,10 @@
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
 </p>
 
+<p align="center">
+  <strong>What's new in 2026.4.15</strong> — encrypted credential vault · HMAC-signed audit chain · bidirectional Slack adapter (Socket Mode) · one-word starter names · <a href="CHANGELOG.md#202641515---2026-04-17">full changelog</a>
+</p>
+
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production.
 
 ```bash
@@ -49,11 +53,11 @@ Run `initrunner run --list` for the full catalog. The model is auto-detected fro
 | Starter | What it does |
 |---------|-------------|
 | `helpdesk` | Drop your docs in, get a Q&A agent with citations and memory |
-| `deep-researcher` | 3-agent pipeline: planner, web researcher, synthesizer |
-| `code-review-team` | Multi-perspective review: architect, security, maintainer |
-| `codebase-analyst` | Index a repo, chat about architecture, learns patterns across sessions |
-| `content-pipeline` | Researcher, writer, editor/fact-checker via webhook or cron |
-| `email-agent` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
+| `scholar` | 3-agent pipeline: planner, web researcher, synthesizer |
+| `reviewer` | Multi-perspective review: architect, security, maintainer |
+| `reader` | Index a repo, chat about architecture, learns patterns across sessions |
+| `writer` | Researcher, writer, editor/fact-checker via webhook or cron |
+| `mail` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
 
 ### Build your own
 
@@ -193,14 +197,14 @@ spec:
 
 ```bash
 cd ~/myproject
-initrunner run codebase-analyst -i   # indexes your code, then starts Q&A
+initrunner run reader -i   # indexes your code, then starts Q&A
 ```
 
 The interesting part is consolidation. After each session, an LLM reads what happened and distills it into the semantic store. Facts the agent learns during a Tuesday debugging session show up when it's reviewing code on Thursday. Shared memory across flows lets teams of agents build knowledge together. See [Memory](docs/core/memory.md) · [Ingestion](docs/core/ingestion.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
-## Security is config, not plumbing
+## Security ships with the framework
 
-Most agent frameworks treat security as "add auth middleware when you get to production." InitRunner ships security integrated and ready to use. You turn it on with config keys, not with a weekend of plumbing.
+Most agent frameworks treat security as "add auth middleware when you get to production." InitRunner ships these controls in the box. Turn them on with config keys.
 
 **Agents accept untrusted input.** Content policy engine (blocked patterns, prompt length limits, optional LLM topic classifier) and an input guard capability validate prompts before the agent starts.
 
@@ -210,7 +214,7 @@ Most agent frameworks treat security as "add auth middleware when you get to pro
 
 **Everything is logged.** Append-only SQLite audit trail with automatic secret scrubbing. Regex patterns redact GitHub tokens, AWS keys, Stripe keys, and more from both prompts and outputs.
 
-These are opt-in via the `security:` config key, not on by magic. Roles without a `security:` section get safe defaults. The point is that these capabilities exist in the box rather than being something you bolt on six months into production.
+All of these are opt-in via the `security:` config key. Roles without a `security:` section get safe defaults.
 
 ```bash
 export INITRUNNER_POLICY_DIR=./policies
@@ -221,7 +225,7 @@ See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/se
 
 ## Cost control
 
-Token budgets are table stakes. InitRunner also enforces USD cost budgets. Set a daily or weekly dollar cap on a daemon and it stops firing triggers when the threshold is hit.
+Most frameworks track token budgets. InitRunner also enforces USD cost budgets. Set a daily or weekly dollar cap on a daemon and it stops firing triggers when the threshold is hit.
 
 ```yaml
 spec:

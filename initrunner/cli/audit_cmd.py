@@ -106,3 +106,51 @@ def audit_export(
         console.print(f"[green]Exported[/green] {len(records)} record(s) to {output}.")
     else:
         sys.stdout.write(text)
+
+
+@app.command("verify-chain")
+def audit_verify_chain(audit_db: AuditDbOption = None) -> None:
+    """Verify the HMAC-signed audit chain. Exits non-zero on any break."""
+    from rich.table import Table
+
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+    from initrunner.services.operations import verify_audit_chain_sync
+
+    db_path = Path(audit_db or DEFAULT_DB_PATH)
+    if not db_path.exists():
+        console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
+        raise typer.Exit(1)
+
+    result = verify_audit_chain_sync(audit_db=db_path)
+
+    tip_hash_short = result.last_verified_hash[:16] + "..." if result.last_verified_hash else "-"
+
+    table = Table(show_header=False, box=None, pad_edge=False)
+    table.add_column(style="dim")
+    table.add_column()
+    table.add_row("Total rows", str(result.total_rows))
+    table.add_row("Unsigned (legacy)", str(result.unsigned_legacy_rows))
+    table.add_row("Verified", str(result.verified_rows))
+    table.add_row("Tip id", str(result.last_verified_id) if result.last_verified_id else "-")
+    table.add_row("Tip hash", tip_hash_short)
+    table.add_row("Pruned gaps", str(len(result.pruned_gaps)))
+    console.print(table)
+
+    if result.ok:
+        console.print("[green]Chain verified.[/green]")
+        return
+
+    reason = result.first_break_reason or "unknown"
+    if reason in ("key_missing", "key_invalid"):
+        console.print(f"[red]Cannot verify:[/red] {reason}")
+        if reason == "key_missing":
+            from initrunner.config import get_audit_hmac_key_path
+
+            console.print(
+                "[dim]Hint:[/dim] set [bold]INITRUNNER_AUDIT_HMAC_KEY[/bold] "
+                f"(64-char hex) or place the 32-byte key at "
+                f"[bold]{get_audit_hmac_key_path()}[/bold]."
+            )
+    else:
+        console.print(f"[red]Chain broken[/red] at id {result.first_break_id}: {reason}")
+    raise typer.Exit(1)

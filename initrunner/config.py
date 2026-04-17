@@ -33,6 +33,10 @@ def get_audit_db_path() -> Path:
     return get_home_dir() / "audit.db"
 
 
+def get_audit_hmac_key_path() -> Path:
+    return get_home_dir() / "audit_hmac.key"
+
+
 def get_stores_dir() -> Path:
     return get_home_dir() / "stores"
 
@@ -71,3 +75,7 @@ def get_mcp_cache_dir() -> Path:
 
 def get_hub_auth_path() -> Path:
     return get_home_dir() / "hub-auth.json"
+
+
+def get_vault_path() -> Path:
+    return get_home_dir() / "vault.enc"

@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Flow
 metadata:
-  name: ci-pipeline
+  name: pipeline
   description: >
     CI event processing pipeline. A webhook receiver accepts CI webhooks,
     a build analyzer diagnoses failures, and a notifier sends Slack alerts

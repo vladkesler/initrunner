@@ -1,7 +1,7 @@
 apiVersion: initrunner/v1
 kind: Flow
 metadata:
-  name: support-desk
+  name: triage
   description: >
     Support desk pipeline with intelligent auto-routing. An intake agent
     summarizes incoming requests, then sense routing automatically sends

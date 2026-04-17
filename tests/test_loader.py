@@ -155,8 +155,61 @@ class TestBuildModel:
             base_url="https://custom.example.com/v1",
             api_key_env="MY_CUSTOM_KEY",
         )
-        with pytest.raises(RoleLoadError, match="Environment variable 'MY_CUSTOM_KEY' is not set"):
+        with pytest.raises(RoleLoadError, match="MY_CUSTOM_KEY"):
             _build_model(mc)
+
+    def test_vault_key_is_injected_into_environ(self, monkeypatch, tmp_path):
+        """When a standard-provider key comes from the vault, it must land in os.environ.
+
+        OpenAI/Anthropic/Google SDKs read the key from os.environ at client
+        construction time. Resolving to a local variable isn't enough.
+        """
+        from initrunner.credentials import reset_resolver
+        from initrunner.credentials.local_vault import LocalEncryptedVault
+
+        monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path))
+        from initrunner.config import get_home_dir
+
+        get_home_dir.cache_clear()
+        reset_resolver()
+
+        vault = LocalEncryptedVault(tmp_path / "vault.enc")
+        vault.init("pw")
+        vault.set("OPENAI_API_KEY", "sk-from-vault")
+        vault.lock()
+
+        monkeypatch.setenv("INITRUNNER_VAULT_PASSPHRASE", "pw")
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        reset_resolver()
+
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
+        result = _build_model(mc)
+
+        assert result == "openai-responses:gpt-5-mini"
+        assert os.environ["OPENAI_API_KEY"] == "sk-from-vault"
+
+    def test_shell_env_wins_over_vault(self, monkeypatch, tmp_path):
+        """An exported env var must NOT be overwritten by the vault value."""
+        from initrunner.credentials import reset_resolver
+        from initrunner.credentials.local_vault import LocalEncryptedVault
+
+        monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path))
+        from initrunner.config import get_home_dir
+
+        get_home_dir.cache_clear()
+        reset_resolver()
+
+        vault = LocalEncryptedVault(tmp_path / "vault.enc")
+        vault.init("pw")
+        vault.set("OPENAI_API_KEY", "sk-from-vault")
+        vault.lock()
+
+        monkeypatch.setenv("INITRUNNER_VAULT_PASSPHRASE", "pw")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-from-shell")
+        reset_resolver()
+
+        _build_model(ModelConfig(provider="openai", name="gpt-5-mini"))
+        assert os.environ["OPENAI_API_KEY"] == "sk-from-shell"
 
     def test_docker_warning(self, tmp_path):
         """Docker warning is logged when localhost base_url inside Docker."""

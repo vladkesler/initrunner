@@ -75,6 +75,19 @@ Runs `pnpm audit --prod` against the dashboard's frontend dependencies. This job
 
 The Docker publish workflow (`.github/workflows/docker-publish.yml`) includes a post-publish Trivy scan of the container image. This detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image` category.
 
+## Audit Chain Verification
+
+If your pipeline produces an audit database (e.g. a fleet of agents writing to a shared `audit.db` that's archived by CI), run `initrunner audit verify-chain` as a job step. It exits 0 on a clean chain and 1 on any tamper or key problem:
+
+```yaml
+- name: Verify audit chain
+  env:
+    INITRUNNER_AUDIT_HMAC_KEY: ${{ secrets.INITRUNNER_AUDIT_HMAC_KEY }}
+  run: uv run initrunner audit verify-chain --audit-db artifacts/audit.db
+```
+
+See [`docs/security/audit-chain.md`](../security/audit-chain.md) for what the chain proves and the limits of the guarantee.
+
 ## Dependabot
 
 Dependabot is configured in `.github/dependabot.yml` for three ecosystems:

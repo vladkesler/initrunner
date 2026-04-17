@@ -1,5 +1,43 @@
 # Changelog
 
+## [Unreleased]
+
+## [2026.4.15] - 2026-04-17
+
+### Breaking
+- **Starter slugs renamed to plain one-word names.** The bundled agent/team/flow starters now use short, human-readable names:
+
+  | Old | New |
+  |---|---|
+  | `browser-agent` | `visitor` |
+  | `codebase-analyst` | `reader` |
+  | `code-review-team` | `reviewer` |
+  | `debate-team` | `debate` |
+  | `discord-assistant` | `discord` |
+  | `email-agent` | `mail` |
+  | `memory-assistant` | `memory` |
+  | `plan-execute` | `planner` |
+  | `project-monitor` | `watcher` |
+  | `rag-agent` | `librarian` |
+  | `telegram-assistant` | `telegram` |
+  | `todo-planner` | `tasks` |
+  | `web-researcher` | `scout` |
+  | `ci-pipeline` | `pipeline` |
+  | `content-pipeline` | `writer` |
+  | `support-desk` | `triage` |
+
+  `helpdesk` and `scholar` are unchanged. No alias layer — update scripts and bookmarks that reference old slugs.
+- **Removed `deep-researcher` from the starter catalog.** The directory only contained a README; `STARTER_ORDER` referenced it but `list_starters()` silently skipped it. The broken entry is gone; `scholar` covers the same research-team use case.
+
+### Added
+- **Encrypted credential vault** -- new `initrunner vault` CLI (`init`/`set`/`get`/`list`/`rm`/`import`/`export`/`rotate`/`verify`/`cache`/`lock`/`status`) backed by Fernet + scrypt at `~/.initrunner/vault.enc`. Resolver chain checks env vars first, then the vault, so existing `api_key_env` / `token_env` / `${VAR}` placeholders keep working. Standard-provider keys resolved from the vault are injected into `os.environ` so SDK clients (OpenAI, Anthropic, Google) find them at construction. `_PASSPHRASE` added to the subprocess env scrub list so the unlock passphrase cannot leak to child processes. Optional extras: `initrunner[vault]`, `initrunner[vault-keyring]`. See `docs/security/vault.md`
+- **HMAC-signed audit chain with `verify-chain` CLI** -- each audit record is HMAC-SHA256-signed over the previous record's hash, turning the SQLite log into a tamper-evident chain. Signing runs inside `BEGIN IMMEDIATE` so concurrent writers serialise through SQLite's RESERVED lock instead of forking the chain. Verification is full-chain, never auto-creates a key (a copied DB without the key fails cleanly), and treats id gaps from pruning as informational rather than breaks. See `docs/security/audit-chain.md`
+- **Bidirectional Slack adapter (triggers)** -- new `SlackAdapter` implementing `ChannelAdapter` via `slack-sdk` Socket Mode (outbound WebSocket, no inbound ports). Subscribes to `app_mention` and `message.im`, threads replies off the triggering message by default, and encodes channel+thread in `channel_target` so each Slack thread gets its own `conversation_key`. The existing outbound webhook tool is unchanged. Includes schema entry, dispatcher registration, doctor/starter/role-generator integration, `initrunner[slack]` extra, and 28 new tests. See `docs/core/triggers.md`
+
+### Dependencies
+- authlib 1.6.9 -> 1.6.11 (security: CSRF in Starlette OAuth client when a `cache` is configured)
+- python-multipart 0.0.22 -> 0.0.26 (security: CVE-2026-40347)
+
 ## [2026.4.14] - 2026-04-14
 
 ### Security

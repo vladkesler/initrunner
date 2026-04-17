@@ -8,13 +8,13 @@
 #   uv pip install initrunner[search]
 #
 # Usage:
-#   initrunner run web-researcher -p "Compare React vs Svelte for dashboards"
-#   initrunner run web-researcher -i
+#   initrunner run scout -p "Compare React vs Svelte for dashboards"
+#   initrunner run scout -i
 
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: web-researcher
+  name: scout
   description: >
     Research assistant that searches the web, reads pages, and delivers
     structured briefings with sources. Give it a topic and get a report.

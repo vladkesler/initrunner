@@ -95,6 +95,21 @@ def make_mock_agent(
     return agent
 
 
+@pytest.fixture(autouse=True)
+def _reset_credential_resolver():
+    """Reset the process-wide credential resolver between tests.
+
+    The resolver caches a ``LocalEncryptedVault`` keyed on the current
+    ``INITRUNNER_HOME`` at first access; without this reset, tests that
+    change that env var inherit the stale path from an earlier test.
+    """
+    from initrunner.credentials import reset_resolver
+
+    reset_resolver()
+    yield
+    reset_resolver()
+
+
 @pytest.fixture
 def role():
     """Provide a default test RoleDefinition."""

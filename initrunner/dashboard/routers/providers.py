@@ -33,14 +33,16 @@ _VALIDATABLE_PROVIDERS = frozenset({"openai", "anthropic"})
 
 @router.get("")
 async def list_providers() -> list[ProviderResponse]:
+    from initrunner.credentials import get_resolver
     from initrunner.dashboard.routers._provider_options import CUSTOM_PRESETS
     from initrunner.services.providers import list_available_providers
 
     providers = await asyncio.to_thread(list_available_providers)
     result = [ProviderResponse(provider=p.provider, model=p.model) for p in providers]
 
+    resolver = get_resolver()
     for preset in CUSTOM_PRESETS:
-        if preset.api_key_env and os.environ.get(preset.api_key_env):
+        if preset.api_key_env and resolver.get(preset.api_key_env):
             result.append(ProviderResponse(provider=preset.name, model=preset.placeholder))
 
     return result
@@ -51,11 +53,13 @@ async def list_providers() -> list[ProviderResponse]:
 
 def _build_provider_status() -> tuple[list[ProviderStatus], str | None, str | None]:
     """Build full provider status list including standard, presets, and Ollama."""
+    from initrunner.credentials import get_resolver
     from initrunner.dashboard.routers._provider_options import CUSTOM_PRESETS
     from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
     from initrunner.services.providers import detect_provider_and_model
 
     statuses: list[ProviderStatus] = []
+    resolver = get_resolver()
 
     # Standard providers
     for prov, env_var in _PROVIDER_API_KEY_ENVS.items():
@@ -63,7 +67,7 @@ def _build_provider_status() -> tuple[list[ProviderStatus], str | None, str | No
             ProviderStatus(
                 provider=prov,
                 env_var=env_var,
-                is_configured=bool(os.environ.get(env_var)),
+                is_configured=bool(resolver.get(env_var)),
             )
         )
 
@@ -75,7 +79,7 @@ def _build_provider_status() -> tuple[list[ProviderStatus], str | None, str | No
             ProviderStatus(
                 provider=preset.name,
                 env_var=preset.api_key_env,
-                is_configured=bool(os.environ.get(preset.api_key_env)),
+                is_configured=bool(resolver.get(preset.api_key_env)),
             )
         )
 
@@ -145,7 +149,7 @@ async def save_key(req: SaveKeyRequest) -> SaveKeyResponse:
             detail="One of provider, preset, or base_url is required",
         )
 
-    # Write to ~/.initrunner/.env via services layer
+    # Persist via services layer (vault when available + unlockable, else ~/.initrunner/.env)
     from initrunner.services.setup import save_env_key
 
     result_path = await asyncio.to_thread(save_env_key, env_name, req.api_key)

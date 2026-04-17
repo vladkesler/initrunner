@@ -276,10 +276,34 @@ def check_ollama_models() -> list[str]:
 
 
 def save_env_key(env_var: str, value: str) -> Path | None:
-    """Write a key to ``~/.initrunner/.env``. Returns path on success, None on failure."""
+    """Persist a credential. Prefers the vault when one exists and is unlockable.
+
+    When ``~/.initrunner/vault.enc`` exists AND a passphrase is available
+    from ``INITRUNNER_VAULT_PASSPHRASE`` or the keyring cache, the key is
+    written to the vault. Otherwise it's written to ``~/.initrunner/.env``
+    as before. Returns the file path that was written, or ``None`` on
+    failure.
+    """
     from dotenv import set_key
 
-    from initrunner.config import get_global_env_path, get_home_dir
+    from initrunner.config import get_global_env_path, get_home_dir, get_vault_path
+    from initrunner.credentials import passphrase
+    from initrunner.credentials.local_vault import LocalEncryptedVault
+    from initrunner.credentials.store import WrongPassphrase
+
+    vault_path = get_vault_path()
+    if vault_path.exists():
+        pw = passphrase.acquire(interactive=False)
+        if pw is not None:
+            vault = LocalEncryptedVault(vault_path)
+            try:
+                vault.unlock(pw)
+                vault.set(env_var, value)
+                return vault_path
+            except WrongPassphrase:
+                _logger.warning("vault passphrase rejected -- falling back to .env for %s", env_var)
+            except Exception as exc:  # pragma: no cover - defensive
+                _logger.warning("vault write failed (%s) -- falling back to .env", exc)
 
     try:
         home_dir = get_home_dir()

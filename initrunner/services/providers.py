@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -120,6 +119,13 @@ def _load_env() -> None:
     _load_dotenv(Path.cwd())
 
 
+def _has_credential(name: str) -> bool:
+    """Return True when a credential is available via env var or the vault."""
+    from initrunner.credentials import get_resolver
+
+    return bool(get_resolver().get(name))
+
+
 def _is_ollama_running() -> bool:
     """Return True if Ollama is reachable at localhost:11434."""
     return is_ollama_running()
@@ -155,7 +161,7 @@ def detect_provider_and_model() -> DetectedProvider | None:
     _load_env()
 
     for provider, env_var in PROVIDER_KEY_ENVS:
-        if os.environ.get(env_var) and _provider_sdk_available(provider):
+        if _has_credential(env_var) and _provider_sdk_available(provider):
             return DetectedProvider(provider=provider, model=_default_model_name(provider))
 
     # Fallback: Ollama running locally
@@ -172,7 +178,7 @@ def detect_bot_tokens() -> dict[str, str]:
     return {
         platform: env_var
         for platform, env_var in _BOT_TOKEN_ENVS.items()
-        if os.environ.get(env_var)
+        if _has_credential(env_var)
     }
 
 
@@ -206,7 +212,7 @@ def list_available_providers() -> list[DetectedProvider]:
 
     result: list[DetectedProvider] = []
     for provider, env_var in PROVIDER_KEY_ENVS:
-        if os.environ.get(env_var) and _provider_sdk_available(provider):
+        if _has_credential(env_var) and _provider_sdk_available(provider):
             result.append(DetectedProvider(provider=provider, model=_default_model_name(provider)))
 
     if _is_ollama_running():
@@ -331,7 +337,7 @@ def check_embedding_status(role: object) -> dict | None:
     if emb_provider == "ollama":
         if _is_ollama_running_cached():
             return None
-    elif emb_env and os.environ.get(emb_env):
+    elif emb_env and _has_credential(emb_env):
         return None
 
     # Effective provider is broken -- build the warning
@@ -352,7 +358,7 @@ def check_embedding_status(role: object) -> dict | None:
         if prov == "ollama":
             configured = _is_ollama_running_cached()
         else:
-            configured = bool(os.environ.get(env))
+            configured = _has_credential(env)
         options.append(
             {
                 "provider": prov,
@@ -396,7 +402,7 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
 
     # Check if user has the required LLM key
     env_var = role.spec.model.api_key_env or PROVIDER_KEY_ENVS_DICT.get(role_provider, "")  # type: ignore[union-attr]
-    user_has_key = bool(os.environ.get(env_var)) if env_var else True
+    user_has_key = _has_credential(env_var) if env_var else True
     # Ollama needs no key
     if role_provider == "ollama":
         user_has_key = _is_ollama_running()
@@ -415,7 +421,7 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
         if emb_provider == "ollama":
             has_embedding_key = _is_ollama_running()
         elif emb_env:
-            has_embedding_key = bool(os.environ.get(emb_env))
+            has_embedding_key = _has_credential(emb_env)
 
     return ProviderCompatibility(
         role_provider=role_provider,
@@ -436,7 +442,7 @@ def check_tool_envs() -> dict[str, list[str]]:
     """
     missing_map: dict[str, list[str]] = {}
     for tool_name, env_vars in TOOL_REQUIRED_ENVS.items():
-        missing = [v for v in env_vars if not os.environ.get(v)]
+        missing = [v for v in env_vars if not _has_credential(v)]
         if missing:
             missing_map[tool_name] = missing
     return missing_map
