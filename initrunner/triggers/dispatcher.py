@@ -42,6 +42,7 @@ def _register_builtins() -> None:
         DiscordTriggerConfig,
         FileWatchTriggerConfig,
         HeartbeatTriggerConfig,
+        SlackTriggerConfig,
         TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
@@ -75,6 +76,12 @@ def _register_builtins() -> None:
         from initrunner.triggers.discord import DiscordAdapter
 
         return ChannelTriggerBridge(DiscordAdapter(config), callback)
+
+    @register_trigger_builder(SlackTriggerConfig)
+    def _build_slack(config, callback):
+        from initrunner.triggers.slack import SlackAdapter
+
+        return ChannelTriggerBridge(SlackAdapter(config), callback)
 
     @register_trigger_builder(HeartbeatTriggerConfig)
     def _build_heartbeat(config, callback):

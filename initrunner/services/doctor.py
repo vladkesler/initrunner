@@ -530,7 +530,7 @@ def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
 # Security diagnosis
 # ---------------------------------------------------------------------------
 
-_EXTERNAL_INPUT_TRIGGERS = frozenset({"webhook", "telegram", "discord"})
+_EXTERNAL_INPUT_TRIGGERS = frozenset({"webhook", "telegram", "discord", "slack"})
 
 
 def diagnose_security(role: object) -> SecurityDiagnosis:
@@ -853,6 +853,7 @@ def diagnose_triggers(role: object) -> list[TriggerDiagnosis]:
         DiscordTriggerConfig,
         FileWatchTriggerConfig,
         HeartbeatTriggerConfig,
+        SlackTriggerConfig,
         TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
@@ -908,6 +909,18 @@ def diagnose_triggers(role: object) -> list[TriggerDiagnosis]:
             elif isinstance(trigger, DiscordTriggerConfig):
                 if not os.environ.get(trigger.token_env):
                     issues.append(f"Environment variable {trigger.token_env} not set")
+
+            elif isinstance(trigger, SlackTriggerConfig):
+                if not os.environ.get(trigger.app_token_env):
+                    issues.append(
+                        f"Environment variable {trigger.app_token_env} not set "
+                        f"(required for Socket Mode)"
+                    )
+                if not os.environ.get(trigger.bot_token_env):
+                    issues.append(
+                        f"Environment variable {trigger.bot_token_env} not set "
+                        f"(required for replies)"
+                    )
 
         except Exception as exc:
             issues.append(f"Check failed: {exc}")

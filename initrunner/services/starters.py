@@ -49,6 +49,7 @@ _EXTRA_MARKERS: dict[str, tuple[str, str]] = {
     "web_reader": ("search", "ddgs"),
     "telegram": ("telegram", "telegram"),
     "discord": ("discord", "discord"),
+    "slack": ("slack", "slack_sdk"),
     "audio": ("audio", "youtube_transcript_api"),
 }
 
@@ -103,14 +104,19 @@ def derive_features(spec: dict) -> list[str]:
 _ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
 
 
+_TRIGGER_TOKEN_ENV_FIELDS = ("token_env", "app_token_env", "bot_token_env")
+
+
 def _detect_requires_env(raw_yaml: str, data: dict) -> list[str]:
     """Detect required environment variables from triggers and ${VAR} patterns."""
     env_vars: set[str] = set()
 
-    # Trigger token_env fields
+    # Trigger *_token_env fields (token_env, app_token_env, bot_token_env)
     for trigger in data.get("spec", {}).get("triggers") or []:
-        if isinstance(trigger, dict) and trigger.get("token_env"):
-            env_vars.add(trigger["token_env"])
+        if isinstance(trigger, dict):
+            for field in _TRIGGER_TOKEN_ENV_FIELDS:
+                if trigger.get(field):
+                    env_vars.add(trigger[field])
 
     # ${VAR} interpolation patterns
     env_vars.update(_ENV_VAR_RE.findall(raw_yaml))

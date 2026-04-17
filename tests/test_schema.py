@@ -28,6 +28,7 @@ from initrunner.agent.schema.triggers import (
     CronTriggerConfig,
     DiscordTriggerConfig,
     FileWatchTriggerConfig,
+    SlackTriggerConfig,
     TelegramTriggerConfig,
     WebhookTriggerConfig,
 )
@@ -463,6 +464,50 @@ class TestTriggerConfig:
         role = RoleDefinition.model_validate(data)
         assert isinstance(role.spec.triggers[0], DiscordTriggerConfig)
         assert role.spec.triggers[0].allowed_user_ids == ["111222333"]
+
+    def test_slack_trigger(self):
+        tc = SlackTriggerConfig()
+        assert tc.type == "slack"
+        assert tc.app_token_env == "SLACK_APP_TOKEN"
+        assert tc.bot_token_env == "SLACK_BOT_TOKEN"
+        assert tc.channel_ids == []
+        assert tc.allowed_user_ids == []
+        assert tc.respond_in_thread is True
+        assert tc.prompt_template == "{message}"
+        assert tc.autonomous is False
+
+    def test_slack_trigger_custom(self):
+        tc = SlackTriggerConfig(
+            app_token_env="MY_SLACK_APP",
+            bot_token_env="MY_SLACK_BOT",
+            channel_ids=["C123", "C456"],
+            allowed_user_ids=["U789"],
+            respond_in_thread=False,
+        )
+        assert tc.app_token_env == "MY_SLACK_APP"
+        assert tc.bot_token_env == "MY_SLACK_BOT"
+        assert tc.channel_ids == ["C123", "C456"]
+        assert tc.allowed_user_ids == ["U789"]
+        assert tc.respond_in_thread is False
+
+    def test_slack_trigger_summary_with_channels(self):
+        tc = SlackTriggerConfig(channel_ids=["C123"])
+        assert "C123" in tc.summary()
+
+    def test_slack_trigger_summary_with_user_ids(self):
+        tc = SlackTriggerConfig(allowed_user_ids=["U999"])
+        assert "user_ids=U999" in tc.summary()
+
+    def test_slack_trigger_summary_no_filters(self):
+        tc = SlackTriggerConfig()
+        assert "mention/DM" in tc.summary()
+
+    def test_slack_discriminated_union(self):
+        data = _minimal_role_data()
+        data["spec"]["triggers"] = [{"type": "slack", "channel_ids": ["C123"]}]
+        role = RoleDefinition.model_validate(data)
+        assert isinstance(role.spec.triggers[0], SlackTriggerConfig)
+        assert role.spec.triggers[0].channel_ids == ["C123"]
 
 
 class TestIngestConfig:

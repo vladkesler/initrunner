@@ -89,6 +89,25 @@ class DiscordTriggerConfig(BaseModel):
         return f"discord: {'; '.join(parts)}" if parts else "discord: all channels (mention/DM)"
 
 
+class SlackTriggerConfig(BaseModel):
+    type: Literal["slack"] = "slack"
+    app_token_env: str = "SLACK_APP_TOKEN"
+    bot_token_env: str = "SLACK_BOT_TOKEN"
+    channel_ids: list[str] = []
+    allowed_user_ids: list[str] = []
+    respond_in_thread: bool = True
+    prompt_template: str = "{message}"
+    autonomous: bool = False
+
+    def summary(self) -> str:
+        parts: list[str] = []
+        if self.channel_ids:
+            parts.append("channels=" + ", ".join(self.channel_ids))
+        if self.allowed_user_ids:
+            parts.append("user_ids=" + ", ".join(self.allowed_user_ids))
+        return f"slack: {'; '.join(parts)}" if parts else "slack: all channels (mention/DM)"
+
+
 class HeartbeatTriggerConfig(BaseModel):
     type: Literal["heartbeat"] = "heartbeat"
     file: str
@@ -130,6 +149,7 @@ TriggerConfig = Annotated[
     | WebhookTriggerConfig
     | TelegramTriggerConfig
     | DiscordTriggerConfig
+    | SlackTriggerConfig
     | HeartbeatTriggerConfig,
     Field(discriminator="type"),
 ]

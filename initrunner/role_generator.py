@@ -45,6 +45,7 @@ def build_schema_reference() -> str:
         CronTriggerConfig,
         DiscordTriggerConfig,
         FileWatchTriggerConfig,
+        SlackTriggerConfig,
         TelegramTriggerConfig,
         WebhookTriggerConfig,
     )
@@ -120,6 +121,7 @@ def build_schema_reference() -> str:
         WebhookTriggerConfig,
         TelegramTriggerConfig,
         DiscordTriggerConfig,
+        SlackTriggerConfig,
     ]:
         type_field = cls.model_fields.get("type")
         type_name = type_field.default if type_field else "?"
