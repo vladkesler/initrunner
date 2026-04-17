@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from typing import Literal
 
 from pydantic_ai.embeddings import Embedder
@@ -33,11 +32,14 @@ def _require_embedding_key(env_var: str, provider: str) -> str:
     Raises a clear ``ValueError`` when the key is missing, explaining that
     embedding keys may differ from LLM keys.
     """
-    value = os.environ.get(env_var)
+    from initrunner.credentials import get_resolver
+
+    value = get_resolver().get(env_var)
     if value:
         return value
     hint = (
-        f"Embedding API key not found: set the {env_var} environment variable.\n"
+        f"Embedding API key not found: set the {env_var} environment variable "
+        f"or run: initrunner vault set {env_var}\n"
         f"Note: embedding keys may differ from LLM keys"
     )
     if provider == "anthropic":
@@ -114,11 +116,13 @@ def _create_custom_embedder(
     else:
         resolved_url = base_url
         if api_key_env:
-            api_key = os.environ.get(api_key_env)
+            from initrunner.credentials import get_resolver
+
+            api_key = get_resolver().get(api_key_env)
             if not api_key:
                 raise ValueError(
-                    f"api_key_env '{api_key_env}' is set but the environment "
-                    "variable is missing or empty"
+                    f"api_key_env '{api_key_env}' is set but no value found "
+                    f"(tried env and vault). Run: initrunner vault set {api_key_env}"
                 )
         else:
             api_key = "custom-provider"

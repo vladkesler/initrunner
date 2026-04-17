@@ -1666,6 +1666,13 @@ search = [
 telegram = [
     { name = "python-telegram-bot" },
 ]
+vault = [
+    { name = "cryptography" },
+]
+vault-keyring = [
+    { name = "cryptography" },
+    { name = "keyring" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1684,6 +1691,8 @@ requires-dist = [
     { name = "better-profanity", marker = "extra == 'all'", specifier = ">=0.7.0" },
     { name = "better-profanity", marker = "extra == 'safety'", specifier = ">=0.7.0" },
     { name = "croniter", specifier = ">=6.0.0" },
+    { name = "cryptography", marker = "extra == 'vault'", specifier = ">=46" },
+    { name = "cryptography", marker = "extra == 'vault-keyring'", specifier = ">=46" },
     { name = "ddgs", marker = "extra == 'all'", specifier = ">=9.10.0" },
     { name = "ddgs", marker = "extra == 'recommended'", specifier = ">=9.10.0" },
     { name = "ddgs", marker = "extra == 'search'", specifier = ">=9.10.0" },
@@ -1698,6 +1707,7 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.2.0" },
     { name = "initguard", specifier = ">=2026.3.3" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "keyring", marker = "extra == 'vault-keyring'", specifier = ">=25" },
     { name = "lancedb", specifier = ">=0.29.2" },
     { name = "markdownify", specifier = ">=1.2.2" },
     { name = "openpyxl", marker = "extra == 'all'", specifier = ">=3.1.5" },
@@ -1741,7 +1751,7 @@ requires-dist = [
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "recommended", "safety", "search", "telegram"]
+provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "recommended", "safety", "search", "telegram", "vault", "vault-keyring"]
 
 [package.metadata.requires-dev]
 dev = [

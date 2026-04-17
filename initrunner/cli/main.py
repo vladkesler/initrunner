@@ -164,6 +164,7 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
 )
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import run  # noqa: E402
+from initrunner.cli.vault_cmd import app as vault_app  # noqa: E402
 
 # --- Getting Started ---
 app.command(rich_help_panel="Getting Started")(run)
@@ -204,6 +205,7 @@ app.add_typer(skill_app, name="skill", rich_help_panel="Agent Internals")
 app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
 app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")
 app.add_typer(cost_app, name="cost", rich_help_panel="Agent Internals")
+app.add_typer(vault_app, name="vault", rich_help_panel="Agent Internals")
 
 # --- Deprecated (hidden from help) ---
 app.add_typer(hub_app, name="hub", hidden=True)

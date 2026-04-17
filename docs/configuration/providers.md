@@ -2,6 +2,8 @@
 
 The default model is `openai`/`gpt-5-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `spec.model` block in your role YAML.
 
+Every `api_key_env` below is resolved through env vars first, then the [Credential Vault](../security/vault.md) if one is initialized. Existing workflows keep working unchanged.
+
 ## Standard providers
 
 Change `provider` and `name`, then install the matching extra if needed:

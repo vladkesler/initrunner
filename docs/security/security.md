@@ -2,6 +2,8 @@
 
 InitRunner includes a unified `SecurityPolicy` configuration surface that enforces content policies, rate limiting, tool sandboxing, and audit compliance across the execution pipeline. All security features are **optional and backward-compatible** -- existing roles without a `security:` key get safe defaults with all checks disabled.
 
+**Related:** [Credential Vault](vault.md) for encrypted storage of API keys and bot tokens.
+
 ## Supply Chain Security
 
 InitRunner's CI pipeline includes automated vulnerability scanning across the full dependency surface.

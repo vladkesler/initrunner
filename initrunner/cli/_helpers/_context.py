@@ -32,29 +32,30 @@ def handle_api_key(
     Shared between ``setup`` and ``doctor --fix`` to avoid duplicating the
     env vs dotenv detection logic.
     """
-    from dotenv import dotenv_values, set_key
+    from dotenv import dotenv_values
     from rich.prompt import Prompt
 
-    from initrunner.config import get_global_env_path, get_home_dir
+    from initrunner.config import get_global_env_path
+    from initrunner.credentials import get_resolver
+    from initrunner.services.setup import save_env_key
     from initrunner.services.setup import validate_api_key as _validate_api_key
 
     env_path = Path(env_path)
+    resolver = get_resolver()
 
-    has_provider_key = bool(os.environ.get(env_var))
-    if not has_provider_key and env_path.is_file():
-        has_provider_key = bool(dotenv_values(env_path).get(env_var))
+    existing_in_dotenv = None
+    if env_path.is_file():
+        existing_in_dotenv = dotenv_values(env_path).get(env_var)
 
-    if has_provider_key:
+    if resolver.get(env_var) or existing_in_dotenv:
         console.print(
             f"[green]Using existing {env_var}.[/green] "
-            f"[dim]Edit {get_global_env_path()} to change it.[/dim]"
+            f"[dim]Edit {get_global_env_path()} or run "
+            f"'initrunner vault set {env_var}' to change it.[/dim]"
         )
         return
 
     existing_in_env = os.environ.get(env_var)
-    existing_in_dotenv = None
-    if env_path.is_file():
-        existing_in_dotenv = dotenv_values(env_path).get(env_var)
 
     if existing_in_env:
         console.print(f"[green]Found {env_var} in environment.[/green]")
@@ -83,17 +84,14 @@ def handle_api_key(
             if typer.confirm("Re-enter the key?", default=True):
                 api_key = Prompt.ask(f"Enter your {env_var}", password=True)
 
-    # Write to .env if key is not already in the env
+    # Persist (vault if available + unlockable, else .env)
     if not os.environ.get(env_var):
-        try:
-            home_dir = get_home_dir()
-            home_dir.mkdir(parents=True, exist_ok=True)
-            set_key(str(env_path), env_var, api_key)
-            env_path.chmod(0o600)
-            console.print(f"Saved to [cyan]{env_path}[/cyan]")
-        except (PermissionError, OSError) as exc:
+        saved_to = save_env_key(env_var, api_key)
+        if saved_to:
+            console.print(f"Saved to [cyan]{saved_to}[/cyan]")
+        else:
             console.print(
-                f"[yellow]Warning:[/yellow] Could not write {env_path}: {exc}\n"
+                f"[yellow]Warning:[/yellow] Could not persist {env_var}.\n"
                 f"Set it manually: [bold]export {env_var}={api_key}[/bold]"
             )
 

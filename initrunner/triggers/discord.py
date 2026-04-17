@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import threading
 from collections.abc import Callable
@@ -85,10 +84,15 @@ class DiscordAdapter(ChannelAdapter):
     def start(self, callback: Callable[[TriggerEvent], None]) -> None:
         import discord  # type: ignore[unresolved-import]
 
-        token = os.environ.get(self._config.token_env)
+        from initrunner.credentials import get_resolver
+
+        token = get_resolver().get(self._config.token_env)
         if not token:
             _logger.error(
-                "Env var %s not set -- Discord adapter not started", self._config.token_env
+                "%s not set (env or vault) -- Discord adapter not started. "
+                "Export the env var or run: initrunner vault set %s",
+                self._config.token_env,
+                self._config.token_env,
             )
             return
 

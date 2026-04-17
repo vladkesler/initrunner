@@ -71,3 +71,7 @@ def get_mcp_cache_dir() -> Path:
 
 def get_hub_auth_path() -> Path:
     return get_home_dir() / "hub-auth.json"
+
+
+def get_vault_path() -> Path:
+    return get_home_dir() / "vault.enc"

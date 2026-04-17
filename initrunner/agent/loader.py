@@ -77,18 +77,30 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
 
 def _build_model(model_config: ModelConfig):
     """Build a PydanticAI model -- string for standard providers, OpenAI model for custom."""
+    from initrunner.credentials import get_resolver
+
+    resolver = get_resolver()
     if not model_config.needs_custom_provider():
         env_var = model_config.api_key_env or _PROVIDER_API_KEY_ENVS.get(model_config.provider)
-        if env_var and not os.environ.get(env_var):
-            raise MissingApiKeyError(
-                env_var=env_var,
-                provider=model_config.provider,
-                message=(
-                    f"API key not found. Set the {env_var} environment variable:\n"
-                    f"  export {env_var}=your-key-here\n"
-                    f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
-                ),
-            )
+        if env_var:
+            resolved = resolver.get(env_var)
+            if not resolved:
+                raise MissingApiKeyError(
+                    env_var=env_var,
+                    provider=model_config.provider,
+                    message=(
+                        f"API key not found. Set the {env_var} environment variable:\n"
+                        f"  export {env_var}=your-key-here\n"
+                        f"Or store it in the vault: initrunner vault set {env_var}\n"
+                        f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
+                    ),
+                )
+            # Standard-provider SDKs (OpenAI, Anthropic, Google, ...) read the
+            # API key from os.environ at client construction time. If the value
+            # came from the vault rather than the shell, inject it so the SDK
+            # sees it. Only set when absent -- a real shell export always wins.
+            if not os.environ.get(env_var):
+                os.environ[env_var] = resolved
         provider = model_config.provider
         # Default OpenAI to the Responses API. It is a superset of Chat
         # Completions and required for reasoning_effort + tools, builtin
@@ -106,14 +118,14 @@ def _build_model(model_config: ModelConfig):
         base_url = base_url or OLLAMA_DEFAULT_BASE_URL
         api_key = "ollama"
     elif model_config.api_key_env:
-        api_key = os.environ.get(model_config.api_key_env)
+        api_key = resolver.get(model_config.api_key_env)
         if not api_key:
             raise MissingApiKeyError(
                 env_var=model_config.api_key_env,
                 provider=model_config.provider,
                 message=(
-                    f"Environment variable '{model_config.api_key_env}' is not set "
-                    f"(required by model config)"
+                    f"API key '{model_config.api_key_env}' not set (required by model config). "
+                    f"Export the env var or run: initrunner vault set {model_config.api_key_env}"
                 ),
             )
     else:
