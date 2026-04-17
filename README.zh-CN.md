@@ -26,7 +26,8 @@
 </p>
 
 <p align="center">
-  <strong>2026.4.15 新功能</strong> — 加密凭证保险库 · HMAC 签名审计链 · 双向 Slack 适配器（Socket Mode）· 单字起始模板名 · <a href="CHANGELOG.md#202641515---2026-04-17">完整变更日志</a>
+  <strong>2026.4.15 新功能</strong><br>
+  加密凭证保险库 · HMAC 签名审计链 · 双向 Slack 适配器 · 单字起始模板名 · <a href="CHANGELOG.md#202641515---2026-04-17">完整变更日志</a>
 </p>
 
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
