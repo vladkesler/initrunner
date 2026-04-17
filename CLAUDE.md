@@ -93,6 +93,7 @@ Detailed docs live in `docs/`. Key references:
 | Tool registry internals | `docs/agents/registry.md` |
 | Security model | `docs/security/security.md` |
 | Credential vault | `docs/security/vault.md` |
+| HMAC-signed audit chain | `docs/security/audit-chain.md` |
 | Ingestion pipeline | `docs/core/ingestion.md` |
 | Memory system | `docs/core/memory.md` |
 | Capabilities (PydanticAI) | `docs/core/capabilities.md` |
