@@ -25,6 +25,10 @@
   <a href="README.md">English</a> · 简体中文 · <a href="README.ja.md">日本語</a>
 </p>
 
+<p align="center">
+  <strong>2026.4.15 新功能</strong> — 加密凭证保险库 · HMAC 签名审计链 · 双向 Slack 适配器（Socket Mode）· 单字起始模板名 · <a href="CHANGELOG.md#202641515---2026-04-17">完整变更日志</a>
+</p>
+
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
 
 用一个 YAML 文件定义 Agent。和它对话。效果满意后，让它自主运行。信任它之后，部署为守护进程，响应 cron 调度、文件变更、webhook 和 Telegram 消息。同一个文件，从原型到生产，无需重写。
@@ -200,9 +204,9 @@ initrunner run reader -i   # 索引你的代码，然后开始问答
 
 关键在于整合。每次会话结束后，LLM 阅读发生了什么，并将其提炼到语义存储中。Agent 在周二调试会话中学到的事实，会在周四审查代码时出现。Flow 中的共享记忆让 Agent 团队共同积累知识。查看 [记忆](docs/core/memory.md) · [摄入](docs/core/ingestion.md) · [RAG 快速开始](docs/getting-started/rag-quickstart.md)。
 
-## 安全是配置，不是工程
+## 安全是内置的
 
-大多数 Agent 框架把安全当作"到了生产再加认证中间件"。InitRunner 出厂就集成了安全功能。你通过配置项启用它们，不需要花一个周末去接管道。
+大多数 Agent 框架把安全当作"到了生产再加认证中间件"。InitRunner 把这些控制开箱内置。用配置项启用即可。
 
 **Agent 接受不可信输入。** 内容策略引擎（禁止模式、提示长度限制、可选的 LLM 话题分类器）和输入守卫能力在 Agent 启动前验证提示。
 
@@ -212,7 +216,7 @@ initrunner run reader -i   # 索引你的代码，然后开始问答
 
 **一切都有记录。** 仅追加 SQLite 审计日志，自动敏感信息清理。正则模式从提示和输出中脱敏 GitHub Token、AWS 密钥、Stripe 密钥等。
 
-这些通过 `security:` 配置项启用，不是自动生效。没有 `security:` 部分的角色会获得安全默认值。重点是这些能力存在于框架内，而不是在生产六个月后从第三方库补上。
+所有这些都通过 `security:` 配置项启用。没有 `security:` 部分的角色会获得安全默认值。
 
 ```bash
 export INITRUNNER_POLICY_DIR=./policies
@@ -223,7 +227,7 @@ initrunner run role.yaml    # 工具调用 + 委托根据策略检查
 
 ## 成本控制
 
-Token 预算是基本操作。InitRunner 还支持 USD 成本预算。为守护进程设置每日或每周美元上限，达到阈值后停止触发。
+大多数框架追踪 Token 预算。InitRunner 还强制执行 USD 成本预算。为守护进程设置每日或每周美元上限，达到阈值后停止触发。
 
 ```yaml
 spec:
