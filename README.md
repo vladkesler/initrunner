@@ -25,18 +25,7 @@
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
-  <strong>What's new in 2026.4.15</strong><br>
-  encrypted credential vault · HMAC-signed audit chain · bidirectional Slack adapter · one-word starter names · <a href="CHANGELOG.md#202641515---2026-04-17">full changelog</a>
-</p>
-
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production.
-
-```bash
-initrunner run researcher -i                            # chat with it
-initrunner run researcher -a -p "Audit this codebase"   # let it work alone
-initrunner run researcher --daemon                      # runs 24/7, reacts to triggers
-```
 
 ## Quickstart
 
@@ -49,16 +38,18 @@ Or: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recom
 
 ### Starters
 
-Run `initrunner run --list` for the full catalog. The model is auto-detected from your API key.
+Eight starters you can run in one command. Browse the full catalog with `initrunner run --list`. The model is auto-detected from your API key.
 
 | Starter | What it does |
 |---------|-------------|
-| `helpdesk` | Drop your docs in, get a Q&A agent with citations and memory |
-| `scholar` | 3-agent pipeline: planner, web researcher, synthesizer |
-| `reviewer` | Multi-perspective review: architect, security, maintainer |
-| `reader` | Index a repo, chat about architecture, learns patterns across sessions |
-| `writer` | Researcher, writer, editor/fact-checker via webhook or cron |
+| `helpdesk` | Q&A agent over your docs (markdown, PDF, HTML, Word) with citations and per-user memory |
+| `scholar` | Three-agent research team: planner, web researcher, synthesizer, with shared memory |
+| `reviewer` | Multi-perspective code review: architect, security, maintainer |
+| `reader` | Index a codebase, chat about architecture, remember patterns across sessions |
+| `scout` | Web research with structured briefings and sourced citations |
+| `writer` | Topic-to-article pipeline: researcher, writer, editor/fact-checker, driven by webhook or cron |
 | `mail` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
+| `librarian` | Knowledge-base Q&A agent with document ingestion |
 
 ### Build your own
 
@@ -106,17 +97,17 @@ spec:
 That file works four ways:
 
 ```bash
-initrunner run reviewer.yaml -i              # interactive REPL
-initrunner run reviewer.yaml -p "Review PR #42"  # one prompt, one response
-initrunner run reviewer.yaml -a -p "Audit the whole repo"  # autonomous: plans, executes, reflects
-initrunner run reviewer.yaml --daemon        # runs continuously, fires on triggers
+initrunner run reviewer.yaml -i                          # interactive REPL
+initrunner run reviewer.yaml -p "Review PR #42"          # one prompt, one response
+initrunner run reviewer.yaml -a -p "Audit the whole repo"  # autonomous loop
+initrunner run reviewer.yaml --daemon                    # runs on triggers
 ```
 
-The `model:` section is optional. Omit it and InitRunner auto-detects from your API key. Works with Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI, OpenRouter, Ollama, and any OpenAI-compatible endpoint.
+The `model:` block is optional. Omit it and InitRunner auto-detects from your API key. Works with Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI, OpenRouter, Ollama, and any OpenAI-compatible endpoint.
 
-### Autonomous mode
+### Autonomous
 
-Add `-a` and the agent stops being a chatbot. It builds a task list, works through each item, reflects on its own progress, and finishes when everything is done. Four reasoning strategies control how: `react` (default), `todo_driven`, `plan_execute`, and `reflexion`.
+Add `-a` and the agent builds a task list, works each item, reflects on progress, and stops when everything's done. Four reasoning strategies control how: `react` (default), `todo_driven`, `plan_execute`, `reflexion`.
 
 ```yaml
 spec:
@@ -128,11 +119,11 @@ spec:
     autonomous_timeout_seconds: 600
 ```
 
-Spin guards catch the agent if it loops without making progress. History compaction summarizes old context so long runs don't blow up the token window. Budget enforcement, iteration limits, and wall-clock timeouts keep everything bounded. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
+Spin guards catch loops without progress. History compaction summarizes old context so long runs don't exhaust the token window. Iteration, token, and wall-clock caps bound every run. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
 
-### Daemon mode
+### Daemon
 
-Add triggers and switch to `--daemon`. The agent runs continuously, reacting to events. Each event fires a prompt-response cycle.
+Add triggers and switch to `--daemon`. The agent runs continuously. Each event fires one prompt-response cycle.
 
 ```yaml
 spec:
@@ -147,21 +138,17 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-```bash
-initrunner run role.yaml --daemon   # runs until Ctrl+C
-```
-
-Six trigger types: cron, webhook, file_watch, heartbeat, telegram, discord. The daemon hot-reloads role changes without restarting and runs up to 4 triggers concurrently. See [Triggers](docs/core/triggers.md).
+Six trigger types: cron, webhook, file_watch, heartbeat, telegram, discord. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
 
 ### Autopilot
 
-`--autopilot` is `--daemon` where every trigger gets the full autonomous loop. Someone messages your Telegram bot "find me flights from NYC to London next week." In daemon mode, you get one shot at an answer. In autopilot, the agent searches, compares options, checks dates, and sends back something worth reading.
+`--autopilot` is `--daemon` plus the autonomous loop on every trigger. A Telegram message like "find me flights from NYC to London next week" in daemon mode gets one LLM turn. In autopilot, the agent searches flights, compares options, checks dates, and replies with a shortlist.
 
 ```bash
 initrunner run role.yaml --autopilot
 ```
 
-You can also be selective. Set `autonomous: true` on individual triggers and leave the rest single-shot:
+Or go selective: set `autonomous: true` on individual triggers, leave the rest single-shot.
 
 ```yaml
 spec:
@@ -175,16 +162,16 @@ spec:
     - type: file_watch
       paths: [./src]
       prompt_template: "File changed: {path}. Review it."
-      # default: quick single response
+      # default: single response
 ```
 
-### Memory carries across everything
+### Memory across modes
 
-Episodic, semantic, and procedural memory persist across interactive sessions, autonomous runs, and daemon triggers. After each session, consolidation extracts durable facts from the conversation using an LLM. The agent accumulates knowledge over time, not just within a single run.
+Semantic memory (facts the agent learns), episodic memory (what happened in past sessions), and procedural memory (how the agent prefers to solve things) persist across interactive sessions, autonomous runs, and daemon triggers. After each session, an LLM consolidates durable facts into the store. Knowledge accumulates over time, not just within a single run.
 
 ## Agents that learn
 
-Point your agent at a directory. It extracts, chunks, embeds, and indexes your documents automatically. During conversation, the agent searches the index and cites what it finds. New and changed files are re-indexed on every run without manual intervention.
+Point your agent at a directory. It extracts, chunks, embeds, and indexes your documents automatically. During conversation, the agent searches the index and cites what it finds. New and changed files re-index on every run.
 
 ```yaml
 spec:
@@ -201,32 +188,37 @@ cd ~/myproject
 initrunner run reader -i   # indexes your code, then starts Q&A
 ```
 
-The interesting part is consolidation. After each session, an LLM reads what happened and distills it into the semantic store. Facts the agent learns during a Tuesday debugging session show up when it's reviewing code on Thursday. Shared memory across flows lets teams of agents build knowledge together. See [Memory](docs/core/memory.md) · [Ingestion](docs/core/ingestion.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
+Consolidation is the interesting part. After each session, an LLM reads the conversation and distills it into the semantic store. Facts the agent learns during a Tuesday debugging session show up when it's reviewing code on Thursday. Shared memory across flows lets teams of agents build knowledge together. See [Memory](docs/core/memory.md) · [Ingestion](docs/core/ingestion.md) · [RAG Quickstart](docs/getting-started/rag-quickstart.md).
 
-## Security ships with the framework
+## Security
 
-Most agent frameworks treat security as "add auth middleware when you get to production." InitRunner ships these controls in the box. Turn them on with config keys.
+Five controls ship with the framework and turn on via config keys. Roles without a `security:` section get safe defaults.
 
-**Agents accept untrusted input.** Content policy engine (blocked patterns, prompt length limits, optional LLM topic classifier) and an input guard capability validate prompts before the agent starts.
+**Input validation.** A content policy engine (blocked patterns, prompt length limits, optional LLM topic classifier) plus an input guard capability validate prompts before the agent starts.
 
-**Agents call tools with real consequences.** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine checks every tool call and delegation against CEL policies. Per-tool allow/deny glob patterns enforce argument-level permissions.
+**Tool authorization.** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine checks every tool call and delegation against CEL policies. Per-tool allow/deny glob patterns enforce argument-level permissions.
 
-**Agents run code.** PEP 578 audit-hook sandbox restricts filesystem writes, blocks subprocess spawning, blocks private-IP network access, and prevents dangerous imports. Docker container sandboxing adds read-only rootfs, memory/CPU limits, and network isolation on top.
+**Sandboxed code execution.** PEP 578 audit hooks block filesystem writes outside allowlisted paths, block `subprocess.Popen` and `os.system` by default, block `socket.connect` to private IPs, and always block `ctypes.dlopen` and new threads. Docker container sandboxing adds read-only rootfs, memory and CPU limits, and network isolation on top.
 
-**Everything is logged.** Append-only SQLite audit trail with automatic secret scrubbing. Regex patterns redact GitHub tokens, AWS keys, Stripe keys, and more from both prompts and outputs.
+**Tamper-evident audit trail.** Every run writes to an append-only SQLite audit log, HMAC-SHA256 signed over the previous record's hash. `initrunner audit verify-chain` detects any middle-row mutation, reorder, or deletion. Secrets are scrubbed on write.
 
-All of these are opt-in via the `security:` config key. Roles without a `security:` section get safe defaults.
+**Encrypted credential vault.** `initrunner vault init` creates `~/.initrunner/vault.enc`, encrypted with Fernet + scrypt from your passphrase. API keys resolve from env vars first, then the vault, so existing `api_key_env:` and `${VAR}` placeholders keep working.
 
-```bash
-export INITRUNNER_POLICY_DIR=./policies
-initrunner run role.yaml    # tool calls + delegation checked against policies
+```yaml
+spec:
+  security:
+    audit_hooks_enabled: true
+    block_private_ips: true
+    input_guard:
+      max_prompt_chars: 10000
+      blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-See [Agent Policy](docs/security/agent-policy.md) · [Security](docs/security/security.md) · [Guardrails](docs/configuration/guardrails.md).
+See [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ## Cost control
 
-Most frameworks track token budgets. InitRunner also enforces USD cost budgets. Set a daily or weekly dollar cap on a daemon and it stops firing triggers when the threshold is hit.
+USD budgets cap daemon spend. Hit the cap and triggers stop firing until the window resets.
 
 ```yaml
 spec:
@@ -235,11 +227,11 @@ spec:
     daemon_weekly_cost_budget: 25.00  # USD per week
 ```
 
-Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to calculate actual spend per model and provider. Every run logs its cost to the audit trail. The dashboard shows cost analytics across agents and time ranges. See [Cost Tracking](docs/core/cost-tracking.md).
+Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to compute spend per model and provider. Every run logs its cost to the audit trail. The dashboard plots cost across agents and time ranges. See [Cost Tracking](docs/core/cost-tracking.md).
 
 ## Multi-agent orchestration
 
-Chain agents into flows. One agent's output feeds into the next. Sense routing auto-picks the right target per message using keyword scoring first (zero API calls), with an LLM tiebreak only when the keywords are ambiguous:
+Chain agents into flows. One agent's output feeds the next.
 
 ```yaml
 apiVersion: initrunner/v1
@@ -261,7 +253,9 @@ spec:
 initrunner flow up flow.yaml
 ```
 
-**Team mode** is for when you want multiple perspectives on one task without a full flow. Define personas in a single file with three strategies: sequential handoff, parallel execution, or debate (multi-round argumentation with synthesis). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
+Sense routing picks the right target per message using keyword scoring first (zero API calls); only ambiguous cases fall back to an LLM tiebreak.
+
+**Team mode** gives multiple perspectives on one task without a full flow. Define personas in one file with three strategies: sequential handoff, parallel execution, or debate (multi-round argumentation with synthesis). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
 
 ## MCP and interfaces
 
@@ -326,11 +320,6 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 
 **OCI registries:** Push role bundles to any OCI-compliant registry: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`. See [OCI Distribution](docs/core/oci-distribution.md).
 
-**Cloud deploy:**
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
-
 ## Documentation
 
 | Area | Key docs |
@@ -343,7 +332,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Security | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| Security | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples
@@ -370,4 +359,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.4.14</sub></p>
+<p align="center"><sub>v2026.4.15</sub></p>
