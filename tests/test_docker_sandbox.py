@@ -1,4 +1,4 @@
-"""Tests for the Docker container sandbox."""
+"""Tests for the Docker sandbox backend and its building blocks."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from initrunner.agent._subprocess import SubprocessTimeout
 from initrunner.agent.schema.security import (
     _DOCKER_BLOCKED_ARGS,
     BindMount,
-    DockerSandboxConfig,
+    DockerBackendConfig,
+    SandboxConfig,
     SecurityPolicy,
 )
 
@@ -21,8 +22,9 @@ from initrunner.agent.schema.security import (
 # ---------------------------------------------------------------------------
 
 
-def _make_ctx(role_dir=None, docker_enabled=False, docker_network="none"):
-    """Build a minimal ToolBuildContext with configurable Docker settings."""
+def _make_ctx(role_dir=None, backend="none", network="none"):
+    """Build a minimal ToolBuildContext with configurable sandbox settings."""
+    from initrunner.agent.runtime_sandbox import resolve_backend
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.agent.tools._registry import ToolBuildContext
 
@@ -35,15 +37,16 @@ def _make_ctx(role_dir=None, docker_enabled=False, docker_network="none"):
                 "role": "test",
                 "model": {"provider": "openai", "name": "gpt-5-mini"},
                 "security": {
-                    "docker": {
-                        "enabled": docker_enabled,
-                        "network": docker_network,
+                    "sandbox": {
+                        "backend": backend,
+                        "network": network,
                     }
                 },
             },
         }
     )
-    return ToolBuildContext(role=role, role_dir=role_dir)
+    sandbox_backend = resolve_backend(role.spec.security.sandbox, role_dir=role_dir)
+    return ToolBuildContext(role=role, role_dir=role_dir, sandbox_backend=sandbox_backend)
 
 
 # ===========================================================================
@@ -51,24 +54,34 @@ def _make_ctx(role_dir=None, docker_enabled=False, docker_network="none"):
 # ===========================================================================
 
 
-class TestDockerSandboxConfigDefaults:
+class TestSandboxConfigDefaults:
     def test_defaults(self):
-        config = DockerSandboxConfig()
-        assert config.enabled is False
-        assert config.image == "python:3.12-slim"
+        config = SandboxConfig()
+        assert config.backend == "none"
         assert config.network == "none"
         assert config.memory_limit == "256m"
         assert config.cpu_limit == 1.0
         assert config.read_only_rootfs is True
         assert config.bind_mounts == []
         assert config.env_passthrough == []
+        assert config.allowed_read_paths == []
+        assert config.allowed_write_paths == []
+
+    def test_docker_backend_defaults(self):
+        config = DockerBackendConfig()
+        assert config.image == "python:3.12-slim"
+        assert config.user == "auto"
         assert config.extra_args == []
 
-    def test_security_policy_has_docker_field(self):
+    def test_security_policy_has_sandbox_field(self):
         policy = SecurityPolicy()
-        assert hasattr(policy, "docker")
-        assert isinstance(policy.docker, DockerSandboxConfig)
-        assert policy.docker.enabled is False
+        assert hasattr(policy, "sandbox")
+        assert isinstance(policy.sandbox, SandboxConfig)
+        assert policy.sandbox.backend == "none"
+
+    def test_legacy_docker_key_rejected(self):
+        with pytest.raises(ValueError, match=r"security\.docker has been replaced"):
+            SecurityPolicy.model_validate({"docker": {"enabled": True}})
 
 
 class TestBindMount:
@@ -91,44 +104,44 @@ class TestBindMount:
         assert m.read_only is False
 
 
-class TestDockerSandboxConfigValidation:
-    def test_empty_image_rejected(self):
-        with pytest.raises(ValueError, match="must not be empty"):
-            DockerSandboxConfig(image="  ")
-
+class TestSandboxConfigValidation:
     def test_invalid_memory_limit(self):
         with pytest.raises(ValueError, match="Invalid memory_limit"):
-            DockerSandboxConfig(memory_limit="abc")
+            SandboxConfig(memory_limit="abc")
 
     def test_valid_memory_formats(self):
         for mem in ("256m", "1g", "512M", "2G", "1024k", "100b", "256"):
-            config = DockerSandboxConfig(memory_limit=mem)
+            config = SandboxConfig(memory_limit=mem)
             assert config.memory_limit == mem
 
     def test_cpu_limit_must_be_positive(self):
         with pytest.raises(ValueError):
-            DockerSandboxConfig(cpu_limit=0)
+            SandboxConfig(cpu_limit=0)
 
     def test_cpu_limit_negative_rejected(self):
         with pytest.raises(ValueError):
-            DockerSandboxConfig(cpu_limit=-1.0)
+            SandboxConfig(cpu_limit=-1.0)
 
     def test_dangerous_extra_args_rejected(self):
         for arg in _DOCKER_BLOCKED_ARGS:
             with pytest.raises(ValueError, match="blocked for security"):
-                DockerSandboxConfig(extra_args=[arg])
+                DockerBackendConfig(extra_args=[arg])
 
     def test_dangerous_extra_args_with_value_rejected(self):
         with pytest.raises(ValueError, match="blocked for security"):
-            DockerSandboxConfig(extra_args=["--cap-add=ALL"])
+            DockerBackendConfig(extra_args=["--cap-add=ALL"])
 
     def test_safe_extra_args_allowed(self):
-        config = DockerSandboxConfig(extra_args=["--pids-limit=100", "--ulimit=nofile=1024"])
+        config = DockerBackendConfig(extra_args=["--pids-limit=100", "--ulimit=nofile=1024"])
         assert len(config.extra_args) == 2
+
+    def test_empty_image_rejected(self):
+        with pytest.raises(ValueError, match="must not be empty"):
+            DockerBackendConfig(image="  ")
 
     def test_duplicate_bind_mount_targets_rejected(self):
         with pytest.raises(ValueError, match="duplicate"):
-            DockerSandboxConfig(
+            SandboxConfig(
                 bind_mounts=[
                     BindMount(source="./a", target="/data"),
                     BindMount(source="./b", target="/data"),
@@ -137,10 +150,10 @@ class TestDockerSandboxConfigValidation:
 
     def test_work_target_conflicts(self):
         with pytest.raises(ValueError, match="/work"):
-            DockerSandboxConfig(bind_mounts=[BindMount(source="./project", target="/work")])
+            SandboxConfig(bind_mounts=[BindMount(source="./project", target="/work")])
 
     def test_valid_bind_mounts(self):
-        config = DockerSandboxConfig(
+        config = SandboxConfig(
             bind_mounts=[
                 BindMount(source="./a", target="/a"),
                 BindMount(source="./b", target="/b", read_only=False),
@@ -213,7 +226,7 @@ class TestBuildDockerCmd:
     def test_basic_command(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config)
         assert cmd[:3] == ["docker", "run", "--rm"]
         assert "--network" in cmd
@@ -226,30 +239,29 @@ class TestBuildDockerCmd:
     def test_read_only_rootfs(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(read_only_rootfs=True)
+        config = SandboxConfig(backend="docker", read_only_rootfs=True)
         cmd = _build_docker_cmd(config)
         assert "--read-only" in cmd
         assert "--tmpfs" in cmd
-        # Check tmpfs value
         tmpfs_idx = cmd.index("--tmpfs")
         assert "/tmp:" in cmd[tmpfs_idx + 1]
 
     def test_no_read_only_rootfs(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(read_only_rootfs=False)
+        config = SandboxConfig(backend="docker", read_only_rootfs=False)
         cmd = _build_docker_cmd(config)
         assert "--read-only" not in cmd
 
     def test_bind_mounts_resolved(self, tmp_path):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        (tmp_path / "data").mkdir()  # source must exist on host
-        config = DockerSandboxConfig(
-            bind_mounts=[BindMount(source="./data", target="/data", read_only=True)]
+        (tmp_path / "data").mkdir()
+        config = SandboxConfig(
+            backend="docker",
+            bind_mounts=[BindMount(source="./data", target="/data", read_only=True)],
         )
         cmd = _build_docker_cmd(config, role_dir=tmp_path)
-        # Should contain -v with resolved path
         v_indices = [i for i, x in enumerate(cmd) if x == "-v"]
         assert len(v_indices) >= 1
         mount_arg = cmd[v_indices[0] + 1]
@@ -271,7 +283,7 @@ class TestBuildDockerCmd:
     def test_working_dir_mount(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, work_dir="/my/work")
         v_indices = [i for i, x in enumerate(cmd) if x == "-v"]
         work_mounts = [cmd[i + 1] for i in v_indices if "/my/work:/work" in cmd[i + 1]]
@@ -285,7 +297,7 @@ class TestBuildDockerCmd:
 
         monkeypatch.setenv("LANG", "en_US.UTF-8")
         monkeypatch.setenv("TZ", "UTC")
-        config = DockerSandboxConfig(env_passthrough=["LANG", "TZ"])
+        config = SandboxConfig(backend="docker", env_passthrough=["LANG", "TZ"])
         cmd = _build_docker_cmd(config)
         e_indices = [i for i, x in enumerate(cmd) if x == "-e"]
         env_args = [cmd[i + 1] for i in e_indices]
@@ -296,7 +308,7 @@ class TestBuildDockerCmd:
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
         monkeypatch.delenv("NONEXISTENT_VAR_XYZ", raising=False)
-        config = DockerSandboxConfig(env_passthrough=["NONEXISTENT_VAR_XYZ"])
+        config = SandboxConfig(backend="docker", env_passthrough=["NONEXISTENT_VAR_XYZ"])
         cmd = _build_docker_cmd(config)
         e_indices = [i for i, x in enumerate(cmd) if x == "-e"]
         env_args = [cmd[i + 1] for i in e_indices]
@@ -305,10 +317,11 @@ class TestBuildDockerCmd:
     def test_extra_args_appended(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(extra_args=["--pids-limit=100"])
+        config = SandboxConfig(
+            backend="docker", docker=DockerBackendConfig(extra_args=["--pids-limit=100"])
+        )
         cmd = _build_docker_cmd(config)
         assert "--pids-limit=100" in cmd
-        # extra_args should come before image
         img_idx = cmd.index("python:3.12-slim")
         pids_idx = cmd.index("--pids-limit=100")
         assert pids_idx < img_idx
@@ -316,21 +329,21 @@ class TestBuildDockerCmd:
     def test_interactive_flag(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, interactive=True)
         assert "-i" in cmd
 
     def test_no_interactive_by_default(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, interactive=False)
         assert "-i" not in cmd
 
     def test_pids_limit_default(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config)
         pids_idx = cmd.index("--pids-limit")
         assert cmd[pids_idx + 1] == "256"
@@ -338,7 +351,7 @@ class TestBuildDockerCmd:
     def test_env_dict_passed(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, env={"MY_VAR": "hello"})
         e_indices = [i for i, x in enumerate(cmd) if x == "-e"]
         env_args = [cmd[i + 1] for i in e_indices]
@@ -347,9 +360,10 @@ class TestBuildDockerCmd:
     def test_rw_mount(self, tmp_path):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        (tmp_path / "data").mkdir()  # source must exist on host
-        config = DockerSandboxConfig(
-            bind_mounts=[BindMount(source="./data", target="/data", read_only=False)]
+        (tmp_path / "data").mkdir()
+        config = SandboxConfig(
+            backend="docker",
+            bind_mounts=[BindMount(source="./data", target="/data", read_only=False)],
         )
         cmd = _build_docker_cmd(config, role_dir=tmp_path)
         v_indices = [i for i, x in enumerate(cmd) if x == "-v"]
@@ -359,186 +373,82 @@ class TestBuildDockerCmd:
 
 
 # ===========================================================================
-# Execution tests
+# DockerBackend tests
 # ===========================================================================
 
 
-class TestDockerRunCommand:
-    def test_builds_and_runs(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
+class TestDockerBackend:
+    def test_run_builds_and_executes(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig()
-        mock_result = MagicMock(
-            stdout=b"hello\n",
-            stderr=b"",
-            returncode=0,
-        )
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
+        mock_result = MagicMock(stdout=b"hello\n", stderr=b"", returncode=0)
         with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
         ) as mock_run:
-            stdout, stderr, rc = docker_run_command(["echo", "hello"], config, timeout=30)
-            assert stdout == "hello\n"
-            assert stderr == ""
-            assert rc == 0
-            # Verify docker run was called
-            call_args = mock_run.call_args
-            cmd = call_args[0][0]
+            result = backend.run(["echo", "hello"], env={}, cwd=tmp_path, timeout=30)
+            assert result.stdout == "hello\n"
+            assert result.stderr == ""
+            assert result.returncode == 0
+            cmd = mock_run.call_args[0][0]
             assert cmd[:3] == ["docker", "run", "--rm"]
             assert cmd[-2:] == ["echo", "hello"]
 
-    def test_timeout_raises(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
+    def test_run_timeout_raises_and_kills_container(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
         with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
         ):
-            with pytest.raises(SubprocessTimeout):
-                docker_run_command(["sleep", "100"], config, timeout=5)
-
-
-class TestDockerRunPython:
-    def test_creates_temp_file_and_runs(self):
-        from initrunner.agent.docker_sandbox import docker_run_python
-
-        config = DockerSandboxConfig()
-        mock_result = MagicMock(
-            stdout=b"42\n",
-            stderr=b"",
-            returncode=0,
-        )
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
-        ) as mock_run:
-            stdout, _stderr, rc = docker_run_python("print(42)", config, timeout=30)
-            assert stdout == "42\n"
-            assert rc == 0
-            # Verify command includes python /code/_run.py
-            call_args = mock_run.call_args
-            cmd = call_args[0][0]
-            assert cmd[-2:] == ["python", "/code/_run.py"]
-            # Verify /code mount exists
-            v_indices = [i for i, x in enumerate(cmd) if x == "-v"]
-            code_mounts = [cmd[i + 1] for i in v_indices if ":/code" in cmd[i + 1]]
-            assert len(code_mounts) == 1
-
-    def test_temp_dir_cleaned_up(self, tmp_path):
-        from initrunner.agent.docker_sandbox import docker_run_python
-
-        config = DockerSandboxConfig()
-        created_dirs = []
-
-        original_mkdtemp = __import__("tempfile").mkdtemp
-
-        def tracking_mkdtemp(**kwargs):
-            d = original_mkdtemp(**kwargs)
-            created_dirs.append(d)
-            return d
-
-        mock_result = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
-        with patch("initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result):
-            with patch(
-                "initrunner.agent.docker_sandbox.tempfile.mkdtemp", side_effect=tracking_mkdtemp
-            ):
-                docker_run_python("print('ok')", config, timeout=30)
-
-        # Verify temp dir was cleaned up
-        assert len(created_dirs) == 1
-        assert not Path(created_dirs[0]).exists()
-
-    def test_temp_dir_cleaned_up_on_timeout(self):
-        from initrunner.agent.docker_sandbox import docker_run_python
-
-        config = DockerSandboxConfig()
-        created_dirs = []
-
-        original_mkdtemp = __import__("tempfile").mkdtemp
-
-        def tracking_mkdtemp(**kwargs):
-            d = original_mkdtemp(**kwargs)
-            created_dirs.append(d)
-            return d
-
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with patch(
-                "initrunner.agent.docker_sandbox.tempfile.mkdtemp", side_effect=tracking_mkdtemp
-            ):
+            with patch("initrunner.agent.runtime_sandbox.docker._kill_container") as mock_kill:
                 with pytest.raises(SubprocessTimeout):
-                    docker_run_python("import time; time.sleep(100)", config, timeout=5)
+                    backend.run(["sleep", "100"], env={}, cwd=tmp_path, timeout=5)
+                mock_kill.assert_called_once()
+                name = mock_kill.call_args[0][0]
+                assert name.startswith("initrunner-")
 
-        assert len(created_dirs) == 1
-        assert not Path(created_dirs[0]).exists()
+    def test_run_with_stdin(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-    def test_timeout_raises(self):
-        from initrunner.agent.docker_sandbox import docker_run_python
-
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
+        mock_result = MagicMock(stdout=b"hi\n", stderr=b"", returncode=0)
         with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with pytest.raises(SubprocessTimeout):
-                docker_run_python("import time; time.sleep(100)", config, timeout=5)
-
-
-class TestDockerRunScript:
-    def test_pipes_body_via_stdin(self):
-        from initrunner.agent.docker_sandbox import docker_run_script
-
-        config = DockerSandboxConfig()
-        mock_result = MagicMock(
-            stdout=b"hello\n",
-            stderr=b"",
-            returncode=0,
-        )
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
         ) as mock_run:
-            stdout, _stderr, rc = docker_run_script("echo hello", "/bin/sh", config, timeout=30)
-            assert stdout == "hello\n"
-            assert rc == 0
-            # Verify -i flag and interpreter
-            call_args = mock_run.call_args
-            cmd = call_args[0][0]
+            backend.run(["/bin/sh"], stdin=b"echo hi", env={}, cwd=tmp_path, timeout=30)
+            cmd = mock_run.call_args[0][0]
             assert "-i" in cmd
-            assert cmd[-1] == "/bin/sh"
-            # Verify stdin
-            assert call_args[1]["input"] == b"echo hello"
+            assert mock_run.call_args[1]["input"] == b"echo hi"
 
-    def test_env_passed_as_flags(self):
-        from initrunner.agent.docker_sandbox import docker_run_script
+    def test_run_with_extra_mounts(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig()
-        mock_result = MagicMock(stdout=b"", stderr=b"", returncode=0)
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
+        mock_result = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
+        code_file = tmp_path / "_run.py"
+        code_file.write_text("print('ok')")
         with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
         ) as mock_run:
-            docker_run_script(
-                "echo $NAME",
-                "/bin/sh",
-                config,
+            backend.run(
+                ["python", "/work/_run.py"],
+                env={},
+                cwd=tmp_path,
                 timeout=30,
-                env={"NAME": "Alice"},
+                extra_mounts=[
+                    BindMount(source=str(code_file), target="/work/_run.py", read_only=True)
+                ],
             )
             cmd = mock_run.call_args[0][0]
-            e_indices = [i for i, x in enumerate(cmd) if x == "-e"]
-            env_args = [cmd[i + 1] for i in e_indices]
-            assert "NAME=Alice" in env_args
-
-    def test_timeout_raises(self):
-        from initrunner.agent.docker_sandbox import docker_run_script
-
-        config = DockerSandboxConfig()
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with pytest.raises(SubprocessTimeout):
-                docker_run_script("sleep 100", "/bin/sh", config, timeout=5)
+            v_indices = [i for i, x in enumerate(cmd) if x == "-v"]
+            mount_args = [cmd[i + 1] for i in v_indices]
+            assert any(f"{code_file}:/work/_run.py:ro" in m for m in mount_args)
 
 
 # ===========================================================================
@@ -551,23 +461,23 @@ class TestShellToolDockerIntegration:
         from initrunner.agent.schema.tools import ShellToolConfig
         from initrunner.agent.tools.shell import build_shell_toolset
 
-        ctx = _make_ctx(docker_enabled=True)
+        ctx = _make_ctx(backend="docker")
         config = ShellToolConfig(require_confirmation=False, blocked_commands=[])
         toolset = build_shell_toolset(config, ctx)
         fn = toolset.tools["run_shell"].function
 
-        with patch("initrunner.agent.docker_sandbox.subprocess.run") as mock_run:
+        with patch("initrunner.agent.runtime_sandbox.docker.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=b"hello\n", stderr=b"", returncode=0)
             output = fn(command="echo hello")
             assert "hello" in output
             cmd = mock_run.call_args[0][0]
             assert cmd[:3] == ["docker", "run", "--rm"]
 
-    def test_uses_normal_path_when_disabled(self):
+    def test_uses_null_backend_when_disabled(self):
         from initrunner.agent.schema.tools import ShellToolConfig
         from initrunner.agent.tools.shell import build_shell_toolset
 
-        ctx = _make_ctx(docker_enabled=False)
+        ctx = _make_ctx(backend="none")
         config = ShellToolConfig(require_confirmation=False, blocked_commands=[])
         toolset = build_shell_toolset(config, ctx)
         fn = toolset.tools["run_shell"].function
@@ -581,23 +491,23 @@ class TestPythonToolDockerIntegration:
         from initrunner.agent.schema.tools import PythonToolConfig
         from initrunner.agent.tools.python_exec import build_python_toolset
 
-        ctx = _make_ctx(docker_enabled=True)
+        ctx = _make_ctx(backend="docker")
         config = PythonToolConfig(require_confirmation=False)
         toolset = build_python_toolset(config, ctx)
         fn = toolset.tools["run_python"].function
 
-        with patch("initrunner.agent.docker_sandbox.subprocess.run") as mock_run:
+        with patch("initrunner.agent.runtime_sandbox.docker.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=b"42\n", stderr=b"", returncode=0)
             output = fn(code="print(42)")
             assert "42" in output
             cmd = mock_run.call_args[0][0]
             assert cmd[:3] == ["docker", "run", "--rm"]
 
-    def test_uses_normal_path_when_disabled(self):
+    def test_uses_null_backend_when_disabled(self):
         from initrunner.agent.schema.tools import PythonToolConfig
         from initrunner.agent.tools.python_exec import build_python_toolset
 
-        ctx = _make_ctx(docker_enabled=False)
+        ctx = _make_ctx(backend="none")
         config = PythonToolConfig(require_confirmation=False)
         toolset = build_python_toolset(config, ctx)
         fn = toolset.tools["run_python"].function
@@ -605,76 +515,18 @@ class TestPythonToolDockerIntegration:
         output = fn(code='print("hello")')
         assert "hello" in output
 
-    def test_network_disabled_no_shim_when_docker_none(self):
-        """network_disabled + Docker network=none → no shim (Docker provides isolation)."""
-        from initrunner.agent.schema.tools import PythonToolConfig
-        from initrunner.agent.tools.python_exec import build_python_toolset
-
-        ctx = _make_ctx(docker_enabled=True, docker_network="none")
-        config = PythonToolConfig(require_confirmation=False, network_disabled=True)
-        toolset = build_python_toolset(config, ctx)
-        fn = toolset.tools["run_python"].function
-
-        with patch("initrunner.agent.docker_sandbox.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
-            fn(code='print("ok")')
-            # The code written to temp file should NOT contain the shim
-            # We can't easily check the temp file content directly,
-            # but we can verify docker was called
-            assert mock_run.called
-
-    def test_network_disabled_shim_preserved_when_docker_bridge(self):
-        """network_disabled + Docker network=bridge → shim preserved."""
-        from initrunner.agent.schema.tools import PythonToolConfig
-        from initrunner.agent.tools.python_exec import build_python_toolset
-
-        ctx = _make_ctx(docker_enabled=True, docker_network="bridge")
-        config = PythonToolConfig(require_confirmation=False, network_disabled=True)
-        toolset = build_python_toolset(config, ctx)
-        fn = toolset.tools["run_python"].function
-
-        written_code = None
-
-        def capture_code(*args, **kwargs):
-            # The code is written to a temp file, then docker is called
-            # We check the file content in the temp dir
-            return MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
-
-        with patch("initrunner.agent.docker_sandbox.subprocess.run", side_effect=capture_code):
-            with patch("initrunner.agent.docker_sandbox.Path.write_text") as mock_write:
-                fn(code='print("ok")')
-                # The write_text call should contain the shim
-                if mock_write.called:
-                    written_code = mock_write.call_args[0][0]
-                    assert "_block_network" in written_code
-
-    def test_network_not_disabled_no_shim(self):
-        """network_disabled=false + Docker → no shim regardless of network."""
-        from initrunner.agent.schema.tools import PythonToolConfig
-        from initrunner.agent.tools.python_exec import build_python_toolset
-
-        ctx = _make_ctx(docker_enabled=True, docker_network="bridge")
-        config = PythonToolConfig(require_confirmation=False, network_disabled=False)
-        toolset = build_python_toolset(config, ctx)
-        fn = toolset.tools["run_python"].function
-
-        with patch("initrunner.agent.docker_sandbox.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
-            fn(code='print("ok")')
-            assert mock_run.called
-
 
 class TestScriptToolDockerIntegration:
     def test_uses_docker_when_enabled(self):
         from initrunner.agent.schema.tools import ScriptDefinition, ScriptToolConfig
         from initrunner.agent.tools.script import build_script_toolset
 
-        ctx = _make_ctx(docker_enabled=True)
+        ctx = _make_ctx(backend="docker")
         config = ScriptToolConfig(scripts=[ScriptDefinition(name="hello", body="echo hello")])
         toolset = build_script_toolset(config, ctx)
         fn = toolset.tools["hello"].function
 
-        with patch("initrunner.agent.docker_sandbox.subprocess.run") as mock_run:
+        with patch("initrunner.agent.runtime_sandbox.docker.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(stdout=b"hello\n", stderr=b"", returncode=0)
             output = fn()
             assert "hello" in output
@@ -682,11 +534,11 @@ class TestScriptToolDockerIntegration:
             assert cmd[:3] == ["docker", "run", "--rm"]
             assert "-i" in cmd
 
-    def test_uses_normal_path_when_disabled(self):
+    def test_uses_null_backend_when_disabled(self):
         from initrunner.agent.schema.tools import ScriptDefinition, ScriptToolConfig
         from initrunner.agent.tools.script import build_script_toolset
 
-        ctx = _make_ctx(docker_enabled=False)
+        ctx = _make_ctx(backend="none")
         config = ScriptToolConfig(scripts=[ScriptDefinition(name="hello", body="echo hello")])
         toolset = build_script_toolset(config, ctx)
         fn = toolset.tools["hello"].function
@@ -696,56 +548,51 @@ class TestScriptToolDockerIntegration:
 
 
 # ===========================================================================
-# Registry startup validation tests
+# Registry startup validation
 # ===========================================================================
 
 
-class TestRegistryDockerValidation:
-    def test_build_toolsets_calls_require_docker_when_enabled(self):
+class TestRegistrySandboxPreflight:
+    def test_build_toolsets_runs_preflight_for_docker_backend(self):
         from initrunner.agent.tools.registry import build_toolsets
 
-        ctx = _make_ctx(docker_enabled=True)
-        with patch("initrunner.agent.docker_sandbox.require_docker") as mock_require:
-            with patch("initrunner.agent.docker_sandbox.ensure_image_available"):
-                build_toolsets([], ctx.role)
-
-        mock_require.assert_called_once()
-
-    def test_build_toolsets_skips_require_docker_when_disabled(self):
-        from initrunner.agent.tools.registry import build_toolsets
-
-        ctx = _make_ctx(docker_enabled=False)
-        with patch("initrunner.agent.docker_sandbox.require_docker") as mock_require:
-            build_toolsets([], ctx.role)
-
-        mock_require.assert_not_called()
-
-    def test_build_toolsets_calls_ensure_image_when_enabled(self):
-        from initrunner.agent.tools.registry import build_toolsets
-
-        ctx = _make_ctx(docker_enabled=True)
-        with patch("initrunner.agent.docker_sandbox.require_docker"):
-            with patch("initrunner.agent.docker_sandbox.ensure_image_available") as mock_ensure:
+        ctx = _make_ctx(backend="docker")
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.check_docker_available", return_value=True
+        ):
+            with patch(
+                "initrunner.agent.runtime_sandbox.docker.ensure_image_available"
+            ) as mock_ensure:
                 build_toolsets([], ctx.role)
 
         mock_ensure.assert_called_once_with("python:3.12-slim")
 
+    def test_build_toolsets_no_preflight_for_null_backend(self):
+        from initrunner.agent.tools.registry import build_toolsets
+
+        ctx = _make_ctx(backend="none")
+        with patch("initrunner.agent.runtime_sandbox.docker.check_docker_available") as mock_check:
+            build_toolsets([], ctx.role)
+
+        mock_check.assert_not_called()
+
 
 # ===========================================================================
-# New feature tests
+# Container name, cleanup, init flag
 # ===========================================================================
 
 
 class TestContainerNameAndCleanup:
-    def test_container_name_in_command(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
+    def test_container_name_in_command(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
         mock_result = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
         with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
         ) as mock_run:
-            docker_run_command(["echo", "ok"], config, timeout=30)
+            backend.run(["echo", "ok"], env={}, cwd=tmp_path, timeout=30)
             cmd = mock_run.call_args[0][0]
             assert "--name" in cmd
             name_idx = cmd.index("--name")
@@ -754,92 +601,68 @@ class TestContainerNameAndCleanup:
     def test_label_in_command(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, container_name="test-123")
         assert "--label" in cmd
         label_idx = cmd.index("--label")
         assert cmd[label_idx + 1] == "initrunner.managed=true"
-
-    def test_kill_container_called_on_timeout(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
-
-        config = DockerSandboxConfig()
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with patch("initrunner.agent.docker_sandbox._kill_container") as mock_kill:
-                with pytest.raises(SubprocessTimeout):
-                    docker_run_command(["sleep", "100"], config, timeout=5)
-                mock_kill.assert_called_once()
-                name = mock_kill.call_args[0][0]
-                assert name.startswith("initrunner-")
-
-    def test_kill_container_called_on_python_timeout(self):
-        from initrunner.agent.docker_sandbox import docker_run_python
-
-        config = DockerSandboxConfig()
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with patch("initrunner.agent.docker_sandbox._kill_container") as mock_kill:
-                with pytest.raises(SubprocessTimeout):
-                    docker_run_python("import time; time.sleep(100)", config, timeout=5)
-                mock_kill.assert_called_once()
-
-    def test_kill_container_called_on_script_timeout(self):
-        from initrunner.agent.docker_sandbox import docker_run_script
-
-        config = DockerSandboxConfig()
-        with patch(
-            "initrunner.agent.docker_sandbox.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=5),
-        ):
-            with patch("initrunner.agent.docker_sandbox._kill_container") as mock_kill:
-                with pytest.raises(SubprocessTimeout):
-                    docker_run_script("sleep 100", "/bin/sh", config, timeout=5)
-                mock_kill.assert_called_once()
 
 
 class TestInitFlag:
     def test_init_flag_present(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config)
         assert "--init" in cmd
 
 
+# ===========================================================================
+# OOM detection
+# ===========================================================================
+
+
 class TestOomDetection:
-    def test_oom_hint_appended_on_137(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
+    def test_oom_hint_appended_on_137(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig(memory_limit="256m")
+        config = SandboxConfig(backend="docker", memory_limit="256m")
+        backend = DockerBackend(config)
         mock_result = MagicMock(stdout=b"", stderr=b"Killed", returncode=137)
-        with patch("initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result):
-            _stdout, stderr, rc = docker_run_command(["python", "-c", "x=[]"], config, timeout=30)
-            assert rc == 137
-            assert "OOM" in stderr
-            assert "256m" in stderr
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
+        ):
+            result = backend.run(["python", "-c", "x=[]"], env={}, cwd=tmp_path, timeout=30)
+            assert result.returncode == 137
+            assert "OOM" in result.stderr
+            assert "256m" in result.stderr
 
-    def test_no_oom_hint_on_normal_exit(self):
-        from initrunner.agent.docker_sandbox import docker_run_command
+    def test_no_oom_hint_on_normal_exit(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
 
-        config = DockerSandboxConfig()
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
         mock_result = MagicMock(stdout=b"ok", stderr=b"", returncode=0)
-        with patch("initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result):
-            _stdout, stderr, rc = docker_run_command(["echo", "ok"], config, timeout=30)
-            assert rc == 0
-            assert "OOM" not in stderr
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
+        ):
+            result = backend.run(["echo", "ok"], env={}, cwd=tmp_path, timeout=30)
+            assert result.returncode == 0
+            assert "OOM" not in result.stderr
+
+
+# ===========================================================================
+# Bind mount validation
+# ===========================================================================
 
 
 class TestBindMountValidation:
     def test_missing_source_raises(self, tmp_path):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(
-            bind_mounts=[BindMount(source="./nonexistent", target="/data")]
+        config = SandboxConfig(
+            backend="docker",
+            bind_mounts=[BindMount(source="./nonexistent", target="/data")],
         )
         with pytest.raises(ValueError, match="does not exist"):
             _build_docker_cmd(config, role_dir=tmp_path)
@@ -847,8 +670,9 @@ class TestBindMountValidation:
     def test_missing_rw_source_raises(self, tmp_path):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(
-            bind_mounts=[BindMount(source="./nonexistent", target="/out", read_only=False)]
+        config = SandboxConfig(
+            backend="docker",
+            bind_mounts=[BindMount(source="./nonexistent", target="/out", read_only=False)],
         )
         with pytest.raises(ValueError, match="does not exist"):
             _build_docker_cmd(config, role_dir=tmp_path)
@@ -857,9 +681,17 @@ class TestBindMountValidation:
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
         (tmp_path / "mydata").mkdir()
-        config = DockerSandboxConfig(bind_mounts=[BindMount(source="./mydata", target="/mydata")])
+        config = SandboxConfig(
+            backend="docker",
+            bind_mounts=[BindMount(source="./mydata", target="/mydata")],
+        )
         cmd = _build_docker_cmd(config, role_dir=tmp_path)
         assert any(":/mydata:ro" in arg for arg in cmd)
+
+
+# ===========================================================================
+# Image availability
+# ===========================================================================
 
 
 class TestEnsureImageAvailable:
@@ -871,7 +703,6 @@ class TestEnsureImageAvailable:
             "initrunner.agent.docker_sandbox.subprocess.run", return_value=mock_result
         ) as mock_run:
             ensure_image_available("python:3.12-slim")
-            # Should only call docker image inspect, not docker pull
             assert mock_run.call_count == 1
             assert "inspect" in str(mock_run.call_args[0][0])
 
@@ -917,13 +748,18 @@ class TestEnsureImageAvailable:
                 ensure_image_available("huge-image:latest")
 
 
+# ===========================================================================
+# User flag
+# ===========================================================================
+
+
 class TestUserFlag:
     def test_auto_user_with_writable_work_dir(self):
         import os
 
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(user="auto")
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config, work_dir="/my/work")
         assert "--user" in cmd
         user_idx = cmd.index("--user")
@@ -932,7 +768,7 @@ class TestUserFlag:
     def test_auto_user_no_writable_mounts(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(user="auto")
+        config = SandboxConfig(backend="docker")
         cmd = _build_docker_cmd(config)
         assert "--user" not in cmd
 
@@ -942,8 +778,8 @@ class TestUserFlag:
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
         (tmp_path / "out").mkdir()
-        config = DockerSandboxConfig(
-            user="auto",
+        config = SandboxConfig(
+            backend="docker",
             bind_mounts=[BindMount(source="./out", target="/out", read_only=False)],
         )
         cmd = _build_docker_cmd(config, role_dir=tmp_path)
@@ -954,19 +790,19 @@ class TestUserFlag:
     def test_null_user_runs_as_root(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(user=None)
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(user=None))
         cmd = _build_docker_cmd(config, work_dir="/my/work")
         assert "--user" not in cmd
 
     def test_explicit_user(self):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 
-        config = DockerSandboxConfig(user="1000:1000")
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(user="1000:1000"))
         cmd = _build_docker_cmd(config)
         assert "--user" in cmd
         user_idx = cmd.index("--user")
         assert cmd[user_idx + 1] == "1000:1000"
 
     def test_default_user_is_auto(self):
-        config = DockerSandboxConfig()
+        config = DockerBackendConfig()
         assert config.user == "auto"

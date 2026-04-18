@@ -11,7 +11,6 @@ from pydantic_ai.toolsets.function import FunctionToolset
 from initrunner.agent._subprocess import (
     SubprocessTimeout,
     format_subprocess_output,
-    run_subprocess_text,
 )
 from initrunner.agent.schema.tools import ShellToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
@@ -79,16 +78,14 @@ def validate_command(
 @register_tool("shell", ShellToolConfig)
 def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing commands (no shell)."""
-    role_dir = ctx.role_dir
-    docker_config = ctx.role.spec.security.docker
+    backend = ctx.sandbox_backend
 
-    # Resolve working directory: explicit > role_dir > cwd
     if config.working_dir:
-        work_dir = str(Path(config.working_dir).resolve())
-    elif role_dir is not None:
-        work_dir = str(role_dir.resolve())
+        work_dir = Path(config.working_dir).resolve()
+    elif ctx.role_dir is not None:
+        work_dir = ctx.role_dir.resolve()
     else:
-        work_dir = None
+        work_dir = Path.cwd()
 
     toolset = FunctionToolset()
 
@@ -106,29 +103,19 @@ def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> Funct
         tokens = result
 
         try:
-            if docker_config.enabled:
-                from initrunner.agent.docker_sandbox import docker_run_command
-
-                stdout, stderr, returncode = docker_run_command(
-                    tokens,
-                    docker_config,
-                    timeout=config.timeout_seconds,
-                    work_dir=work_dir,
-                    role_dir=role_dir,
-                )
-            else:
-                stdout, stderr, returncode = run_subprocess_text(
-                    tokens,
-                    timeout=config.timeout_seconds,
-                    cwd=work_dir,
-                )
+            sr = backend.run(
+                tokens,
+                env={},
+                cwd=work_dir,
+                timeout=config.timeout_seconds,
+            )
         except SubprocessTimeout as exc:
             return str(exc)
         except FileNotFoundError:
             return f"Error: command '{tokens[0]}' not found"
 
         return format_subprocess_output(
-            stdout, stderr, returncode=returncode, max_bytes=config.max_output_bytes
+            sr.stdout, sr.stderr, returncode=sr.returncode, max_bytes=config.max_output_bytes
         )
 
     return toolset

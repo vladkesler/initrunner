@@ -39,8 +39,8 @@ SECURITY_PRESETS: dict[str, dict[str, Any]] = {
     },
     "sandbox": {
         "_extends": "public",
-        "docker": {
-            "enabled": True,
+        "sandbox": {
+            "backend": "auto",
             "network": "none",
             "read_only_rootfs": True,
             "memory_limit": "256m",
@@ -57,7 +57,6 @@ SECURITY_PRESETS: dict[str, dict[str, Any]] = {
             "max_prompt_length": 500_000,
             "max_output_length": 500_000,
         },
-        "docker": {"enabled": False},
     },
 }
 
@@ -264,16 +263,11 @@ class BindMount(BaseModel):
         return v
 
 
-class DockerSandboxConfig(BaseModel):
-    enabled: bool = False
+class DockerBackendConfig(BaseModel):
+    """Docker-specific settings nested under sandbox.docker."""
+
     image: str = "python:3.12-slim"
-    network: Literal["none", "bridge", "host"] = "none"
-    memory_limit: str = "256m"
-    cpu_limit: Annotated[float, Field(gt=0)] = 1.0
-    read_only_rootfs: bool = True
     user: Literal["auto"] | str | None = "auto"
-    bind_mounts: list[BindMount] = Field(default_factory=list)
-    env_passthrough: list[str] = Field(default_factory=list)
     extra_args: list[str] = Field(default_factory=list)
 
     @field_validator("image")
@@ -281,15 +275,6 @@ class DockerSandboxConfig(BaseModel):
     def _non_empty_image(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("Docker image must not be empty")
-        return v
-
-    @field_validator("memory_limit")
-    @classmethod
-    def _valid_memory_format(cls, v: str) -> str:
-        import re
-
-        if not re.match(r"^\d+[bkmgBKMG]?$", v):
-            raise ValueError(f"Invalid memory_limit '{v}' — use Docker format like '256m', '1g'")
         return v
 
     @field_validator("extra_args")
@@ -301,8 +286,32 @@ class DockerSandboxConfig(BaseModel):
                 raise ValueError(f"Docker extra_arg '{arg}' is blocked for security reasons")
         return v
 
+
+class SandboxConfig(BaseModel):
+    """Backend-agnostic runtime sandbox configuration."""
+
+    backend: Literal["auto", "bwrap", "docker", "none"] = "none"
+    network: Literal["none", "bridge", "host"] = "none"
+    allowed_read_paths: list[str] = Field(default_factory=list)
+    allowed_write_paths: list[str] = Field(default_factory=list)
+    memory_limit: str = "256m"
+    cpu_limit: Annotated[float, Field(gt=0)] = 1.0
+    read_only_rootfs: bool = True
+    bind_mounts: list[BindMount] = Field(default_factory=list)
+    env_passthrough: list[str] = Field(default_factory=list)
+    docker: DockerBackendConfig = DockerBackendConfig()
+
+    @field_validator("memory_limit")
+    @classmethod
+    def _valid_memory_format(cls, v: str) -> str:
+        import re
+
+        if not re.match(r"^\d+[bkmgBKMG]?$", v):
+            raise ValueError(f"Invalid memory_limit '{v}' -- use format like '256m', '1g'")
+        return v
+
     @model_validator(mode="after")
-    def _no_conflicting_work_mount(self) -> DockerSandboxConfig:
+    def _no_conflicting_work_mount(self) -> SandboxConfig:
         targets = [m.target for m in self.bind_mounts]
         if "/work" in targets:
             raise ValueError(
@@ -333,8 +342,25 @@ class SecurityPolicy(BaseModel):
     rate_limit: RateLimitConfig = RateLimitConfig()
     resources: ResourceLimits = ResourceLimits()
     tools: ToolSandboxConfig = ToolSandboxConfig()
-    docker: DockerSandboxConfig = DockerSandboxConfig()
+    sandbox: SandboxConfig = SandboxConfig()
     audit: AuditConfig = AuditConfig()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_legacy_docker(cls, data: Any) -> Any:
+        """Fail loudly when roles use the removed security.docker key."""
+        if isinstance(data, dict) and "docker" in data:
+            raise ValueError(
+                "security.docker has been replaced by security.sandbox. "
+                "Move your config:\n"
+                "  security:\n"
+                "    sandbox:\n"
+                "      backend: docker\n"
+                "      docker:\n"
+                "        image: python:3.12-slim\n"
+                "See docs/security/sandbox.md for the full reference."
+            )
+        return data
 
     @model_validator(mode="before")
     @classmethod

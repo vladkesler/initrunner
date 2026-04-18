@@ -15,7 +15,7 @@ import logging
 import pkgutil
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -39,6 +39,13 @@ class ToolBuildContext:
     role: RoleDefinition
     role_dir: Path | None = None
     prefer_async: bool = False
+    sandbox_backend: Any = field(default=None)
+
+    def __post_init__(self) -> None:
+        if self.sandbox_backend is None:
+            from initrunner.agent.runtime_sandbox.null import NullBackend
+
+            self.sandbox_backend = NullBackend()
 
 
 # ---------------------------------------------------------------------------

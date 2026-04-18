@@ -286,6 +286,7 @@ def build_run_scoped_toolsets(
     toolsets with the provided state. Also builds a minimal finish_task
     toolset when no todo tool is configured.
     """
+    from initrunner.agent.runtime_sandbox import resolve_backend
     from initrunner.agent.schema.tools import (
         ClarifyToolConfig,
         SpawnToolConfig,
@@ -294,7 +295,8 @@ def build_run_scoped_toolsets(
     )
     from initrunner.agent.tools._registry import ToolBuildContext, get_builder
 
-    ctx = ToolBuildContext(role=role, role_dir=None)
+    backend = resolve_backend(role.spec.security.sandbox, agent_name=role.metadata.name)
+    ctx = ToolBuildContext(role=role, role_dir=None, sandbox_backend=backend)
     toolsets: list[AbstractToolset] = []
     has_todo = False
 

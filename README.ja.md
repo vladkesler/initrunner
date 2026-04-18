@@ -200,7 +200,7 @@ initrunner run reader -i   # コードをインデックスし、Q&A を開始
 
 **ツール認可。** [InitGuard](https://github.com/initrunner/initguard) ABAC ポリシーエンジンがすべてのツール呼び出しと委任を CEL ポリシーに対してチェック。ツールごとの allow/deny glob パターンで引数レベルのパーミッションを適用。
 
-**コード実行サンドボックス。** PEP 578 監査フックが、許可リスト外のファイル書き込み、`subprocess.Popen` と `os.system`（デフォルト）、プライベート IP への `socket.connect` をブロックし、`ctypes.dlopen` と新規スレッドは常にブロックします。Docker コンテナサンドボックスが読み取り専用 rootfs、メモリ/CPU 制限、ネットワーク分離を追加。
+**コード実行のサンドボックス化。** 監査フックが、Python ツールによる許可パス外への書き込み、サブプロセスの起動、プライベート IP への接続、ネイティブライブラリのロード、新規スレッドの開始をブロックします。より強い隔離が必要な場合、Linux では [Bubblewrap](docs/security/bubblewrap.md)、どの OS でも [Docker](docs/security/docker-sandbox.md) が、shell と python ツールをネットワーク遮断・読み取り専用ファイルシステム・メモリ/CPU 上限付きで実行します。
 
 **改ざん検知可能な監査証跡。** 各実行は追記専用 SQLite 監査ログに書き込まれ、前のレコードのハッシュに対して HMAC-SHA256 で署名されます。`initrunner audit verify-chain` が中間レコードの変更、並び替え、削除を検出。シークレットは書き込み時にスクラブされます。
 
@@ -216,7 +216,7 @@ spec:
       blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-[セキュリティ](docs/security/security.md) · [エージェントポリシー](docs/security/agent-policy.md) · [クレデンシャルボールト](docs/security/vault.md) · [監査チェーン](docs/security/audit-chain.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+[セキュリティ](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker サンドボックス](docs/security/docker-sandbox.md) · [エージェントポリシー](docs/security/agent-policy.md) · [クレデンシャルボールト](docs/security/vault.md) · [監査チェーン](docs/security/audit-chain.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
 
 ## コスト管理
 
@@ -334,7 +334,7 @@ initrunner/
 | オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| セキュリティ | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| セキュリティ | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## サンプル

@@ -90,3 +90,28 @@ def _format_summary(errors: int, warnings: int, infos: int) -> str:
 
 def _pluralize(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
+def render_sandbox_error(
+    err: object,
+) -> Panel:
+    """Render a SandboxUnavailableError as a Rich panel."""
+    from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
+
+    if not isinstance(err, SandboxUnavailableError):
+        raise TypeError(f"Expected SandboxUnavailableError, got {type(err)}")
+
+    body = Text()
+    body.append("[ERROR]", style="bold red")
+    body.append(f" Sandbox backend '{err.backend}' unavailable\n\n")
+    body.append(err.reason)
+    body.append("\n\n")
+    body.append("Remediation:\n", style="bold")
+    body.append(err.remediation)
+
+    return Panel(
+        body,
+        title="[bold]Sandbox unavailable[/bold]",
+        border_style="red",
+        padding=(1, 2),
+    )

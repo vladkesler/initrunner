@@ -37,6 +37,7 @@ class BundleManifest(BaseModel):
     initrunner_version: str = __version__
     files: list[BundleFile] = []
     dependencies: list[str] = []
+    supported_sandbox_backends: list[Literal["bwrap", "docker"]] = []
 
 
 def _file_sha256(path: Path) -> str:
@@ -135,9 +136,9 @@ def collect_bundle_files(role_path: Path) -> list[tuple[Path, BundleFile]]:
                     except ValueError:
                         pass
 
-    # 3c. docker bind_mounts sources
-    if role.spec.security.docker.bind_mounts:
-        for mount in role.spec.security.docker.bind_mounts:
+    # 3c. sandbox bind_mounts sources
+    if role.spec.security.sandbox.bind_mounts:
+        for mount in role.spec.security.sandbox.bind_mounts:
             mount_path = role_dir / mount.source
             if mount_path.is_file():
                 try:
@@ -175,6 +176,16 @@ def create_bundle(role_path: Path, output_dir: Path | None = None) -> Path:
 
     files = collect_bundle_files(role_path)
 
+    sandbox_backend = role.spec.security.sandbox.backend
+    if sandbox_backend == "none":
+        sandbox_backends: list[str] = []
+    elif sandbox_backend == "auto":
+        sandbox_backends = ["bwrap", "docker"]
+    elif sandbox_backend in ("bwrap", "docker"):
+        sandbox_backends = [sandbox_backend]
+    else:
+        sandbox_backends = []
+
     manifest = BundleManifest(
         name=role.metadata.name,
         version=role.metadata.version or "0.0.0",
@@ -185,6 +196,7 @@ def create_bundle(role_path: Path, output_dir: Path | None = None) -> Path:
         initrunner_version=__version__,
         files=[bf for _, bf in files],
         dependencies=list(role.metadata.dependencies),
+        supported_sandbox_backends=sandbox_backends,  # type: ignore[arg-type]
     )
 
     dest_dir = output_dir or role_path.parent
