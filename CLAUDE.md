@@ -117,7 +117,9 @@ Detailed docs live in `docs/`. Key references:
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |
 | A2A server (agent-to-agent) | `docs/interfaces/a2a.md` |
 | Testing guide | `docs/operations/testing.md` |
-| Docker sandbox | `docs/security/docker-sandbox.md` |
+| Runtime sandbox overview | `docs/security/sandbox.md` |
+| Bubblewrap sandbox (Linux, no daemon) | `docs/security/bubblewrap.md` |
+| Docker sandbox (cross-platform containers) | `docs/security/docker-sandbox.md` |
 | Agent policy (initguard) | `docs/security/agent-policy.md` |
 | Auth & guardrails | `docs/security/auth.md`, `docs/configuration/guardrails.md` |
 | CI/CD & releases | `docs/operations/cicd.md`, `docs/operations/pypi_publish.md` |

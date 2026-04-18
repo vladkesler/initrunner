@@ -108,6 +108,56 @@ def audit_export(
         sys.stdout.write(text)
 
 
+@app.command("security-events")
+def audit_security_events(
+    event_type: Annotated[
+        str | None,
+        typer.Option("--event-type", help="Filter by event type (e.g. sandbox.exec)"),
+    ] = None,
+    agent: Annotated[str | None, typer.Option("--agent", help="Filter by agent name")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Max rows to return")] = 50,
+    audit_db: AuditDbOption = None,
+) -> None:
+    """Query the security_events audit table."""
+    import sqlite3
+
+    from rich.table import Table
+
+    from initrunner.audit.logger import DEFAULT_DB_PATH
+
+    db_path = Path(audit_db or DEFAULT_DB_PATH)
+    if not db_path.exists():
+        console.print(f"[red]Error:[/red] Audit database not found at {db_path}")
+        raise typer.Exit(1)
+
+    sql = "SELECT timestamp, event_type, agent_name, details FROM security_events WHERE 1=1"
+    params: list[str | int] = []
+    if event_type:
+        sql += " AND event_type = ?"
+        params.append(event_type)
+    if agent:
+        sql += " AND agent_name = ?"
+        params.append(agent)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+
+    with sqlite3.connect(db_path) as db:
+        rows = list(db.execute(sql, params))
+
+    if not rows:
+        console.print("[dim]No matching security events.[/dim]")
+        return
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("timestamp", style="dim")
+    table.add_column("event_type")
+    table.add_column("agent")
+    table.add_column("details")
+    for ts, et, an, det in rows:
+        table.add_row(ts, et, an or "-", det or "")
+    console.print(table)
+
+
 @app.command("verify-chain")
 def audit_verify_chain(audit_db: AuditDbOption = None) -> None:
     """Verify the HMAC-signed audit chain. Exits non-zero on any break."""

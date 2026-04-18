@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 import tempfile
 import textwrap
@@ -14,8 +13,8 @@ from pydantic_ai.toolsets.function import FunctionToolset
 from initrunner.agent._subprocess import (
     SubprocessTimeout,
     format_subprocess_output,
-    scrub_env,
 )
+from initrunner.agent.schema.security import BindMount
 from initrunner.agent.schema.tools import PythonToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 
@@ -57,92 +56,58 @@ _PROXY_ENV_KEYS = (
 @register_tool("python", PythonToolConfig)
 def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing Python code in a subprocess."""
-    docker_config = ctx.role.spec.security.docker
-    role_dir = ctx.role_dir
+    backend = ctx.sandbox_backend
+    sandbox_cfg = ctx.role.spec.security.sandbox
 
     toolset = FunctionToolset()
 
     @toolset.tool_plain
     def run_python(code: str) -> str:
         """Execute Python code and return the output."""
-        if docker_config.enabled:
-            # Preserve network_disabled shim when Docker network is not 'none'
-            if config.network_disabled and docker_config.network != "none":
-                code = _NETWORK_DISABLE_SHIM + code
-
-            from initrunner.agent.docker_sandbox import docker_run_python
-
-            # Resolve working directory: explicit config, else a temp dir
-            # that gets mounted at /work and cleaned up after execution.
-            docker_work_dir = config.working_dir
-            tmp_work: str | None = None
-            if docker_work_dir is None:
-                tmp_work = tempfile.mkdtemp(prefix="initrunner_docker_work_")
-                docker_work_dir = tmp_work
-
-            try:
-                stdout, stderr, returncode = docker_run_python(
-                    code,
-                    docker_config,
-                    timeout=config.timeout_seconds,
-                    work_dir=docker_work_dir,
-                    role_dir=role_dir,
-                )
-            except SubprocessTimeout as exc:
-                return str(exc)
-            finally:
-                if tmp_work is not None:
-                    shutil.rmtree(tmp_work, ignore_errors=True)
-
-            return format_subprocess_output(
-                stdout, stderr, returncode=returncode, max_bytes=config.max_output_bytes
-            )
-
-        work_dir = config.working_dir
-        use_temp = work_dir is None
-
-        if use_temp:
-            tmp_dir = tempfile.mkdtemp(prefix="initrunner_py_")
-            work_dir = tmp_dir
-        else:
-            if work_dir is None:
-                raise RuntimeError("work_dir must be set when use_temp is False")
-            Path(work_dir).mkdir(parents=True, exist_ok=True)
-
-        # Prepend network-blocking shim when network_disabled is set
-        if config.network_disabled:
+        if config.network_disabled and sandbox_cfg.network != "none":
+            code = _NETWORK_DISABLE_SHIM + code
+        elif config.network_disabled:
             code = _NETWORK_DISABLE_SHIM + code
 
-        # Write code to a temp file
+        use_temp = config.working_dir is None
+        if use_temp:
+            work_dir = tempfile.mkdtemp(prefix="initrunner_py_")
+        else:
+            work_dir = config.working_dir
+            assert work_dir is not None
+            Path(work_dir).mkdir(parents=True, exist_ok=True)
+
         code_file = Path(work_dir) / "_run.py"
         code_file.write_text(code, encoding="utf-8")
 
-        env = scrub_env()
+        env: dict[str, str] = {}
         if config.network_disabled:
             for key in _PROXY_ENV_KEYS:
                 env.pop(key, None)
             env["no_proxy"] = "*"
             env["NO_PROXY"] = "*"
 
+        python_bin = sys.executable if backend.name == "none" else "python3"
         try:
-            result = subprocess.run(
-                [sys.executable, str(code_file)],
-                capture_output=True,
-                timeout=config.timeout_seconds,
-                cwd=work_dir,
+            sr = backend.run(
+                [python_bin, "/work/_run.py"],
                 env=env,
+                cwd=Path(work_dir),
+                timeout=config.timeout_seconds,
+                extra_mounts=[
+                    BindMount(source=str(code_file), target="/work/_run.py", read_only=True),
+                ],
             )
-            stdout = result.stdout.decode("utf-8", errors="replace")
-            stderr = result.stderr.decode("utf-8", errors="replace")
-        except subprocess.TimeoutExpired:
-            return str(SubprocessTimeout(config.timeout_seconds))
+        except SubprocessTimeout as exc:
+            return str(exc)
         finally:
-            # Clean up temp directory and all contents
             if use_temp:
                 shutil.rmtree(work_dir, ignore_errors=True)
             else:
                 code_file.unlink(missing_ok=True)
 
-        return format_subprocess_output(stdout, stderr, max_bytes=config.max_output_bytes)
+        return format_subprocess_output(
+            sr.stdout, sr.stderr, returncode=sr.returncode, max_bytes=config.max_output_bytes
+        )
 
     return toolset

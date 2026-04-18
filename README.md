@@ -198,7 +198,7 @@ Five controls ship with the framework and turn on via config keys. Roles without
 
 **Tool authorization.** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine checks every tool call and delegation against CEL policies. Per-tool allow/deny glob patterns enforce argument-level permissions.
 
-**Sandboxed code execution.** PEP 578 audit hooks block filesystem writes outside allowlisted paths, block `subprocess.Popen` and `os.system` by default, block `socket.connect` to private IPs, and always block `ctypes.dlopen` and new threads. Docker container sandboxing adds read-only rootfs, memory and CPU limits, and network isolation on top.
+**Sandboxed code execution.** Audit hooks stop python tools from writing outside allowed paths, spawning subprocesses, reaching private IPs, loading native libraries, or starting new threads. For stronger isolation, [Bubblewrap](docs/security/bubblewrap.md) on Linux or [Docker](docs/security/docker-sandbox.md) anywhere runs shell and python tools with no network, a read-only filesystem, and memory and CPU caps.
 
 **Tamper-evident audit trail.** Every run writes to an append-only SQLite audit log, HMAC-SHA256 signed over the previous record's hash. `initrunner audit verify-chain` detects any middle-row mutation, reorder, or deletion. Secrets are scrubbed on write.
 
@@ -214,7 +214,7 @@ spec:
       blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-See [Security](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
+See [Security](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker sandbox](docs/security/docker-sandbox.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
 
 ## Cost control
 
@@ -332,7 +332,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| Security | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| Security | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples

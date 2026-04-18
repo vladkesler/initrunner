@@ -116,13 +116,12 @@ class TriggerDiagnosis:
 
 
 @dataclass
-class DockerDiagnosis:
-    """Docker sandbox readiness for a role."""
+class SandboxDiagnosis:
+    """Sandbox readiness for a role."""
 
-    enabled: bool
-    image: str
-    daemon_available: bool
-    image_available: bool | None  # None = not checked (shallow mode)
+    backend: str
+    available: bool
+    detail: str = ""
 
 
 @dataclass
@@ -134,7 +133,7 @@ class RoleDiagnostics:
     custom_tools: list[CustomToolDiagnosis]
     memory_store: MemoryStoreDiagnosis | None
     triggers: list[TriggerDiagnosis]
-    docker: DockerDiagnosis | None = None
+    sandbox: SandboxDiagnosis | None = None
 
 
 @dataclass
@@ -930,40 +929,29 @@ def diagnose_triggers(role: object) -> list[TriggerDiagnosis]:
     return results
 
 
-def diagnose_docker(role: object, *, deep: bool = False) -> DockerDiagnosis | None:
-    """Check Docker sandbox readiness for a role.
+def diagnose_sandbox(role: object, *, deep: bool = False) -> SandboxDiagnosis | None:
+    """Check sandbox backend readiness for a role.
 
-    Returns ``None`` if Docker is not enabled in the role's security config.
+    Returns ``None`` if backend is ``none``.
     """
     spec = role.spec  # type: ignore[attr-defined]
-    docker_cfg = spec.security.docker
-    if not docker_cfg.enabled:
+    sandbox_cfg = spec.security.sandbox
+    if sandbox_cfg.backend == "none":
         return None
 
-    from initrunner.agent.docker_sandbox import check_docker_available
+    from initrunner.agent.runtime_sandbox import resolve_backend
+    from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
 
-    daemon_ok = check_docker_available()
-
-    image_ok: bool | None = None
-    if deep and daemon_ok:
-        import subprocess as _sp
-
-        try:
-            result = _sp.run(
-                ["docker", "image", "inspect", docker_cfg.image],
-                capture_output=True,
-                timeout=10,
-            )
-            image_ok = result.returncode == 0
-        except Exception:
-            image_ok = False
-
-    return DockerDiagnosis(
-        enabled=True,
-        image=docker_cfg.image,
-        daemon_available=daemon_ok,
-        image_available=image_ok,
-    )
+    try:
+        backend = resolve_backend(sandbox_cfg)
+        backend.preflight()
+        return SandboxDiagnosis(backend=backend.name, available=True)
+    except SandboxUnavailableError as exc:
+        return SandboxDiagnosis(
+            backend=sandbox_cfg.backend,
+            available=False,
+            detail=f"{exc.reason}\n{exc.remediation}",
+        )
 
 
 def diagnose_role_deep(
@@ -982,7 +970,7 @@ def diagnose_role_deep(
         custom_tools=diagnose_custom_tools(role, role_dir, deep=deep),
         memory_store=diagnose_memory_store(role, deep=deep),
         triggers=diagnose_triggers(role),
-        docker=diagnose_docker(role, deep=deep),
+        sandbox=diagnose_sandbox(role, deep=deep),
     )
 
 

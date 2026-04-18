@@ -116,9 +116,8 @@ Shell, Python, and script tools can run inside Docker containers for kernel-leve
 
 ```yaml
 security:
-  docker:
-    enabled: true        # run tools in containers
-    image: python:3.12-slim
+  sandbox:
+    backend: docker      # run tools in containers
     network: none        # no network access
     memory_limit: 256m
     cpu_limit: 1.0
@@ -127,9 +126,11 @@ security:
       - source: ./data
         target: /data
         read_only: true
+    docker:
+      image: python:3.12-slim
 ```
 
-Run `initrunner doctor` to verify Docker is available. See [Docker Sandbox](../security/docker-sandbox.md) for the full configuration reference.
+Run `initrunner doctor` to verify Docker is available. See [Docker Sandbox](../security/docker-sandbox.md) for the full configuration reference. On Linux, you can also use [Bubblewrap](../security/bubblewrap.md) (`backend: bwrap`) to skip Docker entirely.
 
 ### Docker sandbox when running InitRunner in Docker (socket passthrough)
 

@@ -200,7 +200,7 @@ initrunner run reader -i   # 索引代码，然后开始问答
 
 **工具授权。** [InitGuard](https://github.com/initrunner/initguard) ABAC 策略引擎根据 CEL 策略检查每次工具调用和委托。每个工具的 allow/deny glob 模式执行参数级权限。
 
-**代码执行沙箱。** PEP 578 审计钩子阻止允许列表之外的文件系统写入，默认阻止 `subprocess.Popen` 和 `os.system`，阻止 `socket.connect` 到私有 IP，并始终阻止 `ctypes.dlopen` 和新线程。Docker 容器沙箱在此基础上增加只读根文件系统、内存/CPU 限制和网络隔离。
+**代码执行沙箱。** 审计钩子阻止 python 工具写入允许列表之外的路径、启动子进程、访问私有 IP、加载原生库或创建新线程。如需更强的隔离，Linux 上的 [Bubblewrap](docs/security/bubblewrap.md) 或任意平台的 [Docker](docs/security/docker-sandbox.md) 会在运行 shell 和 python 工具时强制无网络、只读文件系统以及内存和 CPU 上限。
 
 **防篡改审计日志。** 每次运行写入仅追加的 SQLite 审计日志，用 HMAC-SHA256 对前一条记录的哈希进行签名。`initrunner audit verify-chain` 可检测任何中间记录的修改、重排或删除。敏感信息在写入时脱敏。
 
@@ -216,7 +216,7 @@ spec:
       blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-查看 [安全](docs/security/security.md) · [Agent 策略](docs/security/agent-policy.md) · [凭证保险库](docs/security/vault.md) · [审计链](docs/security/audit-chain.md) · [护栏](docs/configuration/guardrails.md)。
+查看 [安全](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker 沙箱](docs/security/docker-sandbox.md) · [Agent 策略](docs/security/agent-policy.md) · [凭证保险库](docs/security/vault.md) · [审计链](docs/security/audit-chain.md) · [护栏](docs/configuration/guardrails.md)。
 
 ## 成本控制
 
@@ -334,7 +334,7 @@ initrunner/
 | 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| 安全 | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| 安全 | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## 示例

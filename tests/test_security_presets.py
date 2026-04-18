@@ -56,9 +56,9 @@ class TestPresetResolution:
 
     def test_sandbox_enables_docker(self) -> None:
         p = SecurityPolicy(preset="sandbox")
-        assert p.docker.enabled is True
-        assert p.docker.network == "none"
-        assert p.docker.read_only_rootfs is True
+        assert p.sandbox.backend == "auto"
+        assert p.sandbox.network == "none"
+        assert p.sandbox.read_only_rootfs is True
 
     def test_development_preset_relaxes(self) -> None:
         p = SecurityPolicy(preset="development")
@@ -66,7 +66,7 @@ class TestPresetResolution:
         assert p.content.pii_redaction is False
         assert p.content.blocked_input_patterns == []
         assert p.content.max_prompt_length == 500_000
-        assert p.docker.enabled is False
+        assert p.sandbox.backend == "none"
 
     def test_invalid_preset_raises(self) -> None:
         with pytest.raises(ValidationError, match="Unknown security preset"):

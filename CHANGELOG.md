@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [2026.4.16] - 2026-04-18
+
+### Breaking
+- **`security.docker` config block removed.** Replaced by `security.sandbox` with `backend: auto | bwrap | docker | none` and a nested `docker` sub-config. Roles using the legacy key fail schema validation at load time with a migration error pointing at the new format. See `docs/security/sandbox.md` for the before/after.
+
+### Added
+- **Runtime sandbox with pluggable backends.** New `initrunner/agent/runtime_sandbox/` package defines a uniform `SandboxBackend` protocol with three implementations: `BwrapBackend` (Linux user namespaces, no daemon), `DockerBackend` (cross-platform containers), and `NullBackend` (no isolation; translates sandbox paths to host paths so unified tool argv still works). `shell`, `python`, and `script` tools execute through a single `backend.run(argv, stdin, env, cwd, timeout, extra_mounts, net, memory_limit, cpu_limit)` primitive instead of three separate Docker/non-Docker branches.
+- **`backend: auto` with silent fallback.** Picks `bwrap` on Linux and falls through to `docker` when bwrap's functional probe fails (e.g. Ubuntu 24+ AppArmor block). Never falls to `none`. Logs the fallback at info level.
+- **Adaptive preflight remediation.** When bwrap's probe fails, `SandboxUnavailableError.remediation` reads `/proc/sys/kernel/unprivileged_userns_clone` and `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` and emits the specific fix -- sysctl, AppArmor profile reinstall, or switch to `backend: docker`.
+- **`initrunner audit security-events` subcommand.** Queries the `security_events` audit table by `--event-type`, `--agent`, and `--limit`. Renders as a Rich table.
+- **`sandbox.exec` audit event.** Every sandboxed tool call logs backend, `argv0`, returncode, and `duration_ms` to the HMAC-signed audit chain, attributed to the role's agent name.
+- **Bundle sandbox metadata.** `BundleManifest.supported_sandbox_backends` declares which backends a published bundle needs. `initrunner install` warns on hosts missing a matching backend.
+- **Three new docs:** `docs/security/sandbox.md` (cross-backend config reference + migration guide), `docs/security/bubblewrap.md` (bwrap-specific with the Ubuntu 24+ AppArmor fix), `docs/security/docker-sandbox.md` (Docker-specific with `extra_args` blocklist and DinD guidance).
+
+### Changed
+- **`ToolBuildContext` gains `sandbox_backend`.** Tool builders capture `ctx.sandbox_backend` in their closure and drive execution through it. Tool-internal mounts (e.g. `python_exec`'s `/work/_run.py` tempfile) pass through without validation; user-configured mounts (`allowed_read_paths`, `allowed_write_paths`, `bind_mounts`) are validated at load time.
+- **`initrunner doctor --role`** now renders a sandbox row showing the resolved backend and readiness (Docker daemon reachable, bwrap probe passing, image pulled) in place of the old Docker-only row.
+- **`SandboxUnavailableError` rendering.** The CLI catches this error during `build_agent` and renders a clean Rich panel with reason + remediation. Exit code 1.
+- **Audit wire-up.** `create_audit_logger()` now runs before `build_agent()` in both `command_context` and `ephemeral_command_context`, and the audit logger is registered as the runtime-sandbox default so backends pick it up automatically. Backends receive the role's `agent_name` for event attribution.
+- **`docs/security/security.md`, the three READMEs (en/ja/zh-CN), `docs/getting-started/docker.md`, and the CLAUDE.md docs index** rewritten to reference the new backends, prefer active voice, and drop AI puffery. The stale `WASM isolation is recommended` note was replaced with a runtime-sandbox link.
+
+### Fixed
+- **`python_exec` path mismatch inside sandboxes.** The tool was passing the host's `sys.executable` path into sandboxed subprocesses, where that path didn't exist. It now uses `python3` (PATH-resolved) inside sandboxes and `sys.executable` only on the null backend.
+- **Missing audit events for sandboxed executions.** The audit logger was constructed after `build_agent`, so resolved backends had a `NullAuditLogger` when they called `log_security_event`. Fixed by introducing a module-level default audit logger that `resolve_backend` picks up lazily, and reordering CLI setup so the real logger is registered first.
+- **`initrunner doctor` reference to the removed `diag.docker` field.** Now renders `SandboxDiagnosis` via `diag.sandbox`.
+
+### Removed
+- **Legacy helpers `docker_run_command`, `docker_run_python`, `docker_run_script`** from `initrunner/agent/docker_sandbox.py`. Superseded by `DockerBackend.run()`. The remaining helpers (`_build_docker_cmd`, `_generate_container_name`, `_kill_container`, `_resolve_mount_source`, `_format_oom_hint`, `ensure_image_available`) stay as implementation details of `DockerBackend`.
+
 ## [2026.4.15] - 2026-04-17
 
 ### Breaking

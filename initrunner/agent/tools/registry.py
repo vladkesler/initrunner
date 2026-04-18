@@ -90,16 +90,18 @@ def build_toolsets(
     from initrunner.agent.tool_events import wrap_observable
 
     toolsets: list[AbstractToolset] = []
-    ctx = ToolBuildContext(role=role, role_dir=role_dir, prefer_async=prefer_async)
+    from initrunner.agent.runtime_sandbox import resolve_backend
+
+    backend = resolve_backend(
+        role.spec.security.sandbox, role_dir=role_dir, agent_name=role.metadata.name
+    )
+    ctx = ToolBuildContext(
+        role=role, role_dir=role_dir, prefer_async=prefer_async, sandbox_backend=backend
+    )
     agent_name = role.metadata.name
 
     install_audit_hooks(role)
-
-    if role.spec.security.docker.enabled:
-        from initrunner.agent.docker_sandbox import ensure_image_available, require_docker
-
-        require_docker()
-        ensure_image_available(role.spec.security.docker.image)
+    backend.preflight()
 
     for tool in tools:
         if is_run_scoped(tool.type):

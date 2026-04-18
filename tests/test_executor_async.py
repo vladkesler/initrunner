@@ -246,4 +246,7 @@ class TestToolBuildAsync:
         with patch("initrunner.agent.tools.registry.ToolBuildContext") as MockCtx:
             MockCtx.return_value = ToolBuildContext(role=role, prefer_async=True)
             build_toolsets([], role, prefer_async=True)
-            MockCtx.assert_called_once_with(role=role, role_dir=None, prefer_async=True)
+            call = MockCtx.call_args
+            assert call.kwargs["role"] is role
+            assert call.kwargs["role_dir"] is None
+            assert call.kwargs["prefer_async"] is True

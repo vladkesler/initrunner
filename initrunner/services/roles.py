@@ -389,10 +389,10 @@ def _explain_security(role: RoleDefinition) -> str | None:
         return None
     sec = role.spec.security
     parts = []
-    if sec.docker.enabled:
+    if sec.sandbox.backend != "none":
         parts.append(
-            f"Docker sandbox: image={sec.docker.image}, "
-            f"network={sec.docker.network}, memory={sec.docker.memory_limit}."
+            f"Sandbox: backend={sec.sandbox.backend}, "
+            f"network={sec.sandbox.network}, memory={sec.sandbox.memory_limit}."
         )
     content_custom = sec.content.model_dump(exclude_defaults=True)
     if content_custom:

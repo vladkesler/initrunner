@@ -159,6 +159,7 @@ def load_and_build_or_exit(
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
     from initrunner.agent.loader import MissingApiKeyError, RoleLoadError
+    from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
     from initrunner.services.execution import build_agent_sync
 
     def _build():
@@ -172,6 +173,11 @@ def load_and_build_or_exit(
     while True:
         try:
             return _build()
+        except SandboxUnavailableError as e:
+            from initrunner.cli._validation_panel import render_sandbox_error
+
+            console.print(render_sandbox_error(e))
+            raise typer.Exit(1) from None
         except MissingApiKeyError as e:
             if not prompted and prompt_inline_api_key(e.env_var, e.provider):
                 prompted = True
@@ -197,10 +203,13 @@ def load_and_build_or_exit(
 def create_audit_logger(audit_db: Path | None, no_audit: bool) -> AuditLogger | None:
     if no_audit:
         return None
+    from initrunner.agent.runtime_sandbox import set_default_audit_logger
     from initrunner.audit.logger import DEFAULT_DB_PATH
     from initrunner.audit.logger import AuditLogger as _AuditLogger
 
-    return _AuditLogger(audit_db or DEFAULT_DB_PATH)
+    logger = _AuditLogger(audit_db or DEFAULT_DB_PATH)
+    set_default_audit_logger(logger)
+    return logger
 
 
 def _no_memory_role(role: RoleDefinition) -> RoleDefinition:
@@ -315,6 +324,10 @@ def command_context(
     role_file = resolve_role_path(role_file)
     from initrunner.stores.factory import managed_memory_store
 
+    # Audit logger is created before build so sandbox backends pick it up
+    # as the default (sandbox.exec events won't fire otherwise).
+    audit_logger = create_audit_logger(audit_db, no_audit)
+
     role, agent = load_and_build_or_exit(
         role_file, extra_skill_dirs=extra_skill_dirs, model_override=model_override
     )
@@ -326,7 +339,6 @@ def command_context(
         from initrunner.observability import setup_tracing
 
         _otel_provider = setup_tracing(role.spec.observability, role.metadata.name)
-    audit_logger = create_audit_logger(audit_db, no_audit)
 
     mem_role = role if with_memory else _no_memory_role(role)
     with managed_memory_store(mem_role, agent) as memory_store:

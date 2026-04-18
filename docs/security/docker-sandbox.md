@@ -1,183 +1,199 @@
-# Docker Sandbox for Tool Execution
+# Docker Sandbox
 
-InitRunner can run shell, Python, and script tool execution inside Docker containers, providing kernel-level isolation via network namespaces, cgroups, and filesystem restrictions. This is **opt-in** via `security.docker.enabled: true` in your role YAML. When disabled (the default), no behavior changes.
+The Docker sandbox runs tool subprocesses inside disposable `docker run --rm --init` containers. It's the portable option: works on macOS, Windows, and Linux, supports pinned OS images, and handles bridge networking natively.
 
-## Quick Start
+For the cross-backend config reference, see [Runtime Sandbox](sandbox.md). For the Linux-native alternative with no daemon, see [Bubblewrap Sandbox](bubblewrap.md). For running initrunner itself inside Docker (a different topic), see [Docker](../getting-started/docker.md).
+
+## Why Docker
+
+- **Cross-platform.** Works the same on macOS, Windows, and Linux.
+- **Pinned environment.** The image is the filesystem. Upgrading the host doesn't change what the sandbox sees.
+- **Bridge networking.** For tools that need outbound HTTP with a user-defined network, egress allowlist, or Docker DNS aliases, only Docker supports it.
+- **Standard flags.** Memory (`-m`), CPU (`--cpus`), read-only rootfs (`--read-only`), pid limit (`--pids-limit`), container user (`--user`) — all stock `docker run` options.
+
+## Requirements
+
+A reachable Docker daemon. Preflight runs `docker info` before any tool launches and raises `SandboxUnavailableError` with install remediation when the daemon is missing:
+
+| Platform | Command |
+|---|---|
+| Debian/Ubuntu | `apt install docker.io && systemctl start docker` |
+| Fedora | `dnf install docker && systemctl start docker` |
+| Arch | `pacman -S docker && systemctl start docker` |
+| macOS | `brew install --cask docker`, then open Docker Desktop |
+| Windows | Install Docker Desktop |
+
+Preflight also checks the configured image with `docker image inspect` and runs `docker pull` if it's missing. Private images need `docker login` on the host first.
+
+## Enabling it
+
+```yaml
+security:
+  sandbox:
+    backend: docker         # or: auto (prefers bwrap on Linux, falls back to Docker)
+    network: none           # none | bridge | host
+    memory_limit: 256m
+    cpu_limit: 1.0
+    read_only_rootfs: true
+    allowed_read_paths: []
+    allowed_write_paths: []
+    bind_mounts: []
+    env_passthrough: []
+    docker:
+      image: python:3.12-slim
+      user: auto            # "auto" | "1000:1000" | null (root)
+      extra_args: []        # dangerous flags blocked by schema
+```
+
+## Isolation model
+
+Each tool call becomes one `docker run --rm --init` invocation. `--init` spawns a tiny PID-1 that reaps zombies and forwards signals — without it, ctrl-C won't stop a shell running `sleep`.
+
+### Base flags
+
+| Flag | Purpose |
+|---|---|
+| `--rm` | Container is deleted when the process exits. No lingering state. |
+| `--init` | tini as PID 1 for signal handling and zombie reaping. |
+| `--name initrunner-<hash>` | Unique name for cleanup on timeout. |
+| `--label initrunner.managed=true` | Identifies initrunner-managed containers for bulk cleanup. |
+| `--pids-limit 256` | Caps fork bombs. |
+| `--read-only` (when `read_only_rootfs: true`) | Root filesystem is read-only. |
+| `--tmpfs /tmp:rw,noexec,nosuid,size=64m` | Writable `/tmp` without allowing writes elsewhere. |
+
+### Network
+
+| `network:` | Flag | Behavior |
+|---|---|---|
+| `none` | `--network none` | No interfaces, no DNS, no connectivity. Kernel-level block. |
+| `bridge` | `--network bridge` | Default Docker bridge — outbound traffic is NAT'd through the host. |
+| `host` | `--network host` | Shares the host network stack. Equivalent to no isolation at the network layer. |
+
+### Working directory and mounts
+
+- **`/work`** — the tool's `cwd`, bind-mounted read-write. Set as the container's working directory via `-w /work`.
+- **`/role`** — the role directory, read-only. Role-relative `bind_mounts` resolve against this path on the host.
+- **`bind_mounts`** — user-configured. Each entry becomes one `-v host:container[:ro]` flag. Relative `source` paths resolve against `role_dir`. Missing sources raise `ValueError` at build time — no silent failures.
+- **Tool-internal mounts** — e.g. python_exec binding a tempfile. Code-controlled, no schema validation.
+
+### User mapping
+
+The `--user` flag depends on `docker.user` and whether writable mounts exist:
+
+| `docker.user` | Writable mount? | `--user` value |
+|---|---|---|
+| `"auto"` | yes (work_dir or rw bind_mount) | `<host uid>:<host gid>` |
+| `"auto"` | no | (omitted — container default user) |
+| `"1000:1000"` (explicit) | either | `1000:1000` |
+| `null` | either | (omitted — runs as root inside container) |
+
+Auto mapping prevents a common pain point: the container writes files as root, then the host user can't delete them.
+
+### Environment
+
+Container env starts clean. Host variables pass through only when:
+
+1. They're listed in `env_passthrough` **and** exist on the host. `scrub_env()` still strips sensitive prefixes (`OPENAI_API_KEY`, `AWS_SECRET`, …) first.
+2. The tool sets them explicitly via `env={...}` on its `run()` call.
+
+Each becomes one `-e KEY=value` flag.
+
+### Resource limits
+
+| Field | Flag | Notes |
+|---|---|---|
+| `memory_limit` | `-m 256m` | Container is OOM-killed at the limit. Exit code 137 triggers an auto-appended hint: "Container killed (OOM). Increase security.sandbox.memory_limit (current: 256m)." |
+| `cpu_limit` | `--cpus 1.0` | Fractional cores. |
+| `pids_limit` | `--pids-limit 256` | Always on. Caps runaway forks. |
+
+### `extra_args` validation
+
+`docker.extra_args` accepts additional `docker run` flags (e.g. `--ulimit=nofile=1024`). A blocklist rejects flags that defeat isolation:
+
+- `--privileged`
+- `--cap-add` (any form: bare, `--cap-add=NET_ADMIN`, `--cap-add NET_ADMIN`)
+- `--security-opt` when it disables seccomp/apparmor
+- `--pid=host`, `--ipc=host`, `--uts=host`, `--userns=host`
+- `--device`, `--volume-driver`, `--runtime`
+
+See `initrunner/agent/schema/security.py` for the full `_DOCKER_BLOCKED_ARGS` set.
+
+## Container cleanup on timeout
+
+When a tool exceeds its timeout, `subprocess.run` kills the local `docker` CLI — but the container keeps running. The backend catches `subprocess.TimeoutExpired` and runs `docker rm -f <name>` to force-remove it. The backend swallows any cleanup failure so it can't mask the original timeout error.
+
+## Preflight
+
+`initrunner doctor --role <file>` checks two things:
+
+1. The Docker daemon answers `docker info`.
+2. The configured image exists locally, or `docker pull` succeeds.
+
+Run it once per role change so image pulls happen outside the hot path.
+
+## Example: code interpreter with a specific runtime
 
 ```yaml
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
-  name: sandboxed-agent
+  name: docker-node-runner
 spec:
-  role: You are a code execution assistant.
+  role: |
+    You are a JavaScript assistant running in a pinned Node 20 container.
+    Network disabled, 512m memory.
   model:
     provider: openai
     name: gpt-5-mini
   tools:
     - type: shell
-    - type: python
+      allowed_commands: [node, npm]
+    - type: script
+      scripts:
+        - name: run_js
+          body: |
+            node -e "$CODE"
+          parameters:
+            - name: code
+              required: true
   security:
-    docker:
-      enabled: true
+    sandbox:
+      backend: docker
+      network: none
+      memory_limit: 512m
+      cpu_limit: 1.0
+      read_only_rootfs: true
+      docker:
+        image: node:20-slim
+        user: auto
 ```
 
-This runs all shell and Python tool invocations inside `python:3.12-slim` containers with no network access and a read-only root filesystem.
+## Running initrunner itself in Docker
 
-## Prerequisites
+When initrunner runs inside a container and you want sandboxed tools, the inner initrunner still needs a Docker daemon. Two patterns:
 
-Docker must be installed and the daemon running. Verify with:
+1. **Socket passthrough** (simpler, less secure): mount `/var/run/docker.sock` into the initrunner container. The inner process gets effective root on the host via the socket — use only for trusted roles.
+2. **Docker-in-Docker** (safer, heavier): run a dind sidecar and point initrunner at it with `DOCKER_HOST=tcp://dind:2375`.
+
+See [Docker — socket passthrough](../getting-started/docker.md#docker-sandbox-when-running-initrunner-in-docker-socket-passthrough) for the compose snippet.
+
+## Audit
+
+Each `run()` emits a `sandbox.exec` security event:
+
+```
+backend=docker argv0=/usr/bin/python rc=0 duration_ms=312
+```
+
+Query with:
 
 ```bash
-initrunner doctor
+initrunner audit security-events --event-type sandbox.exec
 ```
-
-The doctor command shows a `docker` row in the provider status table. If Docker is enabled in a role but not available, the agent fails to load with a `DockerNotAvailableError`.
-
-## Configuration Reference
-
-All fields under `security.docker`:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | `bool` | `false` | Enable Docker container isolation for tool execution. |
-| `image` | `str` | `"python:3.12-slim"` | Docker image to use for containers. |
-| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Container network mode. `none` provides full network isolation. |
-| `memory_limit` | `str` | `"256m"` | Memory limit in Docker format (`256m`, `1g`, etc.). |
-| `cpu_limit` | `float` | `1.0` | CPU limit (fractional cores, must be > 0). |
-| `read_only_rootfs` | `bool` | `true` | Mount root filesystem as read-only. A writable `/tmp` (64MB, noexec) is added automatically. |
-| `user` | `"auto" \| str \| null` | `"auto"` | Container user. `"auto"` runs as current uid:gid when writable mounts exist. `null` runs as root. Explicit `"1000:1000"` sets a specific uid:gid. |
-| `bind_mounts` | `list[BindMount]` | `[]` | Additional bind mounts into the container. |
-| `env_passthrough` | `list[str]` | `[]` | Environment variable names to pass into the container (filtered through env scrubbing). |
-| `extra_args` | `list[str]` | `[]` | Additional `docker run` flags. Security-sensitive flags are blocked. |
-
-### BindMount Fields
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `source` | `str` | *(required)* | Host path. Relative paths resolve against the role file's directory. |
-| `target` | `str` | *(required)* | Container path. Must be absolute (start with `/`). |
-| `read_only` | `bool` | `true` | Mount as read-only. |
-
-## Security Defaults
-
-The Docker sandbox applies strong defaults:
-
-- **`network: none`** -- Containers have no network access by default. This is enforced at the kernel level and cannot be bypassed from inside the container.
-- **`read_only_rootfs: true`** -- The container's root filesystem is read-only. A writable `/tmp` is provided with `noexec,nosuid` flags and a 64MB size limit.
-- **`pids-limit: 256`** -- Limits the number of processes inside the container to prevent fork bombs.
-- **Working directory** -- The tool's working directory is bind-mounted at `/work` inside the container. The `/work` target is reserved and cannot be used in `bind_mounts`.
-
-## Network Isolation
-
-The `network` field controls container networking:
-
-| Value | Behavior |
-|-------|----------|
-| `none` | No network access (strongest isolation). |
-| `bridge` | Container gets its own network namespace with NAT. Can access external hosts. |
-| `host` | Container shares the host's network namespace. Least isolated. |
-
-### Interaction with `network_disabled`
-
-The Python tool has an existing `network_disabled` option that installs an in-process audit hook to block socket connections. When Docker is enabled:
-
-- **`network: none`** -- Docker provides kernel-level network isolation. The in-process shim is skipped (redundant).
-- **`network: bridge` or `host`** -- If `network_disabled: true`, the in-process shim is preserved inside the container for defense-in-depth.
-
-## Blocked Extra Args
-
-The following `docker run` flags are blocked in `extra_args` to prevent privilege escalation:
-
-- `--privileged`
-- `--cap-add`
-- `--security-opt`
-- `--pid=host`
-- `--userns=host`
-- `--network=host`
-- `--ipc=host`
-
-Attempting to use these raises a validation error at role load time.
-
-## Examples
-
-### Data Processing with File Access
-
-```yaml
-security:
-  docker:
-    enabled: true
-    image: python:3.12-slim
-    network: none
-    memory_limit: 512m
-    cpu_limit: 2.0
-    bind_mounts:
-      - source: ./data
-        target: /data
-        read_only: true
-      - source: ./output
-        target: /output
-        read_only: false
-    env_passthrough: [LANG, TZ]
-```
-
-### Minimal Sandbox
-
-```yaml
-security:
-  docker:
-    enabled: true
-```
-
-Uses all defaults: `python:3.12-slim`, no network, 256MB RAM, 1 CPU, read-only rootfs.
-
-### Custom Image with Extra Args
-
-```yaml
-security:
-  docker:
-    enabled: true
-    image: node:20-slim
-    memory_limit: 1g
-    read_only_rootfs: false
-    extra_args: ["--pids-limit=100", "--ulimit=nofile=1024"]
-```
-
-### Complete Example Role
-
-See [`examples/roles/docker-sandbox.yaml`](../../examples/roles/docker-sandbox.yaml) for a ready-to-use role with Docker isolation:
-
-```bash
-initrunner run examples/roles/docker-sandbox.yaml -p "Use python to compute 2**100"
-```
-
-## How It Works
-
-When `security.docker.enabled` is `true`:
-
-1. **Startup validation** -- `build_toolsets()` calls `require_docker()` to verify the Docker CLI and daemon are available. If not, the agent fails to load.
-
-2. **Shell tools** -- Instead of `subprocess.run(tokens, ...)`, the tool runs `docker run --rm <image> <tokens>`. The working directory is bind-mounted at `/work`.
-
-3. **Python tools** -- Code is written to a temporary file, bind-mounted at `/code/_run.py`, and executed via `docker run --rm <image> python /code/_run.py`. The temp directory is always cleaned up.
-
-4. **Script tools** -- The script body is piped via stdin to `docker run -i --rm <image> <interpreter>`. Script environment variables are passed as `-e` flags.
-
-All three paths reuse the existing timeout handling, output formatting, and truncation logic. `SubprocessTimeout` is raised on timeout just as in the non-Docker path.
-
-## Custom Image Requirements
-
-When using a custom `image`, the image must meet these requirements:
-
-- **Interpreter on PATH** -- The Python tool expects `python` on `PATH`. The script tool uses the configured `interpreter` (default `/bin/sh`). If the interpreter is missing, the container exits with "not found".
-- **Writable /tmp** -- When `read_only_rootfs: true` (default), a writable `/tmp` is provided as a tmpfs (64MB, noexec, nosuid). The image does not need to provide `/tmp` itself.
-- **Working directory at /work** -- The tool's working directory is bind-mounted at `/work`. Your image should not expect a specific working directory.
-- **Code mount at /code** -- Python tool code is mounted at `/code/_run.py` (read-only).
-- **No special init system needed** -- InitRunner passes `--init` (tini) automatically.
 
 ## Limitations
 
-- **Docker overhead** -- Container startup adds latency (~100-500ms per invocation depending on image and system). Not suitable for high-frequency tool calls.
-- **Image pre-pull** -- The image is pulled automatically at agent startup if not locally available. For large images, pre-pull with `docker pull <image>` to avoid startup delay.
-- **No GPU passthrough** -- The sandbox does not configure `--gpus`. Add `--gpus=all` via `extra_args` if needed (note: this reduces isolation).
-- **Host paths** -- Bind mount source paths must exist on the host. Missing sources raise an error at container start time. Relative paths resolve against the role file's directory.
+- **Per-call startup cost.** A Docker container takes ~200–500ms to start. bwrap is ~10× faster on the same host. Use `backend: auto` to prefer bwrap when available.
+- **Daemon dependency.** Every tool call needs the daemon up. If it dies, tools fail with `SandboxUnavailableError`.
+- **Image distribution.** First run may pull the image (up to 5 minutes). Run `initrunner doctor` to pull outside the hot path.
+- **No seccomp customization in v1.** The sandbox uses Docker's default seccomp profile. The schema doesn't expose custom profiles.

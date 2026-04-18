@@ -440,8 +440,8 @@ def dispatch_ephemeral_bot(
     from initrunner.runner import run_daemon
     from initrunner.stores.factory import managed_memory_store
 
-    agent = build_agent(role)
     audit_logger = create_audit_logger(audit_db, no_audit)
+    agent = build_agent(role)
 
     if ingest_config is not None:
         run_ephemeral_ingest(role, prov)
