@@ -25,20 +25,9 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a> · 日本語
 </p>
 
-<p align="center">
-  <strong>2026.4.15 の新機能</strong><br>
-  暗号化クレデンシャルボールト · HMAC 署名済み監査チェーン · 双方向 Slack アダプター · 1 単語のスターター名 · <a href="CHANGELOG.md#202641515---2026-04-17">完全な変更履歴</a>
-</p>
-
 > **注意:** これはコミュニティによる翻訳です。最新の情報は [英語版 README](README.md) を参照してください。翻訳は更新に遅れる場合があります。
 
 1つの YAML ファイルでエージェントを定義。対話する。うまくいったら自律実行させる。信頼できたら、cron スケジュール、ファイル変更、webhook、Telegram メッセージに反応するデーモンとしてデプロイする。同じファイルのまま。プロトタイプから本番まで書き直し不要。
-
-```bash
-initrunner run researcher -i                            # 対話する
-initrunner run researcher -a -p "Audit this codebase"   # 自律的に作業させる
-initrunner run researcher --daemon                      # 24時間365日稼働、トリガーに反応
-```
 
 ## クイックスタート
 
@@ -51,16 +40,18 @@ initrunner setup        # ウィザード：プロバイダー、モデル、API
 
 ### スターター
 
-`initrunner run --list` で全カタログを表示。モデルは API キーから自動検出されます。
+ワンコマンドで実行できる 8 つのスターター。`initrunner run --list` でフルカタログを表示。モデルは API キーから自動検出されます。
 
 | スターター | 機能 |
 |-----------|------|
-| `helpdesk` | ドキュメントを読み込み、引用とメモリ付き Q&A エージェントを取得 |
-| `scholar` | 3 エージェントパイプライン：プランナー、Web リサーチャー、シンセサイザー |
-| `reviewer` | 多視点レビュー：アーキテクト、セキュリティ、メンテナー |
-| `reader` | リポジトリをインデックスし、アーキテクチャについて対話、セッション間でパターンを学習 |
-| `writer` | 調査、執筆、編集/ファクトチェック（webhook または cron 経由） |
+| `helpdesk` | ドキュメント（Markdown、PDF、HTML、Word）の Q&A エージェント。引用とユーザー別メモリ付き |
+| `scholar` | 3 エージェントの研究チーム：プランナー、Web リサーチャー、シンセサイザー（共有メモリ） |
+| `reviewer` | 多視点コードレビュー：アーキテクト、セキュリティ、メンテナー |
+| `reader` | コードベースをインデックスし、アーキテクチャを対話、パターンをセッション間で記憶 |
+| `scout` | 出典付きの構造化ブリーフィングを生成する Web 調査 |
+| `writer` | トピックから記事までのパイプライン：リサーチャー、ライター、編集・ファクトチェッカー、webhook または cron 駆動 |
 | `mail` | 受信トレイを監視、メッセージを分類、返信を起草、緊急メールを Slack に通知 |
+| `librarian` | ドキュメント取り込み付きのナレッジベース Q&A エージェント |
 
 ### 自分で作る
 
@@ -108,17 +99,17 @@ spec:
 このファイルは4つの方法で使えます：
 
 ```bash
-initrunner run reviewer.yaml -i              # インタラクティブ REPL
-initrunner run reviewer.yaml -p "Review PR #42"  # 1つのプロンプト、1つの応答
-initrunner run reviewer.yaml -a -p "Audit the whole repo"  # 自律モード：計画、実行、振り返り
-initrunner run reviewer.yaml --daemon        # 継続稼働、トリガーに反応
+initrunner run reviewer.yaml -i                          # インタラクティブ REPL
+initrunner run reviewer.yaml -p "Review PR #42"          # 1つのプロンプト、1つの応答
+initrunner run reviewer.yaml -a -p "Audit the whole repo"  # 自律ループ
+initrunner run reviewer.yaml --daemon                    # トリガー駆動で稼働
 ```
 
 `model:` セクションはオプション。省略すると InitRunner が API キーから自動検出します。Anthropic、OpenAI、Google、Groq、Mistral、Cohere、xAI、OpenRouter、Ollama、および任意の OpenAI 互換エンドポイントに対応。
 
 ### 自律モード
 
-`-a` を付けるとエージェントはチャットボットではなくなります。タスクリストを作り、各項目を処理し、自身の進捗を振り返り、すべて完了したら終了します。4つの推論戦略が思考方法を制御：`react`（デフォルト）、`todo_driven`、`plan_execute`、`reflexion`。
+`-a` を付けると、エージェントはタスクリストを作り、各項目を処理し、進捗を振り返り、すべて完了したら終了します。4つの推論戦略が思考方法を制御：`react`（デフォルト）、`todo_driven`、`plan_execute`、`reflexion`。
 
 ```yaml
 spec:
@@ -130,11 +121,11 @@ spec:
     autonomous_timeout_seconds: 600
 ```
 
-スピンガードが進展のないループを検出。ヒストリーコンパクションが古いコンテキストを要約し、長時間実行でもトークンウィンドウを圧迫しません。予算制約、イテレーション制限、ウォールクロックタイムアウトですべてが有界に。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+スピンガードが進展のないループを検出。ヒストリーコンパクションが古いコンテキストを要約し、長時間実行でもトークンウィンドウを圧迫しません。イテレーション、トークン、ウォールクロックの上限が各実行を有界化します。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
 
-### デーモンモード
+### デーモン
 
-トリガーを追加して `--daemon` に切り替え。エージェントは継続稼働し、イベントに反応。各イベントが1回のプロンプト-応答サイクルを起動。
+トリガーを追加して `--daemon` に切り替え。エージェントは継続稼働し、各イベントが1回のプロンプト-応答サイクルを起動します。
 
 ```yaml
 spec:
@@ -149,21 +140,17 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-```bash
-initrunner run role.yaml --daemon   # Ctrl+C まで実行
-```
-
 6種類のトリガー：cron、webhook、file_watch、heartbeat、telegram、discord。再起動なしでロール変更をホットリロード、最大4トリガーを同時実行。[トリガー](docs/core/triggers.md) を参照。
 
 ### オートパイロット
 
-`--autopilot` は `--daemon` と同じですが、各トリガーが完全な自律ループを実行。Telegram ボットに「来週ニューヨークからロンドンへのフライトを探して」とメッセージが来たとき、デーモンモードでは1回で回答。オートパイロットでは、エージェントが Web を検索し、オプションを比較し、日程を確認し、読む価値のある回答を返します。
+`--autopilot` は `--daemon` にトリガーごとの自律ループを加えたもの。「来週ニューヨークからロンドンへのフライトを探して」という Telegram メッセージは、デーモンモードでは1回の LLM ターンで処理されます。オートパイロットでは、エージェントがフライトを検索し、オプションを比較し、日程を確認し、候補リストを返します。
 
 ```bash
 initrunner run role.yaml --autopilot
 ```
 
-選択的に設定することも可能。個別のトリガーに `autonomous: true` を設定し、残りはシングルショット応答のまま：
+選択的に有効化することも可能。個別のトリガーに `autonomous: true` を設定し、残りはシングルショットのまま：
 
 ```yaml
 spec:
@@ -177,16 +164,16 @@ spec:
     - type: file_watch
       paths: [./src]
       prompt_template: "File changed: {path}. Review it."
-      # デフォルト：クイックシングル応答
+      # デフォルト：単発応答
 ```
 
-### メモリはすべてを貫く
+### モードをまたぐメモリ
 
-エピソード記憶、セマンティック記憶、手続き記憶がインタラクティブセッション、自律実行、デーモントリガーの間で永続化。各セッション後、統合プロセスが LLM を使って会話から永続的な事実を抽出。エージェントは1回の実行内だけでなく、時間をかけてナレッジを蓄積します。
+セマンティック記憶（エージェントが学んだ事実）、エピソード記憶（過去のセッションで起きたこと）、手続き記憶（エージェントが好む解法）がインタラクティブセッション、自律実行、デーモントリガーの間で永続化されます。各セッション後、LLM が永続的な事実をストアに統合します。ナレッジは1回の実行内だけでなく、時間をかけて蓄積されます。
 
 ## 学習するエージェント
 
-エージェントをディレクトリに向けるだけ。ドキュメントを自動的に抽出、チャンク分割、埋め込み、インデックス。会話中、エージェントは自動でインデックスを検索し、見つけた内容を引用。新規・変更ファイルは毎回の実行で自動再インデックス。
+エージェントをディレクトリに向けるだけ。ドキュメントを自動的に抽出、チャンク分割、埋め込み、インデックスします。会話中、エージェントは自動でインデックスを検索し、見つけた内容を引用。新規・変更ファイルは毎回の実行で再インデックスされます。
 
 ```yaml
 spec:
@@ -203,32 +190,37 @@ cd ~/myproject
 initrunner run reader -i   # コードをインデックスし、Q&A を開始
 ```
 
-重要なのは統合です。各セッション後、LLM が何が起きたかを読み取り、セマンティックストアに蒸留します。火曜日のデバッグセッションで学んだ事実が、木曜日のコードレビュー時に現れます。Flow の共有メモリにより、エージェントチームが共同でナレッジを構築。[メモリ](docs/core/memory.md) · [取り込み](docs/core/ingestion.md) · [RAG クイックスタート](docs/getting-started/rag-quickstart.md) を参照。
+重要なのは統合です。各セッション後、LLM が会話を読み取り、セマンティックストアに蒸留します。火曜日のデバッグセッションで学んだ事実が、木曜日のコードレビュー時に現れます。Flow の共有メモリにより、エージェントチームが共同でナレッジを構築。[メモリ](docs/core/memory.md) · [取り込み](docs/core/ingestion.md) · [RAG クイックスタート](docs/getting-started/rag-quickstart.md) を参照。
 
-## セキュリティは標準装備
+## セキュリティ
 
-ほとんどのエージェントフレームワークはセキュリティを「本番になったら認証ミドルウェアを追加」として扱います。InitRunner はこれらの制御を標準で同梱。設定キーで有効化するだけです。
+フレームワークに同梱され、設定キーで有効化できる5つの制御。`security:` セクションのないロールは安全なデフォルト値で動作します。
 
-**エージェントは信頼できない入力を受け付ける。** コンテンツポリシーエンジン（禁止パターン、プロンプト長制限、オプションの LLM トピック分類器）と入力ガードケイパビリティがエージェント開始前にプロンプトを検証。
+**入力検証。** コンテンツポリシーエンジン（禁止パターン、プロンプト長制限、オプションの LLM トピック分類器）と入力ガードケイパビリティが、エージェント開始前にプロンプトを検証。
 
-**エージェントは実際の影響があるツールを呼び出す。** [InitGuard](https://github.com/initrunner/initguard) ABAC ポリシーエンジンがすべてのツール呼び出しと委任を CEL ポリシーに対してチェック。ツールごとの allow/deny glob パターンで引数レベルのパーミッションを適用。
+**ツール認可。** [InitGuard](https://github.com/initrunner/initguard) ABAC ポリシーエンジンがすべてのツール呼び出しと委任を CEL ポリシーに対してチェック。ツールごとの allow/deny glob パターンで引数レベルのパーミッションを適用。
 
-**エージェントはコードを実行する。** PEP 578 監査フックサンドボックスがファイルシステム書き込みを制限、サブプロセス生成をブロック、プライベート IP ネットワークアクセスをブロック、危険なインポートを防止。Docker コンテナサンドボックスが読み取り専用 rootfs、メモリ/CPU 制限、ネットワーク分離を追加。
+**コード実行サンドボックス。** PEP 578 監査フックが、許可リスト外のファイル書き込み、`subprocess.Popen` と `os.system`（デフォルト）、プライベート IP への `socket.connect` をブロックし、`ctypes.dlopen` と新規スレッドは常にブロックします。Docker コンテナサンドボックスが読み取り専用 rootfs、メモリ/CPU 制限、ネットワーク分離を追加。
 
-**すべてが記録される。** 追記専用 SQLite 監査証跡、自動シークレットスクラブ。正規表現パターンがプロンプトと出力から GitHub トークン、AWS キー、Stripe キーなどを除去。
+**改ざん検知可能な監査証跡。** 各実行は追記専用 SQLite 監査ログに書き込まれ、前のレコードのハッシュに対して HMAC-SHA256 で署名されます。`initrunner audit verify-chain` が中間レコードの変更、並び替え、削除を検出。シークレットは書き込み時にスクラブされます。
 
-これらはすべて `security:` 設定キーによるオプトイン方式です。`security:` セクションのないロールには安全なデフォルト値が適用されます。
+**暗号化クレデンシャルボールト。** `initrunner vault init` で `~/.initrunner/vault.enc` を作成し、パスフレーズから Fernet + scrypt で暗号化します。API キーは環境変数を最初に参照し、次にボールトを参照するので、既存の `api_key_env:` や `${VAR}` プレースホルダーはそのまま動作します。
 
-```bash
-export INITRUNNER_POLICY_DIR=./policies
-initrunner run role.yaml    # ツール呼び出し + 委任をポリシーに対してチェック
+```yaml
+spec:
+  security:
+    audit_hooks_enabled: true
+    block_private_ips: true
+    input_guard:
+      max_prompt_chars: 10000
+      blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-[エージェントポリシー](docs/security/agent-policy.md) · [セキュリティ](docs/security/security.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
+[セキュリティ](docs/security/security.md) · [エージェントポリシー](docs/security/agent-policy.md) · [クレデンシャルボールト](docs/security/vault.md) · [監査チェーン](docs/security/audit-chain.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
 
 ## コスト管理
 
-ほとんどのフレームワークはトークン予算を追跡します。InitRunner はそれに加えて USD コスト予算も強制適用。デーモンに日次または週次のドル上限を設定し、閾値に達したらトリガーの発火を停止。
+USD 予算がデーモンの支出に上限を設定。上限に達するとトリガーの発火は停止し、ウィンドウがリセットされるまで再開しません。
 
 ```yaml
 spec:
@@ -237,11 +229,11 @@ spec:
     daemon_weekly_cost_budget: 25.00  # 週あたり USD
 ```
 
-コスト見積もりは [genai-prices](https://pypi.org/project/genai-prices/) を使用して、モデルとプロバイダーごとの実際の支出を計算。各実行のコストは監査証跡に記録。ダッシュボードではエージェントと期間を横断したコスト分析を表示。[コスト追跡](docs/core/cost-tracking.md) を参照。
+コスト見積もりは [genai-prices](https://pypi.org/project/genai-prices/) でモデルとプロバイダーごとに計算します。各実行のコストは監査証跡に記録。ダッシュボードはエージェントと期間を横断したコストをプロットします。[コスト追跡](docs/core/cost-tracking.md) を参照。
 
 ## マルチエージェントオーケストレーション
 
-エージェントを Flow に連鎖。あるエージェントの出力が次の入力に。センスルーティングがまずキーワードスコアリングでターゲットを自動選択（API 呼び出しゼロ）、キーワードが曖昧な場合のみ LLM でタイブレーク：
+エージェントを Flow に連鎖。あるエージェントの出力が次の入力になります。
 
 ```yaml
 apiVersion: initrunner/v1
@@ -262,6 +254,8 @@ spec:
 ```bash
 initrunner flow up flow.yaml
 ```
+
+センスルーティングはまずキーワードスコアリングでターゲットを選択（API 呼び出しゼロ）し、キーワードが曖昧な場合のみ LLM のタイブレークにフォールバックします。
 
 **チームモード** は、完全な Flow を構築するほどではないが、1つのタスクに複数の視点が必要な場合に使用。1つのファイルでペルソナを定義、3つの戦略：順次ハンドオフ、並列実行、またはディベート（多ラウンドの議論と統合）。[パターンガイド](docs/orchestration/patterns-guide.md) · [チームモード](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md) を参照。
 
@@ -328,11 +322,6 @@ initrunner/
 
 **OCI レジストリ:** ロールバンドルを任意の OCI 準拠レジストリにプッシュ: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`。[OCI 配布](docs/core/oci-distribution.md) を参照。
 
-**クラウドデプロイ:**
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
-
 ## ドキュメント
 
 | 領域 | 主要ドキュメント |
@@ -345,7 +334,7 @@ initrunner/
 | オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| セキュリティ | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| セキュリティ | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## サンプル
@@ -357,7 +346,7 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ## アップグレード
 
-`initrunner doctor --role role.yaml` でロールファイルの非推奨フィールド、スキーマエラー、仕様バージョンの問題をチェック。`--fix` で自動修復。[非推奨事項](docs/operations/deprecations.md) を参照。
+`initrunner doctor --role role.yaml` でロールファイルの非推奨フィールド、スキーマエラー、仕様バージョンの問題をチェック。`--fix` で自動修復。`--flow flow.yaml` で Flow 全体とその参照先ロールを検証。[非推奨事項](docs/operations/deprecations.md) を参照。
 
 ## コミュニティ
 
@@ -372,4 +361,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.4.12</sub></p>
+<p align="center"><sub>v2026.4.15</sub></p>

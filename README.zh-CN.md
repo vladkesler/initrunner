@@ -25,20 +25,9 @@
   <a href="README.md">English</a> · 简体中文 · <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
-  <strong>2026.4.15 新功能</strong><br>
-  加密凭证保险库 · HMAC 签名审计链 · 双向 Slack 适配器 · 单字起始模板名 · <a href="CHANGELOG.md#202641515---2026-04-17">完整变更日志</a>
-</p>
-
 > **注意:** 这是社区翻译版本。以 [英文 README](README.md) 为准。翻译内容可能滞后于最新更新。
 
 用一个 YAML 文件定义 Agent。和它对话。效果满意后，让它自主运行。信任它之后，部署为守护进程，响应 cron 调度、文件变更、webhook 和 Telegram 消息。同一个文件，从原型到生产，无需重写。
-
-```bash
-initrunner run researcher -i                            # 和它对话
-initrunner run researcher -a -p "Audit this codebase"   # 让它自主工作
-initrunner run researcher --daemon                      # 7x24 运行，响应触发器
-```
 
 ## 快速开始
 
@@ -51,16 +40,18 @@ initrunner setup        # 向导：选择提供商、模型、API 密钥
 
 ### 入门模板
 
-运行 `initrunner run --list` 查看完整目录。模型根据你的 API 密钥自动检测。
+八个一条命令即可运行的入门模板。用 `initrunner run --list` 浏览完整目录。模型根据你的 API 密钥自动检测。
 
 | 入门模板 | 功能描述 |
 |---------|---------|
-| `helpdesk` | 导入你的文档，获得带引用和记忆的问答 Agent |
-| `scholar` | 3-Agent 流水线：规划者、网络研究员、综合者 |
-| `reviewer` | 多视角审查：架构师、安全专家、维护者 |
-| `reader` | 索引你的仓库，聊架构，跨会话学习模式 |
-| `writer` | 研究、撰写、编辑/事实核查，通过 webhook 或 cron 触发 |
+| `helpdesk` | 针对你的文档（Markdown、PDF、HTML、Word）的问答 Agent，带引用和按用户记忆 |
+| `scholar` | 三 Agent 研究团队：规划者、网络研究员、综合者，共享记忆 |
+| `reviewer` | 多视角代码审查：架构师、安全专家、维护者 |
+| `reader` | 索引代码库，聊架构，跨会话记忆模式 |
+| `scout` | 网络研究，产出带引用的结构化简报 |
+| `writer` | 主题到文章流水线：研究员、撰稿人、编辑/事实核查员，由 webhook 或 cron 驱动 |
 | `mail` | 监控收件箱，分类消息，起草回复，紧急邮件通知 Slack |
+| `librarian` | 带文档摄入的知识库问答 Agent |
 
 ### 创建自己的 Agent
 
@@ -108,17 +99,17 @@ spec:
 这个文件有四种用法：
 
 ```bash
-initrunner run reviewer.yaml -i              # 交互式 REPL
-initrunner run reviewer.yaml -p "Review PR #42"  # 一个提示，一个回复
-initrunner run reviewer.yaml -a -p "Audit the whole repo"  # 自主模式：规划、执行、反思
-initrunner run reviewer.yaml --daemon        # 持续运行，响应触发器
+initrunner run reviewer.yaml -i                          # 交互式 REPL
+initrunner run reviewer.yaml -p "Review PR #42"          # 一个提示，一个回复
+initrunner run reviewer.yaml -a -p "Audit the whole repo"  # 自主循环
+initrunner run reviewer.yaml --daemon                    # 由触发器驱动
 ```
 
 `model:` 部分是可选的。省略它，InitRunner 会根据你的 API 密钥自动检测。支持 Anthropic、OpenAI、Google、Groq、Mistral、Cohere、xAI、OpenRouter、Ollama 以及任何 OpenAI 兼容端点。
 
 ### 自主模式
 
-加上 `-a`，Agent 不再是聊天机器人。它建立任务列表，逐项完成，反思进度，全部做完后自动停止。四种推理策略控制思考方式：`react`（默认）、`todo_driven`、`plan_execute` 和 `reflexion`。
+加上 `-a`，Agent 建立任务列表，逐项处理，反思进度，全部完成后自动停止。四种推理策略控制思考方式：`react`（默认）、`todo_driven`、`plan_execute` 和 `reflexion`。
 
 ```yaml
 spec:
@@ -130,11 +121,11 @@ spec:
     autonomous_timeout_seconds: 600
 ```
 
-空转检测捕获循环不前进的 Agent。历史压缩总结旧上下文，防止长时间运行耗尽 Token 窗口。预算约束、迭代限制和墙钟超时确保一切有界。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
+空转检测捕获无进展的循环。历史压缩总结旧上下文，防止长时间运行耗尽 Token 窗口。迭代、Token 和墙钟上限约束每次运行。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
 
-### 守护进程模式
+### 守护进程
 
-添加触发器并切换到 `--daemon`。Agent 持续运行，响应事件。每个事件触发一次提示-响应循环。
+添加触发器并切换到 `--daemon`。Agent 持续运行。每个事件触发一次提示-响应循环。
 
 ```yaml
 spec:
@@ -149,21 +140,17 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-```bash
-initrunner run role.yaml --daemon   # 运行直到 Ctrl+C
-```
-
-六种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord。守护进程热重载角色变更无需重启，最多同时运行 4 个触发器。查看 [触发器](docs/core/triggers.md)。
+六种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord。守护进程热重载角色变更无需重启，最多同时运行四个触发器。查看 [触发器](docs/core/triggers.md)。
 
 ### 自动驾驶
 
-`--autopilot` 就是 `--daemon`，但每个触发器走完整的自主循环。有人给你的 Telegram 机器人发消息"帮我找从纽约到伦敦下周的航班"。在守护进程模式下，你只有一次回答机会。在自动驾驶模式下，Agent 搜索网络、比较选项、核对日期，然后发回有价值的答案。
+`--autopilot` 就是 `--daemon` 加上每个触发器的自主循环。Telegram 消息 "帮我找从纽约到伦敦下周的航班" 在守护进程模式下只有一次 LLM 轮次。在自动驾驶模式下，Agent 搜索航班、比较选项、核对日期，然后回复一份候选列表。
 
 ```bash
 initrunner run role.yaml --autopilot
 ```
 
-你也可以有选择性地设置。在单个触发器上设置 `autonomous: true`，其余保持单次响应：
+也可以有选择地启用。在单个触发器上设置 `autonomous: true`，其余保持单次响应：
 
 ```yaml
 spec:
@@ -177,16 +164,16 @@ spec:
     - type: file_watch
       paths: [./src]
       prompt_template: "File changed: {path}. Review it."
-      # 默认：快速单次响应
+      # 默认：单次响应
 ```
 
-### 记忆贯穿一切
+### 跨模式的记忆
 
-情景记忆、语义记忆和程序记忆在交互式会话、自主运行和守护进程触发之间持久化。每次会话结束后，整合过程使用 LLM 从对话中提取持久事实。Agent 不只是运行，它随时间积累知识。
+语义记忆（Agent 学到的事实）、情景记忆（过去会话中发生的事）和程序记忆（Agent 倾向的解决方式）在交互式会话、自主运行和守护进程触发之间持久化。每次会话后，LLM 将持久事实整合到存储中。知识随时间积累，不只是在单次运行内。
 
 ## 会学习的 Agent
 
-将你的 Agent 指向一个目录。它会自动提取、分块、嵌入并索引你的文档。对话过程中，Agent 自动搜索索引并引用找到的内容。新增和变更的文件每次运行时自动重新索引，无需人工干预。
+将 Agent 指向一个目录。它会自动提取、分块、嵌入并索引文档。对话时，Agent 搜索索引并引用找到的内容。新增和变更的文件每次运行时重新索引。
 
 ```yaml
 spec:
@@ -200,35 +187,40 @@ spec:
 
 ```bash
 cd ~/myproject
-initrunner run reader -i   # 索引你的代码，然后开始问答
+initrunner run reader -i   # 索引代码，然后开始问答
 ```
 
-关键在于整合。每次会话结束后，LLM 阅读发生了什么，并将其提炼到语义存储中。Agent 在周二调试会话中学到的事实，会在周四审查代码时出现。Flow 中的共享记忆让 Agent 团队共同积累知识。查看 [记忆](docs/core/memory.md) · [摄入](docs/core/ingestion.md) · [RAG 快速开始](docs/getting-started/rag-quickstart.md)。
+关键在于整合。每次会话结束后，LLM 阅读对话并将其提炼到语义存储中。Agent 在周二调试会话中学到的事实，会在周四审查代码时出现。Flow 中的共享记忆让 Agent 团队共同积累知识。查看 [记忆](docs/core/memory.md) · [摄入](docs/core/ingestion.md) · [RAG 快速开始](docs/getting-started/rag-quickstart.md)。
 
-## 安全是内置的
+## 安全
 
-大多数 Agent 框架把安全当作"到了生产再加认证中间件"。InitRunner 把这些控制开箱内置。用配置项启用即可。
+五个随框架内置、通过配置项启用的控制项。没有 `security:` 部分的角色使用安全默认值。
 
-**Agent 接受不可信输入。** 内容策略引擎（禁止模式、提示长度限制、可选的 LLM 话题分类器）和输入守卫能力在 Agent 启动前验证提示。
+**输入验证。** 内容策略引擎（禁止模式、提示长度限制、可选的 LLM 话题分类器）和输入守卫能力在 Agent 启动前验证提示。
 
-**Agent 调用有实际后果的工具。** [InitGuard](https://github.com/initrunner/initguard) ABAC 策略引擎根据 CEL 策略检查每次工具调用和委托。每个工具的 allow/deny glob 模式执行参数级权限。
+**工具授权。** [InitGuard](https://github.com/initrunner/initguard) ABAC 策略引擎根据 CEL 策略检查每次工具调用和委托。每个工具的 allow/deny glob 模式执行参数级权限。
 
-**Agent 执行代码。** PEP 578 审计钩子沙箱限制文件系统写入、阻止子进程、阻止私有 IP 网络访问、阻止危险导入。Docker 容器沙箱在此基础上增加只读根文件系统、内存/CPU 限制和网络隔离。
+**代码执行沙箱。** PEP 578 审计钩子阻止允许列表之外的文件系统写入，默认阻止 `subprocess.Popen` 和 `os.system`，阻止 `socket.connect` 到私有 IP，并始终阻止 `ctypes.dlopen` 和新线程。Docker 容器沙箱在此基础上增加只读根文件系统、内存/CPU 限制和网络隔离。
 
-**一切都有记录。** 仅追加 SQLite 审计日志，自动敏感信息清理。正则模式从提示和输出中脱敏 GitHub Token、AWS 密钥、Stripe 密钥等。
+**防篡改审计日志。** 每次运行写入仅追加的 SQLite 审计日志，用 HMAC-SHA256 对前一条记录的哈希进行签名。`initrunner audit verify-chain` 可检测任何中间记录的修改、重排或删除。敏感信息在写入时脱敏。
 
-所有这些都通过 `security:` 配置项启用。没有 `security:` 部分的角色会获得安全默认值。
+**加密凭证保险库。** `initrunner vault init` 创建 `~/.initrunner/vault.enc`，使用 Fernet + scrypt 根据你的口令加密。API 密钥先从环境变量解析，然后从保险库，所以现有的 `api_key_env:` 和 `${VAR}` 占位符继续工作。
 
-```bash
-export INITRUNNER_POLICY_DIR=./policies
-initrunner run role.yaml    # 工具调用 + 委托根据策略检查
+```yaml
+spec:
+  security:
+    audit_hooks_enabled: true
+    block_private_ips: true
+    input_guard:
+      max_prompt_chars: 10000
+      blocked_patterns: ["(?i)rm -rf /"]
 ```
 
-查看 [Agent 策略](docs/security/agent-policy.md) · [安全](docs/security/security.md) · [护栏](docs/configuration/guardrails.md)。
+查看 [安全](docs/security/security.md) · [Agent 策略](docs/security/agent-policy.md) · [凭证保险库](docs/security/vault.md) · [审计链](docs/security/audit-chain.md) · [护栏](docs/configuration/guardrails.md)。
 
 ## 成本控制
 
-大多数框架追踪 Token 预算。InitRunner 还强制执行 USD 成本预算。为守护进程设置每日或每周美元上限，达到阈值后停止触发。
+USD 预算限制守护进程支出。达到上限后，触发器停止发火，直到窗口重置。
 
 ```yaml
 spec:
@@ -237,11 +229,11 @@ spec:
     daemon_weekly_cost_budget: 25.00  # 每周 USD
 ```
 
-成本估算使用 [genai-prices](https://pypi.org/project/genai-prices/) 计算每个模型和提供商的实际支出。每次运行的成本记录到审计日志。仪表盘显示跨 Agent 和时间范围的成本分析。查看 [成本追踪](docs/core/cost-tracking.md)。
+成本估算使用 [genai-prices](https://pypi.org/project/genai-prices/) 按模型和提供商计算支出。每次运行的成本记录到审计日志。仪表盘绘制跨 Agent 和时间范围的成本曲线。查看 [成本追踪](docs/core/cost-tracking.md)。
 
 ## 多 Agent 编排
 
-将 Agent 串联为 Flow。一个 Agent 的输出传入下一个。智能路由先用关键词评分自动选择目标（零 API 调用），仅在关键词模糊时用 LLM 仲裁：
+将 Agent 串联为 Flow。一个 Agent 的输出传入下一个。
 
 ```yaml
 apiVersion: initrunner/v1
@@ -263,7 +255,9 @@ spec:
 initrunner flow up flow.yaml
 ```
 
-**团队模式** 适用于需要多视角处理同一任务但不需要完整 Flow 的场景。在一个文件中定义多个角色，三种策略：顺序交接、并行执行或辩论（多轮论证加综合）。查看 [模式指南](docs/orchestration/patterns-guide.md) · [团队模式](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md)。
+智能路由先用关键词评分选择目标（零 API 调用），仅在关键词模糊时才用 LLM 仲裁。
+
+**团队模式** 适用于需要多视角处理同一任务、但不需要完整 Flow 的场景。在一个文件中定义多个角色，三种策略：顺序交接、并行执行或辩论（多轮论证加综合）。查看 [模式指南](docs/orchestration/patterns-guide.md) · [团队模式](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md)。
 
 ## MCP 与界面
 
@@ -328,11 +322,6 @@ initrunner/
 
 **OCI 注册表:** 将角色包推送到任何 OCI 兼容注册表: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`。查看 [OCI 分发](docs/core/oci-distribution.md)。
 
-**云部署:**
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/FROM_REPO?referralCode=...)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vladkesler/initrunner)
-
 ## 文档
 
 | 领域 | 关键文档 |
@@ -345,7 +334,7 @@ initrunner/
 | 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
-| 安全 | [Security Model](docs/security/security.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
+| 安全 | [Security Model](docs/security/security.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
 | 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## 示例
@@ -357,7 +346,7 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ## 升级
 
-运行 `initrunner doctor --role role.yaml` 检查角色文件的废弃字段、Schema 错误和规范版本问题。添加 `--fix` 自动修复。查看 [废弃说明](docs/operations/deprecations.md)。
+运行 `initrunner doctor --role role.yaml` 检查角色文件的废弃字段、Schema 错误和规范版本问题。添加 `--fix` 自动修复。用 `--flow flow.yaml` 验证整个 Flow 及其引用的角色。查看 [废弃说明](docs/operations/deprecations.md)。
 
 ## 社区
 
@@ -372,4 +361,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.4.12</sub></p>
+<p align="center"><sub>v2026.4.15</sub></p>
