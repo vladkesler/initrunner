@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Receipt, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Receipt, Gavel, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
 	import { getMcpHealthSummary } from '$lib/api/mcp';
 	import { onMount } from 'svelte';
+	import { approvals, subscribeApprovals } from '$lib/stores/approvals.svelte';
 
 	let { collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void } = $props();
 
@@ -21,7 +22,8 @@
 	const operateItems = [
 		{ href: '/mcp', label: 'MCP Hub', icon: Cable },
 		{ href: '/audit', label: 'Audit', icon: ScanEye },
-		{ href: '/cost', label: 'Cost', icon: Receipt }
+		{ href: '/cost', label: 'Cost', icon: Receipt },
+		{ href: '/approvals', label: 'Approvals', icon: Gavel }
 	];
 
 	let mcpUnhealthy = $state(0);
@@ -34,8 +36,14 @@
 		};
 		poll();
 		const id = setInterval(poll, 30_000);
-		return () => clearInterval(id);
+		const unsubApprovals = subscribeApprovals();
+		return () => {
+			clearInterval(id);
+			unsubApprovals();
+		};
 	});
+
+	const approvalCount = $derived(approvals.count);
 
 	const homeActive = $derived(isActive('/'));
 	const sysActive = $derived(isActive('/system'));
@@ -120,6 +128,21 @@
 				{/if}
 				{#if item.href === '/mcp' && mcpUnhealthy > 0}
 					<span class="status-dot absolute right-2 top-1/2 -translate-y-1/2" style="background: var(--color-fail)"></span>
+				{/if}
+				{#if item.href === '/approvals' && approvalCount > 0}
+					{#if collapsed}
+						<span
+							class="status-dot absolute right-2 top-1/2 -translate-y-1/2"
+							style="background: var(--color-accent-primary)"
+							aria-label="{approvalCount} pending approval{approvalCount === 1 ? '' : 's'}"
+						></span>
+					{:else}
+						<span
+							class="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm px-1.5 py-0.5 font-mono text-[10px] leading-none text-surface-0 tabular-nums"
+							style="background: var(--color-accent-primary)"
+							aria-label="{approvalCount} pending approval{approvalCount === 1 ? '' : 's'}"
+						>{approvalCount}</span>
+					{/if}
 				{/if}
 			</a>
 		{/each}

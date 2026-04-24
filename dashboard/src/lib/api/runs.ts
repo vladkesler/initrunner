@@ -1,5 +1,13 @@
 import { request } from './client';
-import type { CostUpdateData, RunRequest, RunResponse, SSEEvent, ToolEventData, UsageData } from './types';
+import type {
+	ApprovalRequiredData,
+	CostUpdateData,
+	RunRequest,
+	RunResponse,
+	SSEEvent,
+	ToolEventData,
+	UsageData
+} from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -19,6 +27,7 @@ export function streamRun(
 		onToolEvent?: (event: ToolEventData) => void;
 		onUsage?: (usage: UsageData) => void;
 		onCostUpdate?: (data: CostUpdateData) => void;
+		onApprovalRequired?: (data: ApprovalRequiredData) => void;
 	}
 ): AbortController {
 	const controller = new AbortController();
@@ -64,6 +73,12 @@ export function streamRun(
 						} else if (event.type === 'result') {
 							gotTerminal = true;
 							callbacks.onResult(event.data);
+						} else if (event.type === 'approval_required') {
+							// Terminal for the current stream — the run is paused until
+							// the caller resolves the pending approvals and starts a
+							// resume request.
+							gotTerminal = true;
+							callbacks.onApprovalRequired?.(event.data);
 						} else if (event.type === 'error') {
 							gotTerminal = true;
 							callbacks.onError(event.data);

@@ -81,6 +81,16 @@ Awaiting approval for 1 tool call(s). Resume: initrunner approve abc123 --all
 
 The `--no-audit` flag disables persistence; in that mode a paused daemon run reports that it cannot be resumed rather than silently losing state.
 
+### Dashboard
+
+The dashboard (`initrunner dashboard`) has two approval surfaces, both driven by the same `/api/approvals/*` router:
+
+**Inline in RunPanel.** When a run kicked off from the agent detail page pauses, the `approval_required` SSE event slots a card group into the run panel in place of the "thinking" state. Each pending call carries a 2px left state bar (unset = muted, approved = lime, denied = fail-red), a tool-templated argument preview (e.g. `rm -rf /tmp/cache` rather than JSON), and an Approve/Deny pair with `<kbd>` chip hints. Submit fires only when every card has a decision; re-pauses update the group in place.
+
+**Queue view (`/approvals`).** Reviewers see every paused run across the daemon, API, and other sessions, grouped by run_id. Single-call runs have inline Approve/Deny; multi-call runs open a right-side drawer that shows the originating prompt and per-call controls. A sidebar badge under Operate surfaces the pending count (steady lime; polled every 20s and bumped immediately by SSE). A `?` overlay anywhere in the dashboard shows the full keyboard grammar (`j`/`k` navigate, `A`/`D` decide, `⇧ A`/`⇧ D` bulk, `↵` submit, `Esc` close).
+
+**Absent-Kicker toasts.** A session-local registry of run_ids you kicked off diffs against each poll; if a run *you* started shows up in the pending list while you're on a different page, a toast links back to `/approvals/{run_id}`. Runs other operators started get only the badge — no noise for work you didn't trigger.
+
 ### OpenAI-compatible API
 
 `POST /v1/chat/completions` returns HTTP 200 with an extended body when the model pauses:
@@ -144,6 +154,7 @@ Resumed runs log with `trigger_type="resume"` and a synthetic prompt of the form
 
 ## Not yet supported
 
-- Dashboard UI for approve/deny (the approvals API is in place; the Svelte RunPanel needs the SSE event wired to a button pair).
 - Per-role or per-skill approval defaults (today approval is declared per tool entry).
 - Expiry sweeper for pending approvals older than N hours.
+- Attribution in "already resolved" toasts (the second operator sees a generic message; the resolver's id is in the audit trail but not surfaced on the UI race path).
+- Destructive-verb highlighting in arg previews (`rm`, `drop`, `delete` flagged in red). Deferred to avoid false-confidence from an inevitably incomplete lexicon.

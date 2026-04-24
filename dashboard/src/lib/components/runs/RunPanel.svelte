@@ -1,10 +1,22 @@
 <script lang="ts">
 	import { streamRun } from '$lib/api/runs';
-	import type { CostUpdateData, RunResponse, ThreadMessage, ToolEventData, UsageData } from '$lib/api/types';
+	import type {
+		ApprovalRequiredData,
+		CostUpdateData,
+		PendingCall,
+		RunResponse,
+		ThreadMessage,
+		ToolEventData,
+		UsageData
+	} from '$lib/api/types';
 	import ConversationThread from './ConversationThread.svelte';
 	import ToolActivityPanel from './ToolActivityPanel.svelte';
 	import TokenMeter from './TokenMeter.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
+	import ApprovalCardGroup from '$lib/components/approvals/ApprovalCardGroup.svelte';
+	import { approvals } from '$lib/stores/approvals.svelte';
+	import { startedRuns } from '$lib/stores/startedRuns.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 
 	let {
 		agentId,
@@ -29,6 +41,8 @@
 	let usage: UsageData | null = $state(null);
 	let lastResult: RunResponse | null = $state(null);
 	let costUpdate: CostUpdateData | null = $state(null);
+	let pendingRun: { runId: string; calls: PendingCall[] } | null = $state(null);
+	let approvalSubmitting = $state(false);
 
 	function handleRun() {
 		if (!prompt.trim() || running || blockedReason) return;
@@ -39,6 +53,7 @@
 		toolEvents = [];
 		lastResult = null;
 		costUpdate = null;
+		pendingRun = null;
 
 		messages = [
 			...messages,
@@ -73,6 +88,7 @@
 				},
 				onResult(r: RunResponse) {
 					if (requestVersion !== currentVersion) return;
+					startedRuns.add(r.run_id);
 					messages[assistantIdx] = {
 						...messages[assistantIdx],
 						status: 'complete',
@@ -86,6 +102,21 @@
 					controller = null;
 					onRunCompleted?.();
 				},
+				onApprovalRequired(data: ApprovalRequiredData) {
+					if (requestVersion !== currentVersion) return;
+					startedRuns.add(data.run_id);
+					approvals.bumpOnSseApproval(data.run_id, data.pending_approvals.length);
+					if (data.message_history) {
+						messageHistory = data.message_history;
+					}
+					pendingRun = { runId: data.run_id, calls: data.pending_approvals };
+					messages[assistantIdx] = {
+						...messages[assistantIdx],
+						status: 'interrupted'
+					};
+					running = false;
+					controller = null;
+				},
 				onError(err: string) {
 					if (requestVersion !== currentVersion) return;
 					messages[assistantIdx] = {
@@ -98,6 +129,40 @@
 				}
 			}
 		);
+	}
+
+	async function handleApprovalSubmit(decisions: Record<string, boolean>): Promise<void> {
+		if (!pendingRun) return;
+		approvalSubmitting = true;
+		try {
+			const resp = await approvals.submit(pendingRun.runId, decisions);
+			if (resp.status === 'paused') {
+				// Re-paused — swap the card group in place.
+				pendingRun = { runId: resp.run_id, calls: resp.pending_approvals };
+				if (resp.message_history) messageHistory = resp.message_history;
+				toast.info(`Run paused again (${resp.pending_approvals.length} new call(s))`);
+			} else {
+				if (resp.message_history) messageHistory = resp.message_history;
+				const lastIdx = messages.length - 1;
+				if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
+					messages[lastIdx] = {
+						...messages[lastIdx],
+						status: 'complete',
+						content: resp.output || messages[lastIdx].content
+					};
+				}
+				pendingRun = null;
+				toast.success('Resumed.');
+				onRunCompleted?.();
+			}
+		} catch (e) {
+			if (!(e && typeof e === 'object' && 'status' in e && e.status === 404)) {
+				toast.error(e instanceof Error ? e.message : String(e));
+			}
+			pendingRun = null;
+		} finally {
+			approvalSubmitting = false;
+		}
 	}
 
 	function handleStop() {
@@ -123,6 +188,7 @@
 		usage = null;
 		lastResult = null;
 		costUpdate = null;
+		pendingRun = null;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -139,6 +205,15 @@
 
 <div class="flex flex-1 flex-col gap-3">
 	<ConversationThread {messages} />
+
+	{#if pendingRun}
+		<ApprovalCardGroup
+			runId={pendingRun.runId}
+			calls={pendingRun.calls}
+			submitting={approvalSubmitting}
+			onSubmit={handleApprovalSubmit}
+		/>
+	{/if}
 
 	{#if showPanel}
 		<div class="h-48 shrink-0">

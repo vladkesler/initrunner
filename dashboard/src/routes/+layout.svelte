@@ -2,6 +2,7 @@
 	import '../app.css';
 	import Shell from '$lib/components/layout/Shell.svelte';
 	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
+	import ShortcutOverlay from '$lib/components/ShortcutOverlay.svelte';
 
 	let { children } = $props();
 </script>
@@ -10,3 +11,4 @@
 	{@render children()}
 </Shell>
 <ToastContainer />
+<ShortcutOverlay />
