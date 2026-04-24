@@ -127,10 +127,17 @@ def _prepare_run(
     }
     if extra_toolsets:
         run_kwargs["toolsets"] = extra_toolsets
+    metadata: dict[str, Any] = {
+        "initrunner.run_id": run_id,
+        "initrunner.agent_name": role.metadata.name,
+    }
+    if trigger_type:
+        metadata["initrunner.trigger_type"] = trigger_type
     # Tell InputGuardCapability to skip validation when the caller already
     # checked (e.g. the API server pre-flight) or when pre-flight passed.
     if skip_input_validation or blocked is None:
-        run_kwargs["metadata"] = {"input_validated": True}
+        metadata["input_validated"] = True
+    run_kwargs["metadata"] = metadata
 
     return run_id, usage_limits, run_kwargs, blocked
 

@@ -188,7 +188,7 @@ class TestExecuteRunAsync:
         assert "timed out" in (result.error or "")
 
 
-class TestAsyncSkipInputValidationMetadata:
+class TestAsyncRunMetadata:
     @pytest.mark.asyncio
     async def test_metadata_set_when_skip_true(self):
         role = _make_role()
@@ -203,8 +203,11 @@ class TestAsyncSkipInputValidationMetadata:
 
         await execute_run_async(agent, role, "Hello", skip_input_validation=True)
 
-        call_kwargs = agent.run.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
     @pytest.mark.asyncio
     async def test_metadata_set_when_preflight_passes(self):
@@ -221,8 +224,11 @@ class TestAsyncSkipInputValidationMetadata:
 
         await execute_run_async(agent, role, "Hello", skip_input_validation=False)
 
-        call_kwargs = agent.run.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
 
 class TestExecuteRunStreamAsync:

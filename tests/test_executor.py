@@ -555,8 +555,8 @@ class TestContentBlockedError:
         assert len(rows) == 1
 
 
-class TestSkipInputValidationMetadata:
-    """Tests that skip_input_validation=True passes metadata to the agent."""
+class TestRunMetadata:
+    """Metadata always carries InitRunner identifiers plus the input_validated flag."""
 
     def test_metadata_set_when_skip_true(self):
         agent = _make_mock_agent()
@@ -564,8 +564,11 @@ class TestSkipInputValidationMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=True)
 
-        call_kwargs = agent.run_sync.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
     def test_metadata_set_when_preflight_passes(self):
         """When skip_input_validation=False and validation passes, metadata is still set."""
@@ -574,5 +577,18 @@ class TestSkipInputValidationMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=False)
 
-        call_kwargs = agent.run_sync.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
+
+    def test_metadata_carries_trigger_type(self):
+        agent = _make_mock_agent()
+        role = _make_role()
+
+        execute_run(agent, role, "Hello", trigger_type="cron")
+
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["initrunner.trigger_type"] == "cron"

@@ -19,7 +19,7 @@ def build_todo_toolset(
 ) -> FunctionToolset:
     """Build the todo toolset operating on the unified ReflectionState."""
     state.todo.max_items = config.max_items
-    toolset = FunctionToolset()
+    toolset = FunctionToolset(sequential=True)
 
     def _after_mutation() -> str:
         state.check_auto_complete()

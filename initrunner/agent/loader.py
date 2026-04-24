@@ -337,6 +337,13 @@ def _create_agent(
     kwargs["end_strategy"] = execution.end_strategy
     if execution.tool_timeout_seconds is not None:
         kwargs["tool_timeout"] = execution.tool_timeout_seconds
+    if execution.max_concurrency is not None:
+        from pydantic_ai import ConcurrencyLimit
+
+        kwargs["max_concurrency"] = ConcurrencyLimit(
+            max_running=execution.max_concurrency.max_running,
+            max_queued=execution.max_concurrency.max_queued,
+        )
 
     from initrunner.agent.history_summarizer import build_history_processor
 

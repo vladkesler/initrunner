@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from initrunner.agent.loader import RoleLoadError, build_agent, load_role
-from initrunner.agent.schema.execution import ExecutionConfig
+from initrunner.agent.schema.execution import ConcurrencyConfig, ExecutionConfig
 from initrunner.agent.schema.role import AgentSpec
 
 
@@ -31,6 +31,31 @@ class TestExecutionConfigDefaults:
     def test_end_strategy_literal(self):
         with pytest.raises(ValueError):
             ExecutionConfig(end_strategy="neither")  # type: ignore[arg-type]
+
+    def test_max_concurrency_defaults_none(self):
+        assert ExecutionConfig().max_concurrency is None
+
+
+class TestConcurrencyConfig:
+    def test_max_running_required(self):
+        with pytest.raises(ValueError):
+            ConcurrencyConfig()  # type: ignore[call-arg]
+
+    def test_max_running_lower_bound(self):
+        with pytest.raises(ValueError):
+            ConcurrencyConfig(max_running=0)
+
+    def test_max_queued_lower_bound(self):
+        with pytest.raises(ValueError):
+            ConcurrencyConfig(max_running=1, max_queued=-1)
+
+    def test_round_trip(self):
+        cfg = ExecutionConfig.model_validate(
+            {"max_concurrency": {"max_running": 2, "max_queued": 4}}
+        )
+        assert cfg.max_concurrency is not None
+        assert cfg.max_concurrency.max_running == 2
+        assert cfg.max_concurrency.max_queued == 4
 
 
 class TestAgentSpecIntegration:
@@ -86,6 +111,33 @@ class TestExecutionFieldsWiredToAgent:
         assert agent.end_strategy == "exhaustive"
         assert agent._max_result_retries == 2
         assert agent._tool_timeout == 12.5
+
+    def test_max_concurrency_wired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        execution = (
+            textwrap.dedent("""\
+            execution:
+                max_concurrency:
+                  max_running: 2
+                  max_queued: 4
+        """)
+            .replace("\n", "\n          ")
+            .rstrip()
+        )
+        role = load_role(_write_role(tmp_path, execution))
+        agent = build_agent(role)
+        limiter = agent._concurrency_limiter
+        assert limiter is not None
+        assert getattr(limiter, "max_running") == 2  # noqa: B009
+        assert getattr(limiter, "_max_queued") == 4  # noqa: B009
+
+    def test_max_concurrency_absent_by_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        role = load_role(_write_role(tmp_path))
+        agent = build_agent(role)
+        assert agent._concurrency_limiter is None
 
     def test_yaml_schema_violation_surfaces(self, tmp_path: Path):
         bad = textwrap.dedent("""\

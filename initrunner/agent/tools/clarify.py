@@ -16,7 +16,7 @@ def build_clarify_toolset(
 ) -> FunctionToolset:
     """Build a clarify toolset that pauses execution for user input."""
     state = ClarifyState(max_clarifications=config.max_clarifications)
-    toolset = FunctionToolset()
+    toolset = FunctionToolset(sequential=True)
 
     @toolset.tool_plain
     def clarify(question: str) -> str:

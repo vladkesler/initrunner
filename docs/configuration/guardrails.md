@@ -61,6 +61,9 @@ spec:
     output_retries: 2         # attempts to coax the model into valid output
     end_strategy: exhaustive  # "early" (default) or "exhaustive"
     tool_timeout_seconds: 15  # per-tool wall-clock timeout
+    max_concurrency:          # agent-level backpressure (optional)
+      max_running: 4          # cap on concurrent runs of this agent
+      max_queued: 16          # extra runs held in a queue; null = unbounded wait
 ```
 
 | Field | Type | Default | Description |
@@ -69,6 +72,8 @@ spec:
 | `output_retries` | int (0-10) | *null* | Validator retries for structured output (inherits `retries` when null) |
 | `end_strategy` | `"early"` \| `"exhaustive"` | `"early"` | On final model response: `early` stops immediately; `exhaustive` keeps running registered tool calls |
 | `tool_timeout_seconds` | float | *null* | Per-tool timeout. Fires `UsageLimitExceeded`; distinct from `guardrails.timeout_seconds` which bounds the whole run |
+| `max_concurrency.max_running` | int ≥ 1 | *null* | Max concurrent runs of this agent; translates to `pydantic_ai.ConcurrencyLimit` |
+| `max_concurrency.max_queued` | int ≥ 0 | *null* | Max runs queued beyond `max_running` before new runs are rejected; null = no cap |
 
 These fields are also what the `--agent-spec` importer maps `retries` / `output_retries` / `end_strategy` / `tool_timeout` into. See [Agent Spec Import](../getting-started/agent-spec-import.md).
 
