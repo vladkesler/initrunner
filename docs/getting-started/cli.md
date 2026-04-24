@@ -112,7 +112,7 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--autopilot` | Daemon mode with all triggers autonomous |
 | `--serve` | Serve agent as an OpenAI-compatible API |
 | `--bot TEXT` | Launch as a bot (`telegram` or `discord`) |
-| `--var TEXT` | Variable in `key=value` format (repeatable). Used with Pipeline kind. |
+| `--var TEXT` | Template variable in `key=value` format (repeatable) for `{{var}}` placeholders in `spec.role`. Requires `spec.deps_schema`. See [Agent Spec Import](agent-spec-import.md). |
 | `--host TEXT` | Host to bind to (default: `127.0.0.1`). Used with `--serve`. |
 | `--port INT` | Port to listen on (default: `8000`). Used with `--serve`. |
 | `--api-key TEXT` | API key for Bearer token authentication. Used with `--serve`. |
@@ -361,6 +361,8 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--list-templates` | Show available templates and exit |
 | `--blank` | Start from a minimal blank template |
 | `--langchain PATH` | Import from a LangChain Python file (see [LangChain Import](langchain-import.md)) |
+| `--pydantic-ai PATH` | Import from a PydanticAI Python file (see [PydanticAI Import](pydanticai-import.md)) |
+| `--agent-spec PATH` | Import from a PydanticAI Agent Spec YAML/JSON file (see [Agent Spec Import](agent-spec-import.md)) |
 | `--provider TEXT` | Model provider (resolved from `INITRUNNER_MODEL` env, `run.yaml`, or API key detection if omitted) |
 | `--model TEXT` | Model name (resolved from `run.yaml` or provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
@@ -418,6 +420,23 @@ initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
 # CI/scripted: never prompt, just write the file
 initrunner new "a regex explainer" --no-run
 ```
+
+## Export options
+
+### `export agent-spec`
+
+Convert a role.yaml to a PydanticAI Agent Spec YAML (plus a companion JSON Schema for editor autocomplete).
+
+```bash
+initrunner export agent-spec ./role.yaml [--output OUT] [--no-schema]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-o, --output PATH` | Output path (default: `<name>.agent-spec.yaml` next to the role) |
+| `--with-schema / --no-schema` | Write a companion `.schema.json` (default: on) |
+
+Only the Agent-Spec overlap is exported. Triggers, ingest, memory, skills, sinks, autonomy, reasoning, guardrails, security, resources, and observability are dropped; the CLI prints a warning table listing what was left behind. See [Agent Spec Import](agent-spec-import.md) for the full field map.
 
 ## Setup options
 

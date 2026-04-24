@@ -594,6 +594,22 @@ class BuilderSession:
         self.yaml_text = path.read_text(encoding="utf-8")
         return self._make_turn_result(f"Loaded from {path}. Refine as needed.")
 
+    def seed_from_agent_spec(self, path: Path) -> TurnResult:
+        """Seed from a PydanticAI Agent Spec YAML/JSON file (deterministic)."""
+        import yaml
+
+        from initrunner.services.agent_spec_import import load_agent_spec
+
+        self.seed_source = f"agent-spec:{path}"
+        role_dict = load_agent_spec(path)
+        warnings = role_dict.pop("_import_warnings", [])
+        self.yaml_text = yaml.safe_dump(role_dict, sort_keys=False)
+        self.import_warnings = list(warnings)
+        explanation = f"Imported PydanticAI Agent Spec from {path}."
+        if warnings:
+            explanation += "\nSome fields were dropped (see warnings)."
+        return self._make_turn_result(explanation)
+
     def seed_from_example(self, name: str) -> TurnResult:
         """Seed from a bundled example."""
         from initrunner.examples import ExampleNotFoundError, get_example

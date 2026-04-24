@@ -50,6 +50,28 @@ spec:
 | `retry_policy` | object | `{max_attempts: 1}` | Daemon-level retry policy (see below) |
 | `circuit_breaker` | object | *null* | Circuit breaker config (see below) |
 
+## Execution semantics (`spec.execution`)
+
+The `execution` block mirrors PydanticAI's agent-level execution knobs and is distinct from the budgeting fields above -- use it for retry/termination semantics, not for cost control.
+
+```yaml
+spec:
+  execution:
+    retries: 3                # per-tool retry attempts on tool failure
+    output_retries: 2         # attempts to coax the model into valid output
+    end_strategy: exhaustive  # "early" (default) or "exhaustive"
+    tool_timeout_seconds: 15  # per-tool wall-clock timeout
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retries` | int (0-10) | `1` | Attempts per tool call on failure |
+| `output_retries` | int (0-10) | *null* | Validator retries for structured output (inherits `retries` when null) |
+| `end_strategy` | `"early"` \| `"exhaustive"` | `"early"` | On final model response: `early` stops immediately; `exhaustive` keeps running registered tool calls |
+| `tool_timeout_seconds` | float | *null* | Per-tool timeout. Fires `UsageLimitExceeded`; distinct from `guardrails.timeout_seconds` which bounds the whole run |
+
+These fields are also what the `--agent-spec` importer maps `retries` / `output_retries` / `end_strategy` / `tool_timeout` into. See [Agent Spec Import](../getting-started/agent-spec-import.md).
+
 ## Daemon resilience
 
 When a trigger fires and the agent run fails with a transient provider error (rate limit, 5xx, connection failure), the daemon can retry the entire run with exponential backoff. A circuit breaker tracks failures across trigger fires and stops dispatching when the provider is unhealthy.

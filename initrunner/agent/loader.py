@@ -49,7 +49,35 @@ def load_role(path: Path) -> RoleDefinition:
     except (ValueError, Exception) as e:
         raise RoleLoadError(f"Validation failed for {path}:\n{e}") from e
     validate_capability_tool_conflicts(role)
+    _validate_templating(role)
     return role
+
+
+def _validate_templating(role: RoleDefinition) -> None:
+    """Enforce that ``{{var}}`` in the role prompt matches ``deps_schema``.
+
+    Catches the mismatch at load time so users don't get a half-rendered
+    system prompt at run time.  No-op when the role has neither templates nor
+    a deps_schema.
+    """
+    from initrunner.agent.templating import TemplatingError, has_templates
+
+    prompt = role.spec.role or ""
+    deps_schema = role.spec.deps_schema
+
+    if deps_schema is None and not has_templates(prompt):
+        return
+    if deps_schema is None:
+        raise RoleLoadError(
+            "spec.role uses {{variable}} placeholders but spec.deps_schema is not set. "
+            "Declare a JSON Schema for the variables or remove the placeholders."
+        )
+    from initrunner.agent.templating import validate_schema_and_template
+
+    try:
+        validate_schema_and_template(prompt, deps_schema)
+    except TemplatingError as exc:
+        raise RoleLoadError(str(exc)) from exc
 
 
 # Capability names that conflict with InitRunner tool types.
@@ -302,6 +330,14 @@ def _create_agent(
     if capabilities:
         kwargs["capabilities"] = capabilities
 
+    execution = role.spec.execution
+    kwargs["retries"] = execution.retries
+    if execution.output_retries is not None:
+        kwargs["output_retries"] = execution.output_retries
+    kwargs["end_strategy"] = execution.end_strategy
+    if execution.tool_timeout_seconds is not None:
+        kwargs["tool_timeout"] = execution.tool_timeout_seconds
+
     from initrunner.agent.history_summarizer import build_history_processor
 
     kwargs["history_processors"] = [build_history_processor(role.spec.model)]  # type: ignore[arg-type]
@@ -459,6 +495,18 @@ def build_agent(
         role, role_dir, extra_skill_dirs
     )
 
+    # When the role prompt uses {{var}} templates, defer its substitution to a
+    # dynamic system prompt hook so the raw placeholders never reach the model.
+    # We strip the role prompt from ``instructions`` here (leaving skill prompts
+    # + auto-tool addendum intact) and re-inject it below via @agent.system_prompt.
+    from initrunner.agent.templating import has_templates as _has_templates
+
+    templating_active = role.spec.deps_schema is not None and _has_templates(role.spec.role)
+    if templating_active:
+        prefix = role.spec.role
+        if instructions.startswith(prefix):
+            instructions = instructions[len(prefix) :].lstrip()
+
     if output_type is None:
         from initrunner.agent.output import resolve_output_type
 
@@ -498,6 +546,14 @@ def build_agent(
         prepare_tools=auto.prepare_tools,
         capabilities=capabilities,
     )
+
+    if templating_active:
+        from initrunner.agent.templating import render as _render_template
+
+        @agent.system_prompt
+        def _render_role_prompt() -> str:
+            values = getattr(agent, "_template_values", {}) or {}
+            return _render_template(role.spec.role, role.spec.deps_schema or {}, values)
 
     # Register dynamic system prompt for procedural memory injection.
     # The closure reads ``_memory_store`` from the agent so the already-open

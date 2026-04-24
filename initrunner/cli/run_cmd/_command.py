@@ -212,6 +212,13 @@ def run(
         bool,
         typer.Option("--list", help="List available starter agents"),
     ] = False,
+    template_vars: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--var",
+            help="Template variable (KEY=VALUE, repeatable) for {{var}} placeholders in spec.role",
+        ),
+    ] = None,
 ) -> None:
     """Run an agent from a YAML file, starter name, or ephemeral mode.
 
@@ -426,6 +433,15 @@ def run(
         )
         return
 
+    # --- Parse --var KEY=VALUE pairs into a dict ---
+    template_values: dict[str, str] = {}
+    for raw in template_vars or []:
+        if "=" not in raw:
+            console.print(f"[red]Error:[/red] --var must be KEY=VALUE, got {raw!r}")
+            raise typer.Exit(1)
+        key, _, value = raw.partition("=")
+        template_values[key.strip()] = value
+
     # --- Standard agent execution ---
     _run_agent(
         role_file,
@@ -444,4 +460,5 @@ def run(
         output_format=output_format,
         no_stream=no_stream,
         model=effective_model,
+        template_values=template_values or None,
     )

@@ -10,6 +10,7 @@ from initrunner.cli._helpers import console
 from initrunner.cli.a2a_cmd import app as a2a_app
 from initrunner.cli.audit_cmd import app as audit_app
 from initrunner.cli.examples_cmd import app as examples_app
+from initrunner.cli.export_cmd import app as export_app
 from initrunner.cli.flow_cmd import app as flow_app
 from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
@@ -173,6 +174,7 @@ app.command(rich_help_panel="Getting Started")(new)
 app.command(rich_help_panel="Getting Started")(setup)
 app.command(rich_help_panel="Getting Started")(doctor)
 app.add_typer(examples_app, name="examples", rich_help_panel="Getting Started")
+app.add_typer(export_app, name="export", rich_help_panel="Getting Started")
 
 # --- Run & Test ---
 app.command(rich_help_panel="Run & Test")(test)

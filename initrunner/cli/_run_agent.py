@@ -153,6 +153,7 @@ def _run_agent(
     output_format: str,
     no_stream: bool,
     model: str | None,
+    template_values: dict[str, str] | None = None,
 ) -> None:
     """Standard agent execution: single-shot, REPL, or autonomous."""
     if autonomous and not prompt:
@@ -203,6 +204,13 @@ def _run_agent(
         model_override=resolved_model,
         dry_run=dry_run,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        if template_values is not None:
+            if role.spec.deps_schema is None:
+                console.print(
+                    "[red]Error:[/red] --var supplied but spec.deps_schema is not declared."
+                )
+                raise typer.Exit(1)
+            agent._template_values = template_values
         if not prompt and not autonomous and role.spec.triggers:
             console.print(
                 "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"

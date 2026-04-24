@@ -89,6 +89,7 @@ Detailed docs live in `docs/`. Key references:
 | CLI commands & usage | `docs/getting-started/cli.md` |
 | Choosing features (goal-to-config) | `docs/getting-started/choosing-features.md` |
 | LangChain agent import | `docs/getting-started/langchain-import.md` |
+| PydanticAI Agent Spec import/export | `docs/getting-started/agent-spec-import.md` |
 | Creating new tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Security model | `docs/security/security.md` |
