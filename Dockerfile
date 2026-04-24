@@ -9,6 +9,13 @@ ARG EXTRAS="all"
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Build toolchain for Python C extensions that lack prebuilt wheels for every
+# arch/interpreter combination (e.g. fastavro on linux/arm64 cp313, pulled in
+# transitively via pydantic-ai-slim[cohere]).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libc6-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
 
 # Copy dependency metadata first for layer caching

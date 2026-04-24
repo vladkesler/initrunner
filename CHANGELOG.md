@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [2026.4.18] - 2026-04-24
+
+### Fixed
+- **Docker image builds on linux/arm64 again.** The builder stage now installs `gcc` and `libc6-dev` so Python extensions that lack a prebuilt aarch64 wheel (notably `fastavro`, pulled in transitively via `pydantic-ai-slim[cohere]` → `cohere`) compile from sdist instead of failing with `gcc: No such file or directory`. No code change; PyPI wheel is byte-identical to 2026.4.17.
+
 ## [2026.4.17] - 2026-04-24
 
 ### Added
