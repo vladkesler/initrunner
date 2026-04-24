@@ -216,6 +216,48 @@ class TestModelConfig:
         assert mc.is_reasoning_model() is False
 
 
+class TestModelConfigFallback:
+    def test_default_fallback_empty(self):
+        mc = ModelConfig(provider="openai", name="gpt-4o")
+        assert mc.fallback == []
+
+    def test_fallback_list_of_provider_model_strings(self):
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["openai:gpt-4o-mini", "google:gemini-2.5-flash"],
+        )
+        assert mc.fallback == ["openai:gpt-4o-mini", "google:gemini-2.5-flash"]
+
+    def test_fallback_rejects_ollama(self):
+        with pytest.raises(ValidationError, match="Ollama"):
+            ModelConfig(
+                provider="anthropic",
+                name="claude-sonnet-4-5-20250929",
+                fallback=["ollama:llama3.2"],
+            )
+
+    def test_fallback_rejects_unresolvable_entry(self):
+        with pytest.raises(ValidationError, match="Could not resolve fallback model"):
+            ModelConfig(
+                provider="anthropic",
+                name="claude-sonnet-4-5-20250929",
+                fallback=["not-an-alias-and-no-colon"],
+            )
+
+    def test_fallback_resolves_alias(self, monkeypatch, tmp_path):
+        models_yaml = tmp_path / "models.yaml"
+        models_yaml.write_text("aliases:\n  speedy: openai:gpt-4o-mini\n")
+        monkeypatch.setattr("initrunner.config.get_models_config_path", lambda: models_yaml)
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["speedy"],
+        )
+        # Alias is preserved verbatim in the list; resolution happens at build time.
+        assert mc.fallback == ["speedy"]
+
+
 class TestGuardrails:
     def test_defaults(self):
         g = Guardrails()

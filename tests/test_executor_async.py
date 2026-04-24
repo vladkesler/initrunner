@@ -101,6 +101,27 @@ class TestRetryModelCallAsync:
         # on_retry should NOT be called on the final (3rd) attempt
         assert len(retries) == 2
 
+    @pytest.mark.asyncio
+    async def test_fallback_exception_group_is_not_retried(self):
+        """FallbackModel exhausted every candidate; the outer loop must not retry."""
+        from pydantic_ai.exceptions import ModelHTTPError
+        from pydantic_ai.models.fallback import FallbackExceptionGroup
+
+        retries = []
+        call_count = 0
+
+        async def _fn():
+            nonlocal call_count
+            call_count += 1
+            inner = ModelHTTPError(status_code=500, model_name="openai:x", body=b"err")
+            raise FallbackExceptionGroup("all failed", [inner])
+
+        with pytest.raises(FallbackExceptionGroup):
+            await _retry_model_call_async(_fn, on_retry=lambda: retries.append(1))
+
+        assert call_count == 1
+        assert retries == []
+
 
 class TestExecuteRunAsync:
     @pytest.mark.asyncio

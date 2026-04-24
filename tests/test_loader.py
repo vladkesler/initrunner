@@ -221,6 +221,125 @@ class TestBuildModel:
             assert result is not None
 
 
+class TestBuildModelFallback:
+    def test_empty_fallback_returns_bare_primary(self, monkeypatch):
+        """With no fallback, _build_model returns the same thing _build_single_model does."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        mc = ModelConfig(provider="openai", name="gpt-5-mini")
+        assert _build_model(mc) == "openai-responses:gpt-5-mini"
+
+    def test_fallback_returns_fallback_model(self, monkeypatch):
+        from pydantic_ai.models.fallback import FallbackModel
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["openai:gpt-4o-mini"],
+        )
+        result = _build_model(mc)
+        assert isinstance(result, FallbackModel)
+
+    def test_fallback_chain_walks_in_declared_order(self, monkeypatch):
+        """The primary is first, fallbacks follow in the order declared."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
+        monkeypatch.setenv("GROQ_API_KEY", "test-groq")
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["openai:gpt-4o-mini", "groq:llama-3.1-70b"],
+        )
+        fm = _build_model(mc)
+        model_names = [m.model_name for m in fm.models]
+        assert model_names[0] == "claude-sonnet-4-5-20250929"
+        assert "gpt-4o-mini" in model_names[1]
+        assert "llama-3.1-70b" in model_names[2]
+
+    def test_fallback_resolves_alias_at_build_time(self, monkeypatch, tmp_path):
+        from pydantic_ai.models.fallback import FallbackModel
+
+        models_yaml = tmp_path / "models.yaml"
+        models_yaml.write_text("aliases:\n  speedy: openai:gpt-4o-mini\n")
+        monkeypatch.setattr("initrunner.config.get_models_config_path", lambda: models_yaml)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["speedy"],
+        )
+        result = _build_model(mc)
+        assert isinstance(result, FallbackModel)
+
+    def test_fallback_missing_api_key_raises(self, monkeypatch):
+        """FallbackModel builds clients eagerly; a missing key on a fallback must surface."""
+        from initrunner.agent.loader import MissingApiKeyError
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        # Clear any cached resolver so we actually see the env state.
+        from initrunner.credentials import reset_resolver
+
+        reset_resolver()
+        mc = ModelConfig(
+            provider="anthropic",
+            name="claude-sonnet-4-5-20250929",
+            fallback=["openai:gpt-4o-mini"],
+        )
+        with pytest.raises(MissingApiKeyError, match="OPENAI_API_KEY"):
+            _build_model(mc)
+
+
+class TestOverridePreservesFallback:
+    def test_model_override_preserves_fallback_list(self):
+        from initrunner.agent.loader import _apply_model_override
+        from initrunner.agent.schema.base import ApiVersion, Kind, PartialModelConfig, RoleMetadata
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+
+        role = RoleDefinition(
+            apiVersion=ApiVersion.V1,
+            kind=Kind.AGENT,
+            metadata=RoleMetadata(name="test-role"),
+            spec=AgentSpec(
+                role="r",
+                model=PartialModelConfig(
+                    provider="anthropic",
+                    name="claude-sonnet-4-5-20250929",
+                    fallback=["openai:gpt-4o-mini"],
+                ),
+            ),
+        )
+        overridden = _apply_model_override(role, "google", "gemini-2.5-flash")
+        assert overridden.spec.model is not None
+        assert overridden.spec.model.fallback == ["openai:gpt-4o-mini"]
+
+    def test_auto_detect_preserves_fallback_from_partial(self, monkeypatch):
+        from initrunner.agent.loader import resolve_role_model
+        from initrunner.agent.schema.base import ApiVersion, Kind, PartialModelConfig, RoleMetadata
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        role = RoleDefinition(
+            apiVersion=ApiVersion.V1,
+            kind=Kind.AGENT,
+            metadata=RoleMetadata(name="test-role"),
+            spec=AgentSpec(
+                role="r",
+                # Partial: no provider/name, only tuning + fallback.
+                model=PartialModelConfig(
+                    temperature=0.5,
+                    fallback=["openai:gpt-4o-mini"],
+                ),
+            ),
+        )
+        resolved = resolve_role_model(role)
+        assert resolved.spec.model is not None
+        assert resolved.spec.model.fallback == ["openai:gpt-4o-mini"]
+        assert resolved.spec.model.temperature == 0.5
+
+
 class TestBuildAgent:
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")

@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
+from pydantic_ai.models.fallback import FallbackExceptionGroup
 
 from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
 from initrunner.agent.schema.role import RoleDefinition
@@ -59,6 +60,32 @@ def _validate_input_or_fail(
     return None
 
 
+def _classify_single_exception(exc: BaseException) -> ErrorCategory:
+    """Map one exception to an ErrorCategory using the same rules as _handle_run_error."""
+    if isinstance(exc, ModelHTTPError):
+        if exc.status_code == 429:
+            return ErrorCategory.RATE_LIMIT
+        if exc.status_code in {401, 403}:
+            return ErrorCategory.AUTH
+        if exc.status_code in {500, 502, 503, 504}:
+            return ErrorCategory.SERVER_ERROR
+        return ErrorCategory.UNKNOWN
+    if isinstance(exc, UsageLimitExceeded):
+        return ErrorCategory.USAGE_LIMIT
+    if isinstance(exc, TimeoutError):
+        return ErrorCategory.TIMEOUT
+    if isinstance(exc, (ConnectionError, OSError)):
+        return ErrorCategory.CONNECTION
+    return ErrorCategory.UNKNOWN
+
+
+def _format_inner_failure(exc: BaseException) -> str:
+    """Short, operator-facing summary of one provider's failure."""
+    if isinstance(exc, ModelHTTPError):
+        return f"{exc.model_name} HTTP {exc.status_code}"
+    return f"{type(exc).__name__}: {exc}"
+
+
 def _handle_run_error(
     result: RunResult,
     exc: Exception,
@@ -73,16 +100,19 @@ def _handle_run_error(
     string is formatted using the timeout value.
     """
     result.success = False
-    if isinstance(exc, ModelHTTPError):
+    if isinstance(exc, FallbackExceptionGroup):
+        # Every candidate in the FallbackModel chain failed. Classify by the
+        # last inner exception -- that is the one that actually terminated
+        # the chain -- and list every failure in the error string so the
+        # operator can see the full picture.
+        inner = list(exc.exceptions)
+        last = inner[-1] if inner else exc
+        result.error_category = _classify_single_exception(last)
+        summaries = ", ".join(_format_inner_failure(e) for e in inner)
+        result.error = f"All {len(inner)} fallback models failed: [{summaries}]"
+    elif isinstance(exc, ModelHTTPError):
         result.error = f"Model API error: {exc}"
-        if exc.status_code == 429:
-            result.error_category = ErrorCategory.RATE_LIMIT
-        elif exc.status_code in {401, 403}:
-            result.error_category = ErrorCategory.AUTH
-        elif exc.status_code in {500, 502, 503, 504}:
-            result.error_category = ErrorCategory.SERVER_ERROR
-        else:
-            result.error_category = ErrorCategory.UNKNOWN
+        result.error_category = _classify_single_exception(exc)
     elif isinstance(exc, UsageLimitExceeded):
         result.error = f"Usage limit exceeded: {exc}"
         result.error_category = ErrorCategory.USAGE_LIMIT

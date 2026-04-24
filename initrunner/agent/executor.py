@@ -25,6 +25,7 @@ from typing import Any
 from pydantic_ai import Agent, UsageLimits
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
+from pydantic_ai.models.fallback import FallbackExceptionGroup
 
 from initrunner._ids import generate_id
 from initrunner.agent.capabilities.content_guard import ContentBlockedError
@@ -194,6 +195,7 @@ def _execute_orchestrated(
                 ConnectionError,
                 TimeoutError,
                 OSError,
+                FallbackExceptionGroup,
             ) as e:
                 on_error(result, e)
 
@@ -265,6 +267,7 @@ async def _execute_orchestrated_async(
                 ConnectionError,
                 TimeoutError,
                 OSError,
+                FallbackExceptionGroup,
             ) as e:
                 on_error(result, e)
 

@@ -75,8 +75,14 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
             )
 
 
-def _build_model(model_config: ModelConfig):
-    """Build a PydanticAI model -- string for standard providers, OpenAI model for custom."""
+def _build_single_model(model_config: ModelConfig):
+    """Build one PydanticAI model -- string for standard providers, OpenAIChatModel for custom.
+
+    This is the single construction point for both the primary model and any
+    FallbackModel entries.  API keys are resolved and injected into
+    ``os.environ`` here, so every Model-like returned by this function is
+    immediately usable.
+    """
     from initrunner.credentials import get_resolver
 
     resolver = get_resolver()
@@ -146,6 +152,34 @@ def _build_model(model_config: ModelConfig):
     return OpenAIChatModel(model_config.name, provider=provider)
 
 
+def _build_model(model_config: ModelConfig):
+    """Build the agent model, wrapping with FallbackModel when fallbacks are declared.
+
+    When ``model_config.fallback`` is empty, returns the primary model
+    directly.  When non-empty, returns a ``FallbackModel`` that walks the
+    primary first, then each fallback in declaration order on any
+    ``ModelAPIError``.  Each fallback entry is a ``provider:model`` string
+    (validated at schema time); it is built through
+    ``_build_single_model`` so vault-sourced API keys are injected into
+    ``os.environ`` before ``FallbackModel.__init__`` constructs the
+    per-provider clients.
+    """
+    primary = _build_single_model(model_config)
+    if not model_config.fallback:
+        return primary
+
+    from initrunner.agent.schema.base import _split_provider_and_name
+
+    fallback_models = []
+    for entry in model_config.fallback:
+        prov, name = _split_provider_and_name(entry)
+        fallback_models.append(_build_single_model(ModelConfig(provider=prov, name=name)))
+
+    from pydantic_ai.models.fallback import FallbackModel
+
+    return FallbackModel(primary, *fallback_models)
+
+
 def _inject_local_fallbacks(caps: list) -> None:
     """Wire InitRunner's functions as local fallbacks for capabilities that lack them.
 
@@ -165,11 +199,17 @@ def _inject_local_fallbacks(caps: list) -> None:
 
 
 def _validate_provider(role: RoleDefinition) -> None:
-    """Check the provider SDK is installed, raising RoleLoadError if not."""
-    try:
-        require_provider(role.spec.model.provider)  # type: ignore[union-attr]
-    except RuntimeError as e:
-        raise RoleLoadError(str(e)) from None
+    """Check the provider SDK is installed for the primary model and every fallback."""
+    from initrunner.agent.schema.base import _split_provider_and_name
+
+    model = role.spec.model
+    providers = [model.provider]  # type: ignore[union-attr]
+    providers.extend(_split_provider_and_name(entry)[0] for entry in model.fallback)  # type: ignore[union-attr]
+    for prov in providers:
+        try:
+            require_provider(prov)
+        except RuntimeError as e:
+            raise RoleLoadError(str(e)) from None
 
 
 def _validate_reasoning(role: RoleDefinition) -> None:
@@ -502,8 +542,9 @@ def _set_model(role: RoleDefinition, model: ModelConfig) -> RoleDefinition:
 def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> RoleDefinition:
     """Return a copy of *role* with its model config replaced.
 
-    Preserves tuning fields (temperature, max_tokens, context_window) from the
-    existing model config.  Clears base_url/api_key_env when provider changes.
+    Preserves tuning fields (temperature, max_tokens, context_window) and the
+    fallback list from the existing model config.  Clears base_url/api_key_env
+    when provider changes.
     """
     partial = role.spec.model
     base: dict[str, Any] = {}
@@ -512,6 +553,7 @@ def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> Rol
             "temperature": partial.temperature,
             "max_tokens": partial.max_tokens,
             "context_window": partial.context_window,
+            "fallback": partial.fallback,
         }
         if provider == partial.provider:
             base["base_url"] = partial.base_url
@@ -633,6 +675,7 @@ def resolve_role_model(
         temperature=base.temperature,
         max_tokens=base.max_tokens,
         context_window=base.context_window,
+        fallback=base.fallback,
     )
     return _set_model(role, resolved)
 

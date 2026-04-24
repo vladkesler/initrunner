@@ -1,0 +1,21 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: fallback-demo
+  description: Demonstrates automatic provider failover via model.fallback
+  tags: [example, fallback, reliability]
+spec:
+  role: |
+    You are a helpful assistant. Answer questions concisely.
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    temperature: 0.2
+    # If Anthropic is unreachable (rate-limited, 5xx, network error),
+    # pydantic-ai's FallbackModel walks this list in order.
+    # All API keys must be set; clients are constructed eagerly at load time.
+    fallback:
+      - openai:gpt-4o-mini
+  guardrails:
+    max_tokens_per_run: 5000
+    timeout_seconds: 60
