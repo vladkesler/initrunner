@@ -134,9 +134,7 @@ def _persist_paused(
     try:
         from initrunner.services.execution import persist_paused_run
 
-        persist_paused_run(
-            audit_logger, result, role, new_messages, role_path=role_path
-        )
+        persist_paused_run(audit_logger, result, role, new_messages, role_path=role_path)
     except Exception:
         _logger.exception("Failed to persist paused run %s", result.run_id)
 
@@ -228,29 +226,6 @@ async def stream_run_sse(
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
         return
 
-    # Structured output doesn't support streaming -- run non-streaming
-    if role.spec.output.type != "text":
-        from initrunner.services.execution import execute_run_sync
-
-        try:
-            result, new_messages = await asyncio.to_thread(
-                execute_run_sync,
-                agent,
-                role,
-                prompt,
-                audit_logger=audit_logger,
-                message_history=message_history,
-            )
-            if result.status == "paused":
-                _persist_paused(result, role, new_messages, audit_logger, role_path)
-            payload = _build_result_payload(result, new_messages, role)
-            event_type = "approval_required" if result.status == "paused" else "result"
-            yield f"data: {json.dumps({'type': event_type, 'data': payload})}\n\n"
-        except Exception as exc:
-            _logger.exception("Error during non-streaming structured-output run")
-            yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
-        return
-
     # Emit initial usage event with budget + model info
     guardrails = role.spec.guardrails
     model_spec = role.spec.model
@@ -310,6 +285,22 @@ async def stream_run_sse(
             except RuntimeError:
                 pass
 
+    def on_partial(partial: object) -> None:
+        """Forward a progressively-validated structured-output partial."""
+        from pydantic import BaseModel
+
+        if isinstance(partial, BaseModel):
+            data = partial.model_dump(exclude_unset=False)
+        elif isinstance(partial, (dict, list)):
+            data = partial
+        else:
+            data = {"value": str(partial)}
+        evt = json.dumps({"type": "partial_output", "data": data})
+        try:
+            loop.call_soon_threadsafe(token_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
     def run_stream():
         from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
 
@@ -339,6 +330,7 @@ async def stream_run_sse(
                 prompt,
                 audit_logger=audit_logger,
                 on_token=on_token,
+                on_partial=on_partial,
                 message_history=message_history,
             )
         finally:

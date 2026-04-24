@@ -204,11 +204,21 @@ def _extract_tool_call_names(messages: list) -> list[str]:
     ]
 
 
-def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
-    """Serialize agent output, validate, extract usage. Returns new_messages."""
+def _finalize_run_output(
+    raw_output: Any,
+    usage: Any,
+    new_messages: list,
+    result: RunResult,
+    role: RoleDefinition,
+) -> list:
+    """Finalize a run: serialize output, validate, extract usage, extract tool names.
+
+    Shared between streaming (sync + async) and non-streaming paths. Accepts
+    unpacked components so the streaming path can source them from a
+    ``StreamedRunResult`` / final ``AgentRunResultEvent``.
+    """
     from pydantic_ai import DeferredToolRequests
 
-    raw_output = agent_result.output
     if isinstance(raw_output, DeferredToolRequests):
         # Human-in-the-loop pause: the model asked to call tools whose
         # ``approval: required`` config flags them unapproved. Capture each
@@ -224,32 +234,33 @@ def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefini
             for call in raw_output.approvals
         ]
         result.output = ""
-        usage = agent_result.usage()
+    else:
+        if isinstance(raw_output, BaseModel):
+            result.output = raw_output.model_dump_json()
+        elif isinstance(raw_output, (dict, list)):
+            result.output = json.dumps(raw_output)
+        else:
+            result.output = str(raw_output)
+        _apply_output_validation(result, role)
+
+    if usage is not None:
         result.tokens_in = usage.input_tokens or 0
         result.tokens_out = usage.output_tokens or 0
         result.total_tokens = usage.total_tokens or 0
         result.tool_calls = usage.tool_calls or 0
-        new_messages = agent_result.all_messages()
-        result.tool_call_names = _extract_tool_call_names(new_messages)
-        return new_messages
-
-    if isinstance(raw_output, BaseModel):
-        result.output = raw_output.model_dump_json()
-    elif isinstance(raw_output, (dict, list)):
-        result.output = json.dumps(raw_output)
-    else:
-        result.output = str(raw_output)
-
-    _apply_output_validation(result, role)
-
-    usage = agent_result.usage()
-    result.tokens_in = usage.input_tokens or 0
-    result.tokens_out = usage.output_tokens or 0
-    result.total_tokens = usage.total_tokens or 0
-    result.tool_calls = usage.tool_calls or 0
-    new_messages = agent_result.all_messages()
     result.tool_call_names = _extract_tool_call_names(new_messages)
     return new_messages
+
+
+def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
+    """Serialize agent output, validate, extract usage. Returns new_messages."""
+    return _finalize_run_output(
+        agent_result.output,
+        agent_result.usage(),
+        agent_result.all_messages(),
+        result,
+        role,
+    )
 
 
 def _coerce_args_to_dict(args: Any) -> dict[str, Any]:
@@ -268,25 +279,6 @@ def _coerce_args_to_dict(args: Any) -> dict[str, Any]:
             return {"_raw": args}
         return parsed if isinstance(parsed, dict) else {"_value": parsed}
     return {"_value": args}
-
-
-def _process_stream_output(
-    output_parts: list[str],
-    usage: Any,
-    new_messages: list,
-    result: RunResult,
-    role: RoleDefinition,
-) -> None:
-    """Finalize stream output: join parts, validate, extract usage."""
-    result.tool_call_names = _extract_tool_call_names(new_messages)
-    result.output = "".join(output_parts)
-    _apply_output_validation(result, role)
-
-    if usage is not None:
-        result.tokens_in = usage.input_tokens or 0
-        result.tokens_out = usage.output_tokens or 0
-        result.total_tokens = usage.total_tokens or 0
-        result.tool_calls = usage.tool_calls or 0
 
 
 # ---------------------------------------------------------------------------

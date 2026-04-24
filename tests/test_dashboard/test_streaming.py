@@ -33,6 +33,8 @@ def _mock_run_result():
     r.duration_ms = 10
     r.success = True
     r.error = None
+    r.status = "completed"
+    r.pending_approvals = []
     return r
 
 
@@ -108,35 +110,56 @@ async def test_stream_run_sse_awaits_future(_mock_run_result, _mock_role):
 
 
 @pytest.mark.asyncio
-async def test_stream_run_sse_structured_output_fallback(_mock_run_result, _mock_role):
-    """Structured output roles use non-streaming execution, no token events."""
+async def test_stream_run_sse_structured_output_uses_streaming(_mock_run_result, _mock_role):
+    """Structured-output roles stream through ``execute_run_stream_sync`` and
+    emit ``partial_output`` SSE frames via ``on_partial``.
+
+    The pre-Slice-1 behavior forked into ``execute_run_sync`` for structured
+    roles; that fallback was removed once ``StreamedRunResultSync.stream_output()``
+    became the canonical progressive-partial source.
+    """
     from initrunner.dashboard.streaming import stream_run_sse
 
     _mock_role.spec.output.type = "json_schema"
 
+    captured_partial_cb = {}
+
     def fake_build(path, **kw):
         return (_mock_role, MagicMock())
 
-    def fake_run_sync(agent, role, prompt, **kw):
+    def fake_stream(agent, role, prompt, **kw):
+        # Capture on_partial and simulate a partial emission during streaming
+        cb = kw.get("on_partial")
+        captured_partial_cb["cb"] = cb
+        if cb is not None:
+            cb({"status": "in_progress", "count": 1})
+            cb({"status": "done", "count": 2})
         return (_mock_run_result, [])
 
     with (
         patch("initrunner.services.execution.build_agent_sync", side_effect=fake_build),
-        patch("initrunner.services.execution.execute_run_sync", side_effect=fake_run_sync),
-        patch(
-            "initrunner.services.execution.execute_run_stream_sync",
-            side_effect=AssertionError("streaming should not be called"),
-        ),
+        patch("initrunner.services.execution.execute_run_stream_sync", side_effect=fake_stream),
     ):
         events = await _collect(stream_run_sse(Path("/tmp/role.yaml"), "hello"))
 
-    # No token events emitted
+    # Structured mode: no text token events
     token_events = [e for e in events if '"type": "token"' in e]
     assert token_events == []
+
+    # Two partial_output frames in order
+    partial_events = [
+        json.loads(e.removeprefix("data: ").strip())
+        for e in events
+        if '"type": "partial_output"' in e
+    ]
+    assert len(partial_events) == 2
+    assert partial_events[0]["data"] == {"status": "in_progress", "count": 1}
+    assert partial_events[1]["data"] == {"status": "done", "count": 2}
 
     last = _parse_last_data_event(events)
     assert last["type"] == "result"
     assert last["data"]["success"] is True
+    assert captured_partial_cb["cb"] is not None  # on_partial was wired
 
 
 # ── stream_flow_run_sse ──────────────────────────────────────────────────

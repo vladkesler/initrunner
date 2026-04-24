@@ -50,9 +50,9 @@ from .executor_models import (  # noqa: F401
 from .executor_output import (
     _audit_result,
     _create_run_span,
+    _finalize_run_output,
     _handle_run_error,
     _process_agent_output,
-    _process_stream_output,
     _record_span_metrics,
     _validate_input_or_fail,
 )
@@ -495,40 +495,55 @@ def execute_run_stream(
     message_history: list | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Execute a streaming agent run with guardrails, audit, and token callback."""
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
-        )
+    """Execute a streaming agent run with guardrails, audit, and stream callbacks.
 
+    For text output roles, ``on_token(delta)`` fires per text delta.
+    For structured output roles (``output.type != "text"``), ``on_partial(partial)``
+    fires per progressively-validated partial output from
+    ``stream_output()``. Finalization routes through ``_finalize_run_output``
+    so deferred approvals, BaseModel serialization, and output validation
+    behave identically to non-streaming runs.
+    """
+    is_structured = role.spec.output.type != "text"
     output_parts: list[str] = []
 
     def invoke(run_kwargs: dict, result: RunResult) -> list:
-        stream_state: dict = {"messages": [], "usage": None}
+        stream_state: dict = {"messages": [], "usage": None, "output": None}
 
         def _do_stream():
             stream = agent.run_stream_sync(prompt, **run_kwargs)
-            for chunk in stream.stream_text(delta=True):
-                output_parts.append(chunk)
-                if on_token is not None:
-                    on_token(chunk)
+            if is_structured:
+                for partial in stream.stream_output(debounce_by=0.05):
+                    if on_partial is not None:
+                        on_partial(partial)
+            else:
+                for chunk in stream.stream_text(delta=True):
+                    output_parts.append(chunk)
+                    if on_token is not None:
+                        on_token(chunk)
             stream_state["messages"] = stream.all_messages()
             stream_state["usage"] = stream.usage()
+            stream_state["output"] = stream.get_output()
 
         _run_with_timeout(
             lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
             timeout=role.spec.guardrails.timeout_seconds,
         )
         new_messages = stream_state["messages"]
-        _process_stream_output(output_parts, stream_state["usage"], new_messages, result, role)
+        _finalize_run_output(
+            stream_state["output"],
+            stream_state["usage"],
+            new_messages,
+            result,
+            role,
+        )
         return new_messages
 
     return _execute_orchestrated(
@@ -606,44 +621,90 @@ async def execute_run_stream_async(
     message_history: list | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
+    on_event: Callable[[Any], None] | None = None,
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Async variant of ``execute_run_stream`` -- uses ``agent.run_stream()``."""
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
-        )
+    """Async variant of ``execute_run_stream``.
 
+    Two backbones based on ``on_event``:
+
+    - ``on_event`` set: uses ``agent.run_stream_events()`` to yield typed
+      ``AgentStreamEvent`` instances. Text deltas still route to ``on_token``
+      when extractable from ``PartDeltaEvent``. Final result comes from
+      ``AgentRunResultEvent.result``.
+    - ``on_event`` unset: uses ``async with agent.run_stream(...) as stream``,
+      iterates ``stream_text(delta=True)`` (text roles) or ``stream_output()``
+      (structured roles), and finalizes via ``stream.get_output()``.
+
+    Both backbones finalize through ``_finalize_run_output`` so deferred
+    approvals, BaseModel serialization, and output validation behave
+    identically to non-streaming runs.
+    """
     timeout = role.spec.guardrails.timeout_seconds
+    is_structured = role.spec.output.type != "text"
     output_parts: list[str] = []
-    new_messages_ref: list = []
 
     async def invoke(run_kwargs: dict, result: RunResult) -> list:
-        nonlocal new_messages_ref
+        stream_state: dict[str, Any] = {"messages": [], "usage": None, "output": None}
 
-        async def _do_stream():
-            async with agent.run_stream(prompt, **run_kwargs) as stream:
-                async for chunk in stream.stream_text(delta=True):
-                    output_parts.append(chunk)
-                    if on_token is not None:
-                        on_token(chunk)
+        if on_event is not None:
 
-                nonlocal new_messages_ref
-                new_messages_ref = stream.all_messages()
-                return stream.usage()
+            async def _do_stream_events():
+                from pydantic_ai import AgentRunResultEvent
+                from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 
-        usage = await asyncio.wait_for(
-            _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
-            timeout=timeout,
+                async for event in agent.run_stream_events(prompt, **run_kwargs):
+                    on_event(event)
+                    if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                        text = event.delta.content_delta
+                        if text:
+                            output_parts.append(text)
+                            if on_token is not None:
+                                on_token(text)
+                    elif isinstance(event, AgentRunResultEvent):
+                        stream_state["output"] = event.result.output
+                        stream_state["usage"] = event.result.usage()
+                        stream_state["messages"] = event.result.all_messages()
+
+            await asyncio.wait_for(
+                _retry_model_call_async(_do_stream_events, on_retry=output_parts.clear),
+                timeout=timeout,
+            )
+        else:
+
+            async def _do_stream():
+                async with agent.run_stream(prompt, **run_kwargs) as stream:
+                    if is_structured:
+                        async for partial in stream.stream_output(debounce_by=0.05):
+                            if on_partial is not None:
+                                on_partial(partial)
+                    else:
+                        async for chunk in stream.stream_text(delta=True):
+                            output_parts.append(chunk)
+                            if on_token is not None:
+                                on_token(chunk)
+                    stream_state["messages"] = stream.all_messages()
+                    stream_state["usage"] = stream.usage()
+                    stream_state["output"] = await stream.get_output()
+
+            await asyncio.wait_for(
+                _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
+                timeout=timeout,
+            )
+
+        _finalize_run_output(
+            stream_state["output"],
+            stream_state["usage"],
+            stream_state["messages"],
+            result,
+            role,
         )
-        _process_stream_output(output_parts, usage, new_messages_ref, result, role)
-        return new_messages_ref
+        return stream_state["messages"]
 
     return await _execute_orchestrated_async(
         invoke,

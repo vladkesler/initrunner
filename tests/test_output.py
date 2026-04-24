@@ -372,13 +372,19 @@ class TestExecutorBaseModelSerialization:
 
 
 # ---------------------------------------------------------------------------
-# Streaming guard
+# Streaming with structured output
 # ---------------------------------------------------------------------------
 
 
-class TestStreamingGuard:
-    def test_streaming_with_structured_output_raises(self):
-        """execute_run_stream raises ValueError when output.type is json_schema."""
+class TestStreamingStructured:
+    def test_streaming_with_structured_output_does_not_raise(self):
+        """execute_run_stream no longer raises for structured output.
+
+        The forbid was removed when streaming was rewired to use
+        StreamedRunResultSync.stream_output() for progressively-validated
+        partials. We just verify the guard is gone; the mock stream short-
+        circuits via TimeoutError so we don't need a real stream.
+        """
         from initrunner.agent.schema.role import RoleDefinition
 
         role = RoleDefinition.model_validate(_minimal_role_data(**_json_schema_output_spec()))
@@ -386,8 +392,12 @@ class TestStreamingGuard:
         from initrunner.agent.executor import execute_run_stream
 
         agent = MagicMock()
-        with pytest.raises(ValueError, match="Streaming is not supported with structured output"):
-            execute_run_stream(agent, role, "test prompt", skip_input_validation=True)
+        with patch("initrunner.agent.executor._prepare_run") as mock_prep:
+            mock_prep.return_value = ("run-id", MagicMock(), {}, None)
+            with patch("initrunner.agent.executor._run_with_timeout") as mock_timeout:
+                mock_timeout.side_effect = TimeoutError("expected")
+                result, _ = execute_run_stream(agent, role, "test", skip_input_validation=True)
+                assert result.success is False  # failed on the mock, not on the guard
 
     def test_streaming_with_text_output_does_not_raise(self):
         """execute_run_stream does not raise for text output (normal path)."""
@@ -398,8 +408,6 @@ class TestStreamingGuard:
         from initrunner.agent.executor import execute_run_stream
 
         agent = MagicMock()
-        # Should not raise ValueError — it will fail later on the mock but that's fine
-        # We just verify the structured output guard is not triggered
         with patch("initrunner.agent.executor._prepare_run") as mock_prep:
             mock_prep.return_value = ("run-id", MagicMock(), {}, None)
             with patch("initrunner.agent.executor._run_with_timeout") as mock_timeout:

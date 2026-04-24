@@ -237,14 +237,9 @@ class TestExecuteRunStreamAsync:
             result, _msgs = await execute_run_stream_async(agent, role, "test")
             assert result.success is False
 
-    @pytest.mark.asyncio
-    async def test_structured_output_raises(self):
-        role = _make_role()
-        role.spec.output.type = "json_schema"
-        agent = MagicMock()
-
-        with pytest.raises(ValueError, match="Streaming is not supported"):
-            await execute_run_stream_async(agent, role, "test", skip_input_validation=True)
+    # Streaming with structured output is now supported.
+    # See tests/test_executor_streaming.py::TestAsyncStreamingEvents for the
+    # full coverage (typed events, on_event callback, run_stream_events path).
 
 
 class TestToolBuildAsync:

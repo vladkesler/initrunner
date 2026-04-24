@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -99,10 +99,15 @@ def execute_run_stream_sync(
     message_history: list[ModelMessage] | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
-    """Execute a streaming agent run (sync). Call from a worker thread."""
+    """Execute a streaming agent run (sync). Call from a worker thread.
+
+    ``on_token`` fires for text-output roles. ``on_partial`` fires for
+    structured-output roles with each progressively-validated partial.
+    """
     from initrunner.agent.executor import execute_run_stream
 
     return execute_run_stream(
@@ -113,6 +118,7 @@ def execute_run_stream_sync(
         message_history=message_history,
         model_override=model_override,
         on_token=on_token,
+        on_partial=on_partial,
         skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )
@@ -308,10 +314,20 @@ async def execute_run_stream_async(
     message_history: list[ModelMessage] | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
+    on_event: Callable[[Any], None] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list[ModelMessage]]:
-    """Execute a streaming agent run (async)."""
+    """Execute a streaming agent run (async).
+
+    ``on_event`` receives typed ``AgentStreamEvent`` instances from
+    ``agent.run_stream_events()``. When set, it takes precedence over the
+    token/partial callbacks (both still fire for compatibility). When unset,
+    the executor falls back to ``async with agent.run_stream(...)`` and
+    routes text deltas to ``on_token`` or validated partials to
+    ``on_partial`` depending on the role's output type.
+    """
     from initrunner.agent.executor import execute_run_stream_async as _stream_async
 
     return await _stream_async(
@@ -322,6 +338,8 @@ async def execute_run_stream_async(
         message_history=message_history,
         model_override=model_override,
         on_token=on_token,
+        on_partial=on_partial,
+        on_event=on_event,
         skip_input_validation=skip_input_validation,
         principal_id=principal_id,
     )

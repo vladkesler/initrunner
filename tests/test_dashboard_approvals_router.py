@@ -147,12 +147,8 @@ class TestListPending:
 
     def test_groups_by_run(self, client, audit_db, tmp_path):
         role_path = tmp_path / "role.yaml"
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1", "c2"], role_path=role_path
-        )
-        _seed_paused_run(
-            audit_db, run_id="r2", tool_call_ids=["c3"], role_path=role_path
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1", "c2"], role_path=role_path)
+        _seed_paused_run(audit_db, run_id="r2", tool_call_ids=["c3"], role_path=role_path)
         resp = client.get("/api/approvals/pending")
         assert resp.status_code == 200
         body = resp.json()
@@ -199,9 +195,7 @@ class TestGetRun:
             role_path=tmp_path / "role.yaml",
         )
         with AuditLogger(audit_db) as logger:
-            logger.resolve_pending_approval(
-                run_id="r1", tool_call_id="c1", decision=True
-            )
+            logger.resolve_pending_approval(run_id="r1", tool_call_id="c1", decision=True)
         resp = client.get("/api/approvals/r1")
         assert resp.status_code == 404
 
@@ -213,53 +207,37 @@ class TestGetRun:
 
 class TestResolveRun:
     def test_empty_body_rejected(self, client, audit_db, tmp_path):
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml"
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml")
         resp = client.post("/api/approvals/r1", json={"decisions": {}})
         assert resp.status_code == 400
 
     def test_missing_decisions_field_rejected(self, client, audit_db, tmp_path):
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml"
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml")
         resp = client.post("/api/approvals/r1", json={})
         # Pydantic returns 422 when the required ``decisions`` field is missing.
         assert resp.status_code == 422
 
     def test_non_dict_decisions_rejected(self, client, audit_db, tmp_path):
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml"
-        )
-        resp = client.post(
-            "/api/approvals/r1", json={"decisions": "not-a-dict"}
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=tmp_path / "r.yaml")
+        resp = client.post("/api/approvals/r1", json={"decisions": "not-a-dict"})
         assert resp.status_code == 422
 
     def test_404_on_unknown_run(self, client, audit_db):
         AuditLogger(audit_db).close()
-        resp = client.post(
-            "/api/approvals/nope", json={"decisions": {"c1": True}}
-        )
+        resp = client.post("/api/approvals/nope", json={"decisions": {"c1": True}})
         assert resp.status_code == 404
 
     def test_410_when_role_file_missing(self, client, audit_db, tmp_path):
         # Seed with a role_path that doesn't exist on disk
         missing = tmp_path / "missing.yaml"
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=missing
-        )
-        resp = client.post(
-            "/api/approvals/r1", json={"decisions": {"c1": True}}
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=missing)
+        resp = client.post("/api/approvals/r1", json={"decisions": {"c1": True}})
         assert resp.status_code == 410
         assert "no longer exists" in resp.json()["detail"]
 
     def test_successful_resume(self, client, audit_db, tmp_path):
         role_path = tmp_path / "role.yaml"
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=role_path
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=role_path)
         role_path.write_text("stub")  # existence check only — build is mocked
 
         # Stub the agent build + resume so we don't hit a real model.
@@ -305,9 +283,7 @@ class TestResolveRun:
 
     def test_re_pause_surfaces_new_calls(self, client, audit_db, tmp_path):
         role_path = tmp_path / "role.yaml"
-        _seed_paused_run(
-            audit_db, run_id="r1", tool_call_ids=["c1"], role_path=role_path
-        )
+        _seed_paused_run(audit_db, run_id="r1", tool_call_ids=["c1"], role_path=role_path)
         role_path.write_text("stub")
 
         def fake_build(_path):
@@ -338,9 +314,7 @@ class TestResolveRun:
                 side_effect=fake_resume,
             ),
         ):
-            resp = client.post(
-                "/api/approvals/r1", json={"decisions": {"c1": True}}
-            )
+            resp = client.post("/api/approvals/r1", json={"decisions": {"c1": True}})
 
         assert resp.status_code == 200
         body = resp.json()
