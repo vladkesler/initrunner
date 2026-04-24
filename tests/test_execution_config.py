@@ -74,8 +74,8 @@ def _write_role(tmp_path: Path, execution_block: str = "") -> Path:
         spec:
           role: hi
           model:
-            provider: anthropic
-            name: claude-sonnet-4-5-20250929
+            provider: openai
+            name: gpt-5-mini
           {execution_block}
     """)
     p = tmp_path / "role.yaml"
@@ -85,7 +85,7 @@ def _write_role(tmp_path: Path, execution_block: str = "") -> Path:
 
 class TestExecutionFieldsWiredToAgent:
     def test_defaults_wired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         role = load_role(_write_role(tmp_path))
         agent = build_agent(role)
         assert agent._max_tool_retries == 1
@@ -93,7 +93,7 @@ class TestExecutionFieldsWiredToAgent:
         assert agent._tool_timeout is None
 
     def test_overrides_applied(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         execution = (
             textwrap.dedent("""\
             execution:
@@ -113,7 +113,7 @@ class TestExecutionFieldsWiredToAgent:
         assert agent._tool_timeout == 12.5
 
     def test_max_concurrency_wired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         execution = (
             textwrap.dedent("""\
             execution:
@@ -134,7 +134,7 @@ class TestExecutionFieldsWiredToAgent:
     def test_max_concurrency_absent_by_default(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         role = load_role(_write_role(tmp_path))
         agent = build_agent(role)
         assert agent._concurrency_limiter is None
@@ -148,8 +148,8 @@ class TestExecutionFieldsWiredToAgent:
             spec:
               role: hi
               model:
-                provider: anthropic
-                name: claude-sonnet-4-5-20250929
+                provider: openai
+                name: gpt-5-mini
               execution:
                 end_strategy: maybe
         """)

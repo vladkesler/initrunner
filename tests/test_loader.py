@@ -229,6 +229,7 @@ class TestBuildModelFallback:
         assert _build_model(mc) == "openai-responses:gpt-5-mini"
 
     def test_fallback_returns_fallback_model(self, monkeypatch):
+        pytest.importorskip("anthropic")
         from pydantic_ai.models.fallback import FallbackModel
 
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
@@ -243,6 +244,8 @@ class TestBuildModelFallback:
 
     def test_fallback_chain_walks_in_declared_order(self, monkeypatch):
         """The primary is first, fallbacks follow in the order declared."""
+        pytest.importorskip("anthropic")
+        pytest.importorskip("groq")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
         monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
         monkeypatch.setenv("GROQ_API_KEY", "test-groq")
@@ -258,6 +261,7 @@ class TestBuildModelFallback:
         assert "llama-3.1-70b" in model_names[2]
 
     def test_fallback_resolves_alias_at_build_time(self, monkeypatch, tmp_path):
+        pytest.importorskip("anthropic")
         from pydantic_ai.models.fallback import FallbackModel
 
         models_yaml = tmp_path / "models.yaml"
