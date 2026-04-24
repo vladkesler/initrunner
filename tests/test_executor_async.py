@@ -101,6 +101,27 @@ class TestRetryModelCallAsync:
         # on_retry should NOT be called on the final (3rd) attempt
         assert len(retries) == 2
 
+    @pytest.mark.asyncio
+    async def test_fallback_exception_group_is_not_retried(self):
+        """FallbackModel exhausted every candidate; the outer loop must not retry."""
+        from pydantic_ai.exceptions import ModelHTTPError
+        from pydantic_ai.models.fallback import FallbackExceptionGroup
+
+        retries = []
+        call_count = 0
+
+        async def _fn():
+            nonlocal call_count
+            call_count += 1
+            inner = ModelHTTPError(status_code=500, model_name="openai:x", body=b"err")
+            raise FallbackExceptionGroup("all failed", [inner])
+
+        with pytest.raises(FallbackExceptionGroup):
+            await _retry_model_call_async(_fn, on_retry=lambda: retries.append(1))
+
+        assert call_count == 1
+        assert retries == []
+
 
 class TestExecuteRunAsync:
     @pytest.mark.asyncio
@@ -167,7 +188,7 @@ class TestExecuteRunAsync:
         assert "timed out" in (result.error or "")
 
 
-class TestAsyncSkipInputValidationMetadata:
+class TestAsyncRunMetadata:
     @pytest.mark.asyncio
     async def test_metadata_set_when_skip_true(self):
         role = _make_role()
@@ -182,8 +203,11 @@ class TestAsyncSkipInputValidationMetadata:
 
         await execute_run_async(agent, role, "Hello", skip_input_validation=True)
 
-        call_kwargs = agent.run.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
     @pytest.mark.asyncio
     async def test_metadata_set_when_preflight_passes(self):
@@ -200,8 +224,11 @@ class TestAsyncSkipInputValidationMetadata:
 
         await execute_run_async(agent, role, "Hello", skip_input_validation=False)
 
-        call_kwargs = agent.run.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
 
 class TestExecuteRunStreamAsync:
@@ -216,14 +243,9 @@ class TestExecuteRunStreamAsync:
             result, _msgs = await execute_run_stream_async(agent, role, "test")
             assert result.success is False
 
-    @pytest.mark.asyncio
-    async def test_structured_output_raises(self):
-        role = _make_role()
-        role.spec.output.type = "json_schema"
-        agent = MagicMock()
-
-        with pytest.raises(ValueError, match="Streaming is not supported"):
-            await execute_run_stream_async(agent, role, "test", skip_input_validation=True)
+    # Streaming with structured output is now supported.
+    # See tests/test_executor_streaming.py::TestAsyncStreamingEvents for the
+    # full coverage (typed events, on_event callback, run_stream_events path).
 
 
 class TestToolBuildAsync:

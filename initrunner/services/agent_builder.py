@@ -476,7 +476,7 @@ class BuilderSession:
         )
         model = _build_model(gen_model_config)
 
-        self._agent = Agent(model, system_prompt=system)
+        self._agent = Agent(model, instructions=system)
         return self._agent
 
     # -- Internal helpers ----------------------------------------------------
@@ -593,6 +593,22 @@ class BuilderSession:
         self.seed_source = f"file:{path}"
         self.yaml_text = path.read_text(encoding="utf-8")
         return self._make_turn_result(f"Loaded from {path}. Refine as needed.")
+
+    def seed_from_agent_spec(self, path: Path) -> TurnResult:
+        """Seed from a PydanticAI Agent Spec YAML/JSON file (deterministic)."""
+        import yaml
+
+        from initrunner.services.agent_spec_import import load_agent_spec
+
+        self.seed_source = f"agent-spec:{path}"
+        role_dict = load_agent_spec(path)
+        warnings = role_dict.pop("_import_warnings", [])
+        self.yaml_text = yaml.safe_dump(role_dict, sort_keys=False)
+        self.import_warnings = list(warnings)
+        explanation = f"Imported PydanticAI Agent Spec from {path}."
+        if warnings:
+            explanation += "\nSome fields were dropped (see warnings)."
+        return self._make_turn_result(explanation)
 
     def seed_from_example(self, name: str) -> TurnResult:
         """Seed from a bundled example."""
@@ -723,7 +739,7 @@ class BuilderSession:
             api_key_env=api_key_env,
         )
         model = _build_model(gen_model_config)
-        import_agent = Agent(model, system_prompt=system)
+        import_agent = Agent(model, instructions=system)
 
         # 5. Send structured summary to LLM
         prompt_text = lc_import.to_prompt_text()
@@ -818,7 +834,7 @@ class BuilderSession:
             api_key_env=api_key_env,
         )
         model = _build_model(gen_model_config)
-        import_agent = Agent(model, system_prompt=system)
+        import_agent = Agent(model, instructions=system)
 
         # 5. Send structured summary to LLM
         prompt_text = pai_import.to_prompt_text()

@@ -49,7 +49,35 @@ def load_role(path: Path) -> RoleDefinition:
     except (ValueError, Exception) as e:
         raise RoleLoadError(f"Validation failed for {path}:\n{e}") from e
     validate_capability_tool_conflicts(role)
+    _validate_templating(role)
     return role
+
+
+def _validate_templating(role: RoleDefinition) -> None:
+    """Enforce that ``{{var}}`` in the role prompt matches ``deps_schema``.
+
+    Catches the mismatch at load time so users don't get a half-rendered
+    system prompt at run time.  No-op when the role has neither templates nor
+    a deps_schema.
+    """
+    from initrunner.agent.templating import TemplatingError, has_templates
+
+    prompt = role.spec.role or ""
+    deps_schema = role.spec.deps_schema
+
+    if deps_schema is None and not has_templates(prompt):
+        return
+    if deps_schema is None:
+        raise RoleLoadError(
+            "spec.role uses {{variable}} placeholders but spec.deps_schema is not set. "
+            "Declare a JSON Schema for the variables or remove the placeholders."
+        )
+    from initrunner.agent.templating import validate_schema_and_template
+
+    try:
+        validate_schema_and_template(prompt, deps_schema)
+    except TemplatingError as exc:
+        raise RoleLoadError(str(exc)) from exc
 
 
 # Capability names that conflict with InitRunner tool types.
@@ -75,8 +103,14 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
             )
 
 
-def _build_model(model_config: ModelConfig):
-    """Build a PydanticAI model -- string for standard providers, OpenAI model for custom."""
+def _build_single_model(model_config: ModelConfig):
+    """Build one PydanticAI model -- string for standard providers, OpenAIChatModel for custom.
+
+    This is the single construction point for both the primary model and any
+    FallbackModel entries.  API keys are resolved and injected into
+    ``os.environ`` here, so every Model-like returned by this function is
+    immediately usable.
+    """
     from initrunner.credentials import get_resolver
 
     resolver = get_resolver()
@@ -146,6 +180,34 @@ def _build_model(model_config: ModelConfig):
     return OpenAIChatModel(model_config.name, provider=provider)
 
 
+def _build_model(model_config: ModelConfig):
+    """Build the agent model, wrapping with FallbackModel when fallbacks are declared.
+
+    When ``model_config.fallback`` is empty, returns the primary model
+    directly.  When non-empty, returns a ``FallbackModel`` that walks the
+    primary first, then each fallback in declaration order on any
+    ``ModelAPIError``.  Each fallback entry is a ``provider:model`` string
+    (validated at schema time); it is built through
+    ``_build_single_model`` so vault-sourced API keys are injected into
+    ``os.environ`` before ``FallbackModel.__init__`` constructs the
+    per-provider clients.
+    """
+    primary = _build_single_model(model_config)
+    if not model_config.fallback:
+        return primary
+
+    from initrunner.agent.schema.base import _split_provider_and_name
+
+    fallback_models = []
+    for entry in model_config.fallback:
+        prov, name = _split_provider_and_name(entry)
+        fallback_models.append(_build_single_model(ModelConfig(provider=prov, name=name)))
+
+    from pydantic_ai.models.fallback import FallbackModel
+
+    return FallbackModel(primary, *fallback_models)
+
+
 def _inject_local_fallbacks(caps: list) -> None:
     """Wire InitRunner's functions as local fallbacks for capabilities that lack them.
 
@@ -165,11 +227,17 @@ def _inject_local_fallbacks(caps: list) -> None:
 
 
 def _validate_provider(role: RoleDefinition) -> None:
-    """Check the provider SDK is installed, raising RoleLoadError if not."""
-    try:
-        require_provider(role.spec.model.provider)  # type: ignore[union-attr]
-    except RuntimeError as e:
-        raise RoleLoadError(str(e)) from None
+    """Check the provider SDK is installed for the primary model and every fallback."""
+    from initrunner.agent.schema.base import _split_provider_and_name
+
+    model = role.spec.model
+    providers = [model.provider]  # type: ignore[union-attr]
+    providers.extend(_split_provider_and_name(entry)[0] for entry in model.fallback)  # type: ignore[union-attr]
+    for prov in providers:
+        try:
+            require_provider(prov)
+        except RuntimeError as e:
+            raise RoleLoadError(str(e)) from None
 
 
 def _validate_reasoning(role: RoleDefinition) -> None:
@@ -198,16 +266,16 @@ def _resolve_skills_and_merge(
     role_dir: Path | None,
     extra_skill_dirs: list[Path] | None,
 ) -> tuple[str, list, set[Path]]:
-    """Resolve skills, log warnings, merge tools, and compose the system prompt.
+    """Resolve skills, log warnings, merge tools, and compose the agent instructions.
 
-    Returns ``(system_prompt, all_tools, explicit_skill_paths)``.
+    Returns ``(instructions, all_tools, explicit_skill_paths)``.
     """
-    system_prompt = role.spec.role
+    instructions = role.spec.role
     all_tools = list(role.spec.tools)
     explicit_paths: set[Path] = set()
 
     if not role.spec.skills:
-        return system_prompt, all_tools, explicit_paths
+        return instructions, all_tools, explicit_paths
 
     from initrunner.agent.skills import (
         build_skill_system_prompt,
@@ -231,16 +299,16 @@ def _resolve_skills_and_merge(
     all_tools = merge_skill_tools(resolved_skills, role.spec.tools)
     skill_prompt = build_skill_system_prompt(resolved_skills)
     if skill_prompt:
-        system_prompt = f"{role.spec.role}\n\n{skill_prompt}"
+        instructions = f"{role.spec.role}\n\n{skill_prompt}"
 
-    return system_prompt, all_tools, explicit_paths
+    return instructions, all_tools, explicit_paths
 
 
 def _create_agent(
     role: RoleDefinition,
-    system_prompt: str,
+    instructions: str,
     toolsets: list,
-    output_type: type,
+    output_type: Any,
     instrument: Any = None,
     prepare_tools: Any = None,
     capabilities: list | None = None,
@@ -251,7 +319,7 @@ def _create_agent(
         model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
-        "system_prompt": system_prompt,
+        "instructions": instructions,
         "model_settings": ModelSettings(**model_settings_kwargs),
         "toolsets": toolsets if toolsets else None,
     }
@@ -261,6 +329,21 @@ def _create_agent(
         kwargs["prepare_tools"] = prepare_tools
     if capabilities:
         kwargs["capabilities"] = capabilities
+
+    execution = role.spec.execution
+    kwargs["retries"] = execution.retries
+    if execution.output_retries is not None:
+        kwargs["output_retries"] = execution.output_retries
+    kwargs["end_strategy"] = execution.end_strategy
+    if execution.tool_timeout_seconds is not None:
+        kwargs["tool_timeout"] = execution.tool_timeout_seconds
+    if execution.max_concurrency is not None:
+        from pydantic_ai import ConcurrencyLimit
+
+        kwargs["max_concurrency"] = ConcurrencyLimit(
+            max_running=execution.max_concurrency.max_running,
+            max_queued=execution.max_concurrency.max_queued,
+        )
 
     from initrunner.agent.history_summarizer import build_history_processor
 
@@ -398,7 +481,7 @@ def _build_auto_tools(
 def build_agent(
     role: RoleDefinition,
     role_dir: Path | None = None,
-    output_type: type | None = None,
+    output_type: Any = None,
     extra_skill_dirs: list[Path] | None = None,
     *,
     prefer_async: bool = False,
@@ -415,14 +498,35 @@ def build_agent(
     _validate_provider(role)
     _validate_reasoning(role)
 
-    system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
+    instructions, all_tools, explicit_paths = _resolve_skills_and_merge(
         role, role_dir, extra_skill_dirs
     )
+
+    # When the role prompt uses {{var}} templates, defer its substitution to a
+    # dynamic system prompt hook so the raw placeholders never reach the model.
+    # We strip the role prompt from ``instructions`` here (leaving skill prompts
+    # + auto-tool addendum intact) and re-inject it below via @agent.system_prompt.
+    from initrunner.agent.templating import has_templates as _has_templates
+
+    templating_active = role.spec.deps_schema is not None and _has_templates(role.spec.role)
+    if templating_active:
+        prefix = role.spec.role
+        if instructions.startswith(prefix):
+            instructions = instructions[len(prefix) :].lstrip()
 
     if output_type is None:
         from initrunner.agent.output import resolve_output_type
 
         output_type = resolve_output_type(role.spec.output, role_dir)
+
+    # Widen output_type to a union with DeferredToolRequests when any tool
+    # requires human approval, so PydanticAI can surface pending calls
+    # instead of executing them. Only widens when the caller didn't supply
+    # an explicit output_type to preserve caller intent.
+    if any(t.approval == "required" for t in all_tools):
+        from pydantic_ai import DeferredToolRequests
+
+        output_type = [output_type, DeferredToolRequests]
 
     from initrunner.agent.tools import build_toolsets
 
@@ -432,7 +536,7 @@ def build_agent(
 
     auto = _build_auto_tools(role, role_dir, explicit_paths, extra_skill_dirs)
     toolsets.extend(auto.extra_toolsets)
-    system_prompt += auto.prompt_addendum
+    instructions += auto.prompt_addendum
 
     instrument = None
     if role.spec.observability is not None:
@@ -442,13 +546,21 @@ def build_agent(
 
     agent = _create_agent(
         role,
-        system_prompt,
+        instructions,
         toolsets,
         output_type,
         instrument=instrument,
         prepare_tools=auto.prepare_tools,
         capabilities=capabilities,
     )
+
+    if templating_active:
+        from initrunner.agent.templating import render as _render_template
+
+        @agent.system_prompt
+        def _render_role_prompt() -> str:
+            values = getattr(agent, "_template_values", {}) or {}
+            return _render_template(role.spec.role, role.spec.deps_schema or {}, values)
 
     # Register dynamic system prompt for procedural memory injection.
     # The closure reads ``_memory_store`` from the agent so the already-open
@@ -502,8 +614,9 @@ def _set_model(role: RoleDefinition, model: ModelConfig) -> RoleDefinition:
 def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> RoleDefinition:
     """Return a copy of *role* with its model config replaced.
 
-    Preserves tuning fields (temperature, max_tokens, context_window) from the
-    existing model config.  Clears base_url/api_key_env when provider changes.
+    Preserves tuning fields (temperature, max_tokens, context_window) and the
+    fallback list from the existing model config.  Clears base_url/api_key_env
+    when provider changes.
     """
     partial = role.spec.model
     base: dict[str, Any] = {}
@@ -512,6 +625,7 @@ def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> Rol
             "temperature": partial.temperature,
             "max_tokens": partial.max_tokens,
             "context_window": partial.context_window,
+            "fallback": partial.fallback,
         }
         if provider == partial.provider:
             base["base_url"] = partial.base_url
@@ -633,6 +747,7 @@ def resolve_role_model(
         temperature=base.temperature,
         max_tokens=base.max_tokens,
         context_window=base.context_window,
+        fallback=base.fallback,
     )
     return _set_model(role, resolved)
 

@@ -25,6 +25,7 @@ from typing import Any
 from pydantic_ai import Agent, UsageLimits
 from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
+from pydantic_ai.models.fallback import FallbackExceptionGroup
 
 from initrunner._ids import generate_id
 from initrunner.agent.capabilities.content_guard import ContentBlockedError
@@ -49,9 +50,9 @@ from .executor_models import (  # noqa: F401
 from .executor_output import (
     _audit_result,
     _create_run_span,
+    _finalize_run_output,
     _handle_run_error,
     _process_agent_output,
-    _process_stream_output,
     _record_span_metrics,
     _validate_input_or_fail,
 )
@@ -126,10 +127,17 @@ def _prepare_run(
     }
     if extra_toolsets:
         run_kwargs["toolsets"] = extra_toolsets
+    metadata: dict[str, Any] = {
+        "initrunner.run_id": run_id,
+        "initrunner.agent_name": role.metadata.name,
+    }
+    if trigger_type:
+        metadata["initrunner.trigger_type"] = trigger_type
     # Tell InputGuardCapability to skip validation when the caller already
     # checked (e.g. the API server pre-flight) or when pre-flight passed.
     if skip_input_validation or blocked is None:
-        run_kwargs["metadata"] = {"input_validated": True}
+        metadata["input_validated"] = True
+    run_kwargs["metadata"] = metadata
 
     return run_id, usage_limits, run_kwargs, blocked
 
@@ -194,6 +202,7 @@ def _execute_orchestrated(
                 ConnectionError,
                 TimeoutError,
                 OSError,
+                FallbackExceptionGroup,
             ) as e:
                 on_error(result, e)
 
@@ -265,6 +274,7 @@ async def _execute_orchestrated_async(
                 ConnectionError,
                 TimeoutError,
                 OSError,
+                FallbackExceptionGroup,
             ) as e:
                 on_error(result, e)
 
@@ -331,6 +341,154 @@ def execute_run(
 
 
 # ---------------------------------------------------------------------------
+# Resume execution (human-in-the-loop approval)
+# ---------------------------------------------------------------------------
+
+
+def _resume_prompt(approvals: dict[str, bool]) -> UserPrompt:
+    """Synthetic prompt recorded in the audit trail for a resume."""
+    decisions = ", ".join(f"{tcid}:{'approve' if ok else 'deny'}" for tcid, ok in approvals.items())
+    return f"(resume: {decisions})"
+
+
+def execute_run_resume(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Resume a paused run by supplying approvals for pending tool calls.
+
+    Unlike ``execute_run`` this does not take a new prompt — the model
+    already produced one, the user just answered the approval question.
+    On re-pause (the model queues more approval-required calls after
+    executing the approved ones) the returned ``RunResult`` has
+    ``status="paused"`` again with a fresh ``pending_approvals`` list.
+    """
+    from pydantic_ai import DeferredToolResults
+
+    agent_token = _enter_agent_context(role)
+    try:
+        result = RunResult(run_id=run_id)
+        start = time.monotonic()
+        deferred = DeferredToolResults(approvals=dict(approvals))
+        run_kwargs: dict[str, Any] = {
+            "message_history": message_history,
+            "deferred_tool_results": deferred,
+            "model": model_override,
+            "metadata": {"input_validated": True},
+        }
+        new_messages: list = []
+        timeout = role.spec.guardrails.timeout_seconds
+
+        with _create_run_span(run_id, role, trigger_type="resume") as span:
+            try:
+                agent_result = _run_with_timeout(
+                    lambda: _retry_model_call(lambda: agent.run_sync(**run_kwargs)),
+                    timeout=timeout,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+                FallbackExceptionGroup,
+            ) as e:
+                _handle_run_error(result, e, timeout_seconds=timeout)
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            _resume_prompt(approvals),
+            audit_logger=audit_logger,
+            trigger_type="resume",
+            principal_id=principal_id,
+        )
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
+
+
+async def execute_run_resume_async(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Async variant of ``execute_run_resume``."""
+    from pydantic_ai import DeferredToolResults
+
+    agent_token = _enter_agent_context(role)
+    try:
+        result = RunResult(run_id=run_id)
+        start = time.monotonic()
+        deferred = DeferredToolResults(approvals=dict(approvals))
+        run_kwargs: dict[str, Any] = {
+            "message_history": message_history,
+            "deferred_tool_results": deferred,
+            "model": model_override,
+            "metadata": {"input_validated": True},
+        }
+        new_messages: list = []
+        timeout = role.spec.guardrails.timeout_seconds
+
+        with _create_run_span(run_id, role, trigger_type="resume") as span:
+            try:
+                agent_result = await asyncio.wait_for(
+                    _retry_model_call_async(lambda: agent.run(**run_kwargs)),
+                    timeout=timeout,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+                FallbackExceptionGroup,
+            ) as e:
+                _handle_run_error(result, e, timeout_seconds=timeout)
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            _resume_prompt(approvals),
+            audit_logger=audit_logger,
+            trigger_type="resume",
+            principal_id=principal_id,
+        )
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
+
+
+# ---------------------------------------------------------------------------
 # Streaming execution
 # ---------------------------------------------------------------------------
 
@@ -344,40 +502,55 @@ def execute_run_stream(
     message_history: list | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Execute a streaming agent run with guardrails, audit, and token callback."""
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
-        )
+    """Execute a streaming agent run with guardrails, audit, and stream callbacks.
 
+    For text output roles, ``on_token(delta)`` fires per text delta.
+    For structured output roles (``output.type != "text"``), ``on_partial(partial)``
+    fires per progressively-validated partial output from
+    ``stream_output()``. Finalization routes through ``_finalize_run_output``
+    so deferred approvals, BaseModel serialization, and output validation
+    behave identically to non-streaming runs.
+    """
+    is_structured = role.spec.output.type != "text"
     output_parts: list[str] = []
 
     def invoke(run_kwargs: dict, result: RunResult) -> list:
-        stream_state: dict = {"messages": [], "usage": None}
+        stream_state: dict = {"messages": [], "usage": None, "output": None}
 
         def _do_stream():
             stream = agent.run_stream_sync(prompt, **run_kwargs)
-            for chunk in stream.stream_text(delta=True):
-                output_parts.append(chunk)
-                if on_token is not None:
-                    on_token(chunk)
+            if is_structured:
+                for partial in stream.stream_output(debounce_by=0.05):
+                    if on_partial is not None:
+                        on_partial(partial)
+            else:
+                for chunk in stream.stream_text(delta=True):
+                    output_parts.append(chunk)
+                    if on_token is not None:
+                        on_token(chunk)
             stream_state["messages"] = stream.all_messages()
             stream_state["usage"] = stream.usage()
+            stream_state["output"] = stream.get_output()
 
         _run_with_timeout(
             lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
             timeout=role.spec.guardrails.timeout_seconds,
         )
         new_messages = stream_state["messages"]
-        _process_stream_output(output_parts, stream_state["usage"], new_messages, result, role)
+        _finalize_run_output(
+            stream_state["output"],
+            stream_state["usage"],
+            new_messages,
+            result,
+            role,
+        )
         return new_messages
 
     return _execute_orchestrated(
@@ -455,44 +628,90 @@ async def execute_run_stream_async(
     message_history: list | None = None,
     model_override: Model | str | None = None,
     on_token: Callable[[str], None] | None = None,
+    on_partial: Callable[[Any], None] | None = None,
+    on_event: Callable[[Any], None] | None = None,
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Async variant of ``execute_run_stream`` -- uses ``agent.run_stream()``."""
-    if role.spec.output.type != "text":
-        raise ValueError(
-            "Streaming is not supported with structured output "
-            f"(output.type={role.spec.output.type!r}). "
-            "Use non-streaming execution instead."
-        )
+    """Async variant of ``execute_run_stream``.
 
+    Two backbones based on ``on_event``:
+
+    - ``on_event`` set: uses ``agent.run_stream_events()`` to yield typed
+      ``AgentStreamEvent`` instances. Text deltas still route to ``on_token``
+      when extractable from ``PartDeltaEvent``. Final result comes from
+      ``AgentRunResultEvent.result``.
+    - ``on_event`` unset: uses ``async with agent.run_stream(...) as stream``,
+      iterates ``stream_text(delta=True)`` (text roles) or ``stream_output()``
+      (structured roles), and finalizes via ``stream.get_output()``.
+
+    Both backbones finalize through ``_finalize_run_output`` so deferred
+    approvals, BaseModel serialization, and output validation behave
+    identically to non-streaming runs.
+    """
     timeout = role.spec.guardrails.timeout_seconds
+    is_structured = role.spec.output.type != "text"
     output_parts: list[str] = []
-    new_messages_ref: list = []
 
     async def invoke(run_kwargs: dict, result: RunResult) -> list:
-        nonlocal new_messages_ref
+        stream_state: dict[str, Any] = {"messages": [], "usage": None, "output": None}
 
-        async def _do_stream():
-            async with agent.run_stream(prompt, **run_kwargs) as stream:
-                async for chunk in stream.stream_text(delta=True):
-                    output_parts.append(chunk)
-                    if on_token is not None:
-                        on_token(chunk)
+        if on_event is not None:
 
-                nonlocal new_messages_ref
-                new_messages_ref = stream.all_messages()
-                return stream.usage()
+            async def _do_stream_events():
+                from pydantic_ai import AgentRunResultEvent
+                from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 
-        usage = await asyncio.wait_for(
-            _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
-            timeout=timeout,
+                async for event in agent.run_stream_events(prompt, **run_kwargs):
+                    on_event(event)
+                    if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+                        text = event.delta.content_delta
+                        if text:
+                            output_parts.append(text)
+                            if on_token is not None:
+                                on_token(text)
+                    elif isinstance(event, AgentRunResultEvent):
+                        stream_state["output"] = event.result.output
+                        stream_state["usage"] = event.result.usage()
+                        stream_state["messages"] = event.result.all_messages()
+
+            await asyncio.wait_for(
+                _retry_model_call_async(_do_stream_events, on_retry=output_parts.clear),
+                timeout=timeout,
+            )
+        else:
+
+            async def _do_stream():
+                async with agent.run_stream(prompt, **run_kwargs) as stream:
+                    if is_structured:
+                        async for partial in stream.stream_output(debounce_by=0.05):
+                            if on_partial is not None:
+                                on_partial(partial)
+                    else:
+                        async for chunk in stream.stream_text(delta=True):
+                            output_parts.append(chunk)
+                            if on_token is not None:
+                                on_token(chunk)
+                    stream_state["messages"] = stream.all_messages()
+                    stream_state["usage"] = stream.usage()
+                    stream_state["output"] = await stream.get_output()
+
+            await asyncio.wait_for(
+                _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
+                timeout=timeout,
+            )
+
+        _finalize_run_output(
+            stream_state["output"],
+            stream_state["usage"],
+            stream_state["messages"],
+            result,
+            role,
         )
-        _process_stream_output(output_parts, usage, new_messages_ref, result, role)
-        return new_messages_ref
+        return stream_state["messages"]
 
     return await _execute_orchestrated_async(
         invoke,

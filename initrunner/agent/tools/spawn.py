@@ -224,7 +224,7 @@ def build_spawn_toolset(
         timeout=config.timeout_seconds,
     )
     agent_descriptions = {a.name: a.description for a in config.agents}
-    toolset = FunctionToolset()
+    toolset = FunctionToolset(sequential=True)
 
     @toolset.tool_plain
     def spawn_agent(agent_name: str, prompt: str) -> str:

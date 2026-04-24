@@ -130,6 +130,10 @@ def new(
     pydantic_ai: Annotated[
         str | None, typer.Option("--pydantic-ai", help="Import from PydanticAI Python file")
     ] = None,
+    agent_spec: Annotated[
+        str | None,
+        typer.Option("--agent-spec", help="Import from PydanticAI Agent Spec YAML/JSON file"),
+    ] = None,
     list_templates: Annotated[
         bool, typer.Option("--list-templates", help="Show available templates and exit")
     ] = False,
@@ -188,12 +192,13 @@ def new(
             blank,
             langchain is not None,
             pydantic_ai is not None,
+            agent_spec is not None,
         ]
     )
     if seed_count > 1:
         console.print(
             "[red]Error:[/red] Specify at most one of:"
-            " DESCRIPTION, --from, --template, --blank, --langchain, --pydantic-ai"
+            " DESCRIPTION, --from, --template, --blank, --langchain, --pydantic-ai, --agent-spec"
         )
         raise typer.Exit(1)
 
@@ -235,6 +240,7 @@ def new(
             blank,
             langchain,
             pydantic_ai,
+            agent_spec,
             provider,
             model,
             base_url=base_url,
@@ -331,6 +337,7 @@ def _seed_session(
     blank: bool,
     langchain: str | None,
     pydantic_ai: str | None,
+    agent_spec: str | None,
     provider: str,
     model: str | None,
     *,
@@ -347,6 +354,12 @@ def _seed_session(
 
     if from_source is not None:
         return _seed_from_source(session, from_source, provider, model)
+
+    if agent_spec is not None:
+        spec_path = Path(agent_spec)
+        if not spec_path.exists():
+            raise FileNotFoundError(f"Agent-spec file not found: {spec_path}")
+        return session.seed_from_agent_spec(spec_path)
 
     # LLM-backed seeds below -- verify SDK is installed for the provider
     from initrunner._compat import require_provider

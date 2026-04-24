@@ -147,16 +147,15 @@ The file must contain a valid JSON Schema object. Relative paths are resolved fr
 
 When using flow pipelines, a pipeline step's `output_format` overrides the role-level `spec.output` config. This allows the same role to produce different output formats depending on the pipeline context.
 
-## Streaming Limitation
+## Streaming Structured Output
 
-Structured output requires non-streaming execution. If you attempt to use streaming (`execute_run_stream`) with a `json_schema` output type, a `ValueError` is raised:
+Structured output roles stream just like text roles, but the signal you receive is different: you get progressively-validated partial models, not text deltas.
 
-```
-Streaming is not supported with structured output (output.type='json_schema').
-Use non-streaming execution instead.
-```
+- `initrunner run role.yaml -p "..."` prints the final validated JSON.
+- The dashboard SSE stream emits `partial_output` frames whose `data` field is the latest partial dict as the model builds the object. Text-mode roles continue to emit `token` frames.
+- Programmatic callers pass `on_partial=<callable>` to `execute_run_stream_sync` / `execute_run_stream_async`. The callback receives each partial (a Pydantic model instance) as it grows toward the final validated object.
 
-Use `initrunner run` (single-shot) or non-streaming mode for structured output agents.
+The forbid that previously raised `ValueError("Streaming is not supported with structured output")` was removed once `StreamedRunResultSync.stream_output()` became the canonical source of progressive partials.
 
 ## Example
 

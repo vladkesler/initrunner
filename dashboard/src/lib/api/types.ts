@@ -65,6 +65,12 @@ export interface CostData {
 	total_cost_usd: number;
 }
 
+export interface PendingCall {
+	tool_call_id: string;
+	tool_name: string;
+	arguments: Record<string, unknown>;
+}
+
 export interface RunResponse {
 	run_id: string;
 	output: string;
@@ -78,6 +84,13 @@ export interface RunResponse {
 	error: string | null;
 	message_history?: string | null;
 	cost?: CostData | null;
+	status?: 'done' | 'paused';
+	pending_approvals?: PendingCall[];
+}
+
+export interface ApprovalRequiredData extends RunResponse {
+	status: 'paused';
+	pending_approvals: PendingCall[];
 }
 
 /** Fields ConversationThread actually renders from a run result. */
@@ -156,6 +169,7 @@ export type SSEEvent =
 	| { type: 'usage'; data: UsageData }
 	| { type: 'cost_update'; data: CostUpdateData }
 	| { type: 'result'; data: RunResponse }
+	| { type: 'approval_required'; data: ApprovalRequiredData }
 	| { type: 'error'; data: string };
 
 // -- Budget Progress ----------------------------------------------------------

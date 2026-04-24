@@ -187,7 +187,6 @@ class FlowOrchestrator:
         base_dir: Path,
         *,
         audit_logger: AuditLogger | None = None,
-        max_agent_workers: int | None = None,
         on_tool_event: Callable[[str, ToolEvent], None] | None = None,
     ) -> None:
         self._flow = flow

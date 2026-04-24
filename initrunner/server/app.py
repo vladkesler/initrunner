@@ -9,6 +9,7 @@ import secrets
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from pydantic_ai import Agent
@@ -92,6 +93,68 @@ def _make_id() -> str:
     return "chatcmpl-" + generate_id()
 
 
+def _pending_approvals_payload(result) -> list[dict]:
+    return [
+        {
+            "tool_call_id": p.tool_call_id,
+            "tool_name": p.tool_name,
+            "arguments": p.arguments,
+        }
+        for p in result.pending_approvals
+    ]
+
+
+def _paused_json_response(
+    result,
+    new_messages: list,
+    role,
+    model_name: str,
+    conv_id: str,
+    *,
+    audit_logger: AuditLogger | None,
+    role_path: Path | None,
+) -> JSONResponse:
+    """Build the OpenAI-compatible response for a paused run and persist state.
+
+    The client sees ``finish_reason="tool_calls_pending_approval"`` plus
+    top-level ``pending_approvals`` and ``run_id`` fields. They POST back
+    to ``/v1/approvals/{run_id}`` to resume.
+    """
+    from initrunner.runner._approval import persist_paused_run_if_needed
+
+    persist_paused_run_if_needed(
+        result,
+        role,
+        new_messages,
+        audit_logger=audit_logger,
+        role_path=role_path,
+    )
+    payload = {
+        "id": _make_id(),
+        "object": "chat.completion",
+        "created": _now_ts(),
+        "model": model_name,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": ""},
+                "finish_reason": "tool_calls_pending_approval",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": result.tokens_in,
+            "completion_tokens": result.tokens_out,
+            "total_tokens": result.total_tokens,
+        },
+        "run_id": result.run_id,
+        "pending_approvals": _pending_approvals_payload(result),
+    }
+    return JSONResponse(
+        payload,
+        headers={"X-Conversation-Id": conv_id, "X-Run-Id": result.run_id},
+    )
+
+
 def _now_ts() -> int:
     return int(time.time())
 
@@ -104,6 +167,7 @@ def create_app(
     api_key: str | None = None,
     conversation_ttl: float | None = None,
     cors_origins: list[str] | None = None,
+    role_path: Path | None = None,
 ) -> Starlette:
     """Build and return the Starlette ASGI application."""
     from initrunner.server.rate_limiter import TokenBucketRateLimiter
@@ -197,6 +261,79 @@ def create_app(
             request=request,
         )
 
+    async def approvals_resume(request: Request) -> JSONResponse:
+        """Resolve pending approvals for a paused run and return the resumed completion.
+
+        Request body: ``{"<tool_call_id>": true, "<tool_call_id>": false, ...}``.
+        Every unresolved tool_call_id for this run must be supplied (use
+        ``false`` to deny). On re-pause the response mirrors the
+        non-stream paused shape so the client can iterate.
+        """
+        if audit_logger is None:
+            return _error_response(501, "server_error", "approvals endpoint requires audit logging")
+        run_id = request.path_params["run_id"]
+        try:
+            body = await request.json()
+        except Exception:
+            return _error_response(400, "invalid_request_error", "invalid JSON body")
+        if not isinstance(body, dict) or not all(isinstance(v, bool) for v in body.values()):
+            return _error_response(
+                400,
+                "invalid_request_error",
+                "body must be an object of {tool_call_id: bool}",
+            )
+        approvals: dict[str, bool] = dict(body)
+        resolved_by = request.headers.get("x-resolved-by")
+
+        from initrunner.services.execution import resume_run_async
+
+        try:
+            result, new_messages = await resume_run_async(
+                agent,
+                role,
+                run_id,
+                approvals,
+                audit_logger=audit_logger,
+                resolved_by=resolved_by,
+                role_path=role_path,
+            )
+        except ValueError as e:
+            return _error_response(404, "invalid_request_error", str(e))
+        except Exception:
+            _logger.exception("resume failed for run %s", run_id)
+            return _error_response(500, "server_error", "Internal server error")
+
+        conv_id = request.headers.get("x-conversation-id") or secrets.token_urlsafe(24)
+        if result.status == "paused":
+            return _paused_json_response(
+                result,
+                new_messages,
+                role,
+                model_name,
+                conv_id,
+                audit_logger=audit_logger,
+                role_path=role_path,
+            )
+        if not result.success:
+            status, error_type, message = _classify_error(result.error or "")
+            return _error_response(status, error_type, message)
+        conversations.save(conv_id, _trim_history(new_messages, _MAX_CONVERSATION_HISTORY))
+        resp = ChatCompletionResponse(
+            id=_make_id(),
+            created=_now_ts(),
+            model=model_name,
+            choices=[Choice(message=ChatMessage(role="assistant", content=result.output))],
+            usage=Usage(
+                prompt_tokens=result.tokens_in,
+                completion_tokens=result.tokens_out,
+                total_tokens=result.total_tokens,
+            ),
+        )
+        return JSONResponse(
+            resp.model_dump(exclude_none=True),
+            headers={"X-Conversation-Id": conv_id, "X-Run-Id": run_id},
+        )
+
     # --- Non-streaming handler ---
 
     async def _handle_non_stream(
@@ -231,6 +368,17 @@ def create_app(
         if not result.success:
             status, error_type, message = _classify_error(result.error or "")
             return _error_response(status, error_type, message)
+
+        if result.status == "paused":
+            return _paused_json_response(
+                result,
+                new_messages,
+                role,
+                model_name,
+                conv_id,
+                audit_logger=audit_logger,
+                role_path=role_path,
+            )
 
         conversations.save(conv_id, _trim_history(new_messages, _MAX_CONVERSATION_HISTORY))
 
@@ -354,7 +502,40 @@ def create_app(
             try:
                 result, new_messages = await stream_task
 
-                if result.success:
+                if result.status == "paused":
+                    from initrunner.runner._approval import persist_paused_run_if_needed
+
+                    persist_paused_run_if_needed(
+                        result,
+                        role,
+                        new_messages,
+                        audit_logger=audit_logger,
+                        role_path=role_path,
+                    )
+                    pause_event = {
+                        "event": "approval_required",
+                        "run_id": result.run_id,
+                        "pending_approvals": _pending_approvals_payload(result),
+                    }
+                    yield f"data: {json.dumps(pause_event)}\n\n"
+                    finish = ChatCompletionChunk(
+                        id=completion_id,
+                        created=created,
+                        model=model_name,
+                        choices=[
+                            StreamChoice(
+                                delta=DeltaMessage(),
+                                finish_reason="tool_calls_pending_approval",
+                            )
+                        ],
+                        usage=Usage(
+                            prompt_tokens=result.tokens_in,
+                            completion_tokens=result.tokens_out,
+                            total_tokens=result.total_tokens,
+                        ),
+                    )
+                    yield f"data: {finish.model_dump_json(exclude_none=True)}\n\n"
+                elif result.success:
                     conversations.save(
                         conv_id,
                         _trim_history(new_messages, _MAX_CONVERSATION_HISTORY),
@@ -423,6 +604,7 @@ def create_app(
         Route("/health", health, methods=["GET"]),
         Route("/v1/models", list_models, methods=["GET"]),
         Route("/v1/chat/completions", chat_completions, methods=["POST"]),
+        Route("/v1/approvals/{run_id}", approvals_resume, methods=["POST"]),
     ]
 
     middleware: list[Middleware] = []
@@ -520,6 +702,7 @@ def run_server(
     api_key: str | None = None,
     conversation_ttl: float | None = None,
     cors_origins: list[str] | None = None,
+    role_path: Path | None = None,
 ) -> None:
     """Blocking entry point -- starts uvicorn with the OpenAI-compatible app."""
     app = create_app(
@@ -529,5 +712,6 @@ def run_server(
         api_key=api_key,
         conversation_ttl=conversation_ttl,
         cors_origins=cors_origins,
+        role_path=role_path,
     )
     uvicorn.run(app, host=host, port=port, log_level="info")

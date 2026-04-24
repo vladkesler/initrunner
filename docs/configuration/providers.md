@@ -261,6 +261,28 @@ spec:
     name: fast
 ```
 
+## Multi-provider fallback
+
+Set `model.fallback` to a list of `provider:model` strings (or aliases from `~/.initrunner/models.yaml`) to get automatic provider failover. InitRunner wraps the primary and fallbacks in PydanticAI's [`FallbackModel`](https://ai.pydantic.dev/models/#fallback); on any API error from the primary (including 429 and 5xx), the next candidate is tried, in declaration order.
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    fallback:
+      - openai:gpt-4o-mini
+      - google:gemini-2.5-flash
+```
+
+Notes:
+
+- The **primary** drives sampling config (`temperature`, `max_tokens`, reasoning detection). Fallbacks inherit the same `ModelSettings`, so pick models that accept those settings.
+- API keys for **every** model in the chain must be available at role-load time. `FallbackModel` constructs per-provider clients eagerly; a missing key on a fallback fails fast at startup, not at failover time.
+- Fallback entries are standard-provider strings only. Ollama and custom `base_url` endpoints are not supported as fallbacks in this release.
+- On a **successful** fallback, PydanticAI discards the primary's exception. The run succeeds; the per-provider failure is not surfaced in the audit log. If every candidate fails, the audit record is marked failed and the error lists each inner failure (e.g. `All 3 fallback models failed: [anthropic:... HTTP 500, openai:... HTTP 429, google:... HTTP 503]`).
+- The outer retry loop does **not** retry `FallbackExceptionGroup` -- the FallbackModel has already walked every candidate, so a retry would just repeat the same chain.
+
 ## Model config reference
 
 | Field | Type | Default | Description |
@@ -272,6 +294,7 @@ spec:
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |
 | `max_tokens` | int | `4096` | Maximum tokens per response (1-128000) |
 | `context_window` | int \| null | *null* | Model context window in tokens. Used by the [context budget guard](../orchestration/autonomy.md#context-budget-guard) to prevent history overflow. Auto-detected from provider when null. |
+| `fallback` | list[str] | `[]` | Ordered list of `provider:model` strings (or aliases). When non-empty, the primary and fallbacks are wrapped in a `FallbackModel` for automatic failover on API errors. Standard providers only. |
 
 ## Embedding Configuration
 

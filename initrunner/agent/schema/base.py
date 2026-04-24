@@ -41,6 +41,25 @@ class RoleMetadata(Metadata):
     spec_version: int = 1
 
 
+def _split_provider_and_name(spec: str) -> tuple[str, str]:
+    """Resolve ``spec`` (``provider:model`` or an alias) to ``(provider, name)``.
+
+    Returns ``("", spec)`` when the input is neither a ``provider:model``
+    string nor a known alias.  Callers decide how to handle the unresolved
+    case (e.g. model auto-detection vs. hard error).
+    """
+    if ":" in spec:
+        prov, model_name = spec.split(":", 1)
+        return prov, model_name
+    from initrunner.model_aliases import resolve_model_alias
+
+    resolved = resolve_model_alias(spec)
+    if ":" in resolved:
+        prov, model_name = resolved.split(":", 1)
+        return prov, model_name
+    return "", spec
+
+
 class PartialModelConfig(BaseModel):
     """YAML-facing model config. Provider and name may be omitted for auto-detection."""
 
@@ -51,6 +70,7 @@ class PartialModelConfig(BaseModel):
     temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.1
     max_tokens: Annotated[int, Field(ge=1, le=128000)] = 4096
     context_window: Annotated[int, Field(gt=0)] | None = None
+    fallback: list[str] = []
 
     def is_resolved(self) -> bool:
         """Return True when both provider and name are set."""
@@ -61,6 +81,31 @@ class PartialModelConfig(BaseModel):
 
     def needs_custom_provider(self) -> bool:
         return self.provider == "ollama" or self.base_url is not None
+
+    @model_validator(mode="after")
+    def _check_fallbacks_resolvable(self) -> PartialModelConfig:
+        """Each fallback entry must resolve to a non-Ollama ``provider:model`` pair.
+
+        Ollama (and any other provider that needs a custom ``base_url``) is
+        rejected because fallback entries are bare strings -- they cannot
+        carry the extra config needed to reach a local or self-hosted
+        endpoint.  Aliases defined in ``~/.initrunner/models.yaml`` are
+        resolved inline.
+        """
+        for entry in self.fallback:
+            prov, _ = _split_provider_and_name(entry)
+            if not prov:
+                raise ValueError(
+                    f"Could not resolve fallback model '{entry}'. "
+                    f"Use 'provider:model' or add an alias to ~/.initrunner/models.yaml."
+                )
+            if prov == "ollama":
+                raise ValueError(
+                    f"Fallback model '{entry}' targets Ollama, which requires a custom "
+                    f"base_url. Fallback entries must be standard providers "
+                    f"(anthropic, openai, google, groq, mistral, cohere, xai, ...)."
+                )
+        return self
 
     def is_reasoning_model(self) -> bool:
         """Return True for OpenAI models that drop sampling params when reasoning is active.
@@ -94,26 +139,13 @@ class ModelConfig(PartialModelConfig):
     def _resolve_alias_or_split(cls, data: dict) -> dict:  # type: ignore[type-arg]
         if not isinstance(data, dict):
             return data
-        provider = data.get("provider", "")
-        name = data.get("name", "")
-        if provider:
-            # Explicit provider -- no alias resolution
+        if data.get("provider"):
             return data
-        # No provider: resolve alias or split on colon
-        if ":" in name:
-            prov, model_name = name.split(":", 1)
+        prov, model_name = _split_provider_and_name(data.get("name", ""))
+        if prov:
             data["provider"] = prov
             data["name"] = model_name
-        else:
-            # Could be an alias -- resolve lazily
-            from initrunner.model_aliases import resolve_model_alias
-
-            resolved = resolve_model_alias(name)
-            if ":" in resolved:
-                prov, model_name = resolved.split(":", 1)
-                data["provider"] = prov
-                data["name"] = model_name
-            # else: leave provider empty -- after-validator will catch it
+        # else: leave provider empty -- _check_provider_resolved will catch it
         return data
 
     @model_validator(mode="after")

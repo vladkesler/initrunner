@@ -19,7 +19,7 @@ def build_think_toolset(
     """Build a think toolset with accumulated reasoning chain."""
     state = ThinkState(max_thoughts=config.max_thoughts)
     critique = config.critique
-    toolset = FunctionToolset()
+    toolset = FunctionToolset(sequential=True)
 
     @toolset.tool_plain
     def think(thought: str) -> str:

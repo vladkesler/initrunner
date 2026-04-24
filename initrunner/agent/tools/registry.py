@@ -121,6 +121,13 @@ def build_toolsets(
                 from initrunner.agent.permissions import PermissionToolset
 
                 toolset = PermissionToolset(toolset, tool.permissions, tool.type)
+            # Approval layer: mark tool definitions as unapproved so PydanticAI
+            # surfaces them via DeferredToolRequests. Sits outside permission
+            # checks so deny-rules still short-circuit before asking a human.
+            if tool.approval == "required":
+                from initrunner.agent.approval import ApprovalToolset
+
+                toolset = ApprovalToolset(toolset, tool.type)
             # Outer layer: observable status events
             toolsets.append(wrap_observable(toolset))
 

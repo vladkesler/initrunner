@@ -145,6 +145,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
 
     # -- Register API routers -----------------------------------------------
     from initrunner.dashboard.routers.agents import router as agents_router
+    from initrunner.dashboard.routers.approvals import router as approvals_router
     from initrunner.dashboard.routers.audit import router as audit_router
     from initrunner.dashboard.routers.builder import router as builder_router
     from initrunner.dashboard.routers.cost import router as cost_router
@@ -164,6 +165,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
 
     app.include_router(agents_router)
     app.include_router(runs_router)
+    app.include_router(approvals_router)
     app.include_router(audit_router)
     app.include_router(cost_router)
     app.include_router(memory_router)

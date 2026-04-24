@@ -24,6 +24,14 @@ from initrunner.dashboard.schemas.agents import (
     RunRequest,
     RunResponse,
 )
+from initrunner.dashboard.schemas.approvals import (
+    ApprovalsResolveRequest,
+    ApprovalsResolveResponse,
+    PendingCallResponse,
+    PendingCountResponse,
+    PendingListResponse,
+    PendingRunResponse,
+)
 from initrunner.dashboard.schemas.audit import (
     AuditRecordResponse,
     AuditStatsResponse,
@@ -163,6 +171,9 @@ __all__ = [
     # flow
     "AgentStepResponse",
     "AgentSummary",
+    # approvals
+    "ApprovalsResolveRequest",
+    "ApprovalsResolveResponse",
     # audit
     "AuditRecordResponse",
     "AuditStatsResponse",
@@ -220,6 +231,11 @@ __all__ = [
     "ModelCostResponse",
     "ModelOption",
     "PatternInfo",
+    # approvals
+    "PendingCallResponse",
+    "PendingCountResponse",
+    "PendingListResponse",
+    "PendingRunResponse",
     # team
     "PersonaDetail",
     "PersonaSeedEntry",

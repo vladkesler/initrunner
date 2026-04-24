@@ -274,6 +274,18 @@ Dedicated cost analytics page for spend visibility across agents and models.
 
 Cost values are `null` (displayed as "N/A") when `genai-prices` lacks pricing data for a model/provider.
 
+### Approvals (`/approvals`)
+
+Queue + drawer for resolving paused runs that hit an `approval: required` tool (see [approvals docs](../security/approvals.md) for the role-side config).
+
+- **Queue rows** group by `run_id`. Single-call rows show inline Approve/Deny; multi-call rows open the drawer. Click any row anywhere other than the actions to expand.
+- **Drawer** (`/approvals/{run_id}`) shows the originating prompt, agent, created_at, role path, and per-call Approve/Deny controls. Submit is gated until every pending call has a decision — PydanticAI rejects partial batches.
+- **Bulk actions** (checkbox + toolbar) operate on selected single-call runs. Second click commits within a 4s confirm window; the button morphs to `Confirm approve N` and back if ignored.
+- **Keyboard grammar**: `j`/`k` navigate, `x` toggle selection, `A`/`D` approve/deny focused row, `⇧ A`/`⇧ D` bulk, `↵` open drawer (or submit when all decisions set), `Esc` close, `?` open the shortcut overlay.
+- **Sidebar badge**: steady lime count on the Operate nav entry. Polled every 20s via `GET /api/approvals/pending?count_only=1`; bumped immediately by `approval_required` SSE events on any connected run stream.
+- **Own-run toasts**: a session-local registry of run_ids you kicked off diffs against each poll. When a run *you* started pauses while you're on a different page, a toast links back to the drawer. Runs other operators triggered show only as the badge.
+- **Inline in RunPanel**: the same `ApprovalCardGroup` component slots into the agent detail run panel on `approval_required`. Tool-templated arg previews (`rm -rf /tmp/cache`, `→ /path.txt (11 B)`, `POST host/path`) avoid JSON noise.
+
 ### MCP Hub (`/mcp`)
 
 Visual management center for MCP servers configured across all agents. Four tabs:
@@ -398,7 +410,10 @@ initrunner dashboard
   |      /api/mcp/registry     GET   curated MCP server catalog
   |      /api/mcp/health-summary GET  aggregate health for sidebar badge
   |      /api/runs             POST  execute single run
-  |      /api/runs/stream      POST  streaming run (SSE)
+  |      /api/runs/stream      POST  streaming run (SSE; emits approval_required on pause)
+  |      /api/approvals/pending GET  list paused runs grouped by run_id (count_only=1 for nav badge)
+  |      /api/approvals/{run_id} GET detail: per-call args, originating prompt, role path
+  |      /api/approvals/{run_id} POST resolve: {"decisions": {tool_call_id: bool, ...}}
   |      /api/audit            GET   query audit records
   |      /api/audit/stats      GET   aggregate audit statistics
   |      /api/cost/summary     GET   cost summary (today/week/month/all-time)

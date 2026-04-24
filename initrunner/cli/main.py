@@ -10,6 +10,7 @@ from initrunner.cli._helpers import console
 from initrunner.cli.a2a_cmd import app as a2a_app
 from initrunner.cli.audit_cmd import app as audit_app
 from initrunner.cli.examples_cmd import app as examples_app
+from initrunner.cli.export_cmd import app as export_app
 from initrunner.cli.flow_cmd import app as flow_app
 from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
@@ -141,6 +142,7 @@ def main(
 # Command registrations — plain functions from *_cmd modules
 # ---------------------------------------------------------------------------
 
+from initrunner.cli.approvals_cmd import approve, pending  # noqa: E402
 from initrunner.cli.cost_cmd import app as cost_app  # noqa: E402
 from initrunner.cli.dashboard_cmd import dashboard  # noqa: E402
 from initrunner.cli.desktop_cmd import desktop  # noqa: E402
@@ -172,6 +174,7 @@ app.command(rich_help_panel="Getting Started")(new)
 app.command(rich_help_panel="Getting Started")(setup)
 app.command(rich_help_panel="Getting Started")(doctor)
 app.add_typer(examples_app, name="examples", rich_help_panel="Getting Started")
+app.add_typer(export_app, name="export", rich_help_panel="Getting Started")
 
 # --- Run & Test ---
 app.command(rich_help_panel="Run & Test")(test)
@@ -206,6 +209,8 @@ app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
 app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")
 app.add_typer(cost_app, name="cost", rich_help_panel="Agent Internals")
 app.add_typer(vault_app, name="vault", rich_help_panel="Agent Internals")
+app.command("approve", rich_help_panel="Agent Internals")(approve)
+app.command("pending", rich_help_panel="Agent Internals")(pending)
 
 # --- Deprecated (hidden from help) ---
 app.add_typer(hub_app, name="hub", hidden=True)

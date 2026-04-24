@@ -64,6 +64,21 @@ The agent card at `/.well-known/agent-card.json` is auto-generated from your rol
 
 A2A uses `context_id` to maintain conversation threads across multiple requests. When a client sends messages with the same `context_id`, the server preserves the full message history, enabling multi-turn conversations.
 
+### Why we wrap FastA2A
+
+PydanticAI 1.71+ exposes `agent.to_a2a()` as a one-liner ASGI app. We don't use it.
+
+`to_a2a()` calls `agent.run()` directly. The custom `InitRunnerWorker` at `initrunner/a2a/server.py` overrides `Worker.run_task()` so every A2A task routes through `execute_run_async()` instead. Routing through the executor adds:
+
+- Input content validation (guardrail inputs)
+- Usage limits from `role.spec.guardrails`
+- Retry/timeout wrapping
+- Audit logging via `AuditLogger`
+- Agent-principal context for authz checks
+- Output post-processing (structured type coercion, deferred-tool handling)
+
+An agent served over A2A must behave identically to the same agent served over OpenAI chat completions (`--serve`) or run from the CLI. If you are tempted to swap the worker for `agent.to_a2a()` to simplify the file, check first whether you need any of the above — you probably do.
+
 ## Calling A2A Agents from a Role
 
 Use the delegate tool with `mode: a2a` to call a remote A2A agent from within another agent:

@@ -104,6 +104,89 @@ class TestRetryModelCall:
         assert result == "ok"
         assert len(retries) == 1
 
+    def test_fallback_exception_group_is_not_retried(self):
+        """FallbackModel has already walked every candidate; the outer loop must not retry."""
+        from pydantic_ai.exceptions import ModelHTTPError
+        from pydantic_ai.models.fallback import FallbackExceptionGroup
+
+        retries = []
+        call_count = 0
+
+        def _fn():
+            nonlocal call_count
+            call_count += 1
+            inner = ModelHTTPError(status_code=500, model_name="openai:x", body=b"err")
+            raise FallbackExceptionGroup("all failed", [inner])
+
+        with pytest.raises(FallbackExceptionGroup):
+            _retry_model_call(_fn, on_retry=lambda: retries.append(1))
+
+        assert call_count == 1  # one attempt, no retry
+        assert retries == []
+
+
+class TestHandleRunErrorFallback:
+    def _group(self, *inner):
+        from pydantic_ai.models.fallback import FallbackExceptionGroup
+
+        return FallbackExceptionGroup("all failed", list(inner))
+
+    def test_classifies_by_last_inner_auth(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        from initrunner.agent.executor_models import ErrorCategory, RunResult
+        from initrunner.agent.executor_output import _handle_run_error
+
+        eg = self._group(
+            ModelHTTPError(status_code=500, model_name="anthropic:x", body=b""),
+            ModelHTTPError(status_code=401, model_name="openai:y", body=b""),
+        )
+        result = RunResult(run_id="r")
+        _handle_run_error(result, eg)
+        assert result.success is False
+        assert result.error_category == ErrorCategory.AUTH
+        assert result.error is not None
+        assert "All 2 fallback models failed" in result.error
+        assert "anthropic:x HTTP 500" in result.error
+        assert "openai:y HTTP 401" in result.error
+
+    def test_classifies_by_last_inner_connection(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        from initrunner.agent.executor_models import ErrorCategory, RunResult
+        from initrunner.agent.executor_output import _handle_run_error
+
+        eg = self._group(
+            ModelHTTPError(status_code=429, model_name="anthropic:x", body=b""),
+            ConnectionError("reset"),
+        )
+        result = RunResult(run_id="r")
+        _handle_run_error(result, eg)
+        assert result.error_category == ErrorCategory.CONNECTION
+
+    def test_classifies_by_last_inner_rate_limit(self):
+        from pydantic_ai.exceptions import ModelHTTPError
+
+        from initrunner.agent.executor_models import ErrorCategory, RunResult
+        from initrunner.agent.executor_output import _handle_run_error
+
+        eg = self._group(
+            ModelHTTPError(status_code=500, model_name="a", body=b""),
+            ModelHTTPError(status_code=429, model_name="b", body=b""),
+        )
+        result = RunResult(run_id="r")
+        _handle_run_error(result, eg)
+        assert result.error_category == ErrorCategory.RATE_LIMIT
+
+    def test_classifies_plain_exception_as_unknown(self):
+        from initrunner.agent.executor_models import ErrorCategory, RunResult
+        from initrunner.agent.executor_output import _handle_run_error
+
+        eg = self._group(RuntimeError("weird thing"))
+        result = RunResult(run_id="r")
+        _handle_run_error(result, eg)
+        assert result.error_category == ErrorCategory.UNKNOWN
+
 
 class TestExecuteRun:
     def test_successful_run(self):
@@ -130,6 +213,40 @@ class TestExecuteRun:
         assert result.error == "ConnectionError: API error"
         assert result.output == ""
         assert messages == []
+
+    def test_fallback_exception_group_is_handled_and_audited(self, tmp_path):
+        """The group must route through _handle_run_error and land in audit, not bubble out."""
+        import sqlite3
+
+        from pydantic_ai.exceptions import ModelHTTPError
+        from pydantic_ai.models.fallback import FallbackExceptionGroup
+
+        from initrunner.agent.executor_models import ErrorCategory
+
+        agent = MagicMock()
+        agent.run_sync.side_effect = FallbackExceptionGroup(
+            "all failed",
+            [
+                ModelHTTPError(status_code=500, model_name="anthropic:x", body=b""),
+                ModelHTTPError(status_code=401, model_name="openai:y", body=b""),
+            ],
+        )
+        role = _make_role()
+        db_path = tmp_path / "audit.db"
+
+        with AuditLogger(db_path) as logger:
+            result, messages = execute_run(agent, role, "Hello", audit_logger=logger)
+
+        assert result.success is False
+        assert result.error_category == ErrorCategory.AUTH
+        assert result.error is not None
+        assert "All 2 fallback models failed" in result.error
+        assert messages == []
+
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute("SELECT * FROM audit_log").fetchall()
+        conn.close()
+        assert len(rows) == 1
 
     def test_audit_logging(self, tmp_path):
         db_path = tmp_path / "test_audit.db"
@@ -438,8 +555,8 @@ class TestContentBlockedError:
         assert len(rows) == 1
 
 
-class TestSkipInputValidationMetadata:
-    """Tests that skip_input_validation=True passes metadata to the agent."""
+class TestRunMetadata:
+    """Metadata always carries InitRunner identifiers plus the input_validated flag."""
 
     def test_metadata_set_when_skip_true(self):
         agent = _make_mock_agent()
@@ -447,8 +564,11 @@ class TestSkipInputValidationMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=True)
 
-        call_kwargs = agent.run_sync.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
 
     def test_metadata_set_when_preflight_passes(self):
         """When skip_input_validation=False and validation passes, metadata is still set."""
@@ -457,5 +577,18 @@ class TestSkipInputValidationMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=False)
 
-        call_kwargs = agent.run_sync.call_args.kwargs
-        assert call_kwargs.get("metadata") == {"input_validated": True}
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["input_validated"] is True
+        assert meta["initrunner.agent_name"] == role.metadata.name
+        assert "initrunner.run_id" in meta
+
+    def test_metadata_carries_trigger_type(self):
+        agent = _make_mock_agent()
+        role = _make_role()
+
+        execute_run(agent, role, "Hello", trigger_type="cron")
+
+        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        assert meta is not None
+        assert meta["initrunner.trigger_type"] == "cron"

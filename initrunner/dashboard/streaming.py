@@ -35,13 +35,20 @@ def _build_result_payload(
     new_messages: list[ModelMessage],
     role: RoleDefinition,
 ) -> dict:
-    """Build the SSE result payload dict from a RunResult."""
+    """Build the SSE result payload dict from a RunResult.
+
+    Includes ``status`` and ``pending_approvals`` so the dashboard can
+    distinguish a normal completion from a human-in-the-loop pause. The
+    serialized ``message_history`` is always included when the run paused —
+    the resume path needs it — even though no final output was produced.
+    """
     from pydantic_ai.messages import ModelMessagesTypeAdapter
 
     from initrunner.agent.history import session_limits, trim_message_history
 
+    paused = result.status == "paused"
     serialized_history = None
-    if result.success:
+    if result.success or paused:
         _, max_history = session_limits(role)
         trimmed = trim_message_history(new_messages, max_history)
         serialized_history = ModelMessagesTypeAdapter.dump_json(trimmed).decode("utf-8")
@@ -72,6 +79,15 @@ def _build_result_payload(
         "error": result.error,
         "message_history": serialized_history,
         "cost": cost,
+        "status": result.status,
+        "pending_approvals": [
+            {
+                "tool_call_id": p.tool_call_id,
+                "tool_name": p.tool_name,
+                "arguments": p.arguments,
+            }
+            for p in result.pending_approvals
+        ],
     }
 
 
@@ -95,16 +111,55 @@ def _build_ingest_payload(stats: IngestStats | None) -> dict:
     }
 
 
+def _persist_paused(
+    result: RunResult,
+    role: RoleDefinition,
+    new_messages: list[ModelMessage],
+    audit_logger: AuditLogger | None,
+    role_path: Path,
+) -> None:
+    """Record a paused run's pending approvals so the queue can pick them up.
+
+    A paused run without persistence can't be resumed — PydanticAI needs
+    the exact message history we just saw. We log an error and continue:
+    the SSE payload still surfaces the pause state, but the dashboard UI
+    will only find the row if persistence succeeded.
+    """
+    if audit_logger is None:
+        _logger.error(
+            "Run %s paused but no audit logger is configured; run cannot be resumed.",
+            result.run_id,
+        )
+        return
+    try:
+        from initrunner.services.execution import persist_paused_run
+
+        persist_paused_run(audit_logger, result, role, new_messages, role_path=role_path)
+    except Exception:
+        _logger.exception("Failed to persist paused run %s", result.run_id)
+
+
 async def _sse_pump(
     queue: asyncio.Queue[str | None],
     work: asyncio.Future[Any],
     build_result: Callable[[Any], dict],
     error_context: str,
+    *,
+    event_type_resolver: Callable[[dict], str] | None = None,
+    on_result: Callable[[Any], None] | None = None,
 ) -> AsyncIterator[str]:
     """Drain *queue* with heartbeats, await *work*, emit result.
 
     All items on the queue must be pre-formatted SSE ``data: ...\\n\\n``
     strings; ``None`` is the sentinel.  The pump yields them verbatim.
+
+    *event_type_resolver* inspects the built payload and returns the SSE
+    event type — defaults to ``"result"``. Used by run streaming to emit
+    ``"approval_required"`` when the run paused.
+
+    *on_result* runs once after the payload is built but before it is
+    yielded; lets callers persist server-side state (e.g. pending
+    approvals) that the client-visible payload refers to.
     """
     heartbeat_counter = 0
     while not work.done():
@@ -129,7 +184,10 @@ async def _sse_pump(
     try:
         raw = await work
         payload = build_result(raw)
-        yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
+        if on_result is not None:
+            on_result(raw)
+        event_type = event_type_resolver(payload) if event_type_resolver else "result"
+        yield f"data: {json.dumps({'type': event_type, 'data': payload})}\n\n"
     except Exception as exc:
         _logger.exception(error_context)
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
@@ -166,26 +224,6 @@ async def stream_run_sse(
     except Exception as exc:
         _logger.error("Agent build failed: %s", exc)
         yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
-        return
-
-    # Structured output doesn't support streaming -- run non-streaming
-    if role.spec.output.type != "text":
-        from initrunner.services.execution import execute_run_sync
-
-        try:
-            result, new_messages = await asyncio.to_thread(
-                execute_run_sync,
-                agent,
-                role,
-                prompt,
-                audit_logger=audit_logger,
-                message_history=message_history,
-            )
-            payload = _build_result_payload(result, new_messages, role)
-            yield f"data: {json.dumps({'type': 'result', 'data': payload})}\n\n"
-        except Exception as exc:
-            _logger.exception("Error during non-streaming structured-output run")
-            yield f"data: {json.dumps({'type': 'error', 'data': str(exc)})}\n\n"
         return
 
     # Emit initial usage event with budget + model info
@@ -247,6 +285,22 @@ async def stream_run_sse(
             except RuntimeError:
                 pass
 
+    def on_partial(partial: object) -> None:
+        """Forward a progressively-validated structured-output partial."""
+        from pydantic import BaseModel
+
+        if isinstance(partial, BaseModel):
+            data = partial.model_dump(exclude_unset=False)
+        elif isinstance(partial, (dict, list)):
+            data = partial
+        else:
+            data = {"value": str(partial)}
+        evt = json.dumps({"type": "partial_output", "data": data})
+        try:
+            loop.call_soon_threadsafe(token_queue.put_nowait, f"data: {evt}\n\n")
+        except RuntimeError:
+            pass
+
     def run_stream():
         from initrunner.agent.tool_events import reset_tool_event_callback, set_tool_event_callback
 
@@ -276,6 +330,7 @@ async def stream_run_sse(
                 prompt,
                 audit_logger=audit_logger,
                 on_token=on_token,
+                on_partial=on_partial,
                 message_history=message_history,
             )
         finally:
@@ -288,7 +343,22 @@ async def stream_run_sse(
         result, new_messages = raw  # type: ignore[misc]
         return _build_result_payload(result, new_messages, role)
 
-    async for event in _sse_pump(token_queue, stream_task, _build, "Error during SSE streaming"):
+    def _on_result(raw: object) -> None:
+        result, new_messages = raw  # type: ignore[misc]
+        if result.status == "paused":
+            _persist_paused(result, role, new_messages, audit_logger, role_path)
+
+    def _resolve_event_type(payload: dict) -> str:
+        return "approval_required" if payload.get("status") == "paused" else "result"
+
+    async for event in _sse_pump(
+        token_queue,
+        stream_task,
+        _build,
+        "Error during SSE streaming",
+        event_type_resolver=_resolve_event_type,
+        on_result=_on_result,
+    ):
         yield event
 
 

@@ -153,6 +153,7 @@ def _run_agent(
     output_format: str,
     no_stream: bool,
     model: str | None,
+    template_values: dict[str, str] | None = None,
 ) -> None:
     """Standard agent execution: single-shot, REPL, or autonomous."""
     if autonomous and not prompt:
@@ -203,6 +204,13 @@ def _run_agent(
         model_override=resolved_model,
         dry_run=dry_run,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
+        if template_values is not None:
+            if role.spec.deps_schema is None:
+                console.print(
+                    "[red]Error:[/red] --var supplied but spec.deps_schema is not declared."
+                )
+                raise typer.Exit(1)
+            agent._template_values = template_values
         if not prompt and not autonomous and role.spec.triggers:
             console.print(
                 "[dim]Hint: this role has triggers. Use --daemon to run in daemon mode.[/dim]"
@@ -235,7 +243,7 @@ def _run_agent(
             )
         elif user_prompt and not interactive:
             if effective in ("text", "json"):
-                run_result, _ = _run_formatted(
+                run_result, messages = _run_formatted(
                     effective,
                     agent,
                     role,
@@ -245,7 +253,7 @@ def _run_agent(
                     model_override=model_override,
                 )
             else:
-                run_result, _ = _run_single(
+                run_result, messages = _run_single(
                     agent,
                     role,
                     user_prompt,
@@ -253,6 +261,21 @@ def _run_agent(
                     sink_dispatcher=sink_dispatcher,
                     model_override=model_override,
                 )
+            if run_result.status == "paused":
+                from initrunner.runner._approval import (
+                    persist_paused_run_if_needed,
+                    render_paused_run,
+                )
+
+                persist_paused_run_if_needed(
+                    run_result,
+                    role,
+                    messages,
+                    audit_logger=audit_logger,
+                    role_path=role_file,
+                )
+                render_paused_run(run_result)
+                raise typer.Exit(2)
         elif user_prompt and interactive:
             run_result, message_history = _run_single(
                 agent,

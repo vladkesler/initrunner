@@ -55,7 +55,7 @@ def _get_judge_agent(model: str = "openai:gpt-4o-mini"):
 
     agent = Agent(
         model,
-        system_prompt=_JUDGE_SYSTEM_PROMPT,
+        instructions=_JUDGE_SYSTEM_PROMPT,
         model_settings=ModelSettings(temperature=0.0, max_tokens=1000),
     )
 

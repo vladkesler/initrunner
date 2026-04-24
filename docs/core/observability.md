@@ -183,6 +183,8 @@ initrunner.agent.run                    ← InitRunner parent span
 | `initrunner.agent.run` | `initrunner.run_id`, `initrunner.agent_name`, `initrunner.trigger_type`, `initrunner.tokens_total`, `initrunner.duration_ms`, `initrunner.success` |
 | `initrunner.ingest` | `initrunner.agent_name`, `initrunner.ingest.files_processed`, `initrunner.ingest.chunks_created` |
 
+The same identifiers (`initrunner.run_id`, `initrunner.agent_name`, and `initrunner.trigger_type` when set) are also passed into PydanticAI's `metadata=` kwarg on every run. Backends such as Logfire surface these as span attributes on the PydanticAI-emitted children without extra configuration.
+
 ### PydanticAI spans (automatic)
 
 PydanticAI emits these spans when `instrument` is set on the Agent:

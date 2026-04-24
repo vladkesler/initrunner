@@ -14,6 +14,7 @@ from initrunner.agent.schema.base import (
     PartialModelConfig,
     RoleMetadata,
 )
+from initrunner.agent.schema.execution import ExecutionConfig
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.ingestion import IngestConfig
 from initrunner.agent.schema.memory import MemoryConfig
@@ -85,6 +86,7 @@ class AgentSpec(BaseModel):
     tools: list[ToolConfig] = []
     skills: list[str] = []
     capabilities: list = []
+    deps_schema: dict[str, Any] | None = None
     triggers: list[TriggerConfig] = []
     sinks: list[SinkConfig] = []
     ingest: IngestConfig | None = None
@@ -92,6 +94,7 @@ class AgentSpec(BaseModel):
     autonomy: AutonomyConfig | None = None
     reasoning: ReasoningConfig | None = None
     guardrails: Guardrails = Guardrails()
+    execution: ExecutionConfig = ExecutionConfig()
     resources: ResourceConfig = ResourceConfig()
     security: SecurityPolicy = SecurityPolicy()
     observability: ObservabilityConfig | None = None
