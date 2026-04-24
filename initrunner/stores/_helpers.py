@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from pydantic_ai.messages import (
@@ -17,15 +18,40 @@ if TYPE_CHECKING:
 
 
 def _filter_system_prompts(messages: list[ModelMessage]) -> list[ModelMessage]:
-    """Return messages with SystemPromptPart entries removed from ModelRequest parts."""
+    """Return messages normalized for persistence.
+
+    - ``SystemPromptPart`` entries are removed from each ``ModelRequest.parts``
+      (our static directive now flows through ``Agent.instructions`` instead).
+    - ``ModelRequest`` metadata (timestamp, run_id, metadata, etc.) is preserved
+      via ``dataclasses.replace`` rather than dropped by bare reconstruction.
+    - ``ModelRequest.instructions`` is retained only on the newest two retained
+      requests -- matching PydanticAI's ``_get_instructions`` resolver, which
+      falls back from the newest request to the second-most-recent when the
+      newest is a mock tool-return. Older requests' ``instructions`` are
+      nulled to keep saved sessions tight.
+    - Requests that become empty after stripping are dropped entirely.
+    """
     filtered: list[ModelMessage] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
             new_parts = [p for p in msg.parts if not isinstance(p, SystemPromptPart)]
-            if new_parts:
-                filtered.append(ModelRequest(parts=new_parts))
+            if not new_parts:
+                continue
+            filtered.append(dataclasses.replace(msg, parts=new_parts))
         else:
             filtered.append(msg)
+
+    kept = 0
+    for i in range(len(filtered) - 1, -1, -1):
+        msg = filtered[i]
+        if not isinstance(msg, ModelRequest):
+            continue
+        if kept < 2:
+            kept += 1
+            continue
+        if msg.instructions is not None:
+            filtered[i] = dataclasses.replace(msg, instructions=None)
+
     return filtered
 
 

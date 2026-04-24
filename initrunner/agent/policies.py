@@ -221,7 +221,7 @@ def _get_classifier_agent(model_override: Model | str | None = None):
 
     agent = Agent(
         model,
-        system_prompt=_CLASSIFIER_SYSTEM_PROMPT,
+        instructions=_CLASSIFIER_SYSTEM_PROMPT,
         model_settings=ModelSettings(temperature=0.0, max_tokens=200),
     )
 

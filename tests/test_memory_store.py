@@ -1,10 +1,13 @@
 """Tests for the memory store."""
 
+from datetime import UTC, datetime
+
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
     TextPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 
@@ -205,6 +208,70 @@ class TestFilterSystemPrompts:
         messages = [_make_request("q1"), _make_response("a1")]
         filtered = _filter_system_prompts(messages)
         assert len(filtered) == 2
+
+    def test_preserves_request_metadata(self):
+        ts = datetime(2026, 4, 24, 12, 0, tzinfo=UTC)
+        req = ModelRequest(
+            parts=[SystemPromptPart(content="system"), UserPromptPart(content="user")],
+            timestamp=ts,
+            run_id="run-xyz",
+            metadata={"trace": "abc123"},
+        )
+        filtered = _filter_system_prompts([req])
+        assert len(filtered) == 1
+        out = filtered[0]
+        assert isinstance(out, ModelRequest)
+        assert out.timestamp == ts
+        assert out.run_id == "run-xyz"
+        assert out.metadata == {"trace": "abc123"}
+
+    def test_retains_instructions_on_newest_two_requests(self):
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="q1")], instructions="inst-old"),
+            _make_response("a1"),
+            ModelRequest(parts=[UserPromptPart(content="q2")], instructions="inst-mid"),
+            _make_response("a2"),
+            ModelRequest(parts=[UserPromptPart(content="q3")], instructions="inst-new"),
+        ]
+        filtered = _filter_system_prompts(messages)
+        requests = [m for m in filtered if isinstance(m, ModelRequest)]
+        assert len(requests) == 3
+        assert requests[0].instructions is None
+        assert requests[1].instructions == "inst-mid"
+        assert requests[2].instructions == "inst-new"
+
+    def test_retains_instructions_when_newest_is_tool_return_only(self):
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="q1")], instructions="inst-old"),
+            _make_response("a1"),
+            ModelRequest(parts=[UserPromptPart(content="q2")], instructions="inst-second"),
+            _make_response("a2"),
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(tool_name="t", content="ok", tool_call_id="call-1"),
+                ],
+                instructions="inst-newest",
+            ),
+        ]
+        filtered = _filter_system_prompts(messages)
+        requests = [m for m in filtered if isinstance(m, ModelRequest)]
+        assert len(requests) == 3
+        assert requests[0].instructions is None
+        assert requests[1].instructions == "inst-second"
+        assert requests[2].instructions == "inst-newest"
+
+    def test_single_request_keeps_instructions(self):
+        messages: list = [
+            ModelRequest(
+                parts=[SystemPromptPart(content="s"), UserPromptPart(content="u")],
+                instructions="inst-only",
+            ),
+        ]
+        filtered = _filter_system_prompts(messages)
+        assert len(filtered) == 1
+        out = filtered[0]
+        assert isinstance(out, ModelRequest)
+        assert out.instructions == "inst-only"
 
 
 class TestConcurrentAccess:

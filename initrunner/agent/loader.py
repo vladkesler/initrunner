@@ -198,16 +198,16 @@ def _resolve_skills_and_merge(
     role_dir: Path | None,
     extra_skill_dirs: list[Path] | None,
 ) -> tuple[str, list, set[Path]]:
-    """Resolve skills, log warnings, merge tools, and compose the system prompt.
+    """Resolve skills, log warnings, merge tools, and compose the agent instructions.
 
-    Returns ``(system_prompt, all_tools, explicit_skill_paths)``.
+    Returns ``(instructions, all_tools, explicit_skill_paths)``.
     """
-    system_prompt = role.spec.role
+    instructions = role.spec.role
     all_tools = list(role.spec.tools)
     explicit_paths: set[Path] = set()
 
     if not role.spec.skills:
-        return system_prompt, all_tools, explicit_paths
+        return instructions, all_tools, explicit_paths
 
     from initrunner.agent.skills import (
         build_skill_system_prompt,
@@ -231,14 +231,14 @@ def _resolve_skills_and_merge(
     all_tools = merge_skill_tools(resolved_skills, role.spec.tools)
     skill_prompt = build_skill_system_prompt(resolved_skills)
     if skill_prompt:
-        system_prompt = f"{role.spec.role}\n\n{skill_prompt}"
+        instructions = f"{role.spec.role}\n\n{skill_prompt}"
 
-    return system_prompt, all_tools, explicit_paths
+    return instructions, all_tools, explicit_paths
 
 
 def _create_agent(
     role: RoleDefinition,
-    system_prompt: str,
+    instructions: str,
     toolsets: list,
     output_type: type,
     instrument: Any = None,
@@ -251,7 +251,7 @@ def _create_agent(
         model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
-        "system_prompt": system_prompt,
+        "instructions": instructions,
         "model_settings": ModelSettings(**model_settings_kwargs),
         "toolsets": toolsets if toolsets else None,
     }
@@ -415,7 +415,7 @@ def build_agent(
     _validate_provider(role)
     _validate_reasoning(role)
 
-    system_prompt, all_tools, explicit_paths = _resolve_skills_and_merge(
+    instructions, all_tools, explicit_paths = _resolve_skills_and_merge(
         role, role_dir, extra_skill_dirs
     )
 
@@ -432,7 +432,7 @@ def build_agent(
 
     auto = _build_auto_tools(role, role_dir, explicit_paths, extra_skill_dirs)
     toolsets.extend(auto.extra_toolsets)
-    system_prompt += auto.prompt_addendum
+    instructions += auto.prompt_addendum
 
     instrument = None
     if role.spec.observability is not None:
@@ -442,7 +442,7 @@ def build_agent(
 
     agent = _create_agent(
         role,
-        system_prompt,
+        instructions,
         toolsets,
         output_type,
         instrument=instrument,

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- **Agents now receive their static directive via PydanticAI's `instructions=` kwarg** instead of `system_prompt=`. The composed `spec.role` + skill prompts + auto-skill catalog + tool-search hint flow to `instructions=`; the two dynamic `@agent.system_prompt` decorators (procedural memory, resume context) stay as-is. Matches PydanticAI 1.71+ guidance. No role YAML change.
+- **`stores/_helpers._filter_system_prompts`** rewritten. Preserves `ModelRequest.timestamp`, `run_id`, and `metadata` through filtering (previously dropped by bare `ModelRequest(parts=...)` reconstruction). Also normalizes `ModelRequest.instructions` by retaining it only on the newest two retained requests, matching PydanticAI's `_get_instructions` resolver fallback.
+- **Five internal helper agents** (`eval/judge`, `agent/policies` classifier, three `services/agent_builder` wizard/import agents) migrated to `instructions=` for consistency.
+
 ## [2026.4.16] - 2026-04-18
 
 ### Breaking

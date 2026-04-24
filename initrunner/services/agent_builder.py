@@ -476,7 +476,7 @@ class BuilderSession:
         )
         model = _build_model(gen_model_config)
 
-        self._agent = Agent(model, system_prompt=system)
+        self._agent = Agent(model, instructions=system)
         return self._agent
 
     # -- Internal helpers ----------------------------------------------------
@@ -723,7 +723,7 @@ class BuilderSession:
             api_key_env=api_key_env,
         )
         model = _build_model(gen_model_config)
-        import_agent = Agent(model, system_prompt=system)
+        import_agent = Agent(model, instructions=system)
 
         # 5. Send structured summary to LLM
         prompt_text = lc_import.to_prompt_text()
@@ -818,7 +818,7 @@ class BuilderSession:
             api_key_env=api_key_env,
         )
         model = _build_model(gen_model_config)
-        import_agent = Agent(model, system_prompt=system)
+        import_agent = Agent(model, instructions=system)
 
         # 5. Send structured summary to LLM
         prompt_text = pai_import.to_prompt_text()

@@ -232,7 +232,7 @@ class TestBuildAgent:
         mock_agent_cls.assert_called_once()
         call_kwargs = mock_agent_cls.call_args
         assert call_kwargs.args[0] == "anthropic:claude-sonnet-4-5-20250929"
-        assert call_kwargs.kwargs["system_prompt"] == "You are helpful."
+        assert call_kwargs.kwargs["instructions"] == "You are helpful."
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
