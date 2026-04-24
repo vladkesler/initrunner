@@ -16,6 +16,47 @@ from initrunner.sinks.dispatcher import SinkDispatcher
 from initrunner.stores.base import MemoryStoreBase
 
 
+def _prompt_and_resume(
+    agent: Agent,
+    role: RoleDefinition,
+    result,
+    message_history: list,
+    *,
+    audit_logger: AuditLogger | None,
+    model_override: Model | str | None,
+) -> tuple:
+    """Inline y/N prompt for every pending approval, then resume.
+
+    Unlike the daemon/API path this never persists: the REPL holds the
+    message history in memory across the pause and resume, so we don't
+    need to round-trip through the audit DB.
+    """
+    from rich.prompt import Confirm
+
+    from initrunner.agent.executor import execute_run_resume
+
+    console.print(
+        f"\n[yellow]Run {result.run_id} paused — "
+        f"{len(result.pending_approvals)} tool call(s) need approval.[/yellow]"
+    )
+    approvals: dict[str, bool] = {}
+    for p in result.pending_approvals:
+        console.print(
+            f"\n  [bold]{p.tool_name}[/bold]  [magenta]{p.tool_call_id}[/magenta]\n  {p.arguments}"
+        )
+        approvals[p.tool_call_id] = Confirm.ask("  Approve?", default=False)
+
+    return execute_run_resume(
+        agent,
+        role,
+        run_id=result.run_id,
+        message_history=message_history,
+        approvals=approvals,
+        audit_logger=audit_logger,
+        model_override=model_override,
+    )
+
+
 def run_interactive(
     agent: Agent,
     role: RoleDefinition,
@@ -143,6 +184,16 @@ def run_interactive(
             sink_dispatcher=sink_dispatcher,
             model_override=model_override,
         )
+
+        while result.status == "paused":
+            result, message_history = _prompt_and_resume(
+                agent,
+                role,
+                result,
+                message_history,
+                audit_logger=audit_logger,
+                model_override=model_override,
+            )
 
         cumulative_tokens += result.total_tokens
         budget_status = check_token_budget(cumulative_tokens, session_budget)

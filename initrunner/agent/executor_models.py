@@ -4,6 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any, Literal
+
+RunStatus = Literal["done", "paused"]
+
+
+@dataclass
+class PendingApproval:
+    """A tool call the agent wants to execute, awaiting human approval."""
+
+    tool_call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
 
 
 class ErrorCategory(StrEnum):
@@ -32,6 +44,13 @@ class RunResult:
     error: str | None = None
     error_category: ErrorCategory | None = None
     tool_call_names: list[str] = field(default_factory=list)
+    status: RunStatus = "done"
+    """``"paused"`` when the run surfaced ``DeferredToolRequests`` awaiting
+    human approval; ``"done"`` otherwise. Paused runs have ``success=True``
+    and produce no ``output`` — the caller must resolve every entry in
+    ``pending_approvals`` and then call ``execute_run_resume()``.
+    """
+    pending_approvals: list[PendingApproval] = field(default_factory=list)
 
 
 @dataclass

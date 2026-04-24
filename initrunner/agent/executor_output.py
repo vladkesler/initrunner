@@ -15,7 +15,7 @@ from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
-from .executor_models import ErrorCategory, RunResult
+from .executor_models import ErrorCategory, PendingApproval, RunResult
 
 _logger = logging.getLogger(__name__)
 
@@ -206,7 +206,33 @@ def _extract_tool_call_names(messages: list) -> list[str]:
 
 def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
     """Serialize agent output, validate, extract usage. Returns new_messages."""
+    from pydantic_ai import DeferredToolRequests
+
     raw_output = agent_result.output
+    if isinstance(raw_output, DeferredToolRequests):
+        # Human-in-the-loop pause: the model asked to call tools whose
+        # ``approval: required`` config flags them unapproved. Capture each
+        # pending ToolCallPart verbatim — the caller resolves them via
+        # execute_run_resume() with DeferredToolResults.
+        result.status = "paused"
+        result.pending_approvals = [
+            PendingApproval(
+                tool_call_id=call.tool_call_id,
+                tool_name=call.tool_name,
+                arguments=_coerce_args_to_dict(call.args),
+            )
+            for call in raw_output.approvals
+        ]
+        result.output = ""
+        usage = agent_result.usage()
+        result.tokens_in = usage.input_tokens or 0
+        result.tokens_out = usage.output_tokens or 0
+        result.total_tokens = usage.total_tokens or 0
+        result.tool_calls = usage.tool_calls or 0
+        new_messages = agent_result.all_messages()
+        result.tool_call_names = _extract_tool_call_names(new_messages)
+        return new_messages
+
     if isinstance(raw_output, BaseModel):
         result.output = raw_output.model_dump_json()
     elif isinstance(raw_output, (dict, list)):
@@ -224,6 +250,24 @@ def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefini
     new_messages = agent_result.all_messages()
     result.tool_call_names = _extract_tool_call_names(new_messages)
     return new_messages
+
+
+def _coerce_args_to_dict(args: Any) -> dict[str, Any]:
+    """Normalize a ToolCallPart.args into a plain dict for persistence.
+
+    PydanticAI hands us either a JSON string (most providers) or a dict
+    (structured providers). Both shapes round-trip through json.dumps, so
+    we normalize to dict here to keep downstream consumers simple.
+    """
+    if isinstance(args, dict):
+        return args
+    if isinstance(args, str):
+        try:
+            parsed = json.loads(args)
+        except json.JSONDecodeError:
+            return {"_raw": args}
+        return parsed if isinstance(parsed, dict) else {"_value": parsed}
+    return {"_value": args}
 
 
 def _process_stream_output(

@@ -39,6 +39,14 @@ class ToolConfigBase(BaseModel):
 
     type: str
     permissions: ToolPermissions | None = None
+    approval: Literal["auto", "required"] = "auto"
+    """Human-in-the-loop gating.
+
+    ``"auto"`` (default) lets PydanticAI invoke the tool directly. ``"required"``
+    marks the tool so every call is surfaced as a
+    :class:`~pydantic_ai.DeferredToolRequests` and must be approved out-of-band
+    before execution resumes.
+    """
 
     def summary(self) -> str:
         return self.type

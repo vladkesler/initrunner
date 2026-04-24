@@ -235,7 +235,7 @@ def _run_agent(
             )
         elif user_prompt and not interactive:
             if effective in ("text", "json"):
-                run_result, _ = _run_formatted(
+                run_result, messages = _run_formatted(
                     effective,
                     agent,
                     role,
@@ -245,7 +245,7 @@ def _run_agent(
                     model_override=model_override,
                 )
             else:
-                run_result, _ = _run_single(
+                run_result, messages = _run_single(
                     agent,
                     role,
                     user_prompt,
@@ -253,6 +253,21 @@ def _run_agent(
                     sink_dispatcher=sink_dispatcher,
                     model_override=model_override,
                 )
+            if run_result.status == "paused":
+                from initrunner.runner._approval import (
+                    persist_paused_run_if_needed,
+                    render_paused_run,
+                )
+
+                persist_paused_run_if_needed(
+                    run_result,
+                    role,
+                    messages,
+                    audit_logger=audit_logger,
+                    role_path=role_file,
+                )
+                render_paused_run(run_result)
+                raise typer.Exit(2)
         elif user_prompt and interactive:
             run_result, message_history = _run_single(
                 agent,

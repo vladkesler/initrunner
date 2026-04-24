@@ -79,8 +79,9 @@ def run_single(
         if clarify_token is not None:
             reset_clarify_callback(clarify_token)
         reset_tool_event_callback(token)
-    _display_result(result)
-    if sink_dispatcher is not None:
+    if result.status != "paused":
+        _display_result(result)
+    if sink_dispatcher is not None and result.status != "paused":
         sink_dispatcher.dispatch(result, extract_text_from_prompt(prompt))
     return result, messages
 
@@ -161,11 +162,13 @@ def run_single_stream(
     out.write("\n")
     out.flush()
 
-    if result.success:
+    if result.status == "paused":
+        pass  # Pause renderer in the caller handles display.
+    elif result.success:
         _display_stream_stats(result)
     else:
         _display_result(result)
 
-    if sink_dispatcher is not None:
+    if sink_dispatcher is not None and result.status != "paused":
         sink_dispatcher.dispatch(result, extract_text_from_prompt(prompt))
     return result, messages

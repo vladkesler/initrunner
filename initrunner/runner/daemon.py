@@ -336,6 +336,44 @@ class DaemonRunner:
 
             assert result is not None  # at least one iteration always runs
 
+            # -- Human-in-the-loop pause -------------------------------------
+            # Pause is not a failure and must not retry. Persist state so
+            # `initrunner approve` (or the HTTP approvals route) can resume
+            # on another process; reply to conversational triggers with a
+            # short awaiting-approval note; skip the normal dispatch chain.
+            if not use_autonomous and result.status == "paused":  # type: ignore[union-attr]
+                from initrunner.runner._approval import persist_paused_run_if_needed
+
+                persisted = persist_paused_run_if_needed(
+                    result,  # type: ignore[arg-type]
+                    role,
+                    new_messages,
+                    audit_logger=self._audit_logger,
+                    role_path=self._role_path,
+                )
+                if event.reply_fn is not None:
+                    msg = (
+                        f"Awaiting approval for {len(result.pending_approvals)} "  # type: ignore[union-attr]
+                        f"tool call(s). Resume: initrunner approve {result.run_id} --all"
+                        if persisted
+                        else "Paused for approval, but audit persistence is off "
+                        "— this run cannot be resumed."
+                    )
+                    try:
+                        event.reply_fn(msg)
+                    except Exception:
+                        _logger.warning(
+                            "Failed to deliver pause notice for trigger %s",
+                            event.trigger_type,
+                            exc_info=True,
+                        )
+                _logger.info(
+                    "Run %s paused for approval (%d pending)",
+                    result.run_id,
+                    len(result.pending_approvals),  # type: ignore[union-attr]
+                )
+                return
+
             # -- Circuit breaker (one record per trigger fire) ----------------
             if self._circuit_breaker is not None:
                 if result.success:

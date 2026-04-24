@@ -280,7 +280,7 @@ def _create_agent(
     role: RoleDefinition,
     instructions: str,
     toolsets: list,
-    output_type: type,
+    output_type: Any,
     instrument: Any = None,
     prepare_tools: Any = None,
     capabilities: list | None = None,
@@ -438,7 +438,7 @@ def _build_auto_tools(
 def build_agent(
     role: RoleDefinition,
     role_dir: Path | None = None,
-    output_type: type | None = None,
+    output_type: Any = None,
     extra_skill_dirs: list[Path] | None = None,
     *,
     prefer_async: bool = False,
@@ -463,6 +463,15 @@ def build_agent(
         from initrunner.agent.output import resolve_output_type
 
         output_type = resolve_output_type(role.spec.output, role_dir)
+
+    # Widen output_type to a union with DeferredToolRequests when any tool
+    # requires human approval, so PydanticAI can surface pending calls
+    # instead of executing them. Only widens when the caller didn't supply
+    # an explicit output_type to preserve caller intent.
+    if any(t.approval == "required" for t in all_tools):
+        from pydantic_ai import DeferredToolRequests
+
+        output_type = [output_type, DeferredToolRequests]
 
     from initrunner.agent.tools import build_toolsets
 

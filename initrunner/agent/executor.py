@@ -334,6 +334,154 @@ def execute_run(
 
 
 # ---------------------------------------------------------------------------
+# Resume execution (human-in-the-loop approval)
+# ---------------------------------------------------------------------------
+
+
+def _resume_prompt(approvals: dict[str, bool]) -> UserPrompt:
+    """Synthetic prompt recorded in the audit trail for a resume."""
+    decisions = ", ".join(f"{tcid}:{'approve' if ok else 'deny'}" for tcid, ok in approvals.items())
+    return f"(resume: {decisions})"
+
+
+def execute_run_resume(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Resume a paused run by supplying approvals for pending tool calls.
+
+    Unlike ``execute_run`` this does not take a new prompt — the model
+    already produced one, the user just answered the approval question.
+    On re-pause (the model queues more approval-required calls after
+    executing the approved ones) the returned ``RunResult`` has
+    ``status="paused"`` again with a fresh ``pending_approvals`` list.
+    """
+    from pydantic_ai import DeferredToolResults
+
+    agent_token = _enter_agent_context(role)
+    try:
+        result = RunResult(run_id=run_id)
+        start = time.monotonic()
+        deferred = DeferredToolResults(approvals=dict(approvals))
+        run_kwargs: dict[str, Any] = {
+            "message_history": message_history,
+            "deferred_tool_results": deferred,
+            "model": model_override,
+            "metadata": {"input_validated": True},
+        }
+        new_messages: list = []
+        timeout = role.spec.guardrails.timeout_seconds
+
+        with _create_run_span(run_id, role, trigger_type="resume") as span:
+            try:
+                agent_result = _run_with_timeout(
+                    lambda: _retry_model_call(lambda: agent.run_sync(**run_kwargs)),
+                    timeout=timeout,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+                FallbackExceptionGroup,
+            ) as e:
+                _handle_run_error(result, e, timeout_seconds=timeout)
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            _resume_prompt(approvals),
+            audit_logger=audit_logger,
+            trigger_type="resume",
+            principal_id=principal_id,
+        )
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
+
+
+async def execute_run_resume_async(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Async variant of ``execute_run_resume``."""
+    from pydantic_ai import DeferredToolResults
+
+    agent_token = _enter_agent_context(role)
+    try:
+        result = RunResult(run_id=run_id)
+        start = time.monotonic()
+        deferred = DeferredToolResults(approvals=dict(approvals))
+        run_kwargs: dict[str, Any] = {
+            "message_history": message_history,
+            "deferred_tool_results": deferred,
+            "model": model_override,
+            "metadata": {"input_validated": True},
+        }
+        new_messages: list = []
+        timeout = role.spec.guardrails.timeout_seconds
+
+        with _create_run_span(run_id, role, trigger_type="resume") as span:
+            try:
+                agent_result = await asyncio.wait_for(
+                    _retry_model_call_async(lambda: agent.run(**run_kwargs)),
+                    timeout=timeout,
+                )
+                new_messages = _process_agent_output(agent_result, result, role)
+            except ContentBlockedError as e:
+                result.success = False
+                result.error = e.reason
+                result.error_category = ErrorCategory.CONTENT_BLOCKED
+            except (
+                ModelHTTPError,
+                UsageLimitExceeded,
+                ConnectionError,
+                TimeoutError,
+                OSError,
+                FallbackExceptionGroup,
+            ) as e:
+                _handle_run_error(result, e, timeout_seconds=timeout)
+
+            result.duration_ms = int((time.monotonic() - start) * 1000)
+            _record_span_metrics(span, result)
+
+        _audit_result(
+            result,
+            role,
+            _resume_prompt(approvals),
+            audit_logger=audit_logger,
+            trigger_type="resume",
+            principal_id=principal_id,
+        )
+        return result, new_messages
+    finally:
+        _exit_agent_context(agent_token)
+
+
+# ---------------------------------------------------------------------------
 # Streaming execution
 # ---------------------------------------------------------------------------
 

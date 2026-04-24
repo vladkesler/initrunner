@@ -247,6 +247,69 @@ INSERT INTO delegate_events (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
+_CREATE_PENDING_APPROVALS_TABLE = """\
+CREATE TABLE IF NOT EXISTS pending_approvals (
+    run_id TEXT NOT NULL,
+    tool_call_id TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    role_path TEXT,
+    arguments_json TEXT NOT NULL,
+    message_history_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    resolved_at TEXT,
+    resolved_by TEXT,
+    decision TEXT,
+    PRIMARY KEY (run_id, tool_call_id)
+);
+"""
+
+_CREATE_PENDING_APPROVALS_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_pending_run_id ON pending_approvals (run_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pending_unresolved "
+    "ON pending_approvals (resolved_at) WHERE resolved_at IS NULL;",
+    "CREATE INDEX IF NOT EXISTS idx_pending_agent ON pending_approvals (agent_name);",
+]
+
+_INSERT_PENDING_APPROVAL = """\
+INSERT INTO pending_approvals (
+    run_id, tool_call_id, tool_name, agent_name, role_path,
+    arguments_json, message_history_json, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+"""
+
+_SELECT_PENDING_BY_RUN = """\
+SELECT * FROM pending_approvals WHERE run_id = ? ORDER BY created_at ASC;
+"""
+
+_SELECT_PENDING_UNRESOLVED = """\
+SELECT * FROM pending_approvals WHERE resolved_at IS NULL
+ORDER BY created_at ASC LIMIT ?;
+"""
+
+_UPDATE_PENDING_RESOLVE = """\
+UPDATE pending_approvals
+SET resolved_at = ?, resolved_by = ?, decision = ?
+WHERE run_id = ? AND tool_call_id = ? AND resolved_at IS NULL;
+"""
+
+
+@dataclass
+class PendingApprovalRecord:
+    """One pending or resolved tool-call approval request."""
+
+    run_id: str
+    tool_call_id: str
+    tool_name: str
+    agent_name: str
+    role_path: str | None
+    arguments_json: str
+    message_history_json: str
+    created_at: str
+    resolved_at: str | None = None
+    resolved_by: str | None = None
+    decision: str | None = None  # "approve" | "deny"
+
 
 def _default_db_path() -> Path:
     from initrunner.config import get_audit_db_path
@@ -357,6 +420,23 @@ def _row_to_delegate_event(row: sqlite3.Row) -> DelegateAuditEvent:
     )
 
 
+def _row_to_pending(row: sqlite3.Row) -> PendingApprovalRecord:
+    """Convert a sqlite3.Row to a PendingApprovalRecord."""
+    return PendingApprovalRecord(
+        run_id=row["run_id"],
+        tool_call_id=row["tool_call_id"],
+        tool_name=row["tool_name"],
+        agent_name=row["agent_name"],
+        role_path=row["role_path"],
+        arguments_json=row["arguments_json"],
+        message_history_json=row["message_history_json"],
+        created_at=row["created_at"],
+        resolved_at=row["resolved_at"],
+        resolved_by=row["resolved_by"],
+        decision=row["decision"],
+    )
+
+
 def _row_to_record(row: sqlite3.Row) -> AuditRecord:
     """Convert a sqlite3.Row to an AuditRecord."""
     return AuditRecord(
@@ -452,6 +532,7 @@ class AuditLogger:
             self._conn.execute(_CREATE_SECURITY_EVENTS_TABLE)
             self._conn.execute(_CREATE_DELEGATE_EVENTS_TABLE)
             self._conn.execute(_CREATE_BUDGET_STATE_TABLE)
+            self._conn.execute(_CREATE_PENDING_APPROVALS_TABLE)
             _migrate_add_trigger_columns(self._conn)
             _migrate_add_principal_column(self._conn)
             _migrate_add_compose_name_column(self._conn)
@@ -462,6 +543,8 @@ class AuditLogger:
             for idx in _CREATE_SECURITY_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_DELEGATE_INDEXES:
+                self._conn.execute(idx)
+            for idx in _CREATE_PENDING_APPROVALS_INDEXES:
                 self._conn.execute(idx)
             self._conn.commit()
         except Exception:
@@ -1322,6 +1405,89 @@ class AuditLogger:
         """Delete old audit records and trim to max_records. Returns count deleted."""
         with self._lock:
             return self._prune_locked(retention_days, max_records)
+
+    # ------------------------------------------------------------------
+    # Pending approvals (human-in-the-loop)
+    # ------------------------------------------------------------------
+
+    def record_pending_approval(
+        self,
+        *,
+        run_id: str,
+        tool_call_id: str,
+        tool_name: str,
+        agent_name: str,
+        role_path: str | None,
+        arguments_json: str,
+        message_history_json: str,
+    ) -> None:
+        """Persist one pending tool-call approval. Never raises.
+
+        Unlike run audit records these carry live state needed to resume
+        execution, so losing a row means the run cannot continue. Callers
+        must check ``is_pending_persisted()`` before telling the user the
+        run is paused and safely resumable.
+        """
+        ts = datetime.now(UTC).isoformat()
+        scrubbed_args = scrub_secrets(arguments_json)
+        self._execute_insert_locked(
+            _INSERT_PENDING_APPROVAL,
+            (
+                run_id,
+                tool_call_id,
+                tool_name,
+                agent_name,
+                role_path,
+                scrubbed_args,
+                message_history_json,
+                ts,
+            ),
+            error_label="pending approval",
+            auto_prune=False,
+        )
+
+    def load_pending_approvals(self, run_id: str) -> list[PendingApprovalRecord]:
+        """Return every pending-approval row for a run, oldest first."""
+        try:
+            with self._lock:
+                rows = self._conn.execute(_SELECT_PENDING_BY_RUN, (run_id,)).fetchall()
+        except Exception as e:
+            logger.error("Failed to load pending approvals for %s: %s", run_id, e)
+            return []
+        return [_row_to_pending(row) for row in rows]
+
+    def list_pending_approvals(self, *, limit: int = 100) -> list[PendingApprovalRecord]:
+        """Return unresolved approvals across all runs, oldest first."""
+        try:
+            with self._lock:
+                rows = self._conn.execute(_SELECT_PENDING_UNRESOLVED, (limit,)).fetchall()
+        except Exception as e:
+            logger.error("Failed to list pending approvals: %s", e)
+            return []
+        return [_row_to_pending(row) for row in rows]
+
+    def resolve_pending_approval(
+        self,
+        *,
+        run_id: str,
+        tool_call_id: str,
+        decision: bool,
+        resolved_by: str | None = None,
+    ) -> bool:
+        """Mark one pending approval resolved. Returns True if a row was updated."""
+        ts = datetime.now(UTC).isoformat()
+        decision_str = "approve" if decision else "deny"
+        try:
+            with self._lock:
+                cursor = self._conn.execute(
+                    _UPDATE_PENDING_RESOLVE,
+                    (ts, resolved_by, decision_str, run_id, tool_call_id),
+                )
+                self._conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error("Failed to resolve pending approval %s/%s: %s", run_id, tool_call_id, e)
+            return False
 
     def close(self) -> None:
         with self._lock:

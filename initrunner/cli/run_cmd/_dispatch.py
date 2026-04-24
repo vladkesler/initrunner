@@ -80,6 +80,7 @@ def _dispatch_serve(
             audit_logger=audit_logger,
             api_key=api_key,
             cors_origins=cors_origin,
+            role_path=role_file,
         )
 
 
