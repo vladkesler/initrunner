@@ -2,10 +2,34 @@
 
 ## [Unreleased]
 
+## [2026.4.17] - 2026-04-24
+
+### Added
+- **`spec.model.fallback`** accepts a list of `provider:model` strings (or aliases). When set, `_build_model` wraps the primary and fallbacks in pydantic-ai's `FallbackModel` so runs survive single-provider outages (5xx, 429, auth, connection resets) without call-site changes. Each entry is resolved and validated at load time; Ollama and custom-`base_url` providers are rejected in the fallback chain because aliases cannot carry a `base_url`. The executor catches `FallbackExceptionGroup` on both sync and async paths and classifies by the last inner exception, emitting an error string that lists every provider's failure. See `examples/roles/fallback-demo.yaml` and `docs/configuration/providers.md`.
+- **Human-in-the-loop approval.** Mark any tool config with `approval: required` and runs pause whenever the model wants to call it, using PydanticAI's native `DeferredToolRequests` / `DeferredToolResults` contract so each runner mode resumes without re-prompting or losing message history.
+  - `RunResult` gains `status` and `pending_approvals`; executor exposes `execute_run_resume` and `execute_run_resume_async`.
+  - New `pending_approvals` audit table persists the message history so another process can resume.
+  - REPL prompts y/N inline; single-shot exits 2 with a CLI resume hint; daemon persists and keeps serving other triggers; API returns `finish_reason: tool_calls_pending_approval` and exposes `POST /v1/approvals/{run_id}`.
+  - CLI: `initrunner pending`, `initrunner approve RUN_ID [--all|--tool-call-id] [--deny]`. Docs: `docs/security/approvals.md`.
+- **Dashboard approval queue.** `/approvals` queue route with keyboard navigation and bulk actions; inline `ApprovalCardGroup` in `RunPanel`; `ApprovalDrawer` for multi-call detail; `ShortcutOverlay` (`?`). Sidebar Approvals entry under Operate with a count badge (tabular-nums, polling every 20s + SSE bump). New router `routers/approvals.py` (`GET /api/approvals/pending`, `GET /api/approvals/{run_id}`, `POST /api/approvals/{run_id}`) calls `services.execution.resume_run_sync` in-process. Streaming layer fires a new `approval_required` SSE event when the executor pauses and carries `status` + `pending_approvals` in the result payload.
+- **Streaming structured output.** Structured-output roles now stream progressively-validated partials via `StreamedRunResultSync.stream_output()` (the previous hard forbid on `output.type != "text"` is gone). Sync and async streaming paths accept an `on_partial` callback; the async path additionally accepts an `on_event` callback that yields typed `AgentStreamEvent` instances via `run_stream_events()`. Dashboard emits `partial_output` SSE frames for structured roles instead of falling back to non-streaming.
+- **`spec.execution` block** for agent-level execution semantics (`retries`, `output_retries`, `end_strategy`, `tool_timeout_seconds`), distinct from `guardrails` budgets.
+- **`spec.execution.max_concurrency`** (`{max_running, max_queued}`) wires `pydantic_ai.ConcurrencyLimit` on Agent for per-agent backpressure. `max_running` is required when the block is present.
+- **`spec.deps_schema` with `{{var}}` templating.** Flat-scalar interpolation into `spec.role` and related fields, rendered through a local hook (no `pydantic-handlebars` dep). `initrunner run --var KEY=VALUE` threads values into single-shot runs. See `docs/getting-started/agent-spec-import.md`.
+- **Agent Spec import/export.** `initrunner run --agent-spec <file>` imports a PydanticAI Agent Spec (JSON or YAML) as a transient role; `initrunner export agent-spec <role.yaml>` emits the reverse mapping. `retries`, `output_retries`, `end_strategy`, and `tool_timeout` round-trip through `spec.execution`.
+- **Run identifiers in PydanticAI `metadata=`.** `agent.run(metadata=...)` now carries `initrunner.run_id`, `initrunner.agent_name`, and `initrunner.trigger_type` (when set) alongside the existing `input_validated` flag, so Logfire and equivalent backends surface them on PydanticAI's emitted spans without scraping InitRunner's parent span attributes.
+
 ### Changed
 - **Agents now receive their static directive via PydanticAI's `instructions=` kwarg** instead of `system_prompt=`. The composed `spec.role` + skill prompts + auto-skill catalog + tool-search hint flow to `instructions=`; the two dynamic `@agent.system_prompt` decorators (procedural memory, resume context) stay as-is. Matches PydanticAI 1.71+ guidance. No role YAML change.
 - **`stores/_helpers._filter_system_prompts`** rewritten. Preserves `ModelRequest.timestamp`, `run_id`, and `metadata` through filtering (previously dropped by bare `ModelRequest(parts=...)` reconstruction). Also normalizes `ModelRequest.instructions` by retaining it only on the newest two retained requests, matching PydanticAI's `_get_instructions` resolver fallback.
 - **Five internal helper agents** (`eval/judge`, `agent/policies` classifier, three `services/agent_builder` wizard/import agents) migrated to `instructions=` for consistency.
+- **`_validate_provider`** iterates the full model + fallback chain so a missing provider SDK fails fast at load time, not at failover time.
+
+### Fixed
+- **Race on shared run-scoped state.** `todo`, `think`, `spawn`, and `clarify` toolsets now build with `FunctionToolset(sequential=True)`. PydanticAI's default tool-execution mode is `parallel`; if the model emitted two calls to the same toolset in one turn, they could race on `ReflectionState.todo` or `SpawnPool` internals.
+
+### Removed
+- **`FlowOrchestrator.max_agent_workers`** parameter. Non-functional since the pydantic-graph async migration; no callers referenced it outside its declaration line.
 
 ## [2026.4.16] - 2026-04-18
 
