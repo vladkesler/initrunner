@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run Trivy on published image
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: "ghcr.io/vladkesler/initrunner:latest"
           format: "sarif"
