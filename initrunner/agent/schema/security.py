@@ -287,10 +287,26 @@ class DockerBackendConfig(BaseModel):
         return v
 
 
+class SSHBackendConfig(BaseModel):
+    """SSH-specific settings nested under sandbox.ssh.
+
+    SSH is *remote execution*, not a kernel sandbox. The host is resolved via
+    the user's ``~/.ssh/config`` and ``ssh-agent``; this struct only carries
+    a couple of explicit overrides.
+    """
+
+    host: Annotated[str, Field(min_length=1)]
+    config_file: str | None = None
+    identity_file: str | None = None
+    remote_cwd: str | None = None
+    connect_timeout: Annotated[int, Field(gt=0)] = 10
+    control_persist: str = "60s"
+
+
 class SandboxConfig(BaseModel):
     """Backend-agnostic runtime sandbox configuration."""
 
-    backend: Literal["auto", "bwrap", "docker", "none"] = "none"
+    backend: Literal["auto", "bwrap", "docker", "ssh", "none"] = "none"
     network: Literal["none", "bridge", "host"] = "none"
     allowed_read_paths: list[str] = Field(default_factory=list)
     allowed_write_paths: list[str] = Field(default_factory=list)
@@ -300,6 +316,7 @@ class SandboxConfig(BaseModel):
     bind_mounts: list[BindMount] = Field(default_factory=list)
     env_passthrough: list[str] = Field(default_factory=list)
     docker: DockerBackendConfig = DockerBackendConfig()
+    ssh: SSHBackendConfig | None = None
 
     @field_validator("memory_limit")
     @classmethod
@@ -319,6 +336,51 @@ class SandboxConfig(BaseModel):
             )
         if len(targets) != len(set(targets)):
             raise ValueError("duplicate bind_mount targets")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_ssh_constraints(self) -> SandboxConfig:
+        """SSH is remote execution, not isolation. Reject knobs that don't apply.
+
+        Defaults (read_only_rootfs=True, network=none, default docker subconfig)
+        are accepted as inert under SSH so naive `backend: ssh` configs work.
+        Only explicit divergence -- bind_mounts, allowed_*_paths, network=bridge
+        -- is rejected, because those silently misleading would surprise users.
+        """
+        if self.backend != "ssh":
+            return self
+
+        if self.ssh is None:
+            raise ValueError(
+                "sandbox.backend is 'ssh' but sandbox.ssh is unset. "
+                "Add `ssh: { host: <host> }` to the sandbox config."
+            )
+
+        unsupported_v1 = (
+            "SSH backend has no shared filesystem with the local host. "
+            "v1.1 will add SCP staging; for now, use a remote-installed "
+            "interpreter via shell tools and keep this list empty."
+        )
+        if self.bind_mounts:
+            raise ValueError(
+                f"sandbox.bind_mounts is not supported with backend: ssh. {unsupported_v1}"
+            )
+        if self.allowed_read_paths:
+            raise ValueError(
+                f"sandbox.allowed_read_paths is not supported with backend: ssh. {unsupported_v1}"
+            )
+        if self.allowed_write_paths:
+            raise ValueError(
+                f"sandbox.allowed_write_paths is not supported with backend: ssh. {unsupported_v1}"
+            )
+
+        if self.network == "bridge":
+            raise ValueError(
+                "sandbox.network: bridge is not meaningful with backend: ssh "
+                "(SSH cannot enforce remote network isolation). "
+                "Use 'none' or 'host' (both treated as informational)."
+            )
+
         return self
 
 

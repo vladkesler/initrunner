@@ -46,13 +46,18 @@ def resolve_backend(
 
         return DockerBackend(config, role_dir=role_dir, audit=audit, agent_name=agent_name)
 
+    if backend == "ssh":
+        from initrunner.agent.runtime_sandbox.ssh import SSHBackend
+
+        return SSHBackend(config, role_dir=role_dir, audit=audit, agent_name=agent_name)
+
     if backend == "auto":
         return _resolve_auto(config, role_dir=role_dir, audit=audit, agent_name=agent_name)
 
     raise SandboxUnavailableError(
         backend=backend,
         reason=f"Unknown sandbox backend '{backend}'",
-        remediation="Use one of: auto, bwrap, docker, none",
+        remediation="Use one of: auto, bwrap, docker, ssh, none",
     )
 
 

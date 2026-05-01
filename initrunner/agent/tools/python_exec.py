@@ -14,6 +14,7 @@ from initrunner.agent._subprocess import (
     SubprocessTimeout,
     format_subprocess_output,
 )
+from initrunner.agent.runtime_sandbox.base import SandboxConfigError
 from initrunner.agent.schema.security import BindMount
 from initrunner.agent.schema.tools import PythonToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
@@ -100,6 +101,11 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
             )
         except SubprocessTimeout as exc:
             return str(exc)
+        except SandboxConfigError as exc:
+            # Backend cannot stage local code (e.g. SSH has no shared filesystem).
+            # Surface the message to the model instead of crashing the run so it
+            # can adapt -- usually by switching to the shell tool.
+            return f"Error: python tool unavailable on this sandbox backend: {exc}"
         finally:
             if use_temp:
                 shutil.rmtree(work_dir, ignore_errors=True)
