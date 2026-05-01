@@ -48,6 +48,13 @@ def run(
         int | None,
         typer.Option("--max-iterations", help="Override max iterations for autonomous mode"),
     ] = None,
+    token_budget: Annotated[
+        int | None,
+        typer.Option(
+            "--token-budget",
+            help="Cumulative token budget across the run, including delegations",
+        ),
+    ] = None,
     resume: Annotated[bool, typer.Option("--resume", help="Resume previous REPL session")] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Simulate with TestModel (no API calls)")
@@ -449,6 +456,7 @@ def run(
         interactive=interactive,
         autonomous=autonomous,
         max_iterations=max_iterations,
+        token_budget=token_budget,
         resume=resume,
         dry_run=dry_run,
         audit_db=audit_db,

@@ -67,6 +67,7 @@ class TestRunDryRun:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         agent = MagicMock()
         mock_load.return_value = (role, agent)
         mock_run_single.return_value = (
@@ -96,6 +97,7 @@ class TestRunDryRun:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         agent = MagicMock()
         mock_load.return_value = (role, agent)
         mock_run_single.return_value = (

@@ -2,20 +2,21 @@
 
 Tool subprocesses run under kernel-level isolation, outside the initrunner process. This is distinct from the PEP 578 audit-hook sandbox (`security.tools.audit_hooks_enabled`), which runs inside the Python process.
 
-Pick one of two backends:
+Pick one of three backends:
 
 - **[Bubblewrap](bubblewrap.md)** — Linux user namespaces. No daemon, no Docker, no root. Default on Linux.
 - **[Docker](docker-sandbox.md)** — containers via the Docker daemon. Works on macOS, Windows, and Linux. Supports pinned images and bridge networking.
+- **[SSH](ssh-sandbox.md)** — remote execution on an existing host via OpenSSH. Not a kernel sandbox; use for *where* code runs (a build server, a GPU box), not for *containing* untrusted code.
 
-`backend: auto` tries bwrap on Linux and falls back to Docker. This page is the shared config reference; the linked pages cover each backend's details, examples, and limits.
+`backend: auto` tries bwrap on Linux and falls back to Docker. SSH is opt-in only (`backend: ssh`) because it needs an explicit remote host. This page is the shared config reference; the linked pages cover each backend's details, examples, and limits.
 
 ## Configuration
 
 ```yaml
 security:
   sandbox:
-    backend: auto | bwrap | docker | none   # default: none
-    network: none | bridge | host            # default: none
+    backend: auto | bwrap | docker | ssh | none   # default: none
+    network: none | bridge | host                  # default: none
     allowed_read_paths: []
     allowed_write_paths: []
     memory_limit: "256m"
@@ -27,6 +28,13 @@ security:
       image: "python:3.12-slim"
       user: "auto"
       extra_args: []
+    ssh:
+      host: my-build-box           # required when backend: ssh
+      remote_cwd: /srv/work        # optional; SSH login dir if unset
+      identity_file: null          # optional override; falls back to ~/.ssh/config
+      config_file: null            # optional override
+      connect_timeout: 10
+      control_persist: "60s"
 ```
 
 ### `backend`
@@ -36,7 +44,8 @@ security:
 | `none` | No isolation. Tool subprocesses run on the host. |
 | `bwrap` | Bubblewrap (Linux only). Lightweight user-namespace sandbox. |
 | `docker` | Docker container. Requires a running Docker daemon. |
-| `auto` | Prefers bwrap on Linux, falls back to Docker. Never falls to none. |
+| `ssh` | Remote execution on a host via OpenSSH. Not a kernel sandbox. See [ssh-sandbox.md](ssh-sandbox.md). |
+| `auto` | Prefers bwrap on Linux, falls back to Docker. Never selects `ssh` (requires explicit host) and never falls to `none`. |
 
 ### `network`
 

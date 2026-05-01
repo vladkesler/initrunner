@@ -142,6 +142,7 @@ def _run_agent(
     interactive: bool,
     autonomous: bool,
     max_iterations: int | None,
+    token_budget: int | None,
     resume: bool,
     dry_run: bool,
     audit_db: Path | None,
@@ -242,25 +243,51 @@ def _run_agent(
                 max_iterations_override=max_iterations,
             )
         elif user_prompt and not interactive:
-            if effective in ("text", "json"):
-                run_result, messages = _run_formatted(
-                    effective,
-                    agent,
-                    role,
-                    user_prompt,
-                    audit_logger=audit_logger,
-                    sink_dispatcher=sink_dispatcher,
-                    model_override=model_override,
-                )
-            else:
-                run_result, messages = _run_single(
-                    agent,
-                    role,
-                    user_prompt,
-                    audit_logger=audit_logger,
-                    sink_dispatcher=sink_dispatcher,
-                    model_override=model_override,
-                )
+            from initrunner.runner.run_budget import (
+                make_single_shot_tracker,
+                reset_run_budget_tracker,
+                set_run_budget_tracker,
+            )
+
+            tracker = make_single_shot_tracker(role, token_budget)
+            if tracker is not None:
+                allowed, reason = tracker.check_before_run()
+                if not allowed:
+                    console.print(f"[red]Error:[/red] Run token budget exhausted: {reason}")
+                    raise typer.Exit(1)
+
+            ctx_token = set_run_budget_tracker(tracker)
+            run_result = None
+            try:
+                if effective in ("text", "json"):
+                    run_result, messages = _run_formatted(
+                        effective,
+                        agent,
+                        role,
+                        user_prompt,
+                        audit_logger=audit_logger,
+                        sink_dispatcher=sink_dispatcher,
+                        model_override=model_override,
+                    )
+                else:
+                    run_result, messages = _run_single(
+                        agent,
+                        role,
+                        user_prompt,
+                        audit_logger=audit_logger,
+                        sink_dispatcher=sink_dispatcher,
+                        model_override=model_override,
+                    )
+            finally:
+                if tracker is not None:
+                    if run_result is not None:
+                        tracker.record_usage(run_result.tokens_in, run_result.tokens_out)
+                    else:
+                        # Release the reservation taken by check_before_run when
+                        # the run never produced a RunResult (e.g. exception).
+                        tracker.record_usage(0, 0)
+                reset_run_budget_tracker(ctx_token)
+
             if run_result.status == "paused":
                 from initrunner.runner._approval import (
                     persist_paused_run_if_needed,

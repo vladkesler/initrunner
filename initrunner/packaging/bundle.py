@@ -37,7 +37,7 @@ class BundleManifest(BaseModel):
     initrunner_version: str = __version__
     files: list[BundleFile] = []
     dependencies: list[str] = []
-    supported_sandbox_backends: list[Literal["bwrap", "docker"]] = []
+    supported_sandbox_backends: list[Literal["bwrap", "docker", "ssh"]] = []
 
 
 def _file_sha256(path: Path) -> str:
@@ -181,7 +181,7 @@ def create_bundle(role_path: Path, output_dir: Path | None = None) -> Path:
         sandbox_backends: list[str] = []
     elif sandbox_backend == "auto":
         sandbox_backends = ["bwrap", "docker"]
-    elif sandbox_backend in ("bwrap", "docker"):
+    elif sandbox_backend in ("bwrap", "docker", "ssh"):
         sandbox_backends = [sandbox_backend]
     else:
         sandbox_backends = []

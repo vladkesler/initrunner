@@ -106,6 +106,7 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `-i, --interactive` | Interactive REPL mode |
 | `-a, --autonomous` | Autonomous agentic loop mode (requires `-p`) |
 | `--max-iterations N` | Override max iterations for autonomous mode |
+| `--token-budget N` | Cumulative token budget across the run, including inline-delegated sub-agents. Overrides `guardrails.run_token_budget` for this invocation. |
 | `--resume` | Resume the previous REPL session (requires `memory:` config) |
 | `--dry-run` | Simulate with TestModel (no API calls) |
 | `--daemon` | Run in trigger-driven daemon mode |

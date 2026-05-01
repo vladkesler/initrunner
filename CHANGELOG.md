@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [2026.5.1] - 2026-05-01
+
+### Added
+- **SSH execution backend for remote tool runs.** New `backend: ssh` option for `security.sandbox` runs `shell`, `python`, and `script` tools on a remote host over OpenSSH (ControlMaster-multiplexed, auth via `~/.ssh/config` + ssh-agent). Slots into the existing `SandboxBackend` Protocol next to `bwrap`, `docker`, and `none`. SSH is remote execution, not isolation, so the schema rejects `bind_mounts`, `allowed_read_paths` / `allowed_write_paths`, and `network: bridge` at load time with explicit migration messages; `python_exec` reports the unsupported `extra_mounts` case to the model instead of crashing the run. See `docs/security/ssh-sandbox.md`.
+- **Per-run token budget for one-shot CLI mode.** New `guardrails.run_token_budget` schema field and `--token-budget N` CLI flag cap cumulative token usage across a single `initrunner run` invocation. The tracker is shared via `ContextVar` so it propagates through the timeout thread-pool to delegate tools fired during the parent's model call, meaning inline-delegated sub-agents count against the parent's budget. See `docs/configuration/guardrails.md` and `docs/getting-started/cli.md`.
+
+### Fixed
+- **`initrunner new` dispatch missing `token_budget` kwarg.** The token-budget feature added a required keyword to `_run_agent` but the call site in `cli/new_cmd.py` (used after `initrunner new ... --run`) wasn't updated. Now passes `token_budget=None`.
+
+### Dependencies
+- Bump `aquasecurity/trivy-action` 0.35.0 → 0.36.0 (#104)
+- Bump dashboard `@sveltejs/kit` 2.57.1 → 2.58.0 and `svelte` (#105)
+- Bump dashboard `@tailwindcss/vite` 4.2.2 → 4.2.4 and `tailwindcss` (#106)
+- Bump dashboard `vite` 8.0.9 → 8.0.10 (#107)
+
 ## [2026.4.18] - 2026-04-24
 
 ### Fixed
