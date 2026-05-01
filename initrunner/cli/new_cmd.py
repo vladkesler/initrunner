@@ -53,6 +53,7 @@ def _dispatch_run(yaml_path: Path, prompt: str) -> None:
         interactive=False,
         autonomous=False,
         max_iterations=None,
+        token_budget=None,
         resume=False,
         dry_run=False,
         audit_db=None,
