@@ -35,6 +35,7 @@ class Guardrails(BaseModel):
 
     # Cumulative budgets
     session_token_budget: Annotated[int, Field(gt=0)] | None = None
+    run_token_budget: Annotated[int, Field(gt=0)] | None = None
     daemon_token_budget: Annotated[int, Field(gt=0)] | None = None
     daemon_daily_token_budget: Annotated[int, Field(gt=0)] | None = None
 

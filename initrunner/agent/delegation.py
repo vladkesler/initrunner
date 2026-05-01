@@ -166,6 +166,7 @@ class InlineInvoker:
         from initrunner.agent.executor import execute_run
         from initrunner.agent.loader import load_and_build
         from initrunner.agent.sandbox import _framework_bypass
+        from initrunner.runner.run_budget import get_run_budget_tracker
 
         logger.debug("Delegating to %s (prompt=%r)", self._role_path.name, prompt[:120])
 
@@ -218,9 +219,26 @@ class InlineInvoker:
                 logger.warning("Delegation depth exceeded: %s", e)
                 return f"{_ERROR_PREFIX} {e}"
 
+            tracker = get_run_budget_tracker()
+            if tracker is not None:
+                allowed, reason = tracker.check_before_run()
+                if not allowed:
+                    exit_delegation()
+                    return f"{_ERROR_PREFIX} Run token budget exhausted: {reason}"
+
             try:
                 logger.debug("Executing delegate agent '%s'", agent_name)
-                result, _ = execute_run(agent, role, prompt)
+                try:
+                    result, _ = execute_run(agent, role, prompt)
+                except Exception:
+                    # Release the 1-token reservation taken by check_before_run
+                    # so the parent run is not charged for a sub-agent that
+                    # never produced usage.
+                    if tracker is not None:
+                        tracker.record_usage(0, 0)
+                    raise
+                if tracker is not None:
+                    tracker.record_usage(result.tokens_in, result.tokens_out)
                 if not result.success:
                     logger.warning("Delegate agent '%s' failed: %s", agent_name, result.error)
                     return f"{_ERROR_PREFIX} Agent '{agent_name}' failed: {result.error}"

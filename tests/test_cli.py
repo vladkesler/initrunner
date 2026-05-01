@@ -111,6 +111,7 @@ class TestRun:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         agent = MagicMock()
         mock_load.return_value = (role, agent)
         mock_run_single.return_value = (
@@ -172,6 +173,7 @@ class TestRun:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         agent = MagicMock()
         mock_load.return_value = (role, agent)
         mock_run_single.return_value = (
@@ -224,6 +226,7 @@ class TestRun:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         mock_load.return_value = (role, MagicMock())
         mock_run_single.return_value = (
             RunResult(run_id="x", output="ok", success=True),
@@ -316,6 +319,7 @@ class TestRunStreaming:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
         mock_run_stream.return_value = (
@@ -346,6 +350,7 @@ class TestRunStreaming:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
         mock_formatted.return_value = (
@@ -377,6 +382,7 @@ class TestRunStreaming:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
         mock_run_single.return_value = (
@@ -411,6 +417,7 @@ class TestRunStreaming:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
         mock_run_stream.return_value = (
@@ -444,6 +451,7 @@ class TestRunStreaming:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         mock_load.return_value = (role, MagicMock())
 
@@ -475,6 +483,7 @@ class TestRunOutputFormat:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         return role
 
@@ -1287,6 +1296,7 @@ class TestResolveRolePathInstalled:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         agent = MagicMock()
 
         with (
@@ -1392,6 +1402,7 @@ class TestSuggestNext:
         role.spec.memory = None
         role.spec.sinks = []
         role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
         role.spec.output = OutputConfig(type="text")
         agent = MagicMock()
         mock_load.return_value = (role, agent)

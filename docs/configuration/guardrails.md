@@ -14,6 +14,7 @@ spec:
     input_tokens_limit: 10000       # per-request input token limit
     total_tokens_limit: 20000       # per-request total token limit
     session_token_budget: 500000    # cumulative budget for REPL session
+    run_token_budget: 50000         # cumulative budget for one CLI invocation, including delegations
     daemon_token_budget: 1000000    # cumulative budget for daemon lifetime
     daemon_daily_token_budget: 100000  # daily budget for daemon mode
     daemon_daily_cost_budget: 5.00    # daily USD cost budget for daemon
@@ -40,6 +41,7 @@ spec:
 | `input_tokens_limit` | int | *null* | Per-request input token limit |
 | `total_tokens_limit` | int | *null* | Per-request combined input+output token limit |
 | `session_token_budget` | int | *null* | Cumulative token budget for REPL session (warns at 80%) |
+| `run_token_budget` | int | *null* | Cumulative token budget for a single one-shot CLI run; counts the parent run plus completed inline-delegated sub-runs. Override per-invocation with `--token-budget N`. |
 | `daemon_token_budget` | int | *null* | Lifetime token budget for daemon process |
 | `daemon_daily_token_budget` | int | *null* | Daily token budget for daemon (resets at UTC midnight) |
 | `daemon_daily_cost_budget` | float | *null* | Daily USD cost budget for daemon (resets at UTC midnight) |
@@ -122,9 +124,21 @@ See [Autonomous Execution](../orchestration/autonomy.md) for the full loop lifec
 
 Token usage is tracked per-run in the audit log and displayed in the CLI.
 
-- **Per-run limits** (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) enforce hard stops on individual agent executions.
+- **Per-call limits** (`max_tokens_per_run`, `total_tokens_limit`, `input_tokens_limit`, `max_request_limit`) map to PydanticAI's `UsageLimits` and bound a single LLM round-trip or a single top-level `agent.run`. They do not see tokens spent inside delegated sub-agents.
+- **Per-run cumulative budget** (`run_token_budget`) caps one one-shot CLI invocation across the parent run *and* completed inline-delegated sub-runs. Use this when a coordinator role can spin up a chain of `delegate` tool calls and you want a hard ceiling on total spend per invocation. Override per-invocation with `--token-budget N`.
 - **Session budgets** (`session_token_budget`) track cumulative usage across REPL turns and warn at 80% consumption.
 - **Daemon budgets** (`daemon_token_budget`, `daemon_daily_token_budget`) protect long-running daemons from unbounded spend. The daily budget resets at UTC midnight.
 - **Cost budgets** (`daemon_daily_cost_budget`, `daemon_weekly_cost_budget`) enforce USD spend limits using `genai-prices`. Requires a supported model/provider.
+
+### `run_token_budget` semantics
+
+`run_token_budget` is a **cumulative-completed-run guard with best-effort hard-stop**, not a live token meter:
+
+- It is checked once before the parent run starts (so a previous over-budget invocation in the same process can short-circuit) and again before every inline delegate sub-run.
+- It records actual usage *after* the parent run and after each completed sub-run (PydanticAI only exposes per-`agent.run` usage when the run finishes).
+- It will **stop a cascading delegate chain** the moment the cumulative count crosses the cap.
+- It does **not** abort a single runaway parent mid-stream when the parent never delegates -- in that case the per-call limits (`max_tokens_per_run`, `total_tokens_limit`) remain the relevant guard.
+
+`run_token_budget` does not apply to `--autonomous` runs (use `autonomous_token_budget` for those) or to daemon mode (use the `daemon_*` budgets).
 
 See [token_control.md](token_control.md) for advanced token budget configuration and monitoring, and [cost-tracking.md](../core/cost-tracking.md) for cost analytics and estimation.
