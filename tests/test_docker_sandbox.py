@@ -806,3 +806,163 @@ class TestUserFlag:
     def test_default_user_is_auto(self):
         config = DockerBackendConfig()
         assert config.user == "auto"
+
+
+# ===========================================================================
+# Hardened runtime (gVisor / Kata / Firecracker via --runtime)
+# ===========================================================================
+
+
+class TestDockerRuntimeField:
+    def test_default_runtime_is_none(self):
+        config = DockerBackendConfig()
+        assert config.runtime is None
+
+    def test_runsc_accepted(self):
+        config = DockerBackendConfig(runtime="runsc")
+        assert config.runtime == "runsc"
+
+    def test_kata_variants_accepted(self):
+        for name in ("kata-runtime", "kata-qemu", "kata-fc", "kata-clh"):
+            config = DockerBackendConfig(runtime=name)
+            assert config.runtime == name
+
+    def test_runc_accepted(self):
+        config = DockerBackendConfig(runtime="runc")
+        assert config.runtime == "runc"
+
+    def test_unknown_runtime_rejected(self):
+        with pytest.raises(ValueError):
+            DockerBackendConfig(runtime="bogus")
+
+    def test_extra_args_runtime_equals_form_rejected(self):
+        with pytest.raises(ValueError, match="blocked for security"):
+            DockerBackendConfig(extra_args=["--runtime=runsc"])
+
+    def test_extra_args_runtime_space_form_rejected(self):
+        with pytest.raises(ValueError, match="blocked for security"):
+            DockerBackendConfig(extra_args=["--runtime", "runsc"])
+
+    def test_extra_args_drift_now_blocked(self):
+        for arg in ("--device", "--volume-driver", "--uts=host"):
+            with pytest.raises(ValueError, match="blocked for security"):
+                DockerBackendConfig(extra_args=[arg])
+
+
+class TestBuildDockerCmdRuntime:
+    def test_runtime_emitted_before_image(self):
+        from initrunner.agent.docker_sandbox import _build_docker_cmd
+
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(runtime="runsc"))
+        cmd = _build_docker_cmd(config)
+        assert "--runtime" in cmd
+        rt_idx = cmd.index("--runtime")
+        assert cmd[rt_idx + 1] == "runsc"
+        img_idx = cmd.index("python:3.12-slim")
+        assert rt_idx < img_idx
+
+    def test_no_runtime_flag_when_unset(self):
+        from initrunner.agent.docker_sandbox import _build_docker_cmd
+
+        config = SandboxConfig(backend="docker")
+        cmd = _build_docker_cmd(config)
+        assert "--runtime" not in cmd
+
+    def test_runtime_passes_through_in_run(self, tmp_path):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
+
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(runtime="runsc"))
+        backend = DockerBackend(config)
+        mock_result = MagicMock(stdout=b"ok\n", stderr=b"", returncode=0)
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=mock_result
+        ) as mock_run:
+            backend.run(["echo", "ok"], env={}, cwd=tmp_path, timeout=30)
+            cmd = mock_run.call_args[0][0]
+            assert "--runtime" in cmd
+            rt_idx = cmd.index("--runtime")
+            assert cmd[rt_idx + 1] == "runsc"
+
+
+class TestDockerPreflightRuntime:
+    def _runtimes_payload(self, names: list[str]) -> bytes:
+        import json
+
+        return json.dumps({n: {"path": n} for n in names}).encode()
+
+    def test_preflight_passes_when_runtime_registered(self):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
+
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(runtime="runsc"))
+        backend = DockerBackend(config)
+        info_proc = MagicMock(returncode=0, stdout=self._runtimes_payload(["runc", "runsc"]))
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.check_docker_available", return_value=True
+        ):
+            with patch(
+                "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=info_proc
+            ):
+                with patch(
+                    "initrunner.agent.runtime_sandbox.docker.ensure_image_available"
+                ) as mock_ensure:
+                    backend.preflight()
+                    mock_ensure.assert_called_once_with("python:3.12-slim")
+
+    def test_preflight_fails_when_runtime_missing(self):
+        from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
+
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(runtime="runsc"))
+        backend = DockerBackend(config)
+        info_proc = MagicMock(returncode=0, stdout=self._runtimes_payload(["runc"]))
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.check_docker_available", return_value=True
+        ):
+            with patch(
+                "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=info_proc
+            ):
+                with patch(
+                    "initrunner.agent.runtime_sandbox.docker.ensure_image_available"
+                ) as mock_ensure:
+                    with pytest.raises(SandboxUnavailableError) as exc_info:
+                        backend.preflight()
+                    assert "runsc" in str(exc_info.value)
+                    assert "gVisor" in exc_info.value.remediation
+                    mock_ensure.assert_not_called()
+
+    def test_preflight_fails_cleanly_on_malformed_json(self):
+        from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
+
+        config = SandboxConfig(backend="docker", docker=DockerBackendConfig(runtime="runsc"))
+        backend = DockerBackend(config)
+        info_proc = MagicMock(returncode=0, stdout=b"not-json")
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.check_docker_available", return_value=True
+        ):
+            with patch(
+                "initrunner.agent.runtime_sandbox.docker.subprocess.run", return_value=info_proc
+            ):
+                with patch(
+                    "initrunner.agent.runtime_sandbox.docker.ensure_image_available"
+                ) as mock_ensure:
+                    with pytest.raises(SandboxUnavailableError) as exc_info:
+                        backend.preflight()
+                    assert "could not query Docker runtimes" in exc_info.value.reason
+                    mock_ensure.assert_not_called()
+
+    def test_preflight_skips_runtime_check_when_unset(self):
+        from initrunner.agent.runtime_sandbox.docker import DockerBackend
+
+        config = SandboxConfig(backend="docker")
+        backend = DockerBackend(config)
+        with patch(
+            "initrunner.agent.runtime_sandbox.docker.check_docker_available", return_value=True
+        ):
+            with patch("initrunner.agent.runtime_sandbox.docker.subprocess.run") as mock_subproc:
+                with patch(
+                    "initrunner.agent.runtime_sandbox.docker.ensure_image_available"
+                ) as mock_ensure:
+                    backend.preflight()
+                    mock_subproc.assert_not_called()
+                    mock_ensure.assert_called_once_with("python:3.12-slim")

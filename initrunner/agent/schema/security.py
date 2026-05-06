@@ -246,6 +246,10 @@ _DOCKER_BLOCKED_ARGS = frozenset(
         "--userns=host",
         "--network=host",
         "--ipc=host",
+        "--uts=host",
+        "--device",
+        "--volume-driver",
+        "--runtime",
     }
 )
 
@@ -263,12 +267,16 @@ class BindMount(BaseModel):
         return v
 
 
+DockerRuntime = Literal["runc", "runsc", "kata-runtime", "kata-qemu", "kata-fc", "kata-clh"]
+
+
 class DockerBackendConfig(BaseModel):
     """Docker-specific settings nested under sandbox.docker."""
 
     image: str = "python:3.12-slim"
     user: Literal["auto"] | str | None = "auto"
     extra_args: list[str] = Field(default_factory=list)
+    runtime: DockerRuntime | None = None
 
     @field_validator("image")
     @classmethod

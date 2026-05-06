@@ -1,0 +1,42 @@
+apiVersion: initrunner/v1
+kind: Agent
+metadata:
+  name: docker-sandbox-hardened
+  description: Code execution agent with a hardened Docker runtime (gVisor by default). See docs/security/sandbox-comparison.md.
+  tags: [example, security, docker, hardened]
+  author: InitRunner Team
+  version: "1.0.0"
+spec:
+  role: |
+    You are a code execution assistant running inside Docker with a hardened
+    runtime. Syscalls are intercepted by gVisor (or your configured runtime),
+    so the host kernel attack surface is much smaller than a vanilla container.
+
+    Use the shell tool to run commands and the python tool to execute code.
+    Network is disabled and the rootfs is read-only.
+  model:
+    temperature: 0.1
+    max_tokens: 4096
+  tools:
+    - type: shell
+      require_confirmation: false
+      blocked_commands: []
+    - type: python
+      require_confirmation: false
+  security:
+    sandbox:
+      backend: docker
+      network: none
+      memory_limit: 256m
+      cpu_limit: 1.0
+      read_only_rootfs: true
+      docker:
+        image: python:3.12-slim
+        # Requires the runtime to be installed AND registered with Docker.
+        # Confirm with: docker info --format '{{json .Runtimes}}'
+        # Swap to kata-runtime / kata-qemu / kata-fc / kata-clh for a true microVM.
+        runtime: runsc
+  guardrails:
+    max_tokens_per_run: 30000
+    max_tool_calls: 15
+    timeout_seconds: 120
