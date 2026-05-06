@@ -833,7 +833,7 @@ class TestDockerRuntimeField:
 
     def test_unknown_runtime_rejected(self):
         with pytest.raises(ValueError):
-            DockerBackendConfig(runtime="bogus")
+            DockerBackendConfig(runtime="bogus")  # type: ignore[arg-type]
 
     def test_extra_args_runtime_equals_form_rejected(self):
         with pytest.raises(ValueError, match="blocked for security"):

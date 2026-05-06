@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [2026.5.2] - 2026-05-06
+
+### Added
+- **Hardened Docker runtime support.** New `security.sandbox.docker.runtime` field accepts `runc | runsc | kata-runtime | kata-qemu | kata-fc | kata-clh`. When set, `_build_docker_cmd` emits `--runtime <name>`. Preflight verifies the runtime is registered via `docker info` (parsed defensively, never leaks raw JSON) **before** image pull, so a misconfigured runtime cannot trigger a multi-GB download on a doomed run. Per-runtime install hints surface through `SandboxUnavailableError`. New comparison doc `docs/security/sandbox-comparison.md` separates container, userspace-kernel, and microVM isolation classes; new example role `examples/roles/docker-sandbox-hardened.yaml`. (#112)
+
+### Changed
+- **Async-first executor.** The sync orchestration skeleton left over from the pydantic-graph migration is gone. `_execute_orchestrated` and the duplicated resume body now live as a single async implementation; `execute_run`, `execute_run_resume`, and `execute_run_stream` become `run_sync` wrappers. Five tool modules (`http`, `web_reader`, `web_scraper`, `search`, `image_gen`) lose their parallel `_do_X` / `_do_X_async` impls and register async-only. `ToolBuildContext.prefer_async` plumbing through `build_toolsets` and `build_agent` is removed. `executor.py`: 731 to 423 lines, net -828/+361 across 21 files. (#115)
+- **`RunConfig` lives at `initrunner/run_config.py`.** Moved from `initrunner/cli/run_config.py` so `agent/loader.py` (and other non-CLI consumers like `services/setup.py` and `dashboard/routers/system.py`) no longer import from `cli/`. Seven import sites updated; no compatibility shim. (#114)
+- **`_DOCKER_BLOCKED_ARGS` matches the doc.** `--runtime`, `--device`, `--volume-driver`, `--uts=host` were claimed blocked in `docs/security/docker-sandbox.md` but were not. With `--runtime` promoted to a first-class schema field, both `extra_args: [--runtime, runsc]` and `[--runtime=runsc]` are rejected at load time. (#112)
+
+### Docs
+- **"Five commands you'll actually use" callout** at the top of `docs/getting-started/cli.md`. `initrunner new` / `run` / `setup` / `doctor` / `install` with one-liners taken verbatim from each command's `--help`. The 57-row table is unchanged, just relabeled "The full surface area, when you need it." Linked from the README quickstart so newcomers land directly on it. (#113)
+
+### Chore
+- Remove stray `role.yaml` / `role2.yaml` files accidentally committed at repo root. (#109)
+
+### Dependencies
+- Bump dashboard `@sveltejs/kit` 2.58.0 → 2.59.0 (svelte group) (#110)
+- Bump dashboard `bits-ui` 2.18.0 → 2.18.1 (#111)
+
 ## [2026.5.1] - 2026-05-01
 
 ### Added
