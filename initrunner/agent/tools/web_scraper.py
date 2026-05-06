@@ -8,12 +8,10 @@ from datetime import UTC, datetime
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
-from initrunner._html import fetch_url_as_markdown
 from initrunner.agent._urls import SSRFBlocked, check_domain_filter
 from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
 from initrunner.ingestion.chunker import chunk_text
-from initrunner.ingestion.embeddings import embed_single as _embed_single
 from initrunner.stores.base import make_store_config
 from initrunner.stores.factory import create_document_store
 
@@ -38,40 +36,6 @@ def _store_chunks(
             last_modified=time.time(),
         )
     return f"Stored {len(chunk_texts)} chunks from {url}"
-
-
-def _fetch_and_chunk(url, config, store_config):
-    """Domain-check, fetch (sync), and chunk. Returns (chunk_texts, markdown) or error str."""
-    error = check_domain_filter(url, config.allowed_domains, config.blocked_domains)
-    if error:
-        return error
-
-    try:
-        markdown = fetch_url_as_markdown(
-            url,
-            timeout=config.timeout_seconds,
-            user_agent=config.user_agent,
-            max_bytes=config.max_content_bytes,
-        )
-    except SSRFBlocked as e:
-        return str(e)
-    except Exception as e:
-        return f"Error fetching URL: {e}"
-
-    if not markdown.strip():
-        return f"No content extracted from {url}"
-
-    chunks = chunk_text(
-        markdown,
-        source=url,
-        strategy=store_config.chunking_strategy,
-        chunk_size=store_config.chunk_size,
-        chunk_overlap=store_config.chunk_overlap,
-    )
-    if not chunks:
-        return f"No chunks extracted from {url}"
-
-    return [c.text for c in chunks], markdown
 
 
 async def _fetch_and_chunk_async(url, config, store_config):
@@ -126,59 +90,25 @@ def build_web_scraper_toolset(
 
     toolset = FunctionToolset()
 
-    if ctx.prefer_async:
+    @toolset.tool_plain
+    async def scrape_page(url: str) -> str:
+        """Fetch a web page, extract its content, and store it in the document store.
 
-        @toolset.tool_plain
-        async def scrape_page(url: str) -> str:
-            """Fetch a web page, extract its content, and store it in the document store.
+        The content becomes immediately searchable via search_documents.
 
-            The content becomes immediately searchable via search_documents.
+        Args:
+            url: The URL to scrape and store.
+        """
+        result = await _fetch_and_chunk_async(url, config, store_config)
+        if isinstance(result, str):
+            return result
+        chunk_texts, markdown = result
 
-            Args:
-                url: The URL to scrape and store.
-            """
-            result = await _fetch_and_chunk_async(url, config, store_config)
-            if isinstance(result, str):
-                return result
-            chunk_texts, markdown = result
+        from initrunner.ingestion.embeddings import embed_single_async
 
-            from initrunner.ingestion.embeddings import embed_single_async
-
-            embeddings = await asyncio.gather(
-                *(
-                    embed_single_async(
-                        store_config.embed_provider,
-                        store_config.embed_model,
-                        ct,
-                        base_url=store_config.embed_base_url,
-                        api_key_env=store_config.embed_api_key_env,
-                        input_type="document",
-                    )
-                    for ct in chunk_texts
-                )
-            )
-
-            stored = _store_chunks(store_config, url, chunk_texts, list(embeddings))
-            return f"{stored} ({len(markdown):,} chars)"
-
-    else:
-
-        @toolset.tool_plain
-        def scrape_page(url: str) -> str:
-            """Fetch a web page, extract its content, and store it in the document store.
-
-            The content becomes immediately searchable via search_documents.
-
-            Args:
-                url: The URL to scrape and store.
-            """
-            result = _fetch_and_chunk(url, config, store_config)
-            if isinstance(result, str):
-                return result
-            chunk_texts, markdown = result
-
-            embeddings = [
-                _embed_single(
+        embeddings = await asyncio.gather(
+            *(
+                embed_single_async(
                     store_config.embed_provider,
                     store_config.embed_model,
                     ct,
@@ -187,9 +117,10 @@ def build_web_scraper_toolset(
                     input_type="document",
                 )
                 for ct in chunk_texts
-            ]
+            )
+        )
 
-            stored = _store_chunks(store_config, url, chunk_texts, embeddings)
-            return f"{stored} ({len(markdown):,} chars)"
+        stored = _store_chunks(store_config, url, chunk_texts, list(embeddings))
+        return f"{stored} ({len(markdown):,} chars)"
 
     return toolset

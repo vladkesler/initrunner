@@ -483,8 +483,6 @@ def build_agent(
     role_dir: Path | None = None,
     output_type: Any = None,
     extra_skill_dirs: list[Path] | None = None,
-    *,
-    prefer_async: bool = False,
 ) -> Agent:
     """Construct a PydanticAI Agent from a validated RoleDefinition."""
     # Ensure spec.model is a concrete ModelConfig (not PartialModelConfig)
@@ -530,7 +528,7 @@ def build_agent(
 
     from initrunner.agent.tools import build_toolsets
 
-    toolsets = build_toolsets(all_tools, role, role_dir=role_dir, prefer_async=prefer_async)
+    toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
 
     capabilities = _build_capabilities(role)
 

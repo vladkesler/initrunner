@@ -27,6 +27,7 @@ from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
 from pydantic_ai.models import Model
 from pydantic_ai.models.fallback import FallbackExceptionGroup
 
+from initrunner._async import run_sync
 from initrunner._ids import generate_id
 from initrunner.agent.capabilities.content_guard import ContentBlockedError
 from initrunner.agent.prompt import UserPrompt
@@ -57,9 +58,9 @@ from .executor_output import (
     _validate_input_or_fail,
 )
 from .executor_retry import (
-    _retry_model_call,
+    _retry_model_call,  # noqa: F401
     _retry_model_call_async,
-    _run_with_timeout,
+    _run_with_timeout,  # noqa: F401
     _should_retry,  # noqa: F401
 )
 
@@ -143,85 +144,8 @@ def _prepare_run(
 
 
 # ---------------------------------------------------------------------------
-# Shared orchestration skeletons
+# Shared async orchestration skeleton
 # ---------------------------------------------------------------------------
-
-
-def _execute_orchestrated(
-    invoke_fn: Callable[[dict, RunResult], list],
-    on_error: Callable[[RunResult, Exception], None],
-    role: RoleDefinition,
-    prompt: UserPrompt,
-    *,
-    audit_logger: AuditLogger | None = None,
-    message_history: list | None = None,
-    model_override: Model | str | None = None,
-    trigger_type: str | None = None,
-    trigger_metadata: dict[str, str] | None = None,
-    extra_toolsets: list | None = None,
-    skip_input_validation: bool = False,
-    principal_id: str | None = None,
-) -> tuple[RunResult, list]:
-    """Sync execution skeleton shared by ``execute_run`` and ``execute_run_stream``.
-
-    *invoke_fn(run_kwargs, result) -> new_messages* performs the variant-specific
-    agent call and output processing.  *on_error(result, exc)* handles recoverable
-    errors (may set ``partial_output`` etc.).
-    """
-    agent_token = _enter_agent_context(role)
-    try:
-        run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
-            role,
-            prompt,
-            audit_logger=audit_logger,
-            message_history=message_history,
-            model_override=model_override,
-            trigger_type=trigger_type,
-            trigger_metadata=trigger_metadata,
-            extra_toolsets=extra_toolsets,
-            skip_input_validation=skip_input_validation,
-            principal_id=principal_id,
-        )
-        if blocked is not None:
-            return blocked, []
-
-        result = RunResult(run_id=run_id)
-        new_messages: list = []
-        start = time.monotonic()
-
-        with _create_run_span(run_id, role, trigger_type) as span:
-            try:
-                new_messages = invoke_fn(run_kwargs, result)
-            except ContentBlockedError as e:
-                result.success = False
-                result.error = e.reason
-                result.error_category = ErrorCategory.CONTENT_BLOCKED
-            except (
-                ModelHTTPError,
-                UsageLimitExceeded,
-                ConnectionError,
-                TimeoutError,
-                OSError,
-                FallbackExceptionGroup,
-            ) as e:
-                on_error(result, e)
-
-            result.duration_ms = int((time.monotonic() - start) * 1000)
-            _record_span_metrics(span, result)
-
-        _audit_result(
-            result,
-            role,
-            prompt,
-            audit_logger=audit_logger,
-            trigger_type=trigger_type,
-            trigger_metadata=trigger_metadata,
-            principal_id=principal_id,
-        )
-
-        return result, new_messages
-    finally:
-        _exit_agent_context(agent_token)
 
 
 async def _execute_orchestrated_async(
@@ -315,28 +239,21 @@ def execute_run(
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Execute a single agent run, returning the result and updated message history."""
-
-    def invoke(run_kwargs: dict, result: RunResult) -> list:
-        agent_result = _run_with_timeout(
-            lambda: _retry_model_call(lambda: agent.run_sync(prompt, **run_kwargs)),
-            timeout=role.spec.guardrails.timeout_seconds,
+    """Sync wrapper around ``execute_run_async`` (owns the event loop)."""
+    return run_sync(
+        execute_run_async(
+            agent,
+            role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            extra_toolsets=extra_toolsets,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
         )
-        return _process_agent_output(agent_result, result, role)
-
-    return _execute_orchestrated(
-        invoke,
-        _handle_run_error,
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
     )
 
 
@@ -351,7 +268,7 @@ def _resume_prompt(approvals: dict[str, bool]) -> UserPrompt:
     return f"(resume: {decisions})"
 
 
-def execute_run_resume(
+async def _execute_resume_async_inner(
     agent: Agent,
     role: RoleDefinition,
     *,
@@ -362,79 +279,7 @@ def execute_run_resume(
     model_override: Model | str | None = None,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Resume a paused run by supplying approvals for pending tool calls.
-
-    Unlike ``execute_run`` this does not take a new prompt — the model
-    already produced one, the user just answered the approval question.
-    On re-pause (the model queues more approval-required calls after
-    executing the approved ones) the returned ``RunResult`` has
-    ``status="paused"`` again with a fresh ``pending_approvals`` list.
-    """
-    from pydantic_ai import DeferredToolResults
-
-    agent_token = _enter_agent_context(role)
-    try:
-        result = RunResult(run_id=run_id)
-        start = time.monotonic()
-        deferred = DeferredToolResults(approvals=dict(approvals))
-        run_kwargs: dict[str, Any] = {
-            "message_history": message_history,
-            "deferred_tool_results": deferred,
-            "model": model_override,
-            "metadata": {"input_validated": True},
-        }
-        new_messages: list = []
-        timeout = role.spec.guardrails.timeout_seconds
-
-        with _create_run_span(run_id, role, trigger_type="resume") as span:
-            try:
-                agent_result = _run_with_timeout(
-                    lambda: _retry_model_call(lambda: agent.run_sync(**run_kwargs)),
-                    timeout=timeout,
-                )
-                new_messages = _process_agent_output(agent_result, result, role)
-            except ContentBlockedError as e:
-                result.success = False
-                result.error = e.reason
-                result.error_category = ErrorCategory.CONTENT_BLOCKED
-            except (
-                ModelHTTPError,
-                UsageLimitExceeded,
-                ConnectionError,
-                TimeoutError,
-                OSError,
-                FallbackExceptionGroup,
-            ) as e:
-                _handle_run_error(result, e, timeout_seconds=timeout)
-
-            result.duration_ms = int((time.monotonic() - start) * 1000)
-            _record_span_metrics(span, result)
-
-        _audit_result(
-            result,
-            role,
-            _resume_prompt(approvals),
-            audit_logger=audit_logger,
-            trigger_type="resume",
-            principal_id=principal_id,
-        )
-        return result, new_messages
-    finally:
-        _exit_agent_context(agent_token)
-
-
-async def execute_run_resume_async(
-    agent: Agent,
-    role: RoleDefinition,
-    *,
-    run_id: str,
-    message_history: list,
-    approvals: dict[str, bool],
-    audit_logger: AuditLogger | None = None,
-    model_override: Model | str | None = None,
-    principal_id: str | None = None,
-) -> tuple[RunResult, list]:
-    """Async variant of ``execute_run_resume``."""
+    """Shared async body for ``execute_run_resume`` and ``execute_run_resume_async``."""
     from pydantic_ai import DeferredToolResults
 
     agent_token = _enter_agent_context(role)
@@ -488,6 +333,63 @@ async def execute_run_resume_async(
         _exit_agent_context(agent_token)
 
 
+def execute_run_resume(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Resume a paused run by supplying approvals for pending tool calls.
+
+    Unlike ``execute_run`` this does not take a new prompt — the model
+    already produced one, the user just answered the approval question.
+    On re-pause (the model queues more approval-required calls after
+    executing the approved ones) the returned ``RunResult`` has
+    ``status="paused"`` again with a fresh ``pending_approvals`` list.
+    """
+    return run_sync(
+        _execute_resume_async_inner(
+            agent,
+            role,
+            run_id=run_id,
+            message_history=message_history,
+            approvals=approvals,
+            audit_logger=audit_logger,
+            model_override=model_override,
+            principal_id=principal_id,
+        )
+    )
+
+
+async def execute_run_resume_async(
+    agent: Agent,
+    role: RoleDefinition,
+    *,
+    run_id: str,
+    message_history: list,
+    approvals: dict[str, bool],
+    audit_logger: AuditLogger | None = None,
+    model_override: Model | str | None = None,
+    principal_id: str | None = None,
+) -> tuple[RunResult, list]:
+    """Async variant of ``execute_run_resume``."""
+    return await _execute_resume_async_inner(
+        agent,
+        role,
+        run_id=run_id,
+        message_history=message_history,
+        approvals=approvals,
+        audit_logger=audit_logger,
+        model_override=model_override,
+        principal_id=principal_id,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Streaming execution
 # ---------------------------------------------------------------------------
@@ -509,63 +411,23 @@ def execute_run_stream(
     skip_input_validation: bool = False,
     principal_id: str | None = None,
 ) -> tuple[RunResult, list]:
-    """Execute a streaming agent run with guardrails, audit, and stream callbacks.
-
-    For text output roles, ``on_token(delta)`` fires per text delta.
-    For structured output roles (``output.type != "text"``), ``on_partial(partial)``
-    fires per progressively-validated partial output from
-    ``stream_output()``. Finalization routes through ``_finalize_run_output``
-    so deferred approvals, BaseModel serialization, and output validation
-    behave identically to non-streaming runs.
-    """
-    is_structured = role.spec.output.type != "text"
-    output_parts: list[str] = []
-
-    def invoke(run_kwargs: dict, result: RunResult) -> list:
-        stream_state: dict = {"messages": [], "usage": None, "output": None}
-
-        def _do_stream():
-            stream = agent.run_stream_sync(prompt, **run_kwargs)
-            if is_structured:
-                for partial in stream.stream_output(debounce_by=0.05):
-                    if on_partial is not None:
-                        on_partial(partial)
-            else:
-                for chunk in stream.stream_text(delta=True):
-                    output_parts.append(chunk)
-                    if on_token is not None:
-                        on_token(chunk)
-            stream_state["messages"] = stream.all_messages()
-            stream_state["usage"] = stream.usage()
-            stream_state["output"] = stream.get_output()
-
-        _run_with_timeout(
-            lambda: _retry_model_call(_do_stream, on_retry=output_parts.clear),
-            timeout=role.spec.guardrails.timeout_seconds,
-        )
-        new_messages = stream_state["messages"]
-        _finalize_run_output(
-            stream_state["output"],
-            stream_state["usage"],
-            new_messages,
-            result,
+    """Sync wrapper around ``execute_run_stream_async`` (owns the event loop)."""
+    return run_sync(
+        execute_run_stream_async(
+            agent,
             role,
+            prompt,
+            audit_logger=audit_logger,
+            message_history=message_history,
+            model_override=model_override,
+            on_token=on_token,
+            on_partial=on_partial,
+            extra_toolsets=extra_toolsets,
+            trigger_type=trigger_type,
+            trigger_metadata=trigger_metadata,
+            skip_input_validation=skip_input_validation,
+            principal_id=principal_id,
         )
-        return new_messages
-
-    return _execute_orchestrated(
-        invoke,
-        lambda r, e: _handle_run_error(r, e, partial_output="".join(output_parts)),
-        role,
-        prompt,
-        audit_logger=audit_logger,
-        message_history=message_history,
-        model_override=model_override,
-        trigger_type=trigger_type,
-        trigger_metadata=trigger_metadata,
-        extra_toolsets=extra_toolsets,
-        skip_input_validation=skip_input_validation,
-        principal_id=principal_id,
     )
 
 

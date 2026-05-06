@@ -2,7 +2,7 @@
 
 import json
 import textwrap
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic_ai import Agent
@@ -49,7 +49,7 @@ def _make_mock_agent(output: str = "Hello!"):
     usage.tool_calls = 0
     result.usage.return_value = usage
     result.all_messages.return_value = []
-    agent.run_sync.return_value = result
+    agent.run = AsyncMock(return_value=result)
     return agent
 
 

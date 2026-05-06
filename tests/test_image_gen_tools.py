@@ -14,7 +14,7 @@ from initrunner.agent.tools.image_gen import (
 )
 
 
-def _make_ctx(prefer_async: bool = False):
+def _make_ctx():
     from initrunner.agent.schema.role import RoleDefinition
 
     role = RoleDefinition.model_validate(
@@ -28,7 +28,7 @@ def _make_ctx(prefer_async: bool = False):
             },
         }
     )
-    return ToolBuildContext(role=role, prefer_async=prefer_async)
+    return ToolBuildContext(role=role)
 
 
 # ---------------------------------------------------------------------------
@@ -100,26 +100,19 @@ class TestSaveImage:
 
 class TestGenerateImage:
     def test_openai_generate(self, tmp_path: Path):
-        fake_b64 = "aGVsbG8="  # base64 of "hello"
-        mock_response = MagicMock()
-        mock_response.data = [MagicMock(b64_json=fake_b64)]
-
-        mock_client = MagicMock()
-        mock_client.images.generate.return_value = mock_response
-
-        with patch("initrunner.agent.tools.image_gen._generate_openai") as mock_gen:
+        with patch("initrunner.agent.tools.image_gen._generate_openai_async") as mock_gen:
             mock_gen.return_value = b"hello"
 
             config = ImageGenToolConfig(output_dir=str(tmp_path))
             toolset = build_image_gen_toolset(config, _make_ctx())
             fn = toolset.tools["generate_image"].function
-            result = fn(prompt="a cat")
+            result = asyncio.run(fn(prompt="a cat"))
 
             assert tmp_path.name in result or "image_" in result
             mock_gen.assert_called_once()
 
     def test_stability_generate(self, tmp_path: Path):
-        with patch("initrunner.agent.tools.image_gen._generate_stability") as mock_gen:
+        with patch("initrunner.agent.tools.image_gen._generate_stability_async") as mock_gen:
             mock_gen.return_value = b"image_data"
 
             config = ImageGenToolConfig(
@@ -129,19 +122,19 @@ class TestGenerateImage:
             )
             toolset = build_image_gen_toolset(config, _make_ctx())
             fn = toolset.tools["generate_image"].function
-            result = fn(prompt="a dog")
+            result = asyncio.run(fn(prompt="a dog"))
 
             assert "image_" in result
             mock_gen.assert_called_once()
 
     def test_generate_error(self, tmp_path: Path):
-        with patch("initrunner.agent.tools.image_gen._generate_openai") as mock_gen:
+        with patch("initrunner.agent.tools.image_gen._generate_openai_async") as mock_gen:
             mock_gen.side_effect = RuntimeError("API error")
 
             config = ImageGenToolConfig(output_dir=str(tmp_path))
             toolset = build_image_gen_toolset(config, _make_ctx())
             fn = toolset.tools["generate_image"].function
-            result = fn(prompt="a cat")
+            result = asyncio.run(fn(prompt="a cat"))
             assert "Error:" in result
             assert "API error" in result
 
@@ -170,7 +163,7 @@ class TestEditImage:
                 config = ImageGenToolConfig(output_dir=str(tmp_path))
                 toolset = build_image_gen_toolset(config, _make_ctx())
                 fn = toolset.tools["edit_image"].function
-                result = fn(image_path=str(img_file), prompt="make it blue")
+                result = asyncio.run(fn(image_path=str(img_file), prompt="make it blue"))
 
                 assert "image_" in result
 
@@ -178,7 +171,7 @@ class TestEditImage:
         config = ImageGenToolConfig(output_dir=str(tmp_path))
         toolset = build_image_gen_toolset(config, _make_ctx())
         fn = toolset.tools["edit_image"].function
-        result = fn(image_path="/etc/passwd", prompt="edit")
+        result = asyncio.run(fn(image_path="/etc/passwd", prompt="edit"))
         assert "Error:" in result
 
     def test_path_with_input_root(self, tmp_path: Path):
@@ -204,7 +197,7 @@ class TestEditImage:
                 )
                 toolset = build_image_gen_toolset(config, _make_ctx())
                 fn = toolset.tools["edit_image"].function
-                result = fn(image_path=str(img_file), prompt="make it blue")
+                result = asyncio.run(fn(image_path=str(img_file), prompt="make it blue"))
 
                 assert "image_" in result
 
@@ -212,7 +205,7 @@ class TestEditImage:
         config = ImageGenToolConfig(output_dir=str(tmp_path))
         toolset = build_image_gen_toolset(config, _make_ctx())
         fn = toolset.tools["edit_image"].function
-        result = fn(image_path=str(tmp_path / "nope.png"), prompt="edit")
+        result = asyncio.run(fn(image_path=str(tmp_path / "nope.png"), prompt="edit"))
         assert "Error:" in result
 
 
@@ -224,7 +217,7 @@ class TestEditImage:
 class TestAsyncPath:
     def test_async_builder_registers_async_tools(self, tmp_path: Path):
         config = ImageGenToolConfig(output_dir=str(tmp_path))
-        toolset = build_image_gen_toolset(config, _make_ctx(prefer_async=True))
+        toolset = build_image_gen_toolset(config, _make_ctx())
         assert "generate_image" in toolset.tools
         assert "edit_image" in toolset.tools
         # The tool function should be a coroutine function
@@ -237,7 +230,7 @@ class TestAsyncPath:
             mock_gen.return_value = b"hello"
 
             config = ImageGenToolConfig(output_dir=str(tmp_path))
-            toolset = build_image_gen_toolset(config, _make_ctx(prefer_async=True))
+            toolset = build_image_gen_toolset(config, _make_ctx())
             fn = toolset.tools["generate_image"].function
             result = asyncio.run(fn(prompt="a cat"))
             assert "image_" in result

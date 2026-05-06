@@ -1,6 +1,7 @@
 """Tests for the web_scraper tool."""
 
-from unittest.mock import patch
+import asyncio
+from unittest.mock import AsyncMock, patch
 
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.agent.schema.tools import WebScraperToolConfig
@@ -51,7 +52,7 @@ class TestWebScraperToolset:
         ts = build_web_scraper_toolset(config, _make_ctx())
         func = _get_tool_func(ts, "scrape_page")
 
-        result = func(url="https://notallowed.com/page")
+        result = asyncio.run(func(url="https://notallowed.com/page"))
         assert "not in the allowed domains" in result
 
     def test_blocked_domain_rejects(self):
@@ -59,7 +60,7 @@ class TestWebScraperToolset:
         ts = build_web_scraper_toolset(config, _make_ctx())
         func = _get_tool_func(ts, "scrape_page")
 
-        result = func(url="https://blocked.com/page")
+        result = asyncio.run(func(url="https://blocked.com/page"))
         assert "blocked" in result
 
     def test_allowed_domain_accepts(self):
@@ -69,15 +70,15 @@ class TestWebScraperToolset:
 
         with (
             patch(
-                "initrunner.agent.tools.web_scraper.fetch_url_as_markdown",
-                return_value="Good content",
+                "initrunner._html.fetch_url_as_markdown_async",
+                AsyncMock(return_value="Good content"),
             ),
             patch(
-                "initrunner.agent.tools.web_scraper._embed_single",
-                return_value=[1.0, 0.0, 0.0, 0.0],
+                "initrunner.ingestion.embeddings.embed_single_async",
+                AsyncMock(return_value=[1.0, 0.0, 0.0, 0.0]),
             ),
         ):
-            result = func(url="https://good.com/page")
+            result = asyncio.run(func(url="https://good.com/page"))
 
         assert "Stored" in result
         assert "chunk" in result
@@ -90,17 +91,17 @@ class TestWebScraperToolset:
 
         with (
             patch(
-                "initrunner.agent.tools.web_scraper.fetch_url_as_markdown",
-                return_value="Test content for web scraper tool that is long enough",
+                "initrunner._html.fetch_url_as_markdown_async",
+                AsyncMock(return_value="Test content for web scraper tool that is long enough"),
             ),
             patch(
-                "initrunner.agent.tools.web_scraper._embed_single",
-                return_value=[1.0, 0.0, 0.0, 0.0],
+                "initrunner.ingestion.embeddings.embed_single_async",
+                AsyncMock(return_value=[1.0, 0.0, 0.0, 0.0]),
             ),
         ):
             ts = build_web_scraper_toolset(config, ctx)
             func = _get_tool_func(ts, "scrape_page")
-            result = func(url="https://example.com/page")
+            result = asyncio.run(func(url="https://example.com/page"))
 
         assert "Stored" in result
         assert "chunk" in result
@@ -112,10 +113,10 @@ class TestWebScraperToolset:
         func = _get_tool_func(ts, "scrape_page")
 
         with patch(
-            "initrunner.agent.tools.web_scraper.fetch_url_as_markdown",
-            side_effect=ConnectionError("timeout"),
+            "initrunner._html.fetch_url_as_markdown_async",
+            AsyncMock(side_effect=ConnectionError("timeout")),
         ):
-            result = func(url="https://down.example.com/page")
+            result = asyncio.run(func(url="https://down.example.com/page"))
 
         assert "Error fetching URL" in result
 
@@ -125,10 +126,10 @@ class TestWebScraperToolset:
         func = _get_tool_func(ts, "scrape_page")
 
         with patch(
-            "initrunner.agent.tools.web_scraper.fetch_url_as_markdown",
-            return_value="   ",
+            "initrunner._html.fetch_url_as_markdown_async",
+            AsyncMock(return_value="   "),
         ):
-            result = func(url="https://example.com/empty")
+            result = asyncio.run(func(url="https://example.com/empty"))
 
         assert "No content" in result
 

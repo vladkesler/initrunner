@@ -12,10 +12,33 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
+
+
+class _AsyncIter:
+    """Minimal async iterator over a list of items."""
+
+    def __init__(self, items):
+        self._items = list(items)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self._items:
+            raise StopAsyncIteration
+        return self._items.pop(0)
+
+
+def _async_ctx(stream):
+    """Wrap *stream* in an async context manager mock."""
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=stream)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return ctx
 
 
 def _make_text_role():
@@ -134,15 +157,16 @@ class TestSyncStreamingStructured:
         final = _Sample(status="done", count=5)
 
         stream = MagicMock()
-        stream.stream_output = MagicMock(return_value=iter([partial_1, partial_2]))
+        stream.stream_output = MagicMock(return_value=_AsyncIter([partial_1, partial_2]))
+        stream.stream_text = MagicMock(return_value=_AsyncIter([]))
         stream.all_messages = MagicMock(return_value=[])
         stream.usage = MagicMock(
             return_value=MagicMock(input_tokens=3, output_tokens=4, total_tokens=7, tool_calls=0)
         )
-        stream.get_output = MagicMock(return_value=final)
+        stream.get_output = AsyncMock(return_value=final)
 
         agent = MagicMock()
-        agent.run_stream_sync = MagicMock(return_value=stream)
+        agent.run_stream = MagicMock(return_value=_async_ctx(stream))
 
         with patch("initrunner.agent.executor._prepare_run") as mock_prep:
             mock_prep.return_value = ("run-id", MagicMock(), {}, None)
@@ -171,15 +195,16 @@ class TestSyncStreamingStructured:
         tokens_seen: list[str] = []
 
         stream = MagicMock()
-        stream.stream_text = MagicMock(return_value=iter(["Hello ", "world"]))
+        stream.stream_text = MagicMock(return_value=_AsyncIter(["Hello ", "world"]))
+        stream.stream_output = MagicMock(return_value=_AsyncIter([]))
         stream.all_messages = MagicMock(return_value=[])
         stream.usage = MagicMock(
             return_value=MagicMock(input_tokens=1, output_tokens=2, total_tokens=3, tool_calls=0)
         )
-        stream.get_output = MagicMock(return_value="Hello world")
+        stream.get_output = AsyncMock(return_value="Hello world")
 
         agent = MagicMock()
-        agent.run_stream_sync = MagicMock(return_value=stream)
+        agent.run_stream = MagicMock(return_value=_async_ctx(stream))
 
         with patch("initrunner.agent.executor._prepare_run") as mock_prep:
             mock_prep.return_value = ("run-id", MagicMock(), {}, None)

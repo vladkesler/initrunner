@@ -45,23 +45,6 @@ def _openai_kwargs(prompt: str, size: str, quality: str, style: str, model: str)
     return kwargs
 
 
-def _generate_openai(
-    prompt: str,
-    size: str,
-    quality: str,
-    style: str,
-    model: str,
-    api_key: str,
-    timeout: int,
-) -> bytes:
-    """Generate an image via OpenAI DALL-E API, return raw PNG bytes."""
-    from openai import OpenAI  # type: ignore[import-not-found]
-
-    client = OpenAI(api_key=api_key, timeout=timeout)
-    response = client.images.generate(**_openai_kwargs(prompt, size, quality, style, model))
-    return base64.b64decode(response.data[0].b64_json)
-
-
 async def _generate_openai_async(
     prompt: str,
     size: str,
@@ -98,27 +81,6 @@ def _stability_extract(data: dict) -> bytes:
     if not artifacts:
         raise RuntimeError("Stability API returned no artifacts")
     return base64.b64decode(artifacts[0]["base64"])
-
-
-def _generate_stability(
-    prompt: str,
-    size: str,
-    api_key: str,
-    timeout: int,
-    model: str,
-) -> bytes:
-    """Generate an image via Stability AI REST API, return raw PNG bytes."""
-    import httpx
-
-    url, body = _stability_request_params(prompt, size, model)
-    with httpx.Client(timeout=timeout) as client:
-        resp = client.post(
-            url,
-            json=body,
-            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-        )
-        resp.raise_for_status()
-        return _stability_extract(resp.json())
 
 
 async def _generate_stability_async(
@@ -168,31 +130,6 @@ def _resolve_output_dir(config_dir: str) -> Path:
 # ---------------------------------------------------------------------------
 # Core functions
 # ---------------------------------------------------------------------------
-
-
-def _do_generate(
-    prompt: str,
-    size: str,
-    quality: str,
-    style: str,
-    provider: str,
-    model: str,
-    api_key: str,
-    timeout: int,
-    output_dir: Path,
-) -> str:
-    """Generate an image and save it. Returns the file path or an error."""
-    try:
-        if provider == "openai":
-            image_bytes = _generate_openai(prompt, size, quality, style, model, api_key, timeout)
-        elif provider == "stability":
-            image_bytes = _generate_stability(prompt, size, api_key, timeout, model)
-        else:
-            return f"Error: unknown provider: {provider}"
-    except Exception as exc:
-        return f"Error: image generation failed: {exc}"
-
-    return _save_image(image_bytes, output_dir)
 
 
 async def _do_generate_async(
@@ -284,114 +221,54 @@ def build_image_gen_toolset(
 
     toolset = FunctionToolset()
 
-    if ctx.prefer_async:
+    @toolset.tool_plain
+    async def generate_image(
+        prompt: str,
+        size: str = "",
+        style: str = "",
+        quality: str = "",
+    ) -> str:
+        """Generate an image from a text prompt and save it to disk.
 
-        @toolset.tool_plain
-        async def generate_image(
-            prompt: str,
-            size: str = "",
-            style: str = "",
-            quality: str = "",
-        ) -> str:
-            """Generate an image from a text prompt and save it to disk.
+        Returns the file path of the generated image.
 
-            Returns the file path of the generated image.
+        Args:
+            prompt: Description of the image to generate.
+            size: Image dimensions (e.g. "1024x1024"). Empty for default.
+            style: Style preset (e.g. "natural", "vivid"). Empty for default.
+            quality: Quality level (e.g. "standard", "hd"). Empty for default.
+        """
+        return await _do_generate_async(
+            prompt,
+            size or config.default_size,
+            quality or config.default_quality,
+            style or config.default_style,
+            config.provider,
+            config.model,
+            api_key,
+            config.timeout_seconds,
+            output_dir,
+        )
 
-            Args:
-                prompt: Description of the image to generate.
-                size: Image dimensions (e.g. "1024x1024"). Empty for default.
-                style: Style preset (e.g. "natural", "vivid"). Empty for default.
-                quality: Quality level (e.g. "standard", "hd"). Empty for default.
-            """
-            return await _do_generate_async(
-                prompt,
-                size or config.default_size,
-                quality or config.default_quality,
-                style or config.default_style,
-                config.provider,
-                config.model,
-                api_key,
-                config.timeout_seconds,
-                output_dir,
-            )
+    @toolset.tool_plain
+    async def edit_image(
+        image_path: str,
+        prompt: str,
+        size: str = "",
+    ) -> str:
+        """Edit an existing image using a text prompt (OpenAI only).
 
-        @toolset.tool_plain
-        async def edit_image(
-            image_path: str,
-            prompt: str,
-            size: str = "",
-        ) -> str:
-            """Edit an existing image using a text prompt (OpenAI only).
+        Returns the file path of the edited image.
 
-            Returns the file path of the edited image.
-
-            Args:
-                image_path: Path to the source image file.
-                prompt: Description of the desired edit.
-                size: Output dimensions. Empty for default.
-            """
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                None,
-                lambda: _do_edit(
-                    image_path,
-                    prompt,
-                    size or config.default_size,
-                    config.model,
-                    api_key,
-                    config.timeout_seconds,
-                    output_dir,
-                    allowed_roots,
-                ),
-            )
-
-    else:
-
-        @toolset.tool_plain
-        def generate_image(
-            prompt: str,
-            size: str = "",
-            style: str = "",
-            quality: str = "",
-        ) -> str:
-            """Generate an image from a text prompt and save it to disk.
-
-            Returns the file path of the generated image.
-
-            Args:
-                prompt: Description of the image to generate.
-                size: Image dimensions (e.g. "1024x1024"). Empty for default.
-                style: Style preset (e.g. "natural", "vivid"). Empty for default.
-                quality: Quality level (e.g. "standard", "hd"). Empty for default.
-            """
-            return _do_generate(
-                prompt,
-                size or config.default_size,
-                quality or config.default_quality,
-                style or config.default_style,
-                config.provider,
-                config.model,
-                api_key,
-                config.timeout_seconds,
-                output_dir,
-            )
-
-        @toolset.tool_plain
-        def edit_image(
-            image_path: str,
-            prompt: str,
-            size: str = "",
-        ) -> str:
-            """Edit an existing image using a text prompt (OpenAI only).
-
-            Returns the file path of the edited image.
-
-            Args:
-                image_path: Path to the source image file.
-                prompt: Description of the desired edit.
-                size: Output dimensions. Empty for default.
-            """
-            return _do_edit(
+        Args:
+            image_path: Path to the source image file.
+            prompt: Description of the desired edit.
+            size: Output dimensions. Empty for default.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: _do_edit(
                 image_path,
                 prompt,
                 size or config.default_size,
@@ -400,6 +277,7 @@ def build_image_gen_toolset(
                 config.timeout_seconds,
                 output_dir,
                 allowed_roots,
-            )
+            ),
+        )
 
     return toolset

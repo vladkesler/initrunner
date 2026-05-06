@@ -83,8 +83,6 @@ def build_toolsets(
     tools: list[ToolConfig],
     role: RoleDefinition,
     role_dir: Path | None = None,
-    *,
-    prefer_async: bool = False,
 ) -> list[AbstractToolset]:
     """Build a list of PydanticAI toolsets from tool configs + optional retrieval."""
     from initrunner.agent.tool_events import wrap_observable
@@ -95,9 +93,7 @@ def build_toolsets(
     backend = resolve_backend(
         role.spec.security.sandbox, role_dir=role_dir, agent_name=role.metadata.name
     )
-    ctx = ToolBuildContext(
-        role=role, role_dir=role_dir, prefer_async=prefer_async, sandbox_backend=backend
-    )
+    ctx = ToolBuildContext(role=role, role_dir=role_dir, sandbox_backend=backend)
     agent_name = role.metadata.name
 
     install_audit_hooks(role)

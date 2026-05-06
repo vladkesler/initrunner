@@ -1,6 +1,6 @@
 """Tests for the executor."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -42,8 +42,39 @@ def _make_mock_agent(output: str = "Hello!", tokens_in: int = 10, tokens_out: in
     result.usage.return_value = usage
     result.all_messages.return_value = [{"role": "user", "content": "hi"}]
 
-    agent.run_sync.return_value = result
+    agent.run = AsyncMock(return_value=result)
     return agent
+
+
+class _AsyncIter:
+    """Minimal async iterator over a list of items."""
+
+    def __init__(self, items):
+        self._items = list(items)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if not self._items:
+            raise StopAsyncIteration
+        return self._items.pop(0)
+
+
+def _attach_stream_mock(agent: MagicMock, *, text=None, output="Hello", messages=None) -> None:
+    """Wire ``agent.run_stream`` as an async context manager yielding *text* deltas."""
+    stream = MagicMock()
+    stream.stream_text = MagicMock(return_value=_AsyncIter(text or ["Hello"]))
+    stream.stream_output = MagicMock(return_value=_AsyncIter([output]))
+    stream.all_messages = MagicMock(return_value=messages or [])
+    usage = MagicMock(input_tokens=5, output_tokens=3, total_tokens=8, tool_calls=0)
+    stream.usage = MagicMock(return_value=usage)
+    stream.get_output = AsyncMock(return_value=output)
+
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=stream)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    agent.run_stream = MagicMock(return_value=ctx)
 
 
 class TestShouldRetry:
@@ -204,7 +235,7 @@ class TestExecuteRun:
 
     def test_failed_run(self):
         agent = MagicMock()
-        agent.run_sync.side_effect = ConnectionError("API error")
+        agent.run = AsyncMock(side_effect=ConnectionError("API error"))
         role = _make_role()
 
         result, messages = execute_run(agent, role, "Hello")
@@ -224,12 +255,14 @@ class TestExecuteRun:
         from initrunner.agent.executor_models import ErrorCategory
 
         agent = MagicMock()
-        agent.run_sync.side_effect = FallbackExceptionGroup(
-            "all failed",
-            [
-                ModelHTTPError(status_code=500, model_name="anthropic:x", body=b""),
-                ModelHTTPError(status_code=401, model_name="openai:y", body=b""),
-            ],
+        agent.run = AsyncMock(
+            side_effect=FallbackExceptionGroup(
+                "all failed",
+                [
+                    ModelHTTPError(status_code=500, model_name="anthropic:x", body=b""),
+                    ModelHTTPError(status_code=401, model_name="openai:y", body=b""),
+                ],
+            )
         )
         role = _make_role()
         db_path = tmp_path / "audit.db"
@@ -278,8 +311,8 @@ class TestExecuteRun:
         history = [{"role": "user", "content": "previous"}]
 
         execute_run(agent, role, "Hello", message_history=history)
-        agent.run_sync.assert_called_once()
-        call_kwargs = agent.run_sync.call_args
+        agent.run.assert_called_once()
+        call_kwargs = agent.run.call_args
         assert call_kwargs.kwargs["message_history"] == history
 
     def test_trigger_context_flows_to_audit(self, tmp_path):
@@ -319,7 +352,7 @@ class TestExecuteRun:
         usage.tool_calls = 0
         result_mock.usage.return_value = usage
         result_mock.all_messages.return_value = []
-        agent.run_sync.return_value = result_mock
+        agent.run = AsyncMock(return_value=result_mock)
         role = _make_role()
 
         result, _ = execute_run(agent, role, "Hello")
@@ -341,7 +374,7 @@ class TestExecuteRun:
         usage.tool_calls = 0
         result_mock.usage.return_value = usage
         result_mock.all_messages.return_value = []
-        agent.run_sync.return_value = result_mock
+        agent.run = AsyncMock(return_value=result_mock)
         role = _make_role()
 
         result, _ = execute_run(agent, role, "Hello")
@@ -391,7 +424,7 @@ class TestExecuteRun:
         )
 
         execute_run(agent, role, "Hello")
-        call_kwargs = agent.run_sync.call_args
+        call_kwargs = agent.run.call_args
         limits = call_kwargs.kwargs["usage_limits"]
 
         assert limits.output_tokens_limit == 30000
@@ -406,7 +439,7 @@ class TestExecuteRun:
         role = _make_role()
 
         execute_run(agent, role, "Hello")
-        call_kwargs = agent.run_sync.call_args
+        call_kwargs = agent.run.call_args
         limits = call_kwargs.kwargs["usage_limits"]
 
         assert limits.output_tokens_limit == 50000
@@ -485,18 +518,7 @@ class TestSkipInputValidation:
         from unittest.mock import patch
 
         agent = MagicMock()
-        stream_ctx = MagicMock()
-        stream_mock = MagicMock()
-        stream_mock.stream_text.return_value = iter(["Hello"])
-        stream_mock.all_messages.return_value = []
-        usage = MagicMock()
-        usage.input_tokens = 5
-        usage.output_tokens = 3
-        usage.total_tokens = 8
-        stream_mock.usage.return_value = usage
-        stream_ctx.__enter__ = MagicMock(return_value=stream_mock)
-        stream_ctx.__exit__ = MagicMock(return_value=False)
-        agent.run_stream_sync.return_value = stream_ctx
+        _attach_stream_mock(agent)
 
         role = _make_role()
 
@@ -512,7 +534,7 @@ class TestContentBlockedError:
         from initrunner.agent.capabilities.content_guard import ContentBlockedError
 
         agent = MagicMock()
-        agent.run_sync.side_effect = ContentBlockedError("Input matches blocked pattern")
+        agent.run = AsyncMock(side_effect=ContentBlockedError("Input matches blocked pattern"))
         role = _make_role()
 
         result, messages = execute_run(agent, role, "Hello")
@@ -525,7 +547,7 @@ class TestContentBlockedError:
         from initrunner.agent.capabilities.content_guard import ContentBlockedError
 
         agent = MagicMock()
-        agent.run_stream_sync.side_effect = ContentBlockedError("Blocked")
+        agent.run_stream = MagicMock(side_effect=ContentBlockedError("Blocked"))
         role = _make_role()
 
         result, messages = execute_run_stream(agent, role, "Hello")
@@ -541,7 +563,7 @@ class TestContentBlockedError:
 
         db_path = tmp_path / "test_audit.db"
         agent = MagicMock()
-        agent.run_sync.side_effect = ContentBlockedError("Blocked by policy")
+        agent.run = AsyncMock(side_effect=ContentBlockedError("Blocked by policy"))
         role = _make_role()
 
         with AuditLogger(db_path) as logger:
@@ -564,7 +586,7 @@ class TestRunMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=True)
 
-        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        meta = agent.run.call_args.kwargs.get("metadata")
         assert meta is not None
         assert meta["input_validated"] is True
         assert meta["initrunner.agent_name"] == role.metadata.name
@@ -577,7 +599,7 @@ class TestRunMetadata:
 
         execute_run(agent, role, "Hello", skip_input_validation=False)
 
-        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        meta = agent.run.call_args.kwargs.get("metadata")
         assert meta is not None
         assert meta["input_validated"] is True
         assert meta["initrunner.agent_name"] == role.metadata.name
@@ -589,6 +611,6 @@ class TestRunMetadata:
 
         execute_run(agent, role, "Hello", trigger_type="cron")
 
-        meta = agent.run_sync.call_args.kwargs.get("metadata")
+        meta = agent.run.call_args.kwargs.get("metadata")
         assert meta is not None
         assert meta["initrunner.trigger_type"] == "cron"

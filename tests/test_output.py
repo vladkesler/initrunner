@@ -392,12 +392,11 @@ class TestStreamingStructured:
         from initrunner.agent.executor import execute_run_stream
 
         agent = MagicMock()
+        agent.run_stream = MagicMock(side_effect=TimeoutError("expected"))
         with patch("initrunner.agent.executor._prepare_run") as mock_prep:
             mock_prep.return_value = ("run-id", MagicMock(), {}, None)
-            with patch("initrunner.agent.executor._run_with_timeout") as mock_timeout:
-                mock_timeout.side_effect = TimeoutError("expected")
-                result, _ = execute_run_stream(agent, role, "test", skip_input_validation=True)
-                assert result.success is False  # failed on the mock, not on the guard
+            result, _ = execute_run_stream(agent, role, "test", skip_input_validation=True)
+            assert result.success is False  # failed on the mock, not on the guard
 
     def test_streaming_with_text_output_does_not_raise(self):
         """execute_run_stream does not raise for text output (normal path)."""
@@ -408,12 +407,11 @@ class TestStreamingStructured:
         from initrunner.agent.executor import execute_run_stream
 
         agent = MagicMock()
+        agent.run_stream = MagicMock(side_effect=TimeoutError("expected"))
         with patch("initrunner.agent.executor._prepare_run") as mock_prep:
             mock_prep.return_value = ("run-id", MagicMock(), {}, None)
-            with patch("initrunner.agent.executor._run_with_timeout") as mock_timeout:
-                mock_timeout.side_effect = TimeoutError("expected")
-                result, _ = execute_run_stream(agent, role, "test", skip_input_validation=True)
-                assert result.success is False
+            result, _ = execute_run_stream(agent, role, "test", skip_input_validation=True)
+            assert result.success is False
 
 
 # ---------------------------------------------------------------------------
