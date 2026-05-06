@@ -150,7 +150,7 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
         return model
 
     # Prefer the user's explicit choice from setup (run.yaml)
-    from initrunner.cli.run_config import load_run_config
+    from initrunner.run_config import load_run_config
 
     run_cfg = load_run_config()
     if run_cfg.provider and run_cfg.model:

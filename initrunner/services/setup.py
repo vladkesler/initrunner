@@ -401,7 +401,7 @@ def generate_run_yaml(config: SetupConfig) -> str:
     """
     import yaml
 
-    from initrunner.cli.run_config import RunConfig
+    from initrunner.run_config import RunConfig
 
     run_cfg = RunConfig(
         provider=config.provider,
@@ -416,8 +416,8 @@ def generate_run_yaml(config: SetupConfig) -> str:
 
 def save_run_yaml(config: SetupConfig) -> Path:
     """Write run.yaml to the standard config path."""
-    from initrunner.cli.run_config import _get_run_config_path
     from initrunner.config import get_home_dir
+    from initrunner.run_config import _get_run_config_path
 
     path = _get_run_config_path()
     get_home_dir().mkdir(parents=True, exist_ok=True)
