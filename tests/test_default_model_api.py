@@ -105,7 +105,7 @@ class TestSaveRunConfig:
 
         get_home_dir.cache_clear()
 
-        from initrunner.cli.run_config import save_run_config
+        from initrunner.run_config import save_run_config
 
         save_run_config("anthropic", "claude-sonnet-4-5-20250929")
 
@@ -124,7 +124,7 @@ class TestSaveRunConfig:
 
         get_home_dir.cache_clear()
 
-        from initrunner.cli.run_config import save_run_config
+        from initrunner.run_config import save_run_config
 
         save_run_config(
             "openai",
@@ -152,7 +152,7 @@ class TestClearRunConfigModel:
 
         get_home_dir.cache_clear()
 
-        from initrunner.cli.run_config import clear_run_config_model
+        from initrunner.run_config import clear_run_config_model
 
         clear_run_config_model()
 

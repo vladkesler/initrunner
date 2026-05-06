@@ -478,7 +478,7 @@ def dispatch_ephemeral(
     no_audit: bool = False,
 ) -> None:
     """Shared setup for ephemeral mode, then delegate to REPL or bot."""
-    from initrunner.cli.run_config import load_run_config, resolve_ingest_paths
+    from initrunner.run_config import load_run_config, resolve_ingest_paths
 
     run_cfg = load_run_config()
 

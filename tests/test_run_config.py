@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from initrunner.cli.run_config import RunConfig
+from initrunner.run_config import RunConfig
 
 
 class TestRunConfigFields:

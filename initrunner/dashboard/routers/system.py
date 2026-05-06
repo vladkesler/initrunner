@@ -150,11 +150,11 @@ def _get_default_model() -> DefaultModelResponse:
 
 
 def _save_default_model(req: SaveDefaultModelRequest) -> DefaultModelResponse:
-    from initrunner.cli.run_config import save_run_config
     from initrunner.dashboard.routers._provider_options import (
         CUSTOM_PROVIDER_NAMES,
         resolve_custom_provider,
     )
+    from initrunner.run_config import save_run_config
 
     # Normalize preset names to canonical runtime fields
     provider = req.provider
@@ -179,7 +179,7 @@ def _save_default_model(req: SaveDefaultModelRequest) -> DefaultModelResponse:
 
 
 def _clear_default_model() -> DefaultModelResponse:
-    from initrunner.cli.run_config import clear_run_config_model
+    from initrunner.run_config import clear_run_config_model
 
     clear_run_config_model()
     return _get_default_model()

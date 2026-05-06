@@ -654,7 +654,7 @@ def detect_default_model() -> tuple[str, str, str | None, str | None, str]:
             pass
 
     # 2. run.yaml (from `initrunner setup`)
-    from initrunner.cli.run_config import load_run_config
+    from initrunner.run_config import load_run_config
 
     run_cfg = load_run_config()
     if run_cfg.provider and run_cfg.model:
