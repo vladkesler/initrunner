@@ -1,6 +1,6 @@
 """Tests for runner/runner.py: DaemonTokenTracker, run_single, run_autonomous."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from initrunner.agent.executor import RunResult
 from initrunner.agent.schema.autonomy import AutonomyConfig
@@ -47,7 +47,7 @@ def _make_mock_agent(output: str = "Done", tokens: int = 100, tool_calls: int = 
     result.usage.return_value = usage
     result.all_messages.return_value = [{"role": "user", "content": "hi"}]
 
-    agent.run_sync.return_value = result
+    agent.run = AsyncMock(return_value=result)
     return agent
 
 
@@ -123,7 +123,7 @@ class TestRunSingle:
 
     def test_failed_run_displays_error(self):
         agent = MagicMock()
-        agent.run_sync.side_effect = ConnectionError("boom")
+        agent.run = AsyncMock(side_effect=ConnectionError("boom"))
         role = _make_role()
         result, _messages = run_single(agent, role, "Hi")
         assert result.success is False

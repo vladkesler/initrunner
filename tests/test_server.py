@@ -1033,18 +1033,6 @@ class TestStreamingHeaders:
         assert resp.headers.get("X-Accel-Buffering") == "no"
 
 
-class TestExecutorStreamUsage:
-    """Test that run_stream_sync is used correctly (fix #1)."""
-
-    def test_run_stream_sync_used_directly(self):
-        import inspect
-
-        from initrunner.agent.executor import execute_run_stream
-
-        source = inspect.getsource(execute_run_stream)
-        assert "agent.run_stream_sync(" in source
-
-
 class TestTokenQueueSize:
     """Test that token queue is large enough (fix #5)."""
 

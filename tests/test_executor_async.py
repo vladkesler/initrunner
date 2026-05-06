@@ -246,29 +246,3 @@ class TestExecuteRunStreamAsync:
     # Streaming with structured output is now supported.
     # See tests/test_executor_streaming.py::TestAsyncStreamingEvents for the
     # full coverage (typed events, on_event callback, run_stream_events path).
-
-
-class TestToolBuildAsync:
-    def test_prefer_async_in_context(self):
-        from initrunner.agent.tools._registry import ToolBuildContext
-
-        role = _make_role()
-        ctx = ToolBuildContext(role=role, prefer_async=True)
-        assert ctx.prefer_async is True
-
-        ctx2 = ToolBuildContext(role=role)
-        assert ctx2.prefer_async is False
-
-    def test_build_toolsets_passes_prefer_async(self):
-        from initrunner.agent.tools._registry import ToolBuildContext
-        from initrunner.agent.tools.registry import build_toolsets
-
-        role = _make_role()
-
-        with patch("initrunner.agent.tools.registry.ToolBuildContext") as MockCtx:
-            MockCtx.return_value = ToolBuildContext(role=role, prefer_async=True)
-            build_toolsets([], role, prefer_async=True)
-            call = MockCtx.call_args
-            assert call.kwargs["role"] is role
-            assert call.kwargs["role_dir"] is None
-            assert call.kwargs["prefer_async"] is True

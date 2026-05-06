@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from unittest.mock import MagicMock, patch
 
@@ -190,7 +191,7 @@ class TestDuckDuckGoToolIntegration:
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
 
-            result = fn(query="test query")
+            result = asyncio.run(fn(query="test query"))
             assert "Test Result" in result
             assert "https://example.com" in result
             mock_provider.assert_called_once()
@@ -215,7 +216,7 @@ class TestDuckDuckGoToolIntegration:
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["news_search"].function
 
-            result = fn(query="test news")
+            result = asyncio.run(fn(query="test news"))
             assert "News Item" in result
             assert "https://news.example.com" in result
             assert mock_provider.call_args.kwargs["news"] is True
@@ -395,7 +396,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
-            result = fn(query="test")
+            result = asyncio.run(fn(query="test"))
             assert "ddgs is required" in result
 
     def test_search_api_error(self):
@@ -408,7 +409,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
-            result = fn(query="test")
+            result = asyncio.run(fn(query="test"))
             assert "Error: search failed:" in result
             assert "API rate limited" in result
 
@@ -422,7 +423,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
-            result = fn(query="test")
+            result = asyncio.run(fn(query="test"))
             assert "Error: search timed out after 5s" in result
 
     def test_news_search_api_error(self):
@@ -435,7 +436,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["news_search"].function
-            result = fn(query="test")
+            result = asyncio.run(fn(query="test"))
             assert "Error: search failed:" in result
 
     def test_result_truncation(self):
@@ -457,7 +458,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
-            result = fn(query="test", num_results=20)
+            result = asyncio.run(fn(query="test", num_results=20))
             assert len(result) <= 65_536 + len("\n[truncated]")
 
     def test_num_results_capped_by_max_results(self):
@@ -471,7 +472,7 @@ class TestSearchErrorHandling:
         ):
             toolset = build_search_toolset(config, _make_ctx())
             fn = toolset.tools["web_search"].function
-            fn(query="test", num_results=100)
+            asyncio.run(fn(query="test", num_results=100))
             # Should be capped to max_results=3
             call_kwargs = mock_provider.call_args
             assert call_kwargs.kwargs["max_results"] == 3

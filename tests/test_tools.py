@@ -1,11 +1,12 @@
 """Tests for the tools module."""
 
+import asyncio
 import os
 import sys
 import textwrap
 import types
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -77,7 +78,7 @@ class TestHttpToolset:
         config = HttpToolConfig(base_url="http://127.0.0.1")
         toolset = build_http_toolset(config, _make_ctx())
         fn = toolset.tools["http_request"].function
-        result = fn(method="GET", path="/")
+        result = asyncio.run(fn(method="GET", path="/"))
         assert "SSRF blocked" in result
 
     def test_builds_toolset(self):
@@ -546,7 +547,7 @@ class TestWebReaderToolset:
         config = WebReaderToolConfig()
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
-        result = fn(url="http://169.254.169.254/latest/meta-data/")
+        result = asyncio.run(fn(url="http://169.254.169.254/latest/meta-data/"))
         assert "SSRF blocked" in result
 
     def test_builds_toolset(self):
@@ -558,14 +559,14 @@ class TestWebReaderToolset:
         config = WebReaderToolConfig(allowed_domains=["example.com"])
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
-        result = fn(url="https://blocked.com/page")
+        result = asyncio.run(fn(url="https://blocked.com/page"))
         assert "not in the allowed domains" in result
 
     def test_domain_blocklist_rejects(self):
         config = WebReaderToolConfig(blocked_domains=["evil.com"])
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
-        result = fn(url="https://evil.com/page")
+        result = asyncio.run(fn(url="https://evil.com/page"))
         assert "blocked" in result
 
     def test_fetch_html_returns_markdown(self):
@@ -573,19 +574,11 @@ class TestWebReaderToolset:
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
 
-        html = "<html><body><h1>Title</h1><p>Hello world</p></body></html>"
-        mock_resp = MagicMock()
-        mock_resp.text = html
-        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
-        mock_resp.raise_for_status = MagicMock()
-
-        mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.get.return_value = mock_resp
-
-        with patch("initrunner._html.httpx.Client", return_value=mock_client):
-            result = fn(url="https://example.com/page")
+        with patch(
+            "initrunner._html.fetch_url_as_markdown_async",
+            AsyncMock(return_value="# Title\n\nHello world"),
+        ):
+            result = asyncio.run(fn(url="https://example.com/page"))
 
         assert "Title" in result
         assert "Hello world" in result
@@ -595,19 +588,11 @@ class TestWebReaderToolset:
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
 
-        html = "<html><body><p>" + "x" * 1000 + "</p></body></html>"
-        mock_resp = MagicMock()
-        mock_resp.text = html
-        mock_resp.headers = {"content-type": "text/html"}
-        mock_resp.raise_for_status = MagicMock()
-
-        mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.get.return_value = mock_resp
-
-        with patch("initrunner._html.httpx.Client", return_value=mock_client):
-            result = fn(url="https://example.com/page")
+        with patch(
+            "initrunner._html.fetch_url_as_markdown_async",
+            AsyncMock(return_value="prefix [truncated]"),
+        ):
+            result = asyncio.run(fn(url="https://example.com/page"))
 
         assert "[truncated]" in result
 
@@ -616,18 +601,11 @@ class TestWebReaderToolset:
         toolset = build_web_reader_toolset(config, _make_ctx())
         fn = toolset.tools["fetch_page"].function
 
-        mock_resp = MagicMock()
-        mock_resp.text = "plain text content"
-        mock_resp.headers = {"content-type": "text/plain"}
-        mock_resp.raise_for_status = MagicMock()
-
-        mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.get.return_value = mock_resp
-
-        with patch("initrunner._html.httpx.Client", return_value=mock_client):
-            result = fn(url="https://example.com/data.txt")
+        with patch(
+            "initrunner._html.fetch_url_as_markdown_async",
+            AsyncMock(return_value="plain text content"),
+        ):
+            result = asyncio.run(fn(url="https://example.com/data.txt"))
 
         assert result == "plain text content"
 

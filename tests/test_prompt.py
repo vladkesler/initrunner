@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic_ai.messages import AudioUrl, BinaryContent, DocumentUrl, ImageUrl, VideoUrl
@@ -380,7 +380,7 @@ class TestExecutorMultimodal:
         usage.tool_calls = 0
         result_mock.usage.return_value = usage
         result_mock.all_messages.return_value = []
-        agent.run_sync.return_value = result_mock
+        agent.run = AsyncMock(return_value=result_mock)
 
         # Pass a multimodal prompt
         prompt = ["describe this", ImageUrl(url="https://example.com/img.png")]
@@ -388,9 +388,9 @@ class TestExecutorMultimodal:
 
         assert result.success is True
         assert result.output == "I see an image"
-        # Verify agent.run_sync was called with the multimodal prompt
-        agent.run_sync.assert_called_once()
-        call_args = agent.run_sync.call_args
+        # Verify agent.run was called with the multimodal prompt
+        agent.run.assert_called_once()
+        call_args = agent.run.call_args
         assert call_args[0][0] is prompt
 
 

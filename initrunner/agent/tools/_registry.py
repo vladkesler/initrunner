@@ -38,7 +38,6 @@ class ToolBuildContext:
 
     role: RoleDefinition
     role_dir: Path | None = None
-    prefer_async: bool = False
     sandbox_backend: Any = field(default=None)
 
     def __post_init__(self) -> None:
