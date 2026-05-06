@@ -1,5 +1,15 @@
 # CLI Reference
 
+## Five commands you'll actually use
+
+> Most days, this is the whole CLI. Everything below exists for when you need it.
+>
+> - `initrunner new`: create a new agent role via conversational builder
+> - `initrunner run`: run an agent from a YAML file, starter name, or ephemeral mode
+> - `initrunner setup`: guided setup wizard for first-time configuration
+> - `initrunner doctor`: check provider configuration, API keys, and connectivity
+> - `initrunner install`: install a role from InitHub or an OCI registry
+
 ## Path resolution
 
 All commands that accept a role path also accept a **directory** or an **installed role name**. Resolution order:
@@ -13,7 +23,7 @@ All commands that accept a role path also accept a **directory** or an **install
 
 This means `initrunner run .` works from inside an agent directory, and `initrunner run code-reviewer` works after `initrunner install alice/code-reviewer`.
 
-## Commands
+## The full surface area, when you need it
 
 | Command | Description |
 |---------|-------------|
