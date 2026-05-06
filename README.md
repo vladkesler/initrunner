@@ -36,6 +36,8 @@ initrunner setup        # wizard: pick provider, model, API key
 
 Or: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md).
 
+New to InitRunner? Start with [the five commands you'll actually use](docs/getting-started/cli.md#five-commands-youll-actually-use).
+
 ### Starters
 
 Eight starters you can run in one command. Browse the full catalog with `initrunner run --list`. The model is auto-detected from your API key.
