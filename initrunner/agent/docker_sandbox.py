@@ -126,6 +126,9 @@ def _build_docker_cmd(
     """Build the ``docker run --rm`` command prefix (without the final command)."""
     cmd = ["docker", "run", "--rm", "--init"]
 
+    if config.docker.runtime is not None:
+        cmd.extend(["--runtime", config.docker.runtime])
+
     if container_name:
         cmd.extend(["--name", container_name])
     cmd.extend(["--label", "initrunner.managed=true"])

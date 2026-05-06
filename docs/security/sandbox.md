@@ -5,10 +5,12 @@ Tool subprocesses run under kernel-level isolation, outside the initrunner proce
 Pick one of three backends:
 
 - **[Bubblewrap](bubblewrap.md)** — Linux user namespaces. No daemon, no Docker, no root. Default on Linux.
-- **[Docker](docker-sandbox.md)** — containers via the Docker daemon. Works on macOS, Windows, and Linux. Supports pinned images and bridge networking.
+- **[Docker](docker-sandbox.md)** — containers via the Docker daemon. Works on macOS, Windows, and Linux. Supports pinned images, bridge networking, and hardened runtimes (gVisor, Kata Containers) via `docker.runtime`.
 - **[SSH](ssh-sandbox.md)** — remote execution on an existing host via OpenSSH. Not a kernel sandbox; use for *where* code runs (a build server, a GPU box), not for *containing* untrusted code.
 
 `backend: auto` tries bwrap on Linux and falls back to Docker. SSH is opt-in only (`backend: ssh`) because it needs an explicit remote host. This page is the shared config reference; the linked pages cover each backend's details, examples, and limits.
+
+For an honest comparison across backends and isolation classes (container vs userspace kernel vs microVM), see [Sandbox Backend Comparison](sandbox-comparison.md).
 
 ## Configuration
 
@@ -69,12 +71,15 @@ The dedicated [bubblewrap](bubblewrap.md) and [Docker](docker-sandbox.md) pages 
 |---|---|---|
 | **Platform** | Linux only | macOS, Windows, Linux |
 | **Daemon** | None (`bwrap` binary) | Docker daemon required |
-| **Startup cost** | ~fork+execve | ~200–500ms per call |
+| **Startup cost** | ~fork+execve | ~200-500ms per call |
 | **Filesystem** | Host `/usr`, `/bin`, `/lib` bound read-only | Pinned image |
 | **Network isolation** | `--unshare-net` | `--network none` |
 | **Bridge networking** | Not supported | `--network bridge` |
 | **Resource limits** | `systemd-run --user` (skipped with warning if unavailable) | `-m`, `--cpus`, `--pids-limit` |
+| **Hardened runtime** | n/a | `docker.runtime: runsc / kata-runtime / kata-qemu / kata-fc / kata-clh` |
 | **Install** | `apt install bubblewrap` | `apt install docker.io` or Docker Desktop |
+
+For when a microVM checkbox is the actual question, see [Sandbox Backend Comparison](sandbox-comparison.md).
 
 ## Mount validation
 

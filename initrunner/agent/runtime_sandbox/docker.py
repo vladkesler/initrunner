@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
 from collections.abc import Mapping, Sequence
@@ -22,6 +23,49 @@ from initrunner.agent.runtime_sandbox.base import (
     SandboxUnavailableError,
 )
 from initrunner.agent.schema.security import BindMount, SandboxConfig
+
+_RUNTIME_INSTALL_HINTS: dict[str, str] = {
+    "runsc": (
+        "gVisor (runsc): install per https://gvisor.dev/docs/user_guide/install/, "
+        "register with Docker via /etc/docker/daemon.json, then restart the daemon."
+    ),
+    "kata-runtime": (
+        "Kata Containers: install per https://github.com/kata-containers/kata-containers/"
+        "blob/main/docs/install/README.md and register with Docker."
+    ),
+    "kata-qemu": "Kata Containers (QEMU hypervisor): install per the Kata install docs.",
+    "kata-fc": "Kata Containers (Firecracker hypervisor): install per the Kata install docs.",
+    "kata-clh": "Kata Containers (Cloud Hypervisor): install per the Kata install docs.",
+    "runc": "runc ships with Docker by default; an unregistered runc points to a broken install.",
+}
+
+
+def _list_registered_runtimes() -> list[str] | None:
+    """Return Docker's registered runtime names, or None if the query failed.
+
+    None means we couldn't determine the runtime list (transient docker info
+    failure, malformed JSON). Callers must treat that as "unknown" rather than
+    "empty list," so a transient hiccup never silently passes preflight.
+    """
+    try:
+        proc = subprocess.run(
+            ["docker", "info", "--format", "{{json .Runtimes}}"],
+            capture_output=True,
+            timeout=5,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout.decode("utf-8", errors="replace"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return [k for k in data.keys() if isinstance(k, str)]
+
 
 if TYPE_CHECKING:
     from initrunner.audit.logger import AuditLogger
@@ -62,6 +106,34 @@ class DockerBackend:
                     "  Fedora: dnf install docker && systemctl start docker"
                 ),
             )
+        runtime = self._config.docker.runtime
+        if runtime is not None:
+            registered = _list_registered_runtimes()
+            if registered is None:
+                raise SandboxUnavailableError(
+                    backend="docker",
+                    reason=(
+                        f"could not query Docker runtimes to verify '{runtime}' "
+                        "(docker info failed or returned malformed output)"
+                    ),
+                    remediation=(
+                        "Re-run after the Docker daemon stabilizes, or unset "
+                        "security.sandbox.docker.runtime to fall back to the default."
+                    ),
+                )
+            if runtime not in registered:
+                hint = _RUNTIME_INSTALL_HINTS.get(
+                    runtime, "Install the runtime and register it with Docker."
+                )
+                listed = ", ".join(sorted(registered)) or "(none)"
+                raise SandboxUnavailableError(
+                    backend="docker",
+                    reason=(
+                        f"runtime '{runtime}' is not registered with Docker. "
+                        f"Registered runtimes: {listed}"
+                    ),
+                    remediation=hint,
+                )
         ensure_image_available(self._config.docker.image)
 
     def run(

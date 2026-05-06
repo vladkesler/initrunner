@@ -43,6 +43,7 @@ security:
       image: python:3.12-slim
       user: auto            # "auto" | "1000:1000" | null (root)
       extra_args: []        # dangerous flags blocked by schema
+      runtime: null         # null | runc | runsc | kata-runtime | kata-qemu | kata-fc | kata-clh
 ```
 
 ## Isolation model
@@ -108,15 +109,43 @@ Each becomes one `-e KEY=value` flag.
 
 ### `extra_args` validation
 
-`docker.extra_args` accepts additional `docker run` flags (e.g. `--ulimit=nofile=1024`). A blocklist rejects flags that defeat isolation:
+`docker.extra_args` accepts additional `docker run` flags (e.g. `--ulimit=nofile=1024`). A blocklist rejects flags that defeat isolation or override fields the schema owns:
 
 - `--privileged`
 - `--cap-add` (any form: bare, `--cap-add=NET_ADMIN`, `--cap-add NET_ADMIN`)
-- `--security-opt` when it disables seccomp/apparmor
-- `--pid=host`, `--ipc=host`, `--uts=host`, `--userns=host`
-- `--device`, `--volume-driver`, `--runtime`
+- `--security-opt`
+- `--pid=host`, `--ipc=host`, `--uts=host`, `--userns=host`, `--network=host`
+- `--device`, `--volume-driver`
+- `--runtime` (use the `docker.runtime` field instead, see below)
 
 See `initrunner/agent/schema/security.py` for the full `_DOCKER_BLOCKED_ARGS` set.
+
+### Hardened runtime (`docker.runtime`)
+
+The default Docker runtime (`runc`) shares the host kernel. For workloads where that's not an acceptable trust boundary, set `docker.runtime` to a stronger runtime:
+
+| Value | Isolation class | Notes |
+|---|---|---|
+| `null` (default) | Container (runc) | Standard namespaces + cgroups + seccomp. Shares the host kernel. |
+| `runc` | Container | Same as `null`, but pinned explicitly so preflight fails loud if runc is missing. |
+| `runsc` | Userspace kernel (gVisor) | Syscalls intercepted in userspace. Narrow attack surface. Not a microVM. |
+| `kata-runtime` | microVM (Kata, default hypervisor) | Real guest kernel inside a hypervisor. |
+| `kata-qemu` / `kata-fc` / `kata-clh` | microVM (Kata, named hypervisor) | Pin Kata to QEMU, Firecracker, or Cloud Hypervisor. |
+
+See [sandbox-comparison.md](sandbox-comparison.md) for an honest matrix across all backends.
+
+Preflight calls `docker info --format '{{json .Runtimes}}'` whenever `runtime` is set and raises `SandboxUnavailableError` with an install hint if the runtime isn't registered with the daemon. Confirm manually with:
+
+```bash
+docker info --format '{{json .Runtimes}}' | jq 'keys'
+```
+
+Install per upstream docs. Verified examples (correct as of 2026-05; check upstream before copying):
+
+- gVisor (Debian 12, x86_64): see https://gvisor.dev/docs/user_guide/install/. After installing the `runsc` binary, register it in `/etc/docker/daemon.json` (`{"runtimes": {"runsc": {"path": "/usr/local/bin/runsc"}}}`) and `systemctl restart docker`.
+- Kata Containers: see https://github.com/kata-containers/kata-containers/blob/main/docs/install/README.md. The package name and registration step vary by distro and hypervisor.
+
+Roles that depend on a hardened runtime should declare it in `metadata.tags` (e.g. `[hardened, gvisor]`) so consumers know the host requirement before they install.
 
 ## Container cleanup on timeout
 
