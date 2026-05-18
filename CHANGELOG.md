@@ -2,6 +2,17 @@
 
 ## [2026.5.3] - 2026-05-18
 
+### Security
+- Bump `urllib3` 2.6.3 → 2.7.0. Fixes decompression-bomb safeguard bypass in the streaming API and sensitive headers forwarded across origins in proxied low-level redirects (Dependabot #41, #42). (#126)
+- Bump `python-multipart` 0.0.26 → 0.0.29. Fixes DoS via unbounded multipart part headers (Dependabot #40). (#126)
+- Bump `authlib` 1.6.11 → 1.7.2. Fixes OIDC implicit/hybrid open redirect (Dependabot #43). Pulls in `joserfc` as a new transitive. (#126)
+- Bump dashboard `svelte` 5.55.5 → 5.55.7 (svelte group). Fixes SSR XSS via insecure promise serialization in `hydratable`, XSS via DOM clobbering of internal framework state, SSR XSS via spread attributes, and ReDoS in `<svelte:element>` tag validation (Dependabot #45 through #48). Also bumps `@sveltejs/kit` 2.59.0 → 2.60.1 and `@sveltejs/vite-plugin-svelte` 7.0.0 → 7.1.2. (#125)
+- Bump dashboard `devalue` 5.7.1 → 5.8.1. Fixes DoS via sparse array deserialization (Dependabot #44). (#123)
+
+### Dependencies
+- Bump dashboard `vite` 8.0.10 → 8.0.13. (#120)
+- Bump dashboard `@tailwindcss/vite` 4.2.4 → 4.3.0, `tailwindcss` 4.2.4 → 4.3.0, `tailwind-merge` 3.5.0 → 3.6.0 (tailwind group). (#119)
+
 ## [Unreleased]
 
 ## [2026.5.2] - 2026-05-06
