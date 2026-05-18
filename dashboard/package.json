@@ -23,7 +23,7 @@
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.3",
-    "vite": "^8.0.10"
+    "vite": "^8.0.13"
   },
   "type": "module",
   "dependencies": {
