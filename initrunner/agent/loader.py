@@ -325,10 +325,12 @@ def _create_agent(
     }
     if instrument is not None:
         kwargs["instrument"] = instrument
-    if prepare_tools is not None:
-        kwargs["prepare_tools"] = prepare_tools
     if capabilities:
         kwargs["capabilities"] = capabilities
+    if prepare_tools is not None:
+        from pydantic_ai.capabilities.prepare_tools import PrepareTools
+
+        kwargs.setdefault("capabilities", []).append(PrepareTools(prepare_tools))
 
     execution = role.spec.execution
     if execution.output_retries is not None:
