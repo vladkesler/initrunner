@@ -150,7 +150,7 @@ With `base_url: https://api.example.com`, calling `http_request("GET", "/users/1
 
 ## MCP Tool
 
-Connects to an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, making all of its tools available to the agent via PydanticAI's `FastMCPToolset`.
+Connects to an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, making all of its tools available to the agent via PydanticAI's `MCPToolset` (the v2-ready replacement for the deprecated `FastMCPToolset`).
 
 ```yaml
 tools:

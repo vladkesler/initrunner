@@ -256,7 +256,7 @@ def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefini
     """Serialize agent output, validate, extract usage. Returns new_messages."""
     return _finalize_run_output(
         agent_result.output,
-        agent_result.usage(),
+        agent_result.usage,
         agent_result.all_messages(),
         result,
         role,

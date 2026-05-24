@@ -109,7 +109,7 @@ class TestExecutionFieldsWiredToAgent:
         agent = build_agent(role)
         assert agent._max_tool_retries == 3
         assert agent.end_strategy == "exhaustive"
-        assert agent._max_result_retries == 2
+        assert agent._max_output_retries == 2
         assert agent._tool_timeout == 12.5
 
     def test_max_concurrency_wired(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

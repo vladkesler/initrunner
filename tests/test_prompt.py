@@ -378,7 +378,7 @@ class TestExecutorMultimodal:
         usage.output_tokens = 5
         usage.total_tokens = 15
         usage.tool_calls = 0
-        result_mock.usage.return_value = usage
+        result_mock.usage = usage
         result_mock.all_messages.return_value = []
         agent.run = AsyncMock(return_value=result_mock)
 

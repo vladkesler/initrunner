@@ -1,9 +1,9 @@
-"""FastMCPToolset wrapper for McpToolConfig."""
+"""MCPToolset wrapper for McpToolConfig."""
 
 from __future__ import annotations
 
+from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.toolsets.abstract import AbstractToolset
-from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 
 from initrunner.agent.schema.tools import McpToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
@@ -15,7 +15,7 @@ def build_mcp_toolset(
     config: McpToolConfig,
     ctx: ToolBuildContext,
 ) -> AbstractToolset:
-    """Build a FastMCPToolset from an McpToolConfig."""
+    """Build an MCPToolset from an McpToolConfig."""
     if config.defer:
         return _build_deferred(config, ctx)
     return _build_eager(config, ctx)
@@ -25,7 +25,7 @@ def _build_eager(config: McpToolConfig, ctx: ToolBuildContext) -> AbstractToolse
     """Connect immediately (default behaviour)."""
     sandbox = ctx.role.spec.security.tools
     transport = build_transport(config, ctx.role_dir, sandbox=sandbox)
-    toolset: AbstractToolset = FastMCPToolset(transport, max_retries=config.max_retries)
+    toolset: AbstractToolset = MCPToolset(transport, max_retries=config.max_retries)
     return _apply_filters(toolset, config)
 
 
@@ -41,9 +41,9 @@ def _build_deferred(config: McpToolConfig, ctx: ToolBuildContext) -> AbstractToo
     sandbox = ctx.role.spec.security.tools
     role_dir = ctx.role_dir
 
-    def factory() -> FastMCPToolset:
+    def factory() -> MCPToolset:
         transport = build_transport(config, role_dir, sandbox=sandbox)
-        return FastMCPToolset(transport, max_retries=config.max_retries)
+        return MCPToolset(transport, max_retries=config.max_retries)
 
     toolset: AbstractToolset = DeferredMcpToolset(
         cached_defs=cached_defs,

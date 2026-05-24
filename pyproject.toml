@@ -21,7 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,fastmcp]>=1.71.0",
+    "pydantic-ai-slim[openai,fastmcp]>=1.102.0",
     "pydantic>=2.11",
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
@@ -44,11 +44,11 @@ local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
 safety = ["better-profanity>=0.7.0"]
-anthropic = ["pydantic-ai-slim[anthropic]>=1.71.0"]
-google = ["pydantic-ai-slim[google]>=1.71.0"]
-groq = ["pydantic-ai-slim[groq]>=1.71.0"]
-mistral = ["pydantic-ai-slim[mistral]>=1.71.0"]
-all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=1.71.0"]
+anthropic = ["pydantic-ai-slim[anthropic]>=1.102.0"]
+google = ["pydantic-ai-slim[google]>=1.102.0"]
+groq = ["pydantic-ai-slim[groq]>=1.102.0"]
+mistral = ["pydantic-ai-slim[mistral]>=1.102.0"]
+all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=1.102.0"]
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
@@ -60,7 +60,7 @@ slack = ["slack-sdk>=3.27"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3", "slack-sdk>=3.27"]
 dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
 desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
-a2a = ["pydantic-ai-slim[a2a]>=1.71.0"]
+a2a = ["pydantic-ai-slim[a2a]>=1.102.0"]
 vault = ["cryptography>=46"]
 vault-keyring = ["cryptography>=46", "keyring>=25"]
 recommended = [

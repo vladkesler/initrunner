@@ -133,7 +133,7 @@ class TestMcpConfigValidation:
 class TestMcpBuilderWiring:
     """Tests that new config fields are wired correctly into the builder."""
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_max_retries_passed_to_toolset(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -143,7 +143,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_toolset_cls.call_args
         assert kwargs["max_retries"] == 5
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_timeout_not_passed_to_stdio_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -153,7 +153,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_transport_cls.call_args
         assert "timeout" not in kwargs  # StdioTransport does not support timeout
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.SSETransport")
     def test_headers_passed_to_sse_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -167,7 +167,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_transport_cls.call_args
         assert kwargs["headers"] == {"Authorization": "Bearer tok123"}
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StreamableHttpTransport")
     def test_headers_passed_to_http_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -181,7 +181,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_transport_cls.call_args
         assert kwargs["headers"] == {"X-Api-Key": "key123"}
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.SSETransport")
     def test_timeout_passed_to_sse_transport(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -191,7 +191,7 @@ class TestMcpBuilderWiring:
         assert kwargs["sse_read_timeout"] == 60
 
     @patch.dict(os.environ, {"MCP_API_TOKEN": "secret123"}, clear=False)
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.SSETransport")
     def test_header_env_interpolation(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -205,7 +205,7 @@ class TestMcpBuilderWiring:
         assert kwargs["headers"] == {"Authorization": "Bearer secret123"}
 
     @patch.dict(os.environ, {"MY_VAR": "resolved_value"}, clear=False)
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_env_interpolation_and_merge(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -221,7 +221,7 @@ class TestMcpBuilderWiring:
         assert env["CUSTOM_VAR"] == "resolved_value"
         assert env["STATIC_VAR"] == "static"
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_env_config_overrides_system_env(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -235,7 +235,7 @@ class TestMcpBuilderWiring:
         env = kwargs["env"]
         assert env["PATH"] == "/custom/path"
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_cwd_resolved_relative_to_role_dir(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -246,7 +246,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_transport_cls.call_args
         assert kwargs["cwd"] == "/home/user/roles/subdir"
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_cwd_absolute_not_resolved(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset_cls.return_value = MagicMock()
@@ -257,7 +257,7 @@ class TestMcpBuilderWiring:
         _, kwargs = mock_transport_cls.call_args
         assert kwargs["cwd"] == "/absolute/path"
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_tool_filter_creates_filtered_toolset(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset = MagicMock()
@@ -272,7 +272,7 @@ class TestMcpBuilderWiring:
         mock_toolset.filtered.assert_called_once()
         assert result is mock_filtered
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_tool_exclude_creates_filtered_toolset(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset = MagicMock()
@@ -285,7 +285,7 @@ class TestMcpBuilderWiring:
         mock_toolset.filtered.assert_called_once()
         assert result is mock_filtered
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_tool_prefix_creates_prefixed_toolset(self, mock_transport_cls, mock_toolset_cls):
         mock_toolset = MagicMock()
@@ -298,7 +298,7 @@ class TestMcpBuilderWiring:
         mock_toolset.prefixed.assert_called_once_with("remote")
         assert result is mock_prefixed
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_filter_applied_before_prefix(self, mock_transport_cls, mock_toolset_cls):
         """Verify modifier order: filtered() then prefixed()."""
@@ -322,7 +322,7 @@ class TestMcpBuilderWiring:
         mock_filtered.prefixed.assert_called_once_with("staging")
         assert result is mock_prefixed
 
-    @patch("initrunner.mcp.server.FastMCPToolset")
+    @patch("initrunner.mcp.server.MCPToolset")
     @patch("fastmcp.client.transports.StdioTransport")
     def test_no_headers_not_passed(self, mock_transport_cls, mock_toolset_cls):
         """When headers is empty, 'headers' kwarg should not be in transport args."""

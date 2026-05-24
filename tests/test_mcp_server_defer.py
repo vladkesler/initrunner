@@ -76,7 +76,7 @@ class TestBuildDeferred:
 
         with (
             patch("initrunner.mcp.server.build_transport"),
-            patch("initrunner.mcp.server.FastMCPToolset") as mock_ts,
+            patch("initrunner.mcp.server.MCPToolset") as mock_ts,
         ):
             mock_ts.return_value = MagicMock()
             toolset = build_mcp_toolset(config, ctx)

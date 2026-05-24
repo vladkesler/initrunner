@@ -18,9 +18,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import anyio
-from pydantic_graph.beta import GraphBuilder, StepContext
-from pydantic_graph.beta.id_types import ForkID, NodeID
-from pydantic_graph.beta.join import reduce_list_append
+from pydantic_graph import GraphBuilder, StepContext
+from pydantic_graph.id_types import ForkID, NodeID
+from pydantic_graph.join import reduce_list_append
 
 from initrunner._async import run_sync
 from initrunner._log import get_logger

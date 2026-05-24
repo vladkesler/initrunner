@@ -39,7 +39,8 @@ def _make_mock_agent(output: str = "Hello!", tokens_in: int = 10, tokens_out: in
     usage.output_tokens = tokens_out
     usage.total_tokens = tokens_in + tokens_out
     usage.tool_calls = 0
-    result.usage.return_value = usage
+    # pydantic-ai 1.96+ exposes AgentRunResult.usage as a property, not a method.
+    result.usage = usage
     result.all_messages.return_value = [{"role": "user", "content": "hi"}]
 
     agent.run = AsyncMock(return_value=result)
@@ -67,8 +68,8 @@ def _attach_stream_mock(agent: MagicMock, *, text=None, output="Hello", messages
     stream.stream_text = MagicMock(return_value=_AsyncIter(text or ["Hello"]))
     stream.stream_output = MagicMock(return_value=_AsyncIter([output]))
     stream.all_messages = MagicMock(return_value=messages or [])
-    usage = MagicMock(input_tokens=5, output_tokens=3, total_tokens=8, tool_calls=0)
-    stream.usage = MagicMock(return_value=usage)
+    # pydantic-ai 1.100+ exposes StreamedResponse.usage as a property, not a method.
+    stream.usage = MagicMock(input_tokens=5, output_tokens=3, total_tokens=8, tool_calls=0)
     stream.get_output = AsyncMock(return_value=output)
 
     ctx = MagicMock()
@@ -350,7 +351,7 @@ class TestExecuteRun:
         usage.output_tokens = 5
         usage.total_tokens = 15
         usage.tool_calls = 0
-        result_mock.usage.return_value = usage
+        result_mock.usage = usage
         result_mock.all_messages.return_value = []
         agent.run = AsyncMock(return_value=result_mock)
         role = _make_role()
@@ -372,7 +373,7 @@ class TestExecuteRun:
         usage.output_tokens = 5
         usage.total_tokens = 15
         usage.tool_calls = 0
-        result_mock.usage.return_value = usage
+        result_mock.usage = usage
         result_mock.all_messages.return_value = []
         agent.run = AsyncMock(return_value=result_mock)
         role = _make_role()

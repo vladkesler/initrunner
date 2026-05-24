@@ -1,17 +1,36 @@
 # Changelog
 
+## [2026.5.4] - 2026-05-24
+
+### Security
+- Bump `idna` from 3.11 to 3.16. Closes CVE-2026-45409, an incomplete-fix bypass of the earlier CVE-2024-3651 quadratic-time DoS in `idna.encode()` (Dependabot #49).
+- Bump `pydantic-ai-slim` from 1.71.0 to 1.102.0. Closes GHSA-cqp8-fcvh-x7r3 (fixed in 1.99) and GHSA-cg7w-rg45-pc59 (fixed in 1.102). Both are SSRF cloud-metadata blocklist bypasses via IPv4-mapped IPv6 and NAT64/ISATAP transition forms in URL validation (Dependabot #50).
+- Bump `starlette` from 0.52.1 to 1.1.0. Closes PYSEC-2026-161.
+
+### Changed
+- **Migrate off pydantic-ai deprecations queued for v2.0.** Sweep accumulated 1.71 to 1.102 deprecations so the codebase emits zero `PydanticAIDeprecationWarning`s.
+  - The `Agent(output_retries=)` kwarg is gone; we now pass a `retries={"tools": N, "output": M}` dict matching the `AgentRetries` TypedDict. The YAML-facing `execution.output_retries` field is unchanged.
+  - The `Agent(history_processors=)` kwarg is gone; the token-budget history processor is appended to `capabilities` as a `ProcessHistory(fn)` instance.
+  - The `Agent(prepare_tools=)` kwarg is gone; tool-search filtering is wired via `capabilities=[PrepareTools(fn)]`. The callback in `agent/tools/tool_search.py` is unchanged.
+  - `FastMCPToolset` has been replaced by `pydantic_ai.mcp.MCPToolset`. The deferred-MCP wrapper picks up MCPToolset's direct `list_tools()` method (dropping the `.client.list_tools()` hop). The direct `fastmcp>=3.2.0` dependency is retained because `mcp/gateway.py`, `mcp/browser.py`, `mcp/_transport.py`, and `services/mcp_hub.py` continue to import `fastmcp.FastMCP`, `fastmcp.server.create_proxy`, and `fastmcp.client.transports.*` independently.
+  - `pydantic_graph.beta.{GraphBuilder, StepContext, id_types, join}` has moved to the stable `pydantic_graph` paths. Touches `flow/graph.py` and `team/graph.py`; no call-site changes.
+  - `AgentRunResult.usage()` and `StreamedResponse.usage()` (method-style, deprecated in 1.96 and 1.100 respectively) are now property access. Touches `executor.py`, `executor_output.py`, and seven test fixtures.
+
+### Fixed
+- Test `tests/test_execution_config.py::test_overrides_applied` was asserting on `agent._max_result_retries`; pydantic-ai 1.92 renamed that internal attribute to `_max_output_retries`. Fixed.
+
 ## [2026.5.3] - 2026-05-18
 
 ### Security
-- Bump `urllib3` 2.6.3 → 2.7.0. Fixes decompression-bomb safeguard bypass in the streaming API and sensitive headers forwarded across origins in proxied low-level redirects (Dependabot #41, #42). (#126)
-- Bump `python-multipart` 0.0.26 → 0.0.29. Fixes DoS via unbounded multipart part headers (Dependabot #40). (#126)
-- Bump `authlib` 1.6.11 → 1.7.2. Fixes OIDC implicit/hybrid open redirect (Dependabot #43). Pulls in `joserfc` as a new transitive. (#126)
-- Bump dashboard `svelte` 5.55.5 → 5.55.7 (svelte group). Fixes SSR XSS via insecure promise serialization in `hydratable`, XSS via DOM clobbering of internal framework state, SSR XSS via spread attributes, and ReDoS in `<svelte:element>` tag validation (Dependabot #45 through #48). Also bumps `@sveltejs/kit` 2.59.0 → 2.60.1 and `@sveltejs/vite-plugin-svelte` 7.0.0 → 7.1.2. (#125)
-- Bump dashboard `devalue` 5.7.1 → 5.8.1. Fixes DoS via sparse array deserialization (Dependabot #44). (#123)
+- Bump `urllib3` 2.6.3 to 2.7.0. Fixes decompression-bomb safeguard bypass in the streaming API and sensitive headers forwarded across origins in proxied low-level redirects (Dependabot #41, #42). (#126)
+- Bump `python-multipart` 0.0.26 to 0.0.29. Fixes DoS via unbounded multipart part headers (Dependabot #40). (#126)
+- Bump `authlib` 1.6.11 to 1.7.2. Fixes OIDC implicit/hybrid open redirect (Dependabot #43). Pulls in `joserfc` as a new transitive. (#126)
+- Bump dashboard `svelte` 5.55.5 to 5.55.7 (svelte group). Fixes SSR XSS via insecure promise serialization in `hydratable`, XSS via DOM clobbering of internal framework state, SSR XSS via spread attributes, and ReDoS in `<svelte:element>` tag validation (Dependabot #45 through #48). Also bumps `@sveltejs/kit` 2.59.0 to 2.60.1 and `@sveltejs/vite-plugin-svelte` 7.0.0 to 7.1.2. (#125)
+- Bump dashboard `devalue` 5.7.1 to 5.8.1. Fixes DoS via sparse array deserialization (Dependabot #44). (#123)
 
 ### Dependencies
-- Bump dashboard `vite` 8.0.10 → 8.0.13. (#120)
-- Bump dashboard `@tailwindcss/vite` 4.2.4 → 4.3.0, `tailwindcss` 4.2.4 → 4.3.0, `tailwind-merge` 3.5.0 → 3.6.0 (tailwind group). (#119)
+- Bump dashboard `vite` 8.0.10 to 8.0.13. (#120)
+- Bump dashboard `@tailwindcss/vite` 4.2.4 to 4.3.0, `tailwindcss` 4.2.4 to 4.3.0, `tailwind-merge` 3.5.0 to 3.6.0 (tailwind group). (#119)
 
 ## [Unreleased]
 
@@ -32,8 +51,8 @@
 - Remove stray `role.yaml` / `role2.yaml` files accidentally committed at repo root. (#109)
 
 ### Dependencies
-- Bump dashboard `@sveltejs/kit` 2.58.0 → 2.59.0 (svelte group) (#110)
-- Bump dashboard `bits-ui` 2.18.0 → 2.18.1 (#111)
+- Bump dashboard `@sveltejs/kit` 2.58.0 to 2.59.0 (svelte group) (#110)
+- Bump dashboard `bits-ui` 2.18.0 to 2.18.1 (#111)
 
 ## [2026.5.1] - 2026-05-01
 
@@ -45,15 +64,15 @@
 - **`initrunner new` dispatch missing `token_budget` kwarg.** The token-budget feature added a required keyword to `_run_agent` but the call site in `cli/new_cmd.py` (used after `initrunner new ... --run`) wasn't updated. Now passes `token_budget=None`.
 
 ### Dependencies
-- Bump `aquasecurity/trivy-action` 0.35.0 → 0.36.0 (#104)
-- Bump dashboard `@sveltejs/kit` 2.57.1 → 2.58.0 and `svelte` (#105)
-- Bump dashboard `@tailwindcss/vite` 4.2.2 → 4.2.4 and `tailwindcss` (#106)
-- Bump dashboard `vite` 8.0.9 → 8.0.10 (#107)
+- Bump `aquasecurity/trivy-action` 0.35.0 to 0.36.0 (#104)
+- Bump dashboard `@sveltejs/kit` 2.57.1 to 2.58.0 and `svelte` (#105)
+- Bump dashboard `@tailwindcss/vite` 4.2.2 to 4.2.4 and `tailwindcss` (#106)
+- Bump dashboard `vite` 8.0.9 to 8.0.10 (#107)
 
 ## [2026.4.18] - 2026-04-24
 
 ### Fixed
-- **Docker image builds on linux/arm64 again.** The builder stage now installs `gcc` and `libc6-dev` so Python extensions that lack a prebuilt aarch64 wheel (notably `fastavro`, pulled in transitively via `pydantic-ai-slim[cohere]` → `cohere`) compile from sdist instead of failing with `gcc: No such file or directory`. No code change; PyPI wheel is byte-identical to 2026.4.17.
+- **Docker image builds on linux/arm64 again.** The builder stage now installs `gcc` and `libc6-dev` so Python extensions that lack a prebuilt aarch64 wheel (notably `fastavro`, pulled in transitively via `pydantic-ai-slim[cohere]` to `cohere`) compile from sdist instead of failing with `gcc: No such file or directory`. No code change; PyPI wheel is byte-identical to 2026.4.17.
 
 ## [2026.4.17] - 2026-04-24
 
@@ -1039,7 +1058,7 @@
 ### Changed
 - **BREAKING: Collapse report CLI flags** — `--export-report` + `--report-path` replaced by `--report PATH`; `--report-template` without `--report` now errors
 - **BREAKING: Simplify `memory clear` filters** — `--sessions-only`/`--memories-only` replaced by `--what` (sessions|memories|all); `--what sessions --type X` errors
-- **BREAKING: Rename `timeout` → `timeout_seconds`** on `McpToolConfig`, `ApiEndpoint`, `ToolkitWebReaderConfig`, `ToolkitHttpConfig` — aligns with all other tool configs
+- **BREAKING: Rename `timeout` to `timeout_seconds`** on `McpToolConfig`, `ApiEndpoint`, `ToolkitWebReaderConfig`, `ToolkitHttpConfig` — aligns with all other tool configs
 - Extract `reduce_history()` helper in `agent/history.py` — deduplicates compact+trim sequence from autonomous and daemon runners
 - Inline `_capture_autonomous_episode()` — removed trivial 3-line wrapper in favour of direct `capture_episode()` call
 
@@ -1089,10 +1108,10 @@
 ### Added
 - **Async compose orchestrator**: services run as asyncio tasks on a shared event loop instead of individual threads; agent executions dispatched to a configurable `ThreadPoolExecutor` (`max_agent_workers`). Sync façade (`run_compose()`, `start()`/`stop()`) preserved
 - **Async tool execution**: `execute_run_async()` and `execute_run_stream_async()` use PydanticAI's native `agent.run()` with `asyncio.wait_for` for timeouts — no thread-pool hop
-- **`prefer_async` tool build flag**: `ToolBuildContext.prefer_async` propagates through `build_agent → build_toolsets → tool builders`, letting I/O-bound tools register async closures
+- **`prefer_async` tool build flag**: `ToolBuildContext.prefer_async` propagates through `build_agent to build_toolsets to tool builders`, letting I/O-bound tools register async closures
 - **Async tool variants**: `http`, `web_reader`, `web_scraper` (concurrent embeddings via `asyncio.gather`), and `search` tools provide native async closures when `prefer_async=True`
 - **Async signal handler**: `install_async_shutdown_handler()` in `_signal.py` with double-Ctrl-C force-exit pattern for asyncio event loops
-- **Queue bridge pattern**: sync `queue.Queue` → `asyncio.Queue` bridge inside `ComposeService` preserves `DelegateSink` sync contract while enabling async service loops
+- **Queue bridge pattern**: sync `queue.Queue` to `asyncio.Queue` bridge inside `ComposeService` preserves `DelegateSink` sync contract while enabling async service loops
 - **Dual-mode health monitor**: `HealthMonitor` runs as asyncio task (compose) or thread (standalone)
 - **`AsyncSSRFSafeTransport`**: async SSRF protection for `httpx.AsyncClient`
 - **`fetch_url_as_markdown_async()`**: async HTML fetch and markdown conversion
@@ -1120,7 +1139,7 @@
 ### Added
 - **OCI registry distribution**: publish and install complete role bundles to any OCI-compliant registry (Docker Hub, GHCR, ECR) via `initrunner publish`, `initrunner pull`, and `initrunner install oci://...`
 - **Role bundles**: deterministic `.tar.gz` archives containing role YAML, resolved skills, schema files, and explicit data files with SHA-256 integrity verification
-- **OCI authentication**: `initrunner login` command with credential resolution chain (env vars → oci-auth.json → Docker config base64 auth)
+- **OCI authentication**: `initrunner login` command with credential resolution chain (env vars to oci-auth.json to Docker config base64 auth)
 - **Qualified install IDs**: manifest keys use `github:owner/repo/name` and `oci:registry/repo/name` to prevent name collisions across sources
 - **Bundle metadata field**: optional `metadata.bundle.include` for explicit extra file globs in role YAML
 - New CLI commands: `publish`, `pull`, `login`
@@ -1162,7 +1181,7 @@
 - **Shared streaming module** (`api/_streaming.py`): SSE streaming, upload staging, and attachment resolution utilities extracted from chat_ui and quick_chat routes
 - **MCP transport module** (`mcp/_transport.py`): unified MCP transport construction (stdio, SSE, streamable-http) with sandbox validation and env scrubbing
 - **Async utility** (`_async.py`): `run_sync()` helper for running async coroutines from sync code with event loop reuse and thread fallback
-- **Store factory helpers** (`stores/factory.py`): `managed_memory_store()` context manager for full memory store lifecycle (create → register → yield → unregister → close)
+- **Store factory helpers** (`stores/factory.py`): `managed_memory_store()` context manager for full memory store lifecycle (create to register to yield to unregister to close)
 - **Domain filtering** (`agent/_urls.py`): `check_domain_filter()` for URL domain allow/block list validation
 - **AgentSpec.features property** (`agent/schema/role.py`): lists enabled optional features (tools, triggers, ingest, memory, sinks, skills)
 - **Provider helpers** (`services/providers.py`): `is_ollama_running()`, `list_ollama_models()`, `resolve_provider_and_model()` for consolidated provider/model detection
@@ -1386,7 +1405,7 @@
 ### Changed
 - Python version constraint tightened to `>=3.11,<3.13` — zvec does not yet ship Python 3.13 wheels
 - Zvec-dependent tests skipped in CI (`SKIP_ZVEC_TESTS=1`) — zvec native extension triggers illegal instruction on GitHub Actions runners
-- Default `StoreBackend` enum value: `SQLITE_VEC` → `ZVEC` across all config schemas (IngestConfig, MemoryConfig, SharedMemoryConfig, StoreConfig)
+- Default `StoreBackend` enum value: `SQLITE_VEC` to `ZVEC` across all config schemas (IngestConfig, MemoryConfig, SharedMemoryConfig, StoreConfig)
 - Ingestion pipeline uses factory-based store creation instead of low-level sqlite3 calls
 - `build_memory_system_prompt()` accepts optional `store` parameter to reuse an already-open store
 - Agent loader passes existing memory store to procedural-memory system prompt callback
@@ -1417,7 +1436,7 @@
 - Multi-turn conversation persistence for messaging triggers (LRU store, TTL expiry)
 - `chat` command — zero-config REPL with provider auto-detection, tool profiles (`none`/`minimal`/`all`), and one-command bot mode (`--telegram`/`--discord`)
 - `tool_search` meta-tool — BM25 keyword search over tool catalog; hides tools behind on-demand discovery to reduce context for large (10+) tool sets
-- Provider auto-detection service (`services/providers.py`) — priority-ordered key detection (Anthropic → OpenAI → Google → Groq → Mistral → Cohere → Ollama)
+- Provider auto-detection service (`services/providers.py`) — priority-ordered key detection (Anthropic to OpenAI to Google to Groq to Mistral to Cohere to Ollama)
 - Bot token redaction for Discord and Telegram in sensitive env scrubbing
 - Example roles: `discord-assistant.yaml`, `telegram-assistant.yaml`
 - Docs: Discord quickstart, Telegram quickstart, chat quickstart, tool search reference
@@ -1436,7 +1455,7 @@
 - **fix:** migrate search tool from deprecated `duckduckgo-search` to `ddgs` — import, context
   manager removal, and error messages updated
 - **fix:** `web-searcher` example role prompt tightened to avoid exhausting tool call limit;
-  `max_tool_calls` bumped 10→15, `timeout_seconds` bumped 60→120
+  `max_tool_calls` bumped from 10 to 15, `timeout_seconds` bumped from 60 to 120
 
 ### Changed
 - **deps:** `search` extra now requires `ddgs>=9.10.0` (replaces `duckduckgo-search>=7.0.0`)
@@ -1458,7 +1477,7 @@
 ## [1.1.4] - 2026-02-18
 
 ### Changed
-- **ux:** `setup` "Next steps" panel restructured into three sections (Create your agent / Or run the scaffold / Interfaces); examples discovery (`examples list` → `examples copy` → `run`) replaces the broken `init --template rag` hint
+- **ux:** `setup` "Next steps" panel restructured into three sections (Create your agent / Or run the scaffold / Interfaces); examples discovery (`examples list` to `examples copy` to `run`) replaces the broken `init --template rag` hint
 
 ## [1.1.3] - 2026-02-18
 
@@ -1576,7 +1595,7 @@ All notable changes to this project will be documented in this file.
 
 ### Documentation
 - complete rewrite of `docs/core/memory.md` for rich memory architecture
-- update memory tools section in `docs/agents/tools.md` (3 → 5 tools)
+- update memory tools section in `docs/agents/tools.md` (3 to 5 tools)
 - update autonomy docs with episodic auto-capture and consolidation
 - add `memory list` and `memory consolidate` to CLI reference
 - surface autonomous mode and budget controls in README and CLI docs (2af688a)

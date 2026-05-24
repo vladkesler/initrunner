@@ -7,9 +7,9 @@ import logging
 from collections.abc import Callable
 from typing import Any, Self
 
+from pydantic_ai.mcp import MCPToolset
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets.abstract import AbstractToolset, ToolsetTool
-from pydantic_ai.toolsets.fastmcp import FastMCPToolset
 
 from initrunner.mcp._cache import CachedTool, diff_schemas, write_cache
 
@@ -37,13 +37,13 @@ class DeferredMcpToolset(AbstractToolset[Any]):
       ``ToolDefinition``s; ``call_tool`` triggers lazy connect.
     * **Cache miss, not connected** -- ``get_tools`` connects eagerly
       (first run for this server), caches schemas, serves live.
-    * **Connected** -- delegates entirely to the live ``FastMCPToolset``.
+    * **Connected** -- delegates entirely to the live ``MCPToolset``.
     """
 
     def __init__(
         self,
         cached_defs: list[ToolDefinition] | None,
-        factory: Callable[[], FastMCPToolset],
+        factory: Callable[[], MCPToolset],
         cache_key: str,
         max_retries: int = 1,
     ) -> None:
@@ -51,7 +51,7 @@ class DeferredMcpToolset(AbstractToolset[Any]):
         self._factory = factory
         self._cache_key = cache_key
         self._max_retries = max_retries
-        self._live: FastMCPToolset | None = None
+        self._live: MCPToolset | None = None
         self._connect_lock = asyncio.Lock()
 
     @property
@@ -116,7 +116,7 @@ class DeferredMcpToolset(AbstractToolset[Any]):
 
             # Fetch live schemas and update cache.
             try:
-                mcp_tools = await live.client.list_tools()
+                mcp_tools = await live.list_tools()
             except Exception:
                 _logger.debug("Failed to list tools for cache update on %s", self._cache_key)
                 return

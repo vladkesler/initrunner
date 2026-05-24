@@ -125,18 +125,27 @@ class TestBuildAgentCapabilities:
         ):
             build_agent(role)
 
+        from pydantic_ai.capabilities import ProcessHistory
+
         call_kwargs = mock_agent_cls.call_args.kwargs
         assert "capabilities" in call_kwargs
-        assert call_kwargs["capabilities"] == ["mock_capability"]
+        caps = call_kwargs["capabilities"]
+        assert "mock_capability" in caps
+        assert any(isinstance(c, ProcessHistory) for c in caps)
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
     def test_no_capabilities_by_default(self, mock_require, mock_agent_cls, tmp_path: Path):
+        from pydantic_ai.capabilities import ProcessHistory
+
         role = load_role(_write_role(tmp_path))
         build_agent(role)
         call_kwargs = mock_agent_cls.call_args.kwargs
-        assert "capabilities" not in call_kwargs
+        # ProcessHistory is always appended to drive history-budget enforcement;
+        # no other capabilities should be present when none are declared.
+        caps = call_kwargs["capabilities"]
+        assert len(caps) == 1 and isinstance(caps[0], ProcessHistory)
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")

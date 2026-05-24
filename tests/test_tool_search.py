@@ -380,8 +380,10 @@ class TestBuildAgentIntegration:
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
     def test_build_agent_with_tool_search(self, mock_require, mock_agent_cls, monkeypatch):
-        """build_agent with tool_search.enabled produces an agent with prepare_tools."""
+        """build_agent with tool_search.enabled produces an agent with a PrepareTools capability."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+        from pydantic_ai.capabilities.prepare_tools import PrepareTools
 
         from initrunner.agent.loader import build_agent
 
@@ -392,15 +394,18 @@ class TestBuildAgentIntegration:
         role = RoleDefinition.model_validate(data)
         build_agent(role)
 
-        # Agent constructor should have received a prepare_tools callback
         call_kwargs = mock_agent_cls.call_args
-        assert call_kwargs.kwargs.get("prepare_tools") is not None
+        assert "prepare_tools" not in call_kwargs.kwargs
+        caps = call_kwargs.kwargs.get("capabilities", [])
+        assert any(isinstance(c, PrepareTools) for c in caps)
 
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
     def test_build_agent_without_tool_search(self, mock_require, mock_agent_cls, monkeypatch):
-        """build_agent without tool_search leaves prepare_tools as None."""
+        """build_agent without tool_search adds no PrepareTools capability."""
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+        from pydantic_ai.capabilities.prepare_tools import PrepareTools
 
         from initrunner.agent.loader import build_agent
 
@@ -409,4 +414,6 @@ class TestBuildAgentIntegration:
         build_agent(role)
 
         call_kwargs = mock_agent_cls.call_args
-        assert call_kwargs.kwargs.get("prepare_tools") is None
+        assert "prepare_tools" not in call_kwargs.kwargs
+        caps = call_kwargs.kwargs.get("capabilities", [])
+        assert not any(isinstance(c, PrepareTools) for c in caps)

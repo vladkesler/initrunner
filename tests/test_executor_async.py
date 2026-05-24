@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -152,9 +152,7 @@ class TestExecuteRunAsync:
         @dataclass
         class FakeResult:
             output: str = "response text"
-
-            def usage(self):
-                return FakeUsage()
+            usage: FakeUsage = field(default_factory=FakeUsage)
 
             def all_messages(self):
                 return []

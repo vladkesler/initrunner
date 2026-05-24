@@ -88,7 +88,7 @@ def make_mock_agent(
     usage.output_tokens = tokens_out
     usage.total_tokens = tokens_in + tokens_out
     usage.tool_calls = tool_calls
-    result.usage.return_value = usage
+    result.usage = usage
     result.all_messages.return_value = [{"role": "assistant", "content": output}]
 
     agent.run_sync.return_value = result

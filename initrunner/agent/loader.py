@@ -325,15 +325,21 @@ def _create_agent(
     }
     if instrument is not None:
         kwargs["instrument"] = instrument
-    if prepare_tools is not None:
-        kwargs["prepare_tools"] = prepare_tools
     if capabilities:
         kwargs["capabilities"] = capabilities
+    if prepare_tools is not None:
+        from pydantic_ai.capabilities.prepare_tools import PrepareTools
+
+        kwargs.setdefault("capabilities", []).append(PrepareTools(prepare_tools))
 
     execution = role.spec.execution
-    kwargs["retries"] = execution.retries
     if execution.output_retries is not None:
-        kwargs["output_retries"] = execution.output_retries
+        kwargs["retries"] = {
+            "tools": execution.retries,
+            "output": execution.output_retries,
+        }
+    else:
+        kwargs["retries"] = execution.retries
     kwargs["end_strategy"] = execution.end_strategy
     if execution.tool_timeout_seconds is not None:
         kwargs["tool_timeout"] = execution.tool_timeout_seconds
@@ -345,9 +351,13 @@ def _create_agent(
             max_queued=execution.max_concurrency.max_queued,
         )
 
+    from pydantic_ai.capabilities import ProcessHistory
+
     from initrunner.agent.history_summarizer import build_history_processor
 
-    kwargs["history_processors"] = [build_history_processor(role.spec.model)]  # type: ignore[arg-type]
+    kwargs.setdefault("capabilities", []).append(
+        ProcessHistory(build_history_processor(role.spec.model))  # type: ignore[arg-type]
+    )
 
     return Agent(_build_model(role.spec.model), **kwargs)  # type: ignore[arg-type]
 
