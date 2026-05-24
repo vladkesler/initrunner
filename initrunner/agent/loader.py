@@ -331,9 +331,13 @@ def _create_agent(
         kwargs["capabilities"] = capabilities
 
     execution = role.spec.execution
-    kwargs["retries"] = execution.retries
     if execution.output_retries is not None:
-        kwargs["output_retries"] = execution.output_retries
+        kwargs["retries"] = {
+            "tools": execution.retries,
+            "output": execution.output_retries,
+        }
+    else:
+        kwargs["retries"] = execution.retries
     kwargs["end_strategy"] = execution.end_strategy
     if execution.tool_timeout_seconds is not None:
         kwargs["tool_timeout"] = execution.tool_timeout_seconds
