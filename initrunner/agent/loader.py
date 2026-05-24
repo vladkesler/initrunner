@@ -349,9 +349,13 @@ def _create_agent(
             max_queued=execution.max_concurrency.max_queued,
         )
 
+    from pydantic_ai.capabilities import ProcessHistory
+
     from initrunner.agent.history_summarizer import build_history_processor
 
-    kwargs["history_processors"] = [build_history_processor(role.spec.model)]  # type: ignore[arg-type]
+    kwargs.setdefault("capabilities", []).append(
+        ProcessHistory(build_history_processor(role.spec.model))  # type: ignore[arg-type]
+    )
 
     return Agent(_build_model(role.spec.model), **kwargs)  # type: ignore[arg-type]
 
