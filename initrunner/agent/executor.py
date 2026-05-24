@@ -537,7 +537,7 @@ async def execute_run_stream_async(
                                 on_token(text)
                     elif isinstance(event, AgentRunResultEvent):
                         stream_state["output"] = event.result.output
-                        stream_state["usage"] = event.result.usage()
+                        stream_state["usage"] = event.result.usage
                         stream_state["messages"] = event.result.all_messages()
 
             await asyncio.wait_for(
@@ -558,7 +558,7 @@ async def execute_run_stream_async(
                             if on_token is not None:
                                 on_token(chunk)
                     stream_state["messages"] = stream.all_messages()
-                    stream_state["usage"] = stream.usage()
+                    stream_state["usage"] = stream.usage
                     stream_state["output"] = await stream.get_output()
 
             await asyncio.wait_for(

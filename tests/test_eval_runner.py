@@ -47,7 +47,7 @@ def _make_mock_agent(output: str = "Hello!"):
     usage.output_tokens = 5
     usage.total_tokens = 15
     usage.tool_calls = 0
-    result.usage.return_value = usage
+    result.usage = usage
     result.all_messages.return_value = []
     agent.run = AsyncMock(return_value=result)
     return agent
