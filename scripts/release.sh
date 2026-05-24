@@ -30,7 +30,7 @@ import re, pathlib
 m = re.search(r'__version__\s*=\s*\"(.+?)\"', pathlib.Path('initrunner/__init__.py').read_text())
 print(m.group(1))
 ")
-echo "Bumping $CURRENT → $VERSION"
+echo "Bumping $CURRENT to $VERSION"
 
 # Update __init__.py
 sed -i "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" initrunner/__init__.py
