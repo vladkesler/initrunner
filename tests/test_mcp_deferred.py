@@ -37,11 +37,11 @@ def _make_mcp_tool(name: str = "read_file", desc: str = "Read a file"):
 
 
 def _make_live_toolset(tools: list | None = None):
-    """Build a mock FastMCPToolset."""
+    """Build a mock MCPToolset."""
     ts = AsyncMock()
     ts.__aenter__ = AsyncMock(return_value=ts)
     ts.__aexit__ = AsyncMock(return_value=None)
-    ts.client.list_tools = AsyncMock(return_value=tools or [_make_mcp_tool()])
+    ts.list_tools = AsyncMock(return_value=tools or [_make_mcp_tool()])
     ts.get_tools = AsyncMock(return_value={"read_file": MagicMock()})
     ts.call_tool = AsyncMock(return_value="file contents")
     return ts
