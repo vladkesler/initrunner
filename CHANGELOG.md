@@ -15,6 +15,23 @@
 
 ## [Unreleased]
 
+### Security
+- Bump `idna` from 3.11 to 3.16. Closes CVE-2026-45409, an incomplete-fix bypass of the earlier CVE-2024-3651 quadratic-time DoS in `idna.encode()` (Dependabot #49).
+- Bump `pydantic-ai-slim` from 1.71.0 to 1.102.0. Closes GHSA-cqp8-fcvh-x7r3 (fixed in 1.99) and GHSA-cg7w-rg45-pc59 (fixed in 1.102). Both are SSRF cloud-metadata blocklist bypasses via IPv4-mapped IPv6 and NAT64/ISATAP transition forms in URL validation (Dependabot #50).
+- Bump `starlette` from 0.52.1 to 1.1.0. Closes PYSEC-2026-161.
+
+### Changed
+- **Migrate off pydantic-ai deprecations queued for v2.0.** Sweep accumulated 1.71 to 1.102 deprecations so the codebase emits zero `PydanticAIDeprecationWarning`s.
+  - The `Agent(output_retries=)` kwarg is gone; we now pass a `retries={"tools": N, "output": M}` dict matching the `AgentRetries` TypedDict. The YAML-facing `execution.output_retries` field is unchanged.
+  - The `Agent(history_processors=)` kwarg is gone; the token-budget history processor is appended to `capabilities` as a `ProcessHistory(fn)` instance.
+  - The `Agent(prepare_tools=)` kwarg is gone; tool-search filtering is wired via `capabilities=[PrepareTools(fn)]`. The callback in `agent/tools/tool_search.py` is unchanged.
+  - `FastMCPToolset` has been replaced by `pydantic_ai.mcp.MCPToolset`. The deferred-MCP wrapper picks up MCPToolset's direct `list_tools()` method (dropping the `.client.list_tools()` hop). The direct `fastmcp>=3.2.0` dependency is retained because `mcp/gateway.py`, `mcp/browser.py`, `mcp/_transport.py`, and `services/mcp_hub.py` continue to import `fastmcp.FastMCP`, `fastmcp.server.create_proxy`, and `fastmcp.client.transports.*` independently.
+  - `pydantic_graph.beta.{GraphBuilder, StepContext, id_types, join}` has moved to the stable `pydantic_graph` paths. Touches `flow/graph.py` and `team/graph.py`; no call-site changes.
+  - `AgentRunResult.usage()` and `StreamedResponse.usage()` (method-style, deprecated in 1.96 and 1.100 respectively) are now property access. Touches `executor.py`, `executor_output.py`, and seven test fixtures.
+
+### Fixed
+- Test `tests/test_execution_config.py::test_overrides_applied` was asserting on `agent._max_result_retries`; pydantic-ai 1.92 renamed that internal attribute to `_max_output_retries`. Fixed.
+
 ## [2026.5.2] - 2026-05-06
 
 ### Added
