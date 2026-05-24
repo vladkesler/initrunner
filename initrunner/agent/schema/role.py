@@ -138,6 +138,8 @@ class AgentSpec(BaseModel):
     def _parse_capabilities(cls, v: Any) -> list:
         if not isinstance(v, list):
             return v
+        # NamedSpec has no public re-export on pydantic-ai 1.102; accept the
+        # private import until upstream promotes it. Revisit at v2.0.
         from pydantic_ai._spec import NamedSpec  # type: ignore[import-not-found]
 
         return [NamedSpec.model_validate(item) for item in v]
