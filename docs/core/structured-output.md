@@ -49,6 +49,7 @@ Structured output is configured in the `spec.output` section:
 spec:
   output:
     type: json_schema        # "text" (default) or "json_schema"
+    mode: auto               # how structured output is requested (see below)
     schema: { ... }          # inline JSON Schema (mutually exclusive with schema_file)
     schema_file: schema.json # path to external JSON Schema file
 ```
@@ -58,10 +59,43 @@ spec:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | `str` | `"text"` | Output type. `"text"` for free-form text, `"json_schema"` for validated JSON. |
+| `mode` | `str` | `"auto"` | Strategy used to obtain structured output. One of `auto`, `tool`, `native`, `prompted`, `text`. See [Output Modes](#output-modes). |
 | `schema` | `dict` | `null` | Inline JSON Schema definition. Required when `type` is `json_schema` (unless `schema_file` is set). |
 | `schema_file` | `str` | `null` | Path to an external JSON Schema file. Relative paths are resolved from the role file's directory. |
 
 When `type` is `json_schema`, exactly one of `schema` or `schema_file` must be provided.
+
+## Output Modes
+
+`mode` controls how InitRunner asks the model for structured output. It maps onto PydanticAI's output markers, which decide whether the schema is enforced through a tool call, the provider's native structured-output API, or a prompt instruction.
+
+| Mode | Behavior | When to use |
+|------|----------|-------------|
+| `auto` (default) | Defers to PydanticAI, which picks a strategy from the model's `ModelProfile.default_structured_output_mode` (typically `tool`). | The safe default. Works with every provider and matches prior InitRunner behavior. |
+| `tool` | Forces structured output through a tool call, regardless of model capabilities. | Maximum compatibility, or to pin the strategy so it does not change if you switch models. |
+| `native` | Uses the provider's native structured-output API (for example OpenAI Structured Outputs). Faster and cheaper on models that support it. | Models with native JSON-schema support and a high structured-output volume. |
+| `prompted` | Describes the schema in the prompt and asks the model to reply with matching JSON. | A fallback for providers that lack native or tool-based structured output. |
+| `text` | Plain unstructured text. | Only valid with `type: text`; this is the implicit mode for text roles. |
+
+Validation rules:
+
+- `mode: native`, `tool`, and `prompted` require `type: json_schema`.
+- `mode: text` requires `type: text`.
+- With `type: text`, only `auto` or `text` are accepted.
+
+```yaml
+spec:
+  output:
+    type: json_schema
+    mode: native             # opt into the provider's native structured-output API
+    schema:
+      type: object
+      properties:
+        status: { type: string, enum: [approved, rejected] }
+      required: [status]
+```
+
+When a role uses a `FallbackModel` (a primary plus fallbacks across providers), a pinned `native` mode applies to every model in the chain. If a fallback provider does not support native structured output, that request fails over to the next model rather than silently degrading. Pin `tool` (or keep `auto`) for mixed-provider fallback chains.
 
 ## Inline Schema
 

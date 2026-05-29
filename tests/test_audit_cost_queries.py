@@ -22,6 +22,8 @@ def _insert_record(
     provider: str = "openai",
     tokens_in: int = 100,
     tokens_out: int = 50,
+    thinking_tokens: int = 0,
+    reasoning_tokens: int = 0,
     timestamp: str | None = None,
 ) -> None:
     """Insert a test audit record directly."""
@@ -30,9 +32,10 @@ def _insert_record(
         """\
         INSERT INTO audit_log
             (run_id, agent_name, timestamp, user_prompt, model, provider,
-             output, tokens_in, tokens_out, total_tokens, tool_calls,
+             output, tokens_in, tokens_out, total_tokens,
+             thinking_tokens, reasoning_tokens, tool_calls,
              duration_ms, success)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             f"run-{ts}",
@@ -45,6 +48,8 @@ def _insert_record(
             tokens_in,
             tokens_out,
             tokens_in + tokens_out,
+            thinking_tokens,
+            reasoning_tokens,
             0,
             100,
             True,
@@ -104,6 +109,22 @@ class TestCostByAgent:
             rows = logger.cost_by_agent(since=cutoff)
             assert len(rows) == 1
             assert rows[0]["tokens_in"] == 200
+
+    def test_sums_thinking_tokens(self, audit_db: Path) -> None:
+        with AuditLogger(audit_db) as logger:
+            t1 = "2026-04-01T10:00:00+00:00"
+            t2 = "2026-04-01T11:00:00+00:00"
+            _insert_record(
+                logger, agent_name="a", thinking_tokens=10, reasoning_tokens=4, timestamp=t1
+            )
+            _insert_record(
+                logger, agent_name="a", thinking_tokens=30, reasoning_tokens=6, timestamp=t2
+            )
+
+            rows = logger.cost_by_agent()
+            assert len(rows) == 1
+            assert rows[0]["thinking_tokens"] == 40
+            assert rows[0]["reasoning_tokens"] == 10
 
 
 class TestCostByDay:
@@ -174,3 +195,15 @@ class TestCostByModel:
             rows = logger.cost_by_model(since="2026-04-01T00:00:00+00:00")
             assert len(rows) == 1
             assert rows[0]["tokens_in"] == 200
+
+    def test_sums_thinking_tokens(self, audit_db: Path) -> None:
+        with AuditLogger(audit_db) as logger:
+            t1 = "2026-04-01T10:00:00+00:00"
+            t2 = "2026-04-01T11:00:00+00:00"
+            _insert_record(logger, thinking_tokens=10, reasoning_tokens=4, timestamp=t1)
+            _insert_record(logger, thinking_tokens=30, reasoning_tokens=6, timestamp=t2)
+
+            rows = logger.cost_by_model()
+            assert len(rows) == 1
+            assert rows[0]["thinking_tokens"] == 40
+            assert rows[0]["reasoning_tokens"] == 10

@@ -95,14 +95,35 @@ def build_output_model(
     return create_model(model_name, **field_definitions)
 
 
+def _wrap_output_type(base_type: type[BaseModel], mode: str) -> Any:
+    """Wrap a structured base type in the PydanticAI marker for ``mode``.
+
+    Only the explicit modes ('tool', 'native', 'prompted') wrap the type; 'auto'
+    is handled by the caller, which returns the bare type so PydanticAI selects a
+    mode from the model's ``ModelProfile.default_structured_output_mode``.
+    """
+    from pydantic_ai import NativeOutput, PromptedOutput, ToolOutput
+
+    if mode == "tool":
+        return ToolOutput(base_type)
+    if mode == "native":
+        return NativeOutput(base_type)
+    if mode == "prompted":
+        return PromptedOutput(base_type)
+    raise ValueError(f"Unknown structured output mode: {mode}")
+
+
 def resolve_output_type(
     output_config: OutputConfig,
     role_dir: Path | None = None,
-) -> type:
-    """Resolve an OutputConfig to a Python type for PydanticAI's ``output_type`` param.
+) -> Any:
+    """Resolve an OutputConfig to a value for PydanticAI's ``output_type`` param.
 
-    Returns ``str`` for text output, or a dynamic ``BaseModel`` subclass for
-    ``json_schema`` output.
+    Returns ``str`` for text output. For ``json_schema`` output the dynamic
+    ``BaseModel`` subclass is returned bare when ``mode='auto'`` (letting
+    PydanticAI pick the strategy from the model profile) or wrapped in the
+    matching marker (``ToolOutput``, ``NativeOutput``, ``PromptedOutput``) when
+    the role pins an explicit mode.
     """
     if output_config.type == "text":
         return str
@@ -118,4 +139,7 @@ def resolve_output_type(
         raw = schema_path.read_text(encoding="utf-8")
         schema = json.loads(raw)
 
-    return build_output_model(schema)
+    base_type = build_output_model(schema)
+    if output_config.mode == "auto":
+        return base_type
+    return _wrap_output_type(base_type, output_config.mode)

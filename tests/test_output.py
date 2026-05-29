@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel, ValidationError
+from pydantic_ai import NativeOutput, PromptedOutput, ToolOutput
 
 from initrunner.agent.output import build_output_model, resolve_output_type
 from initrunner.agent.schema.output import OutputConfig
@@ -24,6 +25,13 @@ def _minimal_role_data(**spec_overrides: object) -> dict:
     }
     data["spec"].update(spec_overrides)  # type: ignore[no-matching-overload]
     return data
+
+
+_SIMPLE_SCHEMA: dict = {
+    "type": "object",
+    "properties": {"x": {"type": "string"}},
+    "required": ["x"],
+}
 
 
 def _json_schema_output_spec() -> dict:
@@ -451,3 +459,159 @@ class TestPipelinePrecedence:
         build_agent(role, output_type=dict)
         call_kwargs = mock_agent_cls.call_args
         assert call_kwargs.kwargs["output_type"] is dict
+
+
+# ---------------------------------------------------------------------------
+# OutputConfig.mode validation
+# ---------------------------------------------------------------------------
+
+
+class TestOutputConfigMode:
+    def test_mode_default_is_auto(self):
+        assert OutputConfig().mode == "auto"
+
+    def test_mode_native_value_valid(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "native"}
+        )
+        assert config.mode == "native"
+
+    def test_mode_text_with_text_type_valid(self):
+        config = OutputConfig(type="text", mode="text")
+        assert config.mode == "text"
+
+    def test_mode_text_with_json_schema_invalid(self):
+        with pytest.raises(ValidationError, match="type must be 'text' when mode is 'text'"):
+            OutputConfig.model_validate(
+                {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "text"}
+            )
+
+    def test_mode_native_with_text_type_invalid(self):
+        with pytest.raises(
+            ValidationError, match="mode must be 'text' or 'auto' when output type is 'text'"
+        ):
+            OutputConfig(type="text", mode="native")
+
+    def test_mode_native_with_json_schema_valid(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "native"}
+        )
+        assert config.mode == "native"
+
+    def test_mode_prompted_with_json_schema_valid(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "prompted"}
+        )
+        assert config.mode == "prompted"
+
+    def test_mode_tool_with_json_schema_valid(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "tool"}
+        )
+        assert config.mode == "tool"
+
+    def test_mode_auto_with_text_valid(self):
+        assert OutputConfig(type="text", mode="auto").mode == "auto"
+
+    def test_mode_auto_with_json_schema_valid(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "auto"}
+        )
+        assert config.mode == "auto"
+
+
+# ---------------------------------------------------------------------------
+# resolve_output_type output-mode wrapping
+# ---------------------------------------------------------------------------
+
+
+class TestResolveOutputTypeWrapping:
+    def test_text_mode_returns_str(self):
+        config = OutputConfig(type="text", mode="text")
+        assert resolve_output_type(config) is str
+
+    def test_text_auto_returns_str(self):
+        config = OutputConfig(type="text", mode="auto")
+        assert resolve_output_type(config) is str
+
+    def test_auto_mode_returns_bare_base_model(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "auto"}
+        )
+        result = resolve_output_type(config)
+        assert isinstance(result, type) and issubclass(result, BaseModel)
+
+    def test_tool_mode_returns_tool_output(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "tool"}
+        )
+        result = resolve_output_type(config)
+        assert isinstance(result, ToolOutput)
+        assert issubclass(result.output, BaseModel)  # type: ignore[arg-type]
+
+    def test_native_mode_returns_native_output(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "native"}
+        )
+        result = resolve_output_type(config)
+        assert isinstance(result, NativeOutput)
+
+    def test_prompted_mode_returns_prompted_output(self):
+        config = OutputConfig.model_validate(
+            {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "prompted"}
+        )
+        result = resolve_output_type(config)
+        assert isinstance(result, PromptedOutput)
+
+    def test_tool_mode_from_schema_file(self, tmp_path: Path):
+        schema_file = tmp_path / "schema.json"
+        schema_file.write_text(json.dumps(_SIMPLE_SCHEMA))
+        config = OutputConfig(type="json_schema", schema_file="schema.json", mode="native")
+        result = resolve_output_type(config, role_dir=tmp_path)
+        assert isinstance(result, NativeOutput)
+
+
+# ---------------------------------------------------------------------------
+# build_agent passes the resolved (possibly wrapped) output type to the Agent
+# ---------------------------------------------------------------------------
+
+
+class TestBuildAgentOutputMode:
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_build_agent_auto_mode_passes_bare_model(self, mock_require, mock_agent_cls):
+        from initrunner.agent.loader import build_agent
+        from initrunner.agent.schema.role import RoleDefinition
+
+        spec = {"output": {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "auto"}}
+        role = RoleDefinition.model_validate(_minimal_role_data(**spec))
+        build_agent(role)
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert isinstance(output_type, type) and issubclass(output_type, BaseModel)
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_build_agent_native_mode_passes_native_output(self, mock_require, mock_agent_cls):
+        from initrunner.agent.loader import build_agent
+        from initrunner.agent.schema.role import RoleDefinition
+
+        spec = {"output": {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "native"}}
+        role = RoleDefinition.model_validate(_minimal_role_data(**spec))
+        build_agent(role)
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert isinstance(output_type, NativeOutput)
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_build_agent_tool_mode_passes_tool_output(self, mock_require, mock_agent_cls):
+        from initrunner.agent.loader import build_agent
+        from initrunner.agent.schema.role import RoleDefinition
+
+        spec = {"output": {"type": "json_schema", "schema": _SIMPLE_SCHEMA, "mode": "tool"}}
+        role = RoleDefinition.model_validate(_minimal_role_data(**spec))
+        build_agent(role)
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert isinstance(output_type, ToolOutput)

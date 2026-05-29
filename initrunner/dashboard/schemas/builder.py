@@ -15,6 +15,7 @@ from initrunner.dashboard.schemas._common import (
 
 __all__ = [
     "BuilderOptionsResponse",
+    "ConfigOptionsResponse",
     "EmbeddingOption",
     "EmbeddingWarning",
     "EnvVarStatus",
@@ -51,6 +52,15 @@ class TemplateSetup(BaseModel):
     docs_url: str
 
 
+class ConfigOptionsResponse(BaseModel):
+    """Valid enum values for role-config fields, so the frontend can offer them as choices."""
+
+    output_modes: list[str]
+    thinking_efforts: list[str]
+    retrieval_strategies: list[str]
+    embedding_providers: list[str]
+
+
 class BuilderOptionsResponse(BaseModel):
     templates: list[TemplateInfo]
     providers: list[ProviderModels]
@@ -63,6 +73,7 @@ class BuilderOptionsResponse(BaseModel):
     template_setups: dict[str, TemplateSetup] = {}
     provider_status: list[ProviderStatus] = []
     tool_func_map: dict[str, list[str]] = {}  # tool type -> function names
+    config_options: ConfigOptionsResponse | None = None
 
 
 class StarterInfo(BaseModel):

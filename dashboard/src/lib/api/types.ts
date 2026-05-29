@@ -125,12 +125,21 @@ export interface AuditRecord {
 	tokens_in: number;
 	tokens_out: number;
 	total_tokens: number;
+	thinking_tokens: number;
+	reasoning_tokens: number;
 	tool_calls: number;
 	duration_ms: number;
 	success: boolean;
 	error: string | null;
 	trigger_type: string | null;
 	cost_usd: number | null;
+}
+
+export interface AuditRunDetail extends AuditRecord {
+	thinking_tokens: number;
+	reasoning_tokens: number;
+	event_timeline: Array<Record<string, unknown>> | null;
+	judge_verdicts: Array<Record<string, unknown>> | null;
 }
 
 export interface Provider {
@@ -816,6 +825,8 @@ export interface AgentCost {
 	tokens_out: number;
 	total_cost_usd: number | null;
 	avg_cost_per_run: number | null;
+	thinking_tokens: number;
+	reasoning_tokens: number;
 }
 
 export interface DailyCost {
@@ -831,6 +842,8 @@ export interface ModelCost {
 	tokens_in: number;
 	tokens_out: number;
 	total_cost_usd: number | null;
+	thinking_tokens: number;
+	reasoning_tokens: number;
 }
 
 export interface ToolCost {

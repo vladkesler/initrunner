@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026.5.5] - 2026-05-29
+
+### Added
+- **Native extended-thinking effort.** New `model.thinking` field (`false | minimal | low | medium | high | xhigh`) populates PydanticAI's `ModelSettings["thinking"]` at agent-build time, validated at load against reasoning-model support, with per-flow-agent and per-persona overrides. Thinking-token usage is read from the model usage details and recorded on `RunResult` and in the audit trail. See `docs/core/reasoning.md`.
+- **Per-role output modes.** New `output.mode` (`auto | tool | native | prompted | text`, default `auto`) wraps the resolved output type in the matching PydanticAI wrapper (`ToolOutput` / `NativeOutput` / `PromptedOutput` / `TextOutput`); `auto` defers to PydanticAI's native model-profile detection. See `docs/core/structured-output.md`.
+- **Verified reflexion.** `ReflexionStrategy` can bind the LLM judge as a verification gate: after each critique round it scores output against the role's success criteria, short-circuits once all criteria pass, and otherwise feeds the per-criterion failure reasons into the next continuation prompt. Verdicts are audited, turning "reflect N times" into "reflect until verified, max N". See `docs/core/reasoning.md`.
+- **Hybrid retrieval.** New `retrieval` strategy (`vector | hybrid | hybrid_rerank`, default `vector`) on the document store. `hybrid` adds a BM25 full-text index alongside the vector column and fuses results with reciprocal rank fusion; `hybrid_rerank` adds an optional cross-encoder stage that degrades to plain RRF when `sentence-transformers` is absent. New `hybrid_search` method on the `DocumentStore` ABC. See `docs/core/rag-guide.md`.
+- **Durable, resumable flows.** New `durability` block on `FlowSpec` with an audit-backed checkpoint journal (`flow/checkpoint.py`) keyed by `flow_run_id`. Completed delegation envelopes are recorded through the HMAC audit chain and replayed on `initrunner flow resume <id>` instead of re-running. `backend` is `none | journal` (default `none`), so single-shot and REPL runs are unaffected. See `docs/orchestration/durability.md`.
+- **Ensemble voting.** New `ensemble` delegate-sink and team strategy plus a SpawnPool-backed fan-out that runs the same prompt K times. A reducer selects the winner by `majority`, `weighted` (per-target YAML weight), or `judge` (the LLM judge), and emits the winning envelope and full vote trace to the audit chain. See `docs/orchestration/flow.md`.
+- **First-class evaluation on pydantic-evals.** The YAML `TestSuite` schema is unchanged, but cases now run through a pydantic-evals `Dataset` of evaluators producing an `EvaluationReport`. Adds span-based assertions over OpenTelemetry spans and the structured run-event timeline, and reuses the existing LLM judge as a custom evaluator so local, no-Logfire setups still work. See `docs/operations/testing.md`.
+- **Cyclic loop-back routing.** New bounded `loop_back` edge (`{target, max_iterations, until}`) on the delegate sink enables writer/critic refine loops. Cycle detection in `initrunner/_graph.py` now permits only explicitly-marked loop-back edges; every other cycle is still rejected. See `docs/orchestration/flow.md`.
+- **Structured blackboard shared-state.** A typed `Blackboard` is now the flow graph's run state, exposed to agents through a run-scoped `blackboard` tool (`post` / `read` / `claim` / `list`). Fan-in joins read attributed entries instead of only concatenating prompt strings, and the final board is persisted to the audit chain. See `docs/orchestration/blackboard.md`.
+- **In-process local embeddings.** New `provider: local` embeds documents in-process via `fastembed` (the `local-embeddings` extra), distinct from the HTTP-backed `ollama` provider, so no endpoint is required and no document text leaves the process. See `docs/configuration/providers.md`.
+- **Dashboard surfacing for the new capabilities.** The audit table and cost views now show thinking and reasoning token counts; the audit detail drawer renders a per-run event timeline (tool calls, tool results, thinking) and verified-reflexion judge verdicts via a new `GET /api/audit/{run_id}` endpoint; and the agent builder exposes a thinking-effort selector backed by the valid config enums from the builder options endpoint.
+
+### Changed
+- **Full streaming-event consumption.** The streaming executor now branches on `ThinkingPartDelta`, `FunctionToolCallEvent`, and `FunctionToolResultEvent` in addition to text deltas, persists a redacted structured event timeline to the append-only audit log, attributes reasoning tokens separately, and treats the native typed events as the source of truth over the legacy ContextVar tool-event path. Events are forwarded to the display and SSE consumers.
+- **Audit schema.** `AuditRecord` gains `thinking_tokens`, a structured run-event timeline, and judge-verdict fields; the HMAC chain covers the new fields and an idempotent migration backfills existing databases (legacy rows verify and default to 0 or empty).
+- **Store context managers.** `DocumentStore.__enter__` and `MemoryStoreBase.__enter__` now return `Self`, preserving the concrete store type inside `with` blocks.
+
+### Fixed
+- **Durable daemon flows no longer prune checkpoints after a failed run.** The trigger-driven flow daemon (`initrunner flow up`) pruned the checkpoint journal after any `graph.run()` that did not raise, so a run where a sub-agent returned `RunResult(success=False)` still had its checkpoints deleted. `initrunner flow resume <id>` then found zero completed services and re-ran the flow from the start, defeating resume-after-failure. The daemon now gates the prune on overall-run success (a per-run flag set false when any completed sub-agent reports `success=False`), mirroring the orchestrator's `run_once` path. Failed runs keep their checkpoints so resume replays the completed services and re-runs the failed one; fully successful runs still prune.
+- **`initrunner run` now persists the structured run-event timeline.** The run-event timeline (tool calls, tool results, thinking deltas) was only built and stored when a live `on_event` consumer was wired, so every CLI `run` (buffered and streaming) wrote `event_timeline_json = NULL` to the audit database. The timeline is now reconstructed from the run's final message history whenever the run is audited, independent of any live UI consumer, reusing the existing redacted entry shapes and length bounds. Capture is gated on audit being enabled, so `--no-audit` runs add no overhead, and the live `on_event` path is unchanged.
+- **`ensure_private_dir` no longer crashes on a parent directory it does not own.** Pointing `--audit-db` (or a store path) at a file inside a shared directory such as `/tmp` previously raised `PermissionError` because the helper unconditionally `chmod`ed the parent to `0o700`. It now tightens permissions only on a directory it just created or already owns, and otherwise leaves the directory untouched. Data privacy is unaffected: the audit database and store files are still locked to `0o600`.
+
+### Dependencies
+- Add `pydantic-evals` to the `observability` optional-dependencies extra.
+- Wire the `local-embeddings` extra (`fastembed`) into the embedding factory.
+- Bump dashboard `vite` 8.0.13 to 8.0.14 (#132).
+- Bump dashboard svelte group with 2 updates (#131).
+
 ## [2026.5.4] - 2026-05-24
 
 ### Security
@@ -31,8 +62,6 @@
 ### Dependencies
 - Bump dashboard `vite` 8.0.10 to 8.0.13. (#120)
 - Bump dashboard `@tailwindcss/vite` 4.2.4 to 4.3.0, `tailwindcss` 4.2.4 to 4.3.0, `tailwind-merge` 3.5.0 to 3.6.0 (tailwind group). (#119)
-
-## [Unreleased]
 
 ## [2026.5.2] - 2026-05-06
 

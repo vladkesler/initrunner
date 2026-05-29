@@ -33,6 +33,7 @@
 		customModelName = $bindable(''),
 		customBaseUrl = $bindable(''),
 		apiKey = $bindable(''),
+		thinkingEffort = $bindable(''),
 		hubQuery = $bindable(''),
 		hubResults,
 		hubSearching,
@@ -64,6 +65,7 @@
 		customModelName: string;
 		customBaseUrl: string;
 		apiKey: string;
+		thinkingEffort?: string;
 		hubQuery: string;
 		hubResults: HubSearchResult[];
 		hubSearching: boolean;
@@ -347,6 +349,26 @@
 			? 'Used by the builder to generate YAML. Your agent\u2019s model comes from the source code.'
 			: 'Powers the agent and generates the role YAML. You can change it later.'}
 	/>
+
+	<!-- Thinking effort (reasoning-capable OpenAI models) -->
+	{#if options.config_options?.thinking_efforts?.length}
+		<div>
+			<label for="thinking-effort" class="mb-1 block text-[12px] font-medium text-fg-muted">
+				Thinking effort
+			</label>
+			<select
+				id="thinking-effort"
+				bind:value={thinkingEffort}
+				class="border border-edge bg-surface-1 px-3 py-1.5 font-mono text-[13px] text-fg outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent-primary/40 focus:shadow-[0_0_0_3px_oklch(0.91_0.20_128/0.08)]"
+			>
+				<option value="">Off</option>
+				{#each options.config_options.thinking_efforts as effort}
+					<option value={effort}>{effort}</option>
+				{/each}
+			</select>
+			<p class="mt-1 text-[12px] text-fg-faint">Only applies to reasoning-capable OpenAI models.</p>
+		</div>
+	{/if}
 
 	<!-- Generate button -->
 	<div>

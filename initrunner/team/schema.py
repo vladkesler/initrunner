@@ -70,6 +70,29 @@ class DebateConfig(BaseModel):
     synthesize: bool = True
 
 
+class TeamEnsembleConfig(BaseModel):
+    """Configuration for the ``ensemble`` team strategy.
+
+    Every persona answers the same task in parallel; a reducer then picks one
+    winning answer instead of concatenating them. ``majority`` votes on
+    identical answers, ``weighted`` favours the highest-weight persona, and
+    ``judge`` scores each answer with an LLM judge (``eval/judge.py``).
+    """
+
+    mode: Literal["majority", "weighted", "judge"] = "majority"
+    judge_model: str = "openai:gpt-4o-mini"
+    judge_criteria: list[str] = Field(default_factory=list)
+    weights: dict[str, float] | None = None
+
+    @model_validator(mode="after")
+    def _validate_mode(self) -> TeamEnsembleConfig:
+        if self.mode == "weighted" and not self.weights:
+            raise ValueError("team ensemble mode 'weighted' requires a non-empty 'weights' map")
+        if self.weights is not None and all(weight == 0 for weight in self.weights.values()):
+            raise ValueError("team ensemble weights cannot all be zero")
+        return self
+
+
 class TeamSpec(BaseModel):
     model: PartialModelConfig | None = None
     personas: dict[str, PersonaConfig] = Field(min_length=2)
@@ -79,8 +102,9 @@ class TeamSpec(BaseModel):
     shared_memory: SharedMemoryConfig = SharedMemoryConfig()
     shared_documents: TeamDocumentsConfig = TeamDocumentsConfig()
     observability: ObservabilityConfig | None = None
-    strategy: Literal["sequential", "parallel", "debate"] = "sequential"
+    strategy: Literal["sequential", "parallel", "debate", "ensemble"] = "sequential"
     debate: DebateConfig = Field(default_factory=DebateConfig)
+    ensemble: TeamEnsembleConfig = Field(default_factory=TeamEnsembleConfig)
 
     @field_validator("personas", mode="before")
     @classmethod
@@ -116,7 +140,7 @@ class TeamSpec(BaseModel):
 
     @model_validator(mode="after")
     def _validate_concurrent_no_persona_env(self) -> TeamSpec:
-        if self.strategy in ("parallel", "debate"):
+        if self.strategy in ("parallel", "debate", "ensemble"):
             for name, persona in self.personas.items():
                 if persona.environment:
                     raise ValueError(
@@ -124,6 +148,16 @@ class TeamSpec(BaseModel):
                         f"strategy='{self.strategy}' (persona '{name}'). "
                         f"os.environ is process-global; concurrent env mutations are unsafe."
                     )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_ensemble_weights(self) -> TeamSpec:
+        if self.strategy == "ensemble" and self.ensemble.weights is not None:
+            unknown = set(self.ensemble.weights) - set(self.personas)
+            if unknown:
+                raise ValueError(
+                    f"team ensemble weights reference unknown personas: {sorted(unknown)}"
+                )
         return self
 
 

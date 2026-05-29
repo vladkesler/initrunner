@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from initrunner import __version__
 
 _USER_AGENT = f"initrunner/{__version__}"
+
+ThinkingEffort = Literal[False, "minimal", "low", "medium", "high", "xhigh"]
+"""Extended-thinking effort levels accepted by ``ModelSettings['thinking']``.
+
+``False`` explicitly disables thinking; the string levels map directly onto
+PydanticAI's ``ThinkingLevel``. ``None`` (the field default) leaves the
+setting unset so the provider applies its own default.
+"""
 
 
 class ApiVersion(StrEnum):
@@ -71,6 +79,14 @@ class PartialModelConfig(BaseModel):
     max_tokens: Annotated[int, Field(ge=1, le=128000)] = 4096
     context_window: Annotated[int, Field(gt=0)] | None = None
     fallback: list[str] = []
+    thinking: ThinkingEffort | None = None
+    """Native extended-thinking effort. Maps to ``ModelSettings['thinking']``.
+
+    Only supported on reasoning-capable OpenAI models (the o-series and the
+    gpt-5 family). Leave unset to use the provider default. This is distinct
+    from ``spec.reasoning``, which orchestrates InitRunner's cross-turn
+    reasoning patterns rather than model-level thinking.
+    """
 
     def is_resolved(self) -> bool:
         """Return True when both provider and name are set."""
@@ -127,6 +143,40 @@ class PartialModelConfig(BaseModel):
         ):
             return True
         return False
+
+    def supports_thinking(self) -> bool:
+        """Return True for OpenAI models that accept a native ``thinking`` setting.
+
+        Covers the whole reasoning-capable OpenAI surface: every o-series
+        model and the entire gpt-5 family (including gpt-5.1+, which accepts a
+        reasoning_effort). The non-chat restriction matches the providers that
+        actually honor the thinking knob -- ``gpt-5-chat`` does not.
+        """
+        if not self.provider or self.provider.lower() != "openai":
+            return False
+        name = self.name.lower()
+        if name.startswith("o"):
+            return True
+        return name.startswith("gpt-5") and "gpt-5-chat" not in name
+
+    @model_validator(mode="after")
+    def _check_thinking_supported(self) -> PartialModelConfig:
+        """Reject ``thinking`` on providers/models that do not support it.
+
+        Skips the check when provider or name is still empty (a partial config
+        awaiting auto-detection) so resolution can fill them in first.
+        """
+        if self.thinking is None:
+            return self
+        if not self.provider or not self.name:
+            return self
+        if not self.supports_thinking():
+            raise ValueError(
+                f"thinking is only supported on reasoning-capable OpenAI models "
+                f"(the o-series and the gpt-5 family), not '{self.provider}:{self.name}'. "
+                f"Remove the thinking field or switch to a supported model."
+            )
+        return self
 
 
 class ModelConfig(PartialModelConfig):

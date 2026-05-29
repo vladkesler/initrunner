@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 _logger = logging.getLogger(__name__)
 
@@ -104,6 +104,13 @@ def _parse_judge_response(response: str, criteria: list[str]) -> JudgeResult:
         )
 
 
+# Public aliases for reuse by the pydantic-evals LLM-judge evaluator. The judge
+# agent factory is thread-safe and cached per model string, so the pydantic-evals
+# concurrent runner shares one agent per model without redundant construction.
+get_judge_agent = _get_judge_agent
+parse_judge_response = _parse_judge_response
+
+
 def run_judge_sync(
     output: str, criteria: list[str], model: str = "openai:gpt-4o-mini"
 ) -> JudgeResult:
@@ -115,3 +122,67 @@ def run_judge_sync(
 
     result = judge.run_sync(prompt)
     return _parse_judge_response(str(result.output), criteria)
+
+
+DEFAULT_VOTE_CRITERIA: list[str] = ["clarity", "completeness", "accuracy"]
+
+
+@dataclass
+class VotingResult:
+    """Outcome of an LLM-judge vote across several candidate outputs.
+
+    ``votes`` maps each candidate index to a per-criterion pass count (1 for
+    passed, 0 for failed). ``winning_index`` is the candidate that passed the
+    most criteria; ties break on the lowest index for determinism.
+    """
+
+    criteria: list[str]
+    votes: dict[int, dict[str, int]]
+    winning_index: int
+    consensus_text: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def ensemble_judge_vote_sync(
+    outputs: list[str],
+    criteria: list[str] | None = None,
+    model: str = "openai:gpt-4o-mini",
+) -> VotingResult:
+    """Score each candidate output with the LLM judge and pick a winner.
+
+    Reuses :func:`run_judge_sync` per candidate: the judge marks every
+    criterion pass/fail, and the candidate that passes the most criteria
+    wins. Ties break on the lowest index so the result is deterministic.
+
+    An empty ``outputs`` list yields a ``VotingResult`` with
+    ``winning_index = -1`` and no votes, so callers never have to guard
+    against an empty fan-in separately.
+    """
+    resolved_criteria = list(criteria) if criteria else list(DEFAULT_VOTE_CRITERIA)
+    if not outputs:
+        return VotingResult(
+            criteria=resolved_criteria,
+            votes={},
+            winning_index=-1,
+            consensus_text="No candidate outputs to vote on",
+        )
+
+    votes: dict[int, dict[str, int]] = {}
+    for idx, output in enumerate(outputs):
+        judge_result = run_judge_sync(output, resolved_criteria, model)
+        votes[idx] = {cr.criterion: (1 if cr.passed else 0) for cr in judge_result.criteria_results}
+
+    totals = {idx: sum(per_criterion.values()) for idx, per_criterion in votes.items()}
+    winning_index = max(range(len(outputs)), key=lambda i: (totals[i], -i))
+    consensus_text = (
+        f"Candidate {winning_index} won "
+        f"({totals[winning_index]}/{len(resolved_criteria)} criteria passed)"
+    )
+    return VotingResult(
+        criteria=resolved_criteria,
+        votes=votes,
+        winning_index=winning_index,
+        consensus_text=consensus_text,
+    )

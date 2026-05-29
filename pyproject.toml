@@ -49,10 +49,12 @@ google = ["pydantic-ai-slim[google]>=1.102.0"]
 groq = ["pydantic-ai-slim[groq]>=1.102.0"]
 mistral = ["pydantic-ai-slim[mistral]>=1.102.0"]
 all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=1.102.0"]
+# OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
+    "pydantic-evals>=1.102.0",
 ]
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]

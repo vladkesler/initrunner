@@ -8,6 +8,33 @@ from unittest.mock import MagicMock
 from initrunner.agent.tools.spawn import SpawnPool
 
 
+class TestBulkSubmit:
+    def test_bulk_submit_runs_same_prompt_k_times(self):
+        pool = SpawnPool(max_concurrent=4, timeout=10)
+        invoker = MagicMock()
+        invoker.invoke.return_value = "answer"
+
+        task_ids = pool.bulk_submit("ensemble", "agent-a", "same prompt", 3, invoker)
+        assert task_ids == ["ensemble_run0", "ensemble_run1", "ensemble_run2"]
+
+        tasks = pool.await_tasks(task_ids)
+        assert len(tasks) == 3
+        assert all(t.status == "completed" for t in tasks)
+        assert all(t.result == "answer" for t in tasks)
+        assert invoker.invoke.call_count == 3
+        pool.shutdown()
+
+    def test_bulk_submit_returns_ids_immediately(self):
+        pool = SpawnPool(max_concurrent=2, timeout=10)
+        invoker = MagicMock()
+        invoker.invoke.return_value = "x"
+        task_ids = pool.bulk_submit("base", "agent-a", "p", 2, invoker)
+        assert len(task_ids) == 2
+        assert all(tid in {t.task_id for t in pool.poll()} for tid in task_ids)
+        pool.await_tasks(task_ids)
+        pool.shutdown()
+
+
 class TestAwaitAny:
     def test_returns_completed_task(self):
         pool = SpawnPool(max_concurrent=2, timeout=10)

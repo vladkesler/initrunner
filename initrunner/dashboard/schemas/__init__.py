@@ -34,12 +34,14 @@ from initrunner.dashboard.schemas.approvals import (
 )
 from initrunner.dashboard.schemas.audit import (
     AuditRecordResponse,
+    AuditRunDetailResponse,
     AuditStatsResponse,
     TopAgentResponse,
     TriggerStatResponse,
 )
 from initrunner.dashboard.schemas.builder import (
     BuilderOptionsResponse,
+    ConfigOptionsResponse,
     EmbeddingOption,
     EmbeddingWarning,
     EnvVarStatus,
@@ -176,11 +178,13 @@ __all__ = [
     "ApprovalsResolveResponse",
     # audit
     "AuditRecordResponse",
+    "AuditRunDetailResponse",
     "AuditStatsResponse",
     "BudgetGauge",
     "BudgetProgressResponse",
     # builder
     "BuilderOptionsResponse",
+    "ConfigOptionsResponse",
     "CostSummaryResponse",
     "DailyCostResponse",
     # system

@@ -326,6 +326,19 @@ class FlowOrchestrator:
     # One-shot execution
     # ------------------------------------------------------------------
 
+    def _build_checkpoint_journal(self):
+        """Return a CheckpointJournal when durability is active, else None.
+
+        A journal is only built when the flow opts into durability AND an
+        audit logger is available (the journal is the audit store). Disabled
+        durability leaves single-shot and REPL runs untouched.
+        """
+        if not self._flow.spec.durability.active or self._audit_logger is None:
+            return None
+        from initrunner.flow.checkpoint import CheckpointJournal
+
+        return CheckpointJournal(self._audit_logger)
+
     def run_once(
         self,
         prompt: str,
@@ -336,14 +349,26 @@ class FlowOrchestrator:
         on_service_start: Callable[[str], None] | None = None,
         on_service_complete: Callable[[str, RunResult], None] | None = None,
         on_tool_event: Callable[[str, ToolEvent], None] | None = None,
+        flow_run_id: str | None = None,
+        resume: bool = False,
     ) -> FlowRunResult:
-        """Run a single prompt through the flow graph synchronously."""
+        """Run a single prompt through the flow graph synchronously.
+
+        When the flow enables durability, each completed sub-agent is
+        checkpointed. Pass ``resume=True`` with an existing ``flow_run_id``
+        to replay completed services from the journal instead of re-running
+        them; see :meth:`resume`.
+        """
         from initrunner._ids import generate_id
         from initrunner.flow.graph import run_flow_graph_sync
 
-        flow_run_id = generate_id()
+        run_id = flow_run_id or generate_id()
         self._build_members(one_shot=True)
         entry = self._find_entry(entry_service)
+        journal = self._build_checkpoint_journal()
+        # Durability requires daemon-style (not one_shot) steps so checkpoints
+        # are recorded and replayed; one_shot steps never journal.
+        graph_one_shot = journal is None
 
         _refs, _entry_name, total_ms, timed_out = run_flow_graph_sync(
             self._flow,
@@ -355,14 +380,17 @@ class FlowOrchestrator:
             audit_logger=self._audit_logger,
             on_service_start=on_service_start,
             on_service_complete=on_service_complete,
-            one_shot=True,
-            flow_run_id=flow_run_id,
+            one_shot=graph_one_shot,
+            flow_run_id=run_id,
             on_tool_event=on_tool_event or self._on_tool_event,
+            checkpoint_journal=journal,
         )
 
         result = self._collect_results(entry, total_ms, timed_out=timed_out)
-        result.flow_run_id = flow_run_id
-        self._log_aggregate(flow_run_id, prompt, result)
+        result.flow_run_id = run_id
+        self._log_aggregate(run_id, prompt, result)
+        if journal is not None and result.success and not resume:
+            journal.prune(run_id)
         return result
 
     async def run_once_async(
@@ -375,14 +403,18 @@ class FlowOrchestrator:
         on_service_start: Callable[[str], None] | None = None,
         on_service_complete: Callable[[str, RunResult], None] | None = None,
         on_tool_event: Callable[[str, ToolEvent], None] | None = None,
+        flow_run_id: str | None = None,
+        resume: bool = False,
     ) -> FlowRunResult:
         """Run a single prompt through the flow graph asynchronously."""
         from initrunner._ids import generate_id
         from initrunner.flow.graph import run_flow_graph_async
 
-        flow_run_id = generate_id()
+        run_id = flow_run_id or generate_id()
         self._build_members(one_shot=True)
         entry = self._find_entry(entry_service)
+        journal = self._build_checkpoint_journal()
+        graph_one_shot = journal is None
 
         _refs, _entry_name, total_ms, timed_out = await run_flow_graph_async(
             self._flow,
@@ -394,15 +426,63 @@ class FlowOrchestrator:
             audit_logger=self._audit_logger,
             on_service_start=on_service_start,
             on_service_complete=on_service_complete,
-            one_shot=True,
-            flow_run_id=flow_run_id,
+            one_shot=graph_one_shot,
+            flow_run_id=run_id,
             on_tool_event=on_tool_event or self._on_tool_event,
+            checkpoint_journal=journal,
         )
 
         result = self._collect_results(entry, total_ms, timed_out=timed_out)
-        result.flow_run_id = flow_run_id
-        self._log_aggregate(flow_run_id, prompt, result)
+        result.flow_run_id = run_id
+        self._log_aggregate(run_id, prompt, result)
+        if journal is not None and result.success and not resume:
+            journal.prune(run_id)
         return result
+
+    def resume(
+        self,
+        flow_run_id: str,
+        prompt: str = "",
+        *,
+        entry_service: str | None = None,
+        timeout_seconds: float = 300,
+        on_service_start: Callable[[str], None] | None = None,
+        on_service_complete: Callable[[str, RunResult], None] | None = None,
+        on_tool_event: Callable[[str, ToolEvent], None] | None = None,
+    ) -> FlowRunResult:
+        """Resume a durable flow from its audit-backed checkpoint journal.
+
+        Services that already produced a successful checkpoint are replayed
+        from the journal; the first incomplete (or failed/paused) service and
+        everything after it are re-run. Requires the flow to enable durability
+        and an audit logger to be configured.
+
+        ``prompt`` only matters when the entry service itself was never
+        checkpointed (a crash before the first completion); replayed entry
+        services ignore it.
+        """
+        if not self._flow.spec.durability.active:
+            raise ValueError("Flow does not enable durability; nothing to resume")
+        if self._audit_logger is None:
+            raise ValueError("Resume requires an audit logger (the checkpoint journal)")
+
+        completed = self._audit_logger.list_completed_services(flow_run_id)
+        logger.info(
+            "Resuming flow %s: %d checkpointed service(s): %s",
+            flow_run_id,
+            len(completed),
+            ", ".join(completed) or "(none)",
+        )
+        return self.run_once(
+            prompt,
+            entry_service=entry_service,
+            timeout_seconds=timeout_seconds,
+            on_service_start=on_service_start,
+            on_service_complete=on_service_complete,
+            on_tool_event=on_tool_event,
+            flow_run_id=flow_run_id,
+            resume=True,
+        )
 
     # ------------------------------------------------------------------
     # Daemon execution

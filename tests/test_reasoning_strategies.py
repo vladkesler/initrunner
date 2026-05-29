@@ -356,6 +356,277 @@ class TestReflexionDimensions:
         with pytest.raises(ValueError):
             ReflexionDimension(name="", prompt="Check something.")
 
+
+class TestReasoningConfigSuccessCriteria:
+    def test_success_criteria_auto_derived_from_dimensions(self):
+        dims = [
+            ReflexionDimension(name="accuracy", prompt="Check accuracy."),
+            ReflexionDimension(name="clarity", prompt="Check clarity."),
+        ]
+        config = ReasoningConfig(reflection_dimensions=dims)
+        assert config.success_criteria == ["accuracy", "clarity"]
+
+    def test_success_criteria_explicit_overrides_auto(self):
+        dims = [ReflexionDimension(name="accuracy", prompt="Check accuracy.")]
+        config = ReasoningConfig(
+            reflection_dimensions=dims,
+            success_criteria=["custom criterion"],
+        )
+        assert config.success_criteria == ["custom criterion"]
+
+    def test_success_criteria_empty_raises(self):
+        with pytest.raises(ValueError, match="non-empty"):
+            ReasoningConfig(reflection_rounds=1, success_criteria=[])
+
+    def test_success_criteria_over_10_raises(self):
+        criteria = [f"c{i}" for i in range(11)]
+        with pytest.raises(ValueError, match="Maximum 10"):
+            ReasoningConfig(reflection_rounds=1, success_criteria=criteria)
+
+    def test_success_criteria_none_allowed(self):
+        config = ReasoningConfig(reflection_rounds=1, success_criteria=None)
+        assert config.success_criteria is None
+
+
+def _make_judge_result(passed):
+    from initrunner.eval.judge import JudgeCriterionResult, JudgeResult
+
+    return JudgeResult(
+        criteria_results=[
+            JudgeCriterionResult(
+                criterion=name,
+                passed=ok,
+                reason="ok" if ok else "needs work",
+            )
+            for name, ok in passed
+        ]
+    )
+
+
+class TestReflexionStrategyWithJudge:
+    def _dims(self, n=2):
+        return [ReflexionDimension(name=f"dim{i}", prompt=f"Check dim {i}.") for i in range(n)]
+
+    def _open_strategy(self, strategy, state):
+        """Advance the strategy past base completion into reflexion mode."""
+        strategy.should_continue(state, 1)
+
+    def test_judge_not_called_without_criteria(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=None,
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            prompt = s.build_continuation_prompt(state)
+        mock_judge.assert_not_called()
+        assert "REFLECTION (1/2)" in prompt
+
+    def test_judge_called_with_criteria(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=["c1", "c2"],
+        )
+        state = ReflectionState(completed=True, summary="My work summary")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.return_value = _make_judge_result([("c1", False), ("c2", False)])
+            s.build_continuation_prompt(state)
+        mock_judge.assert_called_once()
+        args = mock_judge.call_args[0]
+        assert args[0] == "My work summary"
+        assert args[1] == ["c1", "c2"]
+
+    def test_judge_passed_short_circuits(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=["c1"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.return_value = _make_judge_result([("c1", True)])
+            prompt = s.build_continuation_prompt(state)
+        # Verified path advances the round counter and flags the next dimension.
+        assert "[VERIFIED]" in prompt
+        assert s._reflexion_count == 1
+
+    def test_judge_passed_at_max_rounds_finishes(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=1,
+            dimensions=self._dims(1),
+            success_criteria=["c1"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.return_value = _make_judge_result([("c1", True)])
+            prompt = s.build_continuation_prompt(state)
+        assert state.completed is True
+        assert "verified as complete" in prompt
+
+    def test_judge_failed_injects_reasons(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=["c1", "c2"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.return_value = _make_judge_result([("c1", True), ("c2", False)])
+            prompt = s.build_continuation_prompt(state)
+        assert "Judge feedback" in prompt
+        assert "c2: needs work" in prompt
+        assert "c1" not in prompt.split("Judge feedback")[1]
+
+    def test_judge_exception_falls_back_to_dimension(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=["c1"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.side_effect = RuntimeError("judge offline")
+            prompt = s.build_continuation_prompt(state)
+        assert "REFLECTION (1/2)" in prompt
+        assert "DIM0" in prompt
+        assert state.judge_verdicts == []
+
+    def test_judge_disabled_after_consecutive_failures(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=3,
+            dimensions=self._dims(3),
+            success_criteria=["c1"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.side_effect = RuntimeError("judge offline")
+            s.build_continuation_prompt(state)
+            state.completed = True
+            s.should_continue(state, 2)
+            s.build_continuation_prompt(state)
+            # Judge now disabled; a third round must not call it.
+            state.completed = True
+            s.should_continue(state, 3)
+            s.build_continuation_prompt(state)
+        assert mock_judge.call_count == 2
+        assert s._judge_disabled is True
+
+    def test_judge_verdicts_stored_in_state(self):
+        from unittest.mock import patch
+
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=self._dims(2),
+            success_criteria=["c1", "c2"],
+        )
+        state = ReflectionState(completed=True, summary="Done")
+        self._open_strategy(s, state)
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.return_value = _make_judge_result([("c1", True), ("c2", False)])
+            s.build_continuation_prompt(state)
+        assert len(state.judge_verdicts) == 1
+        verdict = state.judge_verdicts[0]
+        assert verdict["round"] == 1
+        assert verdict["all_passed"] is False
+        assert verdict["criteria_results"][0] == {
+            "criterion": "c1",
+            "passed": True,
+            "reason": "ok",
+        }
+
+
+class TestResolveStrategyWithSuccessCriteria:
+    def test_reflexion_with_success_criteria(self):
+        config = ReasoningConfig(reflection_rounds=2, success_criteria=["correct", "complete"])
+        role = _make_test_role()
+        strategy = resolve_strategy(config, role)
+        assert isinstance(strategy, ReflexionStrategy)
+        assert strategy._success_criteria == ["correct", "complete"]
+
+    def test_judge_model_uses_role_model(self):
+        from initrunner.agent.schema.base import ModelConfig
+        from initrunner.agent.schema.reasoning import ReasoningConfig
+
+        role = _make_test_role()
+        role.spec.model = ModelConfig(provider="anthropic", name="claude-sonnet-4-5")
+        config = ReasoningConfig(reflection_rounds=1, success_criteria=["c1"])
+        strategy = resolve_strategy(config, role)
+        assert isinstance(strategy, ReflexionStrategy)
+        assert strategy._judge_model == "anthropic:claude-sonnet-4-5"
+
+
+class TestReflexionFullCycleWithJudge:
+    def test_reflexion_full_cycle_with_judge(self):
+        from unittest.mock import patch
+
+        dims = [
+            ReflexionDimension(name="first", prompt="Check first."),
+            ReflexionDimension(name="second", prompt="Check second."),
+        ]
+        s = ReflexionStrategy(
+            "Continue.",
+            reflection_rounds=2,
+            dimensions=dims,
+            success_criteria=["c1", "c2"],
+        )
+        state = ReflectionState(completed=True, summary="Draft done")
+
+        verdicts = [
+            _make_judge_result([("c1", False), ("c2", True)]),
+            _make_judge_result([("c1", True), ("c2", True)]),
+        ]
+
+        with patch("initrunner.runner.reasoning.run_judge_sync") as mock_judge:
+            mock_judge.side_effect = verdicts
+
+            # Round 1: base completed -> re-open, judge fails -> dimension prompt
+            assert s.should_continue(state, 1) is True
+            p1 = s.build_continuation_prompt(state)
+            assert "Judge feedback" in p1
+            assert "c1: needs work" in p1
+
+            # Round 2: re-open, judge passes at max rounds -> finishes verified
+            state.completed = True
+            assert s.should_continue(state, 2) is True
+            p2 = s.build_continuation_prompt(state)
+            assert "verified as complete" in p2
+            assert state.completed is True
+
+        assert len(state.judge_verdicts) == 2
+        assert state.judge_verdicts[0]["all_passed"] is False
+        assert state.judge_verdicts[1]["all_passed"] is True
+
     def test_blank_prompt_raises(self):
         with pytest.raises(ValueError):
             ReflexionDimension(name="test", prompt="")

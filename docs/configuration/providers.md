@@ -310,7 +310,10 @@ The embedding model is determined by the agent's `spec.model.provider` unless ov
 | `anthropic` | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
 | `google` | `google:text-embedding-004` | `GOOGLE_API_KEY` |
 | `ollama` | `ollama:nomic-embed-text` | Ollama running locally |
+| `local` | `local:BAAI/bge-small-en-v1.5` | `initrunner[local-embeddings]` |
 | All others | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
+
+> **`local` is not `ollama`.** The `local` provider runs the embedding model in-process via [fastembed](https://github.com/qdrant/fastembed) with no HTTP hop, no API key, and no separate server. The `ollama` provider routes through an OpenAI-compatible HTTP client and needs a running Ollama endpoint. Pick `local` when you want zero external dependencies; pick `ollama` when you already run Ollama and want to share its model cache.
 
 > **Important:** Anthropic does not offer an embeddings API. If your agent uses `provider: anthropic`, you still need `OPENAI_API_KEY` set for embeddings. This only applies when using RAG or memory -- pure chat agents don't need it.
 
@@ -332,6 +335,54 @@ spec:
       model: text-embedding-3-large
 ```
 
+### Local in-process embeddings (fastembed)
+
+The `local` provider embeds text on the same machine that runs the agent, with no
+HTTP request and no API key. It uses [fastembed](https://github.com/qdrant/fastembed),
+which ships quantized ONNX models and does not pull in PyTorch. Install the extra:
+
+```bash
+uv pip install "initrunner[local-embeddings]"
+```
+
+Then set `provider: local` in your `ingest` or `memory` embeddings config:
+
+```yaml
+spec:
+  ingest:
+    sources: ["./docs/**/*.md"]
+    embeddings:
+      provider: local
+      model: BAAI/bge-small-en-v1.5   # 384 dimensions, default; omit to use it
+```
+
+The model is downloaded from Hugging Face on first use (a few hundred MB) and cached
+on disk; later runs load it from the cache. The first embedding call after process
+start pays a one-time load cost. Choose a larger model for higher retrieval quality
+at the cost of speed and a different vector dimension:
+
+| Model | Dimensions | Notes |
+|-------|-----------|-------|
+| `BAAI/bge-small-en-v1.5` | 384 | Default. Fast on CPU, good quality. |
+| `BAAI/bge-base-en-v1.5` | 768 | Larger, slower, higher quality. |
+| `BAAI/bge-large-en-v1.5` | 1024 | Largest of the family. |
+
+Run `python -c "from fastembed import TextEmbedding; print([m['model'] for m in TextEmbedding.list_supported_models()])"`
+to list every model fastembed supports.
+
+> **Dimension consistency.** A store (RAG index or memory store) is locked to the
+> embedding dimension of the model that first wrote to it. You cannot query or
+> extend that store with a model of a different dimension: switching from
+> `BAAI/bge-small-en-v1.5` (384) to `BAAI/bge-base-en-v1.5` (768), or between
+> `local` and any HTTP provider whose vectors differ in size, raises a
+> `DimensionMismatchError` on reopen. To change the embedding model, point the
+> agent at a fresh `store_path` and re-ingest.
+
+> **CPU performance.** fastembed runs on CPU by default. It is fast for typical
+> document sets, but for very large batches expect throughput to be lower than a
+> hosted GPU endpoint. Ingestion batches embeddings, so this is rarely a problem
+> for one-time indexing.
+
 ### Custom Embedding Endpoints
 
 For self-hosted or third-party embedding services, use `base_url` and `api_key_env`:
@@ -350,7 +401,7 @@ spec:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
+| `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. Use `local` for in-process fastembed (no HTTP, no key). |
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
 | `api_key_env` | `str` | `""` | Env var holding the embedding API key. Works for all providers (not just custom endpoints). When empty, the default key for the resolved provider is used automatically. |

@@ -311,3 +311,64 @@ class TestFormatToolEventPrefixed:
 
         printer = _make_prefixed_tool_event_printer()
         assert callable(printer)
+
+
+class TestStreamingToolEvent:
+    def test_dataclass_fields(self):
+        from initrunner.agent.tool_events import StreamingToolEvent
+
+        ev = StreamingToolEvent(
+            tool_name="shell",
+            tool_call_id="tc-1",
+            status="completed",
+            result_summary="ok",
+            args_preview='{"cmd": "ls"}',
+            duration_ms=12,
+            timestamp_unix_ms=1717056000000,
+        )
+        assert ev.tool_name == "shell"
+        assert ev.status == "completed"
+        assert ev.tool_call_id == "tc-1"
+
+
+class TestFormatThinkingEvent:
+    def test_renders_truncated_content(self):
+        from initrunner.runner.display import _format_thinking_event
+
+        formatted = _format_thinking_event({"content_delta": "weighing the options"})
+        assert "thinking" in formatted
+        assert "weighing the options" in formatted
+
+    def test_handles_missing_content(self):
+        from initrunner.runner.display import _format_thinking_event
+
+        formatted = _format_thinking_event({"type": "thinking_delta"})
+        assert "thinking" in formatted
+
+    def test_caps_long_content(self):
+        from initrunner.runner.display import _format_thinking_event
+
+        formatted = _format_thinking_event({"content_delta": "x" * 500})
+        # 120-char cap plus markup wrapper, never the full 500.
+        assert len(formatted) < 200
+
+
+class TestFormatToolTimelineSummary:
+    def test_lists_tool_calls(self):
+        from initrunner.runner.display import _format_tool_timeline_summary
+
+        timeline: list[dict[str, object]] = [
+            {"type": "thinking_delta"},
+            {"type": "function_tool_call", "tool_name": "shell"},
+            {"type": "function_tool_result"},
+            {"type": "function_tool_call", "tool_name": "http"},
+        ]
+        summary = _format_tool_timeline_summary(timeline)
+        assert "shell" in summary
+        assert "http" in summary
+
+    def test_empty_when_no_tool_calls(self):
+        from initrunner.runner.display import _format_tool_timeline_summary
+
+        assert _format_tool_timeline_summary([{"type": "thinking_delta"}]) == ""
+        assert _format_tool_timeline_summary([]) == ""

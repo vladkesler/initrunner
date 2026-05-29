@@ -317,6 +317,8 @@ def _create_agent(
     model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}  # type: ignore[union-attr]
     if not role.spec.model.is_reasoning_model():  # type: ignore[union-attr]
         model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
+    if role.spec.model.thinking is not None:  # type: ignore[union-attr]
+        model_settings_kwargs["thinking"] = role.spec.model.thinking  # type: ignore[union-attr]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
         "instructions": instructions,
@@ -385,6 +387,14 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
         validate_capability_tool_conflicts(role)
 
         cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
+        model = role.spec.model
+        if "Thinking" in cap_names and getattr(model, "thinking", None) is not None:
+            logger.warning(
+                "Both a Thinking capability and model.thinking are declared. "
+                "model.thinking sets ModelSettings['thinking'] directly; "
+                "the Thinking capability does the same at the capability layer. "
+                "Prefer model.thinking and remove the capability to avoid confusion.",
+            )
         if "Thinking" in cap_names and role.spec.reasoning is not None:
             logger.warning(
                 "Both a Thinking capability and spec.reasoning are declared. "
@@ -634,6 +644,7 @@ def _apply_model_override(role: RoleDefinition, provider: str, name: str) -> Rol
             "max_tokens": partial.max_tokens,
             "context_window": partial.context_window,
             "fallback": partial.fallback,
+            "thinking": partial.thinking,
         }
         if provider == partial.provider:
             base["base_url"] = partial.base_url
@@ -756,6 +767,7 @@ def resolve_role_model(
         max_tokens=base.max_tokens,
         context_window=base.context_window,
         fallback=base.fallback,
+        thinking=base.thinking,
     )
     return _set_model(role, resolved)
 

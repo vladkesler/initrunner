@@ -211,3 +211,32 @@ class TestTodoList:
         assert item.id in result
         assert "high" in result
         assert "Task" in result
+
+
+class TestReflectionStateJudgeVerdicts:
+    def test_judge_verdicts_default_empty(self):
+        state = ReflectionState()
+        assert state.judge_verdicts == []
+
+    def test_judge_verdicts_append_structure(self):
+        state = ReflectionState()
+        verdict = {
+            "round": 1,
+            "all_passed": False,
+            "criteria_results": [
+                {"criterion": "c1", "passed": True, "reason": "ok"},
+                {"criterion": "c2", "passed": False, "reason": "missing"},
+            ],
+        }
+        state.judge_verdicts.append(verdict)
+        assert len(state.judge_verdicts) == 1
+        stored = state.judge_verdicts[0]
+        assert stored["round"] == 1
+        assert stored["all_passed"] is False
+        assert stored["criteria_results"][1]["criterion"] == "c2"
+
+    def test_judge_verdicts_independent_per_instance(self):
+        a = ReflectionState()
+        b = ReflectionState()
+        a.judge_verdicts.append({"round": 1, "all_passed": True, "criteria_results": []})
+        assert b.judge_verdicts == []

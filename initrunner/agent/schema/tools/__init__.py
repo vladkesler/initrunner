@@ -35,6 +35,7 @@ from initrunner.agent.schema.tools._io import (
 )
 from initrunner.agent.schema.tools._media import AudioToolConfig, ImageGenToolConfig
 from initrunner.agent.schema.tools._reasoning import (
+    BlackboardToolConfig,
     CalculatorToolConfig,
     ClarifyToolConfig,
     DateTimeToolConfig,
@@ -53,6 +54,7 @@ __all__ = [
     "ApiParameter",
     "ApiToolConfig",
     "AudioToolConfig",
+    "BlackboardToolConfig",
     "CalculatorToolConfig",
     "ClarifyToolConfig",
     "CsvAnalysisToolConfig",

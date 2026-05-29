@@ -235,6 +235,67 @@ The pool is cleaned up when the run ends -- remaining tasks are cancelled and th
 4. Synthesize results into final answer
 ```
 
+## Native Extended Thinking
+
+Some OpenAI models run an internal reasoning pass before producing their answer. The `model.thinking` field turns that on and sets how much effort the model spends, mapping directly onto PydanticAI's `ModelSettings['thinking']`.
+
+```yaml
+spec:
+  model:
+    provider: openai
+    name: o3-mini
+    thinking: high     # minimal | low | medium | high | xhigh | false
+```
+
+The level names are strings, but `false` is the YAML boolean (not the string `"false"`), which explicitly disables the internal reasoning pass:
+
+```yaml
+spec:
+  model:
+    provider: openai
+    name: o3-mini
+    thinking: false    # boolean, turns extended thinking off
+```
+
+| Value | Effect |
+|-------|--------|
+| `minimal` | Smallest reasoning budget; fastest, cheapest |
+| `low` | Light reasoning |
+| `medium` | Balanced reasoning |
+| `high` | Heavy reasoning for hard problems |
+| `xhigh` | Maximum reasoning budget |
+| `false` | Explicitly disable thinking (boolean) |
+
+Leave the field unset to use the provider default.
+
+### Supported models
+
+`model.thinking` is only valid on reasoning-capable OpenAI models: the o-series (any `o...` model) and the gpt-5 family (excluding `gpt-5-chat`). Setting it on any other provider or model raises a load-time error so the misconfiguration surfaces before the agent runs:
+
+```
+thinking is only supported on reasoning-capable OpenAI models
+(the o-series and the gpt-5 family), not 'anthropic:claude-sonnet-4-5'.
+```
+
+### Relationship to spec.reasoning
+
+`model.thinking` and `spec.reasoning` are orthogonal:
+
+- **`model.thinking`** controls model-level extended thinking inside a single model request.
+- **`spec.reasoning`** controls InitRunner's cross-turn orchestration patterns (react, todo_driven, plan_execute, reflexion) in autonomous mode.
+
+You can use both together: a `high`-thinking model running a `todo_driven` strategy, for example. `model.thinking` is also distinct from the judge-gated reflexion loop (`success_criteria`, see [verified reflexion](#reflexion-with-verification)): thinking adjusts effort inside one model request, while verified reflexion runs a separate LLM-as-judge across reflexion rounds. The two are orthogonal and compose freely.
+
+### Relationship to the Thinking capability
+
+PydanticAI also exposes a `Thinking` capability you can declare under `spec.capabilities`. It does the same thing at the capability layer. Prefer `model.thinking`: it lives next to the rest of the model config and goes through schema validation. If you declare both `model.thinking` and a `Thinking` capability, the loader logs a warning. The old `- Thinking: high` capability form keeps working for backward compatibility.
+
+### Cost and token usage
+
+Extended thinking consumes additional tokens that the model spends reasoning before it answers. InitRunner records that count separately. Every run captures `thinking_tokens` in its `RunResult`, and the audit log persists a `thinking_tokens` column alongside `tokens_in` / `tokens_out` / `total_tokens`. Existing audit databases gain the column automatically on first open (older rows report `0`).
+
+Use this to see how much of a run's cost went to reasoning rather than the visible answer, and to tune the effort level down when the extra reasoning is not paying off.
+
 ## Reasoning Strategies
 
 The `spec.reasoning` config controls how the autonomous runner orchestrates agent behavior across turns. Strategies operate in **autonomous mode only** (`-a` flag).
@@ -250,6 +311,9 @@ spec:
     reflection_dimensions:   # per-round evaluation rubrics (reflexion only)
       - name: correctness
         prompt: "Check for errors..."
+    success_criteria:        # judge-verified gating (reflexion only)
+      - correctness
+      - completeness
     auto_detect: true        # infer pattern from tool/autonomy config
 ```
 
@@ -258,7 +322,8 @@ spec:
 | `pattern` | string | `"react"` | Reasoning pattern to use |
 | `auto_plan` | bool | `false` | Prepend "create a todo list" to first turn |
 | `reflection_rounds` | int | `0` | Number of self-critique rounds after completion |
-| `reflection_dimensions` | list | `null` | Per-round evaluation dimensions (see [reflexion](#reflexion)) |
+| `reflection_dimensions` | list | `null` | Per-round evaluation dimensions (see [reflexion](#reflexion-basic)) |
+| `success_criteria` | list | `null` | Criteria an LLM-as-judge verifies each reflexion round (see [verified reflexion](#reflexion-with-verification)). Auto-derived from `reflection_dimensions` names when unset. Max 10. |
 | `auto_detect` | bool | `true` | Infer pattern from tool/autonomy config |
 
 ### Budget-aware continuation prompts
@@ -331,7 +396,7 @@ How it works:
 3. Phase transition: "PHASE 2 - EXECUTION: Work through your plan."
 4. Execution continues until auto-completion or `finish_task`
 
-#### reflexion
+#### reflexion (basic)
 
 Post-completion self-critique. After the agent finishes (calls `finish_task` or todo auto-completes), the runner re-opens the state and injects dimension-specific evaluation prompts for additional rounds.
 
@@ -380,6 +445,77 @@ How it works:
 4. Final output is from the last iteration
 
 Note: reflexion is its own reasoning pattern, not a modifier on other patterns. If you want todo-driven behavior with self-critique, set `reflection_rounds` (or `reflection_dimensions`) without an explicit `pattern` -- auto-detection will select `reflexion`, and the agent can still use todo tools for structured work.
+
+#### reflexion (with verification)
+
+Basic reflexion runs a fixed number of self-critique rounds and trusts the agent to fix what it finds. Verified reflexion adds an LLM-as-judge that gates each round: before composing the next continuation prompt, the runner judges the latest summary against a list of `success_criteria`. A round that passes every criterion is recorded as verified and the loop advances (or finishes early once all rounds clear). A round that fails injects the judge's per-criterion reasons into the next prompt so the agent addresses them directly.
+
+Turn it on by adding `success_criteria`:
+
+```yaml
+reasoning:
+  pattern: reflexion
+  reflection_rounds: 2
+  success_criteria:
+    - correctness
+    - completeness
+```
+
+When you set `reflection_dimensions` but leave `success_criteria` unset, the criteria are **auto-derived from the dimension names**, so a dimensions-only config gets verification for free:
+
+```yaml
+reasoning:
+  pattern: reflexion
+  reflection_dimensions:
+    - name: accuracy
+      prompt: Verify all numbers, dates, and technical claims.
+    - name: coverage
+      prompt: Are all requirements from the original prompt addressed?
+  # success_criteria becomes [accuracy, coverage] automatically
+```
+
+`success_criteria` accepts at most 10 entries and must be non-empty when provided.
+
+**The judge model**
+
+Verification reuses the role's own configured model, so the judge stays on the same provider the agent already authenticates against. When the role leaves its model unset, the judge falls back to `openai:gpt-4o-mini`. The judge runs with `temperature=0.0` and returns a strict pass/fail verdict per criterion.
+
+**Verified vs failed rounds**
+
+The two outcomes build different continuation prompts:
+
+- **Verified** (all criteria pass): the round counter advances and the next prompt is tagged `REFLECTION (2/2) -- COMPLETENESS [VERIFIED]:`, telling the agent the previous round cleared the bar and to move to the next dimension. Once the last round verifies, the runner marks the state complete and asks the agent to call `finish_task` -- so a run that passes verification early stops without burning the remaining rounds.
+- **Failed** (one or more criteria fail): the runner falls through to the plain dimension prompt and appends the failed-criteria feedback so the agent knows exactly what to fix:
+
+  ```
+  REFLECTION (2/2) -- COMPLETENESS:
+  Are there missing sections, unaddressed requirements, or gaps in coverage? ...
+  Make corrections if needed, then call finish_task when satisfied.
+
+  Judge feedback on the previous round:
+  - completeness: The error-handling section is missing entirely.
+  Address these issues in your revision.
+  ```
+
+**Judge failure handling**
+
+The judge call is best-effort and never stalls reflexion. If the judge raises an exception, that round falls back to the plain dimension prompt and continues. After two consecutive judge failures the judge is disabled for the rest of the run, so a broken or rate-limited judge endpoint degrades gracefully to basic reflexion rather than blocking progress.
+
+**Inspecting verdicts**
+
+Every judge verdict is recorded on `ReflectionState.judge_verdicts`. Each entry is a dict:
+
+```python
+{"round": 2, "all_passed": False, "criteria_results": [
+    {"criterion": "completeness", "passed": False, "reason": "..."},
+]}
+```
+
+The list stays empty unless `success_criteria` are configured, so basic reflexion carries no verdict overhead.
+
+**When to use verification**
+
+Reach for verified reflexion when "looks done" is not enough and you can name what done means: factual accuracy on a research brief, full requirement coverage on a spec, schema-valid output on a generator. For open-ended drafting where any extra polish helps, basic reflexion is simpler and avoids the per-round judge call.
 
 ### Auto-detection
 

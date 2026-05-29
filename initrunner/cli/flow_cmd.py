@@ -146,6 +146,83 @@ def flow_up(
             audit_logger.close()
 
 
+@app.command("resume")
+def flow_resume(
+    flow_file: Annotated[Path, typer.Argument(help="Path to flow YAML")],
+    flow_run_id: Annotated[
+        str, typer.Argument(help="flow_run_id of the interrupted run to resume")
+    ],
+    prompt: Annotated[
+        str | None,
+        typer.Option(
+            "--prompt",
+            "-p",
+            help="Prompt for the entry agent if it never checkpointed (rarely needed)",
+        ),
+    ] = None,
+    entry: Annotated[
+        str | None,
+        typer.Option("--entry", help="Override the entry agent"),
+    ] = None,
+    audit_db: AuditDbOption = None,
+) -> None:
+    """Resume an interrupted durable flow from its checkpoint journal.
+
+    Sub-agents that already produced a successful checkpoint are replayed from
+    the audit-backed journal; the first incomplete (failed or paused) agent and
+    everything after it are re-run. The flow must enable ``durability`` in its
+    spec, and audit logging must be on (the journal lives in the audit store).
+    """
+    from initrunner.flow.loader import FlowLoadError
+    from initrunner.services.flow import load_flow_sync, resume_flow_sync
+
+    preflight_validate_or_exit(flow_file)
+
+    try:
+        flow = load_flow_sync(flow_file)
+    except FlowLoadError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    if not flow.spec.durability.active:
+        console.print(
+            "[red]This flow does not enable durability.[/red] Add a "
+            "[bold]durability: {enabled: true}[/bold] block to its spec to make runs resumable."
+        )
+        raise typer.Exit(1)
+
+    audit_logger = create_audit_logger(audit_db, no_audit=False)
+    if audit_logger is None:
+        console.print("[red]Error:[/red] Resume requires audit logging.")
+        raise typer.Exit(1)
+
+    try:
+        completed = audit_logger.list_completed_services(flow_run_id)
+        console.print(
+            f"[bold]Resuming flow[/bold] {flow.metadata.name} (run {flow_run_id}) -- "
+            f"{len(completed)} checkpointed service(s)."
+        )
+        if completed:
+            console.print(f"[dim]Replaying: {', '.join(completed)}[/dim]")
+
+        result = resume_flow_sync(
+            flow,
+            flow_file.parent,
+            flow_run_id,
+            prompt or "",
+            entry_service=entry,
+            audit_logger=audit_logger,
+        )
+        console.print(f"\n[bold]Result[/bold] ({result.output_mode}):")
+        console.print(result.output or "[dim](no output)[/dim]")
+        console.print(f"\n[dim]Flow run ID: {result.flow_run_id}[/dim]")
+    except (ValueError, RuntimeError) as e:
+        console.print(f"[red]Resume failed:[/red] {e}")
+        raise typer.Exit(1) from None
+    finally:
+        audit_logger.close()
+
+
 @app.command("events")
 def flow_events(
     source: Annotated[str | None, typer.Option("--source", help="Filter by source agent")] = None,

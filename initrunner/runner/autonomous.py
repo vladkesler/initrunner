@@ -222,6 +222,7 @@ def run_autonomous(
                 trigger_type=trigger_type or "autonomous",
                 trigger_metadata=t_meta,
                 extra_toolsets=all_extra,
+                judge_verdicts=reflection_state.judge_verdicts,
             )
             progress.update(ptask, advance=1)
 

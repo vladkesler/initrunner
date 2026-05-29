@@ -36,6 +36,8 @@ async def get_cost_summary() -> CostSummaryResponse:
                 tokens_out=e.tokens_out,
                 total_cost_usd=e.total_cost_usd,
                 avg_cost_per_run=e.avg_cost_per_run,
+                thinking_tokens=e.thinking_tokens,
+                reasoning_tokens=e.reasoning_tokens,
             )
             for e in summary.top_agents
         ],
@@ -74,6 +76,8 @@ async def get_cost_by_agent(
             tokens_out=e.tokens_out,
             total_cost_usd=e.total_cost_usd,
             avg_cost_per_run=e.avg_cost_per_run,
+            thinking_tokens=e.thinking_tokens,
+            reasoning_tokens=e.reasoning_tokens,
         )
         for e in report.entries
     ]
@@ -136,6 +140,8 @@ async def get_cost_by_model(
             tokens_in=e.tokens_in,
             tokens_out=e.tokens_out,
             total_cost_usd=e.total_cost_usd,
+            thinking_tokens=e.thinking_tokens,
+            reasoning_tokens=e.reasoning_tokens,
         )
         for e in entries
     ]

@@ -23,8 +23,28 @@ def run_suite_sync(
     concurrency: int = 1,
     tag_filter: list[str] | None = None,
     role_file: Path | None = None,
+    pydantic_evals: bool = False,
 ) -> SuiteResult:
-    """Run an eval suite, building per-worker agents when concurrent."""
+    """Run an eval suite, building per-worker agents when concurrent.
+
+    With ``pydantic_evals=True`` the suite runs through the pydantic-evals
+    engine, capturing OTel spans per case so span-based assertions can read a
+    real span tree. The returned ``SuiteResult`` is identical in shape to the
+    bespoke path, so callers and JSON export are unaffected. Requires the
+    ``observability`` extra.
+    """
+    if pydantic_evals:
+        from initrunner.eval.runner import run_suite_pydantic_evals
+
+        return run_suite_pydantic_evals(
+            agent,
+            role,
+            suite,
+            dry_run=dry_run,
+            concurrency=concurrency,
+            tag_filter=tag_filter,
+        ).suite_result
+
     from initrunner.eval.runner import run_suite
 
     agent_factory = None

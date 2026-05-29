@@ -45,6 +45,25 @@ class TodoToolConfig(ToolConfigBase):
         return f"todo{suffix}"
 
 
+class BlackboardToolConfig(ToolConfigBase):
+    """Shared-state coordination for agents inside one flow run.
+
+    A flow agent declares ``type: blackboard`` to post, read, and claim
+    structured entries on a per-run blackboard. The board lives in the flow
+    graph state, so an upstream agent can post a value that a downstream
+    agent (or a fan-in join) reads without threading it through prompt text.
+    The tool is only active inside a flow; a standalone single-shot run has
+    no blackboard and the tool is never built.
+    """
+
+    type: Literal["blackboard"] = "blackboard"
+    max_entries: int = Field(default=100, ge=1, le=1000)
+    max_value_chars: int = Field(default=10_000, ge=1, le=100_000)
+
+    def summary(self) -> str:
+        return f"blackboard: max_entries={self.max_entries}"
+
+
 class CalculatorToolConfig(ToolConfigBase):
     type: Literal["calculator"] = "calculator"
     max_expression_length: int = 1000

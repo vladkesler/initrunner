@@ -1,11 +1,38 @@
 <script lang="ts">
-	import type { AuditRecord } from '$lib/api/types';
+	import type { AuditRecord, AuditRunDetail } from '$lib/api/types';
+	import { getAuditRunDetail } from '$lib/api/audit';
 	import { X, CheckCircle, XCircle, Copy } from 'lucide-svelte';
 	import { formatCost } from '$lib/utils/format';
 
 	let { record, onClose }: { record: AuditRecord; onClose: () => void } = $props();
 
 	let copyFeedback = $state('');
+	let detail = $state<AuditRunDetail | null>(null);
+
+	$effect(() => {
+		const runId = record?.run_id;
+		if (!runId) {
+			detail = null;
+			return;
+		}
+		getAuditRunDetail(runId)
+			.then((d) => (detail = d))
+			.catch(() => (detail = null));
+	});
+
+	/** Read a string-ish field from a loosely-typed verifier/event record. */
+	function field(entry: Record<string, unknown>, ...keys: string[]): string | null {
+		for (const k of keys) {
+			const v = entry[k];
+			if (v !== undefined && v !== null && v !== '') return String(v);
+		}
+		return null;
+	}
+
+	function verdictPassed(entry: Record<string, unknown>): boolean {
+		const v = entry.passed ?? entry.pass ?? entry.success;
+		return v === true || v === 'true' || v === 'pass';
+	}
 
 	function formatTimestamp(ts: string): string {
 		try {
@@ -84,6 +111,18 @@
 						{record.tokens_in.toLocaleString()} in / {record.tokens_out.toLocaleString()} out
 					</div>
 				</div>
+				{#if detail && detail.thinking_tokens > 0}
+					<div>
+						<div class="mb-1 section-label">Thinking</div>
+						<div class="font-mono text-[13px] text-fg-muted">{detail.thinking_tokens.toLocaleString()}</div>
+					</div>
+				{/if}
+				{#if detail && detail.reasoning_tokens > 0}
+					<div>
+						<div class="mb-1 section-label">Reasoning</div>
+						<div class="font-mono text-[13px] text-fg-muted">{detail.reasoning_tokens.toLocaleString()}</div>
+					</div>
+				{/if}
 				<div>
 					<div class="mb-1 section-label">Cost</div>
 					<div class="font-mono text-[13px] text-fg-muted">{formatCost(record.cost_usd)}</div>
@@ -157,6 +196,67 @@
 				</div>
 				<pre class="max-h-96 overflow-y-auto border border-edge bg-surface-1 p-3 font-mono text-[13px] leading-relaxed text-fg-muted whitespace-pre-wrap">{record.output}</pre>
 			</div>
+
+			<!-- Event timeline -->
+			{#if detail?.event_timeline?.length}
+				<div>
+					<div class="mb-2 section-label">Timeline</div>
+					<div class="border border-edge bg-surface-1">
+						{#each detail.event_timeline as event, i (i)}
+							<div class="flex items-center gap-2 border-b border-edge-subtle px-3 py-2 last:border-b-0">
+								<span
+									class="status-dot shrink-0"
+									class:bg-ok={verdictPassed(event) || field(event, 'status') !== 'error'}
+									class:bg-fail={field(event, 'status') === 'error'}
+								></span>
+								<span class="flex-1 truncate font-mono text-[13px] text-fg">
+									{field(event, 'tool_name', 'name', 'event', 'type') ?? 'event'}
+								</span>
+								{#if field(event, 'duration_ms')}
+									<span class="font-mono text-[13px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+										{field(event, 'duration_ms')}ms
+									</span>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Judge verdicts -->
+			{#if detail?.judge_verdicts?.length}
+				<div>
+					<div class="mb-2 section-label">Judge verdicts</div>
+					<div class="space-y-2">
+						{#each detail.judge_verdicts as verdict, i (i)}
+							<div class="card-surface flex items-start gap-2 p-3">
+								{#if verdictPassed(verdict)}
+									<CheckCircle size={16} class="mt-0.5 shrink-0 text-ok" />
+								{:else}
+									<XCircle size={16} class="mt-0.5 shrink-0 text-fail" />
+								{/if}
+								<div class="min-w-0 flex-1 space-y-1">
+									<div class="flex items-center justify-between gap-2">
+										<span class="font-mono text-[13px] text-fg">
+											{field(verdict, 'name', 'assertion', 'check') ?? 'verdict'}
+										</span>
+										{#if field(verdict, 'score')}
+											<span class="font-mono text-[13px] text-fg-faint" style="font-variant-numeric: tabular-nums">
+												{field(verdict, 'score')}
+											</span>
+										{/if}
+									</div>
+									{#if field(verdict, 'rationale', 'reason', 'explanation')}
+										<p class="font-mono text-[13px] leading-relaxed text-fg-muted">
+											{field(verdict, 'rationale', 'reason', 'explanation')}
+										</p>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

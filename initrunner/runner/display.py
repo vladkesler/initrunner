@@ -230,6 +230,30 @@ def _make_prefixed_tool_event_printer() -> Callable[[str, ToolEvent], None]:
     return _on_event
 
 
+def _format_thinking_event(event: dict[str, object]) -> str:
+    """Format a thinking-delta timeline entry as a dim Rich-markup line."""
+    content = event.get("content_delta") or ""
+    snippet = str(content)[:120]
+    suffix = f": {snippet}" if snippet else ""
+    return f"[dim]  [thinking]{suffix}[/dim]"
+
+
+def _format_tool_timeline_summary(timeline: list[dict[str, object]]) -> str:
+    """Compact one-line summary of tool calls in a streaming timeline.
+
+    Returns an empty string when the timeline holds no tool calls, so callers
+    can skip printing. Tool names are rendered in call order.
+    """
+    names = [
+        str(entry.get("tool_name"))
+        for entry in timeline
+        if entry.get("type") == "function_tool_call" and entry.get("tool_name")
+    ]
+    if not names:
+        return ""
+    return f"[dim]  tools: {', '.join(names)}[/dim]"
+
+
 def _display_result_plain(result: RunResult) -> None:
     """Write plain-text output to stdout, stats/errors to stderr."""
     if result.success:

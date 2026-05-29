@@ -74,6 +74,69 @@ class DelegateAuditEvent:
     compose_name: str | None = None  # Compose project identity for filtering
 
 
+def _encode_event_timeline(timeline: list[dict[str, Any]] | None) -> str | None:
+    """JSON-encode a redacted streaming timeline for persistence. Never raises.
+
+    Returns ``None`` for an empty timeline or when serialization fails, so a
+    malformed entry can never block an audit write.
+    """
+    if not timeline:
+        return None
+    try:
+        return json.dumps(timeline, default=str)
+    except Exception as e:
+        logger.error("Failed to encode event timeline: %s", e)
+        return None
+
+
+def _encode_judge_verdicts(verdicts: list[dict[str, Any]] | None) -> str | None:
+    """JSON-encode verified-reflexion judge verdicts for persistence. Never raises.
+
+    Returns ``None`` for an empty list or when serialization fails, so a
+    malformed verdict can never block an audit write.
+    """
+    if not verdicts:
+        return None
+    try:
+        return json.dumps(verdicts, default=str)
+    except Exception as e:
+        logger.error("Failed to encode judge verdicts: %s", e)
+        return None
+
+
+# Per-candidate output is truncated before it enters the vote trace so a wide
+# fan-in cannot bloat the signed chain.
+_ENSEMBLE_OUTPUT_PREVIEW_CHARS = 1000
+
+# Per-entry value is truncated before a blackboard snapshot enters the chain so
+# a large shared board cannot bloat the signed audit log.
+_BLACKBOARD_VALUE_PREVIEW_CHARS = 1000
+
+
+def _truncate_vote_trace(vote_trace: dict[str, Any]) -> dict[str, Any]:
+    """Bound the size of string values in a vote trace. Never raises.
+
+    Candidate text is capped at ``_ENSEMBLE_OUTPUT_PREVIEW_CHARS`` with a
+    ``[truncated]`` marker; non-string values pass through unchanged.
+    """
+    bounded: dict[str, Any] = {}
+    for key, value in vote_trace.items():
+        if isinstance(value, str) and len(value) > _ENSEMBLE_OUTPUT_PREVIEW_CHARS:
+            bounded[key] = value[:_ENSEMBLE_OUTPUT_PREVIEW_CHARS] + " [truncated]"
+        elif isinstance(value, list):
+            bounded[key] = [
+                (
+                    item[:_ENSEMBLE_OUTPUT_PREVIEW_CHARS] + " [truncated]"
+                    if isinstance(item, str) and len(item) > _ENSEMBLE_OUTPUT_PREVIEW_CHARS
+                    else item
+                )
+                for item in value
+            ]
+        else:
+            bounded[key] = value
+    return bounded
+
+
 @dataclass
 class AuditRecord:
     run_id: str
@@ -89,11 +152,15 @@ class AuditRecord:
     tool_calls: int
     duration_ms: int
     success: bool
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
     error: str | None = None
     trigger_type: str | None = None
     trigger_metadata: str | None = None
     principal_id: str | None = None
     tool_names: str | None = None  # JSON-encoded list of tool names
+    event_timeline_json: str | None = None  # JSON-encoded redacted streaming timeline
+    judge_verdicts: str | None = None  # JSON-encoded verified-reflexion judge verdicts
 
     @classmethod
     def from_run(
@@ -119,6 +186,8 @@ class AuditRecord:
             tokens_in=result.tokens_in,
             tokens_out=result.tokens_out,
             total_tokens=result.total_tokens,
+            thinking_tokens=result.thinking_tokens,
+            reasoning_tokens=result.reasoning_tokens,
             tool_calls=result.tool_calls,
             duration_ms=result.duration_ms,
             success=result.success,
@@ -127,6 +196,8 @@ class AuditRecord:
             trigger_metadata=json.dumps(trigger_metadata) if trigger_metadata else None,
             principal_id=principal_id,
             tool_names=json.dumps(result.tool_call_names) if result.tool_call_names else None,
+            event_timeline_json=_encode_event_timeline(result.event_timeline),
+            judge_verdicts=_encode_judge_verdicts(getattr(result, "judge_verdicts", None)),
         )
 
 
@@ -143,12 +214,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
     tokens_in INTEGER NOT NULL,
     tokens_out INTEGER NOT NULL,
     total_tokens INTEGER NOT NULL,
+    thinking_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens INTEGER NOT NULL DEFAULT 0,
     tool_calls INTEGER NOT NULL,
     duration_ms INTEGER NOT NULL,
     success BOOLEAN NOT NULL,
     error TEXT,
     trigger_type TEXT,
-    trigger_metadata TEXT
+    trigger_metadata TEXT,
+    event_timeline_json TEXT,
+    judge_verdicts TEXT
 );
 """
 
@@ -162,10 +237,10 @@ _CREATE_INDEXES = [
 _INSERT = """\
 INSERT INTO audit_log (
     run_id, agent_name, timestamp, user_prompt, model, provider,
-    output, tokens_in, tokens_out, total_tokens, tool_calls,
-    duration_ms, success, error, trigger_type, trigger_metadata,
-    principal_id, tool_names, prev_hash, record_hash
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    output, tokens_in, tokens_out, total_tokens, thinking_tokens, reasoning_tokens,
+    tool_calls, duration_ms, success, error, trigger_type, trigger_metadata,
+    principal_id, tool_names, event_timeline_json, judge_verdicts, prev_hash, record_hash
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 _SELECT_CHAIN_TIP = """\
@@ -293,6 +368,86 @@ SET resolved_at = ?, resolved_by = ?, decision = ?
 WHERE run_id = ? AND tool_call_id = ? AND resolved_at IS NULL;
 """
 
+_CREATE_FLOW_CHECKPOINTS_TABLE = """\
+CREATE TABLE IF NOT EXISTS flow_checkpoints (
+    flow_run_id TEXT NOT NULL,
+    service_name TEXT NOT NULL,
+    sequence_number INTEGER NOT NULL,
+    timestamp TEXT NOT NULL,
+    envelope_json TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    message_history_json TEXT,
+    prev_hash TEXT,
+    record_hash TEXT,
+    PRIMARY KEY (flow_run_id, service_name)
+);
+"""
+
+_CREATE_FLOW_CHECKPOINT_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_checkpoint_flow ON flow_checkpoints (flow_run_id);",
+    "CREATE INDEX IF NOT EXISTS idx_checkpoint_seq "
+    "ON flow_checkpoints (flow_run_id, sequence_number);",
+]
+
+_UPSERT_FLOW_CHECKPOINT = """\
+INSERT OR REPLACE INTO flow_checkpoints (
+    flow_run_id, service_name, sequence_number, timestamp,
+    envelope_json, result_json, message_history_json, prev_hash, record_hash
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+"""
+
+_SELECT_FLOW_CHECKPOINT = """\
+SELECT envelope_json, result_json, message_history_json
+FROM flow_checkpoints
+WHERE flow_run_id = ? AND service_name = ?
+LIMIT 1;
+"""
+
+_SELECT_COMPLETED_SERVICES = """\
+SELECT service_name FROM flow_checkpoints
+WHERE flow_run_id = ?
+ORDER BY sequence_number ASC;
+"""
+
+_SELECT_CHECKPOINT_CHAIN_TIP = """\
+SELECT record_hash FROM flow_checkpoints
+WHERE record_hash IS NOT NULL
+ORDER BY rowid DESC LIMIT 1;
+"""
+
+_DELETE_FLOW_CHECKPOINTS = "DELETE FROM flow_checkpoints WHERE flow_run_id = ?;"
+
+# Fields hashed into the per-checkpoint HMAC chain, in canonical order.
+_CHECKPOINT_HASH_FIELDS = [
+    "flow_run_id",
+    "service_name",
+    "sequence_number",
+    "timestamp",
+    "envelope_json",
+    "result_json",
+    "message_history_json",
+]
+
+
+@dataclass
+class FlowCheckpointRecord:
+    """One recorded sub-agent completion in a durable flow run.
+
+    ``envelope_json`` / ``result_json`` hold the serialized
+    ``DelegationEnvelope`` and ``RunResult``; ``message_history_json`` holds
+    the serialized PydanticAI message history (or ``None``). The checkpoint
+    layer treats these as opaque strings -- the ``flow.checkpoint`` module
+    owns serialization.
+    """
+
+    flow_run_id: str
+    service_name: str
+    sequence_number: int
+    timestamp: str
+    envelope_json: str
+    result_json: str
+    message_history_json: str | None = None
+
 
 @dataclass
 class PendingApprovalRecord:
@@ -371,6 +526,46 @@ def _migrate_add_tool_names_column(conn: sqlite3.Connection) -> None:
         pass  # Column already exists
 
 
+def _migrate_add_thinking_tokens_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add thinking_tokens column to audit_log.
+
+    Rows predating this migration get 0 via the column default, so existing
+    chain hashes stay verifiable (legacy rows carry NULL hashes regardless).
+    """
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN thinking_tokens INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
+def _migrate_add_streaming_columns(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add reasoning_tokens and event_timeline_json columns.
+
+    Rows predating this migration get 0 / NULL via the column defaults, so
+    existing chain hashes stay verifiable (legacy rows carry NULL hashes anyway).
+    """
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN reasoning_tokens INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN event_timeline_json TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
+def _migrate_add_judge_verdicts_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add judge_verdicts column to audit_log.
+
+    Rows predating this migration get NULL via the column default, so existing
+    chain hashes stay verifiable (legacy rows carry NULL hashes regardless).
+    """
+    try:
+        conn.execute("ALTER TABLE audit_log ADD COLUMN judge_verdicts TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
 def _migrate_add_hash_columns(conn: sqlite3.Connection) -> None:
     """Idempotent migration: add prev_hash/record_hash columns for the signed chain.
 
@@ -382,6 +577,18 @@ def _migrate_add_hash_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE audit_log ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+
+def _migrate_add_checkpoint_message_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add message_history_json to flow_checkpoints.
+
+    Older durable runs predating this column keep NULL, which the checkpoint
+    layer treats as "no message history".
+    """
+    try:
+        conn.execute("ALTER TABLE flow_checkpoints ADD COLUMN message_history_json TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
 
 def _build_where(
@@ -450,6 +657,8 @@ def _row_to_record(row: sqlite3.Row) -> AuditRecord:
         tokens_in=row["tokens_in"],
         tokens_out=row["tokens_out"],
         total_tokens=row["total_tokens"],
+        thinking_tokens=row["thinking_tokens"],
+        reasoning_tokens=row["reasoning_tokens"],
         tool_calls=row["tool_calls"],
         duration_ms=row["duration_ms"],
         success=bool(row["success"]),
@@ -458,6 +667,8 @@ def _row_to_record(row: sqlite3.Row) -> AuditRecord:
         trigger_metadata=row["trigger_metadata"],
         principal_id=row["principal_id"],
         tool_names=row["tool_names"],
+        event_timeline_json=row["event_timeline_json"],
+        judge_verdicts=row["judge_verdicts"],
     )
 
 
@@ -472,6 +683,8 @@ _RECORD_FIELDS = [
     "tokens_in",
     "tokens_out",
     "total_tokens",
+    "thinking_tokens",
+    "reasoning_tokens",
     "tool_calls",
     "duration_ms",
     "success",
@@ -480,6 +693,8 @@ _RECORD_FIELDS = [
     "trigger_metadata",
     "principal_id",
     "tool_names",
+    "event_timeline_json",
+    "judge_verdicts",
 ]
 
 
@@ -533,11 +748,16 @@ class AuditLogger:
             self._conn.execute(_CREATE_DELEGATE_EVENTS_TABLE)
             self._conn.execute(_CREATE_BUDGET_STATE_TABLE)
             self._conn.execute(_CREATE_PENDING_APPROVALS_TABLE)
+            self._conn.execute(_CREATE_FLOW_CHECKPOINTS_TABLE)
             _migrate_add_trigger_columns(self._conn)
             _migrate_add_principal_column(self._conn)
             _migrate_add_compose_name_column(self._conn)
             _migrate_add_tool_names_column(self._conn)
+            _migrate_add_thinking_tokens_column(self._conn)
+            _migrate_add_streaming_columns(self._conn)
+            _migrate_add_judge_verdicts_column(self._conn)
             _migrate_add_hash_columns(self._conn)
+            _migrate_add_checkpoint_message_column(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -545,6 +765,8 @@ class AuditLogger:
             for idx in _CREATE_DELEGATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_PENDING_APPROVALS_INDEXES:
+                self._conn.execute(idx)
+            for idx in _CREATE_FLOW_CHECKPOINT_INDEXES:
                 self._conn.execute(idx)
             self._conn.commit()
         except Exception:
@@ -600,6 +822,8 @@ class AuditLogger:
             tokens_in=record.tokens_in,
             tokens_out=record.tokens_out,
             total_tokens=record.total_tokens,
+            thinking_tokens=record.thinking_tokens,
+            reasoning_tokens=record.reasoning_tokens,
             tool_calls=record.tool_calls,
             duration_ms=record.duration_ms,
             success=record.success,
@@ -608,6 +832,8 @@ class AuditLogger:
             trigger_metadata=record.trigger_metadata,
             principal_id=record.principal_id,
             tool_names=record.tool_names,
+            event_timeline_json=record.event_timeline_json,
+            judge_verdicts=record.judge_verdicts,
         )
         key = self._get_hmac_key()
         record_dict = {f: getattr(scrubbed, f) for f in _RECORD_FIELDS}
@@ -634,6 +860,8 @@ class AuditLogger:
                         scrubbed.tokens_in,
                         scrubbed.tokens_out,
                         scrubbed.total_tokens,
+                        scrubbed.thinking_tokens,
+                        scrubbed.reasoning_tokens,
                         scrubbed.tool_calls,
                         scrubbed.duration_ms,
                         scrubbed.success,
@@ -642,6 +870,8 @@ class AuditLogger:
                         scrubbed.trigger_metadata,
                         scrubbed.principal_id,
                         scrubbed.tool_names,
+                        scrubbed.event_timeline_json,
+                        scrubbed.judge_verdicts,
                         prev_hash,
                         record_hash,
                     ),
@@ -849,6 +1079,113 @@ class AuditLogger:
             ),
             error_label="delegate event",
         )
+
+    def log_ensemble_vote(
+        self,
+        *,
+        source_service: str,
+        target_services: list[str],
+        mode: str,
+        winning_output: str,
+        vote_trace: dict[str, Any],
+        trace: str | None = None,
+        run_id: str = "",
+    ) -> None:
+        """Record an ensemble vote outcome on the signed audit chain. Never raises.
+
+        Writes a signed ``AuditRecord`` (trigger_type ``ensemble_vote``) so the
+        winning answer and the full vote trace are tamper-evident alongside
+        every other agent run. The vote trace is truncated and secret-scrubbed
+        before serialization so a large fan-in can never bloat or leak into the
+        chain.
+        """
+        try:
+            preview = scrub_secrets(winning_output[:_ENSEMBLE_OUTPUT_PREVIEW_CHARS])
+            metadata = {
+                "scope": "ensemble_vote",
+                "source_service": source_service,
+                "target_services": target_services,
+                "mode": mode,
+                "trace": trace,
+                "vote_trace": _truncate_vote_trace(vote_trace),
+            }
+            self.log(
+                AuditRecord(
+                    run_id=run_id or source_service,
+                    agent_name=source_service,
+                    timestamp=datetime.now(UTC).isoformat(),
+                    user_prompt="",
+                    model="ensemble",
+                    provider="ensemble",
+                    output=preview,
+                    tokens_in=0,
+                    tokens_out=0,
+                    total_tokens=0,
+                    tool_calls=0,
+                    duration_ms=0,
+                    success=True,
+                    trigger_type="ensemble_vote",
+                    trigger_metadata=json.dumps(metadata, default=str),
+                )
+            )
+        except Exception as e:
+            logger.error("Failed to record ensemble vote: %s", e)
+
+    def log_blackboard_state(
+        self,
+        *,
+        flow_run_id: str,
+        flow_name: str,
+        snapshot: dict[str, Any],
+    ) -> None:
+        """Record a flow run's final blackboard on the signed audit chain. Never raises.
+
+        Writes one signed ``AuditRecord`` (trigger_type ``blackboard_state``) so
+        the shared coordination state a flow's agents built is tamper-evident
+        alongside their runs. Each entry value is truncated and secret-scrubbed
+        before serialization so a large board can never bloat or leak into the
+        chain.
+        """
+        try:
+            entries = snapshot.get("entries", {})
+            bounded: dict[str, Any] = {}
+            for key, entry in entries.items():
+                value = entry.get("value", "")
+                if isinstance(value, str) and len(value) > _BLACKBOARD_VALUE_PREVIEW_CHARS:
+                    value = value[:_BLACKBOARD_VALUE_PREVIEW_CHARS] + " [truncated]"
+                bounded[key] = {
+                    "value": scrub_secrets(value) if isinstance(value, str) else value,
+                    "author": entry.get("author", ""),
+                    "timestamp": entry.get("timestamp", ""),
+                }
+            metadata = {
+                "scope": "blackboard_state",
+                "flow_name": flow_name,
+                "flow_run_id": flow_run_id,
+                "entries": bounded,
+                "claimed": list(snapshot.get("claimed", [])),
+            }
+            self.log(
+                AuditRecord(
+                    run_id=flow_run_id or flow_name,
+                    agent_name=flow_name,
+                    timestamp=datetime.now(UTC).isoformat(),
+                    user_prompt="",
+                    model="blackboard",
+                    provider="flow",
+                    output=f"{len(bounded)} entries, {len(metadata['claimed'])} claimed",
+                    tokens_in=0,
+                    tokens_out=0,
+                    total_tokens=0,
+                    tool_calls=0,
+                    duration_ms=0,
+                    success=True,
+                    trigger_type="blackboard_state",
+                    trigger_metadata=json.dumps(metadata, default=str),
+                )
+            )
+        except Exception as e:
+            logger.error("Failed to record blackboard state: %s", e)
 
     def query_delegate_events(
         self,
@@ -1107,9 +1444,11 @@ class AuditLogger:
         where, params = self._cost_filters(agent_name, since, until)
         sql = f"""\
             SELECT agent_name, model, provider,
-                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
-                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
-                   COUNT(*)                      AS run_count
+                   COALESCE(SUM(tokens_in), 0)        AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0)       AS tokens_out,
+                   COALESCE(SUM(thinking_tokens), 0)  AS thinking_tokens,
+                   COALESCE(SUM(reasoning_tokens), 0) AS reasoning_tokens,
+                   COUNT(*)                           AS run_count
             FROM audit_log {where}
             GROUP BY agent_name, model, provider
             ORDER BY SUM(tokens_in + tokens_out) DESC
@@ -1156,9 +1495,11 @@ class AuditLogger:
         where, params = self._cost_filters(None, since, until)
         sql = f"""\
             SELECT model, provider,
-                   COALESCE(SUM(tokens_in), 0)  AS tokens_in,
-                   COALESCE(SUM(tokens_out), 0) AS tokens_out,
-                   COUNT(*)                      AS run_count
+                   COALESCE(SUM(tokens_in), 0)        AS tokens_in,
+                   COALESCE(SUM(tokens_out), 0)       AS tokens_out,
+                   COALESCE(SUM(thinking_tokens), 0)  AS thinking_tokens,
+                   COALESCE(SUM(reasoning_tokens), 0) AS reasoning_tokens,
+                   COUNT(*)                           AS run_count
             FROM audit_log {where}
             GROUP BY model, provider
             ORDER BY SUM(tokens_in + tokens_out) DESC
@@ -1488,6 +1829,131 @@ class AuditLogger:
         except Exception as e:
             logger.error("Failed to resolve pending approval %s/%s: %s", run_id, tool_call_id, e)
             return False
+
+    # ------------------------------------------------------------------
+    # Durable flow checkpoints (resumable multi-agent runs)
+    # ------------------------------------------------------------------
+
+    def append_checkpoint(
+        self,
+        *,
+        flow_run_id: str,
+        service_name: str,
+        sequence_number: int,
+        envelope_json: str,
+        result_json: str,
+        message_history_json: str | None,
+    ) -> None:
+        """Record one completed sub-agent delegation. Never raises.
+
+        Each checkpoint is signed into its own HMAC chain (separate from the
+        ``audit_log`` chain) so the durable journal is tamper-evident. The
+        ``(flow_run_id, service_name)`` primary key means a replayed service
+        overwrites its prior row rather than duplicating it.
+        """
+        try:
+            ts = datetime.now(UTC).isoformat()
+            scrubbed_result = scrub_secrets(result_json)
+            scrubbed_envelope = scrub_secrets(envelope_json)
+            key = self._get_hmac_key()
+            record_dict = {
+                "flow_run_id": flow_run_id,
+                "service_name": service_name,
+                "sequence_number": sequence_number,
+                "timestamp": ts,
+                "envelope_json": scrubbed_envelope,
+                "result_json": scrubbed_result,
+                "message_history_json": message_history_json,
+            }
+            serialized = canonical_serialize(record_dict, _CHECKPOINT_HASH_FIELDS)
+            with self._lock:
+                in_txn = False
+                try:
+                    self._conn.execute("BEGIN IMMEDIATE")
+                    in_txn = True
+                    prev_row = self._conn.execute(_SELECT_CHECKPOINT_CHAIN_TIP).fetchone()
+                    prev_hash = prev_row["record_hash"] if prev_row else None
+                    record_hash = compute_record_hash(key, prev_hash, serialized)
+                    self._conn.execute(
+                        _UPSERT_FLOW_CHECKPOINT,
+                        (
+                            flow_run_id,
+                            service_name,
+                            sequence_number,
+                            ts,
+                            scrubbed_envelope,
+                            scrubbed_result,
+                            message_history_json,
+                            prev_hash,
+                            record_hash,
+                        ),
+                    )
+                    self._conn.commit()
+                    in_txn = False
+                except Exception:
+                    if in_txn:
+                        try:
+                            self._conn.rollback()
+                        except Exception:
+                            pass
+                    raise
+        except Exception as e:
+            logger.error(
+                "Failed to write flow checkpoint %s/%s: %s",
+                flow_run_id,
+                service_name,
+                e,
+            )
+
+    def get_checkpoint(self, flow_run_id: str, service_name: str) -> FlowCheckpointRecord | None:
+        """Return the checkpoint for one flow service, or None if absent.
+
+        Does not verify the HMAC chain on read: integrity verification is a
+        separate concern, so a missing key never blocks a resume.
+        """
+        try:
+            with self._lock:
+                row = self._conn.execute(
+                    _SELECT_FLOW_CHECKPOINT, (flow_run_id, service_name)
+                ).fetchone()
+            if row is None:
+                return None
+            return FlowCheckpointRecord(
+                flow_run_id=flow_run_id,
+                service_name=service_name,
+                sequence_number=0,
+                timestamp="",
+                envelope_json=row["envelope_json"],
+                result_json=row["result_json"],
+                message_history_json=row["message_history_json"],
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to read flow checkpoint %s/%s: %s",
+                flow_run_id,
+                service_name,
+                e,
+            )
+            return None
+
+    def list_completed_services(self, flow_run_id: str) -> list[str]:
+        """Return service names checkpointed for a flow, in sequence order."""
+        try:
+            with self._lock:
+                rows = self._conn.execute(_SELECT_COMPLETED_SERVICES, (flow_run_id,)).fetchall()
+            return [row["service_name"] for row in rows]
+        except Exception as e:
+            logger.error("Failed to list completed services for %s: %s", flow_run_id, e)
+            return []
+
+    def prune_flow_checkpoints(self, flow_run_id: str) -> None:
+        """Delete every checkpoint for one flow run. Never raises."""
+        self._execute_insert_locked(
+            _DELETE_FLOW_CHECKPOINTS,
+            (flow_run_id,),
+            error_label="flow checkpoint prune",
+            auto_prune=False,
+        )
 
     def close(self) -> None:
         with self._lock:

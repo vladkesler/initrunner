@@ -70,6 +70,10 @@ spec:
       model: ""                 # default: "" (uses provider default)
       base_url: ""              # default: "" (custom endpoint URL)
       api_key_env: ""           # default: "" (env var holding API key)
+    retriever:
+      strategy: vector          # default: "vector" (vector | hybrid | hybrid_rerank)
+      rrf_k: 60                 # default: 60 (RRF smoothing constant)
+      reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
     store_backend: lancedb      # default: "lancedb"
     store_path: null            # default: ~/.initrunner/stores/<agent-name>.lance
 ```
@@ -82,6 +86,7 @@ spec:
 | `watch` | `bool` | `false` | Reserved for future use. |
 | `chunking` | `ChunkingConfig` | See below | Chunking strategy and parameters. |
 | `embeddings` | `EmbeddingConfig` | See below | Embedding provider and model. |
+| `retriever` | `RetrieverConfig` | See below | Search mode (vector, hybrid, or hybrid with reranking). |
 | `store_backend` | `str` | `"lancedb"` | Vector store backend. Uses LanceDB, an in-process vector database. |
 | `store_path` | `str \| null` | `null` | Custom path for the vector store directory. Default: `~/.initrunner/stores/<agent-name>.lance`. |
 
@@ -101,6 +106,18 @@ spec:
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
 | `api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (e.g. `OPENAI_API_KEY` for OpenAI/Anthropic, `GOOGLE_API_KEY` for Google). |
+
+### Retriever Options
+
+Controls how `search_documents` retrieves chunks at query time. The default is
+pure vector search, so existing roles are unchanged. See the
+[RAG guide](rag-guide.md#hybrid-retrieval-vector--keyword) for when to use each mode.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `strategy` | `"vector" \| "hybrid" \| "hybrid_rerank"` | `"vector"` | `vector` is dense cosine search only. `hybrid` fuses dense and BM25 full-text results with reciprocal rank fusion. `hybrid_rerank` adds a cross-encoder reranking pass, degrading to `hybrid` when the optional backend is absent. |
+| `rrf_k` | `int` | `60` | Reciprocal rank fusion smoothing constant. Larger values flatten the contribution of rank position. |
+| `reranker_model` | `str` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Cross-encoder model used by `hybrid_rerank`. Requires the optional `sentence-transformers` dependency. |
 
 ## URL Sources
 
@@ -217,8 +234,14 @@ The embedding provider is determined by this priority:
 | `anthropic` | `openai:text-embedding-3-small` (Anthropic has no embeddings API) |
 | `google` | `google:text-embedding-004` |
 | `ollama` | `ollama:nomic-embed-text` |
+| `local` | `local:BAAI/bge-small-en-v1.5` (in-process fastembed, no HTTP) |
 
 If no match is found, falls back to `openai:text-embedding-3-small`.
+
+The `local` provider runs entirely in-process via fastembed and needs no API key or
+running server; it is distinct from `ollama`, which calls a local HTTP endpoint. See
+[Providers: Local in-process embeddings](../configuration/providers.md#local-in-process-embeddings-fastembed)
+for setup, model choices, and the dimension-consistency constraint.
 
 ## Vector Store
 

@@ -75,8 +75,9 @@ The `--task` flag is an alias for `--prompt` (`-p`). Both work.
 | `tools` | `list[ToolConfig]` | `[]` | Tools shared by all personas. |
 | `guardrails` | `TeamGuardrails` | *(defaults)* | Per-persona and team-level budget controls. |
 | `handoff_max_chars` | `int` | `4000` | Max chars of prior output passed to next persona (sequential only). |
-| `strategy` | `"sequential" \| "parallel" \| "debate"` | `"sequential"` | Execution strategy. |
+| `strategy` | `"sequential" \| "parallel" \| "debate" \| "ensemble"` | `"sequential"` | Execution strategy. |
 | `debate` | `DebateConfig` | `{max_rounds: 3, synthesize: true}` | Debate-specific settings (only used when `strategy: debate`). |
+| `ensemble` | `TeamEnsembleConfig` | `{mode: majority}` | Ensemble voting settings (only used when `strategy: ensemble`). |
 | `shared_memory` | `SharedMemoryConfig` | *(disabled)* | Shared memory store across personas. |
 | `shared_documents` | `TeamDocumentsConfig` | *(disabled)* | Shared document store with pre-run ingestion. |
 | `observability` | `ObservabilityConfig` | `null` | OpenTelemetry tracing configuration. |
@@ -254,6 +255,36 @@ spec:
 |--------|------|---------|-------------|
 | `debate.max_rounds` | `int` | `3` | Number of debate rounds (2-10). |
 | `debate.synthesize` | `bool` | `true` | Run a synthesis step after the final round. |
+
+### Ensemble
+
+Every persona answers the same task in parallel (like `parallel`), then a vote picks one winning answer instead of concatenating them. Use it when you want several personas (or several models) to answer the same question and keep the best or most-agreed-upon response.
+
+```yaml
+spec:
+  strategy: ensemble
+  personas:
+    alpha: "Answer concisely."
+    beta: "Answer concisely."
+    gamma: "Answer concisely."
+  ensemble:
+    mode: majority          # majority | weighted | judge
+```
+
+- **Concurrency**: all personas run concurrently via the parallel graph.
+- **Per-persona env vars**: not supported (same as parallel and debate -- concurrent execution).
+- **Failure behavior**: if any persona fails, the team fails (no winner is chosen).
+- **Final output**: the single winning answer.
+- **Audit**: the vote is recorded on the signed audit chain with `trigger_type: ensemble_vote`, including the candidate answers and the per-mode tally.
+
+| Config | Type | Default | Description |
+|--------|------|---------|-------------|
+| `ensemble.mode` | `"majority" \| "weighted" \| "judge"` | `"majority"` | How the winner is chosen. |
+| `ensemble.judge_model` | `str` | `"openai:gpt-4o-mini"` | Model used to score answers when `mode: judge`. |
+| `ensemble.judge_criteria` | `list[str]` | `[]` | Criteria the judge checks (defaults to `clarity, completeness, accuracy`). |
+| `ensemble.weights` | `dict[str, float] \| None` | `None` | Per-persona weight for `mode: weighted`. Keys must be persona names. |
+
+The three modes match the flow [ensemble sink](flow.md#ensemble-voting): `majority` votes on identical answers, `weighted` favours the highest-weight persona, and `judge` scores each answer with an LLM judge and keeps the best.
 
 ### Handoff Between Personas (sequential)
 

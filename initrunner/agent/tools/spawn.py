@@ -77,6 +77,27 @@ class SpawnPool:
         self._futures[task_id] = future
         return task
 
+    def bulk_submit(
+        self,
+        base_task_id: str,
+        agent_name: str,
+        prompt: str,
+        num_runs: int,
+        invoker: AgentInvoker,
+    ) -> list[str]:
+        """Submit the same prompt ``num_runs`` times for ensemble reasoning.
+
+        Returns the generated task ids. Each run executes independently on the
+        pool, so the caller can ``await_tasks`` on the returned ids and vote on
+        the collected outputs.
+        """
+        task_ids: list[str] = []
+        for i in range(num_runs):
+            task_id = f"{base_task_id}_run{i}"
+            self.submit(task_id, agent_name, prompt, invoker)
+            task_ids.append(task_id)
+        return task_ids
+
     def _on_done(self, task_id: str, future: Future[str]) -> None:
         task = self._tasks.get(task_id)
         if task is None:

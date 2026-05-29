@@ -67,6 +67,59 @@ class TestCostByModel:
         assert resp.status_code == 200
         assert resp.json() == []
 
+    def test_includes_thinking_tokens(self, client: TestClient):
+        entries = [
+            ModelCostEntry(
+                model="gpt-4o",
+                provider="openai",
+                run_count=5,
+                tokens_in=1000,
+                tokens_out=500,
+                total_cost_usd=0.05,
+                thinking_tokens=120,
+                reasoning_tokens=40,
+            )
+        ]
+        with patch("initrunner.services.cost.cost_by_model_sync", return_value=entries):
+            resp = client.get("/api/cost/by-model")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data[0]["thinking_tokens"] == 120
+        assert data[0]["reasoning_tokens"] == 40
+        # Thinking tokens are sibling counts; cost stays priced from tokens_in/out only.
+        assert data[0]["total_cost_usd"] == 0.05
+
+
+class TestCostByAgent:
+    def test_includes_thinking_tokens(self, client: TestClient):
+        from initrunner.services.cost import AgentCostEntry, CostReport
+
+        report = CostReport(
+            entries=[
+                AgentCostEntry(
+                    agent_name="researcher",
+                    run_count=3,
+                    tokens_in=900,
+                    tokens_out=300,
+                    total_cost_usd=0.03,
+                    avg_cost_per_run=0.01,
+                    thinking_tokens=250,
+                    reasoning_tokens=80,
+                )
+            ],
+            total_cost_usd=0.03,
+            total_runs=3,
+            period_start=None,
+            period_end=None,
+        )
+        with patch("initrunner.services.cost.cost_report_sync", return_value=report):
+            resp = client.get("/api/cost/by-agent")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data[0]["thinking_tokens"] == 250
+        assert data[0]["reasoning_tokens"] == 80
+        assert data[0]["total_cost_usd"] == 0.03
+
 
 class TestAuditCostUsd:
     def test_cost_usd_present_in_records(self, client: TestClient):
@@ -85,6 +138,8 @@ class TestAuditCostUsd:
             tokens_in: int = 100
             tokens_out: int = 50
             total_tokens: int = 150
+            thinking_tokens: int = 0
+            reasoning_tokens: int = 0
             tool_calls: int = 0
             duration_ms: int = 500
             success: bool = True
@@ -126,6 +181,8 @@ class TestAuditCostUsd:
             tokens_in: int = 100
             tokens_out: int = 50
             total_tokens: int = 150
+            thinking_tokens: int = 0
+            reasoning_tokens: int = 0
             tool_calls: int = 0
             duration_ms: int = 500
             success: bool = True

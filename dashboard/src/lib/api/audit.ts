@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { AuditRecord } from './types';
+import type { AuditRecord, AuditRunDetail } from './types';
 
 export function queryAudit(params?: {
 	agent_name?: string;
@@ -24,4 +24,8 @@ export function queryAudit(params?: {
 	}
 	const qs = search.toString();
 	return request(`/api/audit${qs ? `?${qs}` : ''}`);
+}
+
+export function getAuditRunDetail(runId: string): Promise<AuditRunDetail> {
+	return request(`/api/audit/${encodeURIComponent(runId)}`);
 }

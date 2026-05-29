@@ -8,7 +8,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
@@ -17,10 +17,7 @@ from pydantic_ai import Agent
 from initrunner.agent.executor import RunResult, execute_run
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.eval.assertions import AssertionResult, EvalContext, evaluate_assertions
-from initrunner.eval.schema import TestCase, TestSuiteDefinition
-
-if TYPE_CHECKING:
-    pass
+from initrunner.eval.schema import SpanAssertion, TestCase, TestSuiteDefinition
 
 
 class SuiteLoadError(Exception):
@@ -160,6 +157,8 @@ def _run_single_case(
         tool_call_names=run_result.tool_call_names,
         total_tokens=run_result.total_tokens,
         duration_ms=duration_ms,
+        reasoning_tokens=run_result.reasoning_tokens,
+        event_timeline=run_result.event_timeline,
     )
     assertion_results = evaluate_assertions(case.assertions, ctx, dry_run=dry_run)
     all_assertions_passed = all(ar.passed for ar in assertion_results)
@@ -172,6 +171,15 @@ def _run_single_case(
         passed=case_passed,
         duration_ms=duration_ms,
     )
+
+
+def _filter_cases(suite: TestSuiteDefinition, tag_filter: list[str] | None) -> list[TestCase]:
+    """Return the suite cases narrowed by an optional tag filter."""
+    cases = suite.cases
+    if tag_filter:
+        tag_set = set(tag_filter)
+        cases = [c for c in cases if tag_set.intersection(c.tags)]
+    return cases
 
 
 def run_suite(
@@ -193,12 +201,7 @@ def run_suite(
         raise ValueError("suite must not be None")
     result = SuiteResult(suite_name=suite.metadata.name)
 
-    # Filter cases by tag
-    cases = suite.cases
-    if tag_filter:
-        tag_set = set(tag_filter)
-        cases = [c for c in cases if tag_set.intersection(c.tags)]
-
+    cases = _filter_cases(suite, tag_filter)
     if not cases:
         return result
 
@@ -245,3 +248,156 @@ def _run_concurrent(
 
     indexed_results.sort(key=lambda x: x[0])
     return [cr for _, cr in indexed_results]
+
+
+@dataclass
+class PydanticEvalsResult:
+    """Outcome of the pydantic-evals run-suite path.
+
+    ``suite_result`` mirrors the bespoke ``SuiteResult`` so existing CLI output
+    and ``to_dict()`` exports keep working unchanged. ``report`` is the native
+    ``pydantic_evals.reporting.EvaluationReport`` for callers that want span
+    analysis, per-evaluator scores, or aggregate metrics.
+    """
+
+    suite_result: SuiteResult
+    report: Any
+
+
+def run_suite_pydantic_evals(
+    agent: Agent,
+    role: RoleDefinition,
+    suite: TestSuiteDefinition,
+    *,
+    dry_run: bool = False,
+    concurrency: int = 1,
+    tag_filter: list[str] | None = None,
+) -> PydanticEvalsResult:
+    """Run a suite through pydantic-evals, capturing OTel spans per case.
+
+    Each case becomes a ``pydantic_evals.Case`` whose evaluators are translated
+    from the case assertions. The task executes the agent inside a span-capture
+    block so span-based assertions can read a real ``SpanTree`` when an OTel
+    provider is configured, and the run-event timeline otherwise. Returns both a
+    backward-compatible ``SuiteResult`` and the native ``EvaluationReport``.
+
+    Requires the ``observability`` extra (``pydantic-evals``). Raises
+    ``MissingExtraError`` with an install hint when it is not installed.
+    """
+    from pydantic_evals import Case, Dataset  # type: ignore[import-not-found]
+
+    from initrunner.eval.evaluators import RunRecord, build_evaluators
+    from initrunner.observability import capture_span_tree
+
+    cases = _filter_cases(suite, tag_filter)
+    suite_result = SuiteResult(suite_name=suite.metadata.name)
+    if not cases:
+        empty_dataset = Dataset(cases=[], evaluators=[], name=suite.metadata.name)
+        empty_report = empty_dataset.evaluate_sync(
+            lambda _inputs: RunRecord(), name=suite.metadata.name, progress=False
+        )
+        return PydanticEvalsResult(suite_result=suite_result, report=empty_report)
+
+    cases_by_name: dict[str, TestCase] = {c.name: c for c in cases}
+
+    def task(inputs: dict[str, Any]) -> RunRecord:
+        case = cases_by_name[inputs["name"]]
+        model_override = None
+        if dry_run:
+            from pydantic_ai.models.test import TestModel
+
+            output_text = case.expected_output or _DEFAULT_DRY_RUN_OUTPUT
+            model_override = TestModel(custom_output_text=output_text, call_tools=[])
+
+        start = time.monotonic()
+        with capture_span_tree():
+            run_result, _ = execute_run(
+                agent, role, case.prompt, audit_logger=None, model_override=model_override
+            )
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return RunRecord(
+            output=run_result.output,
+            tool_call_names=run_result.tool_call_names,
+            total_tokens=run_result.total_tokens,
+            reasoning_tokens=run_result.reasoning_tokens,
+            duration_ms=duration_ms,
+            event_timeline=run_result.event_timeline,
+        )
+
+    # ``expected_output`` is intentionally omitted: every check runs through an
+    # explicit assertion evaluator, so a separate expected-output comparison
+    # would be redundant and would force a mismatched output generic.
+    pe_cases: list[Case[dict[str, Any], RunRecord, Any]] = [
+        Case(
+            name=case.name,
+            inputs={"name": case.name, "prompt": case.prompt},
+            evaluators=tuple(build_evaluators(case.assertions)),
+        )
+        for case in cases
+    ]
+    dataset: Dataset[dict[str, Any], RunRecord, Any] = Dataset(
+        cases=pe_cases, evaluators=[], name=suite.metadata.name
+    )
+    report = dataset.evaluate_sync(
+        task,
+        name=suite.metadata.name,
+        max_concurrency=concurrency if concurrency > 1 else None,
+        progress=False,
+    )
+
+    suite_result.case_results = _report_to_case_results(report, cases_by_name)
+    return PydanticEvalsResult(suite_result=suite_result, report=report)
+
+
+def _report_to_case_results(report: Any, cases_by_name: dict[str, TestCase]) -> list[CaseResult]:
+    """Convert a pydantic-evals ``EvaluationReport`` into ``CaseResult`` objects.
+
+    Preserves the original suite case order and rebuilds a ``RunResult`` plus
+    ``AssertionResult`` list from the report so ``SuiteResult.to_dict()`` keeps
+    its stable schema.
+    """
+    from initrunner.eval.assertions import AssertionResult
+
+    by_name = {rc.name: rc for rc in report.cases}
+    case_results: list[CaseResult] = []
+    for name, case in cases_by_name.items():
+        report_case = by_name.get(name)
+        if report_case is None:
+            continue
+        output = report_case.output
+        run_result = RunResult(
+            run_id=name,
+            output=output.output,
+            total_tokens=output.total_tokens,
+            reasoning_tokens=output.reasoning_tokens,
+            tool_call_names=list(output.tool_call_names),
+            event_timeline=list(output.event_timeline),
+        )
+        assertion_results: list[AssertionResult] = []
+        report_assertions = report_case.assertions
+        # pydantic-evals disambiguates colliding evaluation names by suffixing
+        # ``_2``, ``_3`` and so on, so reconstruct the key per assertion type
+        # occurrence to preserve a one-to-one mapping back to suite assertions.
+        seen_by_key: dict[str, int] = {}
+        for assertion in case.assertions:
+            base_key = "span" if isinstance(assertion, SpanAssertion) else assertion.type
+            occurrence = seen_by_key.get(base_key, 0)
+            seen_by_key[base_key] = occurrence + 1
+            lookup_key = base_key if occurrence == 0 else f"{base_key}_{occurrence + 1}"
+            result = report_assertions.get(lookup_key)
+            passed = bool(result.value) if result is not None else False
+            message = (result.reason if result is not None else "Evaluator did not run") or ""
+            assertion_results.append(
+                AssertionResult(assertion=assertion, passed=passed, message=message)
+            )
+        all_passed = all(ar.passed for ar in assertion_results)
+        case_results.append(
+            CaseResult(
+                case=case,
+                run_result=run_result,
+                assertion_results=assertion_results,
+                passed=all_passed,
+                duration_ms=int(report_case.task_duration * 1000),
+            )
+        )
+    return case_results

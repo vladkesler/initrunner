@@ -278,3 +278,42 @@ class TestStandardProviderApiKeyEnv:
 
         with pytest.raises(ValueError, match=r"ingest\.embeddings\.api_key_env"):
             create_embedder(provider="openai")
+
+
+class TestGetReranker:
+    def test_rrf_reranker(self):
+        from lancedb.rerankers import RRFReranker
+
+        from initrunner.ingestion.embeddings import get_reranker
+
+        reranker = get_reranker("rrf")
+        assert isinstance(reranker, RRFReranker)
+
+    def test_unknown_reranker_raises(self):
+        from initrunner.ingestion.embeddings import get_reranker
+
+        with pytest.raises(ValueError, match="Unknown reranker_type"):
+            get_reranker("nope")
+
+    def test_cross_encoder_without_backend_raises(self):
+        import lancedb.rerankers
+
+        from initrunner._compat import MissingExtraError
+        from initrunner.ingestion.embeddings import get_reranker
+
+        class _Boom:
+            def __init__(self, *args, **kwargs):
+                raise ImportError("no torch")
+
+        with patch.object(lancedb.rerankers, "CrossEncoderReranker", _Boom):
+            with pytest.raises(MissingExtraError, match="sentence-transformers"):
+                get_reranker("cross_encoder")
+
+    def test_cross_encoder_with_backend(self):
+        pytest.importorskip("sentence_transformers")
+        from lancedb.rerankers import CrossEncoderReranker
+
+        from initrunner.ingestion.embeddings import get_reranker
+
+        reranker = get_reranker("cross_encoder")
+        assert isinstance(reranker, CrossEncoderReranker)

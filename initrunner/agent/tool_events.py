@@ -25,6 +25,27 @@ class ToolEvent:
     phase: str = "complete"  # "start" or "complete"
 
 
+@dataclass(frozen=True, slots=True)
+class StreamingToolEvent:
+    """Typed tool-call lifecycle captured from ``run_stream_events()``.
+
+    Distinct from ``ToolEvent`` (the ContextVar completion-phase wrapper):
+    this records the structured tool-call timeline that pydantic_ai emits as
+    ``FunctionToolCallEvent`` / ``FunctionToolResultEvent`` while a streamed
+    run is in flight. ``status`` advances through ``queued`` (call observed),
+    ``completed`` (result returned), or ``error`` (the model asked for a
+    retry). All free-text previews are secret-scrubbed and length-bounded.
+    """
+
+    tool_name: str
+    tool_call_id: str
+    status: str  # "queued" | "completed" | "error"
+    result_summary: str | None
+    args_preview: str | None
+    duration_ms: int
+    timestamp_unix_ms: int
+
+
 # ---------------------------------------------------------------------------
 # ContextVar plumbing
 # ---------------------------------------------------------------------------
