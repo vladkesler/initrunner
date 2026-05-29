@@ -425,6 +425,25 @@ async def run_team_graph_async(
                     f"{team.spec.guardrails.team_token_budget}"
                 )
 
+        elif team.spec.strategy == "ensemble":
+            graph = _build_parallel_graph(team)
+            state = TeamGraphState(wall_start=time.monotonic(), team_result=result)
+
+            timeout = team.spec.guardrails.team_timeout_seconds
+            try:
+                if timeout:
+                    with anyio.fail_after(float(timeout)):
+                        graph_output = await graph.run(state=state, deps=deps, inputs=task)
+                else:
+                    graph_output = await graph.run(state=state, deps=deps, inputs=task)
+            except TimeoutError:
+                result.success = False
+                result.error = "Team timeout exceeded"
+                _log_team_aggregate(audit_logger, team, task, result)
+                return result
+
+            await _collect_ensemble_results(result, team, task, graph_output, audit_logger)
+
         elif team.spec.strategy == "debate":
             timeout = team.spec.guardrails.team_timeout_seconds
             try:
@@ -728,6 +747,98 @@ def _collect_parallel_results(
             result.error = f"Persona '{failed_personas[0]}' failed"
         else:
             result.error = f"Persona(s) failed: {', '.join(failed_personas)}"
+
+
+async def _collect_ensemble_results(
+    result: TeamResult,
+    team: TeamDefinition,
+    task: str,
+    graph_output: list[tuple[int, str, RunResult]] | None,
+    audit_logger: Any | None,
+) -> None:
+    """Vote on parallel persona outputs and keep a single winning answer.
+
+    Reuses ``eval/judge.py`` for ``mode == "judge"``; ``majority`` and
+    ``weighted`` resolve in-process. The winning answer and full vote trace
+    are recorded on the signed audit chain.
+    """
+    if graph_output is None:
+        return
+
+    sorted_items = sorted(graph_output, key=lambda t: t[0])
+    failed: list[str] = []
+    candidates: list[tuple[str, str]] = []  # (persona_name, output)
+    for _idx, pname, run_result in sorted_items:
+        accumulate_result(result, pname, run_result)
+        if not run_result.success:
+            failed.append(pname)
+        elif run_result.output:
+            candidates.append((pname, run_result.output))
+
+    if failed:
+        result.success = False
+        if len(failed) == 1:
+            result.error = f"Persona '{failed[0]}' failed"
+        else:
+            result.error = f"Persona(s) failed: {', '.join(failed)}"
+        return
+
+    if not candidates:
+        result.final_output = ""
+        return
+
+    cfg = team.spec.ensemble
+    winner_name, winner_output, vote_trace = await _vote_on_candidates(candidates, cfg)
+    result.final_output = winner_output
+
+    if audit_logger is not None:
+        audit_logger.log_ensemble_vote(
+            source_service=team.metadata.name,
+            target_services=[name for name, _ in candidates],
+            mode=cfg.mode,
+            winning_output=winner_output,
+            vote_trace=vote_trace,
+            trace=winner_name,
+            run_id=result.team_run_id,
+        )
+
+
+async def _vote_on_candidates(
+    candidates: list[tuple[str, str]],
+    cfg: Any,
+) -> tuple[str, str, dict]:
+    """Pick a winning (name, output) from candidates and build a vote trace."""
+    from collections import Counter
+
+    trace: dict[str, Any]
+    if cfg.mode == "judge":
+        from initrunner.eval.judge import ensemble_judge_vote_sync
+
+        outputs = [out for _name, out in candidates]
+        vote_result = await anyio.to_thread.run_sync(  # type: ignore[unresolved-attribute]
+            lambda: ensemble_judge_vote_sync(outputs, cfg.judge_criteria, cfg.judge_model)
+        )
+        win_name, win_output = candidates[vote_result.winning_index]
+        trace = {
+            "mode": "judge",
+            "judge_model": cfg.judge_model,
+            "criteria": vote_result.criteria,
+            "votes": {str(k): v for k, v in vote_result.votes.items()},
+            "consensus": vote_result.consensus_text,
+        }
+    elif cfg.mode == "weighted":
+        weights = cfg.weights or {}
+        win_name, win_output = max(candidates, key=lambda c: weights.get(c[0], 0.0))
+        trace = {"mode": "weighted", "weights": dict(weights), "winning_source": win_name}
+    else:
+        counts = Counter(out for _name, out in candidates)
+        top = max(counts.values())
+        win_name, win_output = next((n, o) for n, o in candidates if counts[o] == top)
+        trace = {"mode": "majority", "counts": dict(counts), "winning_count": top}
+
+    trace["candidates"] = [out for _name, out in candidates]
+    trace["winning_source"] = win_name
+    return win_name, win_output, trace
 
 
 def run_team_graph_sync(

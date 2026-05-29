@@ -177,6 +177,82 @@ class TestBuildAgentCapabilities:
 
         assert any("Thinking capability" in r.message for r in caplog.records)
 
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_warning_model_thinking_plus_thinking_capability(
+        self, mock_require, mock_agent_cls, tmp_path: Path, caplog, monkeypatch
+    ):
+        monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: cap-test
+              description: test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+                thinking: high
+              capabilities:
+                - Thinking: high
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+
+        with (
+            patch(
+                "pydantic_ai.agent.spec.load_capability_from_nested_spec",
+                return_value="mock_cap",
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            build_agent(role)
+
+        assert any("model.thinking" in r.message for r in caplog.records)
+        # model.thinking still reaches the model settings.
+        call_kwargs = mock_agent_cls.call_args
+        assert call_kwargs.kwargs["model_settings"]["thinking"] == "high"
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_manual_thinking_capability_still_works(
+        self, mock_require, mock_agent_cls, tmp_path: Path
+    ):
+        """A Thinking capability declared alone (no model.thinking) is preserved."""
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: cap-test
+              description: test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+              capabilities:
+                - Thinking: high
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+
+        with patch(
+            "pydantic_ai.agent.spec.load_capability_from_nested_spec",
+            return_value="mock_capability",
+        ):
+            build_agent(role)
+
+        caps = mock_agent_cls.call_args.kwargs["capabilities"]
+        assert "mock_capability" in caps
+        # No model.thinking declared, so nothing is forced into model settings.
+        assert "thinking" not in mock_agent_cls.call_args.kwargs["model_settings"]
+
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")

@@ -100,6 +100,8 @@ Detailed docs live in `docs/`. Key references:
 | Memory system | `docs/core/memory.md` |
 | Capabilities (PydanticAI) | `docs/core/capabilities.md` |
 | Reasoning primitives | `docs/core/reasoning.md` |
+| Structured output modes | `docs/core/structured-output.md` |
+| Agent evals & test suites | `docs/core/evals.md` |
 | RAG quickstart | `docs/getting-started/rag-quickstart.md` |
 | RAG patterns & guide | `docs/core/rag-guide.md` |
 | Triggers (cron/file/webhook/heartbeat) | `docs/core/triggers.md` |
@@ -113,7 +115,10 @@ Detailed docs live in `docs/`. Key references:
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
 | Orchestration patterns (all 5, side-by-side) | `docs/orchestration/patterns-guide.md` |
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
-| Flow orchestration | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
+| Flow orchestration (comprehensive guide) | `docs/orchestration/flow.md` |
+| Flow orchestration (delegation & sinks) | `docs/orchestration/delegation.md`, `docs/orchestration/sinks.md` |
+| Blackboard (shared in-run state) | `docs/orchestration/blackboard.md` |
+| Durable, resumable flows | `docs/orchestration/durability.md` |
 | Dashboard (web UI) | `docs/interfaces/dashboard.md` |
 | Dashboard design system | `docs/interfaces/design-system.md` |
 | MCP gateway (serve agents) | `docs/interfaces/mcp-gateway.md` |

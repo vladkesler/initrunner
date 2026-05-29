@@ -38,12 +38,22 @@ class RunResult:
     tokens_in: int = 0
     tokens_out: int = 0
     total_tokens: int = 0
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
+    """Reasoning/thinking tokens reported in the final streaming event. Mirrors
+    ``thinking_tokens`` for the non-streaming path; the streaming consumer may
+    override it from ``AgentRunResultEvent.result.usage``."""
     tool_calls: int = 0
     duration_ms: int = 0
     success: bool = True
     error: str | None = None
     error_category: ErrorCategory | None = None
     tool_call_names: list[str] = field(default_factory=list)
+    event_timeline: list[dict[str, Any]] = field(default_factory=list)
+    """Redacted, best-effort log of streaming thinking/tool deltas captured from
+    ``run_stream_events()``. Empty for non-streaming runs and for streaming runs
+    without an ``on_event`` consumer. Capped at the most recent entries; every
+    free-text value is secret-scrubbed before it lands here."""
     status: RunStatus = "done"
     """``"paused"`` when the run surfaced ``DeferredToolRequests`` awaiting
     human approval; ``"done"`` otherwise. Paused runs have ``success=True``
@@ -51,6 +61,11 @@ class RunResult:
     ``pending_approvals`` and then call ``execute_run_resume()``.
     """
     pending_approvals: list[PendingApproval] = field(default_factory=list)
+    judge_verdicts: list[dict[str, Any]] = field(default_factory=list)
+    """Verified-reflexion judge verdicts copied from the autonomous
+    ``ReflectionState`` onto the final iteration result, so the audit layer can
+    persist them. Empty for non-reflexion runs and runs without success
+    criteria. Each entry mirrors ``ReflectionState.judge_verdicts``."""
 
 
 @dataclass

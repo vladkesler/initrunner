@@ -1,5 +1,8 @@
 """Tests for the vector store."""
 
+import pytest
+
+from initrunner.stores.lance_document_store import _FTS_INDEX_NAME
 from initrunner.stores.lance_store import LanceDocumentStore
 
 
@@ -196,3 +199,183 @@ class TestLanceDocumentStore:
             assert store.read_store_meta("nonexistent") is None
             store.write_store_meta("my_key", "my_value")
             assert store.read_store_meta("my_key") == "my_value"
+
+
+def _seed_corpus(store: LanceDocumentStore) -> None:
+    store.add_documents(
+        texts=[
+            "python programming language",
+            "machine learning models",
+            "data science with python",
+        ],
+        embeddings=[
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ],
+        sources=["a.md", "b.md", "c.md"],
+    )
+
+
+class TestHybridSearch:
+    def test_fts_index_created_on_first_add(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            assert store._fts_ready is False
+            _seed_corpus(store)
+            assert store._fts_ready is True
+            tbl = store._db.open_table("chunks")
+            assert _FTS_INDEX_NAME in {ix.name for ix in tbl.list_indices()}
+
+    def test_hybrid_search_basic(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=2,
+                retrieval_strategy="hybrid",
+            )
+            assert len(results) == 2
+            top_sources = {r.source for r in results}
+            # both python-containing docs should rank in the top 2
+            assert "a.md" in top_sources
+
+    def test_hybrid_search_fts_surfaces_keyword(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            store.add_documents(
+                texts=["API reference", "REST endpoints", "GraphQL schema"],
+                embeddings=[
+                    [0.0, 0.0, 0.0, 1.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                ],
+                sources=["api.md", "rest.md", "graphql.md"],
+            )
+            # vector query points away from the API doc, but the keyword matches
+            results = store.hybrid_search(
+                "API",
+                [0.0, 1.0, 0.0, 0.0],
+                top_k=3,
+                retrieval_strategy="hybrid",
+            )
+            assert any(r.source == "api.md" for r in results)
+
+    def test_hybrid_search_with_glob_filter(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            store.add_documents(
+                texts=["python guide", "python api", "python blog"],
+                embeddings=[
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                ],
+                sources=["docs/guide.md", "docs/api.md", "blog/post.txt"],
+            )
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=5,
+                retrieval_strategy="hybrid",
+                source_filter="docs/*",
+            )
+            assert results
+            assert all(r.source.startswith("docs/") for r in results)
+
+    def test_hybrid_search_with_exact_filter(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=5,
+                retrieval_strategy="hybrid",
+                source_filter="a.md",
+            )
+            assert [r.source for r in results] == ["a.md"]
+
+    def test_vector_strategy_matches_query(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            via_query = store.query([1.0, 0.0, 0.0, 0.0], top_k=3)
+            via_hybrid = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=3,
+                retrieval_strategy="vector",
+            )
+            assert [r.chunk_id for r in via_query] == [r.chunk_id for r in via_hybrid]
+            assert [r.distance for r in via_query] == [r.distance for r in via_hybrid]
+
+    def test_empty_text_falls_back_to_vector(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            results = store.hybrid_search(
+                "   ",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=2,
+                retrieval_strategy="hybrid",
+            )
+            # blank text means no BM25 signal; results come from dense search
+            assert results[0].source == "a.md"
+
+    def test_hybrid_search_empty_store(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                retrieval_strategy="hybrid",
+            )
+            assert results == []
+
+    def test_unknown_strategy_raises(self, tmp_path):
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            with pytest.raises(ValueError, match="Unknown retrieval_strategy"):
+                store.hybrid_search(
+                    "python",
+                    [1.0, 0.0, 0.0, 0.0],
+                    retrieval_strategy="bogus",
+                )
+
+    def test_hybrid_rerank_degrades_without_backend(self, tmp_path, monkeypatch):
+        # Force the cross-encoder import to fail so the reranker degrades to RRF.
+        import lancedb.rerankers
+
+        class _Boom:
+            def __init__(self, *args, **kwargs):
+                raise ImportError("no torch")
+
+        monkeypatch.setattr(lancedb.rerankers, "CrossEncoderReranker", _Boom)
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=2,
+                retrieval_strategy="hybrid_rerank",
+            )
+            assert len(results) == 2
+
+    def test_hybrid_rerank_cross_encoder(self, tmp_path):
+        pytest.importorskip("sentence_transformers")
+        store_path = tmp_path / "test.lance"
+        with LanceDocumentStore(store_path, dimensions=4) as store:
+            _seed_corpus(store)
+            results = store.hybrid_search(
+                "python",
+                [1.0, 0.0, 0.0, 0.0],
+                top_k=2,
+                retrieval_strategy="hybrid_rerank",
+            )
+            assert len(results) == 2
+            assert any("python" in r.text for r in results)

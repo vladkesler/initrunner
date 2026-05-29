@@ -20,6 +20,7 @@ from initrunner.dashboard.routers._provider_options import (
 )
 from initrunner.dashboard.schemas import (
     BuilderOptionsResponse,
+    ConfigOptionsResponse,
     EmbeddingWarning,
     EnvVarStatus,
     HubSearchResponse,
@@ -112,6 +113,26 @@ def _build_tool_func_map() -> dict[str, list[str]]:
     return result
 
 
+def _config_options() -> ConfigOptionsResponse:
+    """Surface the valid role-config enum values from their schema definitions."""
+    from typing import get_args
+
+    from initrunner.agent.schema.base import ThinkingEffort
+    from initrunner.agent.schema.ingestion import RetrieverConfig
+    from initrunner.agent.schema.output import OutputMode
+
+    strategy_annotation = RetrieverConfig.model_fields["strategy"].annotation
+    return ConfigOptionsResponse(
+        output_modes=list(get_args(OutputMode)),
+        # Drop the False literal: the UI offers an explicit disable affordance instead.
+        thinking_efforts=[v for v in get_args(ThinkingEffort) if v is not False],
+        retrieval_strategies=list(get_args(strategy_annotation)),
+        # EmbeddingConfig.provider is a free-form str (no Literal), so the allowlist is
+        # hard-coded from its docstring -- the one place a literal list is unavoidable.
+        embedding_providers=["openai", "ollama", "local", "cohere"],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -155,6 +176,7 @@ async def builder_options(
         template_setups=template_setups,
         provider_status=opts.provider_status,
         tool_func_map=tool_func_map,
+        config_options=_config_options(),
     )
 
 

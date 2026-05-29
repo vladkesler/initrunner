@@ -14,7 +14,7 @@ This guide covers practical patterns for using InitRunner's retrieval-augmented 
 - [ ] Documents ready (Markdown, text, HTML, PDF, DOCX, XLSX)
 - [ ] Optional extras installed if needed: `initrunner[ingest]` for PDF/DOCX/XLSX support
 
-> **Note:** The `local-embeddings` extra (`fastembed`) is declared in `pyproject.toml` but not yet implemented. For local embeddings without an API key, use [Ollama](../configuration/ollama.md).
+> **Note:** The `local-embeddings` extra (`fastembed`) is available for in-process embeddings with no API key. See [Providers: Local in-process embeddings](../configuration/providers.md#local-in-process-embeddings-fastembed) for setup.
 
 ## RAG vs Memory — When to Use Which
 
@@ -194,6 +194,54 @@ spec:
       - "./kb/general/**/*.md"
 ```
 
+### Hybrid retrieval (vector + keyword)
+
+Dense vector search alone can miss exact keywords, identifiers, error codes, and
+acronyms that do not embed well. Hybrid retrieval runs both a dense vector search
+and a BM25 full-text search, then fuses the two rankings with reciprocal rank
+fusion (RRF). Set the mode under `ingest.retriever`:
+
+```yaml
+spec:
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+    retriever:
+      strategy: hybrid
+```
+
+`strategy` accepts three values:
+
+| Strategy | What it does | Extra dependency |
+|----------|--------------|------------------|
+| `vector` | Dense cosine search only (the default; unchanged behaviour) | none |
+| `hybrid` | RRF fusion of dense vector and BM25 full-text results | none |
+| `hybrid_rerank` | Hybrid fusion, then reorders the candidates with a cross-encoder | optional |
+
+The BM25 full-text index is built automatically on the first ingest, so existing
+stores pick up hybrid search after their next `initrunner ingest` run. No new
+required dependency is added: RRF fusion ships with LanceDB.
+
+`hybrid_rerank` adds a cross-encoder reranking pass on top of the fused
+candidates for higher precision. The cross-encoder backend is optional: when
+`sentence-transformers` is not installed, `hybrid_rerank` degrades to plain
+`hybrid` scoring instead of failing. Install it with `uv pip install
+sentence-transformers` and tune the model:
+
+```yaml
+spec:
+  ingest:
+    sources:
+      - "./docs/**/*.md"
+    retriever:
+      strategy: hybrid_rerank
+      reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+      rrf_k: 60
+```
+
+The agent can also override the configured mode per call:
+`search_documents(query, strategy="hybrid")`.
+
 ### Fully local RAG with Ollama
 
 No external API keys needed — use Ollama for both the LLM and embeddings:
@@ -224,12 +272,14 @@ The default embedding model depends on your agent's provider. You can override i
 | Google | `text-embedding-004` | 768 | Good | Free tier available | Default for Google |
 | Ollama | `nomic-embed-text` | 768 | Good | Free (local) | Default for Ollama |
 | Ollama | `mxbai-embed-large` | 1024 | Better (local) | Free (local) | Higher quality local option |
+| fastembed (local) | `BAAI/bge-small-en-v1.5` | 384 | Good | Free (local) | Default for `local` provider. No HTTP, no API key. |
 
 **When to use which:**
 
 - **Starting out / cost-sensitive** — `text-embedding-3-small` (OpenAI default). Good quality at low cost.
 - **Maximum retrieval quality** — `text-embedding-3-large`. Better for large knowledge bases where precision matters. Uses 2x storage.
 - **Fully local / no API key** — `nomic-embed-text` via Ollama. Free, private, good quality. Use `mxbai-embed-large` for better accuracy at the cost of slightly more storage.
+- **Truly offline / no external API** — `BAAI/bge-small-en-v1.5` via the `local` provider (fastembed). Runs in-process with no HTTP hop and no server. Use `BAAI/bge-base-en-v1.5` (768 dims) for better accuracy at the cost of higher storage and slower embedding.
 - **Google ecosystem** — `text-embedding-004`. Good quality with a free tier.
 
 To override the default:

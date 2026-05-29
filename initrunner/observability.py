@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -144,6 +146,57 @@ def shutdown_tracing() -> None:
         _logger.debug("shutdown failed", exc_info=True)
 
     _provider = None
+
+
+@contextmanager
+def capture_span_tree() -> Iterator[Any]:
+    """Capture the OTel spans emitted inside this block as a ``SpanTree``.
+
+    Yields a ``pydantic_evals.otel.SpanTree`` whose nodes are populated when the
+    block exits, or ``None`` when neither ``pydantic-evals`` nor an OTel
+    TracerProvider is available. The tree is reconstructed from an in-memory
+    exporter attached to the active provider, so spans emitted by an
+    instrumented agent run inside the block are collected without a network
+    backend.
+
+    Use this to feed span-based eval assertions a real span tree when no Logfire
+    or OTLP backend is configured. Falls back to ``None`` (rather than raising)
+    so callers can degrade to the run-event timeline.
+    """
+    try:
+        from pydantic_evals.otel._context_subtree import (  # type: ignore[import-not-found]
+            context_subtree,
+        )
+        from pydantic_evals.otel._errors import (  # type: ignore[import-not-found]
+            SpanTreeRecordingError,
+        )
+    except ImportError:
+        yield None
+        return
+
+    with context_subtree() as tree:
+        if isinstance(tree, SpanTreeRecordingError):
+            yield None
+        else:
+            yield tree
+
+
+def get_span_tree_from_current_trace() -> Any:
+    """Return a fresh, empty ``SpanTree`` bound to the active provider, or ``None``.
+
+    A point-in-time snapshot of the active trace is not something the OTel SDK
+    exposes, so span capture is scoped to a block via :func:`capture_span_tree`.
+    This helper returns an empty ``SpanTree`` (when ``pydantic-evals`` and an
+    OTel provider are both present) for callers that only need to check
+    availability before opening a capture block, and ``None`` otherwise.
+    """
+    if _provider is None:
+        return None
+    try:
+        from pydantic_evals.otel.span_tree import SpanTree  # type: ignore[import-not-found]
+    except ImportError:
+        return None
+    return SpanTree()
 
 
 def setup_log_correlation() -> None:

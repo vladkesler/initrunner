@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 __all__ = [
     "AuditRecordResponse",
+    "AuditRunDetailResponse",
     "AuditStatsResponse",
     "TopAgentResponse",
     "TriggerStatResponse",
@@ -23,12 +24,21 @@ class AuditRecordResponse(BaseModel):
     tokens_in: int
     tokens_out: int
     total_tokens: int
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
     tool_calls: int
     duration_ms: int
     success: bool
     error: str | None = None
     trigger_type: str | None = None
     cost_usd: float | None = None
+
+
+class AuditRunDetailResponse(AuditRecordResponse):
+    """Single-run drill-down: the base record plus parsed timeline and judge verdicts."""
+
+    event_timeline: list[dict] | None = None
+    judge_verdicts: list[dict] | None = None
 
 
 class TopAgentResponse(BaseModel):

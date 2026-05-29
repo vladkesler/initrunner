@@ -103,7 +103,12 @@ A case with no assertions passes as long as the agent run succeeds (no exception
 
 ## Assertions
 
-Assertions use a discriminated union on the `type` field. Three types are available:
+Assertions use a discriminated union on the `type` field. Output-based types
+(`contains`, `not_contains`, `regex`, `max_tokens`, `max_latency`, `tool_calls`,
+`llm_judge`) check the final result. Timeline- and span-based types
+(`tool_order`, `reasoning_budget`, `memory_consulted`, `span`) inspect the
+structured run-event timeline and OTel spans, so they can assert on *how* the
+agent reached its answer, not just the answer itself.
 
 ### `contains`
 
@@ -153,6 +158,167 @@ assertions:
 
 Remember that YAML requires escaping backslashes in double-quoted strings (`"\\d+"`) or using single quotes (`'\d+'`).
 
+### `tool_calls`
+
+Checks which tools the agent called, comparing the observed set against an
+expected set.
+
+```yaml
+assertions:
+  - type: tool_calls
+    expected: ["web_search", "calculator"]
+    mode: subset        # subset (default) | exact | superset
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `expected` | `list[string]` | *(required)* | Tool names the agent is expected to call. |
+| `mode` | `string` | `subset` | `subset`: all expected appear; `exact`: sets match exactly; `superset`: no tools beyond expected. |
+
+### `max_tokens` and `max_latency`
+
+```yaml
+assertions:
+  - type: max_tokens
+    limit: 4000           # total tokens must be <= this
+  - type: max_latency
+    limit_ms: 5000        # wall-clock duration must be <= this
+```
+
+### `llm_judge`
+
+Scores the output against natural-language criteria using an LLM judge. Skipped
+in `--dry-run`.
+
+```yaml
+assertions:
+  - type: llm_judge
+    criteria:
+      - "The response is polite"
+      - "The response answers the question"
+    model: "openai:gpt-4o-mini"   # default
+```
+
+### Timeline- and span-based assertions
+
+These read the structured run-event timeline (`RunResult.event_timeline`) and,
+on the pydantic-evals path, the OTel span tree. They let you assert on the
+agent's process: did it call tools in the right order, stay within a reasoning
+budget, or consult memory?
+
+The timeline is the always-available source, so these assertions work without
+Logfire or an OTLP backend configured. When you run via `--pydantic-evals`
+against an instrumented agent, span-based checks additionally query a real OTel
+`SpanTree`.
+
+#### `tool_order`
+
+Asserts the relative or exact order of tool calls.
+
+```yaml
+assertions:
+  - type: tool_order
+    sequence: ["web_search", "summarize"]
+    strict: false        # false: relative order (gaps allowed); true: exact sequence
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `sequence` | `list[string]` | *(required)* | Tool names in the order they must appear. |
+| `strict` | `bool` | `false` | `false`: names appear in this relative order, other calls allowed in between. `true`: the observed tool-call sequence equals `sequence` exactly. |
+
+#### `reasoning_budget`
+
+Asserts the agent stayed within a thinking-token budget. A run that reports zero
+reasoning tokens is treated as within any budget, so models that do not emit
+thinking are never penalized.
+
+```yaml
+assertions:
+  - type: reasoning_budget
+    max_reasoning_tokens: 2000
+```
+
+#### `memory_consulted`
+
+Asserts the agent did (or did not) consult memory during the run.
+
+```yaml
+assertions:
+  - type: memory_consulted
+    expected: true                       # set false to assert memory was NOT touched
+    tools: ["recall_memory", "search_memory", "memory_search"]   # default names
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `expected` | `bool` | `true` | `true` requires a memory tool call; `false` asserts none happened. |
+| `tools` | `list[string]` | `["recall_memory", "search_memory", "memory_search"]` | Tool names treated as memory consultation. |
+
+#### `span`
+
+Matches spans by name and attribute. Falls back to the run-event timeline when
+no OTel spans were recorded (treating each tool call as a span named after the
+tool, with its entry keys as attributes).
+
+```yaml
+assertions:
+  - type: span
+    name_contains: "web_search"   # substring match on span / tool name
+    attribute: "tool_call_id"     # optional: require this attribute key
+    attribute_value: "abc123"     # optional: require this attribute value
+    count: 1                      # optional: exact match count; omit for "at least one"
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `name_contains` | `string` | *(none)* | Substring that must appear in the span or tool name. |
+| `attribute` | `string` | *(none)* | Attribute key the span must carry. |
+| `attribute_value` | `string` | *(none)* | Required value for `attribute` (only checked when `attribute` is set). |
+| `count` | `int` | *(none)* | When set, the number of matching spans must equal it exactly. Otherwise at least one match is required. |
+
+## Running on pydantic-evals
+
+InitRunner can run the same YAML suite through
+[pydantic-evals](https://ai.pydantic.dev/evals/), translating each case into a
+`Dataset` of `Case` objects with evaluators built from your assertions. Pass
+`--pydantic-evals` to opt in (requires the `observability` extra, which bundles
+`pydantic-evals`):
+
+```bash
+uv pip install "initrunner[observability]"
+initrunner test role.yaml --suite tests.yaml --pydantic-evals -v
+```
+
+The output table and exit codes are identical to the default path, so this is a
+drop-in for CI. The difference is under the hood: each case runs inside an OTel
+span-capture block, so `span` assertions can query a real span tree, and you can
+reach the native `EvaluationReport` from Python for aggregate metrics and span
+analysis:
+
+```python
+from pathlib import Path
+
+from initrunner.agent.loader import load_and_build
+from initrunner.eval.runner import load_suite, run_suite_pydantic_evals
+
+role, agent = load_and_build(Path("role.yaml"))
+suite = load_suite(Path("tests.yaml"))
+
+result = run_suite_pydantic_evals(agent, role, suite)
+print(result.suite_result.passed, "/", result.suite_result.total, "passed")
+
+# Native pydantic-evals report for deeper analysis.
+report = result.report
+report.print()                       # rich table with per-evaluator scores
+for case in report.cases:
+    print(case.name, case.assertions)
+```
+
+`run_suite_pydantic_evals` returns a `PydanticEvalsResult` with two fields:
+`suite_result` (the familiar `SuiteResult`, so `to_dict()` exports are unchanged)
+and `report` (the `pydantic_evals.reporting.EvaluationReport`).
+
 ## CLI Reference
 
 ### `initrunner test`
@@ -166,6 +332,9 @@ initrunner test <PATH> --suite <suite.yaml> [--dry-run] [-v]
 | `--suite` | `-s` | yes | Path to the test suite YAML file. |
 | `--dry-run` | | no | Use `TestModel` instead of the configured LLM. No API calls. |
 | `--verbose` | `-v` | no | Show per-assertion pass/fail details in the output table. |
+| `--concurrency` | `-j` | no | Number of concurrent workers (default `1`). |
+| `--tag` | | no | Filter cases by tag. Repeatable. |
+| `--pydantic-evals` | | no | Run via pydantic-evals with OTel span capture. Needs the `observability` extra. |
 
 **Exit codes:**
 
@@ -316,17 +485,19 @@ The eval framework lives in `initrunner/eval/`:
 | Module | Purpose |
 |--------|---------|
 | `schema.py` | Pydantic models: `TestSuiteDefinition`, `TestCase`, assertion types |
-| `assertions.py` | Pure functions: `evaluate_assertion()`, `evaluate_assertions()` |
-| `runner.py` | `load_suite()`, `run_suite()`, `CaseResult`, `SuiteResult` |
+| `assertions.py` | Pure functions: `evaluate_assertion()`, `evaluate_assertions()`, timeline helpers |
+| `runner.py` | `load_suite()`, `run_suite()`, `run_suite_pydantic_evals()`, `CaseResult`, `SuiteResult` |
+| `evaluators.py` | pydantic-evals `Evaluator` adapters backed by `assertions.py`; only imported on the `--pydantic-evals` path |
+| `judge.py` | LLM-as-judge agent (`get_judge_agent`, `parse_judge_response`, `run_judge_sync`) |
 
-The `--dry-run` flag is powered by a `model_override` parameter threaded through the execution pipeline:
+Both runner paths share `assertions.py`, so the bespoke runner and the
+pydantic-evals runner agree on pass/fail semantics. Span capture for the
+pydantic-evals path uses `initrunner.observability.capture_span_tree()`, which
+attaches an in-memory exporter to the active OTel provider and degrades to the
+run-event timeline when no provider is configured.
 
-```
-CLI (--dry-run)
-  → creates TestModel
-  → runner.run_single(model_override=...)
-    → executor.execute_run(model_override=...)
-      → agent.run_sync(model=model_override)
-```
-
-When `model_override` is `None` (the default), the agent uses its configured model as usual.
+The `--dry-run` flag is powered by a `model_override` parameter threaded through
+the execution pipeline: the CLI creates a `TestModel`, `run_suite()` forwards it
+to `executor.execute_run(model_override=...)`, and the executor passes it to
+`agent.run_sync(model=model_override)`. When `model_override` is `None` (the
+default), the agent uses its configured model as usual.

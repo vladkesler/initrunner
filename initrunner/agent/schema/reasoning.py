@@ -50,6 +50,11 @@ class ReasoningConfig(BaseModel):
     auto_plan: bool = False
     reflection_rounds: int = Field(default=0, ge=0, le=3)
     reflection_dimensions: list[ReflexionDimension] | None = None
+    success_criteria: list[str] | None = None
+    """Criteria the reflexion judge verifies after each round. When set, an
+    LLM-as-judge gates the self-critique loop: a round that passes every
+    criterion is marked verified and the loop advances or finishes early.
+    Auto-derived from ``reflection_dimensions`` names when left unset."""
     auto_detect: bool = True
 
     @model_validator(mode="after")
@@ -62,4 +67,12 @@ class ReasoningConfig(BaseModel):
                 raise ValueError("Maximum 3 reflection dimensions allowed")
             if self.reflection_rounds == 0:
                 self.reflection_rounds = len(dims)
+            if self.success_criteria is None:
+                self.success_criteria = [d.name for d in dims]
+
+        if self.success_criteria is not None:
+            if len(self.success_criteria) == 0:
+                raise ValueError("success_criteria must be non-empty when provided")
+            if len(self.success_criteria) > 10:
+                raise ValueError("Maximum 10 success criteria allowed")
         return self

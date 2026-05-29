@@ -85,6 +85,27 @@ async def run_flow_once_async(
     )
 
 
+def resume_flow_sync(
+    flow: FlowDefinition,
+    base_dir: Path,
+    flow_run_id: str,
+    prompt: str = "",
+    *,
+    entry_service: str | None = None,
+    audit_logger: AuditLogger | None = None,
+) -> FlowRunResult:
+    """Resume an interrupted durable flow from its checkpoint journal (sync).
+
+    Replays sub-agents that already produced a successful checkpoint and re-runs
+    the first incomplete one onward. Requires the flow to enable durability and
+    an audit logger (the journal lives in the audit store).
+    """
+    from initrunner.flow.orchestrator import FlowOrchestrator
+
+    orchestrator = FlowOrchestrator(flow, base_dir, audit_logger=audit_logger)
+    return orchestrator.resume(flow_run_id, prompt, entry_service=entry_service)
+
+
 # ---------------------------------------------------------------------------
 # Scaffold helpers
 # ---------------------------------------------------------------------------

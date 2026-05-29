@@ -180,6 +180,11 @@ def build_team_next_steps(path: Path, team: TeamDefinition) -> list[str]:
         )
     elif team.spec.strategy == "parallel":
         steps.append(f"Parallel strategy: all {len(team.spec.personas)} personas run concurrently")
+    elif team.spec.strategy == "ensemble":
+        steps.append(
+            f"Ensemble strategy: all {len(team.spec.personas)} personas answer in parallel, "
+            f"then a {team.spec.ensemble.mode} vote picks one winner"
+        )
     else:
         max_chars = team.spec.handoff_max_chars
         steps.append(

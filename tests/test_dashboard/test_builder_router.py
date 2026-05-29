@@ -98,6 +98,20 @@ def test_builder_options(builder_client):
     assert "rag" not in setups
 
 
+def test_builder_options_exposes_config_options(builder_client):
+    """The options endpoint surfaces the valid role-config enum values."""
+    resp = builder_client.get("/api/builder/templates")
+    assert resp.status_code == 200
+    config = resp.json()["config_options"]
+    assert "native" in config["output_modes"]
+    assert "prompted" in config["output_modes"]
+    assert "minimal" in config["thinking_efforts"]
+    assert "xhigh" in config["thinking_efforts"]
+    assert False not in config["thinking_efforts"]
+    assert "hybrid_rerank" in config["retrieval_strategies"]
+    assert "local" in config["embedding_providers"]
+
+
 def test_template_setups_env_var_status(builder_client, monkeypatch):
     """Env var status reflects whether the token is set in the environment."""
     # Token not set

@@ -6,7 +6,7 @@ import abc
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from initrunner._paths import LazyPath
 
@@ -39,6 +39,8 @@ class StoreConfig:
     chunk_overlap: int = 50
     embed_base_url: str = ""
     embed_api_key_env: str = ""
+    retrieval_strategy: str = "vector"  # vector | hybrid | hybrid_rerank
+    reranker_model: str = ""  # cross-encoder model for hybrid_rerank
 
 
 class DimensionMismatchError(Exception):
@@ -102,6 +104,8 @@ def make_store_config(role: RoleDefinition) -> StoreConfig:
             chunk_overlap=ingest.chunking.chunk_overlap,
             embed_base_url=ingest.embeddings.base_url,
             embed_api_key_env=ingest.embeddings.api_key_env,
+            retrieval_strategy=ingest.retriever.strategy,
+            reranker_model=ingest.retriever.reranker_model,
         )
     return StoreConfig(
         db_path=resolve_store_path(None, name),
@@ -211,6 +215,26 @@ class DocumentStore(FileMetadataStore):
     ) -> list[SearchResult]: ...
 
     @abc.abstractmethod
+    def hybrid_search(
+        self,
+        query_text: str,
+        embedding: list[float],
+        top_k: int = 5,
+        retrieval_strategy: str = "vector",
+        source_filter: str | None = None,
+        reranker_model: str = "",
+    ) -> list[SearchResult]:
+        """Search documents combining dense vectors and BM25 full-text search.
+
+        ``retrieval_strategy`` selects the mode:
+        ``vector`` (dense cosine only, identical to :meth:`query`),
+        ``hybrid`` (RRF fusion of vector and full-text results), or
+        ``hybrid_rerank`` (hybrid fusion followed by cross-encoder reranking,
+        degrading to ``hybrid`` when the optional backend is unavailable).
+        """
+        ...
+
+    @abc.abstractmethod
     def count(self) -> int: ...
 
     @abc.abstractmethod
@@ -236,7 +260,7 @@ class DocumentStore(FileMetadataStore):
     @abc.abstractmethod
     def close(self) -> None: ...
 
-    def __enter__(self) -> DocumentStore:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -340,7 +364,7 @@ class MemoryStoreBase(SessionStore, MemoryStore):
     @abc.abstractmethod
     def close(self) -> None: ...
 
-    def __enter__(self) -> MemoryStoreBase:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

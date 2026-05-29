@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
-from fastapi import APIRouter, Query  # type: ignore[import-not-found]
+from fastapi import APIRouter, HTTPException, Query  # type: ignore[import-not-found]
 
-from initrunner.dashboard.schemas import AuditRecordResponse, AuditStatsResponse, TopAgentResponse
+from initrunner.dashboard.schemas import (
+    AuditRecordResponse,
+    AuditRunDetailResponse,
+    AuditStatsResponse,
+    TopAgentResponse,
+)
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -54,6 +60,8 @@ async def query_audit(
             tokens_in=r.tokens_in,
             tokens_out=r.tokens_out,
             total_tokens=r.total_tokens,
+            thinking_tokens=r.thinking_tokens,
+            reasoning_tokens=r.reasoning_tokens,
             tool_calls=r.tool_calls,
             duration_ms=r.duration_ms,
             success=r.success,
@@ -90,4 +98,64 @@ async def audit_stats(
             TopAgentResponse(name=a.name, count=a.count, avg_duration_ms=a.avg_duration_ms)
             for a in stats.top_agents
         ],
+    )
+
+
+def _parse_json_list(raw: str | None) -> list[dict] | None:
+    """Decode a JSON-encoded list, returning None for empty or malformed input."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    return parsed if isinstance(parsed, list) else None
+
+
+@router.get("/{run_id}")
+async def audit_run_detail(run_id: str) -> AuditRunDetailResponse:
+    """Drill-down for a single run: base record plus parsed timeline and judge verdicts.
+
+    Registered after ``/stats`` so FastAPI matches the literal path before the converter.
+    """
+    from initrunner.config import get_audit_db_path
+    from initrunner.services.operations import query_audit_sync
+
+    records = await asyncio.to_thread(
+        query_audit_sync,
+        run_id=run_id,
+        limit=1,
+        audit_db=get_audit_db_path(),
+    )
+    if not records:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    r = records[0]
+
+    from initrunner.pricing import estimate_cost
+
+    cost = estimate_cost(r.tokens_in, r.tokens_out, r.model, r.provider)
+    cost_usd = cost["total_cost_usd"] if cost else None
+
+    return AuditRunDetailResponse(
+        run_id=r.run_id,
+        agent_name=r.agent_name,
+        timestamp=r.timestamp,
+        user_prompt=r.user_prompt,
+        model=r.model,
+        provider=r.provider,
+        output=r.output,
+        tokens_in=r.tokens_in,
+        tokens_out=r.tokens_out,
+        total_tokens=r.total_tokens,
+        thinking_tokens=r.thinking_tokens,
+        reasoning_tokens=r.reasoning_tokens,
+        tool_calls=r.tool_calls,
+        duration_ms=r.duration_ms,
+        success=r.success,
+        error=r.error,
+        trigger_type=r.trigger_type,
+        cost_usd=cost_usd,
+        event_timeline=_parse_json_list(r.event_timeline_json),
+        judge_verdicts=_parse_json_list(r.judge_verdicts),
     )

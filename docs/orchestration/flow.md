@@ -172,7 +172,9 @@ sink:
 |-------|------|---------|-------------|
 | `type` | `"delegate"` | *(required)* | Must be `delegate`. |
 | `target` | `str \| list[str]` | *(required)* | Target agent name(s) to route output to. |
-| `strategy` | `"all" \| "keyword" \| "sense"` | `"all"` | Routing strategy for multi-target delegates. See [Routing Strategy](#routing-strategy). |
+| `strategy` | `"all" \| "keyword" \| "sense" \| "ensemble"` | `"all"` | Routing strategy for multi-target delegates. See [Routing Strategy](#routing-strategy) and [Ensemble Voting](#ensemble-voting). |
+| `ensemble` | `EnsembleConfig \| None` | `None` | Voting config. Required when `strategy: ensemble`, rejected otherwise. See [Ensemble Voting](#ensemble-voting). |
+| `loop_back` | `LoopBackConfig \| None` | `None` | Bounded loop-back edge for critic/refine patterns. See [Loop-Back Routing](#loop-back-routing). |
 | `keep_existing_sinks` | `bool` | `false` | When `true`, the agent's role-level sinks (webhook, file, custom) are also activated alongside the delegate. When `false`, only the delegate sink is used. |
 | `queue_size` | `int` | `100` | Daemon ingress queue capacity (bounded backpressure for trigger-driven runs). |
 | `timeout_seconds` | `int` | `60` | Reserved (kept for schema compatibility). |
@@ -186,6 +188,7 @@ When a delegate sink has multiple targets, the `strategy` field controls how mes
 | `all` | Fan-out -- every target receives every message (default, backward compatible) | None |
 | `keyword` | [Intent Sensing](../core/intent_sensing.md) keyword scoring picks the best target | None |
 | `sense` | Keyword scoring first; LLM tiebreaker when ambiguous | 0 or 1 per message |
+| `ensemble` | Fan-out to every target, then vote on the answers and keep one winner | 0 (majority/weighted) or 1 per candidate (judge) |
 
 The `keyword` and `sense` strategies use the same two-pass [Intent Sensing](../core/intent_sensing.md) logic used by `--sense` in the CLI. They score the agent's output text against each target agent's `metadata.name`, `metadata.description`, and `metadata.tags` from its role definition.
 
@@ -251,9 +254,134 @@ The [dashboard flow builder](../interfaces/dashboard.md) exposes routing strateg
 
 When only one target is specified, `strategy` has no effect -- the message always goes to that target regardless of the strategy setting.
 
+### Ensemble Voting
+
+The `ensemble` strategy fans the same prompt out to every target (like `all`), then a reducer picks a single winning answer instead of concatenating them. Use it when you want several agents (or several models) to answer the same question and keep the best or most-agreed-upon response.
+
+```yaml
+router:
+  role: roles/router.yaml
+  sink:
+    type: delegate
+    strategy: ensemble
+    target: [gpt-answerer, claude-answerer, llama-answerer]
+    ensemble:
+      mode: majority          # majority | weighted | judge
+```
+
+`ensemble` requires at least two targets and an `ensemble:` block. The block is rejected for any other strategy.
+
+#### EnsembleConfig options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `"majority" \| "weighted" \| "judge"` | `"majority"` | How the winner is chosen. |
+| `judge_model` | `str` | `"openai:gpt-4o-mini"` | Model used to score candidates when `mode: judge`. |
+| `judge_criteria` | `list[str]` | `[]` | Criteria the judge checks. Defaults to `clarity, completeness, accuracy` when empty. |
+| `weights` | `dict[str, float] \| None` | `None` | Per-target weight for `mode: weighted`. Keys must be target names. |
+
+#### Modes
+
+- **majority** -- normalized vote on identical answers. The most frequent answer wins; ties break on the lowest topology index, so the result is deterministic. No extra API calls.
+- **weighted** -- each target carries a weight; the answer from the highest-weight target wins. Requires a non-empty `weights` map whose keys are all targets. No extra API calls.
+- **judge** -- an LLM judge (reusing [`eval/judge.py`](../operations/testing.md)) scores every candidate against `judge_criteria` and the highest-scoring answer wins. Costs one judge call per candidate, so a three-way ensemble in judge mode adds three judge calls per round.
+
+```yaml
+# weighted: trust the specialist model more
+sink:
+  type: delegate
+  strategy: ensemble
+  target: [fast-model, strong-model]
+  ensemble:
+    mode: weighted
+    weights:
+      fast-model: 0.2
+      strong-model: 0.8
+
+# judge: let an LLM pick the clearest, most complete answer
+sink:
+  type: delegate
+  strategy: ensemble
+  target: [draft-a, draft-b, draft-c]
+  ensemble:
+    mode: judge
+    judge_model: openai:gpt-4o-mini
+    judge_criteria: [clarity, completeness, correctness]
+```
+
+The winning answer flows downstream as a single `DelegationEnvelope`, exactly like the output of any other agent, so ensemble targets can be terminal (the winner becomes the flow output) or feed a downstream agent.
+
+#### Audit trail
+
+Every ensemble vote is recorded on the signed audit chain as a row with `trigger_type: ensemble_vote`. The row stores the winning answer (truncated) and a `vote_trace` in its trigger metadata: the candidate answers, the per-mode tally (vote counts, weights, or judge scores), and the winning source. Each candidate string is capped at 1000 characters with a `[truncated]` marker so a wide fan-in cannot bloat the chain. Inspect them with `initrunner audit export --trigger-type ensemble_vote`.
+
+### Loop-Back Routing
+
+A `loop_back` edge turns a normal forward delegation into a bounded refine loop: an agent delegates forward (for example, a writer hands a draft to a critic), and the critic's output is routed back to an upstream agent for another pass. This is the classic critic/refine supervisor pattern. Flow graphs are otherwise acyclic, and every unmarked cycle is still rejected at validation time; only an explicitly-marked `loop_back` edge is permitted to close a cycle.
+
+```yaml
+writer:
+  role: ./roles/writer.yaml
+  sink:
+    type: delegate
+    target: critic            # forward edge: writer -> critic
+    loop_back:
+      type: loop-back
+      target: writer          # back edge: critic output returns to writer
+      max_iterations: 4       # always stop after 4 rounds
+      until:
+        output: "contains:APPROVED"   # exit early when the critic approves
+critic:
+  role: ./roles/critic.yaml
+```
+
+The flow runs `writer -> critic -> writer -> critic -> ...` until one of the two bounds is hit, then the last output becomes the flow result. The loop target is usually the loop source itself (`writer`), but it can be any upstream agent on the path.
+
+#### LoopBackConfig options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `type` | `"loop-back"` | *(required)* | Discriminator. Must be `loop-back`. |
+| `target` | `str` | *(required)* | The agent the loop returns to. Must be a known agent and must not be one of the sink's own forward `target`s. |
+| `max_iterations` | `int` | `3` | Hard cap on loop rounds. Bounded to `1..20`. The loop always stops once this many rounds complete. |
+| `until` | `dict[str, str] \| None` | `None` | Optional early-exit predicate evaluated against the latest agent output. When omitted, only `max_iterations` bounds the loop. |
+
+#### The `until` predicate
+
+`until` is a small map keyed by the output field to inspect. Only `output` (the latest agent text flowing back along the loop) is supported. The value is one of:
+
+- `contains:<text>` -- exit when the output contains `<text>` (case-insensitive). Use this with a critic that emits a sentinel like `APPROVED` once it is satisfied.
+- `<op><number>` where `<op>` is `>`, `>=`, `<`, `<=`, or `==` -- exit when the first number parsed from the output satisfies the comparison. For example `">0.8"` exits when a critic reports a confidence score above 0.8.
+
+Because `until` is keyed by field name and `output` is the only supported field, a single condition string applies per loop-back edge. Validation rejects any other key with `loop_back until only supports the 'output' field`. The predicate evaluates that one condition against the latest output, so pick the single most reliable exit signal: an approval token via `contains:`, or a numeric threshold such as `">0.8"`.
+
+#### Bounding and safety
+
+The loop is bounded two independent ways. `max_iterations` is the hard ceiling, and `until` is the optional early exit. Each round carries an immutable per-edge `DelegationEnvelope` whose `loop_back_iteration` counter is incremented by a decider step, so concurrent branches never share or corrupt the count. The flow [depth limit](#depth-limit) remains in force as a final backstop, so a misconfigured loop can never run unbounded.
+
+#### Validation
+
+`initrunner flow validate` shows the loop-back in the sink column:
+
+```bash
+$ initrunner flow validate flow.yaml
+```
+
+```
+                               Flow: refine-loop
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┓
+┃ Agent  ┃ Role                ┃ Sink                       ┃ Needs  ┃ Restart ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
+│ writer │ ./roles/writer.yaml │ delegate: critic           │ (none) │ none    │
+│        │                     │ (loop-back: writer x4)     │        │         │
+│ critic │ ./roles/critic.yaml │ (none)                     │ (none) │ none    │
+└────────┴─────────────────────┴────────────────────────────┴────────┴─────────┘
+Valid
+```
+
 ### Fan-In Behavior
 
-When multiple agents delegate to the same downstream target (diamond pattern: A->[B,C]->D), the downstream agent runs **once** with the concatenated output from all upstream branches. Outputs are joined in YAML declaration order (topology order), separated by `---`. This is more efficient than running the downstream agent multiple times.
+When multiple agents delegate to the same downstream target (diamond pattern: A->[B,C]->D), the downstream agent runs **once** with the combined output from all upstream branches. By default outputs are joined in YAML declaration order (topology order), separated by `---`. When the fan-in target is fed by the targets of a single `ensemble` source, the fan-in vote replaces concatenation and only the winning answer is passed downstream.
 
 ### Role Sink Interaction
 
@@ -905,3 +1033,7 @@ During orchestration, errors are handled defensively:
 - **Queue overflow**: When a downstream agent's inbox is full and the timeout expires, the message is dropped with a stderr warning. The upstream agent is not affected.
 - **Circuit breaker**: When a delegate sink's circuit breaker is enabled and trips open after consecutive failures, all messages are rejected with `circuit_open` audit status until the reset timer allows a probe. See [Circuit Breaker](#circuit-breaker).
 - **Agent execution errors**: Failed agent runs increment the agent's `error_count` but do not stop the agent thread. The error is included in audit logs if auditing is enabled.
+
+## Coordinating with Shared State
+
+Flow agents pass a prompt string along each edge, and a fan-in join concatenates those strings. When agents need to hand each other a named, structured value (a chosen plan, a budget, a claimed work item) rather than prose, add a per-run blackboard so an upstream agent can post a value that a downstream agent or fan-in join reads by key. See [Blackboard: shared state inside a flow run](blackboard.md).

@@ -29,6 +29,8 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "fasta2a": ("a2a", "pydantic-ai-slim[a2a]"),
     "cryptography": ("vault", "cryptography"),
     "keyring": ("vault-keyring", "keyring"),
+    "pydantic_evals": ("observability", "pydantic-evals"),
+    "fastembed": ("local-embeddings", "fastembed"),
 }
 
 
@@ -137,6 +139,11 @@ def require_ingest(package: str) -> None:
 def require_a2a() -> None:
     """Check that fasta2a is importable, or raise with install hint."""
     require_extra("fasta2a", extra="a2a", pip_name="pydantic-ai-slim[a2a]")
+
+
+def require_embeddings_local() -> None:
+    """Check that fastembed is importable, or raise with install hint."""
+    require_extra("fastembed", extra="local-embeddings", pip_name="fastembed")
 
 
 def is_dashboard_available() -> bool:

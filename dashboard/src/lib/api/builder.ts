@@ -56,6 +56,14 @@ export interface BuilderOptions {
 	template_setups: Record<string, TemplateSetup>;
 	provider_status: ProviderStatus[];
 	tool_func_map: Record<string, string[]>;
+	config_options?: ConfigOptions;
+}
+
+export interface ConfigOptions {
+	output_modes: string[];
+	thinking_efforts: string[];
+	retrieval_strategies: string[];
+	embedding_providers: string[];
 }
 
 export interface StarterInfo {

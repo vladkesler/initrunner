@@ -278,3 +278,196 @@ class TestAsyncStreamingEvents:
         assert events_seen == events_to_yield
         assert tokens_seen == ["Hello ", "world"]
         assert result.output == "Hello world"
+
+
+# ---------------------------------------------------------------------------
+# Timeline entry builder (item #3): redacted thinking + tool events
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTimelineEntry:
+    def test_thinking_delta_recorded_and_redacted(self):
+        from pydantic_ai.messages import PartDeltaEvent, ThinkingPartDelta
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        ev = PartDeltaEvent(
+            index=0,
+            delta=ThinkingPartDelta(content_delta="step one", provider_name="anthropic"),
+        )
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert entry["type"] == "thinking_delta"
+        assert entry["content_delta"] == "step one"
+        assert entry["has_signature"] is False
+        assert entry["provider_name"] == "anthropic"
+        assert isinstance(entry["timestamp_unix_ms"], int)
+
+    def test_thinking_delta_content_secret_scrubbed(self):
+        from pydantic_ai.messages import PartDeltaEvent, ThinkingPartDelta
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        secret = "sk-ant-" + "a" * 40
+        ev = PartDeltaEvent(index=0, delta=ThinkingPartDelta(content_delta=f"key is {secret}"))
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert secret not in entry["content_delta"]
+        assert "[REDACTED]" in entry["content_delta"]
+
+    def test_text_delta_not_recorded(self):
+        from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        ev = PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="visible output"))
+        assert build_timeline_entry(ev) is None
+
+    def test_function_tool_call_recorded(self):
+        from pydantic_ai.messages import FunctionToolCallEvent, ToolCallPart
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        part = ToolCallPart(tool_name="shell", args={"cmd": "ls"}, tool_call_id="tc-1")
+        ev = FunctionToolCallEvent(part=part)
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert entry["type"] == "function_tool_call"
+        assert entry["tool_call_id"] == "tc-1"
+        assert entry["tool_name"] == "shell"
+        assert entry["args_preview"] == '{"cmd": "ls"}'
+
+    def test_function_tool_call_args_redacted_and_truncated(self):
+        from pydantic_ai.messages import FunctionToolCallEvent, ToolCallPart
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        secret = "ghp_" + "b" * 40
+        part = ToolCallPart(
+            tool_name="http", args={"token": secret, "pad": "x" * 200}, tool_call_id="tc-2"
+        )
+        ev = FunctionToolCallEvent(part=part)
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert secret not in entry["args_preview"]
+        assert entry["args_preview"].endswith("[truncated]")
+
+    def test_function_tool_result_recorded_and_redacted(self):
+        from pydantic_ai.messages import FunctionToolResultEvent, ToolReturnPart
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        secret = "sk-proj-" + "c" * 40
+        part = ToolReturnPart(tool_name="shell", content="ignored", tool_call_id="tc-3")
+        ev = FunctionToolResultEvent(part=part, content=f"output with {secret} inside")
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert entry["type"] == "function_tool_result"
+        assert secret not in entry["content_preview"]
+        assert "[REDACTED]" in entry["content_preview"]
+        assert entry["part_type"] == "ToolReturnPart"
+
+    def test_cap_timeline_keeps_tail(self):
+        from initrunner.agent.executor_output import _TIMELINE_MAX_ENTRIES, cap_timeline
+
+        timeline = [{"i": i} for i in range(_TIMELINE_MAX_ENTRIES + 50)]
+        capped = cap_timeline(timeline)
+        assert len(capped) == _TIMELINE_MAX_ENTRIES
+        assert capped[-1] == {"i": _TIMELINE_MAX_ENTRIES + 49}
+
+
+class TestStreamEventsTimelinePopulation:
+    @pytest.mark.asyncio
+    async def test_timeline_and_reasoning_tokens_populated(self):
+        """End-to-end: thinking + tool events land in result.event_timeline,
+        reasoning tokens come from the final event, and text stays out of the
+        timeline while still reaching on_token."""
+        from pydantic_ai import AgentRunResultEvent
+        from pydantic_ai.messages import (
+            FunctionToolCallEvent,
+            FunctionToolResultEvent,
+            PartDeltaEvent,
+            TextPartDelta,
+            ThinkingPartDelta,
+            ToolCallPart,
+            ToolReturnPart,
+        )
+
+        from initrunner.agent.executor import execute_run_stream_async
+
+        role = _make_text_role()
+
+        thinking = PartDeltaEvent(index=0, delta=ThinkingPartDelta(content_delta="reasoning"))
+        text = PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="Answer"))
+        call = FunctionToolCallEvent(
+            part=ToolCallPart(tool_name="shell", args={"cmd": "ls"}, tool_call_id="tc-1")
+        )
+        result_ev = FunctionToolResultEvent(
+            part=ToolReturnPart(tool_name="shell", content="x", tool_call_id="tc-1"),
+            content="bin lib",
+        )
+
+        fake_agent_result = MagicMock()
+        fake_agent_result.output = "Answer"
+        usage = MagicMock(input_tokens=5, output_tokens=10, total_tokens=15, tool_calls=1)
+        usage.thinking_tokens = 4096
+        usage.details = {}
+        fake_agent_result.usage = usage
+        fake_agent_result.all_messages = MagicMock(return_value=[])
+        final_event = AgentRunResultEvent(result=fake_agent_result)
+
+        events = [thinking, text, call, result_ev, final_event]
+
+        async def fake_run_stream_events(*_args, **_kwargs):
+            for ev in events:
+                yield ev
+
+        agent = MagicMock()
+        agent.run_stream_events = fake_run_stream_events
+
+        tokens_seen: list[str] = []
+
+        with patch("initrunner.agent.executor._prepare_run") as mock_prep:
+            mock_prep.return_value = ("run-id", MagicMock(), {}, None)
+            result, _msgs = await execute_run_stream_async(
+                agent,
+                role,
+                "prompt",
+                on_token=tokens_seen.append,
+                on_event=lambda _e: None,
+                skip_input_validation=True,
+            )
+
+        assert tokens_seen == ["Answer"]
+        assert result.reasoning_tokens == 4096
+        types = [e["type"] for e in result.event_timeline]
+        assert types == ["thinking_delta", "function_tool_call", "function_tool_result"]
+        # Text delta content must never appear in the timeline.
+        assert all("Answer" not in str(e.get("content_delta")) for e in result.event_timeline)
+
+    @pytest.mark.asyncio
+    async def test_no_timeline_without_on_event(self):
+        """The fallback (no on_event) path leaves event_timeline empty."""
+        from initrunner.agent.executor import execute_run_stream_async
+
+        role = _make_text_role()
+
+        stream = MagicMock()
+        stream.stream_text = MagicMock(return_value=_AsyncIter(["hi"]))
+        stream.stream_output = MagicMock(return_value=_AsyncIter([]))
+        stream.all_messages = MagicMock(return_value=[])
+        stream.usage = MagicMock(
+            return_value=MagicMock(input_tokens=1, output_tokens=1, total_tokens=2, tool_calls=0)
+        )
+        stream.get_output = AsyncMock(return_value="hi")
+
+        agent = MagicMock()
+        agent.run_stream = MagicMock(return_value=_async_ctx(stream))
+
+        with patch("initrunner.agent.executor._prepare_run") as mock_prep:
+            mock_prep.return_value = ("run-id", MagicMock(), {}, None)
+            result, _msgs = await execute_run_stream_async(
+                agent, role, "prompt", skip_input_validation=True
+            )
+
+        assert result.event_timeline == []

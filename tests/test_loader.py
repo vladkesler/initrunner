@@ -492,6 +492,78 @@ class TestBuildAgent:
         assert "temperature" not in call_kwargs.kwargs["model_settings"]
         assert "max_tokens" in call_kwargs.kwargs["model_settings"]
 
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_thinking_passed_to_model_settings(self, mock_require, mock_agent_cls, tmp_path):
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: thinking-agent
+              description: Test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+                thinking: high
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role)
+        call_kwargs = mock_agent_cls.call_args
+        assert call_kwargs.kwargs["model_settings"]["thinking"] == "high"
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_thinking_omitted_when_unset(self, mock_require, mock_agent_cls, tmp_path):
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: plain-agent
+              description: Test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role)
+        call_kwargs = mock_agent_cls.call_args
+        assert "thinking" not in call_kwargs.kwargs["model_settings"]
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
+    def test_thinking_false_is_passed(self, mock_require, mock_agent_cls, tmp_path):
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: no-think-agent
+              description: Test
+            spec:
+              role: You are helpful.
+              model:
+                provider: openai
+                name: o3-mini
+                thinking: false
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        role = load_role(p)
+        build_agent(role)
+        call_kwargs = mock_agent_cls.call_args
+        # Explicit disable must reach the model settings (not be dropped as falsy).
+        assert call_kwargs.kwargs["model_settings"]["thinking"] is False
+
 
 class TestApiKeyValidation:
     def test_missing_openai_key_raises(self, monkeypatch):

@@ -210,6 +210,289 @@ class TestTriggerFields:
         assert record.trigger_metadata is None
 
 
+class TestThinkingTokens:
+    def test_from_run_passes_thinking_tokens(self):
+        from unittest.mock import MagicMock
+
+        result = MagicMock()
+        result.run_id = "run1"
+        result.output = "ok"
+        result.tokens_in = 1
+        result.tokens_out = 2
+        result.total_tokens = 3
+        result.thinking_tokens = 4200
+        result.tool_calls = 0
+        result.duration_ms = 100
+        result.success = True
+        result.error = None
+        result.tool_call_names = []
+
+        role = MagicMock()
+        role.metadata.name = "agent1"
+        role.spec.model.name = "o3-mini"
+        role.spec.model.provider = "openai"
+
+        record = AuditRecord.from_run(result, role, "test prompt")
+        assert record.thinking_tokens == 4200
+
+    def test_default_thinking_tokens_is_zero(self):
+        record = _make_record()
+        assert record.thinking_tokens == 0
+
+    def test_log_and_readback_preserves_thinking_tokens(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        record = _make_record(thinking_tokens=5000)
+
+        with AuditLogger(db_path) as logger:
+            logger.log(record)
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM audit_log").fetchall()
+        conn.close()
+
+        assert rows[0]["thinking_tokens"] == 5000
+
+    def test_query_returns_thinking_tokens(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(thinking_tokens=777))
+            records = logger.query()
+        assert records[0].thinking_tokens == 777
+
+    def test_schema_includes_thinking_tokens_column(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path):
+            conn = sqlite3.connect(str(db_path))
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)").fetchall()}
+            conn.close()
+        assert "thinking_tokens" in cols
+
+    def test_chain_verifies_with_thinking_tokens(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="r1", thinking_tokens=100))
+            logger.log(_make_record(run_id="r2", thinking_tokens=200))
+            result = logger.verify_chain()
+        assert result.ok
+        assert result.verified_rows == 2
+
+    def test_migrate_old_schema_without_thinking_tokens(self, tmp_path):
+        """A DB predating thinking_tokens gains the column with a 0 default."""
+        db_path = tmp_path / "old.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""\
+            CREATE TABLE audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                agent_name TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                user_prompt TEXT NOT NULL,
+                model TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                output TEXT NOT NULL,
+                tokens_in INTEGER NOT NULL,
+                tokens_out INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                tool_calls INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                success BOOLEAN NOT NULL,
+                error TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO audit_log VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("r1", "ag", "2025-01-01", "hi", "m", "p", "o", 1, 2, 3, 0, 100, 1, None),
+        )
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="new", thinking_tokens=9000))
+            records = logger.query()
+            old = next(r for r in records if r.run_id == "r1")
+            new = next(r for r in records if r.run_id == "new")
+        assert old.thinking_tokens == 0
+        assert new.thinking_tokens == 9000
+
+
+class TestStreamingTimeline:
+    """reasoning_tokens + event_timeline_json columns from item #3."""
+
+    def test_from_run_with_reasoning_tokens(self):
+        from unittest.mock import MagicMock
+
+        result = MagicMock()
+        result.run_id = "run1"
+        result.output = "ok"
+        result.tokens_in = 1
+        result.tokens_out = 2
+        result.total_tokens = 3
+        result.thinking_tokens = 0
+        result.reasoning_tokens = 2000
+        result.tool_calls = 0
+        result.duration_ms = 100
+        result.success = True
+        result.error = None
+        result.tool_call_names = []
+        result.event_timeline = []
+
+        role = MagicMock()
+        role.metadata.name = "agent1"
+        role.spec.model.name = "claude-opus-4"
+        role.spec.model.provider = "anthropic"
+
+        record = AuditRecord.from_run(result, role, "test prompt")
+        assert record.reasoning_tokens == 2000
+        assert record.event_timeline_json is None
+
+    def test_from_run_with_event_timeline(self):
+        from unittest.mock import MagicMock
+
+        timeline = [
+            {"type": "thinking_delta", "timestamp_unix_ms": 1, "content_delta": "analyzing"},
+            {"type": "function_tool_call", "timestamp_unix_ms": 2, "tool_name": "shell"},
+        ]
+        result = MagicMock()
+        result.run_id = "run1"
+        result.output = "ok"
+        result.tokens_in = 1
+        result.tokens_out = 2
+        result.total_tokens = 3
+        result.thinking_tokens = 0
+        result.reasoning_tokens = 0
+        result.tool_calls = 1
+        result.duration_ms = 100
+        result.success = True
+        result.error = None
+        result.tool_call_names = ["shell"]
+        result.event_timeline = timeline
+
+        role = MagicMock()
+        role.metadata.name = "agent1"
+        role.spec.model.name = "claude-opus-4"
+        role.spec.model.provider = "anthropic"
+
+        record = AuditRecord.from_run(result, role, "test prompt")
+        assert record.event_timeline_json is not None
+        assert json.loads(record.event_timeline_json) == timeline
+
+    def test_defaults_are_zero_and_none(self):
+        record = _make_record()
+        assert record.reasoning_tokens == 0
+        assert record.event_timeline_json is None
+
+    def test_schema_includes_new_columns(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path):
+            conn = sqlite3.connect(str(db_path))
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)").fetchall()}
+            conn.close()
+        assert "reasoning_tokens" in cols
+        assert "event_timeline_json" in cols
+
+    def test_log_and_readback_roundtrip(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        timeline_json = json.dumps([{"type": "function_tool_call", "tool_name": "http"}])
+        record = _make_record(reasoning_tokens=4096, event_timeline_json=timeline_json)
+
+        with AuditLogger(db_path) as logger:
+            logger.log(record)
+            records = logger.query()
+
+        assert records[0].reasoning_tokens == 4096
+        timeline_json = records[0].event_timeline_json
+        assert timeline_json is not None
+        assert json.loads(timeline_json) == [{"type": "function_tool_call", "tool_name": "http"}]
+
+    def test_chain_verifies_with_new_columns(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="r1", reasoning_tokens=100))
+            logger.log(
+                _make_record(
+                    run_id="r2",
+                    reasoning_tokens=200,
+                    event_timeline_json='[{"type":"thinking_delta"}]',
+                )
+            )
+            result = logger.verify_chain()
+        assert result.ok
+        assert result.verified_rows == 2
+
+    def test_cost_query_sums_reasoning_tokens(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="r1", reasoning_tokens=1000))
+            logger.log(_make_record(run_id="r2", reasoning_tokens=2500))
+            conn = logger._conn
+            total = conn.execute(
+                "SELECT COALESCE(SUM(reasoning_tokens), 0) AS t FROM audit_log"
+            ).fetchone()["t"]
+        assert total == 3500
+
+    def test_migrate_old_schema_without_new_columns(self, tmp_path):
+        """A DB predating item #3 gains both columns with safe defaults."""
+        db_path = tmp_path / "old.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""\
+            CREATE TABLE audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                agent_name TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                user_prompt TEXT NOT NULL,
+                model TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                output TEXT NOT NULL,
+                tokens_in INTEGER NOT NULL,
+                tokens_out INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                tool_calls INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                success BOOLEAN NOT NULL,
+                error TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO audit_log VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("r1", "ag", "2025-01-01", "hi", "m", "p", "o", 1, 2, 3, 0, 100, 1, None),
+        )
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="new", reasoning_tokens=9000))
+            records = logger.query()
+            old = next(r for r in records if r.run_id == "r1")
+            new = next(r for r in records if r.run_id == "new")
+        assert old.reasoning_tokens == 0
+        assert old.event_timeline_json is None
+        assert new.reasoning_tokens == 9000
+
+
+class TestEncodeEventTimeline:
+    def test_empty_returns_none(self):
+        from initrunner.audit.logger import _encode_event_timeline
+
+        assert _encode_event_timeline([]) is None
+        assert _encode_event_timeline(None) is None
+
+    def test_encodes_list(self):
+        from initrunner.audit.logger import _encode_event_timeline
+
+        encoded = _encode_event_timeline([{"type": "thinking_delta", "timestamp_unix_ms": 1}])
+        assert encoded is not None
+        assert json.loads(encoded) == [{"type": "thinking_delta", "timestamp_unix_ms": 1}]
+
+    def test_non_serializable_does_not_raise(self):
+        from initrunner.audit.logger import _encode_event_timeline
+
+        # default=str coerces odd values rather than raising.
+        encoded = _encode_event_timeline([{"obj": object()}])
+        assert encoded is not None
+
+
 class TestTriggerStats:
     def test_empty_db(self, tmp_path):
         db_path = tmp_path / "test.db"
@@ -709,6 +992,67 @@ class TestAuditSecretScrubbing:
             rows = logger.query()
         assert rows[0].user_prompt == "What is the weather?"
         assert rows[0].output == "It is sunny today."
+
+
+class TestEnsembleVote:
+    def test_records_signed_vote(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log_ensemble_vote(
+                source_service="router",
+                target_services=["a", "b"],
+                mode="majority",
+                winning_output="Paris",
+                vote_trace={"counts": {"Paris": 2, "London": 1}},
+                trace="router,a",
+                run_id="flow1",
+            )
+            recs = logger.query(trigger_type="ensemble_vote")
+
+        assert len(recs) == 1
+        assert recs[0].output == "Paris"
+        assert recs[0].run_id == "flow1"
+        assert recs[0].trigger_metadata is not None
+        md = json.loads(recs[0].trigger_metadata)
+        assert md["mode"] == "majority"
+        assert md["vote_trace"]["counts"] == {"Paris": 2, "London": 1}
+
+    def test_truncates_large_candidate_text(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        big = "z" * 5000
+        with AuditLogger(db_path) as logger:
+            logger.log_ensemble_vote(
+                source_service="router",
+                target_services=["a", "b"],
+                mode="judge",
+                winning_output=big,
+                vote_trace={"candidates": [big, "small"]},
+            )
+            rec = logger.query(trigger_type="ensemble_vote")[0]
+        # winning output preview is bounded
+        assert len(rec.output) <= 1000
+        assert rec.trigger_metadata is not None
+        md = json.loads(rec.trigger_metadata)
+        assert any("[truncated]" in c for c in md["vote_trace"]["candidates"])
+
+    def test_never_raises_on_closed_db(self, tmp_path, caplog):
+        db_path = tmp_path / "test.db"
+        audit_logger = AuditLogger(db_path)
+        audit_logger.close()
+        ir_logger = logging.getLogger("initrunner")
+        ir_logger.addHandler(caplog.handler)
+        try:
+            with caplog.at_level("ERROR", logger="initrunner.audit"):
+                # Must not raise even though the connection is gone.
+                audit_logger.log_ensemble_vote(
+                    source_service="router",
+                    target_services=["a"],
+                    mode="majority",
+                    winning_output="x",
+                    vote_trace={},
+                )
+        finally:
+            ir_logger.removeHandler(caplog.handler)
 
 
 class TestDelegateEvents:
@@ -1329,3 +1673,144 @@ class TestAuditChain:
 
         assert loaded is not None
         assert loaded["total_consumed"] == 5
+
+
+class TestJudgeVerdicts:
+    """judge_verdicts column from item #4 (verified reflexion)."""
+
+    def test_defaults_to_none(self):
+        record = _make_record()
+        assert record.judge_verdicts is None
+
+    def test_schema_includes_judge_verdicts_column(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path):
+            conn = sqlite3.connect(str(db_path))
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(audit_log)").fetchall()}
+            conn.close()
+        assert "judge_verdicts" in cols
+
+    def test_from_run_encodes_judge_verdicts(self):
+        from unittest.mock import MagicMock
+
+        verdicts = [
+            {
+                "round": 1,
+                "all_passed": False,
+                "criteria_results": [{"criterion": "c1", "passed": False, "reason": "x"}],
+            }
+        ]
+        result = MagicMock()
+        result.run_id = "run1"
+        result.output = "ok"
+        result.tokens_in = 1
+        result.tokens_out = 2
+        result.total_tokens = 3
+        result.thinking_tokens = 0
+        result.reasoning_tokens = 0
+        result.tool_calls = 0
+        result.duration_ms = 100
+        result.success = True
+        result.error = None
+        result.tool_call_names = []
+        result.event_timeline = []
+        result.judge_verdicts = verdicts
+
+        role = MagicMock()
+        role.metadata.name = "agent1"
+        role.spec.model.name = "claude-opus-4"
+        role.spec.model.provider = "anthropic"
+
+        record = AuditRecord.from_run(result, role, "test prompt")
+        assert record.judge_verdicts is not None
+        assert json.loads(record.judge_verdicts) == verdicts
+
+    def test_from_run_empty_verdicts_is_none(self):
+        from unittest.mock import MagicMock
+
+        result = MagicMock()
+        result.run_id = "run1"
+        result.output = "ok"
+        result.tokens_in = 1
+        result.tokens_out = 2
+        result.total_tokens = 3
+        result.thinking_tokens = 0
+        result.reasoning_tokens = 0
+        result.tool_calls = 0
+        result.duration_ms = 100
+        result.success = True
+        result.error = None
+        result.tool_call_names = []
+        result.event_timeline = []
+        result.judge_verdicts = []
+
+        role = MagicMock()
+        role.metadata.name = "agent1"
+        role.spec.model.name = "claude-opus-4"
+        role.spec.model.provider = "anthropic"
+
+        record = AuditRecord.from_run(result, role, "test prompt")
+        assert record.judge_verdicts is None
+
+    def test_log_and_readback_roundtrip(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        verdicts_json = json.dumps([{"round": 1, "all_passed": True, "criteria_results": []}])
+        record = _make_record(judge_verdicts=verdicts_json)
+        with AuditLogger(db_path) as logger:
+            logger.log(record)
+            records = logger.query()
+        assert records[0].judge_verdicts is not None
+        assert json.loads(records[0].judge_verdicts) == [
+            {"round": 1, "all_passed": True, "criteria_results": []}
+        ]
+
+    def test_chain_verifies_with_judge_verdicts(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="r1"))
+            logger.log(
+                _make_record(
+                    run_id="r2",
+                    judge_verdicts='[{"round":1,"all_passed":true,"criteria_results":[]}]',
+                )
+            )
+            result = logger.verify_chain()
+        assert result.ok
+        assert result.verified_rows == 2
+
+    def test_migrate_old_schema_gains_judge_verdicts(self, tmp_path):
+        db_path = tmp_path / "old.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""\
+            CREATE TABLE audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL,
+                agent_name TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                user_prompt TEXT NOT NULL,
+                model TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                output TEXT NOT NULL,
+                tokens_in INTEGER NOT NULL,
+                tokens_out INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                tool_calls INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                success BOOLEAN NOT NULL,
+                error TEXT
+            )
+        """)
+        conn.execute(
+            "INSERT INTO audit_log VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("r1", "ag", "2025-01-01", "hi", "m", "p", "o", 1, 2, 3, 0, 100, 1, None),
+        )
+        conn.commit()
+        conn.close()
+
+        with AuditLogger(db_path) as logger:
+            logger.log(_make_record(run_id="new", judge_verdicts='[{"round":1}]'))
+            records = logger.query()
+            old = next(r for r in records if r.run_id == "r1")
+            new = next(r for r in records if r.run_id == "new")
+        assert old.judge_verdicts is None
+        assert new.judge_verdicts == '[{"round":1}]'

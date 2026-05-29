@@ -3,6 +3,7 @@
 from initrunner.flow.loader import FlowLoadError, load_flow
 from initrunner.flow.schema import (
     DelegateSinkConfig,
+    DurabilityConfig,
     FlowAgentConfig,
     FlowDefinition,
     FlowMetadata,
@@ -22,6 +23,7 @@ from initrunner.flow.systemd import (
 
 __all__ = [
     "DelegateSinkConfig",
+    "DurabilityConfig",
     "FlowAgentConfig",
     "FlowDefinition",
     "FlowLoadError",

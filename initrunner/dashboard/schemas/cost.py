@@ -20,6 +20,8 @@ class AgentCostResponse(BaseModel):
     tokens_out: int
     total_cost_usd: float | None
     avg_cost_per_run: float | None
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 class DailyCostResponse(BaseModel):
@@ -44,6 +46,8 @@ class ModelCostResponse(BaseModel):
     tokens_in: int
     tokens_out: int
     total_cost_usd: float | None
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 class ToolCostResponse(BaseModel):

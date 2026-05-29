@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -29,10 +30,35 @@ class LazyPath:
 
 
 def ensure_private_dir(path: Path) -> None:
-    """Create (or tighten) a directory to mode 0o700."""
+    """Create a directory and, when we own it, tighten it to mode 0o700.
+
+    The path may be one we do not own, for example a shared parent such as
+    ``/tmp`` passed via ``--audit-db`` or a store path. Locking down such a
+    directory is not ours to do and would raise ``PermissionError``, so
+    permissions are only adjusted on a directory we just created or already own.
+    Privacy of the data itself is enforced at the file level (see
+    :func:`secure_database`, mode 0o600).
+    """
+    newly_created = not path.exists()
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if sys.platform != "win32":
+    if sys.platform == "win32":
+        return
+    if not (newly_created or _owned_by_current_user(path)):
+        return
+    try:
         path.chmod(0o700)
+    except OSError:
+        # A directory we cannot lock down still holds only 0o600 data files,
+        # so audit and store contents stay owner-only regardless.
+        pass
+
+
+def _owned_by_current_user(path: Path) -> bool:
+    """Return True if ``path`` is owned by the current user (POSIX, best effort)."""
+    try:
+        return path.stat().st_uid == os.getuid()
+    except (OSError, AttributeError):
+        return False
 
 
 def secure_database(db_path: Path) -> None:

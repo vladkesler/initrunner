@@ -10,6 +10,7 @@ from pathlib import Path
 import lancedb  # type: ignore[import-not-found]
 import pyarrow as pa  # type: ignore[import-not-found]
 
+from initrunner._log import get_logger
 from initrunner._paths import ensure_private_dir
 from initrunner.stores._helpers import _glob_to_sql_like
 from initrunner.stores._lance_common import (
@@ -27,6 +28,9 @@ from initrunner.stores.base import DocumentStore, SearchResult
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
+
+# Name of the BM25 full-text index built on the ``text`` column for hybrid search.
+_FTS_INDEX_NAME = "text_fts"
 
 _FILE_META_SCHEMA = pa.schema(
     [
@@ -64,6 +68,81 @@ def wipe_document_store(db_path: Path) -> None:
         shutil.rmtree(db_path)
 
 
+_DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+logger = get_logger("stores")
+
+
+def _build_fusion_reranker(retrieval_strategy: str, reranker_model: str) -> object:
+    """Build the lancedb reranker for the requested hybrid strategy.
+
+    ``hybrid`` always uses reciprocal rank fusion (RRF), which needs no extra
+    dependency. ``hybrid_rerank`` adds a cross-encoder on top, but the
+    cross-encoder backend (``sentence-transformers`` plus ``torch``) is optional:
+    when it is not installed the reranker degrades to plain RRF so the search
+    still succeeds. The cross-encoder is never a required dependency.
+    """
+    from lancedb.rerankers import RRFReranker  # type: ignore[import-not-found]
+
+    if retrieval_strategy != "hybrid_rerank":
+        return RRFReranker()
+
+    from lancedb.rerankers import CrossEncoderReranker  # type: ignore[import-not-found]
+
+    model_name = reranker_model or _DEFAULT_RERANKER_MODEL
+    try:
+        return CrossEncoderReranker(model_name=model_name)
+    except ImportError:
+        logger.debug(
+            "cross-encoder reranking unavailable (install sentence-transformers); "
+            "falling back to RRF fusion"
+        )
+        return RRFReranker()
+
+
+def _rows_to_results(
+    rows: list[dict],
+    top_k: int,
+    source_filter: str | None,
+    use_fnmatch: bool,
+) -> list[SearchResult]:
+    """Convert hybrid query rows into ``SearchResult`` objects.
+
+    lancedb returns a ``_relevance_score`` per row (higher is better). It is
+    min-max normalised across the candidate pool to ``[0, 1]`` and stored as a
+    distance (``1 - relevance``) so existing consumers that expect a smaller
+    distance to mean a closer match keep working unchanged.
+    """
+    scored: list[tuple[dict, str, float]] = []
+    for row in rows:
+        source = row.get("source", "")
+        if use_fnmatch and not fnmatch.fnmatch(source, source_filter):  # type: ignore[arg-type]
+            continue
+        scored.append((row, source, float(row.get("_relevance_score", 0.0))))
+
+    if not scored:
+        return []
+
+    relevances = [s for _, _, s in scored]
+    lo, hi = min(relevances), max(relevances)
+    span = hi - lo
+
+    results: list[SearchResult] = []
+    for row, source, relevance in scored:
+        norm = (relevance - lo) / span if span > 0 else 1.0
+        results.append(
+            SearchResult(
+                chunk_id=int(row["id"]),
+                text=row.get("text", ""),
+                source=source,
+                distance=1.0 - norm,
+            )
+        )
+        if len(results) >= top_k:
+            break
+    return results
+
+
 # ---------------------------------------------------------------------------
 # LanceDocumentStore
 # ---------------------------------------------------------------------------
@@ -88,6 +167,7 @@ class LanceDocumentStore(DocumentStore):
 
         # Chunks table -- only created once dimensions are known
         self._chunks_ready = False
+        self._fts_ready = False
         if self._dimensions is not None:
             self._ensure_chunks_table(self._dimensions)
 
@@ -99,6 +179,21 @@ class LanceDocumentStore(DocumentStore):
         if "chunks" not in _table_names(self._db):
             self._db.create_table("chunks", schema=_make_chunks_schema(dimensions))
         self._chunks_ready = True
+
+    def _ensure_fts_index(self) -> None:
+        """Create a BM25 full-text index on the ``text`` column if absent.
+
+        Uses the native (tantivy-free) FTS engine so no extra dependency is
+        required. Idempotent: subsequent calls are cheap no-ops once the index
+        exists. Callers must hold ``self._lock``.
+        """
+        if self._fts_ready:
+            return
+        tbl = self._db.open_table("chunks")
+        existing = {ix.name for ix in tbl.list_indices()}
+        if _FTS_INDEX_NAME not in existing:
+            tbl.create_fts_index("text", name=_FTS_INDEX_NAME, use_tantivy=False, replace=True)
+        self._fts_ready = True
 
     def _alloc_ids(self, count: int) -> list[int]:
         """Allocate *count* sequential IDs."""
@@ -145,6 +240,26 @@ class LanceDocumentStore(DocumentStore):
             tbl = self._db.open_table("chunks")
             tbl.add(data)
             self._flush_counter()
+            self._ensure_fts_index()
+
+    @staticmethod
+    def _build_source_filter(source_filter: str | None) -> tuple[str | None, bool]:
+        """Translate a source filter into a SQL predicate or fnmatch flag.
+
+        Returns ``(filter_expr, use_fnmatch)``. ``filter_expr`` is a SQL ``where``
+        clause when the filter is an exact path or a glob expressible as ``like``.
+        ``use_fnmatch`` is set when the glob uses character classes (``[...]``),
+        which SQL ``like`` cannot represent, so filtering happens in Python.
+        """
+        if source_filter is None:
+            return None, False
+        is_glob = "*" in source_filter or "?" in source_filter
+        if not is_glob:
+            return f"source = '{_esc(source_filter)}'", False
+        if "[" not in source_filter:
+            like_pattern = _glob_to_sql_like(source_filter)
+            return f"source like '{_esc(like_pattern)}'", False
+        return None, True
 
     def query(
         self,
@@ -160,19 +275,7 @@ class LanceDocumentStore(DocumentStore):
             if tbl.count_rows() == 0:
                 return []
 
-            filter_expr: str | None = None
-            use_fnmatch = False
-
-            if source_filter is not None:
-                is_glob = "*" in source_filter or "?" in source_filter
-
-                if not is_glob:
-                    filter_expr = f"source = '{_esc(source_filter)}'"
-                elif "[" not in source_filter:
-                    like_pattern = _glob_to_sql_like(source_filter)
-                    filter_expr = f"source like '{_esc(like_pattern)}'"
-                else:
-                    use_fnmatch = True
+            filter_expr, use_fnmatch = self._build_source_filter(source_filter)
 
             fetch_k = top_k * 10 if use_fnmatch else top_k
 
@@ -199,6 +302,50 @@ class LanceDocumentStore(DocumentStore):
                     break
 
             return search_results
+
+    def hybrid_search(
+        self,
+        query_text: str,
+        embedding: list[float],
+        top_k: int = 5,
+        retrieval_strategy: str = "vector",
+        source_filter: str | None = None,
+        reranker_model: str = "",
+    ) -> list[SearchResult]:
+        if retrieval_strategy == "vector":
+            return self.query(embedding, top_k=top_k, source_filter=source_filter)
+        if retrieval_strategy not in ("hybrid", "hybrid_rerank"):
+            raise ValueError(f"Unknown retrieval_strategy: {retrieval_strategy!r}")
+        if not query_text.strip():
+            # BM25 has nothing to match on; fall back to dense search.
+            return self.query(embedding, top_k=top_k, source_filter=source_filter)
+
+        with self._lock:
+            if not self._chunks_ready:
+                return []
+            tbl = self._db.open_table("chunks")
+            if tbl.count_rows() == 0:
+                return []
+            self._ensure_fts_index()
+
+            reranker = _build_fusion_reranker(retrieval_strategy, reranker_model)
+            filter_expr, use_fnmatch = self._build_source_filter(source_filter)
+
+            # Fetch a deeper candidate pool than top_k so fusion and reranking
+            # have material to reorder; widen further when fnmatch post-filters.
+            fetch_k = top_k * 10 if use_fnmatch else top_k * 5
+
+            search = (
+                tbl.search(query_type="hybrid")  # type: ignore[unresolved-attribute]
+                .vector(embedding)
+                .text(query_text)
+                .metric("cosine")
+            )
+            if filter_expr is not None:
+                search = search.where(filter_expr, prefilter=True)
+            rows = search.rerank(reranker).limit(fetch_k).select(["id", "text", "source"]).to_list()
+
+            return _rows_to_results(rows, top_k, source_filter, use_fnmatch)
 
     def count(self) -> int:
         with self._lock:
@@ -332,6 +479,7 @@ class LanceDocumentStore(DocumentStore):
                 ]
                 tbl.add(data)
                 self._flush_counter()
+                self._ensure_fts_index()
 
             fm = self._db.open_table("file_metadata")
             fm.merge_insert("id").when_matched_update_all().when_not_matched_insert_all().execute(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from initrunner._log import get_logger
 from initrunner.agent.reflection import ReflectionState
 from initrunner.agent.schema.reasoning import (
     DEFAULT_REFLEXION_DIMENSIONS,
@@ -11,6 +12,7 @@ from initrunner.agent.schema.reasoning import (
     ReflexionDimension,
 )
 from initrunner.agent.schema.tools import TodoToolConfig
+from initrunner.eval.judge import run_judge_sync
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
@@ -170,20 +172,40 @@ class PlanExecuteStrategy:
         return [toolset]
 
 
+_MAX_CONSECUTIVE_JUDGE_FAILURES = 2
+
+
 class ReflexionStrategy:
-    """Post-completion self-critique rounds."""
+    """Post-completion self-critique rounds, optionally gated by an eval judge.
+
+    When ``success_criteria`` are supplied, each reflexion round runs an
+    LLM-as-judge against the latest summary before composing the next prompt.
+    A round that passes every criterion is recorded as verified and the loop
+    advances to the next dimension (or finishes early once all rounds clear).
+    A round that fails injects the per-criterion reasons into the next prompt
+    so the agent can address them directly. The judge call is best-effort: if
+    it raises, the round falls back to the plain dimension prompt, and after
+    two consecutive judge failures the judge is disabled for the rest of the
+    run so a broken judge cannot stall reflexion.
+    """
 
     def __init__(
         self,
         continuation_prompt: str,
         reflection_rounds: int,
         dimensions: list[ReflexionDimension],
+        success_criteria: list[str] | None = None,
+        judge_model: str = "openai:gpt-4o-mini",
     ) -> None:
         self._continuation = continuation_prompt
         self._reflection_rounds = reflection_rounds
         self._dimensions = dimensions
+        self._success_criteria = success_criteria
+        self._judge_model = judge_model
         self._base_completed = False
         self._reflexion_count = 0
+        self._consecutive_judge_failures = 0
+        self._judge_disabled = False
 
     def wrap_initial_prompt(self, prompt: UserPrompt) -> UserPrompt:
         return prompt
@@ -193,19 +215,102 @@ class ReflexionStrategy:
 
         state_text = format_reflection_state(state)
 
-        if self._base_completed:
-            self._reflexion_count += 1
-            dim = self._dimensions[(self._reflexion_count - 1) % len(self._dimensions)]
+        if not self._base_completed:
+            return f"{self._continuation}\n\nCURRENT STATUS:\n{state_text}"
+
+        if self._success_criteria and not self._judge_disabled:
+            verified_prompt = self._verify_and_build(state, state_text)
+            if verified_prompt is not None:
+                return verified_prompt
+
+        return self._build_dimension_prompt(state, state_text)
+
+    def _verify_and_build(self, state: ReflectionState, state_text: str) -> str | None:
+        """Run the judge and, on a passing verdict, build the verified prompt.
+
+        Returns the verified-round prompt when all criteria pass, or ``None``
+        to signal the caller should fall through to the plain dimension prompt
+        (criteria failed, or the judge raised). Stores every verdict on
+        ``state.judge_verdicts`` for auditing.
+        """
+        assert self._success_criteria is not None
+        try:
+            verdict = run_judge_sync(state.summary, self._success_criteria, self._judge_model)
+        except Exception as e:
+            self._consecutive_judge_failures += 1
+            if self._consecutive_judge_failures >= _MAX_CONSECUTIVE_JUDGE_FAILURES:
+                self._judge_disabled = True
+            get_logger("reasoning").warning(
+                "Reflexion judge evaluation failed: %s. Continuing with dimension prompt.", e
+            )
+            return None
+
+        self._consecutive_judge_failures = 0
+        state.judge_verdicts.append(
+            {
+                "round": self._reflexion_count + 1,
+                "all_passed": verdict.all_passed,
+                "criteria_results": [
+                    {"criterion": cr.criterion, "passed": cr.passed, "reason": cr.reason}
+                    for cr in verdict.criteria_results
+                ],
+            }
+        )
+
+        if not verdict.all_passed:
+            return None
+
+        # Verified: advance the round counter past this dimension.
+        self._reflexion_count += 1
+        if self._reflexion_count >= self._reflection_rounds:
+            state.completed = True
             return (
-                f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}) "
-                f"-- {dim.name.upper()}:\n"
-                f"{dim.prompt}\n\n"
-                f"Make corrections if needed, then call finish_task when satisfied.\n\n"
-                f"Your previous summary: {state.summary}\n\n"
+                "All verification criteria passed. The task is verified as complete. "
+                "Call finish_task to confirm.\n\n"
                 f"CURRENT STATUS:\n{state_text}"
             )
 
-        return f"{self._continuation}\n\nCURRENT STATUS:\n{state_text}"
+        dim = self._dimensions[self._reflexion_count % len(self._dimensions)]
+        return (
+            f"REFLECTION ({self._reflexion_count + 1}/{self._reflection_rounds}) "
+            f"-- {dim.name.upper()} [VERIFIED]:\n"
+            f"{dim.prompt}\n\n"
+            "The previous round passed every verification criterion. "
+            "Continue to the next dimension, then call finish_task when satisfied.\n\n"
+            f"Your previous summary: {state.summary}\n\n"
+            f"CURRENT STATUS:\n{state_text}"
+        )
+
+    def _build_dimension_prompt(self, state: ReflectionState, state_text: str) -> str:
+        self._reflexion_count += 1
+        dim = self._dimensions[(self._reflexion_count - 1) % len(self._dimensions)]
+        judge_context = self._format_failed_criteria(state)
+        return (
+            f"REFLECTION ({self._reflexion_count}/{self._reflection_rounds}) "
+            f"-- {dim.name.upper()}:\n"
+            f"{dim.prompt}\n\n"
+            f"Make corrections if needed, then call finish_task when satisfied."
+            f"{judge_context}\n\n"
+            f"Your previous summary: {state.summary}\n\n"
+            f"CURRENT STATUS:\n{state_text}"
+        )
+
+    @staticmethod
+    def _format_failed_criteria(state: ReflectionState) -> str:
+        """Render the most recent failed-criteria reasons for the agent."""
+        if not state.judge_verdicts:
+            return ""
+        last = state.judge_verdicts[-1]
+        if last.get("all_passed"):
+            return ""
+        failed = [cr for cr in last.get("criteria_results", []) if not cr.get("passed")]
+        if not failed:
+            return ""
+        lines = ["\n\nJudge feedback on the previous round:"]
+        for cr in failed:
+            lines.append(f"- {cr['criterion']}: {cr['reason']}")
+        lines.append("Address these issues in your revision.")
+        return "\n".join(lines)
 
     def should_continue(self, state: ReflectionState, iteration: int) -> bool:
         if not state.completed:
@@ -266,8 +371,30 @@ def resolve_strategy(
             dims = list(config.reflection_dimensions)
         else:
             dims = DEFAULT_REFLEXION_DIMENSIONS[: config.reflection_rounds]
-        return ReflexionStrategy(continuation, config.reflection_rounds, dims)
+        return ReflexionStrategy(
+            continuation,
+            config.reflection_rounds,
+            dims,
+            success_criteria=config.success_criteria,
+            judge_model=_resolve_judge_model(role),
+        )
     return ReactStrategy(continuation)
+
+
+_DEFAULT_JUDGE_MODEL = "openai:gpt-4o-mini"
+
+
+def _resolve_judge_model(role: RoleDefinition) -> str:
+    """Pick the judge model for verified reflexion.
+
+    Reuses the role's own configured model so verification stays on the same
+    provider the agent already authenticates against, falling back to a small
+    default only when the role leaves its model unset.
+    """
+    model = role.spec.model
+    if model is not None and model.is_resolved():
+        return model.to_model_string()
+    return _DEFAULT_JUDGE_MODEL
 
 
 # ---------------------------------------------------------------------------

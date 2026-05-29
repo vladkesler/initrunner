@@ -162,6 +162,7 @@ async def _execute_orchestrated_async(
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
+    judge_verdicts: list[dict[str, Any]] | None = None,
 ) -> tuple[RunResult, list]:
     """Async execution skeleton shared by ``execute_run_async`` and ``execute_run_stream_async``."""
     agent_token = _enter_agent_context(role)
@@ -205,6 +206,9 @@ async def _execute_orchestrated_async(
             result.duration_ms = int((time.monotonic() - start) * 1000)
             _record_span_metrics(span, result)
 
+        if judge_verdicts:
+            result.judge_verdicts = list(judge_verdicts)
+
         _audit_result(
             result,
             role,
@@ -238,6 +242,7 @@ def execute_run(
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
+    judge_verdicts: list[dict[str, Any]] | None = None,
 ) -> tuple[RunResult, list]:
     """Sync wrapper around ``execute_run_async`` (owns the event loop)."""
     return run_sync(
@@ -253,6 +258,7 @@ def execute_run(
             extra_toolsets=extra_toolsets,
             skip_input_validation=skip_input_validation,
             principal_id=principal_id,
+            judge_verdicts=judge_verdicts,
         )
     )
 
@@ -302,7 +308,9 @@ async def _execute_resume_async_inner(
                     _retry_model_call_async(lambda: agent.run(**run_kwargs)),
                     timeout=timeout,
                 )
-                new_messages = _process_agent_output(agent_result, result, role)
+                new_messages = _process_agent_output(
+                    agent_result, result, role, capture_timeline=audit_logger is not None
+                )
             except ContentBlockedError as e:
                 result.success = False
                 result.error = e.reason
@@ -449,16 +457,20 @@ async def execute_run_async(
     extra_toolsets: list | None = None,
     skip_input_validation: bool = False,
     principal_id: str | None = None,
+    judge_verdicts: list[dict[str, Any]] | None = None,
 ) -> tuple[RunResult, list]:
     """Async variant of ``execute_run`` -- uses ``agent.run()`` + ``asyncio.wait_for``."""
     timeout = role.spec.guardrails.timeout_seconds
+    # When the run will be audited, reconstruct the tool-call/result timeline
+    # from the run's messages -- the buffered path has no live stream events.
+    capture_timeline = audit_logger is not None
 
     async def invoke(run_kwargs: dict, result: RunResult) -> list:
         agent_result = await asyncio.wait_for(
             _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
             timeout=timeout,
         )
-        return _process_agent_output(agent_result, result, role)
+        return _process_agent_output(agent_result, result, role, capture_timeline=capture_timeline)
 
     return await _execute_orchestrated_async(
         invoke,
@@ -473,6 +485,7 @@ async def execute_run_async(
         extra_toolsets=extra_toolsets,
         skip_input_validation=skip_input_validation,
         principal_id=principal_id,
+        judge_verdicts=judge_verdicts,
     )
 
 
@@ -517,9 +530,19 @@ async def execute_run_stream_async(
     timeout = role.spec.guardrails.timeout_seconds
     is_structured = role.spec.output.type != "text"
     output_parts: list[str] = []
+    event_timeline: list[dict[str, Any]] = []
+    # When the run will be audited, persist the timeline even without a live
+    # on_event consumer. The on_event backbone builds it from live stream
+    # events; the run_stream backbone reconstructs it from the final messages.
+    capture_timeline = audit_logger is not None
 
     async def invoke(run_kwargs: dict, result: RunResult) -> list:
-        stream_state: dict[str, Any] = {"messages": [], "usage": None, "output": None}
+        stream_state: dict[str, Any] = {
+            "messages": [],
+            "usage": None,
+            "output": None,
+            "reasoning_tokens": None,
+        }
 
         if on_event is not None:
 
@@ -527,6 +550,14 @@ async def execute_run_stream_async(
                 from pydantic_ai import AgentRunResultEvent
                 from pydantic_ai.messages import PartDeltaEvent, TextPartDelta
 
+                from .executor_output import (
+                    _extract_reasoning_tokens,
+                    build_timeline_entry,
+                )
+
+                # A retry replays the whole stream, so drop anything captured
+                # by the prior attempt to keep the timeline consistent.
+                event_timeline.clear()
                 async for event in agent.run_stream_events(prompt, **run_kwargs):
                     on_event(event)
                     if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
@@ -535,10 +566,18 @@ async def execute_run_stream_async(
                             output_parts.append(text)
                             if on_token is not None:
                                 on_token(text)
-                    elif isinstance(event, AgentRunResultEvent):
+                        continue
+                    if isinstance(event, AgentRunResultEvent):
                         stream_state["output"] = event.result.output
                         stream_state["usage"] = event.result.usage
                         stream_state["messages"] = event.result.all_messages()
+                        stream_state["reasoning_tokens"] = _extract_reasoning_tokens(
+                            event.result.usage
+                        )
+                        continue
+                    entry = build_timeline_entry(event)
+                    if entry is not None:
+                        event_timeline.append(entry)
 
             await asyncio.wait_for(
                 _retry_model_call_async(_do_stream_events, on_retry=output_parts.clear),
@@ -572,6 +611,9 @@ async def execute_run_stream_async(
             stream_state["messages"],
             result,
             role,
+            reasoning_tokens=stream_state["reasoning_tokens"],
+            event_timeline=event_timeline if on_event is not None else None,
+            capture_timeline=capture_timeline,
         )
         return stream_state["messages"]
 

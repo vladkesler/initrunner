@@ -80,11 +80,19 @@ def test(
     tag: Annotated[
         list[str] | None, typer.Option("--tag", help="Filter cases by tag (repeatable)")
     ] = None,
+    pydantic_evals: Annotated[
+        bool,
+        typer.Option(
+            "--pydantic-evals",
+            help="Run via pydantic-evals with OTel span capture (needs observability extra)",
+        ),
+    ] = False,
     model: ModelOption = None,
 ) -> None:
     """Run a test suite against an agent role."""
     role_file = resolve_role_path(role_file)
 
+    from initrunner._compat import MissingExtraError
     from initrunner.eval.runner import SuiteLoadError, load_suite
     from initrunner.services.eval import run_suite_sync, save_result
 
@@ -112,15 +120,20 @@ def test(
         + (f" [dim](concurrency={concurrency})[/dim]" if concurrency > 1 else "")
     )
 
-    suite_result = run_suite_sync(
-        agent,
-        role,
-        test_suite,
-        dry_run=dry_run,
-        concurrency=concurrency,
-        tag_filter=tag,
-        role_file=role_file,
-    )
+    try:
+        suite_result = run_suite_sync(
+            agent,
+            role,
+            test_suite,
+            dry_run=dry_run,
+            concurrency=concurrency,
+            tag_filter=tag,
+            role_file=role_file,
+            pydantic_evals=pydantic_evals,
+        )
+    except MissingExtraError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     _display_suite_result(suite_result, verbose=verbose)
 
     if output is not None:

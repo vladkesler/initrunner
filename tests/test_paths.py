@@ -25,6 +25,51 @@ def test_ensure_private_dir_tightens_existing(tmp_path):
     assert stat.S_IMODE(target.stat().st_mode) == 0o700
 
 
+def test_ensure_private_dir_skips_unowned_existing(tmp_path, monkeypatch):
+    """A pre-existing directory we do not own is left untouched, never chmod'd."""
+    import initrunner._paths as paths
+
+    target = tmp_path / "shared"
+    target.mkdir(mode=0o755)
+    monkeypatch.setattr(paths, "_owned_by_current_user", lambda p: False)
+    ensure_private_dir(target)  # must not raise
+    # permissions stay as the real owner set them, not forced to 0o700
+    assert stat.S_IMODE(target.stat().st_mode) == 0o755
+
+
+def test_ensure_private_dir_survives_chmod_permission_error(tmp_path, monkeypatch):
+    """A directory we cannot chmod (the /tmp case) must not crash the caller."""
+    target = tmp_path / "locked"
+    target.mkdir(mode=0o755)
+
+    def _boom(*_args, **_kwargs):
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr("pathlib.Path.chmod", _boom)
+    ensure_private_dir(target)  # PermissionError is swallowed, no raise
+
+
+def test_audit_logger_in_unowned_parent_does_not_crash(tmp_path, monkeypatch):
+    """Regression: --audit-db under a parent we do not own (e.g. /tmp) must not crash init."""
+    import initrunner._paths as paths
+    from initrunner.audit.logger import AuditLogger
+
+    parent = tmp_path / "shared_tmp"
+    parent.mkdir(mode=0o755)
+    # Simulate a shared, not-owned parent like /tmp.
+    monkeypatch.setattr(paths, "_owned_by_current_user", lambda p: False)
+    logger = AuditLogger(db_path=parent / "audit.db")
+    try:
+        db = parent / "audit.db"
+        assert db.exists()
+        # the parent's permissions are left alone ...
+        assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+        # ... while the data file itself is still locked down to owner-only.
+        assert stat.S_IMODE(db.stat().st_mode) == 0o600
+    finally:
+        logger.close()
+
+
 def test_secure_database_sets_0o600(tmp_path):
     db = tmp_path / "test.db"
     db.write_text("data")

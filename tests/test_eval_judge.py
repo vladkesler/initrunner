@@ -167,3 +167,73 @@ class TestRunJudgeSync:
         prompt_arg = mock_agent.run_sync.call_args[0][0]
         assert "test output" in prompt_arg
         assert "Is good" in prompt_arg
+
+
+class TestEnsembleJudgeVoteSync:
+    def test_winner_passes_most_criteria(self):
+        from initrunner.eval.judge import VotingResult, ensemble_judge_vote_sync
+
+        side = [
+            JudgeResult(
+                criteria_results=[
+                    JudgeCriterionResult(criterion="c1", passed=True, reason=""),
+                    JudgeCriterionResult(criterion="c2", passed=True, reason=""),
+                ]
+            ),
+            JudgeResult(
+                criteria_results=[
+                    JudgeCriterionResult(criterion="c1", passed=True, reason=""),
+                    JudgeCriterionResult(criterion="c2", passed=False, reason=""),
+                ]
+            ),
+        ]
+        with patch("initrunner.eval.judge.run_judge_sync", side_effect=side):
+            result = ensemble_judge_vote_sync(["strong", "weak"], ["c1", "c2"])
+        assert isinstance(result, VotingResult)
+        assert result.winning_index == 0
+
+    def test_to_dict_round_trips(self):
+        from initrunner.eval.judge import ensemble_judge_vote_sync
+
+        with patch(
+            "initrunner.eval.judge.run_judge_sync",
+            return_value=JudgeResult(
+                criteria_results=[JudgeCriterionResult(criterion="c1", passed=True, reason="")]
+            ),
+        ):
+            result = ensemble_judge_vote_sync(["only"], ["c1"])
+        d = result.to_dict()
+        assert d["winning_index"] == 0
+        assert d["criteria"] == ["c1"]
+
+
+class TestPublicJudgeAliases:
+    def test_public_aliases_point_to_private(self):
+        from initrunner.eval.judge import (
+            _get_judge_agent,
+            _parse_judge_response,
+            get_judge_agent,
+            parse_judge_response,
+        )
+
+        assert get_judge_agent is _get_judge_agent
+        assert parse_judge_response is _parse_judge_response
+
+    def test_parse_judge_response_public_alias_works(self):
+        from initrunner.eval.judge import parse_judge_response
+
+        response = json.dumps({"results": [{"criterion": "c1", "passed": True, "reason": "ok"}]})
+        result = parse_judge_response(response, ["c1"])
+        assert result.all_passed
+
+    @patch("pydantic_ai.Agent")
+    def test_get_judge_agent_public_alias_caches(self, mock_agent_cls):
+        from initrunner.eval.judge import _judge_cache, get_judge_agent
+
+        _judge_cache.clear()
+        mock_agent_cls.return_value = "judge-agent"
+        agent1 = get_judge_agent("test:model")
+        agent2 = get_judge_agent("test:model")
+        assert agent1 == "judge-agent"
+        assert agent2 == "judge-agent"
+        mock_agent_cls.assert_called_once()

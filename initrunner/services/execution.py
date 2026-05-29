@@ -327,6 +327,12 @@ async def execute_run_stream_async(
     the executor falls back to ``async with agent.run_stream(...)`` and
     routes text deltas to ``on_token`` or validated partials to
     ``on_partial`` depending on the role's output type.
+
+    With ``on_event`` set, the executor also consumes the full event stream:
+    thinking deltas, tool-call deltas, and tool-call/result events are reduced
+    into a redacted ``RunResult.event_timeline`` and any reasoning-token count
+    on the final event is captured in ``RunResult.reasoning_tokens``. Both are
+    persisted to the audit trail for cost tracking and observability.
     """
     from initrunner.agent.executor import execute_run_stream_async as _stream_async
 

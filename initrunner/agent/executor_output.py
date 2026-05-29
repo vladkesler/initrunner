@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from contextlib import contextmanager
 from typing import Any
 
@@ -13,6 +14,7 @@ from pydantic_ai.models.fallback import FallbackExceptionGroup
 
 from initrunner.agent.prompt import UserPrompt, attachment_summary, extract_text_from_prompt
 from initrunner.agent.schema.role import RoleDefinition
+from initrunner.audit._redact import scrub_secrets
 from initrunner.audit.logger import AuditLogger, AuditRecord
 
 from .executor_models import ErrorCategory, PendingApproval, RunResult
@@ -191,6 +193,39 @@ def _audit_result(
 # ---------------------------------------------------------------------------
 
 
+_THINKING_DETAIL_KEYS = ("thinking_tokens", "reasoning_tokens")
+
+
+def _extract_thinking_tokens(usage: Any) -> int:
+    """Return the thinking/reasoning token count from a pydantic_ai usage object.
+
+    Handles both a direct ``thinking_tokens`` attribute (should a future
+    pydantic_ai release add one) and the current shape, where OpenAI reasoning
+    tokens surface inside the ``details`` dict under ``reasoning_tokens``.
+    Returns 0 when no such count is present.
+    """
+    direct = getattr(usage, "thinking_tokens", None)
+    if direct:
+        return int(direct)
+    details = getattr(usage, "details", None)
+    if isinstance(details, dict):
+        for key in _THINKING_DETAIL_KEYS:
+            value = details.get(key)
+            if value:
+                return int(value)
+    return 0
+
+
+def _extract_reasoning_tokens(usage: Any) -> int:
+    """Return the reasoning token count from a usage object, else 0.
+
+    Alias of ``_extract_thinking_tokens`` kept as a named entry point for the
+    streaming consumer, which talks about "reasoning tokens" to match the
+    pydantic_ai event vocabulary. Both surface the same underlying count.
+    """
+    return _extract_thinking_tokens(usage)
+
+
 def _extract_tool_call_names(messages: list) -> list[str]:
     """Extract tool call names from message history."""
     from pydantic_ai.messages import ModelResponse, ToolCallPart
@@ -204,18 +239,212 @@ def _extract_tool_call_names(messages: list) -> list[str]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Streaming event timeline (redacted, best-effort observability log)
+# ---------------------------------------------------------------------------
+
+# Cap so a long-running agent with many tool calls cannot grow an unbounded
+# timeline. We keep the most recent entries (the tail), which is where the
+# interesting failures tend to be.
+_TIMELINE_MAX_ENTRIES = 500
+
+
+def _now_ms() -> int:
+    """Wall-clock milliseconds for timeline ordering. Best-effort, monotonic-ish."""
+    return int(time.time() * 1000)
+
+
+def _truncate_redact(text: str | None, max_len: int) -> str | None:
+    """Secret-scrub then length-bound a free-text preview for the timeline."""
+    if not text:
+        return None
+    scrubbed = scrub_secrets(text)
+    if len(scrubbed) > max_len:
+        return scrubbed[:max_len] + "[truncated]"
+    return scrubbed
+
+
+def _preview_args(args: Any, max_len: int) -> str | None:
+    """Render tool-call args (dict or JSON string) to a redacted preview."""
+    if args is None:
+        return None
+    rendered = json.dumps(args, default=str) if isinstance(args, dict) else str(args)
+    return _truncate_redact(rendered, max_len)
+
+
+def build_timeline_entry(event: Any) -> dict[str, Any] | None:
+    """Map a typed ``AgentStreamEvent`` to a redacted plain-dict timeline entry.
+
+    Returns ``None`` for events we do not record (text deltas, start/end
+    markers). Every returned dict is JSON-serializable and secret-scrubbed,
+    so it is safe to persist in the audit trail. Never raises -- a malformed
+    event yields ``None`` rather than crashing the stream.
+    """
+    from pydantic_ai.messages import (
+        FunctionToolCallEvent,
+        FunctionToolResultEvent,
+        PartDeltaEvent,
+        ThinkingPartDelta,
+        ToolCallPartDelta,
+    )
+
+    try:
+        if isinstance(event, PartDeltaEvent):
+            delta = event.delta
+            if isinstance(delta, ThinkingPartDelta):
+                return {
+                    "type": "thinking_delta",
+                    "timestamp_unix_ms": _now_ms(),
+                    "content_delta": _truncate_redact(delta.content_delta, 200),
+                    "has_signature": delta.signature_delta is not None,
+                    "provider_name": delta.provider_name,
+                }
+            if isinstance(delta, ToolCallPartDelta):
+                return {
+                    "type": "tool_call_delta",
+                    "timestamp_unix_ms": _now_ms(),
+                    "tool_call_id": delta.tool_call_id,
+                    "tool_name_delta": delta.tool_name_delta,
+                    "args_delta_preview": _preview_args(delta.args_delta, 120),
+                }
+            return None
+        if isinstance(event, FunctionToolCallEvent):
+            part = event.part
+            return {
+                "type": "function_tool_call",
+                "timestamp_unix_ms": _now_ms(),
+                "tool_call_id": part.tool_call_id,
+                "tool_name": part.tool_name,
+                "args_preview": _preview_args(part.args, 120),
+                "args_valid": event.args_valid,
+            }
+        if isinstance(event, FunctionToolResultEvent):
+            content = event.content
+            content_preview = _truncate_redact(content, 120) if isinstance(content, str) else None
+            part_type = type(event.part).__name__ if event.part is not None else None
+            return {
+                "type": "function_tool_result",
+                "timestamp_unix_ms": _now_ms(),
+                "content_preview": content_preview,
+                "part_type": part_type,
+            }
+    except Exception:
+        # Timeline is best-effort observability; never let it break the run.
+        return None
+    return None
+
+
+def build_timeline_from_messages(messages: list) -> list[dict[str, Any]]:
+    """Reconstruct a redacted timeline from a run's final message history.
+
+    Used by the buffered (non-streaming) path and the streaming path's
+    ``run_stream()`` backbone, which never see live ``AgentStreamEvent``
+    instances. Walks messages in order, emitting the same entry shapes
+    ``build_timeline_entry`` produces for live events:
+
+    - ``ThinkingPart``     -> ``thinking_delta`` entry
+    - ``ToolCallPart``     -> ``function_tool_call`` entry
+    - ``ToolReturnPart``   -> ``function_tool_result`` entry
+
+    Every free-text value is secret-scrubbed and length-bounded. Never
+    raises -- a malformed message yields no entry rather than crashing the
+    run. The result is uncapped here; callers run it through ``cap_timeline``.
+    """
+    from pydantic_ai.messages import (
+        ModelRequest,
+        ModelResponse,
+        ThinkingPart,
+        ToolCallPart,
+        ToolReturnPart,
+    )
+
+    timeline: list[dict[str, Any]] = []
+    for message in messages:
+        try:
+            parts = getattr(message, "parts", None)
+            if not parts:
+                continue
+            # Tool calls and thinking originate in model responses; tool
+            # returns come back in the following request. Emitting in message
+            # order keeps call-then-result adjacency in the timeline.
+            if isinstance(message, ModelResponse):
+                for part in parts:
+                    if isinstance(part, ThinkingPart):
+                        timeline.append(
+                            {
+                                "type": "thinking_delta",
+                                "timestamp_unix_ms": _now_ms(),
+                                "content_delta": _truncate_redact(part.content, 200),
+                                "has_signature": part.signature is not None,
+                                "provider_name": part.provider_name,
+                            }
+                        )
+                    elif isinstance(part, ToolCallPart):
+                        timeline.append(
+                            {
+                                "type": "function_tool_call",
+                                "timestamp_unix_ms": _now_ms(),
+                                "tool_call_id": part.tool_call_id,
+                                "tool_name": part.tool_name,
+                                "args_preview": _preview_args(part.args, 120),
+                                "args_valid": True,
+                            }
+                        )
+            elif isinstance(message, ModelRequest):
+                for part in parts:
+                    if isinstance(part, ToolReturnPart):
+                        content = part.content
+                        content_preview = (
+                            _truncate_redact(content, 120) if isinstance(content, str) else None
+                        )
+                        timeline.append(
+                            {
+                                "type": "function_tool_result",
+                                "timestamp_unix_ms": _now_ms(),
+                                "content_preview": content_preview,
+                                "part_type": type(part).__name__,
+                            }
+                        )
+        except Exception:
+            # Timeline is best-effort observability; never let it break the run.
+            continue
+    return timeline
+
+
+def cap_timeline(timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Bound timeline length, keeping the most recent entries."""
+    if len(timeline) > _TIMELINE_MAX_ENTRIES:
+        return timeline[-_TIMELINE_MAX_ENTRIES:]
+    return timeline
+
+
 def _finalize_run_output(
     raw_output: Any,
     usage: Any,
     new_messages: list,
     result: RunResult,
     role: RoleDefinition,
+    *,
+    reasoning_tokens: int | None = None,
+    event_timeline: list[dict[str, Any]] | None = None,
+    capture_timeline: bool = False,
 ) -> list:
     """Finalize a run: serialize output, validate, extract usage, extract tool names.
 
     Shared between streaming (sync + async) and non-streaming paths. Accepts
     unpacked components so the streaming path can source them from a
     ``StreamedRunResult`` / final ``AgentRunResultEvent``.
+
+    The streaming consumer may pass a ``reasoning_tokens`` count extracted from
+    the final event and an ``event_timeline`` of redacted thinking/tool entries;
+    both are attached to ``result`` for cost tracking and audit logging.
+
+    When ``capture_timeline`` is set and no live ``event_timeline`` was
+    supplied (the buffered path and the non-``on_event`` streaming path never
+    see live stream events), the timeline is reconstructed from
+    ``new_messages`` so a CLI run still records a meaningful tool-call/result
+    trace. Callers gate this on audit being enabled so non-audited runs add no
+    overhead.
     """
     from pydantic_ai import DeferredToolRequests
 
@@ -247,19 +476,39 @@ def _finalize_run_output(
         result.tokens_in = usage.input_tokens or 0
         result.tokens_out = usage.output_tokens or 0
         result.total_tokens = usage.total_tokens or 0
+        result.thinking_tokens = _extract_thinking_tokens(usage)
         result.tool_calls = usage.tool_calls or 0
+    result.reasoning_tokens = (
+        reasoning_tokens if reasoning_tokens is not None else _extract_reasoning_tokens(usage)
+    )
+    if event_timeline is not None:
+        result.event_timeline = cap_timeline(event_timeline)
+    elif capture_timeline:
+        result.event_timeline = cap_timeline(build_timeline_from_messages(new_messages))
     result.tool_call_names = _extract_tool_call_names(new_messages)
     return new_messages
 
 
-def _process_agent_output(agent_result: Any, result: RunResult, role: RoleDefinition) -> list:
-    """Serialize agent output, validate, extract usage. Returns new_messages."""
+def _process_agent_output(
+    agent_result: Any,
+    result: RunResult,
+    role: RoleDefinition,
+    *,
+    capture_timeline: bool = False,
+) -> list:
+    """Serialize agent output, validate, extract usage. Returns new_messages.
+
+    With ``capture_timeline`` set, reconstructs the redacted event timeline
+    from the run's messages so a buffered (non-streaming) run still records a
+    tool-call/result trace. Callers gate this on audit being enabled.
+    """
     return _finalize_run_output(
         agent_result.output,
         agent_result.usage,
         agent_result.all_messages(),
         result,
         role,
+        capture_timeline=capture_timeline,
     )
 
 

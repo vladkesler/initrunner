@@ -301,3 +301,61 @@ class TestAgentCreationWithInstrumentation:
 
                 call_kwargs = MockAgent.call_args
                 assert "instrument" not in call_kwargs.kwargs
+
+
+class TestSpanTreeCapture:
+    def setup_method(self):
+        import initrunner.observability as obs
+
+        obs._provider = None
+
+    def teardown_method(self):
+        import initrunner.observability as obs
+
+        obs._provider = None
+
+    def test_get_span_tree_none_without_provider(self):
+        import initrunner.observability as obs
+
+        obs._provider = None
+        assert obs.get_span_tree_from_current_trace() is None
+
+    def test_get_span_tree_returns_tree_with_provider(self):
+        pytest.importorskip("pydantic_evals")
+        from pydantic_evals.otel.span_tree import SpanTree
+
+        import initrunner.observability as obs
+
+        obs._provider = object()  # sentinel: a provider is configured
+        tree = obs.get_span_tree_from_current_trace()
+        assert isinstance(tree, SpanTree)
+
+    def test_capture_span_tree_empty_without_instrumentation(self):
+        pytest.importorskip("pydantic_evals")
+        from pydantic_evals.otel.span_tree import SpanTree
+
+        import initrunner.observability as obs
+
+        # context_subtree binds to the global OTel provider, which may already be
+        # set by another test. Either way, with no spans emitted inside the block
+        # the result is None (no recordable provider) or an empty SpanTree.
+        with obs.capture_span_tree() as tree:
+            assert tree is None or isinstance(tree, SpanTree)
+        if tree is not None:
+            assert len(tree.nodes_by_id) == 0
+
+    def test_capture_span_tree_yields_none_without_pydantic_evals(self, monkeypatch):
+        import builtins
+
+        import initrunner.observability as obs
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name.startswith("pydantic_evals"):
+                raise ImportError("simulated missing pydantic_evals")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        with obs.capture_span_tree() as tree:
+            assert tree is None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from initrunner.agent.reasoning import TodoList
 
@@ -14,6 +15,10 @@ class ReflectionState:
     status: str = "completed"  # completed | blocked | failed
     plan_finalized: bool = False
     todo: TodoList = field(default_factory=TodoList)
+    judge_verdicts: list[dict[str, Any]] = field(default_factory=list)
+    """Per-round judge results from the verified reflexion loop. Each entry:
+    ``{"round": int, "all_passed": bool, "criteria_results": list[dict]}``.
+    Empty unless ``success_criteria`` are configured for a reflexion run."""
     # Budget awareness (populated by autonomous runner each iteration)
     iterations_completed: int = 0
     max_iterations: int = 0

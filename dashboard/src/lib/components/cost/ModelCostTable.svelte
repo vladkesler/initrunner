@@ -63,6 +63,7 @@
 					<th class="section-label w-16 cursor-pointer px-3 py-2 text-right" onclick={() => toggleSort('run_count')}>Runs {@render sortIcon('run_count')}</th>
 					<th class="section-label hidden w-20 cursor-pointer px-3 py-2 text-right md:table-cell" onclick={() => toggleSort('tokens_in')}>Tk In {@render sortIcon('tokens_in')}</th>
 					<th class="section-label hidden w-20 cursor-pointer px-3 py-2 text-right md:table-cell" onclick={() => toggleSort('tokens_out')}>Tk Out {@render sortIcon('tokens_out')}</th>
+					<th class="section-label hidden w-20 px-3 py-2 text-right md:table-cell">Thinking</th>
 					<th class="section-label w-24 cursor-pointer px-3 py-2 text-right" onclick={() => toggleSort('total_cost_usd')}>Total {@render sortIcon('total_cost_usd')}</th>
 				</tr>
 			</thead>
@@ -83,6 +84,9 @@
 						</td>
 						<td class="hidden w-20 px-3 py-2 text-right font-mono text-[13px] text-fg-faint md:table-cell" style="font-variant-numeric: tabular-nums">
 							{formatTokens(entry.tokens_out)}
+						</td>
+						<td class="hidden w-20 px-3 py-2 text-right font-mono text-[13px] text-fg-faint md:table-cell" style="font-variant-numeric: tabular-nums">
+							{entry.thinking_tokens ? formatTokens(entry.thinking_tokens) : '-'}
 						</td>
 						<td class="w-24 px-3 py-2 text-right font-mono text-[13px]" style="font-variant-numeric: tabular-nums">
 							{#if entry.total_cost_usd !== null && entry.total_cost_usd > 0}

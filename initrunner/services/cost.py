@@ -14,6 +14,8 @@ class AgentCostEntry:
     tokens_out: int
     total_cost_usd: float | None
     avg_cost_per_run: float | None
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 @dataclass
@@ -31,6 +33,8 @@ class ModelCostEntry:
     tokens_in: int
     tokens_out: int
     total_cost_usd: float | None
+    thinking_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 @dataclass
@@ -80,13 +84,22 @@ def _agent_entries_from_rows(rows: list[dict]) -> list[AgentCostEntry]:
     from collections import defaultdict
 
     by_agent: dict[str, dict] = defaultdict(
-        lambda: {"run_count": 0, "tokens_in": 0, "tokens_out": 0, "costs": []}
+        lambda: {
+            "run_count": 0,
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "thinking_tokens": 0,
+            "reasoning_tokens": 0,
+            "costs": [],
+        }
     )
     for row in rows:
         a = by_agent[row["agent_name"]]
         a["run_count"] += row["run_count"]
         a["tokens_in"] += row["tokens_in"]
         a["tokens_out"] += row["tokens_out"]
+        a["thinking_tokens"] += row.get("thinking_tokens", 0)
+        a["reasoning_tokens"] += row.get("reasoning_tokens", 0)
         a["costs"].append(_price_group(row))
 
     entries = []
@@ -104,6 +117,8 @@ def _agent_entries_from_rows(rows: list[dict]) -> list[AgentCostEntry]:
                     if total is not None and data["run_count"]
                     else None
                 ),
+                thinking_tokens=data["thinking_tokens"],
+                reasoning_tokens=data["reasoning_tokens"],
             )
         )
     # Sort by cost descending (None last)
@@ -199,6 +214,8 @@ def cost_by_model_sync(
             tokens_in=row["tokens_in"],
             tokens_out=row["tokens_out"],
             total_cost_usd=_price_group(row),
+            thinking_tokens=row.get("thinking_tokens", 0),
+            reasoning_tokens=row.get("reasoning_tokens", 0),
         )
         for row in rows
     ]
