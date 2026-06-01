@@ -16,7 +16,7 @@
     "@types/js-yaml": "^4.0.9",
     "bits-ui": "^2.18.1",
     "clsx": "^2.1.1",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^4.2.0",
     "lucide-svelte": "^1.0.1",
     "svelte": "^5.55.9",
     "tailwind-merge": "^3.6.0",
