@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
+from starlette.requests import Request
 
 from initrunner.agent._subprocess import scrub_env
 from initrunner.middleware import read_body_capped
@@ -44,28 +47,28 @@ class TestScrubEnvBreadth:
             assert env.get(name) == "value"
 
 
-class _FakeRequest:
-    def __init__(self, chunks: list[bytes]) -> None:
-        self._chunks = chunks
+def _streaming_request(chunks: list[bytes]) -> Request:
+    """A real Starlette Request whose body arrives in chunks (no Content-Length)."""
+    queue = list(chunks)
 
-    async def stream(self):
-        for c in self._chunks:
-            yield c
+    async def receive():
+        if queue:
+            return {"type": "http.request", "body": queue.pop(0), "more_body": bool(queue)}
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    return Request({"type": "http", "method": "POST", "headers": [], "query_string": b""}, receive)
 
 
 class TestReadBodyCapped:
     def test_under_cap_returns_body(self):
-        import asyncio
-
-        assert asyncio.run(read_body_capped(_FakeRequest([b"ab", b"cd", b"ef"]), 100)) == b"abcdef"
+        req = _streaming_request([b"ab", b"cd", b"ef"])
+        assert asyncio.run(read_body_capped(req, 100)) == b"abcdef"
 
     def test_over_cap_returns_none(self):
         # Chunked stream with no Content-Length: must abort once the cap is crossed.
-        import asyncio
-
-        assert asyncio.run(read_body_capped(_FakeRequest([b"x" * 8, b"y" * 8]), 10)) is None
+        req = _streaming_request([b"x" * 8, b"y" * 8])
+        assert asyncio.run(read_body_capped(req, 10)) is None
 
     def test_exact_cap_ok(self):
-        import asyncio
-
-        assert asyncio.run(read_body_capped(_FakeRequest([b"x" * 10]), 10)) == b"x" * 10
+        req = _streaming_request([b"x" * 10])
+        assert asyncio.run(read_body_capped(req, 10)) == b"x" * 10

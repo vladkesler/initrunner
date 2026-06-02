@@ -361,4 +361,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.5.2</sub></p>
+<p align="center"><sub>v2026.6.1</sub></p>
