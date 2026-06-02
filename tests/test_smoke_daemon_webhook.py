@@ -114,6 +114,46 @@ class TestWebhookTriggerHTTP:
         finally:
             trigger.stop()
 
+    def test_x_principal_id_not_trusted(self):
+        # A client-supplied X-Principal-Id must not become the audit-trail actor.
+        port = _get_free_port()
+        events: list[TriggerEvent] = []
+        config = WebhookTriggerConfig(port=port)
+        trigger = WebhookTrigger(config, events.append)
+        trigger.start()
+        try:
+            _wait_for_port(port)
+            body = b"payload"
+            assert config.secret is not None
+            headers = _sign_body(body, config.secret)
+            headers["x-principal-id"] = "admin"
+            resp = httpx.post(f"http://127.0.0.1:{port}/webhook", content=body, headers=headers)
+            assert resp.status_code == 200
+            assert len(events) == 1
+            assert events[0].principal_id is None
+            assert events[0].metadata.get("claimed_principal_id") == "admin"
+        finally:
+            trigger.stop()
+
+    def test_chunked_oversize_body_rejected(self):
+        # No Content-Length (chunked) must still be capped, not buffered unbounded.
+        port = _get_free_port()
+        config = WebhookTriggerConfig(port=port)
+        trigger = WebhookTrigger(config, lambda e: None)
+        trigger.start()
+        try:
+            _wait_for_port(port)
+
+            def _gen():
+                # ~2 MB streamed in chunks, no Content-Length -> chunked encoding.
+                for _ in range(32):
+                    yield b"x" * 65536
+
+            resp = httpx.post(f"http://127.0.0.1:{port}/webhook", content=_gen())
+            assert resp.status_code == 413
+        finally:
+            trigger.stop()
+
     def test_wrong_method_returns_405(self):
         port = _get_free_port()
         config = WebhookTriggerConfig(port=port)

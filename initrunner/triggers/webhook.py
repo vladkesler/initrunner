@@ -52,17 +52,12 @@ class WebhookTrigger(TriggerBase):
             if not rate_limiter.allow():
                 return JSONResponse({"error": "rate limit exceeded"}, status_code=429)
 
-            content_length = request.headers.get("content-length")
-            if content_length:
-                try:
-                    if int(content_length) > _MAX_BODY_BYTES:
-                        return JSONResponse({"error": "payload too large"}, status_code=413)
-                except ValueError:
-                    pass
+            from initrunner.middleware import read_body_capped
 
-            body = await request.body()
-
-            if len(body) > _MAX_BODY_BYTES:
+            # Bounded read: a chunked request omits Content-Length, so the header
+            # check alone is bypassable -- cap the bytes actually received.
+            body = await read_body_capped(request, _MAX_BODY_BYTES)
+            if body is None:
                 return JSONResponse({"error": "payload too large"}, status_code=413)
 
             if config.secret:
@@ -73,12 +68,18 @@ class WebhookTrigger(TriggerBase):
                 if not hmac.compare_digest(sig_header, expected):
                     return JSONResponse({"error": "invalid signature"}, status_code=403)
 
-            principal_id = request.headers.get("x-principal-id")
+            # Never trust a client-supplied principal: it would flow into the
+            # HMAC-chained audit trail as the run's actor. Record the claim as
+            # untrusted metadata instead of adopting it as the identity.
+            metadata = {"path": config.path}
+            claimed_principal = request.headers.get("x-principal-id")
+            if claimed_principal:
+                metadata["claimed_principal_id"] = claimed_principal
             event = TriggerEvent(
                 trigger_type="webhook",
                 prompt=body.decode("utf-8", errors="replace"),
-                metadata={"path": config.path},
-                principal_id=principal_id,
+                metadata=metadata,
+                principal_id=None,
             )
             self._callback(event)
             return JSONResponse({"status": "ok"})

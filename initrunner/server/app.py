@@ -198,8 +198,16 @@ def create_app(
         return JSONResponse(resp.model_dump(exclude_none=True))
 
     async def chat_completions(request: Request) -> JSONResponse | StreamingResponse:
+        from initrunner.middleware import read_body_capped
+
+        # Bounded read closes the chunked-encoding bypass of the Content-Length
+        # body-size middleware (an attacker omits Content-Length to stream an
+        # unbounded body into memory).
+        raw = await read_body_capped(request, server_cfg.max_request_body_bytes)
+        if raw is None:
+            return _error_response(413, "request_too_large", "request body too large")
         try:
-            body = await request.json()
+            body = json.loads(raw)
         except Exception:
             return _error_response(400, "invalid_request_error", "invalid JSON body")
 
