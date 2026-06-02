@@ -6,9 +6,15 @@ import socket
 import time
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
-from initrunner.agent._urls import SSRFBlocked, SSRFSafeTransport, validate_url_ssrf
+from initrunner.agent._urls import (
+    SSRFBlocked,
+    SSRFSafeTransport,
+    _resolve_safe_ip,
+    validate_url_ssrf,
+)
 
 
 def _mock_getaddrinfo(*addrs: str):
@@ -189,21 +195,31 @@ class TestSSRFSafeTransport:
     def test_raises_for_private_ip(self, mock_dns):
         mock_dns.side_effect = _mock_getaddrinfo("127.0.0.1")
         transport = SSRFSafeTransport()
-        request = MagicMock()
-        request.url = "http://localhost/"
         with pytest.raises(SSRFBlocked, match="SSRF blocked"):
-            transport.handle_request(request)
+            transport.handle_request(httpx.Request("GET", "http://localhost/"))
 
     @patch("initrunner.agent._urls.socket.getaddrinfo")
-    def test_calls_super_for_safe_url(self, mock_dns):
+    def test_pins_validated_ip_for_safe_url(self, mock_dns):
+        # The connection must target the SAME IP we validated (no re-resolution),
+        # with Host + TLS SNI preserved -- this is what closes the rebinding TOCTOU.
         mock_dns.side_effect = _mock_getaddrinfo("93.184.216.34")
         transport = SSRFSafeTransport()
-        request = MagicMock()
-        request.url = "https://example.com/"
+        request = httpx.Request("GET", "https://example.com/path")
         with patch("httpx.HTTPTransport.handle_request", return_value=MagicMock()) as mock_super:
             result = transport.handle_request(request)
-            mock_super.assert_called_once_with(request)
+            mock_super.assert_called_once()
+            passed = mock_super.call_args.args[0]
+            assert passed.url.host == "93.184.216.34"  # pinned to the validated IP
+            assert passed.extensions.get("sni_hostname") == "example.com"
+            assert passed.headers["host"] == "example.com"  # original Host preserved
             assert result is mock_super.return_value
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_blocks_non_http_scheme(self, mock_dns):
+        transport = SSRFSafeTransport()
+        with pytest.raises(SSRFBlocked, match="scheme"):
+            transport.handle_request(httpx.Request("GET", "file://etc/passwd"))
+        mock_dns.assert_not_called()
 
     def test_dns_timeout_parameter(self):
         transport = SSRFSafeTransport(dns_timeout=5.0)
@@ -213,3 +229,57 @@ class TestSSRFSafeTransport:
         """SSRFBlocked is a subclass of httpx.HTTPError for catch compatibility."""
         exc = SSRFBlocked("test")
         assert isinstance(exc, Exception)
+
+
+# ---------------------------------------------------------------------------
+# Newly-blocked CIDR ranges (CGNAT, TEST-NET, benchmarking, reserved, IPv6 doc)
+# ---------------------------------------------------------------------------
+class TestExpandedBlocklist:
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "100.64.0.1",  # CGNAT
+            "100.100.100.200",  # Alibaba metadata (inside CGNAT)
+            "192.0.0.1",  # IETF protocol assignments
+            "192.0.2.5",  # TEST-NET-1
+            "198.18.0.1",  # benchmarking
+            "198.51.100.7",  # TEST-NET-2
+            "203.0.113.9",  # TEST-NET-3
+            "240.0.0.1",  # reserved
+            "255.255.255.255",  # broadcast (inside 240/4)
+        ],
+    )
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_ipv4_ranges_blocked(self, mock_dns, ip):
+        mock_dns.side_effect = _mock_getaddrinfo(ip)
+        assert validate_url_ssrf("http://host.example/") is not None
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_ipv6_doc_and_unspecified_blocked(self, mock_dns):
+        for ip in ("2001:db8::1", "::"):
+            mock_dns.side_effect = _mock_getaddrinfo_v6(ip)
+            assert validate_url_ssrf("http://host.example/") is not None
+
+
+# ---------------------------------------------------------------------------
+# IP pinning helper + DNS-rebinding defence
+# ---------------------------------------------------------------------------
+class TestResolveSafeIp:
+    def test_public_ip_literal_returned(self):
+        assert _resolve_safe_ip("93.184.216.34", 443, 10.0) == "93.184.216.34"
+
+    def test_private_ip_literal_raises(self):
+        with pytest.raises(SSRFBlocked):
+            _resolve_safe_ip("169.254.169.254", 80, 10.0)
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_mixed_resolution_blocks(self, mock_dns):
+        # public + private together -> never connect (the rebinding multiplexing case)
+        mock_dns.side_effect = _mock_getaddrinfo("93.184.216.34", "127.0.0.1")
+        with pytest.raises(SSRFBlocked):
+            _resolve_safe_ip("rebind.example", 80, 10.0)
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_picks_first_public_ip(self, mock_dns):
+        mock_dns.side_effect = _mock_getaddrinfo("93.184.216.34", "93.184.216.35")
+        assert _resolve_safe_ip("ok.example", 80, 10.0) == "93.184.216.34"
