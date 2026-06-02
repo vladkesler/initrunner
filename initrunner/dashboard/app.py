@@ -72,6 +72,25 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Host-header allowlist (anti-DNS-rebinding). A malicious web page can point
+    # its hostname at 127.0.0.1 and drive a keyless localhost dashboard through
+    # the victim's browser; rejecting unexpected Host headers blocks that. When
+    # exposed we default to permissive (mandatory auth is the protection) unless
+    # the operator pins allowed_hosts.
+    if settings.allowed_hosts is not None:
+        allowed_hosts = settings.allowed_hosts
+    elif settings.expose:
+        allowed_hosts = ["*"]
+    else:
+        allowed_hosts = ["localhost", "127.0.0.1", "::1", "testserver"]
+    if "*" not in allowed_hosts:
+        from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+        app.add_middleware(
+            TrustedHostMiddleware,  # type: ignore[arg-type]
+            allowed_hosts=allowed_hosts,
+        )
+
     # -- Dependency overrides: inject caches as singletons ------------------
     app.dependency_overrides[get_role_cache] = lambda: role_cache
     app.dependency_overrides[get_flow_cache] = lambda: flow_cache
@@ -103,10 +122,14 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             return value if value.startswith("/") else "/"
 
         def _is_https(request: Request) -> bool:
-            """True when the request arrived over HTTPS (direct or proxied)."""
-            if request.url.scheme == "https":
-                return True
-            return request.headers.get("x-forwarded-proto", "") == "https"
+            """True when the request arrived over HTTPS.
+
+            Relies on ``request.url.scheme``, which uvicorn only sets from
+            ``X-Forwarded-Proto`` when the proxy is explicitly trusted
+            (``--forwarded-allow-ips``). We must not read the header directly --
+            any client can spoof it to strip the cookie's ``Secure`` flag.
+            """
+            return request.url.scheme == "https"
 
         @app.get("/login", include_in_schema=False)
         async def login_page(

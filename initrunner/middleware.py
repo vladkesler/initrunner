@@ -7,10 +7,63 @@ suitable for ``BaseHTTPMiddleware``.
 from __future__ import annotations
 
 import hmac
+import ipaddress
+import logging
+import secrets
 from collections.abc import Callable, Set
 
 from starlette.requests import Request
 from starlette.responses import Response
+
+_logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Fail-closed network exposure — refuse to serve an unauthenticated server on a
+# non-loopback interface
+# ---------------------------------------------------------------------------
+
+_LOOPBACK_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1", ""})
+
+
+def is_loopback_host(host: str | None) -> bool:
+    """Return True when *host* binds only the loopback interface.
+
+    Loopback binds are reachable only from the same machine, so running them
+    without authentication is an accepted local-dev convenience. Everything else
+    (``0.0.0.0``, ``::``, a LAN/public IP, or a hostname) is treated as exposed.
+    """
+    h = (host or "").strip().lower()
+    if h.startswith("[") and h.endswith("]"):
+        h = h[1:-1]
+    if h in _LOOPBACK_HOSTNAMES:
+        return True
+    try:
+        return ipaddress.ip_address(h).is_loopback
+    except ValueError:
+        return False
+
+
+def resolve_exposed_api_key(host: str | None, api_key: str | None) -> tuple[str | None, str | None]:
+    """Fail closed when a server is exposed off-host without authentication.
+
+    Returns ``(effective_key, generated_key)``:
+
+    - Loopback bind -> ``(api_key, None)``: local-only servers may run keyless.
+    - Non-loopback bind with a key -> ``(api_key, None)``: honoured as-is.
+    - Non-loopback bind with **no** key -> a random key is generated and returned
+      as both values, so the server is never reachable off-host unauthenticated.
+      Callers surface ``generated_key`` once (it is the only way in).
+    """
+    if api_key or is_loopback_host(host):
+        return api_key, None
+    generated = secrets.token_urlsafe(32)
+    _logger.warning(
+        "Server bound to non-loopback host %r without an API key; generated one to "
+        "avoid serving unauthenticated. Set --api-key (or the env var) to choose your own.",
+        host,
+    )
+    return generated, generated
+
 
 # ---------------------------------------------------------------------------
 # Path predicates — control which routes a middleware applies to
