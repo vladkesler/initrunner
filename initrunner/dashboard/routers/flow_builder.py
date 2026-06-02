@@ -17,6 +17,12 @@ from initrunner.dashboard.deps import (
     get_role_cache,
 )
 from initrunner.dashboard.routers._agent_options import build_agent_options
+from initrunner.dashboard.routers._paths import (
+    PathValidationError,
+    role_save_roots,
+    safe_basename,
+    validated_child_dir,
+)
 from initrunner.dashboard.routers._provider_options import gather_provider_options
 from initrunner.dashboard.schemas import (
     FlowBuilderOptionsResponse,
@@ -185,7 +191,15 @@ async def save_flow(
     req: FlowSaveRequest,
     flow_cache: Annotated[FlowCache, Depends(get_flow_cache)],
 ) -> FlowSaveResponse:
-    project_dir = Path(req.directory) / req.project_name
+    allowed_roots = role_save_roots(flow_cache._settings)
+    try:
+        project_dir = validated_child_dir(req.directory, req.project_name, allowed_roots)
+        # Role keys are request-controlled; confine each to a bare filename now
+        # so a traversal key is a clean 400 rather than a mid-write failure.
+        for name in req.role_yamls:
+            safe_basename(name)
+    except PathValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if project_dir.exists() and not req.force:
         raise HTTPException(
@@ -234,7 +248,10 @@ def _write_and_validate(project_dir: Path, flow_yaml: str, role_yamls: dict[str,
     flow_path = project_dir / "flow.yaml"
     flow_path.write_text(flow_yaml)
 
-    for filename, role_yaml in role_yamls.items():
+    # Role keys are request-controlled; confine each to a bare filename in roles/.
+    safe_role_yamls = {safe_basename(name): role_yaml for name, role_yaml in role_yamls.items()}
+
+    for filename, role_yaml in safe_role_yamls.items():
         (roles_dir / filename).write_text(role_yaml)
 
     issues: list[str] = []
@@ -246,7 +263,7 @@ def _write_and_validate(project_dir: Path, flow_yaml: str, role_yamls: dict[str,
         issues.append(f"flow.yaml: {exc}")
         valid = False
 
-    for filename in role_yamls:
+    for filename in safe_role_yamls:
         role_path = roles_dir / filename
         try:
             load_role(role_path)

@@ -234,11 +234,24 @@ async def create_skill(
     cache: Annotated[SkillCache, Depends(get_skill_cache)],
 ) -> SkillCreateResponse:
     from initrunner.agent.skills import SkillLoadError
+    from initrunner.dashboard.routers._paths import PathValidationError, safe_basename
     from initrunner.services.skill_service import create_skill as svc_create
+    from initrunner.services.skill_service import get_skill_directories
 
-    directory = Path(body.directory)
+    # Confine creation to a valid skill directory; basename-guard the skill name.
+    allowed_dirs = await asyncio.to_thread(get_skill_directories, cache._settings.get_role_dirs())
     try:
-        path = await asyncio.to_thread(svc_create, body.name, directory, body.provider)
+        name = safe_basename(body.name)
+        target_dir = Path(body.directory).resolve()
+        if not any(target_dir == Path(d).resolve() for d in allowed_dirs):
+            raise PathValidationError(
+                f"Directory {body.directory!r} is not a configured skill directory"
+            )
+    except PathValidationError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+
+    try:
+        path = await asyncio.to_thread(svc_create, name, target_dir, body.provider)
     except SkillLoadError as exc:
         raise HTTPException(409, detail=str(exc)) from exc
 

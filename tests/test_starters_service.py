@@ -90,6 +90,40 @@ class TestResolveStarterPath:
     def test_returns_none_for_unknown(self):
         assert resolve_starter_path("does-not-exist") is None
 
+    def test_rejects_parent_traversal(self):
+        # The slug is request-supplied (builder starter_slug); ../ must not escape.
+        assert resolve_starter_path("../../../../etc/passwd") is None
+        assert resolve_starter_path("../" * 6 + "etc/hosts") is None
+
+    def test_rejects_absolute_name(self):
+        assert resolve_starter_path("/etc/passwd") is None
+
+    def test_rejects_symlink_escape(self, tmp_path, monkeypatch):
+        # A symlink inside the starters dir pointing outside must not be followed
+        # into an arbitrary read.
+        import initrunner.services.starters as starters_mod
+
+        fake_starters = tmp_path / "_starters"
+        fake_starters.mkdir()
+        secret = tmp_path / "secret.yaml"
+        secret.write_text("kind: Secret\n", encoding="utf-8")
+        (fake_starters / "evil.yaml").symlink_to(secret)
+        monkeypatch.setattr(starters_mod, "STARTERS_DIR", fake_starters)
+
+        assert resolve_starter_path("evil") is None
+
+    def test_confined_path_still_resolves(self, tmp_path, monkeypatch):
+        import initrunner.services.starters as starters_mod
+
+        fake_starters = tmp_path / "_starters"
+        fake_starters.mkdir()
+        (fake_starters / "ok.yaml").write_text("kind: Agent\n", encoding="utf-8")
+        monkeypatch.setattr(starters_mod, "STARTERS_DIR", fake_starters)
+
+        path = resolve_starter_path("ok")
+        assert path is not None and path.is_file()
+        assert path.resolve().is_relative_to(fake_starters.resolve())
+
 
 class TestDeriveFeatures:
     def test_rag_feature(self):

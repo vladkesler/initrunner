@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
@@ -34,11 +33,9 @@ router = APIRouter(prefix="/api/team-builder", tags=["team-builder"])
 async def get_options(
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
 ) -> TeamBuilderOptionsResponse:
-    from initrunner.dashboard.config import DashboardSettings
     from initrunner.dashboard.routers._agent_options import build_agent_options
 
-    settings = DashboardSettings()
-    opts = await gather_provider_options(settings)
+    opts = await gather_provider_options(role_cache._settings)
 
     return TeamBuilderOptionsResponse(
         providers=opts.providers,
@@ -189,25 +186,22 @@ async def save_team(
     body: TeamSaveRequest,
     cache: Annotated[TeamCache, Depends(get_team_cache)],
 ) -> TeamSaveResponse:
-    from initrunner.dashboard.config import DashboardSettings
+    from initrunner.dashboard.routers._paths import (
+        PathValidationError,
+        role_save_roots,
+        validated_file_target,
+    )
     from initrunner.services.team_builder import (
         build_team_next_steps,
         validate_team_yaml,
     )
 
-    settings = DashboardSettings()
-    allowed_dirs = settings.get_role_dirs()
-
-    target_dir = Path(body.directory).resolve()
-    in_allowed = any(
-        target_dir == d.resolve() or str(target_dir).startswith(str(d.resolve()))
-        for d in allowed_dirs
-    )
-    if not in_allowed:
-        raise HTTPException(
-            400,
-            detail=f"Directory {body.directory} is not within configured role directories",
-        )
+    allowed_dirs = role_save_roots(cache._settings)
+    try:
+        output_path = validated_file_target(body.directory, body.filename, allowed_dirs)
+    except PathValidationError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    target_dir = output_path.parent
 
     team, issues = await asyncio.to_thread(validate_team_yaml, body.yaml_text)
     errors = [i.message for i in issues if i.severity == "error"]
@@ -221,7 +215,6 @@ async def save_team(
             team_id="",
         )
 
-    output_path = target_dir / body.filename
     if output_path.exists() and not body.force:
         raise HTTPException(409, detail=f"File already exists: {output_path}")
 

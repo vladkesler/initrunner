@@ -44,7 +44,9 @@ class _IsolatedRoleCache(RoleCache):
 
 class _IsolatedFlowCache(FlowCache):
     def __init__(self, dirs: list[Path]):
-        settings = DashboardSettings()
+        # Expose the scanned dirs as allowed save roots so the router's
+        # path-containment check (which reads flow_cache._settings) permits them.
+        settings = DashboardSettings(extra_role_dirs=list(dirs))
         self._settings = settings
         self._dirs = dirs
         self._cache: dict = {}
@@ -376,7 +378,7 @@ def test_validate_missing_spec(client):
 # -- POST /api/flow-builder/save -------------------------------------------
 
 
-def test_save_flow(client, tmp_path):
+def test_save_flow(client, role_dir):
     tc, _ = client
     seed_resp = tc.post(
         "/api/flow-builder/seed",
@@ -396,7 +398,7 @@ def test_save_flow(client, tmp_path):
         json={
             "flow_yaml": seed_data["flow_yaml"],
             "role_yamls": seed_data["role_yamls"],
-            "directory": str(tmp_path),
+            "directory": str(role_dir),
             "project_name": "saved",
         },
     )
@@ -405,10 +407,10 @@ def test_save_flow(client, tmp_path):
     assert data["valid"] is True
     assert "flow_id" in data
     assert len(data["next_steps"]) > 0
-    assert (tmp_path / "saved" / "flow.yaml").exists()
+    assert (role_dir / "saved" / "flow.yaml").exists()
 
 
-def test_save_conflict(client, tmp_path):
+def test_save_conflict(client, role_dir):
     tc, _ = client
     seed_resp = tc.post(
         "/api/flow-builder/seed",
@@ -428,7 +430,7 @@ def test_save_conflict(client, tmp_path):
         json={
             "flow_yaml": seed_data["flow_yaml"],
             "role_yamls": seed_data["role_yamls"],
-            "directory": str(tmp_path),
+            "directory": str(role_dir),
             "project_name": "dup",
         },
     )
@@ -438,7 +440,7 @@ def test_save_conflict(client, tmp_path):
         json={
             "flow_yaml": seed_data["flow_yaml"],
             "role_yamls": seed_data["role_yamls"],
-            "directory": str(tmp_path),
+            "directory": str(role_dir),
             "project_name": "dup",
         },
     )
