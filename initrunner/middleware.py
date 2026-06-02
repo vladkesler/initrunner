@@ -213,6 +213,25 @@ def make_auth_dispatch(
     return dispatch
 
 
+async def read_body_capped(request: Request, max_bytes: int) -> bytes | None:
+    """Read the full request body, returning ``None`` if it exceeds *max_bytes*.
+
+    Streams the body and aborts the moment the cap is crossed, so a chunked
+    ``Transfer-Encoding`` request with no ``Content-Length`` cannot force
+    unbounded buffering. The header-only checks (``make_body_size_dispatch`` and
+    the webhook's Content-Length check) are trivially bypassed by chunked
+    encoding; this enforces the limit on the bytes actually received.
+    """
+    total = 0
+    chunks: list[bytes] = []
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > max_bytes:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def make_rate_limit_dispatch(
     *,
     rate_limiter,
