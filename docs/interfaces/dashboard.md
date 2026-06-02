@@ -546,6 +546,10 @@ Without `--api-key`, the dashboard runs with no authentication (suitable for loc
 
 **Limitations**: Authentication mode supports the built-in same-origin UI and Bearer-token API clients. The cross-origin Vite dev server (`localhost:5173`) is not supported in authenticated mode. For development with auth, use the production build served by the backend.
 
+### Save path confinement
+
+The builder save endpoints (`/api/builder/save`, `/api/flow-builder/save`, `/api/team-builder/save`, and skill creation via `POST /api/skills`) write files to a request-supplied directory and filename. These are confined to the configured save directories: the discovered role directories plus any passed via `--roles-dir`, and for skills the directories surfaced by `GET /api/skills/directories`. A request whose target directory resolves outside those roots, or whose filename/project name contains a path separator or `..`, is rejected with `400`. This holds regardless of authentication, so an exposed-but-unauthenticated instance cannot be coerced into writing arbitrary files.
+
 ## API Reference
 
 All endpoints return JSON. Errors return `{"detail": "message"}`.

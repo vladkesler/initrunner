@@ -413,23 +413,20 @@ async def save_agent(
     req: SaveRequest,
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
 ) -> SaveResponse:
-    from initrunner.config import get_roles_dir
+    from initrunner.dashboard.routers._paths import (
+        PathValidationError,
+        role_save_roots,
+        validated_file_target,
+    )
     from initrunner.services.agent_builder import BuilderSession
 
-    # Validate directory is within discovered role dirs or ~/.initrunner/roles
-    allowed_dirs = list(role_cache._settings.get_role_dirs())
-    global_roles = get_roles_dir()
-    if global_roles not in allowed_dirs:
-        allowed_dirs.append(global_roles)
-    target_dir = Path(req.directory).resolve()
-    if not any(target_dir.is_relative_to(d.resolve()) for d in allowed_dirs):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Directory {req.directory} is not within a configured role directory. "
-            f"Allowed: {[str(d) for d in allowed_dirs]}",
-        )
+    # Confine the write to a configured role dir (filename basename-guarded).
+    allowed_dirs = role_save_roots(role_cache._settings)
+    try:
+        output_path = validated_file_target(req.directory, req.filename, allowed_dirs)
+    except PathValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    output_path = target_dir / req.filename
     session = BuilderSession()
     session.yaml_text = req.yaml_text
     if req.sidecar_source is not None:

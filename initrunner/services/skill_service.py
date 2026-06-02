@@ -291,6 +291,10 @@ def create_skill(name: str, directory: Path, provider: str = "openai") -> Path:
     """Scaffold a new skill in directory format. Returns path to SKILL.md."""
     from initrunner.templates import template_skill
 
+    # Guard against path traversal via the skill name.
+    if not name or Path(name).name != name or name in (".", ".."):
+        raise SkillLoadError(f"Invalid skill name: {name!r}")
+
     skill_dir = directory / name
     skill_file = skill_dir / "SKILL.md"
 

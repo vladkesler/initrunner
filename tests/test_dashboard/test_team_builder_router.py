@@ -14,7 +14,9 @@ class _IsolatedTeamCache(TeamCache):
     """TeamCache that only scans specific dirs."""
 
     def __init__(self, dirs: list[Path]):
-        settings = DashboardSettings()
+        # Expose the scanned dirs as allowed save roots so the router's
+        # path-containment check (which reads cache._settings) permits them.
+        settings = DashboardSettings(extra_role_dirs=list(dirs))
         self._settings = settings
         self._discover_fn = None
         self._path_attr = "path"
