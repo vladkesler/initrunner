@@ -14,8 +14,9 @@ initrunner a2a serve role.yaml
 # With authentication
 initrunner a2a serve role.yaml --api-key my-secret-key
 
-# Custom host/port
-initrunner a2a serve role.yaml --host 0.0.0.0 --port 9000
+# Custom host/port. Binding a non-loopback host without --api-key fails closed:
+# a key is generated and printed rather than serving the agent unauthenticated.
+initrunner a2a serve role.yaml --host 0.0.0.0 --port 9000 --api-key my-secret-key
 ```
 
 The server exposes:
@@ -29,7 +30,7 @@ The server exposes:
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
-| `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all endpoints except the agent card require `Authorization: Bearer <key>`. |
+| `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all endpoints except the agent card require `Authorization: Bearer <key>`. Binding a non-loopback `--host` without a key fails closed — one is generated and printed so the JSON-RPC endpoint is never served unauthenticated off-host. |
 | `--cors-origin` | `str` | `None` | Allowed CORS origin. Can be repeated. |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |

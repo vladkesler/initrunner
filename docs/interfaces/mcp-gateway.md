@@ -135,6 +135,7 @@ Synopsis: `initrunner mcp toolkit [OPTIONS]`
 | `--transport, -t` | `str` | `stdio` | Transport: `stdio`, `sse`, or `streamable-http`. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to (sse/http only). |
 | `--port` | `int` | `8080` | Port to listen on (sse/http only). |
+| `--api-key` | `str` | `None` | Require this Bearer token (sse/http). Env: `INITRUNNER_MCP_API_KEY`. Fails closed on a non-loopback host (see [Network security](#network-security)). |
 | `--server-name` | `str` | `initrunner-toolkit` | MCP server name (overrides config). |
 
 ### Config File Format
@@ -222,11 +223,18 @@ Synopsis: `initrunner mcp serve ROLE_FILES... [OPTIONS]`
 | `--transport, -t` | `str` | `stdio` | Transport protocol: `stdio`, `sse`, or `streamable-http`. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to (sse/streamable-http only). |
 | `--port` | `int` | `8080` | Port to listen on (sse/streamable-http only). |
+| `--api-key` | `str` | `None` | Require this Bearer token (sse/streamable-http). Env: `INITRUNNER_MCP_API_KEY`. See [Network security](#network-security). |
 | `--server-name` | `str` | `initrunner` | MCP server name reported to clients. |
 | `--pass-through` | `bool` | `false` | Also expose the agents' own MCP tools directly (see [Pass-Through Mode](#pass-through-mode)). |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 | `--skill-dir` | `Path` | `None` | Extra skill search directory. |
+
+`initrunner mcp toolkit` and `initrunner mcp browser` take the same `--api-key` option.
+
+## Network security
+
+The gateway invokes agents and tools, so the HTTP transports (`sse`, `streamable-http`) **fail closed**: binding a non-loopback host (e.g. `--host 0.0.0.0`) without `--api-key` generates a random Bearer token and prints it once rather than serving unauthenticated. Supply `--api-key` (or `INITRUNNER_MCP_API_KEY`) to set your own; clients then send `Authorization: Bearer <key>`. `stdio` is local-only and needs no key. A loopback bind may run keyless.
 
 ## Transports
 
