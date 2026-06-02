@@ -16,6 +16,34 @@ if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
 
 
+_TOOL_CODE_ENV = "INITRUNNER_ALLOW_TOOL_CODE"
+
+
+def _tool_code_execution_allowed() -> bool:
+    """Operator consent to run bundle-shipped tool code (env var, not role config).
+
+    The opt-in must come from the user, never the role YAML -- a malicious bundle
+    controls its own YAML, so a config flag would be self-granted.
+    """
+    import os
+
+    return os.environ.get(_TOOL_CODE_ENV, "").strip().lower() in ("1", "true", "yes")
+
+
+def _is_untrusted_role_dir(role_dir: Path | None) -> bool:
+    """True when the role was installed from a bundle (hub/OCI), not authored locally.
+
+    Bundle installs land under ``oci__*`` / ``hub__*`` directories and leave a
+    ``manifest.json`` behind (see registry/_install.py, services/packaging.py). A
+    locally-authored role directory has neither, so its own tool code is trusted.
+    """
+    if role_dir is None:
+        return False
+    if role_dir.name.startswith(("oci__", "hub__")):
+        return True
+    return (role_dir / "manifest.json").is_file()
+
+
 def _validate_source_imports(source_text: str, sandbox: ToolSandboxConfig) -> None:
     """AST-based import analysis on raw source text (before importing the module)."""
     import ast
@@ -126,7 +154,30 @@ def build_custom_toolset(
         )
 
     if spec.origin and Path(spec.origin).is_file():
-        source_text = Path(spec.origin).read_text()
+        origin = Path(spec.origin).resolve()
+        # Supply-chain RCE gate. importlib.import_module() below runs the module's
+        # top-level code in THIS process; the AST scan is best-effort, not a
+        # boundary (string-built imports / module-level eval/exec/getattr evade
+        # it, and a runtime sandbox backend doesn't help -- the import is
+        # in-process, before any subprocess isolation). So when the module ships
+        # inside an *installed* role directory, refuse to import it without
+        # explicit operator consent.
+        role_dir_resolved = ctx.role_dir.resolve() if ctx.role_dir is not None else None
+        ships_with_role = role_dir_resolved is not None and origin.is_relative_to(role_dir_resolved)
+        if (
+            ships_with_role
+            and _is_untrusted_role_dir(ctx.role_dir)
+            and not _tool_code_execution_allowed()
+        ):
+            if role_dir_str is not None and role_dir_str in sys.path:
+                sys.path.remove(role_dir_str)
+            raise ValueError(
+                f"Refusing to load custom-tool module '{config.module}': it ships with an "
+                f"installed role, and importing it runs arbitrary code in this process. "
+                f"Review the code at {origin}, then set {_TOOL_CODE_ENV}=1 to allow it "
+                f"(or run the agent under a runtime sandbox you trust)."
+            )
+        source_text = origin.read_text()
         _validate_source_imports(source_text, sandbox)
 
     try:
