@@ -89,7 +89,16 @@ def _run_ab(args: list[str], config: BrowserMCPConfig) -> str:
 
 
 def _check_url(url: str, config: BrowserMCPConfig) -> str | None:
-    """Validate a URL for SSRF and domain filters. Returns error or None."""
+    """Validate a URL for SSRF and domain filters. Returns error or None.
+
+    NOTE: this is a best-effort pre-check, NOT a containment boundary. The
+    ``agent-browser`` subprocess does its own DNS resolution and fetching (and
+    can be steered to new URLs by page content/redirects), so a determined
+    attacker can bypass this check via DNS rebinding or in-page navigation. For
+    real isolation, run ``agent-browser`` inside a sandbox/network namespace with
+    egress filtered to deny RFC-1918/link-local/CGNAT/metadata ranges, and set a
+    strict ``allowed_domains`` allowlist.
+    """
     parsed = urlparse(url)
     if parsed.scheme == "file":
         return "Error: file:// URLs are not allowed"
