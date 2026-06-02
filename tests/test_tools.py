@@ -664,3 +664,104 @@ class TestDateTimeToolset:
         result = fn(text="not a date")
         assert "Could not parse" in result
         assert "ISO 8601" in result
+
+
+class TestCustomToolRceGate:
+    """Supply-chain RCE gate: bundle-shipped tool modules require operator consent."""
+
+    @staticmethod
+    def _ctx_with_role_dir(role_dir):
+        from initrunner.agent.schema.role import RoleDefinition
+
+        role = RoleDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Agent",
+                "metadata": {"name": "rce-test", "description": "test"},
+                "spec": {"role": "test", "model": {"provider": "openai", "name": "gpt-5-mini"}},
+            }
+        )
+        return ToolBuildContext(role=role, role_dir=role_dir)
+
+    @staticmethod
+    def _evil_module(name: str, sentinel: Path, tmp_path: Path) -> str:
+        # Module body writes a sentinel on import -- proves whether import ran.
+        return _make_temp_module(
+            name,
+            f"""\
+            import pathlib
+            pathlib.Path({str(sentinel)!r}).write_text("pwned")
+
+            def do_thing(x: str) -> str:
+                \"\"\"A tool.\"\"\"
+                return x
+            """,
+            tmp_path,
+        )
+
+    def test_untrusted_bundle_module_refused_without_consent(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("INITRUNNER_ALLOW_TOOL_CODE", raising=False)
+        (tmp_path / "manifest.json").write_text("{}")  # marks installed-bundle provenance
+        sentinel = tmp_path / "pwned.txt"
+        mod = self._evil_module("_rce_untrusted_mod", sentinel, tmp_path)
+
+        config = CustomToolConfig(module=mod)
+        with pytest.raises(ValueError, match="Refusing to load custom-tool module"):
+            _build_custom_toolset(config, self._ctx_with_role_dir(tmp_path))
+        assert not sentinel.exists(), "module body must not run when the gate refuses"
+
+    def test_untrusted_bundle_module_allowed_with_consent(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("INITRUNNER_ALLOW_TOOL_CODE", "1")
+        (tmp_path / "manifest.json").write_text("{}")
+        sentinel = tmp_path / "ok.txt"
+        mod = self._evil_module("_rce_consented_mod", sentinel, tmp_path)
+
+        toolset = _build_custom_toolset(
+            CustomToolConfig(module=mod), self._ctx_with_role_dir(tmp_path)
+        )
+        assert "do_thing" in toolset.tools
+        assert sentinel.exists()
+
+    def test_local_role_module_allowed_without_consent(self, tmp_path, monkeypatch):
+        # A locally-authored role (no manifest.json / oci__ / hub__) is trusted:
+        # its own tool code loads without an opt-in -- no regression for authors.
+        monkeypatch.delenv("INITRUNNER_ALLOW_TOOL_CODE", raising=False)
+        sentinel = tmp_path / "local.txt"
+        mod = self._evil_module("_rce_local_mod", sentinel, tmp_path)
+
+        toolset = _build_custom_toolset(
+            CustomToolConfig(module=mod), self._ctx_with_role_dir(tmp_path)
+        )
+        assert "do_thing" in toolset.tools
+        assert sentinel.exists()
+
+    def test_oci_named_dir_is_untrusted(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("INITRUNNER_ALLOW_TOOL_CODE", raising=False)
+        role_dir = tmp_path / "oci__reg__owner__pack"
+        role_dir.mkdir()
+        sentinel = role_dir / "pwned.txt"
+        mod = self._evil_module("_rce_oci_mod", sentinel, role_dir)
+
+        with pytest.raises(ValueError, match="Refusing to load custom-tool module"):
+            _build_custom_toolset(CustomToolConfig(module=mod), self._ctx_with_role_dir(role_dir))
+        assert not sentinel.exists()
+
+    def test_provenance_and_consent_helpers(self, tmp_path, monkeypatch):
+        from initrunner.agent.tools.custom import (
+            _is_untrusted_role_dir,
+            _tool_code_execution_allowed,
+        )
+
+        assert _is_untrusted_role_dir(None) is False
+        assert _is_untrusted_role_dir(tmp_path) is False
+        # Name-based provenance: oci__/hub__ dirs are untrusted even without a manifest.
+        assert _is_untrusted_role_dir(tmp_path / "hub__owner__pack") is True
+        assert _is_untrusted_role_dir(tmp_path / "oci__reg__owner__pack") is True
+        # manifest.json marks even a plainly-named dir as an installed bundle.
+        (tmp_path / "manifest.json").write_text("{}")
+        assert _is_untrusted_role_dir(tmp_path) is True
+
+        monkeypatch.delenv("INITRUNNER_ALLOW_TOOL_CODE", raising=False)
+        assert _tool_code_execution_allowed() is False
+        monkeypatch.setenv("INITRUNNER_ALLOW_TOOL_CODE", "yes")
+        assert _tool_code_execution_allowed() is True

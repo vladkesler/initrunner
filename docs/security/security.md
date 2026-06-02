@@ -251,6 +251,34 @@ A blocked import raises `ValueError` and the agent fails to load.
 
 > **Limitation**: AST analysis is not a sandbox. It catches common import patterns but can't stop all code execution. For runtime enforcement, enable PEP 578 audit hooks (next section). For fully untrusted code, use the [runtime sandbox](sandbox.md) (bwrap or Docker).
 
+#### Bundle code-execution gate
+
+Loading a `custom` tool imports a Python module by name, which runs that module's
+top-level code **in the InitRunner process**. When the module ships inside a role
+you installed from an untrusted source (InitHub or an OCI registry -- directories
+named `hub__*` / `oci__*`, or any role dir containing a bundle `manifest.json`),
+InitRunner **refuses to import it** and the agent fails to load:
+
+```
+Refusing to load custom-tool module 'evil_tool': it ships with an installed role,
+and importing it runs arbitrary code in this process. Review the code at
+<path>, then set INITRUNNER_ALLOW_TOOL_CODE=1 to allow it.
+```
+
+This is the supply-chain boundary: a malicious bundle cannot self-grant trust
+(the opt-in is an environment variable you set, never a field in the role YAML),
+and the AST scan above is only best-effort defense-in-depth. After reviewing the
+module, allow it with:
+
+```bash
+INITRUNNER_ALLOW_TOOL_CODE=1 initrunner run owner/pack -p "..."
+```
+
+Roles you authored locally (no bundle provenance marker) are trusted and load
+their own tool modules without the opt-in. `initrunner install` also flags, in
+its preview, any bundle whose role declares code-executing tools (`custom`,
+`plugin`, `shell`, `python`, `script`, command-backed `mcp`).
+
 #### PEP 578 Audit Hook Sandbox
 
 AST analysis catches static import patterns, but a tool can trivially defeat it at runtime with string concatenation, `getattr`, or indirect imports. With `audit_hooks_enabled: true`, InitRunner installs a [PEP 578](https://peps.python.org/pep-0578/) audit hook that fires at the C-interpreter level on `open()`, `socket.connect()`, process-spawning calls (`subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.exec*`, `os.fork`), `import`, `exec`, and `compile`.
