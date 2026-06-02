@@ -42,6 +42,12 @@ def a2a_serve(
 
     require_a2a()
 
+    from initrunner.middleware import resolve_exposed_api_key
+
+    # Fail closed: the A2A JSON-RPC endpoint drives the agent. Don't serve it
+    # off-host without auth.
+    api_key, generated_key = resolve_exposed_api_key(host, api_key)
+
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
@@ -53,7 +59,12 @@ def a2a_serve(
         console.print(f"[bold]A2A Server:[/bold] {role.metadata.name}")
         console.print(f"  Endpoint:   http://{host}:{port}")
         console.print(f"  Agent card: http://{host}:{port}/.well-known/agent-card.json")
-        if api_key:
+        if generated_key is not None:
+            console.print(
+                "  Auth:       [yellow]enabled[/yellow] -- generated key (no --api-key given):\n"
+                f"              [bold]{generated_key}[/bold]"
+            )
+        elif api_key:
             console.print("  Auth:       [yellow]enabled[/yellow] (Bearer token required)")
         if cors_origin:
             console.print(f"  CORS:       {', '.join(cors_origin)}")

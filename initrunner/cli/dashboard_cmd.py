@@ -21,6 +21,13 @@ def launch_dashboard(
     """Start the dashboard server (blocking)."""
     from initrunner.dashboard.app import create_app  # type: ignore[import-not-found]
     from initrunner.dashboard.config import DashboardSettings  # type: ignore[import-not-found]
+    from initrunner.middleware import resolve_exposed_api_key
+
+    # Fail closed: a dashboard on 0.0.0.0 exposes agent execution, secret writes,
+    # and role/flow editing. If exposed without a key, generate one rather than
+    # serve unauthenticated.
+    bind_host = "0.0.0.0" if expose else "127.0.0.1"
+    api_key, generated_key = resolve_exposed_api_key(bind_host, api_key)
 
     settings = DashboardSettings(
         port=port,
@@ -30,15 +37,15 @@ def launch_dashboard(
     )
 
     if expose:
-        if api_key:
+        if generated_key is not None:
             console.print(
-                "[yellow]Warning: dashboard exposed on all interfaces "
-                "-- authentication enabled[/yellow]"
+                "[yellow]Dashboard exposed on all interfaces with no --api-key.[/yellow]\n"
+                "[yellow]Generated one so it is not open -- sign in with:[/yellow]\n"
+                f"  [bold]{generated_key}[/bold]"
             )
         else:
             console.print(
-                "[yellow]Warning: dashboard exposed on all interfaces "
-                "-- no authentication enabled[/yellow]"
+                "[yellow]Dashboard exposed on all interfaces -- authentication enabled.[/yellow]"
             )
 
     app = create_app(settings)

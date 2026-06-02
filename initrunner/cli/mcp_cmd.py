@@ -68,6 +68,14 @@ def mcp_serve(
     ] = "stdio",
     host: Annotated[str, typer.Option(help="Host to bind to (sse/http)")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on (sse/http)")] = 8080,
+    api_key: Annotated[
+        str | None,
+        typer.Option(
+            "--api-key",
+            envvar="INITRUNNER_MCP_API_KEY",
+            help="Require this Bearer token (sse/http). Auto-generated if exposed without one.",
+        ),
+    ] = None,
     server_name: Annotated[str, typer.Option(help="MCP server name")] = "initrunner",
     pass_through: Annotated[
         bool, typer.Option("--pass-through", help="Also expose agent MCP tools directly")
@@ -120,7 +128,7 @@ def mcp_serve(
         if transport != "stdio":
             err_console.print(f"  Endpoint: {host}:{port}")
 
-        run_mcp_gateway(mcp, transport=transport, host=host, port=port)
+        run_mcp_gateway(mcp, transport=transport, host=host, port=port, api_key=api_key)
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -148,6 +156,14 @@ def mcp_toolkit(
     ] = "stdio",
     host: Annotated[str, typer.Option(help="Host to bind to (sse/http)")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on (sse/http)")] = 8080,
+    api_key: Annotated[
+        str | None,
+        typer.Option(
+            "--api-key",
+            envvar="INITRUNNER_MCP_API_KEY",
+            help="Require this Bearer token (sse/http). Auto-generated if exposed without one.",
+        ),
+    ] = None,
     server_name: Annotated[
         str | None, typer.Option(help="MCP server name (overrides config)")
     ] = None,
@@ -210,7 +226,7 @@ def mcp_toolkit(
         err_console.print(f"  Endpoint: {host}:{port}")
 
     try:
-        run_mcp_gateway(mcp, transport=transport, host=host, port=port)
+        run_mcp_gateway(mcp, transport=transport, host=host, port=port, api_key=api_key)
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
@@ -223,6 +239,14 @@ def mcp_browser(
     ] = "stdio",
     host: Annotated[str, typer.Option(help="Host to bind to (sse/http)")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on (sse/http)")] = 8080,
+    api_key: Annotated[
+        str | None,
+        typer.Option(
+            "--api-key",
+            envvar="INITRUNNER_MCP_API_KEY",
+            help="Require this Bearer token (sse/http). Auto-generated if exposed without one.",
+        ),
+    ] = None,
     session_name: Annotated[
         str | None, typer.Option("--session-name", help="Browser session name for persistence")
     ] = None,
@@ -276,7 +300,7 @@ def mcp_browser(
         err_console.print(f"  Endpoint: {host}:{port}")
 
     try:
-        run_mcp_gateway(mcp, transport=transport, host=host, port=port)
+        run_mcp_gateway(mcp, transport=transport, host=host, port=port, api_key=api_key)
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

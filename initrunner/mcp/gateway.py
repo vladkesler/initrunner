@@ -187,14 +187,42 @@ def run_mcp_gateway(
     transport: str = "stdio",
     host: str = "127.0.0.1",
     port: int = 8080,
+    api_key: str | None = None,
 ) -> None:
-    """Run an MCP gateway server with the specified transport."""
+    """Run an MCP gateway server with the specified transport.
+
+    For the network transports (sse / streamable-http) this fails closed: a
+    non-loopback bind without an API key gets a generated one (printed once) so
+    the gateway -- which can invoke agents and tools -- is never reachable
+    off-host unauthenticated. *api_key*, when present, is enforced as a static
+    Bearer token.
+    """
     if transport not in _VALID_TRANSPORTS:
         raise ValueError(f"Unknown transport: {transport!r}. Expected: stdio, sse, streamable-http")
 
     if transport == "stdio":
+        # stdio is not network-exposed; auth is N/A.
         mcp.run(transport="stdio", show_banner=False)
-    elif transport == "sse":
+        return
+
+    from initrunner.middleware import resolve_exposed_api_key
+
+    effective_key, generated_key = resolve_exposed_api_key(host, api_key)
+    if effective_key:
+        from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
+
+        mcp.auth = StaticTokenVerifier({effective_key: {"client_id": "initrunner", "scopes": []}})
+    if generated_key is not None:
+        from rich.console import Console
+
+        Console(stderr=True).print(
+            "[yellow]MCP gateway exposed without --api-key; generated one so it is "
+            "not open. Send it as a Bearer token:[/yellow]\n"
+            f"  [bold]{generated_key}[/bold]"
+        )
+
+    # Pass literal transports so the FastMCP Literal type is satisfied.
+    if transport == "sse":
         mcp.run(transport="sse", host=host, port=port)
     else:
         mcp.run(transport="streamable-http", host=host, port=port)

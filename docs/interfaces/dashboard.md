@@ -522,9 +522,11 @@ See [Design System](design-system.md) for the full reference (colors, typography
 
 By default, the dashboard binds to `127.0.0.1` (localhost only). It is not accessible from other machines.
 
-The `--expose` flag binds to `0.0.0.0`, making it accessible on all network interfaces. When exposing the dashboard, use `--api-key` to require authentication.
+The `--expose` flag binds to `0.0.0.0`, making it accessible on all network interfaces. **Exposing fails closed:** if you pass `--expose` without `--api-key`, the dashboard generates a random key, prints it once, and requires it — it never serves unauthenticated on a non-loopback interface. Pass `--api-key` (or set `INITRUNNER_DASHBOARD_API_KEY`) to choose your own.
 
-The dashboard can execute any discovered agent with any prompt. It has the same access as `initrunner run` on the command line.
+The dashboard can execute any discovered agent with any prompt, write provider keys, and edit role/flow YAML. It has the same access as `initrunner run` on the command line — treat access to it as access to the host.
+
+**DNS-rebinding protection:** the localhost dashboard rejects requests whose `Host` header isn't `localhost`/`127.0.0.1` (a `TrustedHost` allowlist), so a malicious web page can't drive it through a rebinding hostname. When `--expose`d, the allowlist is permissive (authentication is the protection); pin it with `allowed_hosts` if you terminate at a fixed hostname.
 
 ### Authentication
 
@@ -542,7 +544,9 @@ When enabled:
 - **Public endpoints**: Only `/api/health` and `/login` are accessible without authentication. All other routes (including `/api/docs` and `/api/openapi.json`) require a valid key.
 - **Logout**: `POST /logout` clears the session cookie.
 
-Without `--api-key`, the dashboard runs with no authentication (suitable for localhost-only use).
+Without `--api-key`, a **localhost** dashboard runs with no authentication (suitable for local-only use). Binding to a non-loopback host (`--expose`) always requires a key — one is generated and printed if you don't supply it.
+
+The session cookie's `Secure` flag is set from the connection scheme (`request.url.scheme`), which uvicorn only marks HTTPS for a trusted proxy (`--forwarded-allow-ips`); the client-supplied `X-Forwarded-Proto` header is not trusted on its own.
 
 **Limitations**: Authentication mode supports the built-in same-origin UI and Bearer-token API clients. The cross-origin Vite dev server (`localhost:5173`) is not supported in authenticated mode. For development with auth, use the production build served by the backend.
 

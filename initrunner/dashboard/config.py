@@ -19,6 +19,10 @@ class DashboardSettings:
     expose: bool = False
     api_key: str | None = None
     extra_role_dirs: list[Path] = field(default_factory=list)
+    # Host header allowlist (anti-DNS-rebinding). None -> default policy in
+    # create_app: loopback names only when not exposed, permissive when exposed
+    # (mandatory auth is the protection there).
+    allowed_hosts: list[str] | None = None
 
     @property
     def host(self) -> str:
