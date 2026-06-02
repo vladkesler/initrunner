@@ -30,6 +30,25 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool 
     return None
 
 
+@pytest.fixture(autouse=True)
+def _reset_home_dir_cache():
+    """Clear the get_home_dir() lru_cache around every test.
+
+    get_home_dir() is ``@lru_cache``'d but resolves from ``INITRUNNER_HOME`` /
+    ``XDG_DATA_HOME``. A test that monkeypatches those env vars populates the
+    cache with a temp path; monkeypatch then restores the env, but the cache
+    keeps the stale value for the rest of the session -- breaking any later test
+    that relies on the real home (e.g. store-path validation). Clearing before
+    and after each test keeps resolution consistent with the current env,
+    regardless of collection order.
+    """
+    from initrunner.config import get_home_dir
+
+    get_home_dir.cache_clear()
+    yield
+    get_home_dir.cache_clear()
+
+
 def make_role(
     *,
     name: str = "test-agent",
