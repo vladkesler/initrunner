@@ -361,4 +361,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.5.2</sub></p>
+<p align="center"><sub>v2026.6.1</sub></p>

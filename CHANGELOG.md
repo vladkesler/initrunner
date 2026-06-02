@@ -1,5 +1,31 @@
 # Changelog
 
+## [2026.6.1] - 2026-06-02
+
+### Security
+- **Critical: gate bundle-shipped custom-tool code execution.** Loading a `custom` tool imported a module by name, which runs that module's top-level code in the InitRunner process; the AST import scan was never a real boundary. A role installed from InitHub or an OCI registry could ship a tool module that ran arbitrary code on `initrunner run`. Importing a module that ships inside an installed role (directories named `hub__*`/`oci__*`, or containing a bundle `manifest.json`) is now refused unless the operator sets `INITRUNNER_ALLOW_TOOL_CODE=1` -- an environment variable, never a role-YAML field, so a malicious bundle cannot self-grant trust. Locally-authored roles load their own tool modules unchanged, and `initrunner install` previews now flag bundles that declare code-executing tools. See `docs/security/security.md`. (#144)
+- **Fail closed on network-exposed servers.** Authentication was opt-in: with no API key the dashboard, MCP gateway (sse/streamable-http), and A2A server served every endpoint unauthenticated, and `--expose` only printed a warning. Binding a non-loopback host without a key now generates and prints a one-time key instead of serving open, across all three. The MCP gateway gains `--api-key` (env `INITRUNNER_MCP_API_KEY`) on `serve`/`toolkit`/`browser`. Loopback binds may still run keyless for local dev. (#139)
+- **Block DNS-rebinding of the localhost dashboard.** Added Starlette `TrustedHostMiddleware` so the dashboard rejects requests whose `Host` header is not `localhost`/`127.0.0.1`, preventing a malicious page from driving the local dashboard through a rebinding hostname. The session cookie's `Secure` flag now derives from the connection scheme rather than the spoofable `X-Forwarded-Proto` header. (#139)
+- **Pin the validated IP to defeat SSRF DNS rebinding.** `SSRFSafeTransport` validated the URL and then let httpx re-resolve and connect, so a rebinding resolver could pass validation and connect to `169.254.169.254`/`127.0.0.1`. It now resolves once, validates every returned address, and connects to the pinned IP while preserving the Host header and TLS SNI, for both the sync and async transports and every redirect hop. The blocklist gains `100.64.0.0/10` (CGNAT, including the Alibaba metadata endpoint `100.100.100.200`), `192.0.0.0/24`, `192.0.2.0/24`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24`, `240.0.0.0/4`, and IPv6 `::/128` and `2001:db8::/32`. (#140)
+- **Close audit-hook sandbox bypasses.** `_check_open` now decodes write intent from `os.open()` integer flags, not just the `open()` mode string (an `os.open(path, O_WRONLY|O_CREAT)` previously skipped the `allowed_write_paths` check), and the subprocess block covers `os.posix_spawn`, `os.exec*`, `os.fork`, and `os.forkpty` in addition to `subprocess.Popen`/`os.system`. Sandbox violations are now recorded to the audit chain, and the docs no longer claim the in-process hook contains a determined adversary. (#141)
+- **Confine dashboard builder reads to the bundled starters directory.** The builder's starter-seed path and `resolve_starter_path` joined a request-supplied slug onto a filesystem path with only an `is_file()` check, so a slug like `../../../etc/passwd` read arbitrary `.yaml` files. Both now confine every candidate to `STARTERS_DIR` (rejecting `..`, absolute, and symlink escapes), alongside the builder save-path containment on the same change. (#138)
+- **Bump `pyjwt` 2.12.1 to 2.13.0.** Closes PYSEC-2026-175, PYSEC-2026-177, PYSEC-2026-178, and PYSEC-2026-179, four advisories fixed in 2.13.0. `pyjwt[crypto]` is a transitive dependency.
+- **Broaden subprocess environment scrubbing.** The name denylist missed `AWS_ACCESS_KEY_ID`, `GITHUB_PAT`, `SECRET_KEY_BASE`, and `*_DSN`, leaking them into tool subprocess environments. It now strips whole-provider prefixes (`AWS_`, `AZURE_`, `OPENAI_`, ...) and more secret-shaped suffixes (`_PAT`, `_DSN`, `_KEY_BASE`, `_CONNECTION_STRING`, ...). Tools inherit almost no environment, so dropping a non-secret like `AWS_REGION` is harmless. (#143)
+- **Cap chunked request bodies; stop trusting client-set audit identity.** The body-size limit only checked `Content-Length`, which a chunked `Transfer-Encoding` request omits, allowing an unbounded body to buffer into memory. A streaming bounded read now caps both the OpenAI-compatible server and the webhook trigger regardless of headers. The webhook no longer copies the client `X-Principal-Id` header into the HMAC-chained audit trail as the run's actor; it records the claim as untrusted metadata instead. (#143)
+
+### Changed
+- **`security.sandbox.docker.extra_args` is now an allowlist.** The exact-string denylist missed `-v`/`--volume`/`--mount`, the space-separated `--pid host` form, `--gpus`, `--cgroup-parent`, and others, each of which escapes the container. Only resource and label flags are permitted now; mounts, host namespaces, capabilities, devices, and runtime overrides are rejected at load. Configs relying on those flags will fail validation. (#141)
+- **Writable bind mounts of host system roots are refused.** `SandboxConfig` rejects `allowed_write_paths` entries or writable `bind_mounts` whose source is a host system root (`/`, `/etc`, `/usr`, `/home`, ...); read-only binds are unaffected. (#141)
+- **Exec tools warn when unsandboxed.** `shell`, `python`, and `script` log a warning when built with `security.sandbox.backend: none` (host execution), and `shell` warns on an empty `allowed_commands` list (every binary, including interpreters, is permitted). (#141)
+
+### Fixed
+- **Test isolation: clear the `get_home_dir()` cache around every test.** The `@lru_cache`d home resolver retained a temp path set by an env-var monkeypatch, so later tests that relied on the real home failed depending on collection order. An autouse `conftest` fixture now clears the cache before and after each test. (#142)
+
+### Dependencies
+- Bump dashboard `svelte` 5.55.9 to 5.56.0 (svelte group). (#135)
+- Bump dashboard `js-yaml` 4.1.1 to 4.2.0. (#136)
+- Bump dashboard `vite` 8.0.14 to 8.0.16. (#137)
+
 ## [2026.5.5] - 2026-05-29
 
 ### Added
