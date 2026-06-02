@@ -85,7 +85,7 @@ For when a microVM checkbox is the actual question, see [Sandbox Backend Compari
 
 Mounts fall into two categories:
 
-- **User-configured** (`allowed_read_paths`, `allowed_write_paths`, `bind_mounts` from role YAML): validated at load time against the role's permitted roots. A typo'd `/etc` mount fails before the role ever runs.
+- **User-configured** (`allowed_read_paths`, `allowed_write_paths`, `bind_mounts` from role YAML): at **load time**, the schema refuses any *writable* bind whose source is a host system root (`/`, `/etc`, `/usr`, `/home`, ...), so a role can't hand the agent the host filesystem. Relative sources are confined to the role directory by the backend at **build time**. Read-only binds of system paths are permitted (they cannot write the host).
 - **Tool-internal** (e.g. `python_exec` writes code to `/tmp` and mounts it at `/work/_run.py`): code-controlled, trusted, no validation.
 
 ## Audit

@@ -144,7 +144,10 @@ def _make_script_fn(
 @register_tool("script", ScriptToolConfig)
 def build_script_toolset(config: ScriptToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset from a ScriptToolConfig."""
+    from initrunner.agent.runtime_sandbox import warn_if_unsandboxed
+
     backend = ctx.sandbox_backend
+    warn_if_unsandboxed(backend, "script")
 
     if config.working_dir:
         work_dir = Path(config.working_dir).resolve()

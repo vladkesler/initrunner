@@ -89,6 +89,13 @@ def _prepare_run(
     """
     run_id = generate_id()
 
+    # Persist sandbox-hook violations to the audit chain. set_audit_logger is
+    # otherwise never called, so violations were only logged, never recorded.
+    if audit_logger is not None and role.spec.security.tools.audit_hooks_enabled:
+        from initrunner.agent.sandbox import set_audit_logger
+
+        set_audit_logger(audit_logger)
+
     blocked: RunResult | None = None
     if not skip_input_validation:
         blocked = _validate_input_or_fail(

@@ -253,7 +253,9 @@ A blocked import raises `ValueError` and the agent fails to load.
 
 #### PEP 578 Audit Hook Sandbox
 
-AST analysis catches static import patterns, but a tool can trivially defeat it at runtime with string concatenation, `getattr`, or indirect imports. With `audit_hooks_enabled: true`, InitRunner installs a [PEP 578](https://peps.python.org/pep-0578/) audit hook that fires at the C-interpreter level on every `open()`, `socket.connect()`, `subprocess.Popen()`, `import`, `exec`, and `compile` -- regardless of how the call reached it. Python code can't bypass or remove an audit hook.
+AST analysis catches static import patterns, but a tool can trivially defeat it at runtime with string concatenation, `getattr`, or indirect imports. With `audit_hooks_enabled: true`, InitRunner installs a [PEP 578](https://peps.python.org/pep-0578/) audit hook that fires at the C-interpreter level on `open()`, `socket.connect()`, process-spawning calls (`subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.exec*`, `os.fork`), `import`, `exec`, and `compile`.
+
+> **Limitation -- defense in depth, not containment.** An audit hook *cannot* be removed, but it does **not** contain code running in the same interpreter. Such code can re-acquire builtins, mutate this module's per-thread state, or call the internal framework-bypass helper to turn enforcement off, and the C-level event surface has gaps (a new syscall, a primitive without an audit event). Treat audit hooks as a tripwire and a speed bump for honest-but-buggy tools and prompt-injection noise -- **not** as a boundary against a determined adversary. For untrusted code (a malicious role/bundle, or prompt-injected `python`/`custom` tools), the real boundary is the [runtime sandbox](sandbox.md) (bwrap or Docker), which runs the code in a separate process under kernel isolation.
 
 ```yaml
 security:
@@ -279,8 +281,8 @@ security:
 
 | Event | Behavior |
 |-------|----------|
-| `open` (write mode) | Blocked unless path is in `allowed_write_paths`. Reads are always allowed. |
-| `subprocess.Popen`, `os.system` | Blocked unless `allow_subprocess: true`. |
+| `open` (write mode) | Blocked unless path is in `allowed_write_paths`. Reads are always allowed. Write intent is decoded from both the `open()` mode string and `os.open()` integer flags. |
+| `subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.exec*`, `os.fork`, `os.forkpty` | Blocked unless `allow_subprocess: true`. |
 | `socket.connect` | Blocks connections to private IPs (RFC 1918, loopback, link-local) when `block_private_ips: true`. |
 | `socket.getaddrinfo` | Enforces `allowed_network_hosts` hostname allowlist at DNS resolution. |
 | `import` | Blocks modules in `blocked_custom_modules`. Always blocks `threading` and `_thread` (prevents sandbox escape via new threads). |

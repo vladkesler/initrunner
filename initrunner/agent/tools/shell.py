@@ -78,7 +78,18 @@ def validate_command(
 @register_tool("shell", ShellToolConfig)
 def build_shell_toolset(config: ShellToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing commands (no shell)."""
+    from initrunner.agent.runtime_sandbox import warn_if_unsandboxed
+
     backend = ctx.sandbox_backend
+    warn_if_unsandboxed(backend, "shell")
+    if not config.allowed_commands:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Shell tool has an empty allowed_commands list: every binary is permitted "
+            "(an interpreter like 'sh -c ...' re-enables a full shell). Set "
+            "allowed_commands to the specific binaries the agent needs."
+        )
 
     if config.working_dir:
         work_dir = Path(config.working_dir).resolve()
