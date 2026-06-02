@@ -253,20 +253,40 @@ def get_starter(slug: str) -> StarterEntry | None:
     return None
 
 
+def _within_starters(candidate: Path) -> Path | None:
+    """Resolve *candidate* and return it only if it stays inside STARTERS_DIR.
+
+    ``resolve()`` collapses ``..`` and follows symlinks; ``is_relative_to`` then
+    rejects anything that lands outside the bundled starters directory. This
+    confines a request-supplied starter name so it cannot read arbitrary files.
+    """
+    root = STARTERS_DIR.resolve()
+    try:
+        resolved = candidate.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return resolved if resolved.is_relative_to(root) else None
+
+
 def resolve_starter_path(name: str) -> Path | None:
-    """Resolve a starter name to its YAML path, or None if not found."""
+    """Resolve a starter name to its YAML path, or None if not found.
+
+    *name* is request-supplied (builder ``starter_slug``); every candidate is
+    confined to STARTERS_DIR, so a crafted name (``../``, absolute, or a symlink)
+    cannot escape to read arbitrary files.
+    """
     # Single-file starters
     for ext in (".yaml", ".yml"):
-        candidate = STARTERS_DIR / f"{name}{ext}"
-        if candidate.is_file():
+        candidate = _within_starters(STARTERS_DIR / f"{name}{ext}")
+        if candidate is not None and candidate.is_file():
             return candidate
 
     # Composite starters
-    composite = STARTERS_DIR / name
-    if composite.is_dir():
+    composite = _within_starters(STARTERS_DIR / name)
+    if composite is not None and composite.is_dir():
         for candidate_name in ("flow.yaml", "role.yaml"):
-            candidate = composite / candidate_name
-            if candidate.is_file():
+            candidate = _within_starters(composite / candidate_name)
+            if candidate is not None and candidate.is_file():
                 return candidate
 
     return None

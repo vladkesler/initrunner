@@ -252,10 +252,13 @@ async def seed_agent(
         elif req.mode == "starter":
             if not req.starter_slug:
                 raise ValueError("starter_slug is required for mode=starter")
-            from initrunner.services.starters import STARTERS_DIR
+            from initrunner.services.starters import resolve_starter_path
 
-            starter_path = STARTERS_DIR / f"{req.starter_slug}.yaml"
-            if not starter_path.is_file():
+            # resolve_starter_path confines the request-supplied slug to the
+            # bundled starters dir (no ../ or symlink escape) -- mirrors the
+            # flow/team builders.
+            starter_path = resolve_starter_path(req.starter_slug)
+            if starter_path is None:
                 raise ValueError(f"Starter not found: {req.starter_slug}")
             raw = starter_path.read_text(encoding="utf-8")
             # Rewrite model block with the user's chosen provider/model

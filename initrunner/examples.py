@@ -142,8 +142,13 @@ def copy_example(name: str, output_dir: Path) -> list[Path]:
     category_dirs = {"role": "roles", "flow": "flows", "skill": "skills"}
     category_subdir = category_dirs.get(entry.category, entry.category)
 
+    # Confine every write to output_dir. Catalog paths are trusted today, but a
+    # `..` or absolute rel_path must never escape the target directory.
+    out_root = output_dir.resolve()
     for rel_path in entry.files:
         dest = output_dir / rel_path
+        if not dest.resolve().is_relative_to(out_root):
+            raise ExampleDownloadError(f"Unsafe example file path: {rel_path}")
         if dest.exists():
             raise FileExistsError(f"File already exists: {dest}")
 
