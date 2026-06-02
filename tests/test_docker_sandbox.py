@@ -10,7 +10,6 @@ import pytest
 
 from initrunner.agent._subprocess import SubprocessTimeout
 from initrunner.agent.schema.security import (
-    _DOCKER_BLOCKED_ARGS,
     BindMount,
     DockerBackendConfig,
     SandboxConfig,
@@ -122,18 +121,33 @@ class TestSandboxConfigValidation:
         with pytest.raises(ValueError):
             SandboxConfig(cpu_limit=-1.0)
 
-    def test_dangerous_extra_args_rejected(self):
-        for arg in _DOCKER_BLOCKED_ARGS:
-            with pytest.raises(ValueError, match="blocked for security"):
-                DockerBackendConfig(extra_args=[arg])
-
-    def test_dangerous_extra_args_with_value_rejected(self):
-        with pytest.raises(ValueError, match="blocked for security"):
-            DockerBackendConfig(extra_args=["--cap-add=ALL"])
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--privileged"],
+            ["--cap-add=ALL"],
+            ["--cap-add", "SYS_ADMIN"],
+            ["-v", "/:/host"],
+            ["--volume", "/etc:/etc"],
+            ["--mount", "type=bind,src=/,dst=/host"],
+            ["--pid=host"],
+            ["--pid", "host"],  # space-separated form the old denylist missed
+            ["--network=host"],
+            ["--gpus", "all"],  # not in the old denylist
+            ["--device", "/dev/sda"],
+            ["--runtime=runsc"],
+            ["--cgroup-parent=/evil"],  # not in the old denylist
+        ],
+    )
+    def test_dangerous_extra_args_rejected(self, args):
+        with pytest.raises(ValueError, match="not allowed"):
+            DockerBackendConfig(extra_args=args)
 
     def test_safe_extra_args_allowed(self):
-        config = DockerBackendConfig(extra_args=["--pids-limit=100", "--ulimit=nofile=1024"])
-        assert len(config.extra_args) == 2
+        config = DockerBackendConfig(
+            extra_args=["--pids-limit=100", "--ulimit", "nofile=1024", "--cpus=2", "--read-only"]
+        )
+        assert len(config.extra_args) == 5
 
     def test_empty_image_rejected(self):
         with pytest.raises(ValueError, match="must not be empty"):
@@ -836,16 +850,16 @@ class TestDockerRuntimeField:
             DockerBackendConfig(runtime="bogus")  # type: ignore[arg-type]
 
     def test_extra_args_runtime_equals_form_rejected(self):
-        with pytest.raises(ValueError, match="blocked for security"):
+        with pytest.raises(ValueError, match="not allowed"):
             DockerBackendConfig(extra_args=["--runtime=runsc"])
 
     def test_extra_args_runtime_space_form_rejected(self):
-        with pytest.raises(ValueError, match="blocked for security"):
+        with pytest.raises(ValueError, match="not allowed"):
             DockerBackendConfig(extra_args=["--runtime", "runsc"])
 
     def test_extra_args_drift_now_blocked(self):
         for arg in ("--device", "--volume-driver", "--uts=host"):
-            with pytest.raises(ValueError, match="blocked for security"):
+            with pytest.raises(ValueError, match="not allowed"):
                 DockerBackendConfig(extra_args=[arg])
 
 
@@ -966,3 +980,36 @@ class TestDockerPreflightRuntime:
                     backend.preflight()
                     mock_subproc.assert_not_called()
                     mock_ensure.assert_called_once_with("python:3.12-slim")
+
+
+# ---------------------------------------------------------------------------
+# Writable bind-mount / allowed_write_paths containment
+# ---------------------------------------------------------------------------
+
+
+class TestWritableMountContainment:
+    @pytest.mark.parametrize("source", ["/", "/etc", "/usr", "/home", "/var", "/root"])
+    def test_writable_system_root_bind_rejected(self, source):
+        with pytest.raises(ValueError, match="host system path"):
+            SandboxConfig(bind_mounts=[BindMount(source=source, target="/host", read_only=False)])
+
+    @pytest.mark.parametrize("path", ["/", "/etc", "/usr"])
+    def test_allowed_write_path_system_root_rejected(self, path):
+        with pytest.raises(ValueError, match="host system path"):
+            SandboxConfig(allowed_write_paths=[path])
+
+    def test_readonly_system_bind_allowed(self):
+        cfg = SandboxConfig(bind_mounts=[BindMount(source="/etc", target="/etc", read_only=True)])
+        assert cfg.bind_mounts[0].read_only is True
+
+    def test_safe_writable_subdir_allowed(self):
+        cfg = SandboxConfig(allowed_write_paths=["/tmp/agent-workspace"])
+        assert cfg.allowed_write_paths == ["/tmp/agent-workspace"]
+
+    def test_relative_source_not_blocked_here(self):
+        # Relative paths are confined to role_dir by the backend at build time,
+        # not by this schema validator.
+        cfg = SandboxConfig(
+            bind_mounts=[BindMount(source="data", target="/work/data", read_only=False)]
+        )
+        assert cfg.bind_mounts[0].source == "data"

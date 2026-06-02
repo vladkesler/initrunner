@@ -237,20 +237,57 @@ class ToolSandboxConfig(BaseModel):
     sandbox_violation_action: Literal["raise", "log"] = "raise"
 
 
-_DOCKER_BLOCKED_ARGS = frozenset(
+# Allowlist of Docker `docker run` flags safe to pass through extra_args. A
+# denylist is unwinnable here: the previous one missed -v/--volume/--mount, the
+# space-separated `--pid host` form, --gpus, --cgroup-parent, etc. -- any of
+# which escapes the container. Only resource/limit/label flags that cannot mount
+# host paths, share host namespaces, add capabilities/devices, or change the
+# runtime are permitted. Use the `flag=value` form for negative values.
+_DOCKER_ALLOWED_ARGS = frozenset(
     {
-        "--privileged",
-        "--cap-add",
-        "--security-opt",
-        "--pid=host",
-        "--userns=host",
-        "--network=host",
-        "--ipc=host",
-        "--uts=host",
-        "--device",
-        "--volume-driver",
-        "--runtime",
+        "--ulimit",
+        "--memory-swap",
+        "--memory-reservation",
+        "--memory-swappiness",
+        "--cpu-shares",
+        "--cpu-period",
+        "--cpu-quota",
+        "--cpus",
+        "--cpuset-cpus",
+        "--cpuset-mems",
+        "--pids-limit",
+        "--shm-size",
+        "--oom-kill-disable",
+        "--oom-score-adj",
+        "--stop-signal",
+        "--stop-timeout",
+        "--label",
+        "-l",
+        "--read-only",
+        "--tmpfs",
     }
+)
+
+# Absolute paths that must never be a *writable* bind-mount source: binding any
+# of these (or "/") read-write hands the agent the host filesystem.
+_DANGEROUS_WRITE_ROOTS = (
+    "/",
+    "/etc",
+    "/root",
+    "/home",
+    "/boot",
+    "/sys",
+    "/proc",
+    "/dev",
+    "/usr",
+    "/bin",
+    "/sbin",
+    "/lib",
+    "/lib64",
+    "/var",
+    "/run",
+    "/opt",
+    "/srv",
 )
 
 
@@ -287,11 +324,20 @@ class DockerBackendConfig(BaseModel):
 
     @field_validator("extra_args")
     @classmethod
-    def _reject_dangerous_args(cls, v: list[str]) -> list[str]:
+    def _allowlist_args(cls, v: list[str]) -> list[str]:
         for arg in v:
-            normalized = arg.split("=")[0] if "=" in arg else arg
-            if arg in _DOCKER_BLOCKED_ARGS or normalized in _DOCKER_BLOCKED_ARGS:
-                raise ValueError(f"Docker extra_arg '{arg}' is blocked for security reasons")
+            # Value tokens (e.g. the "nofile=1024" after "--ulimit") don't start
+            # with "-"; they belong to a preceding allowed flag.
+            if not arg.startswith("-"):
+                continue
+            name = arg.split("=", 1)[0]
+            if name not in _DOCKER_ALLOWED_ARGS:
+                raise ValueError(
+                    f"Docker extra_arg '{arg}' is not allowed. Permitted flags: "
+                    f"{sorted(_DOCKER_ALLOWED_ARGS)}. Mounts, host namespaces, "
+                    f"capabilities, devices, and runtime overrides are blocked to "
+                    f"preserve container isolation."
+                )
         return v
 
 
@@ -344,6 +390,43 @@ class SandboxConfig(BaseModel):
             )
         if len(targets) != len(set(targets)):
             raise ValueError("duplicate bind_mount targets")
+        return self
+
+    @model_validator(mode="after")
+    def _reject_dangerous_writable_mounts(self) -> SandboxConfig:
+        """Refuse writable binds of host system roots.
+
+        Binding "/" (or /etc, /usr, /home, ...) read-write into the sandbox hands
+        the agent the host filesystem -- defeating the isolation entirely. Only
+        absolute sources are checked here; role-relative paths are confined to
+        role_dir by the backend at build time. Read-only binds are allowed (they
+        cannot be used to write the host).
+        """
+        if self.backend == "ssh":
+            # SSH rejects bind_mounts / allowed_*_paths outright (see
+            # _validate_ssh_constraints); let that give the clearer message.
+            return self
+
+        from pathlib import Path
+
+        def _check(src: str, label: str) -> None:
+            p = Path(src)
+            if not p.is_absolute():
+                return
+            resolved = p.resolve()
+            for root in _DANGEROUS_WRITE_ROOTS:
+                r = Path(root)
+                if resolved == r or r.is_relative_to(resolved):
+                    raise ValueError(
+                        f"{label} '{src}' exposes host system path '{root}' as writable; "
+                        f"refused. Bind a specific project subdirectory instead."
+                    )
+
+        for m in self.bind_mounts:
+            if not m.read_only:
+                _check(m.source, "writable bind_mount source")
+        for w in self.allowed_write_paths:
+            _check(w, "allowed_write_path")
         return self
 
     @model_validator(mode="after")

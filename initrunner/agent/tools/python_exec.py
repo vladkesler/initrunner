@@ -57,7 +57,10 @@ _PROXY_ENV_KEYS = (
 @register_tool("python", PythonToolConfig)
 def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for executing Python code in a subprocess."""
+    from initrunner.agent.runtime_sandbox import warn_if_unsandboxed
+
     backend = ctx.sandbox_backend
+    warn_if_unsandboxed(backend, "python")
     sandbox_cfg = ctx.role.spec.security.sandbox
 
     toolset = FunctionToolset()

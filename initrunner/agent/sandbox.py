@@ -4,12 +4,22 @@ Installs a permanent sys.addaudithook that enforces filesystem, network,
 subprocess, import, and eval/exec restrictions when a sandbox_scope() is active.
 Enforcement is per-thread via threading.local() — only fires inside custom tool
 invocations, never during framework operations.
+
+SCOPE / LIMITATION: this is defense-in-depth, NOT a containment boundary. Code
+running in the same interpreter can defeat an audit-hook sandbox -- e.g. by
+re-acquiring builtins, mutating this module's thread-local state, or calling the
+internal bypass helper. Audit hooks observe events; they cannot revoke a
+determined in-process adversary's access. For untrusted code, the real boundary
+is the runtime sandbox (bwrap/docker) that runs it in a separate process with
+kernel-level isolation. Keep the docs honest about this (see
+docs/security/security.md).
 """
 
 from __future__ import annotations
 
 import ipaddress
 import logging
+import os
 import sys
 import threading
 from contextlib import contextmanager
@@ -159,15 +169,37 @@ def _record_violation(state: _SandboxState, event: str, detail: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+# Bits in the os.open() flags int that imply write intent.
+_WRITE_FLAG_MASK = (
+    os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC | getattr(os, "O_EXCL", 0)
+)
+
+
+def _open_is_write(args: tuple[Any, ...]) -> bool:
+    """Decide whether an 'open' audit event represents a write.
+
+    The PEP 578 ``open`` event carries ``(path, mode, flags)``. The builtin
+    ``open()`` sets *mode* to a string; ``os.open(path, flags)`` sets *mode* to
+    ``None`` and puts the intent in the integer *flags* (args[2]). The original
+    check bailed whenever *mode* was not a string, so ``os.open`` slipped past
+    the write-path allowlist entirely -- decode the flags instead.
+    """
+    mode = args[1] if len(args) >= 2 else None
+    if isinstance(mode, str):
+        return not set(mode) <= {"r", "b", "t"}
+    flags = args[2] if len(args) >= 3 else None
+    if isinstance(flags, int):
+        return bool(flags & _WRITE_FLAG_MASK)
+    # Unknown shape -> treat as a write so we fail closed rather than open.
+    return True
+
+
 def _check_open(state: _SandboxState, args: tuple[Any, ...]) -> None:
     """Check open() calls — block writes outside allowed paths, reads always pass."""
-    if len(args) < 2:
+    if len(args) < 1:
         return
-    path_arg, mode = args[0], args[1]
-    if not isinstance(mode, str):
-        return
-    # Read-only modes are always allowed
-    if set(mode) <= {"r", "b", "t"}:
+    path_arg = args[0]
+    if not _open_is_write(args):
         return
 
     # Write mode — check against allowed_write_paths
@@ -195,6 +227,22 @@ def _check_open(state: _SandboxState, args: tuple[Any, ...]) -> None:
             continue
 
     _record_violation(state, "open", f"Write to '{target}' blocked (not in allowed_write_paths)")
+
+
+# Every audit event that spawns or replaces a process. Checking only
+# subprocess.Popen / os.system left os.posix_spawn, os.exec*, os.spawn*, and
+# os.fork (which pty.fork uses) as open holes around allow_subprocess=False.
+_SUBPROCESS_EVENTS = frozenset(
+    {
+        "subprocess.Popen",
+        "os.system",
+        "os.exec",
+        "os.posix_spawn",
+        "os.spawn",
+        "os.fork",
+        "os.forkpty",
+    }
+)
 
 
 def _check_subprocess(state: _SandboxState, event: str) -> None:
@@ -331,7 +379,7 @@ def _audit_hook(event: str, args: tuple[Any, ...]) -> None:
 
     if event == "open":
         _check_open(state, args)
-    elif event in ("subprocess.Popen", "os.system"):
+    elif event in _SUBPROCESS_EVENTS:
         _check_subprocess(state, event)
     elif event == "socket.connect":
         _check_network(state, args)

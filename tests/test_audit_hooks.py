@@ -261,6 +261,93 @@ class TestSubprocessHooks:
             stdout, _ = proc.communicate()
             assert b"test" in stdout
 
+    @pytest.mark.parametrize("event", ["os.posix_spawn", "os.exec", "os.fork", "os.forkpty"])
+    def test_process_spawn_events_blocked(self, event):
+        """os.posix_spawn / os.exec* / os.fork were unguarded -- only Popen/system were checked."""
+        from initrunner.agent.sandbox import _audit_hook
+
+        config = ToolSandboxConfig(audit_hooks_enabled=True, allow_subprocess=False)
+        state = _get_state()
+        state.enforcing = True
+        state.config = config
+        state.agent_name = "test"
+        try:
+            with pytest.raises(SandboxViolation, match="Subprocess execution blocked"):
+                _audit_hook(event, ("/bin/echo", ["echo"], {}))
+        finally:
+            state.enforcing = False
+            state.config = None
+
+    @pytest.mark.parametrize("event", ["os.posix_spawn", "os.fork"])
+    def test_process_spawn_events_allowed_when_enabled(self, event):
+        from initrunner.agent.sandbox import _audit_hook
+
+        config = ToolSandboxConfig(audit_hooks_enabled=True, allow_subprocess=True)
+        state = _get_state()
+        state.enforcing = True
+        state.config = config
+        state.agent_name = "test"
+        try:
+            _audit_hook(event, ("/bin/echo", ["echo"], {}))  # no raise
+            assert state.violations == []
+        finally:
+            state.enforcing = False
+            state.config = None
+
+
+# ---------------------------------------------------------------------------
+# Write-intent decoding (builtin open mode string vs os.open integer flags)
+# ---------------------------------------------------------------------------
+
+
+class TestOpenWriteDecoding:
+    def test_builtin_mode_string(self):
+        from initrunner.agent.sandbox import _open_is_write
+
+        assert _open_is_write(("/p", "w")) is True
+        assert _open_is_write(("/p", "wb")) is True
+        assert _open_is_write(("/p", "a")) is True
+        assert _open_is_write(("/p", "r+")) is True
+        assert _open_is_write(("/p", "r")) is False
+        assert _open_is_write(("/p", "rb")) is False
+
+    def test_os_open_integer_flags(self):
+        import os
+
+        from initrunner.agent.sandbox import _open_is_write
+
+        # os.open passes mode=None and the intent in args[2] (the int flags).
+        assert _open_is_write(("/p", None, os.O_WRONLY | os.O_CREAT)) is True
+        assert _open_is_write(("/p", None, os.O_RDWR)) is True
+        assert _open_is_write(("/p", None, os.O_APPEND | os.O_WRONLY)) is True
+        assert _open_is_write(("/p", None, os.O_RDONLY)) is False
+
+    def test_os_open_write_blocked_in_scope(self, tmp_path):
+        import os
+
+        config = ToolSandboxConfig(
+            audit_hooks_enabled=True,
+            allowed_write_paths=[],
+            sandbox_violation_action="raise",
+        )
+        with sandbox_scope(config=config, agent_name="test"):
+            with pytest.raises(SandboxViolation, match="open"):
+                os.open(str(tmp_path / "x.txt"), os.O_WRONLY | os.O_CREAT, 0o600)
+
+    def test_os_open_readonly_allowed_in_scope(self, tmp_path):
+        import os
+
+        target = tmp_path / "r.txt"
+        target.write_text("hi", encoding="utf-8")
+        config = ToolSandboxConfig(
+            audit_hooks_enabled=True,
+            allowed_write_paths=[],
+            sandbox_violation_action="raise",
+        )
+        with sandbox_scope(config=config, agent_name="test"):
+            fd = os.open(str(target), os.O_RDONLY)  # read -> allowed
+            os.close(fd)
+
 
 # ---------------------------------------------------------------------------
 # Import hooks
