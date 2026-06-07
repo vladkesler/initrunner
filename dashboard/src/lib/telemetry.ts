@@ -53,7 +53,12 @@ export function initTelemetry(): void {
 			disable_session_recording: true,
 			rageclick: false,
 			enable_heatmaps: false,
-			capture_dead_clicks: false
+			capture_dead_clicks: false,
+			// Override the source IP so PostHog never stores the real one.
+			before_send: (event) => {
+				if (event) event.properties = { ...event.properties, $ip: '0.0.0.0' };
+				return event;
+			}
 		});
 		started = true;
 	} catch {

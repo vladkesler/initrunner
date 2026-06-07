@@ -40,8 +40,9 @@ which is the source of truth. Two events are sent:
 
 `os` (`Linux` / `Darwin` / `Windows`), `python_version` (major.minor, e.g.
 `3.12`), `initrunner_version`, and `$lib` (`initrunner-cli`). Every event is sent
-with `$process_person_profile: false` (anonymous, no person profile is created)
-and `$geoip_disable: true` (no server-side geolocation).
+with `$process_person_profile: false` (anonymous, no person profile is created),
+`$geoip_disable: true` (no server-side geolocation), and `$ip: 0.0.0.0` (the real
+source IP is never stored).
 
 ## What is never collected
 
@@ -53,8 +54,11 @@ leaves the process.
 
 A note on IP addresses: InitRunner never puts an IP, hostname, or username in the
 payload. Any HTTPS request still exposes the source IP at the network layer, so
-the events set `$geoip_disable: true` and the PostHog project has "Discard client
-IP data" enabled, so the IP is not stored or geolocated.
+every event overrides it: `$ip` is set to `0.0.0.0` (PostHog stores the sent
+value instead of the request IP) and `$geoip_disable: true` skips geolocation.
+The real IP is therefore never stored. As a backstop you can also enable
+"Discard client IP data" in the PostHog project settings, which strips the IP
+server-side for every event.
 
 ## The anonymous install id
 

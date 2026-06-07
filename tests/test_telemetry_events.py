@@ -20,6 +20,13 @@ def test_anonymous_control_properties_present():
     )
     assert props["$process_person_profile"] is False
     assert props["$geoip_disable"] is True
+    # $ip override so PostHog never stores the real source IP.
+    assert props["$ip"] == "0.0.0.0"
+
+
+def test_first_run_overrides_ip():
+    props = _events.first_run_properties()
+    assert props["$ip"] == "0.0.0.0"
 
 
 def test_first_run_properties_allowlisted():

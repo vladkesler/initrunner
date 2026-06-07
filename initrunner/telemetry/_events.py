@@ -53,8 +53,8 @@ _ALLOWED_PROPERTY_KEYS = frozenset(
         "is_tty", "is_ci", "install_method",
         # super properties
         "os", "python_version", "initrunner_version", "$lib",
-        # PostHog control properties (anonymous event, no geo lookup)
-        "$process_person_profile", "$geoip_disable",
+        # PostHog control properties: anonymous event, no geo lookup, no stored IP
+        "$process_person_profile", "$geoip_disable", "$ip",
     }
 )  # fmt: skip
 
@@ -117,6 +117,10 @@ def _finalize(props: dict[str, object]) -> dict[str, object]:
     """Force anonymity, drop unknown keys, scrub string values."""
     props["$process_person_profile"] = False
     props["$geoip_disable"] = True
+    # Override the source IP so PostHog never stores the real one. $geoip_disable
+    # alone only skips the geo lookup; a sent $ip replaces the request IP. (null
+    # is ignored and falls back to the socket IP; "0.0.0.0" is honored.)
+    props["$ip"] = "0.0.0.0"
     out: dict[str, object] = {}
     for key, value in props.items():
         if key not in _ALLOWED_PROPERTY_KEYS:
