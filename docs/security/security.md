@@ -546,3 +546,7 @@ spec:
 ```
 
 Burst size derives automatically as `rate_limit_rpm / 6`, roughly 10 seconds of capacity. The webhook returns 429 when the bucket empties.
+
+## Usage Telemetry
+
+InitRunner sends anonymous, opt-out product-usage telemetry (command name, outcome, OS, and version, tied to a random id) so the maintainers can see whether and how it is used. It never sends prompts, file contents, paths, arguments, or API keys, and it is distinct from the local audit trail (never transmitted) and from agent observability. Turn it off with `initrunner telemetry disable`, `DO_NOT_TRACK=1`, or `INITRUNNER_TELEMETRY=off`. Full disclosure of every field and opt-out path is in [`docs/operations/telemetry.md`](../operations/telemetry.md).

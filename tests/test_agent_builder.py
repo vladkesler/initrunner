@@ -738,3 +738,121 @@ class TestExtractTestPrompt:
             session = BuilderSession()
             turn = session.seed_description("a news bot", "openai")
         assert turn.test_prompt == "what's the top story today?"
+
+
+# ---------------------------------------------------------------------------
+# Module-stem sanitizer + sidecar naming
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeModuleStem:
+    @pytest.mark.parametrize(
+        ("stem", "expected"),
+        [
+            ("my-agent", "my_agent"),
+            ("2fa-bot", "agent_2fa_bot"),  # leading digit
+            ("role.v2", "role_v2"),
+            ("a!b@c", "a_b_c"),
+            ("123", "agent_123"),
+            ("", "agent"),
+            ("___", "agent"),
+            ("plain", "plain"),
+        ],
+    )
+    def test_sanitize(self, stem, expected):
+        from initrunner.services.agent_builder import sanitize_module_stem
+
+        assert sanitize_module_stem(stem) == expected
+
+    def test_save_uses_sanitized_sidecar_name(self, tmp_path):
+        """A digit-leading stem must yield an importable sidecar module."""
+        yaml_text = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: twofa-bot
+            spec:
+              role: You help with 2FA.
+              model:
+                provider: openai
+                name: gpt-5-mini
+              tools:
+                - type: custom
+                  module: _langchain_tools
+        """)
+        session = BuilderSession()
+        session.yaml_text = yaml_text
+        session._sidecar_source = "# generated tools\n"
+
+        result = session.save(tmp_path / "2fa-bot.yaml", force=True)
+
+        sidecar = tmp_path / "agent_2fa_bot_tools.py"
+        assert sidecar.exists()
+        assert str(sidecar) in result.generated_assets
+        assert "agent_2fa_bot_tools" in (tmp_path / "2fa-bot.yaml").read_text()
+
+
+# ---------------------------------------------------------------------------
+# seed_yaml / undo / current_turn / message trim
+# ---------------------------------------------------------------------------
+
+
+class TestSeedYamlAndHistory:
+    def test_seed_yaml_canonicalizes_and_has_no_test_prompt(self):
+        session = BuilderSession()
+        turn = session.seed_yaml(_VALID_YAML, source_label="offline-form")
+        assert turn.test_prompt is None
+        assert turn.ready is True
+        assert session.role is not None
+        assert session.seed_source == "offline-form"
+
+    def test_undo_round_trip(self):
+        session = BuilderSession()
+        session.seed_yaml(_VALID_YAML)
+        first = session.yaml_text
+
+        session.checkpoint()
+        session.yaml_text = _VALID_YAML_WITH_MEMORY
+        assert session.previous_yaml == first
+
+        assert session.undo() is True
+        assert session.yaml_text == first
+        # Stack now empty.
+        assert session.undo() is False
+
+    def test_current_turn_preserves_test_prompt(self):
+        response = (
+            "Here is the agent.\nTest prompt: summarize today's headlines\n"
+            "```yaml\n" + _VALID_YAML + "```"
+        )
+        with patch("initrunner.services.agent_builder.BuilderSession._get_agent") as mock_get:
+            mock_get.return_value = _make_fake_agent(response)
+            session = BuilderSession()
+            turn = session.seed_description("a news bot", "openai")
+        assert turn.test_prompt == "summarize today's headlines"
+
+        # A command-derived turn must NOT erase the tailored prompt.
+        refreshed = session.current_turn()
+        assert refreshed.test_prompt == "summarize today's headlines"
+        assert refreshed.explanation == ""
+
+    def test_trim_messages_cuts_on_request_boundary(self):
+        from pydantic_ai.messages import (
+            ModelRequest,
+            ModelResponse,
+            TextPart,
+            UserPromptPart,
+        )
+
+        session = BuilderSession()
+        msgs: list = []
+        for i in range(45):
+            if i % 2 == 0:
+                msgs.append(ModelRequest(parts=[UserPromptPart(content=f"q{i}")]))
+            else:
+                msgs.append(ModelResponse(parts=[TextPart(content=f"a{i}")]))
+        session._messages = list(msgs)
+        session._trim_messages()
+
+        assert len(session._messages) <= 40
+        assert isinstance(session._messages[0], ModelRequest)

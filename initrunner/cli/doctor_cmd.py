@@ -140,6 +140,20 @@ def doctor(
         "[dim]Note: Anthropic uses OpenAI embeddings (OPENAI_API_KEY) for RAG/memory.[/dim]"
     )
 
+    # ----- Usage telemetry -----
+    from initrunner import telemetry
+
+    tele = telemetry.status()
+    if tele["enabled"]:
+        tele_state = "[green]enabled[/green]"
+    else:
+        tele_state = f"[yellow]disabled[/yellow] ({tele['reason']})"
+    console.print()
+    console.print(
+        f"[bold]Usage telemetry:[/bold] {tele_state} "
+        "[dim](anonymous, opt-out; initrunner telemetry status)[/dim]"
+    )
+
     # ----- Fix: providers (when --fix) -----
     fixed: list[str] = []
     if fix:

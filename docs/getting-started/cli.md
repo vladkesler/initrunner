@@ -371,6 +371,7 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--template TEXT` | Start from a named template (use `--list-templates` to see options) |
 | `--list-templates` | Show available templates and exit |
 | `--blank` | Start from a minimal blank template |
+| `--offline` | Build via a deterministic structured form (no AI/LLM call) |
 | `--langchain PATH` | Import from a LangChain Python file (see [LangChain Import](langchain-import.md)) |
 | `--pydantic-ai PATH` | Import from a PydanticAI Python file (see [PydanticAI Import](pydanticai-import.md)) |
 | `--agent-spec PATH` | Import from a PydanticAI Agent Spec YAML/JSON file (see [Agent Spec Import](agent-spec-import.md)) |
@@ -382,7 +383,7 @@ Create a new agent role via conversational builder. Seed modes are mutually excl
 | `--run PROMPT` | After creating, immediately execute the agent with `PROMPT`. Bypasses the post-creation confirmation. |
 | `--no-run` | Skip the post-creation `Run it now?` confirmation. |
 
-Without any seed, starts an interactive conversation where the LLM asks what to build.
+Without any seed, an interactive terminal shows a guided start menu (describe / template / example / offline / import); piped/non-TTY input falls back to an LLM conversation that asks what to build. The refinement loop accepts `:` commands (`:help`, `:validate`, `:explain`, `:tools`, `:model`, `:diff`, `:undo`, `:yaml`, `:save`, `:quit`) and runs in command-only mode when no API key is configured. See [Role Generation](../agents/role_generation.md) for the full menu, offline form, and command reference.
 
 ### Run it now?
 

@@ -79,3 +79,7 @@ def get_hub_auth_path() -> Path:
 
 def get_vault_path() -> Path:
     return get_home_dir() / "vault.enc"
+
+
+def get_telemetry_config_path() -> Path:
+    return get_home_dir() / "telemetry.json"
