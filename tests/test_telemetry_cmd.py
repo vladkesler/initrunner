@@ -24,23 +24,27 @@ def home(tmp_path, monkeypatch):
 def test_status_enable_disable_reset(home):
     from initrunner.telemetry import _config
 
+    # Fresh install: opt-in, undecided.
     result = runner.invoke(telemetry_app, ["status"])
     assert result.exit_code == 0
-    assert "enabled" in result.output.lower()
+    assert "opt-in" in result.output.lower()
 
     result = runner.invoke(telemetry_app, ["disable"])
     assert result.exit_code == 0
     disabled = _config._load_raw()
-    assert disabled is not None and disabled.enabled is False
+    assert disabled is not None and disabled.consent == "denied"
 
     result = runner.invoke(telemetry_app, ["status"])
     assert "disabled" in result.output.lower()
-    assert "config-opt-out" in result.output
+    assert "consent-denied" in result.output
 
     result = runner.invoke(telemetry_app, ["enable"])
     assert result.exit_code == 0
     enabled = _config._load_raw()
-    assert enabled is not None and enabled.enabled is True
+    assert enabled is not None and enabled.consent == "granted"
+
+    result = runner.invoke(telemetry_app, ["status"])
+    assert "enabled" in result.output.lower()
 
     before_reset = _config._load_raw()
     assert before_reset is not None

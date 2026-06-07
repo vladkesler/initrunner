@@ -146,12 +146,14 @@ def doctor(
     tele = telemetry.status()
     if tele["enabled"]:
         tele_state = "[green]enabled[/green]"
+    elif tele["reason"] == "unset":
+        tele_state = "[yellow]off[/yellow] (not yet chosen)"
     else:
         tele_state = f"[yellow]disabled[/yellow] ({tele['reason']})"
     console.print()
     console.print(
         f"[bold]Usage telemetry:[/bold] {tele_state} "
-        "[dim](anonymous, opt-out; initrunner telemetry status)[/dim]"
+        "[dim](anonymous, opt-in; initrunner telemetry status)[/dim]"
     )
 
     # ----- Fix: providers (when --fix) -----

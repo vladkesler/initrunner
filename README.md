@@ -218,7 +218,7 @@ spec:
 
 See [Security](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker sandbox](docs/security/docker-sandbox.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
 
-**Telemetry.** InitRunner sends anonymous, opt-out usage data (which command ran, version, OS, error type, tied to a random id) to guide what to build next. No prompts, files, paths, or keys are sent. Turn it off with `initrunner telemetry disable` or `DO_NOT_TRACK=1`. See [Telemetry](docs/operations/telemetry.md).
+**Telemetry.** InitRunner can send anonymous usage data (which command ran, version, OS, error type, tied to a random id) to guide what to build next. It is opt-in: the CLI asks once on the first interactive run and sends nothing until you agree. No prompts, files, paths, or keys are sent. Manage it with `initrunner telemetry enable/disable` (or `DO_NOT_TRACK=1`). See [Telemetry](docs/operations/telemetry.md).
 
 ## Cost control
 
@@ -363,4 +363,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.6.2</sub></p>
+<p align="center"><sub>v2026.6.3</sub></p>

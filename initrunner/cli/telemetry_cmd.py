@@ -1,4 +1,4 @@
-"""Telemetry status and opt-out commands."""
+"""Telemetry status and consent commands."""
 
 from __future__ import annotations
 
@@ -17,6 +17,11 @@ def telemetry_status() -> None:
     info = telemetry.status()
     if info["enabled"]:
         console.print("Usage telemetry: [green]enabled[/green]")
+    elif info["reason"] == "unset" and info["consent"] in (None, "unset"):
+        console.print(
+            "Usage telemetry: [yellow]off[/yellow] (opt-in; you will be asked on the first "
+            "interactive run, or enable now with [cyan]initrunner telemetry enable[/cyan])"
+        )
     else:
         console.print(f"Usage telemetry: [yellow]disabled[/yellow] (reason: {info['reason']})")
     console.print(f"Install ID: {info['install_id'] or '[dim](not yet generated)[/dim]'}")
@@ -29,7 +34,10 @@ def telemetry_status() -> None:
     console.print(
         "[dim]Never collected: prompts, file contents, paths, arguments, or API keys.[/dim]"
     )
-    console.print("[dim]Opt out: initrunner telemetry disable  (or set DO_NOT_TRACK=1)[/dim]")
+    console.print(
+        "[dim]Opt-in; off by default. Enable: initrunner telemetry enable. "
+        "Disable: initrunner telemetry disable (or set DO_NOT_TRACK=1).[/dim]"
+    )
 
 
 @app.command("enable")
