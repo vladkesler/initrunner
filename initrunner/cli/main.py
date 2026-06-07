@@ -16,12 +16,19 @@ from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
 from initrunner.cli.skill_cmd import app as skill_app
+from initrunner.cli.telemetry_cmd import app as telemetry_app
 
 app = typer.Typer(
     name="initrunner",
     help="A lightweight AI agent runner.",
     no_args_is_help=False,
 )
+
+# Command name captured by the main() callback for the telemetry hook in
+# app_entry(). A plain module global (the CLI is single-process) read back when
+# the command finishes; eager-callback paths (--help/--version) fall back to an
+# argv scan in _resolve_command().
+_invoked_command: str | None = None
 
 # Sub-app and command registrations are below the callback (after lazy imports).
 # See "Command registrations" block.
@@ -56,6 +63,9 @@ def main(
     from initrunner._log import setup_logging
 
     setup_logging(verbose=verbose)
+
+    global _invoked_command
+    _invoked_command = ctx.invoked_subcommand
 
     if ctx.invoked_subcommand is not None:
         return
@@ -221,11 +231,74 @@ app.add_typer(cost_app, name="cost", rich_help_panel="Agent Internals")
 app.add_typer(vault_app, name="vault", rich_help_panel="Agent Internals")
 app.command("approve", rich_help_panel="Agent Internals")(approve)
 app.command("pending", rich_help_panel="Agent Internals")(pending)
+app.add_typer(telemetry_app, name="telemetry", rich_help_panel="Agent Internals")
 
 # --- Deprecated (hidden from help) ---
 app.add_typer(hub_app, name="hub", hidden=True)
 
 
+def _resolve_command() -> str:
+    """Best-effort command name for telemetry.
+
+    Prefers the value the main() callback captured; falls back to scanning argv
+    for paths where the callback never runs (``--help``, ``--version``, parse
+    errors). The value is normalized to the known-command allowlist downstream.
+    """
+    if _invoked_command:
+        return _invoked_command
+    import sys
+
+    for arg in sys.argv[1:]:
+        if arg in ("--help", "-h"):
+            return "help"
+        if arg == "--version":
+            return "version"
+        if not arg.startswith("-"):
+            return arg
+    return "other"
+
+
 def app_entry() -> None:
-    """Entry point for the CLI."""
-    app()
+    """Entry point for the CLI.
+
+    Wraps the Typer app so a single site captures the command outcome for
+    anonymous telemetry. The notice (if any) is shown before the first send, and
+    the bounded flush guarantees a slow network never delays exit. All telemetry
+    calls are best-effort and never raise.
+    """
+    import sys
+    import time
+
+    from initrunner import telemetry
+
+    global _invoked_command
+    _invoked_command = None  # main() sets it; reset so a bypassed callback falls back to argv
+
+    start = time.monotonic()
+    telemetry.notice_if_first_run()
+
+    status = "ok"
+    exit_code: int | None = 0
+    error_kind: str | None = None
+    try:
+        app()
+    except SystemExit as exc:
+        code = exc.code
+        exit_code = code if isinstance(code, int) else (0 if code is None else 1)
+        status = "ok" if exit_code == 0 else "error"
+        raise
+    except BaseException as exc:
+        status = "error"
+        exit_code = 1
+        error_kind = type(exc).__name__
+        raise
+    finally:
+        telemetry.record_command(
+            command=_resolve_command(),
+            status=status,
+            exit_code=exit_code,
+            error_kind=error_kind,
+            duration_ms=(time.monotonic() - start) * 1000.0,
+            is_tty=sys.stdin.isatty(),
+        )
+        telemetry.flush()
