@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2026.6.2] - 2026-06-07
 
 ### Added
 - **Anonymous, opt-out usage telemetry (PostHog).** InitRunner now reports anonymous usage so the maintainers can see whether and how it is used. Per CLI command it sends the command name (from a known list, never arguments), the outcome and exception class (never the message), a coarse duration bucket, OS, Python version, and InitRunner version, tied to a random install id, not to you. No prompts, file contents, paths, arguments, or API keys are sent, and events are anonymous (no PostHog person profiles, and `$ip` is overridden to `0.0.0.0` so the real source IP is never stored). It is shipped in core with a tiny dependency-free sender that never blocks process exit, and a one-time notice prints before the first send. Turn it off with `initrunner telemetry disable`, `DO_NOT_TRACK=1`, or `INITRUNNER_TELEMETRY=off`; it is off by default in CI. New `initrunner telemetry status|enable|disable|reset`, a status line in `initrunner doctor`, and `INITRUNNER_TELEMETRY_DEBUG=1` to print events without sending. The dashboard adds the same opt-out posture via `posthog-js` (no autocapture or session recording, honors Do Not Track). See `docs/operations/telemetry.md`.
@@ -13,6 +13,9 @@
 ### Fixed
 - **Invalid sidecar module names from awkward role filenames.** A stem starting with a digit or containing dots (e.g. `2fa-bot.yaml`) produced an unimportable Python sidecar module for imported custom tools; stems are now sanitized to a valid identifier. The same sanitizer is reused by `initrunner new --template tool`.
 - **Consistent validation display in `initrunner new`.** Post-save warnings now render through the shared validation panel (severity labels, line and column, fix hints) instead of ad-hoc lines.
+
+### Security
+- **Bump `aiohttp` 3.13.4 to 3.14.0.** Closes two moderate advisories fixed in 3.14.0: cross-origin redirect leaking per-request cookies (`GHSA-hg6j-4rv6-33pg`, CVE-2026-47265) and deserialization of untrusted data (`GHSA-jg22-mg44-37j8`, CVE-2026-34993). `aiohttp` is a transitive dependency of the optional `discord-py` and `xai-sdk` packages. (#146)
 
 ## [2026.6.1] - 2026-06-02
 
