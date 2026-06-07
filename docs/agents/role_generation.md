@@ -1,6 +1,6 @@
 # Role Generation
 
-InitRunner provides a single `initrunner new` command for creating `role.yaml` files. It supports multiple seed modes (templates, AI generation, examples, hub bundles, or local files) and an interactive refinement loop for iterating on the YAML before saving.
+InitRunner provides a single `initrunner new` command for creating `role.yaml` files. It supports multiple seed modes (templates, AI generation, examples, hub bundles, or local files) and an interactive refinement loop for iterating on the YAML before saving. Run with no arguments in a terminal and it shows a guided start menu; a deterministic offline form is available for building a role with no AI/API key at all.
 
 ## Quick Start
 
@@ -17,8 +17,11 @@ initrunner new --blank --provider anthropic
 # Load from a bundled example
 initrunner new --from hello-world
 
-# Fully interactive (no seed -- LLM asks what to build)
+# Guided start menu (describe / template / example / offline / import)
 initrunner new
+
+# Build a role with no AI -- a deterministic structured form
+initrunner new --offline
 ```
 
 ## CLI Flags
@@ -29,6 +32,7 @@ initrunner new
 | `--from SOURCE` | Local file path, bundled example name, or `hub:ref` |
 | `--template TEXT` | Start from a named template |
 | `--blank` | Start from minimal blank template |
+| `--offline` | Build via a deterministic structured form (no AI/LLM call) |
 | `--provider TEXT` | Model provider (auto-detected if omitted) |
 | `--model TEXT` | Model name (uses provider default if omitted) |
 | `--output PATH` | Output file path (default: `role.yaml`) |
@@ -37,7 +41,7 @@ initrunner new
 | `--run PROMPT` | After creating, execute the agent immediately with `PROMPT`. Bypasses the post-creation confirmation. |
 | `--no-run` | Skip the post-creation `Run it now?` confirmation. |
 
-Seed modes are mutually exclusive: specify at most one of `DESCRIPTION`, `--from`, `--template`, or `--blank`. `--run` and `--no-run` are also mutually exclusive.
+Seed modes are mutually exclusive: specify at most one of `DESCRIPTION`, `--from`, `--template`, `--blank`, `--offline`, `--langchain`, `--pydantic-ai`, or `--agent-spec`. `--run` and `--no-run` are also mutually exclusive.
 
 ## Seed Modes
 
@@ -82,17 +86,37 @@ Resolution order for `--from SOURCE`:
 
 For multi-file example/hub bundles, only the primary role YAML is loaded into the builder. Omitted sidecar files (skills, configs, etc.) are listed as a warning. Use `initrunner examples copy <name>` to get all files.
 
-### No Seed (Interactive)
+### No Seed (Guided Menu)
 
 ```bash
 initrunner new
 ```
 
-When no seed is specified, the LLM starts a conversation asking what kind of agent to build.
+In an interactive terminal, no seed shows a guided start menu. Each option is annotated with its credential implication so you know which paths need an API key:
+
+```
+How would you like to start?
+
+  1. Describe it in natural language   (AI generates it)   (default)
+  2. Start from a template             (no API key needed)
+  3. Start from a bundled example      (no API key needed)
+  4. Build it manually, no AI          (no API key needed)
+  5. Import LangChain / PydanticAI / Agent Spec   (AI assists)
+```
+
+The default (option 1) is the AI describe-then-refine flow. Options 2-4 need no API key. When stdin is not a TTY (pipes/CI), the menu is skipped and the LLM starts a conversation asking what to build, as before.
+
+### Offline (no API key)
+
+```bash
+initrunner new --offline
+```
+
+A deterministic, no-LLM structured form. It walks you through agent name, description, system prompt, provider/model, a tool multi-select (with required config prompted per tool), and feature toggles (memory, document ingestion, a cron trigger), then assembles a valid `role.yaml` with zero network calls. The result flows into the same preview, refinement, and save path as any other seed. This is also the natural fallback offered by the credential preflight when no API key is configured.
 
 ## Refinement Loop
 
-After the initial seed, the builder shows a syntax-highlighted YAML panel with the agent name and validation status:
+After the initial seed, the builder shows a syntax-highlighted YAML panel with the agent name and validation status, then a refinement prompt:
 
 ```
 +-- code-reviewer -------------------- VALID --+
@@ -101,16 +125,38 @@ After the initial seed, the builder shows a syntax-highlighted YAML panel with t
 | ...                                           |
 +-----------------------------------------------+
 
-Refine (empty to save, "quit" to discard):
-> add memory and change model to claude
+Refine: describe a change, :help for commands, Enter to save, :quit to discard >
 ```
 
-- Type a refinement request to iterate on the YAML
+- Type plain text to ask the AI to refine the YAML (e.g. `add memory and switch to claude`)
 - Press Enter (empty input) or type `save` to write the file
 - Type `quit` or `q` to discard without saving
 - Use `--no-refine` to skip the loop entirely
 
+After each AI refinement, a one-line change summary (`+adds -removes`) is printed.
+
+#### Commands
+
+Input starting with `:` (or a bare `?` for help) runs a deterministic command -- no LLM call:
+
+| Command | Description |
+|---------|-------------|
+| `:help` (or `?`) | Show the command list |
+| `:yaml` | Show the full current YAML |
+| `:validate` | Show the validation panel (errors / warnings / notes) |
+| `:explain` | Plain-English summary of each section |
+| `:tools` | List available tool types and the role's current tools |
+| `:diff` | Unified diff vs the previous turn |
+| `:model [provider:name]` | Change the model deterministically; bare `:model` opens a picker |
+| `:undo` | Revert the last change (AI refinement or `:model`) |
+| `:save` | Save and exit (also: empty line) |
+| `:quit` | Discard and exit (also: `q`) |
+
+`:undo` reverts the YAML to the previous turn; `:model` and `:undo` preserve the tailored test prompt, so the post-creation `Run it now?` offer still appears after using them.
+
 The refinement LLM has the full schema reference and tool registry, so it can add tools, triggers, memory, ingest, reasoning, autonomy, security, and observability sections by name. The schema reference includes field-level details for all sections, so the LLM knows which fields are required (e.g. `sources` for ingest) and which can be omitted for defaults.
+
+**No API key configured?** Template, example, and offline seeds work without a key. In that case the refinement loop runs in command-only mode: the `:` commands (including `:model`) still work, but plain-text AI refinement prints a hint instead of failing with an authentication error.
 
 ## Provider Auto-Detection
 
@@ -122,6 +168,16 @@ When `--provider` is omitted, `initrunner new` resolves the builder model using 
 4. Falls back to `openai`
 
 If your saved `run.yaml` specifies a provider, that provider is used even if other API keys exist in the environment. Custom endpoint fields (`base_url`, `api_key_env`) from `run.yaml` are also injected into the generated YAML, so OpenRouter and other custom-endpoint setups work out of the box.
+
+### Credential preflight
+
+Before an AI-backed seed in the guided menu, `initrunner new` resolves the key (via the vault and environment) and prints the model it is about to use:
+
+```
+Using openai:gpt-5-mini
+```
+
+If no key is configured (in an interactive terminal), it offers to enter a key inline, switch provider, or build offline -- instead of failing with a 401 partway through generation. Switching provider re-resolves the model and any custom-endpoint preset. When stdin is not a TTY, the preflight is skipped and a missing key surfaces as the usual authentication error from the model call.
 
 ## Post-Creation Output
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Guided start menu for `initrunner new`.** Running `initrunner new` with no seed in a terminal now shows a numbered picker (describe / template / example / build offline / import), each annotated with whether it needs an API key. Piped or non-TTY input keeps the previous LLM-conversation fallback. See `docs/agents/role_generation.md`.
+- **Offline role builder.** New `initrunner new --offline` (and menu option 4) builds a valid `role.yaml` through a deterministic structured form (name, system prompt, provider/model, tool multi-select, memory/ingest/trigger toggles) with no LLM or network call. Entered tool-field values are parsed through YAML so numbers, booleans, and lists keep their types. Backed by a new pure `services/wizard.py`.
+- **Credential preflight.** Before an AI-backed seed, the builder resolves the API key through the vault and environment, prints `Using <provider>:<model>`, and on a missing key (in a terminal) offers to enter a key inline, switch provider, or build offline, instead of failing with a 401 mid-generation. Custom-endpoint presets (`base_url`, `api_key_env`) are carried through a provider switch.
+- **Refinement-loop commands.** The refine step accepts `:` commands (`:help` / `?`, `:yaml`, `:validate`, `:explain`, `:tools`, `:diff`, `:model`, `:undo`, `:save`, `:quit`). `:model` changes the model and `:undo` reverts the last change, both deterministically with no LLM call; each AI refinement prints a `+adds -removes` change summary. When no API key is configured, plain-text refinement is replaced by a hint, so template, example, and offline roles can still be edited and saved.
+- **First-run offline path.** Bare `initrunner` with no provider configured now offers to build an agent offline, instead of only printing the setup hint.
+
+### Fixed
+- **Invalid sidecar module names from awkward role filenames.** A stem starting with a digit or containing dots (e.g. `2fa-bot.yaml`) produced an unimportable Python sidecar module for imported custom tools; stems are now sanitized to a valid identifier. The same sanitizer is reused by `initrunner new --template tool`.
+- **Consistent validation display in `initrunner new`.** Post-save warnings now render through the shared validation panel (severity labels, line and column, fix hints) instead of ad-hoc lines.
+
 ## [2026.6.1] - 2026-06-02
 
 ### Security

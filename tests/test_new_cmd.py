@@ -727,3 +727,230 @@ class TestPostCreateRunOffer:
         assert result.exit_code == 0, result.output
         assert "Run it now" not in result.output
         assert called is False
+
+
+# ---------------------------------------------------------------------------
+# Offline form + guided menu + no-AI guard
+# ---------------------------------------------------------------------------
+
+
+def _full_mock_session(test_prompt=None, valid=True):
+    """Mock BuilderSession supporting all seed paths + a real save() result."""
+    turn = TurnResult(
+        explanation="Built.", yaml_text=_VALID_YAML, issues=[], test_prompt=test_prompt
+    )
+    role = MagicMock()
+    role.metadata.name = "test-agent"
+    role.kind = "Agent"
+    role.spec.triggers = None
+    role.spec.ingest = None
+
+    session = MagicMock()
+    for m in (
+        "seed_blank",
+        "seed_template",
+        "seed_description",
+        "seed_from_example",
+        "seed_yaml",
+        "seed_from_agent_spec",
+    ):
+        getattr(session, m).return_value = turn
+    session.current_turn.return_value = turn
+    session.omitted_assets = []
+    session.import_warnings = []
+    session.issues = []
+    session.yaml_text = _VALID_YAML
+    session.role = role
+
+    def _save(path, force=False):
+        path.write_text(_VALID_YAML)
+        return PostCreateResult(
+            yaml_path=path,
+            valid=valid,
+            issues=[],
+            next_steps=[f"initrunner validate {path}"],
+            omitted_assets=[],
+        )
+
+    session.save.side_effect = _save
+    return session
+
+
+_DETECT = ("openai", "gpt-5-mini", None, None, "test")
+
+
+class TestOfflineAndMenu:
+    def test_offline_and_blank_mutually_exclusive(self, tmp_path):
+        result = runner.invoke(
+            app, ["new", "--offline", "--blank", "--output", str(tmp_path / "r.yaml")]
+        )
+        assert result.exit_code == 1
+        assert "at most one" in result.output.lower()
+
+    def test_offline_requires_tty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: False)
+        result = runner.invoke(app, ["new", "--offline", "--output", str(tmp_path / "r.yaml")])
+        assert result.exit_code == 1
+        assert "interactive terminal" in result.output.lower()
+
+    def test_offline_builds_via_form_without_llm(self, tmp_path, monkeypatch):
+        session = _full_mock_session()
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+        monkeypatch.setattr(
+            "initrunner.cli._helpers._display.prompt_model_selection",
+            lambda *a, **k: "gpt-5-mini",
+        )
+        out = tmp_path / "role.yaml"
+        # name, desc, sysprompt, editor?, use-provider?, tools, memory?, rag?, trigger?
+        form = "off-bot\n\n\nn\ny\n\nn\nn\nn\n"
+        with (
+            patch("initrunner.services.agent_builder.BuilderSession", return_value=session),
+            patch("initrunner.agent.loader.detect_default_model", return_value=_DETECT),
+        ):
+            result = runner.invoke(
+                app, ["new", "--offline", "--no-refine", "--output", str(out)], input=form
+            )
+        assert result.exit_code == 0, result.output
+        assert session.seed_yaml.called
+        assert not session.seed_description.called
+        assert out.exists()
+
+    def test_menu_routes_to_template(self, tmp_path, monkeypatch):
+        session = _full_mock_session()
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+        out = tmp_path / "role.yaml"
+        with (
+            patch("initrunner.services.agent_builder.BuilderSession", return_value=session),
+            patch("initrunner.agent.loader.detect_default_model", return_value=_DETECT),
+        ):
+            # menu "2" (template) -> template "1" (basic)
+            result = runner.invoke(
+                app, ["new", "--no-refine", "--output", str(out)], input="2\n1\n"
+            )
+        assert result.exit_code == 0, result.output
+        session.seed_template.assert_called_once()
+        assert session.seed_template.call_args[0][0] == "basic"
+        assert not session.seed_description.called
+
+    def test_offline_plain_text_refine_blocked_without_key(self, tmp_path, monkeypatch):
+        session = _full_mock_session()
+        monkeypatch.setattr("initrunner.cli.new_cmd._stdin_is_interactive", lambda: True)
+        monkeypatch.setattr("initrunner.cli.new_cmd._key_available", lambda *a, **k: False)
+        monkeypatch.setattr(
+            "initrunner.cli._helpers._display.prompt_model_selection",
+            lambda *a, **k: "gpt-5-mini",
+        )
+        out = tmp_path / "role.yaml"
+        form = "off-bot\n\n\nn\ny\n\nn\nn\nn\n"
+        refine = "add a web tool\n\n"  # plain text -> blocked; empty -> save
+        with (
+            patch("initrunner.services.agent_builder.BuilderSession", return_value=session),
+            patch("initrunner.agent.loader.detect_default_model", return_value=_DETECT),
+        ):
+            result = runner.invoke(
+                app, ["new", "--offline", "--no-run", "--output", str(out)], input=form + refine
+            )
+        assert result.exit_code == 0, result.output
+        assert not session.refine.called
+        assert "no api key configured for ai refinement" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# Refinement-loop command handlers (direct, no CliRunner)
+# ---------------------------------------------------------------------------
+
+
+def _loop_ctx(issues=None, role_kind="Agent"):
+    from initrunner.cli.new_cmd import _LoopCtx
+
+    session = MagicMock()
+    session.yaml_text = _VALID_YAML
+    session.issues = issues if issues is not None else []
+    role = MagicMock()
+    role.kind = role_kind
+    role.metadata.name = "x"
+    role.spec.tools = []
+    session.role = role
+    return _LoopCtx(session, "openai", "gpt-5-mini", None, None), session
+
+
+class TestLoopCommands:
+    def test_save_and_quit_signals(self):
+        from initrunner.cli.new_cmd import _CMD_QUIT, _CMD_SAVE, _handle_command
+
+        ctx, _ = _loop_ctx()
+        assert _handle_command(":save", ctx) == _CMD_SAVE
+        assert _handle_command(":quit", ctx) == _CMD_QUIT
+
+    def test_unknown_command(self, capsys):
+        from initrunner.cli.new_cmd import _CMD_CONTINUE, _handle_command
+
+        ctx, _ = _loop_ctx()
+        assert _handle_command(":bogus", ctx) == _CMD_CONTINUE
+        assert "unknown command" in capsys.readouterr().out.lower()
+
+    def test_help_lists_all_commands(self, capsys):
+        from initrunner.cli.new_cmd import _handle_command
+
+        ctx, _ = _loop_ctx()
+        _handle_command(":help", ctx)
+        out = capsys.readouterr().out
+        for usage in (":yaml", ":validate", ":explain", ":tools", ":diff", ":model", ":undo"):
+            assert usage in out
+
+    def test_help_alias_question_mark(self, capsys):
+        from initrunner.cli.new_cmd import _handle_command
+
+        ctx, _ = _loop_ctx()
+        _handle_command("?", ctx)
+        assert ":save" in capsys.readouterr().out
+
+    def test_model_with_arg_is_deterministic(self):
+        from initrunner.cli.new_cmd import _CMD_CONTINUE, _handle_command
+
+        ctx, session = _loop_ctx()
+        with patch(
+            "initrunner.services.agent_builder.rewrite_model_block", return_value="NEW_YAML"
+        ) as rw:
+            assert _handle_command(":model openai:gpt-5-nano", ctx) == _CMD_CONTINUE
+        rw.assert_called_once()
+        session.checkpoint.assert_called_once()
+        assert session.yaml_text == "NEW_YAML"
+
+    def test_model_bad_arg_no_checkpoint(self, capsys):
+        from initrunner.cli.new_cmd import _handle_command
+
+        ctx, session = _loop_ctx()
+        _handle_command(":model openai", ctx)  # missing :name
+        session.checkpoint.assert_not_called()
+        assert "usage" in capsys.readouterr().out.lower()
+
+    def test_undo_calls_session(self):
+        from initrunner.cli.new_cmd import _handle_command
+
+        ctx, session = _loop_ctx()
+        session.undo.return_value = True
+        _handle_command(":undo", ctx)
+        session.undo.assert_called_once()
+
+    def test_validate_uses_shared_panel(self):
+        from initrunner.cli.new_cmd import _handle_command
+        from initrunner.services.agent_builder import ValidationIssue
+
+        ctx, session = _loop_ctx(
+            issues=[ValidationIssue(field="x", message="m", severity="warning")]
+        )
+        with patch(
+            "initrunner.cli._validation_panel.render_validation_panel", return_value="PANEL"
+        ) as rv:
+            _handle_command(":validate", ctx)
+        rv.assert_called_once()
+        assert rv.call_args[0][2] == session.issues
+
+    def test_explain_guards_invalid_yaml(self, capsys):
+        from initrunner.cli.new_cmd import _handle_command
+
+        ctx, session = _loop_ctx()
+        session.role = None
+        _handle_command(":explain", ctx)
+        assert "fix validation errors" in capsys.readouterr().out.lower()

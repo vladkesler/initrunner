@@ -32,6 +32,10 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
+# Cap the LLM transcript carried across refinements. Trimming is boundary-aware
+# (see ``BuilderSession._trim_messages``) so a slice never starts mid-exchange.
+_MAX_HISTORY_MESSAGES = 40
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -183,6 +187,21 @@ def _extract_test_prompt(explanation: str) -> tuple[str | None, str]:
         return None, explanation
     cleaned = (explanation[: match.start()] + explanation[match.end() :]).strip()
     return prompt, cleaned
+
+
+def sanitize_module_stem(stem: str, *, fallback: str = "agent") -> str:
+    """Turn an arbitrary file stem into a valid Python module identifier.
+
+    Maps non-identifier characters to ``_``, strips edge underscores, and
+    prefixes ``fallback`` when the result is empty or starts with a digit
+    (e.g. ``2fa-bot`` -> ``agent_2fa_bot``, ``role.v2`` -> ``role_v2``).
+    """
+    s = re.sub(r"[^0-9a-zA-Z_]", "_", stem).strip("_")
+    if not s:
+        return fallback
+    if s[0].isdigit():
+        s = f"{fallback}_{s}"
+    return s if s.isidentifier() else fallback
 
 
 def build_tool_summary() -> str:
@@ -399,6 +418,8 @@ class BuilderSession:
         self.omitted_assets: list[str] = []
         self.import_warnings: list[str] = []
         self._sidecar_source: str | None = None  # Custom tool module content
+        self._history: list[str] = []  # YAML snapshots for undo (turn boundaries)
+        self._last_test_prompt: str | None = None  # Survives non-LLM command turns
 
     # -- Properties ----------------------------------------------------------
 
@@ -483,6 +504,9 @@ class BuilderSession:
 
     def _make_turn_result(self, explanation: str) -> TurnResult:
         test_prompt, cleaned = _extract_test_prompt(explanation)
+        # Record the freshly extracted prompt (may be None when an AI turn
+        # changes the agent) so command-only turns can carry it forward.
+        self._last_test_prompt = test_prompt
         return TurnResult(
             explanation=cleaned,
             yaml_text=self._yaml_text,
@@ -574,6 +598,7 @@ class BuilderSession:
 
         result = agent.run_sync(user_prompt)
         self._messages = list(result.all_messages())
+        self._trim_messages()
 
         explanation, yaml_content = self._extract_yaml_from_response(result.output)
         self.yaml_text = yaml_content
@@ -593,6 +618,17 @@ class BuilderSession:
         self.seed_source = f"file:{path}"
         self.yaml_text = path.read_text(encoding="utf-8")
         return self._make_turn_result(f"Loaded from {path}. Refine as needed.")
+
+    def seed_yaml(self, text: str, *, source_label: str = "form") -> TurnResult:
+        """Seed from pre-built YAML text (deterministic, no LLM/network).
+
+        Used by the offline structured-form path. The ``yaml_text`` setter
+        validates and canonicalizes, so the result flows into the same
+        display/refine/save path as any other seed.
+        """
+        self.seed_source = source_label
+        self.yaml_text = text
+        return self._make_turn_result("Built from your answers. Refine as needed, or save.")
 
     def seed_from_agent_spec(self, path: Path) -> TurnResult:
         """Seed from a PydanticAI Agent Spec YAML/JSON file (deterministic)."""
@@ -747,6 +783,7 @@ class BuilderSession:
             f"Convert this LangChain agent to an InitRunner role.yaml:\n\n{prompt_text}"
         )
         self._messages = list(result.all_messages())
+        self._trim_messages()
 
         explanation, yaml_content = self._extract_yaml_from_response(result.output)
         self.yaml_text = yaml_content
@@ -842,6 +879,7 @@ class BuilderSession:
             f"Convert this PydanticAI agent to an InitRunner role.yaml:\n\n{prompt_text}"
         )
         self._messages = list(result.all_messages())
+        self._trim_messages()
 
         explanation, yaml_content = self._extract_yaml_from_response(result.output)
         self.yaml_text = yaml_content
@@ -856,6 +894,68 @@ class BuilderSession:
 
         return self._make_turn_result(explanation or "Imported from PydanticAI source.")
 
+    # -- History / undo ------------------------------------------------------
+
+    def _commit_history(self) -> None:
+        """Snapshot the current canonical YAML as an undo checkpoint."""
+        if self._yaml_text:
+            self._history.append(self._yaml_text)
+
+    def checkpoint(self) -> None:
+        """Public turn-boundary snapshot for deterministic (non-LLM) edits."""
+        self._commit_history()
+
+    def undo(self) -> bool:
+        """Revert to the previous YAML snapshot. Returns False if none.
+
+        Restores YAML only; the LLM transcript (``_messages``) is left intact
+        because it is append-only and re-truncating it would desync PydanticAI
+        request/response pairing. The current YAML is always re-sent in the
+        refine prompt, so refinement context is preserved regardless.
+        """
+        if not self._history:
+            return False
+        self.yaml_text = self._history.pop()  # setter re-validates + canonicalizes
+        return True
+
+    @property
+    def previous_yaml(self) -> str | None:
+        """The most recent undo snapshot, or None."""
+        return self._history[-1] if self._history else None
+
+    def current_turn(self) -> TurnResult:
+        """A TurnResult for the current YAML, no LLM call.
+
+        Carries ``_last_test_prompt`` forward (rather than re-extracting from an
+        empty explanation) so deterministic command turns -- ``:model``,
+        ``:validate``, ``:undo`` -- do not erase a previously tailored prompt.
+        """
+        return TurnResult(
+            explanation="",
+            yaml_text=self._yaml_text,
+            issues=self.issues,
+            import_warnings=list(self.import_warnings),
+            test_prompt=self._last_test_prompt,
+        )
+
+    def _trim_messages(self) -> None:
+        """Cap the transcript, cutting on a ModelRequest boundary.
+
+        PydanticAI re-sends ``instructions`` every run, so dropping old turns
+        never loses the system prompt. Cutting on a request boundary avoids
+        slicing into the middle of a request/response/tool exchange.
+        """
+        if len(self._messages) <= _MAX_HISTORY_MESSAGES:
+            return
+        from pydantic_ai.messages import ModelRequest
+
+        cut = len(self._messages) - _MAX_HISTORY_MESSAGES
+        for i in range(cut, len(self._messages)):
+            if isinstance(self._messages[i], ModelRequest):
+                self._messages = self._messages[i:]
+                return
+        # No safe boundary in the tail -- leave history intact this round.
+
     # -- Refinement ----------------------------------------------------------
 
     def refine(
@@ -868,6 +968,7 @@ class BuilderSession:
         api_key_env: str | None = None,
     ) -> TurnResult:
         """Refine the current YAML based on user input."""
+        self._commit_history()  # snapshot pre-refine state for :undo
         agent = self._get_agent(provider, model_name, base_url=base_url, api_key_env=api_key_env)
 
         prompt = (
@@ -876,6 +977,7 @@ class BuilderSession:
 
         result = agent.run_sync(prompt, message_history=self._messages or None)
         self._messages = list(result.all_messages())
+        self._trim_messages()
 
         explanation, yaml_content = self._extract_yaml_from_response(result.output)
         self.yaml_text = yaml_content
@@ -913,6 +1015,7 @@ class BuilderSession:
         _logger.info("Auto-repairing: %s", error_text)
         result = agent.run_sync(repair_prompt, message_history=self._messages or None)
         self._messages = list(result.all_messages())
+        self._trim_messages()
 
         _, yaml_content = self._extract_yaml_from_response(result.output)
         return yaml_content
@@ -932,9 +1035,8 @@ class BuilderSession:
 
         # Resolve sidecar module name from output YAML stem
         if self._sidecar_source is not None:
-            # Sanitize stem to valid Python identifier (hyphens -> underscores)
-            safe_stem = path.stem.replace("-", "_")
-            sidecar_module = f"{safe_stem}_tools"
+            # Sanitize stem to a valid Python module identifier.
+            sidecar_module = f"{sanitize_module_stem(path.stem)}_tools"
             # Replace placeholder module name in YAML
             self._yaml_text = self._yaml_text.replace("_langchain_tools", sidecar_module)
             self._yaml_text = self._yaml_text.replace("_pydanticai_tools", sidecar_module)

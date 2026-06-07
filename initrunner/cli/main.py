@@ -71,18 +71,28 @@ def main(
     from initrunner.services.setup import needs_setup
 
     if needs_setup():
-        # TTY + no config: hint to run setup
+        # TTY + no config: offer an offline build, else hint to run setup.
         from rich.panel import Panel
+        from rich.prompt import Confirm
 
         console.print(
             Panel(
                 "No provider configured yet.\n"
-                "Run [bold]initrunner setup[/bold] to get started,\n"
+                "Run [bold]initrunner setup[/bold] to add an API key,\n"
                 "or launch [bold]initrunner dashboard[/bold] to configure in the browser.",
                 title="Setup Required",
                 border_style="yellow",
             )
         )
+        try:
+            build_offline = Confirm.ask("Build an agent now without AI (offline)?", default=False)
+        except (KeyboardInterrupt, EOFError):
+            raise typer.Exit(1) from None
+        if build_offline:
+            from initrunner.cli.new_cmd import new
+
+            new(offline=True)
+            raise typer.Exit()
         raise typer.Exit(1)
     else:
         # TTY + configured: offer action menu
