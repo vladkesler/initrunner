@@ -2,8 +2,10 @@
 
 InitRunner collects anonymous usage telemetry so the maintainers can see whether
 it is being used and which parts are used, and decide what to work on next. It is
-**opt-out**: it runs by default, sends only an allowlist of non-identifying
-values, and can be turned off with one command or an environment variable.
+**opt-in**: nothing is sent until you agree. The CLI asks once, on the first
+interactive run, and the dashboard asks once with a consent banner. Until then
+(and in any non-interactive context) it stays off and sends nothing. When on, it
+sends only an allowlist of non-identifying values.
 
 This is separate from two things it is often confused with:
 
@@ -68,29 +70,36 @@ username, hostname, or home directory, so it carries no identifying information.
 It exists only so distinct installs can be counted. Rotate it any time with
 `initrunner telemetry reset`.
 
-## Turning it off
+## Turning it on or off
 
-Any one of these disables the CLI telemetry. They are checked before anything is
-sent, and a disabled run does no network work.
+Telemetry is off until you opt in. On the first interactive run (a real
+subcommand with a terminal attached), the CLI prints a short explanation and asks
+once whether to enable it. Answering no records the choice; answering yes sends
+the first event. Non-interactive runs (pipes, scripts, daemons), `--help`,
+completion, and the `telemetry` subcommands never prompt and never send, so
+automation is never blocked and nothing leaves the machine before you choose.
+
+You can set the choice explicitly at any time:
 
 ```bash
-initrunner telemetry disable     # persistent opt-out
-export DO_NOT_TRACK=1             # the cross-tool standard
-export INITRUNNER_TELEMETRY=off   # project-specific switch
+initrunner telemetry enable      # opt in
+initrunner telemetry disable     # opt out
+export DO_NOT_TRACK=1            # the cross-tool standard (forces off)
+export INITRUNNER_TELEMETRY=off  # project-specific switch (on/off)
 ```
 
-Telemetry is also off by default in CI (when a `CI` environment variable is set).
-Re-enable with `initrunner telemetry enable`. Check the current state, the reason
-it is off, your install id, and the config path with:
+`DO_NOT_TRACK` and `INITRUNNER_TELEMETRY` take precedence over the stored choice,
+and telemetry is also off in CI (when a `CI` environment variable is set). Check
+the current state, the reason, your install id, and the config path with:
 
 ```bash
 initrunner telemetry status
 initrunner doctor                # also shows a telemetry status line
 ```
 
-On the first run where telemetry is active, a one-time notice is printed to
-stderr before anything is sent, so disclosure always precedes collection (this
-holds for non-interactive and daemon runs too).
+Upgrading from a release that defaulted telemetry on: an explicit
+`telemetry disable` is preserved (you stay opted out), and any other prior state
+is reset to undecided so you are asked once under the opt-in default.
 
 ## Where the data goes
 
@@ -104,9 +113,10 @@ ingestion key; it grants capture-only access. To request deletion, run
 
 The web dashboard uses `posthog-js` with the same posture: no autocapture, no
 session recording, no heatmaps, no input contents, and anonymous events. It is
-disabled when the browser sets Do Not Track, when you choose "Disable" on the
-first-run notice (or have previously opted out), or when no key is configured at
-build time. The opt-out is stored in the browser's local storage.
+opt-in too: posthog is not initialized until you choose "Enable" on the consent
+banner shown on first load. It never starts when the browser sets Do Not Track,
+when you choose "No thanks", or when no key is configured at build time. The
+choice is stored in the browser's local storage (a prior opt-out is preserved).
 
 ## Development and overrides
 

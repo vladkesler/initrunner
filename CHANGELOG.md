@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.6.3] - 2026-06-07
+
+### Changed
+- **Usage telemetry is now opt-in.** Anonymous telemetry no longer runs by default. The CLI asks once, on the first interactive run (a real subcommand with a terminal attached), and sends nothing until you accept; non-interactive runs, pipes, daemons, `--help`, completion, and the `telemetry` subcommands never prompt and never send. The dashboard defers `posthog-js` until you accept a consent banner (Enable / No thanks). Manage it anytime with `initrunner telemetry enable`/`disable`, `DO_NOT_TRACK=1`, or `INITRUNNER_TELEMETRY=off`. On upgrade, an explicit prior `initrunner telemetry disable` is preserved; any other prior state is reset to undecided so you are asked once under the new default. The persisted state file moves to schema v2 (a tri-state `consent` value), migrated in place. See `docs/operations/telemetry.md`.
+
 ## [2026.6.2] - 2026-06-07
 
 ### Added

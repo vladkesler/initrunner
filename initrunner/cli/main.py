@@ -258,13 +258,59 @@ def _resolve_command() -> str:
     return "other"
 
 
+_CONSENT_SKIP_COMMANDS = {"telemetry", "help", "version"}
+_CONSENT_SKIP_FLAGS = {"--help", "-h", "--install-completion", "--show-completion"}
+
+
+def _maybe_prompt_telemetry_consent() -> None:
+    """Ask once, on an interactive first run, before any telemetry is sent.
+
+    Telemetry is opt-in: this is the only place consent is granted interactively.
+    Best-effort and silent in every non-interactive or already-decided case, so
+    pipes, daemons, scripts, ``--help``, and completion never block or prompt.
+    """
+    import sys
+
+    from initrunner import telemetry
+
+    try:
+        if not telemetry.consent_needed():
+            return
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            return
+        # _resolve_command() returns the subcommand even for `... doctor --help`,
+        # so also reject help/completion flags appearing anywhere in argv.
+        if _resolve_command() in _CONSENT_SKIP_COMMANDS:
+            return
+        if any(arg in _CONSENT_SKIP_FLAGS for arg in sys.argv[1:]):
+            return
+        console.print(
+            "[bold]Help improve InitRunner?[/bold] Send anonymous usage data (which command "
+            "ran, version, OS, error type) to guide what to build next. No prompts, files, "
+            "paths, arguments, or API keys are sent, and it is tied to a random id, not to you. "
+            "Change anytime with [cyan]initrunner telemetry enable/disable[/cyan]."
+        )
+        granted = typer.confirm("Enable anonymous usage telemetry?", default=False)
+        telemetry.set_consent(granted)
+        if granted:
+            telemetry.send_first_run()
+    except (KeyboardInterrupt, EOFError, typer.Abort):
+        # No decision: leave consent unset so we ask again next interactive run.
+        return
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).debug("telemetry consent prompt failed", exc_info=True)
+
+
 def app_entry() -> None:
     """Entry point for the CLI.
 
     Wraps the Typer app so a single site captures the command outcome for
-    anonymous telemetry. The notice (if any) is shown before the first send, and
-    the bounded flush guarantees a slow network never delays exit. All telemetry
-    calls are best-effort and never raise.
+    anonymous telemetry. The opt-in consent prompt (if any) runs before the app,
+    so nothing is sent until the user accepts, and the bounded flush guarantees a
+    slow network never delays exit. All telemetry calls are best-effort and never
+    raise.
     """
     import sys
     import time
@@ -275,7 +321,7 @@ def app_entry() -> None:
     _invoked_command = None  # main() sets it; reset so a bypassed callback falls back to argv
 
     start = time.monotonic()
-    telemetry.notice_if_first_run()
+    _maybe_prompt_telemetry_consent()
 
     status = "ok"
     exit_code: int | None = 0

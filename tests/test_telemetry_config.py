@@ -36,16 +36,17 @@ def test_file_created_mode_0600(home):
     assert mode == 0o600
 
 
-def test_defaults_on_corrupt_file(home):
+def test_recovers_from_corrupt_file(home):
     from initrunner.telemetry import _config
 
     path = get_telemetry_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("not json {{{")
     assert _config._load_raw() is None
-    # load_or_create recovers and rewrites a valid record
+    # load_or_create recovers and rewrites a valid, undecided record
     state = _config.load_or_create()
     assert state.install_id
+    assert state.consent == "unset"
     assert _config._load_raw() is not None
 
 
@@ -54,16 +55,51 @@ def test_disable_enable_preserves_id_and_mode(home):
 
     original = _config.load_or_create().install_id
 
-    _config.set_enabled(False)
+    _config.set_consent(False)
     disabled = _config._load_raw()
-    assert disabled is not None and disabled.enabled is False
+    assert disabled is not None and disabled.consent == "denied"
     assert stat.S_IMODE(get_telemetry_config_path().stat().st_mode) == 0o600
 
-    _config.set_enabled(True)
+    _config.set_consent(True)
     reloaded = _config._load_raw()
     assert reloaded is not None
-    assert reloaded.enabled is True
+    assert reloaded.consent == "granted"
     assert reloaded.install_id == original
+
+
+def test_migrates_v1_record(home):
+    import json
+
+    from initrunner.telemetry import _config
+
+    path = get_telemetry_config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # A v1 explicit opt-out maps to denied and is never re-asked.
+    path.write_text(
+        json.dumps(
+            {"schema_version": 1, "install_id": "a" * 32, "enabled": False, "notice_shown": True}
+        )
+    )
+    state = _config._load_raw()
+    assert state is not None and state.consent == "denied"
+    assert state._needs_persist is True
+
+    # load_or_create upgrades the file in place to schema v2.
+    _config.load_or_create()
+    on_disk = json.loads(path.read_text())
+    assert on_disk["schema_version"] == 2
+    assert on_disk["consent"] == "denied"
+    assert "enabled" not in on_disk and "notice_shown" not in on_disk
+
+    # A v1 default-on record maps to unset, so the user is re-asked.
+    path.write_text(
+        json.dumps(
+            {"schema_version": 1, "install_id": "b" * 32, "enabled": True, "notice_shown": False}
+        )
+    )
+    reasked = _config._load_raw()
+    assert reasked is not None and reasked.consent == "unset"
 
 
 def test_reset_rotates_id(home):

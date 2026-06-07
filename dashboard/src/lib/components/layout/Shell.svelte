@@ -4,33 +4,26 @@
 	import HeaderBar from './HeaderBar.svelte';
 	import CommandPalette from './CommandPalette.svelte';
 	import { safeGet, safeSet } from '$lib/utils/storage';
-	import {
-		telemetryAvailable,
-		hasOptedOut,
-		noticeDismissed,
-		dismissNotice,
-		setTelemetryEnabled
-	} from '$lib/telemetry';
+	import { needsConsentPrompt, setConsent } from '$lib/telemetry';
 
 	let { children }: { children: any } = $props();
 	let collapsed = $state(false);
-	let showTelemetryNotice = $state(false);
+	let showTelemetryConsent = $state(false);
 
 	onMount(() => {
 		const stored = safeGet('sidebar-collapsed');
 		if (stored === 'true') collapsed = true;
-		showTelemetryNotice = telemetryAvailable() && !hasOptedOut() && !noticeDismissed();
+		showTelemetryConsent = needsConsentPrompt();
 	});
 
-	function keepTelemetry() {
-		dismissNotice();
-		showTelemetryNotice = false;
+	function enableTelemetry() {
+		setConsent(true);
+		showTelemetryConsent = false;
 	}
 
-	function disableTelemetry() {
-		setTelemetryEnabled(false);
-		dismissNotice();
-		showTelemetryNotice = false;
+	function declineTelemetry() {
+		setConsent(false);
+		showTelemetryConsent = false;
 	}
 
 	function toggleSidebar() {
@@ -52,25 +45,25 @@
 	<Sidebar {collapsed} onToggle={toggleSidebar} />
 	<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
 		<HeaderBar />
-		{#if showTelemetryNotice}
+		{#if showTelemetryConsent}
 			<div
 				class="flex flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-8 py-2 text-sm text-muted-foreground lg:px-10"
 			>
 				<span class="min-w-0 flex-1">
-					Anonymous usage data (pages visited, no inputs or content) helps guide what to build
-					next.
+					Help improve InitRunner? Send anonymous usage data (pages visited; no inputs or
+					content) to guide what to build next. Nothing is sent until you choose.
 				</span>
 				<button
 					class="rounded-md px-3 py-1 text-foreground hover:bg-muted"
-					onclick={disableTelemetry}
+					onclick={declineTelemetry}
 				>
-					Disable
+					No thanks
 				</button>
 				<button
-					class="rounded-md px-3 py-1 text-foreground hover:bg-muted"
-					onclick={keepTelemetry}
+					class="rounded-md bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90"
+					onclick={enableTelemetry}
 				>
-					Keep on
+					Enable
 				</button>
 			</div>
 		{/if}

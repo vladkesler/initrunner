@@ -1,8 +1,9 @@
-"""Telemetry consent state: an anonymous install id plus an opt-out flag.
+"""Telemetry consent state: an anonymous install id plus a consent decision.
 
-State lives at ``~/.initrunner/telemetry.json`` (mode 0600). It is created
-silently on first use, like ``audit_hmac.key`` (see ``audit/_hmac.py``), and
-every function here is best-effort: failures are logged at debug and never
+State lives at ``~/.initrunner/telemetry.json`` (mode 0600). The install id is
+created silently on first use, like ``audit_hmac.key`` (see ``audit/_hmac.py``),
+but telemetry is opt-in: nothing is sent until ``consent`` is ``"granted"``.
+Every function here is best-effort: failures are logged at debug and never
 raised to callers.
 """
 
@@ -15,14 +16,18 @@ import secrets
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 
 from initrunner.config import get_telemetry_config_path
 
 _logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Tri-state consent: never asked, accepted, or refused.
+Consent = Literal["unset", "granted", "denied"]
 
 _DO_NOT_TRACK = "DO_NOT_TRACK"
 _INITRUNNER_TELEMETRY = "INITRUNNER_TELEMETRY"
@@ -36,9 +41,13 @@ class TelemetryState(BaseModel):
 
     schema_version: int = SCHEMA_VERSION
     install_id: str = ""
-    enabled: bool = True
-    notice_shown: bool = False
+    consent: Consent = "unset"
     created_at: str = ""
+
+    # Set in-memory by ``_load_raw`` when a legacy (v1) record was migrated, so
+    # ``load_or_create`` knows to write the upgrade back once. Excluded from
+    # ``model_dump_json`` (PrivateAttr), so it never lands in the file.
+    _needs_persist: bool = PrivateAttr(default=False)
 
 
 def _now_iso() -> str:
@@ -50,8 +59,27 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _migrate(data: dict) -> bool:
+    """Upgrade a parsed record to the current schema in place. Return True if changed.
+
+    v1 stored ``enabled``/``notice_shown``; v2 stores tri-state ``consent``. An
+    explicit ``enabled: false`` (someone ran ``telemetry disable``) maps to
+    ``denied`` so it is never re-asked; anything else maps to ``unset`` so the
+    user is prompted under the new opt-in default.
+    """
+    if "consent" in data:
+        return False
+    data["consent"] = "denied" if data.get("enabled") is False else "unset"
+    data["schema_version"] = SCHEMA_VERSION
+    return True
+
+
 def _load_raw() -> TelemetryState | None:
-    """Return the persisted state, or ``None`` if absent/unreadable. Never raises."""
+    """Return the persisted state, or ``None`` if absent/unreadable. Never raises.
+
+    Migrates legacy records in memory only; persistence is deferred to
+    ``load_or_create`` so ``resolve_enabled`` stays read-only.
+    """
     try:
         path = get_telemetry_config_path()
         if not path.is_file():
@@ -59,7 +87,10 @@ def _load_raw() -> TelemetryState | None:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return None
-        return TelemetryState.model_validate(data)
+        migrated = _migrate(data)
+        state = TelemetryState.model_validate(data)
+        state._needs_persist = migrated
+        return state
     except Exception:
         _logger.debug("Failed to load telemetry state", exc_info=True)
         return None
@@ -127,13 +158,15 @@ def load_or_create() -> TelemetryState:
     if existing is not None:
         if not existing.install_id:
             existing.install_id = uuid.uuid4().hex
+            existing._needs_persist = True
+        if existing._needs_persist:
             _safe_write(existing)
+            existing._needs_persist = False
         return existing
     state = TelemetryState(
         schema_version=SCHEMA_VERSION,
         install_id=uuid.uuid4().hex,
-        enabled=True,
-        notice_shown=False,
+        consent="unset",
         created_at=_now_iso(),
     )
     try:
@@ -144,7 +177,7 @@ def load_or_create() -> TelemetryState:
 
 
 # ---------------------------------------------------------------------------
-# Opt-out resolution
+# Consent resolution
 # ---------------------------------------------------------------------------
 
 
@@ -178,9 +211,9 @@ def resolve_enabled() -> tuple[bool, str]:
     """Resolve whether telemetry is enabled and why. Never raises, never sends.
 
     Precedence (first match wins): ``DO_NOT_TRACK`` > ``INITRUNNER_TELEMETRY`` >
-    CI default-off > persisted opt-out > default on. Reads only env vars and the
-    existing config file, so the disabled path never creates state or touches the
-    network.
+    CI default-off > persisted consent. Telemetry is opt-in, so an undecided or
+    absent record resolves to off. Reads only env vars and the existing config
+    file, so the disabled path never creates state or touches the network.
     """
     try:
         decision, reason = _env_decision()
@@ -189,9 +222,12 @@ def resolve_enabled() -> tuple[bool, str]:
         if _is_ci():
             return False, "ci"
         state = _load_raw()
-        if state is not None and not state.enabled:
-            return False, "config-opt-out"
-        return True, "enabled"
+        consent = state.consent if state is not None else "unset"
+        if consent == "granted":
+            return True, "consent-granted"
+        if consent == "denied":
+            return False, "consent-denied"
+        return False, "unset"
     except Exception:
         _logger.debug("resolve_enabled failed; disabling", exc_info=True)
         return False, "error"
@@ -202,19 +238,12 @@ def resolve_enabled() -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 
 
-def set_enabled(enabled: bool) -> TelemetryState:
+def set_consent(granted: bool) -> TelemetryState:
+    """Persist an explicit consent decision (``granted`` or ``denied``)."""
     state = load_or_create()
-    state.enabled = enabled
+    state.consent = "granted" if granted else "denied"
     _safe_write(state)
     return state
-
-
-def mark_notice_shown() -> None:
-    state = load_or_create()
-    if state.notice_shown:
-        return
-    state.notice_shown = True
-    _safe_write(state)
 
 
 def reset_install_id() -> TelemetryState:
