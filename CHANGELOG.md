@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026.6.4] - 2026-06-15
+
+### Added
+- **More `spec.model` settings reach the provider.** `role.yaml` now exposes `top_p`, `top_k`, `seed`, `stop_sequences`, `parallel_tool_calls`, `presence_penalty`, `frequency_penalty`, `logit_bias`, `extra_headers`, and `extra_body`, passed straight through to PydanticAI's `ModelSettings`. The sampling knobs are dropped on OpenAI reasoning models, the same way `temperature` already was. See `docs/configuration/providers.md`.
+- **Static `tool_choice` in `spec.model`.** `auto` (provider default) or `none` (text-only mode, tools disabled). `required` and tool-name lists are rejected at load with a message pointing to dynamic capabilities, because a static value there would force a tool call on every step and prevent a final response.
+- **Provider-native prompt caching.** `spec.model.prompt_cache: true` (or a mapping with `instructions`, `tools`, `ttl`) caches the static request prefix on Anthropic and Bedrock, mapping to their `*_cache_instructions` / `*_cache_tool_definitions` settings. Rejected at load on other providers. Cuts input-token cost for daemons and triggers with large static prompts. See `docs/configuration/providers.md`.
+- **`fallback_on` for multi-provider failover.** `spec.model.fallback_on` narrows or widens which exceptions trigger failover (`ModelAPIError`, `ModelHTTPError`, `UnexpectedModelBehavior`, `ContentFilterError`); the default stays `ModelAPIError`. Requires a `fallback` list.
+- **Model-request concurrency limits.** `spec.model.concurrency` (`max_running`, `max_queued`, `share`) caps in-flight model requests via PydanticAI's `ConcurrencyLimitedModel`. A named `share` makes several agents in one process (compose services, team personas, flow nodes) coordinate against one provider budget. Distinct from `execution.max_concurrency`, which bounds tool execution. See `docs/configuration/providers.md`.
+- **Tunable HTTP retries.** `spec.execution.http_retries` and `http_retry_max_wait` configure the new transport-level retry policy (see Changed).
+- **`doctor` checks the model name.** With `--role`, `doctor` now flags a `provider:model` that is not in PydanticAI's known-model list and suggests the closest match on a likely typo (`gpt-4o-minii` warns "did you mean 'openai:gpt-4o-mini'?"). Advisory only, and custom endpoints are skipped. Backed by PydanticAI's `known_model_names()`. See `docs/operations/doctor.md`.
+- **Native pydantic-evals report output.** `initrunner test --report` prints the native `EvaluationReport` (per-evaluator scores, averages, span analyses) and `--report-json` saves the full report; both imply `--pydantic-evals` and need the `observability` extra. See `docs/core/evals.md`.
+- **AgentSpec metadata round-trips.** `metadata.tags`, `author`, `team`, and `version` now survive export to and import from PydanticAI Agent Spec instead of being dropped. See `docs/getting-started/agent-spec-import.md`.
+
+### Changed
+- **Bumped `pydantic-ai-slim` and `pydantic-evals` from 1.102.0 to 1.107.0.** Pulls in the upstream UI-adapter file-read security fix, Claude Opus 4.8 / Fable 5 / Mythos 5 and Grok 4.3 model support, `CachePoint` caching for OpenRouter, and `known_model_names()`. Adds the `retries` extra.
+- **Model-call retries now live in the httpx transport.** Replaced the hand-rolled status-code backoff loop in `executor_retry.py` with PydanticAI's `AsyncTenacityTransport`, injected into each provider client at construction. Retries `{429, 500, 502, 503, 504}` with exponential backoff and `Retry-After` support, uniformly across one-shot, REPL, streaming, and daemon runs; permanent errors (401/403/404/422) surface immediately. Covers OpenAI, Anthropic, Google, Groq, Mistral, Cohere, and custom OpenAI-compatible endpoints; Bedrock and xAI keep their SDKs' native retries. As a side effect this fixed a latent bug where a custom `api_key_env` was ignored for standard providers (the key is now passed to the client explicitly). See `docs/configuration/providers.md`.
+- **Human approval now uses PydanticAI's `ApprovalRequiredToolset`.** Replaced InitRunner's custom `ApprovalToolset` (which hand-marked tool definitions `kind="unapproved"`) with the native toolset and its `approval_required_func` callback. Same observable pause-and-resume behavior; the approval gate now sits outermost, so an approved call still descends through the policy and permission deny-rules at execution time.
+
+### Security
+- **Broadened SSRF blocklist and IPv6 coverage for URL-fetching tools.** Building on the IP-pinning transport, the blocklist now catches cloud metadata endpoints that no private range covers (Azure WireServer's public IP `168.63.129.16`, plus AWS ECS/EKS, Oracle, Scaleway, and IPv6 endpoints), decodes IPv6 transition forms that embed an IPv4 address (IPv4-mapped, IPv4-compatible, 6to4, NAT64, ISATAP, Teredo) so a blocked address cannot be smuggled as IPv6 (e.g. `2002:7f00:1::` is 6to4 for `127.0.0.1`), adds `224.0.0.0/4`, `100::/64`, `2001::/32`, and `ff00::/8`, and strips trailing-dot FQDNs (`blocked.com.`) so they cannot slip past exact-match allow/blocklists. See `docs/security/security.md`.
+
 ## [2026.6.3] - 2026-06-07
 
 ### Changed
