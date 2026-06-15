@@ -308,6 +308,37 @@ class TestBuildAgentCapabilities:
             load_role(p)
 
 
+class TestImageGenerationCapability:
+    """The native ImageGeneration capability loads from YAML, including fallback_model."""
+
+    def test_imagegen_with_fallback_model_parses(self, tmp_path: Path):
+        p = _write_role(
+            tmp_path,
+            "  capabilities:\n"
+            "    - ImageGeneration:\n"
+            "        fallback_model: openai:gpt-5\n"
+            '        size: "1024x1024"\n',
+        )
+        role = load_role(p)
+        ns = role.spec.capabilities[0]
+        assert ns.name == "ImageGeneration"
+        assert ns.kwargs["fallback_model"] == "openai:gpt-5"
+
+    def test_imagegen_capability_constructs(self, tmp_path: Path):
+        from initrunner.agent.loader import _build_capabilities
+
+        p = _write_role(
+            tmp_path,
+            "  capabilities:\n    - ImageGeneration:\n        fallback_model: openai:gpt-5\n",
+        )
+        role = load_role(p)
+        caps = _build_capabilities(role)
+        assert caps is not None
+        cap = caps[0]
+        assert type(cap).__name__ == "ImageGeneration"
+        assert cap.fallback_model == "openai:gpt-5"
+
+
 # ---------------------------------------------------------------------------
 # Dashboard summary tests
 # ---------------------------------------------------------------------------

@@ -198,6 +198,24 @@ initrunner test <PATH> -s <suite.yaml> [OPTIONS]
 | `-j`, `--concurrency` | Number of concurrent workers (default: 1) |
 | `-o`, `--output` | Save JSON results to file |
 | `--tag` | Filter cases by tag (repeatable) |
+| `--pydantic-evals` | Run via the pydantic-evals engine with OTel span capture (needs the `observability` extra) |
+| `--report` | Print the native pydantic-evals report (per-evaluator scores, averages, span analyses). Implies `--pydantic-evals`. |
+| `--report-json` | Save the full native pydantic-evals report as JSON. Implies `--pydantic-evals`. |
+
+## Native pydantic-evals report
+
+InitRunner's own table (`-o results.json`) is a compact, stable summary. For the richer per-evaluator breakdown -- scores, aggregate averages, case groups, and span analyses -- render or export the native `pydantic_evals.EvaluationReport`:
+
+```bash
+# Rich console report alongside the InitRunner table
+initrunner test role.yaml -s suite.yaml --report
+
+# Full native report as JSON (one object per case: scores, assertions with
+# reasons, metrics, durations, span/trace ids)
+initrunner test role.yaml -s suite.yaml --report-json report.json
+```
+
+Both flags run the suite through the pydantic-evals engine (so they imply `--pydantic-evals`) and need the `observability` extra installed. `--report-json` serializes via pydantic-evals' own `EvaluationReportAdapter`, so the output round-trips back into pydantic-evals tooling.
 
 ## CI Usage
 

@@ -184,3 +184,33 @@ class TestLoadAgentSpec:
         )
         role_dict = load_agent_spec(spec_path)
         assert role_dict["metadata"]["name"] == "my-agent"
+
+
+class TestMetadataImport:
+    def test_known_metadata_keys_lifted(self):
+        role = agent_spec_to_role_dict(
+            {
+                "name": "greeter",
+                "model": "openai:gpt-4o",
+                "instructions": "hi",
+                "metadata": {"tags": ["a"], "author": "jc", "team": "core", "version": "2"},
+            },
+            fallback_name="x",
+        )
+        assert role["metadata"]["tags"] == ["a"]
+        assert role["metadata"]["author"] == "jc"
+        assert role["metadata"]["team"] == "core"
+        assert role["metadata"]["version"] == "2"
+        assert "_import_warnings" not in role
+
+    def test_unknown_metadata_keys_warn(self):
+        role = agent_spec_to_role_dict(
+            {
+                "name": "greeter",
+                "model": "openai:gpt-4o",
+                "instructions": "hi",
+                "metadata": {"cost_center": "42"},
+            },
+            fallback_name="x",
+        )
+        assert any("cost_center" in w for w in role["_import_warnings"])

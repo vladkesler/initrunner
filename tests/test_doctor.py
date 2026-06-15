@@ -247,6 +247,19 @@ class TestDoctorRoleValidation:
         assert result.exit_code == 0
         assert "valid and up to date" in result.output
 
+    def test_unknown_model_name_warns_in_cli(self, tmp_path: Path, monkeypatch):
+        """A typo'd model name surfaces a Role Diagnostics warning with a suggestion."""
+        content = _valid_role_yaml().replace("name: gpt-5-mini", "name: gpt-5-minii")
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor", "--role", str(p)])
+
+        assert result.exit_code == 0
+        assert "did you mean" in result.output
+
     def test_stale_version_note(self, tmp_path: Path, monkeypatch):
         """spec_version: 1 shows stale note but exits 0."""
         content = _valid_role_yaml().replace("spec_version: 2", "spec_version: 1")
@@ -1619,3 +1632,57 @@ class TestDoctorFlagInteractions:
                 result = runner.invoke(app, ["doctor", "--flow", str(flow), "--fix", "--yes"])
         assert result.exit_code == 1
         assert "mutually exclusive" in result.output
+
+
+class TestDiagnoseModelName:
+    def _role(self, provider: str, name: str, **model_kw):
+        from initrunner.agent.schema.role import RoleDefinition
+
+        return RoleDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Agent",
+                "metadata": {"name": "test-role", "spec_version": 2},
+                "spec": {"role": "x", "model": {"provider": provider, "name": name, **model_kw}},
+            }
+        )
+
+    def test_known_model_recognized(self):
+        from initrunner.services.doctor import diagnose_model_name
+
+        diag = diagnose_model_name(self._role("openai", "gpt-4o"))
+        assert diag is not None
+        assert diag.checked and diag.recognized
+
+    def test_unknown_model_warns_with_suggestion(self):
+        from initrunner.services.doctor import diagnose_model_name
+
+        diag = diagnose_model_name(self._role("openai", "gpt-4oo"))
+        assert diag is not None
+        assert diag.checked and not diag.recognized
+        assert diag.suggestion is not None and diag.suggestion.startswith("openai:")
+
+    def test_custom_endpoint_skipped(self):
+        from initrunner.services.doctor import diagnose_model_name
+
+        diag = diagnose_model_name(
+            self._role("ollama", "llama3", base_url="http://localhost:11434")
+        )
+        assert diag is not None
+        assert not diag.checked and diag.recognized
+
+    def test_unknown_provider_skipped(self):
+        from initrunner.services.doctor import diagnose_model_name
+
+        diag = diagnose_model_name(self._role("some-proxy", "whatever"))
+        assert diag is not None
+        assert not diag.checked and diag.recognized
+
+    def test_check_rendering(self):
+        from initrunner.services.doctor import diagnose_role_deep, role_diagnostics_to_checks
+
+        diag = diagnose_role_deep(self._role("openai", "gpt-4oo"), None)
+        model_checks = [c for c in role_diagnostics_to_checks(diag) if c["name"] == "model"]
+        assert len(model_checks) == 1
+        assert model_checks[0]["status"] == "warn"
+        assert "Did you mean" in model_checks[0]["message"]

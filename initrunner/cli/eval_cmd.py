@@ -87,6 +87,21 @@ def test(
             help="Run via pydantic-evals with OTel span capture (needs observability extra)",
         ),
     ] = False,
+    report: Annotated[
+        bool,
+        typer.Option(
+            "--report",
+            help="Print the native pydantic-evals report (per-evaluator scores, "
+            "analyses). Implies --pydantic-evals.",
+        ),
+    ] = False,
+    report_json: Annotated[
+        Path | None,
+        typer.Option(
+            "--report-json",
+            help="Save the full native pydantic-evals report as JSON. Implies --pydantic-evals.",
+        ),
+    ] = None,
     model: ModelOption = None,
 ) -> None:
     """Run a test suite against an agent role."""
@@ -94,7 +109,17 @@ def test(
 
     from initrunner._compat import MissingExtraError
     from initrunner.eval.runner import SuiteLoadError, load_suite
-    from initrunner.services.eval import run_suite_sync, save_result
+    from initrunner.services.eval import (
+        run_suite_report_sync,
+        run_suite_sync,
+        save_report,
+        save_result,
+    )
+
+    # --report / --report-json need the native EvaluationReport, which only the
+    # pydantic-evals engine produces.
+    want_report = report or report_json is not None
+    use_pydantic_evals = pydantic_evals or want_report
 
     resolved_model = resolve_model_override(model)
 
@@ -120,25 +145,46 @@ def test(
         + (f" [dim](concurrency={concurrency})[/dim]" if concurrency > 1 else "")
     )
 
+    native_report = None
     try:
-        suite_result = run_suite_sync(
-            agent,
-            role,
-            test_suite,
-            dry_run=dry_run,
-            concurrency=concurrency,
-            tag_filter=tag,
-            role_file=role_file,
-            pydantic_evals=pydantic_evals,
-        )
+        if want_report:
+            pe_result = run_suite_report_sync(
+                agent,
+                role,
+                test_suite,
+                dry_run=dry_run,
+                concurrency=concurrency,
+                tag_filter=tag,
+            )
+            suite_result = pe_result.suite_result
+            native_report = pe_result.report
+        else:
+            suite_result = run_suite_sync(
+                agent,
+                role,
+                test_suite,
+                dry_run=dry_run,
+                concurrency=concurrency,
+                tag_filter=tag,
+                role_file=role_file,
+                pydantic_evals=use_pydantic_evals,
+            )
     except MissingExtraError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
     _display_suite_result(suite_result, verbose=verbose)
 
+    if report and native_report is not None:
+        console.print()
+        native_report.print(console=console, include_input=verbose, include_output=verbose)
+
     if output is not None:
         save_result(suite_result, output)
         console.print(f"[green]Results saved:[/green] {output}")
+
+    if report_json is not None and native_report is not None:
+        save_report(native_report, report_json)
+        console.print(f"[green]Report saved:[/green] {report_json}")
 
     if not suite_result.all_passed:
         raise typer.Exit(1)

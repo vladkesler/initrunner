@@ -65,8 +65,9 @@ spec:
 | `retries`, `output_retries`, `end_strategy`, `tool_timeout` | `spec.execution.*` |
 | `deps_schema` | `spec.deps_schema` (verbatim) |
 | `output_schema` | `spec.output` with `type: json_schema` |
+| `metadata.tags` / `author` / `team` / `version` | `metadata.tags` / `author` / `team` / `version` (round-trips through export too) |
 
-Dropped with a warning: `instrument` (use `spec.observability` instead), `json_schema_path` (InitRunner doesn't need the companion schema path), and any `model_settings` keys beyond `max_tokens` / `temperature`.
+Dropped with a warning: `instrument` (use `spec.observability` instead), `json_schema_path` (InitRunner doesn't need the companion schema path), any `model_settings` keys beyond `max_tokens` / `temperature`, and `metadata` keys other than the four above.
 
 ## Running with template variables
 

@@ -125,6 +125,16 @@ class SandboxDiagnosis:
 
 
 @dataclass
+class ModelNameDiagnosis:
+    """Whether the role's model name is known to PydanticAI."""
+
+    model: str  # "provider:name"
+    checked: bool  # False when the provider is custom or not in the known list
+    recognized: bool
+    suggestion: str | None
+
+
+@dataclass
 class RoleDiagnostics:
     """Aggregated deep diagnostics for a role file."""
 
@@ -134,6 +144,7 @@ class RoleDiagnostics:
     memory_store: MemoryStoreDiagnosis | None
     triggers: list[TriggerDiagnosis]
     sandbox: SandboxDiagnosis | None = None
+    model_name: ModelNameDiagnosis | None = None
 
 
 @dataclass
@@ -954,6 +965,45 @@ def diagnose_sandbox(role: object, *, deep: bool = False) -> SandboxDiagnosis | 
         )
 
 
+def diagnose_model_name(role: object) -> ModelNameDiagnosis | None:
+    """Check the role's model name against PydanticAI's known model list.
+
+    Unknown names are advisory only: providers ship new models faster than
+    the library updates, and PydanticAI accepts unknown names at runtime.
+    Custom endpoints (Ollama, ``base_url`` overrides) are skipped because
+    their model names are deployment-specific.
+    """
+    spec = role.spec  # type: ignore[attr-defined]
+    model = spec.model
+    if not model.is_resolved():
+        return None
+
+    label = model.to_model_string()
+    if model.needs_custom_provider():
+        return ModelNameDiagnosis(model=label, checked=False, recognized=True, suggestion=None)
+
+    from pydantic_ai.models import known_model_names
+
+    names = known_model_names()
+    known_providers = {n.split(":", 1)[0] for n in names if ":" in n}
+    if model.provider not in known_providers:
+        return ModelNameDiagnosis(model=label, checked=False, recognized=True, suggestion=None)
+
+    if label in names:
+        return ModelNameDiagnosis(model=label, checked=True, recognized=True, suggestion=None)
+
+    import difflib
+
+    provider_names = [n for n in names if n.startswith(f"{model.provider}:")]
+    close = difflib.get_close_matches(label, provider_names, n=1, cutoff=0.6)
+    return ModelNameDiagnosis(
+        model=label,
+        checked=True,
+        recognized=False,
+        suggestion=close[0] if close else None,
+    )
+
+
 def diagnose_role_deep(
     role: object,
     role_dir: Path | None,
@@ -971,6 +1021,7 @@ def diagnose_role_deep(
         memory_store=diagnose_memory_store(role, deep=deep),
         triggers=diagnose_triggers(role),
         sandbox=diagnose_sandbox(role, deep=deep),
+        model_name=diagnose_model_name(role),
     )
 
 
@@ -1111,6 +1162,17 @@ def role_diagnostics_to_checks(diag: RoleDiagnostics) -> list:
         else:
             status, msg = "ok", trig.label
         checks.append({"name": f"trigger: {trig.trigger_type}", "status": status, "message": msg})
+
+    if diag.model_name is not None:
+        mn = diag.model_name
+        if not mn.checked:
+            status, msg = "ok", f"Custom endpoint, name not checked: {mn.model}"
+        elif mn.recognized:
+            status, msg = "ok", f"Known model: {mn.model}"
+        else:
+            hint = f" Did you mean '{mn.suggestion}'?" if mn.suggestion else ""
+            status, msg = "warn", f"Model '{mn.model}' is not in PydanticAI's known list.{hint}"
+        checks.append({"name": "model", "status": status, "message": msg})
 
     return checks
 
