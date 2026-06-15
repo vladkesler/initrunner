@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from initrunner.agent.permissions import PolicyToolset
 from initrunner.agent.schema.tools import ToolConfig
@@ -117,15 +117,17 @@ def build_toolsets(
                 from initrunner.agent.permissions import PermissionToolset
 
                 toolset = PermissionToolset(toolset, tool.permissions, tool.type)
-            # Approval layer: mark tool definitions as unapproved so PydanticAI
-            # surfaces them via DeferredToolRequests. Sits outside permission
-            # checks so deny-rules still short-circuit before asking a human.
+            # Observable status events
+            wrapped: Any = wrap_observable(toolset)
+            # Outermost: approval gating via PydanticAI's native toolset.
+            # Unapproved calls raise ApprovalRequired before any status event
+            # fires; approved resumes (ctx.tool_call_approved) pass through to
+            # the permission/policy layers, so deny-rules still apply.
             if tool.approval == "required":
-                from initrunner.agent.approval import ApprovalToolset
+                from pydantic_ai.toolsets import ApprovalRequiredToolset
 
-                toolset = ApprovalToolset(toolset, tool.type)
-            # Outer layer: observable status events
-            toolsets.append(wrap_observable(toolset))
+                wrapped = ApprovalRequiredToolset(wrapped)
+            toolsets.append(wrapped)
 
     # Auto-tools (retrieval, memory) — not user-configured, wired from role spec
     if role.spec.ingest is not None:

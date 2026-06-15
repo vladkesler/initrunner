@@ -450,9 +450,9 @@ def _finalize_run_output(
 
     if isinstance(raw_output, DeferredToolRequests):
         # Human-in-the-loop pause: the model asked to call tools whose
-        # ``approval: required`` config flags them unapproved. Capture each
-        # pending ToolCallPart verbatim — the caller resolves them via
-        # execute_run_resume() with DeferredToolResults.
+        # ``approval: required`` config gates them behind ApprovalRequired.
+        # Capture each pending ToolCallPart verbatim — the caller resolves
+        # them via execute_run_resume() with DeferredToolResults.
         result.status = "paused"
         result.pending_approvals = [
             PendingApproval(
