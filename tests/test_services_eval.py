@@ -124,3 +124,32 @@ class TestSaveResult:
         out.parent.mkdir(parents=True)
         save_result(sr, out)
         assert out.exists()
+
+
+class TestNativeReport:
+    def test_run_suite_report_returns_native_report(self):
+        import pytest
+
+        pytest.importorskip("pydantic_evals")
+        from initrunner.eval.runner import PydanticEvalsResult
+        from initrunner.services.eval import run_suite_report_sync
+
+        agent = Agent(TestModel(custom_output_text="world"))
+        result = run_suite_report_sync(agent, _make_role(), _make_suite(), dry_run=True)
+        assert isinstance(result, PydanticEvalsResult)
+        # The native report carries one entry per case.
+        assert len(result.report.cases) == 2
+
+    def test_save_report_serializes_json(self, tmp_path: Path):
+        import pytest
+
+        pytest.importorskip("pydantic_evals")
+        from initrunner.services.eval import run_suite_report_sync, save_report
+
+        agent = Agent(TestModel(custom_output_text="world"))
+        result = run_suite_report_sync(agent, _make_role(), _make_suite(), dry_run=True)
+        out = tmp_path / "report.json"
+        save_report(result.report, out)
+        data = json.loads(out.read_text())
+        assert data["name"] == "svc-suite"
+        assert len(data["cases"]) == 2

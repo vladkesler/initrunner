@@ -32,7 +32,7 @@ Names are CamelCase class names matching PydanticAI's capability registry. For c
 | `Thinking` | `effort`: `minimal`, `low`, `medium`, `high`, `xhigh` | Enable model-level extended thinking |
 | `WebSearch` | `allowed_domains`, `blocked_domains`, `search_context_size`, `max_uses` | Web search with provider-adaptive fallback |
 | `WebFetch` | `allowed_domains`, `blocked_domains`, `max_uses` | URL fetching with local fallback |
-| `ImageGeneration` | (none at construction) | Image generation with fallback |
+| `ImageGeneration` | `fallback_model`, `image_model`, `quality`, `size`, `output_format`, `action`, `background`, `moderation` | Provider-native image generation (OpenAI Responses, Google) with optional `fallback_model` delegation on providers that lack it |
 | `MCP` | `url` (required), `id`, `authorization_token`, `headers`, `allowed_tools` | PydanticAI-native MCP server connection |
 | `BuiltinTool` | `tool` (builtin tool spec) | Register individual builtin tools |
 | `PrefixTools` | `prefix`, `capability` (nested spec) | Namespace tool names to avoid conflicts |
@@ -56,6 +56,24 @@ spec:
         allowed_domains: [docs.python.org, github.com]
         search_context_size: medium
 ```
+
+### Image generation with fallback
+
+`ImageGeneration` uses the provider's native image tool on OpenAI Responses and Google. On a provider that has no native image tool, set `fallback_model` to delegate generation to a subagent running that model, so the same role works across providers without code:
+
+```yaml
+spec:
+  model:
+    provider: anthropic          # no native image tool
+    name: claude-sonnet-4-5-20250929
+  capabilities:
+    - ImageGeneration:
+        fallback_model: openai:gpt-5   # delegate image gen here
+        size: "1024x1024"
+        quality: high
+```
+
+This is the native PydanticAI capability. It is distinct from the `image_gen` **tool** (`spec.tools`), which wraps the OpenAI / Stability image APIs as an explicit callable that saves files to disk. Declaring both at once is rejected; pick the capability for in-conversation generation, the tool for file-output workflows.
 
 ### Remote MCP server
 

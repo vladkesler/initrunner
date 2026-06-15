@@ -94,3 +94,63 @@ class TestRoleToAgentSpec:
         from pydantic_ai.agent.spec import AgentSpec
 
         AgentSpec.model_validate(reloaded)
+
+
+class TestMetadataRoundTrip:
+    def test_metadata_exported(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: greeter
+              description: says hi
+              tags: [demo, greeting]
+              author: jc
+              team: platform
+              version: "1.2"
+            spec:
+              role: hello world
+              model:
+                provider: openai
+                name: gpt-4o
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        spec, _dropped = role_to_agent_spec(load_role(p))
+        assert spec["metadata"] == {
+            "tags": ["demo", "greeting"],
+            "author": "jc",
+            "team": "platform",
+            "version": "1.2",
+        }
+
+    def test_metadata_omitted_when_empty(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        spec, _dropped = role_to_agent_spec(load_role(_write_role(tmp_path)))
+        assert "metadata" not in spec
+
+    def test_full_round_trip(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        from initrunner.services.agent_spec_import import agent_spec_to_role_dict
+
+        content = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: greeter
+              tags: [demo]
+              author: jc
+            spec:
+              role: hello world
+              model:
+                provider: openai
+                name: gpt-4o
+        """)
+        p = tmp_path / "role.yaml"
+        p.write_text(content)
+        spec, _dropped = role_to_agent_spec(load_role(p))
+        role_dict = agent_spec_to_role_dict(spec, fallback_name="x")
+        assert role_dict["metadata"]["tags"] == ["demo"]
+        assert role_dict["metadata"]["author"] == "jc"
+        assert "_import_warnings" not in role_dict

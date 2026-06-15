@@ -169,6 +169,7 @@ These run automatically with `--role` and have no side effects:
 | **Memory store** | Resolves the store path and checks the parent directory exists and is writable. A missing store is reported as info (runtime creates it on first use). |
 | **Triggers** | Validates cron expressions (via `croniter`), checks timezone validity, verifies file_watch/heartbeat paths exist (CWD-relative, matching runtime), checks Telegram/Discord token env vars are set. |
 | **MCP servers** | Listed as "skipped" in static mode (connection requires spawning processes). |
+| **Model name** | Checks `provider:name` against PydanticAI's known model list and suggests the closest match on a likely typo (`gpt-4oo` warns with "Did you mean 'openai:gpt-4o'?"). Advisory only -- unknown names still run, since providers ship models faster than the list updates. Custom endpoints (Ollama, `base_url` overrides) are skipped. |
 
 ### Active checks (`--deep`)
 

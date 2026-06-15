@@ -131,22 +131,20 @@ Every pending `tool_call_id` on that run must carry a decision — `false` denie
 
 ## How it works
 
-1. `ApprovalToolset` (in `initrunner/agent/tools/registry.py` when `tool.approval == "required"`) flips `ToolDefinition.kind = "unapproved"` on every wrapped tool.
+1. Tools with `approval: "required"` are wrapped in PydanticAI's native `ApprovalRequiredToolset` (in `initrunner/agent/tools/registry.py`). An unapproved call raises `ApprovalRequired`, which PydanticAI collects into `DeferredToolRequests` instead of executing the tool.
 2. The agent's `output_type` is widened to `[original, DeferredToolRequests]` at build time.
-3. When the model decides to call an unapproved tool, PydanticAI returns a `DeferredToolRequests` instead of executing it.
-4. The executor detects this in `_process_agent_output` and sets `RunResult.status = "paused"` + `pending_approvals`.
-5. The runner mode persists the pause to the audit SQLite `pending_approvals` table (one row per pending call, carrying the full message history as JSON).
-6. `initrunner approve` / the HTTP route load the row, build a `DeferredToolResults(approvals={id: bool, ...})`, and call `agent.run_sync(message_history=..., deferred_tool_results=...)`. If the model pauses again, the cycle repeats.
+3. The executor detects the deferred output in `_process_agent_output` and sets `RunResult.status = "paused"` + `pending_approvals`.
+4. The runner mode persists the pause to the audit SQLite `pending_approvals` table (one row per pending call, carrying the full message history as JSON).
+5. `initrunner approve` / the HTTP route load the row, build a `DeferredToolResults(approvals={id: bool, ...})`, and call `agent.run_sync(message_history=..., deferred_tool_results=...)`. PydanticAI re-dispatches the approved calls with `ctx.tool_call_approved` set, so they pass straight through the approval wrapper. If the model pauses again, the cycle repeats.
 
 ## Composition with other gates
 
-The wrapper stack is builder → `PolicyToolset` → `PermissionToolset` → `ApprovalToolset` → observable events. Decisions go:
+The wrapper stack is builder, then `PolicyToolset`, then `PermissionToolset`, then observable events, with `ApprovalRequiredToolset` outermost. The approval gate fires first (before any tool status event), pausing the run. On an approved resume the call still descends through the full stack:
 
 1. Identity-based policy (Cedar, if enabled) rejects calls the principal isn't allowed to make at all.
 2. Permission rules reject calls whose arguments match deny globs.
-3. Approval marks whatever survives as `unapproved`, which PydanticAI surfaces to the human.
 
-A call that would be denied by policy or permissions never bothers a reviewer.
+A human approval therefore can never override a policy or permission deny-rule; the approved call is still rejected at execution time.
 
 ## Audit trail
 

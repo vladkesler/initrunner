@@ -1,24 +1,29 @@
-"""Retry and timeout resilience primitives for agent execution."""
+"""Retry and timeout resilience primitives for agent execution.
+
+HTTP retries live at the httpx transport layer via PydanticAI's
+``AsyncTenacityTransport``: every provider request (including streaming)
+retries transient status codes with exponential backoff, honoring
+``Retry-After`` headers. The client built here is injected into provider
+construction in ``loader._build_single_model``.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import atexit
 import contextvars
 import logging
-import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FuturesTimeout
-from typing import Any, TypeVar
+from typing import TypeVar
 
-from pydantic_ai.exceptions import ModelHTTPError
+import httpx
 
 _logger = logging.getLogger(__name__)
 
-_RETRY_MAX_ATTEMPTS = 3
-_RETRY_BACKOFF_BASE = 1.0  # seconds
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_DEFAULT_ATTEMPTS = 3
+_DEFAULT_MAX_WAIT = 60.0  # seconds; cap for Retry-After + backoff waits
 
 _TIMEOUT_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="run_timeout")
 atexit.register(_TIMEOUT_POOL.shutdown, wait=False)
@@ -40,66 +45,45 @@ def _run_with_timeout(fn: Callable[[], _T], timeout: float) -> _T:
         raise TimeoutError(f"Run timed out after {int(timeout)}s") from None
 
 
-def _should_retry(exc: ModelHTTPError, attempt: int) -> float | None:
-    """Return delay seconds if retryable and more attempts remain, else None."""
-    if exc.status_code not in _RETRYABLE_STATUS_CODES:
-        return None
-    if attempt >= _RETRY_MAX_ATTEMPTS - 1:
-        return None
-    delay = _RETRY_BACKOFF_BASE * (2**attempt)
-    _logger.warning(
-        "Retryable HTTP %d from model (attempt %d/%d), retrying in %.1fs",
-        exc.status_code,
-        attempt + 1,
-        _RETRY_MAX_ATTEMPTS,
-        delay,
-    )
-    return delay
+def _raise_for_retryable_status(response: httpx.Response) -> None:
+    """Raise ``HTTPStatusError`` only for transient status codes.
 
-
-def _retry_model_call(
-    fn: Callable[[], _T],
-    *,
-    on_retry: Callable[[], None] | None = None,
-) -> _T:
-    """Call *fn* with retry-on-transient-HTTP-error logic.
-
-    Retries up to ``_RETRY_MAX_ATTEMPTS`` times for status codes in
-    ``_RETRYABLE_STATUS_CODES``, using exponential backoff.  Calls
-    *on_retry* (if provided) before each retry attempt -- only when an
-    actual retry will follow.
+    Permanent errors (401, 403, 404, 422, ...) pass through untouched so the
+    provider SDK surfaces them immediately instead of burning retry attempts.
     """
-    last_http_error: ModelHTTPError | None = None
-    for attempt in range(_RETRY_MAX_ATTEMPTS):
-        try:
-            return fn()
-        except ModelHTTPError as e:
-            delay = _should_retry(e, attempt)
-            if delay is None:
-                raise
-            last_http_error = e
-            if on_retry is not None:
-                on_retry()
-            time.sleep(delay)
-    raise last_http_error  # type: ignore[misc]
+    if response.status_code in _RETRYABLE_STATUS_CODES:
+        response.raise_for_status()
 
 
-async def _retry_model_call_async(
-    fn: Callable[..., Any],
+def build_retrying_async_client(
     *,
-    on_retry: Callable[[], None] | None = None,
-) -> Any:
-    """Async variant of ``_retry_model_call`` -- uses ``asyncio.sleep``."""
-    last_http_error: ModelHTTPError | None = None
-    for attempt in range(_RETRY_MAX_ATTEMPTS):
-        try:
-            return await fn()
-        except ModelHTTPError as e:
-            delay = _should_retry(e, attempt)
-            if delay is None:
-                raise
-            last_http_error = e
-            if on_retry is not None:
-                on_retry()
-            await asyncio.sleep(delay)
-    raise last_http_error  # type: ignore[misc]
+    attempts: int = _DEFAULT_ATTEMPTS,
+    max_wait: float = _DEFAULT_MAX_WAIT,
+) -> httpx.AsyncClient:
+    """Build an ``httpx.AsyncClient`` that retries transient provider errors.
+
+    Wraps the default transport in PydanticAI's ``AsyncTenacityTransport``
+    with exponential backoff capped by ``Retry-After`` header support
+    (``wait_retry_after``). Retries status codes {429, 500, 502, 503, 504}
+    up to ``attempts`` total tries.
+    """
+    from pydantic_ai.models import DEFAULT_HTTP_TIMEOUT, get_user_agent
+    from pydantic_ai.retries import AsyncTenacityTransport, RetryConfig, wait_retry_after
+    from tenacity import retry_if_exception_type, stop_after_attempt
+
+    transport = AsyncTenacityTransport(
+        RetryConfig(
+            retry=retry_if_exception_type(httpx.HTTPStatusError),
+            wait=wait_retry_after(max_wait=max_wait),
+            stop=stop_after_attempt(attempts),
+            reraise=True,
+        ),
+        validate_response=_raise_for_retryable_status,
+    )
+    # Mirror pydantic_ai.models.create_async_http_client defaults: httpx's own
+    # 5s default timeout would kill long model calls.
+    return httpx.AsyncClient(
+        transport=transport,
+        timeout=httpx.Timeout(timeout=DEFAULT_HTTP_TIMEOUT, connect=5),
+        headers={"User-Agent": get_user_agent()},
+    )

@@ -9,8 +9,8 @@ import pytest
 from pydantic_ai import Agent, DeferredToolRequests
 from pydantic_ai.messages import ModelRequest, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.toolsets import ApprovalRequiredToolset
 
-from initrunner.agent.approval import ApprovalToolset
 from initrunner.agent.executor_models import PendingApproval, RunResult
 from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.guardrails import Guardrails
@@ -64,23 +64,27 @@ class TestApprovalSchema:
 
 
 # ---------------------------------------------------------------------------
-# ApprovalToolset wrapper
+# Approval toolset wiring (native ApprovalRequiredToolset)
 # ---------------------------------------------------------------------------
 
 
-class TestApprovalToolset:
-    def test_stores_inner_and_tool_type(self):
-        """ApprovalToolset wraps another toolset and retains references.
+class TestApprovalToolsetWiring:
+    def test_registry_wraps_approval_required_tools(self, tmp_path):
+        """build_toolsets puts ApprovalRequiredToolset outermost for
+        approval: required tools, so unapproved calls defer before any
+        status event fires."""
+        from initrunner.agent.tools.registry import build_toolsets
 
-        End-to-end behaviour (kind="unapproved" on tool defs, calls rerouted
-        to DeferredToolRequests) is covered in TestExecutorPauseDetection.
-        """
-        from pydantic_ai.toolsets import FunctionToolset
+        role = _make_role(tools=[{"type": "calculator", "approval": "required"}])
+        toolsets = build_toolsets(role.spec.tools, role, role_dir=tmp_path)
+        assert any(isinstance(ts, ApprovalRequiredToolset) for ts in toolsets)
 
-        inner = FunctionToolset()
-        wrapped = ApprovalToolset(inner, "function")
-        assert wrapped._inner is inner
-        assert wrapped._tool_type == "function"
+    def test_registry_skips_wrapper_for_auto_tools(self, tmp_path):
+        from initrunner.agent.tools.registry import build_toolsets
+
+        role = _make_role(tools=[{"type": "calculator"}])
+        toolsets = build_toolsets(role.spec.tools, role, role_dir=tmp_path)
+        assert not any(isinstance(ts, ApprovalRequiredToolset) for ts in toolsets)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +104,7 @@ class TestExecutorPauseDetection:
         def dangerous(command: str) -> str:
             return f"ran: {command}"
 
-        wrapped = ApprovalToolset(ts, "function")
+        wrapped = ApprovalRequiredToolset(ts)
 
         def fake_model(messages: list, info: AgentInfo):
             # First turn: call the tool

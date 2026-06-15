@@ -283,3 +283,92 @@ class TestResolveSafeIp:
     def test_picks_first_public_ip(self, mock_dns):
         mock_dns.side_effect = _mock_getaddrinfo("93.184.216.34", "93.184.216.35")
         assert _resolve_safe_ip("ok.example", 80, 10.0) == "93.184.216.34"
+
+
+# ---------------------------------------------------------------------------
+# Cloud metadata endpoints, IPv6 transition forms, multicast, trailing dot
+# ---------------------------------------------------------------------------
+class TestCloudMetadataAndTransitionForms:
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "168.63.129.16",  # Azure WireServer (PUBLIC IP -- only the metadata guard catches it)
+            "169.254.169.254",  # AWS/GCP/Azure IMDS
+            "169.254.170.2",  # AWS ECS task role credentials
+            "100.100.100.200",  # Alibaba
+            "192.0.0.192",  # Oracle Cloud Classic
+        ],
+    )
+    def test_cloud_metadata_ipv4_blocked(self, ip):
+        import ipaddress
+
+        from initrunner.agent._urls import _is_private_ip
+
+        assert _is_private_ip(ipaddress.ip_address(ip)) is True
+
+    def test_azure_metadata_is_public_ip_not_in_ranges(self):
+        """168.63.129.16 must be caught by the metadata guard, not a CIDR range."""
+        import ipaddress
+
+        from initrunner.agent._urls import _BLOCKED_NETWORKS, _is_private_ip
+
+        addr = ipaddress.ip_address("168.63.129.16")
+        assert not any(addr in net for net in _BLOCKED_NETWORKS)  # public IP
+        assert _is_private_ip(addr) is True  # but still blocked
+
+    @pytest.mark.parametrize(
+        "ipv6",
+        [
+            "2002:7f00:1::",  # 6to4 encoding 127.0.0.1
+            "2002:a00:1::",  # 6to4 encoding 10.0.0.1
+            "64:ff9b::7f00:1",  # NAT64 well-known prefix encoding 127.0.0.1
+            "::ffff:169.254.169.254",  # IPv4-mapped metadata
+            "::7f00:1",  # IPv4-compatible (deprecated) encoding 127.0.0.1
+        ],
+    )
+    def test_ipv6_embedded_private_ipv4_blocked(self, ipv6):
+        import ipaddress
+
+        from initrunner.agent._urls import _is_private_ip
+
+        assert _is_private_ip(ipaddress.ip_address(ipv6)) is True
+
+    def test_ipv6_embedded_metadata_blocked(self):
+        """6to4-wrapped Azure metadata is caught by the exhaustive metadata decode."""
+        import ipaddress
+
+        from initrunner.agent._urls import _is_private_ip
+
+        # 6to4 wrapper around 168.63.129.16 (a8 3f 81 10)
+        assert _is_private_ip(ipaddress.ip_address("2002:a83f:8110::")) is True
+
+    @pytest.mark.parametrize("ip", ["224.0.0.1", "239.255.255.250"])
+    def test_ipv4_multicast_blocked(self, ip):
+        import ipaddress
+
+        from initrunner.agent._urls import _is_private_ip
+
+        assert _is_private_ip(ipaddress.ip_address(ip)) is True
+
+    def test_public_ipv6_not_blocked(self):
+        """A genuine public IPv6 must not be misclassified."""
+        import ipaddress
+
+        from initrunner.agent._urls import _is_private_ip
+
+        assert _is_private_ip(ipaddress.ip_address("2606:4700:4700::1111")) is False  # Cloudflare
+
+    def test_trailing_dot_does_not_bypass_blocklist(self):
+        from initrunner.agent._urls import check_domain_filter
+
+        # blocked.com. (trailing dot) must still match the blocklist for blocked.com
+        result = check_domain_filter(
+            "https://blocked.com./path", allowed_domains=[], blocked_domains=["blocked.com"]
+        )
+        assert result is not None and "blocked" in result
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_trailing_dot_metadata_host_blocked(self, mock_dns):
+        mock_dns.side_effect = _mock_getaddrinfo("169.254.169.254")
+        with pytest.raises(SSRFBlocked):
+            _resolve_safe_ip("metadata.internal.", 80, 10.0)

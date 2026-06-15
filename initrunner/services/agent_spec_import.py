@@ -77,6 +77,22 @@ def agent_spec_to_role_dict(spec: dict[str, Any], *, fallback_name: str) -> dict
     if isinstance(description, str) and description:
         metadata["description"] = description
 
+    # AgentSpec.metadata is free-form; lift the keys our Metadata schema knows.
+    spec_metadata = spec.get("metadata")
+    if isinstance(spec_metadata, dict):
+        if isinstance(spec_metadata.get("tags"), list):
+            metadata["tags"] = [str(t) for t in spec_metadata["tags"]]
+        for key in ("author", "team", "version"):
+            value = spec_metadata.get(key)
+            if isinstance(value, str) and value:
+                metadata[key] = value
+        leftover = sorted(set(spec_metadata) - {"name", "tags", "author", "team", "version"})
+        if leftover:
+            warnings.append(
+                f"Dropped unrecognized metadata keys: {leftover}. "
+                f"InitRunner role metadata supports tags, author, team, version."
+            )
+
     # --- model --------------------------------------------------------------
     model_str = spec.get("model")
     if not isinstance(model_str, str) or not model_str:

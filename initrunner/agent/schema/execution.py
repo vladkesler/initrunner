@@ -24,3 +24,9 @@ class ExecutionConfig(BaseModel):
     end_strategy: Literal["early", "exhaustive"] = "early"
     tool_timeout_seconds: Annotated[float, Field(gt=0)] | None = None
     max_concurrency: ConcurrencyConfig | None = None
+    http_retries: Annotated[int, Field(ge=1, le=10)] = 3
+    """Total attempts per provider HTTP request for transient errors
+    (429/5xx). Applied at the httpx transport layer with exponential backoff
+    and ``Retry-After`` support."""
+    http_retry_max_wait: Annotated[float, Field(gt=0, le=600)] = 60.0
+    """Cap in seconds for a single retry wait (backoff or Retry-After)."""

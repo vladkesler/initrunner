@@ -40,6 +40,20 @@ def role_to_agent_spec(role: RoleDefinition) -> tuple[dict[str, Any], DroppedSec
     if role.metadata.description:
         spec["description"] = role.metadata.description
 
+    # Free-form AgentSpec.metadata round-trips the descriptive role metadata
+    # that has no top-level Agent-Spec analogue.
+    extra_metadata: dict[str, Any] = {}
+    if role.metadata.tags:
+        extra_metadata["tags"] = list(role.metadata.tags)
+    if role.metadata.author:
+        extra_metadata["author"] = role.metadata.author
+    if role.metadata.team:
+        extra_metadata["team"] = role.metadata.team
+    if role.metadata.version:
+        extra_metadata["version"] = role.metadata.version
+    if extra_metadata:
+        spec["metadata"] = extra_metadata
+
     # --- model --------------------------------------------------------------
     model = role.spec.model
     if model is None or not getattr(model, "provider", "") or not getattr(model, "name", ""):

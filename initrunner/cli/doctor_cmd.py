@@ -551,6 +551,12 @@ def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
 
     assert isinstance(diag, RoleDiagnostics)
 
+    # A model-name warning (unrecognized name) is worth surfacing on its own;
+    # a recognized/unchecked model only appears when the table shows anyway.
+    model_warn = (
+        diag.model_name is not None and diag.model_name.checked and not diag.model_name.recognized
+    )
+
     # Skip if there's nothing to show
     if (
         not diag.mcp_servers
@@ -559,6 +565,7 @@ def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
         and diag.memory_store is None
         and not diag.triggers
         and diag.sandbox is None
+        and not model_warn
     ):
         return
 
@@ -655,6 +662,19 @@ def _render_role_diagnostics(diag: object, *, indent: str = "") -> None:
         else:
             status = "[red]fail[/red]"
         table.add_row("sandbox", sb.backend, status, sb.detail or "")
+
+    if diag.model_name is not None:
+        mn = diag.model_name
+        if not mn.checked:
+            status, details = "[dim]ok[/dim]", "custom endpoint (name not checked)"
+        elif mn.recognized:
+            status, details = "[green]ok[/green]", "known model"
+        else:
+            status = "[yellow]warn[/yellow]"
+            details = "not in PydanticAI's known list"
+            if mn.suggestion:
+                details += f" -- did you mean '{mn.suggestion}'?"
+        table.add_row("model", mn.model, status, details)
 
     console.print()
     console.print(table)
