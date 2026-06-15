@@ -326,6 +326,13 @@ Two-layer approach for defense in depth:
 
 A tool that manually constructs an IP and calls `connect()` directly will still be blocked if it targets a private range. For full IP lockdown, use the hostname allowlist.
 
+**SSRF coverage (URL-fetching tools).** The web tools (`web_reader`, `web_scraper`, `http`, MCP browser) route through an SSRF-safe httpx transport (`initrunner/agent/_urls.py`) that validates and **pins** the resolved IP for the connection, so a rebinding resolver cannot swap in a private address between check and connect, and every redirect hop is re-validated. The blocklist covers:
+
+- RFC 1918 / loopback / link-local / CGNAT, plus IANA special-purpose ranges (TEST-NET, benchmarking, multicast, reserved) for IPv4 and IPv6.
+- **Cloud metadata endpoints**, including Azure's WireServer at the *public* IP `168.63.129.16` that no private range catches, plus AWS (IMDS, ECS, EKS), GCP, Alibaba, Oracle, and Scaleway endpoints (IPv4 and IPv6).
+- **IPv6 transition forms** that embed an IPv4 destination -- IPv4-mapped, IPv4-compatible, 6to4 (`2002::/16`), NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), ISATAP, and Teredo -- are decoded and the embedded IPv4 is checked against the blocklist, so a blocked address cannot be smuggled in IPv6 clothing (e.g. `2002:7f00:1::` is 6to4 for `127.0.0.1`).
+- Trailing-dot FQDN forms (`blocked.com.`, `169.254.169.254.`) are normalized so they cannot slip past exact-match allow/blocklists.
+
 **Discovery mode:**
 
 Set `sandbox_violation_action: log` to observe what the sandbox would block before enforcing. InitRunner records violations in the `security_events` table and lets operations proceed:
