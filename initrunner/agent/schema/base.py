@@ -19,6 +19,13 @@ PydanticAI's ``ThinkingLevel``. ``None`` (the field default) leaves the
 setting unset so the provider applies its own default.
 """
 
+# PydanticAI exception names accepted in ``model.fallback_on``, mapped to their
+# classes in initrunner.agent.loader. ``ModelAPIError`` is the base for API/HTTP
+# failures (PydanticAI's own default); the rest narrow or broaden the trigger.
+FALLBACK_ON_EXCEPTIONS = frozenset(
+    {"ModelAPIError", "ModelHTTPError", "UnexpectedModelBehavior", "ContentFilterError"}
+)
+
 
 class ApiVersion(StrEnum):
     V1 = "initrunner/v1"
@@ -68,6 +75,43 @@ def _split_provider_and_name(spec: str) -> tuple[str, str]:
     return "", spec
 
 
+class ModelConcurrencyConfig(BaseModel):
+    """Cap concurrent model requests, optionally sharing the cap across agents.
+
+    Maps to PydanticAI's ``ConcurrencyLimitedModel`` + ``ConcurrencyLimiter``.
+    Distinct from ``execution.max_concurrency``, which bounds an agent's
+    parallel *tool* execution. This bounds in-flight *model requests* -- useful
+    when several agents in one process (compose services, team personas, flow
+    nodes) share a provider rate-limit budget.
+    """
+
+    max_running: Annotated[int, Field(ge=1)]
+    """Maximum concurrent in-flight model requests."""
+    max_queued: Annotated[int, Field(ge=0)] | None = None
+    """Maximum requests allowed to wait; excess is rejected. ``None`` = unbounded."""
+    share: str | None = None
+    """Name of a shared limiter. Agents (in the same process) whose model config
+    uses the same ``share`` name coordinate against one combined budget. Without
+    a name, the cap is per-agent."""
+
+
+class PromptCacheConfig(BaseModel):
+    """Provider-native prompt caching for the static prefix of a request.
+
+    Maps to Anthropic's ``anthropic_cache_*`` and Bedrock's ``bedrock_cache_*``
+    model settings. Caching the system instructions and tool definitions lets
+    repeated runs of a role (daemons, triggers, REPLs) reuse the cached prefix,
+    cutting input-token cost. Only ``anthropic`` and ``bedrock`` support it.
+    """
+
+    instructions: bool = True
+    """Cache the system instructions (role prompt + skill prompts)."""
+    tools: bool = True
+    """Cache the tool definitions block."""
+    ttl: Literal["5m", "1h"] = "5m"
+    """Cache time-to-live. ``1h`` needs provider support for extended caching."""
+
+
 class PartialModelConfig(BaseModel):
     """YAML-facing model config. Provider and name may be omitted for auto-detection."""
 
@@ -78,7 +122,35 @@ class PartialModelConfig(BaseModel):
     temperature: Annotated[float, Field(ge=0.0, le=2.0)] = 0.1
     max_tokens: Annotated[int, Field(ge=1, le=128000)] = 4096
     context_window: Annotated[int, Field(gt=0)] | None = None
+    concurrency: ModelConcurrencyConfig | None = None
     fallback: list[str] = []
+    fallback_on: list[str] = []
+    """Exception types that trigger failover to the next fallback model. Names
+    from PydanticAI's exceptions (``ModelAPIError``, ``ModelHTTPError``,
+    ``UnexpectedModelBehavior``, ``ContentFilterError``). Empty uses PydanticAI's
+    default (``ModelAPIError``). Only valid when ``fallback`` is set."""
+    prompt_cache: PromptCacheConfig | None = None
+    """Provider-native prompt caching. ``prompt_cache: true`` enables caching
+    of instructions and tool definitions; a mapping tunes it. Anthropic and
+    Bedrock only."""
+    top_p: Annotated[float, Field(gt=0.0, le=1.0)] | None = None
+    top_k: Annotated[int, Field(ge=1)] | None = None
+    seed: int | None = None
+    stop_sequences: list[str] | None = None
+    parallel_tool_calls: bool | None = None
+    presence_penalty: Annotated[float, Field(ge=-2.0, le=2.0)] | None = None
+    frequency_penalty: Annotated[float, Field(ge=-2.0, le=2.0)] | None = None
+    logit_bias: dict[str, int] | None = None
+    extra_headers: dict[str, str] | None = None
+    extra_body: dict[str, object] | None = None
+    tool_choice: Literal["auto", "none"] | None = None
+    """Static tool-choice policy passed to ``ModelSettings['tool_choice']``.
+
+    Only ``auto`` (provider default) and ``none`` (text-only mode, tools
+    disabled) are valid here: PydanticAI rejects a static ``required`` or
+    tool-name list because it would lock every step into a tool call and
+    prevent a final response. Per-step forcing needs a dynamic capability.
+    """
     thinking: ThinkingEffort | None = None
     """Native extended-thinking effort. Maps to ``ModelSettings['thinking']``.
 
@@ -87,6 +159,31 @@ class PartialModelConfig(BaseModel):
     from ``spec.reasoning``, which orchestrates InitRunner's cross-turn
     reasoning patterns rather than model-level thinking.
     """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _explain_dynamic_tool_choice(cls, data: dict) -> dict:  # type: ignore[type-arg]
+        if isinstance(data, dict) and (
+            data.get("tool_choice") == "required" or isinstance(data.get("tool_choice"), list)
+        ):
+            raise ValueError(
+                "tool_choice: 'required' and tool-name lists cannot be set statically -- "
+                "they would force a tool call on every step and prevent a final response. "
+                "Use 'auto' or 'none' here; per-step forcing requires a dynamic capability."
+            )
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_prompt_cache_shorthand(cls, data: dict) -> dict:  # type: ignore[type-arg]
+        """Allow ``prompt_cache: true`` as shorthand for the default config."""
+        if isinstance(data, dict):
+            value = data.get("prompt_cache")
+            if value is True:
+                data = {**data, "prompt_cache": {}}
+            elif value is False:
+                data = {**data, "prompt_cache": None}
+        return data
 
     def is_resolved(self) -> bool:
         """Return True when both provider and name are set."""
@@ -121,6 +218,24 @@ class PartialModelConfig(BaseModel):
                     f"base_url. Fallback entries must be standard providers "
                     f"(anthropic, openai, google, groq, mistral, cohere, xai, ...)."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _check_fallback_on(self) -> PartialModelConfig:
+        """Validate ``fallback_on`` names and require ``fallback`` to be set."""
+        if not self.fallback_on:
+            return self
+        if not self.fallback:
+            raise ValueError(
+                "fallback_on has no effect without fallback models. "
+                "Add a 'fallback' list or remove 'fallback_on'."
+            )
+        unknown = [n for n in self.fallback_on if n not in FALLBACK_ON_EXCEPTIONS]
+        if unknown:
+            raise ValueError(
+                f"Unknown fallback_on exception(s): {unknown}. "
+                f"Valid names: {sorted(FALLBACK_ON_EXCEPTIONS)}."
+            )
         return self
 
     def is_reasoning_model(self) -> bool:
@@ -175,6 +290,28 @@ class PartialModelConfig(BaseModel):
                 f"thinking is only supported on reasoning-capable OpenAI models "
                 f"(the o-series and the gpt-5 family), not '{self.provider}:{self.name}'. "
                 f"Remove the thinking field or switch to a supported model."
+            )
+        return self
+
+    def supports_prompt_cache(self) -> bool:
+        """Return True for providers with native prompt-cache settings."""
+        return self.provider.lower() in ("anthropic", "bedrock")
+
+    @model_validator(mode="after")
+    def _check_prompt_cache_supported(self) -> PartialModelConfig:
+        """Reject ``prompt_cache`` on providers without native cache settings.
+
+        Skips the check when the provider is still empty (a partial config
+        awaiting auto-detection).
+        """
+        if self.prompt_cache is None:
+            return self
+        if not self.provider:
+            return self
+        if not self.supports_prompt_cache():
+            raise ValueError(
+                f"prompt_cache is only supported on Anthropic and Bedrock, not "
+                f"'{self.provider}'. Remove prompt_cache or switch providers."
             )
         return self
 

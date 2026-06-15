@@ -58,10 +58,7 @@ from .executor_output import (
     _validate_input_or_fail,
 )
 from .executor_retry import (
-    _retry_model_call,  # noqa: F401
-    _retry_model_call_async,
     _run_with_timeout,  # noqa: F401
-    _should_retry,  # noqa: F401
 )
 
 # ---------------------------------------------------------------------------
@@ -312,7 +309,7 @@ async def _execute_resume_async_inner(
         with _create_run_span(run_id, role, trigger_type="resume") as span:
             try:
                 agent_result = await asyncio.wait_for(
-                    _retry_model_call_async(lambda: agent.run(**run_kwargs)),
+                    agent.run(**run_kwargs),
                     timeout=timeout,
                 )
                 new_messages = _process_agent_output(
@@ -474,7 +471,7 @@ async def execute_run_async(
 
     async def invoke(run_kwargs: dict, result: RunResult) -> list:
         agent_result = await asyncio.wait_for(
-            _retry_model_call_async(lambda: agent.run(prompt, **run_kwargs)),
+            agent.run(prompt, **run_kwargs),
             timeout=timeout,
         )
         return _process_agent_output(agent_result, result, role, capture_timeline=capture_timeline)
@@ -562,9 +559,6 @@ async def execute_run_stream_async(
                     build_timeline_entry,
                 )
 
-                # A retry replays the whole stream, so drop anything captured
-                # by the prior attempt to keep the timeline consistent.
-                event_timeline.clear()
                 async for event in agent.run_stream_events(prompt, **run_kwargs):
                     on_event(event)
                     if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
@@ -587,7 +581,7 @@ async def execute_run_stream_async(
                         event_timeline.append(entry)
 
             await asyncio.wait_for(
-                _retry_model_call_async(_do_stream_events, on_retry=output_parts.clear),
+                _do_stream_events(),
                 timeout=timeout,
             )
         else:
@@ -608,7 +602,7 @@ async def execute_run_stream_async(
                     stream_state["output"] = await stream.get_output()
 
             await asyncio.wait_for(
-                _retry_model_call_async(_do_stream, on_retry=output_parts.clear),
+                _do_stream(),
                 timeout=timeout,
             )
 

@@ -281,7 +281,49 @@ Notes:
 - API keys for **every** model in the chain must be available at role-load time. `FallbackModel` constructs per-provider clients eagerly; a missing key on a fallback fails fast at startup, not at failover time.
 - Fallback entries are standard-provider strings only. Ollama and custom `base_url` endpoints are not supported as fallbacks in this release.
 - On a **successful** fallback, PydanticAI discards the primary's exception. The run succeeds; the per-provider failure is not surfaced in the audit log. If every candidate fails, the audit record is marked failed and the error lists each inner failure (e.g. `All 3 fallback models failed: [anthropic:... HTTP 500, openai:... HTTP 429, google:... HTTP 503]`).
-- The outer retry loop does **not** retry `FallbackExceptionGroup` -- the FallbackModel has already walked every candidate, so a retry would just repeat the same chain.
+- Each candidate (primary and every fallback) carries its own [HTTP retry transport](#http-retries), so a transient 429/5xx is retried in place before InitRunner gives up on that candidate and moves to the next.
+- By default, failover triggers on `ModelAPIError` (any provider API/HTTP failure). Narrow or widen the trigger with `fallback_on`:
+
+  ```yaml
+  spec:
+    model:
+      provider: anthropic
+      name: claude-sonnet-4-5-20250929
+      fallback: [openai:gpt-4o-mini]
+      fallback_on: [ModelHTTPError, ContentFilterError]
+  ```
+
+  Valid names are PydanticAI exception types: `ModelAPIError` (the default; base for API/HTTP failures), `ModelHTTPError` (HTTP status errors only), `UnexpectedModelBehavior`, and `ContentFilterError`. `fallback_on` requires a non-empty `fallback` list.
+
+## HTTP retries
+
+Every model request is retried at the HTTP transport layer on transient errors (status `429`, `500`, `502`, `503`, `504`) using PydanticAI's [`AsyncTenacityTransport`](https://ai.pydantic.dev/retries/). Retries use exponential backoff and honor a `Retry-After` response header when the provider sends one. Permanent errors (`400`, `401`, `403`, `404`, `422`, ...) are **not** retried -- they surface immediately. The transport applies to OpenAI, Anthropic, Google, Groq, Mistral, Cohere, and every custom OpenAI-compatible endpoint (Ollama, vLLM, OpenRouter). Bedrock (boto3) and xAI (gRPC) rely on their own SDKs' native retry handling.
+
+Tune it under `spec.execution`:
+
+```yaml
+spec:
+  execution:
+    http_retries: 3          # total attempts per request (1-10, default 3)
+    http_retry_max_wait: 60  # cap in seconds for one backoff/Retry-After wait (default 60)
+```
+
+Because retries live in the httpx transport (below the agent loop), they apply uniformly to one-shot, REPL, streaming, and daemon runs without restarting the whole agent turn. Daemon trigger runs additionally have their own higher-level [retry policy and circuit breaker](guardrails.md) for retrying an entire run.
+
+## Model request concurrency
+
+Cap how many model requests are in flight at once, optionally sharing one budget across several agents in the same process (compose services, team personas, flow nodes). This is distinct from `execution.max_concurrency`, which bounds an agent's parallel *tool* execution; this bounds *model requests* and is the lever for staying under a provider's rate limit when many agents share an API key.
+
+```yaml
+spec:
+  model:
+    concurrency:
+      max_running: 4          # max concurrent in-flight requests
+      max_queued: 50          # optional: reject once this many are waiting
+      share: openai-pool      # optional: agents with the same name share one budget
+```
+
+Without `share`, the cap is per-agent. With a `share` name, every agent (in the same process) whose model config uses that name coordinates against a single `ConcurrencyLimiter` -- so a pool of five personas hitting one OpenAI key can be held to, say, four concurrent requests total. The first config registered for a given name sets its limits. Maps to PydanticAI's `ConcurrencyLimitedModel`.
 
 ## Model config reference
 
@@ -294,7 +336,49 @@ Notes:
 | `temperature` | float | `0.1` | Sampling temperature (0.0-2.0) |
 | `max_tokens` | int | `4096` | Maximum tokens per response (1-128000) |
 | `context_window` | int \| null | *null* | Model context window in tokens. Used by the [context budget guard](../orchestration/autonomy.md#context-budget-guard) to prevent history overflow. Auto-detected from provider when null. |
+| `concurrency` | mapping \| null | *null* | Cap concurrent model requests (`max_running`, `max_queued`, `share`). See [Model request concurrency](#model-request-concurrency). |
 | `fallback` | list[str] | `[]` | Ordered list of `provider:model` strings (or aliases). When non-empty, the primary and fallbacks are wrapped in a `FallbackModel` for automatic failover on API errors. Standard providers only. |
+| `fallback_on` | list[str] | `[]` | Exception types that trigger failover (`ModelAPIError`, `ModelHTTPError`, `UnexpectedModelBehavior`, `ContentFilterError`). Empty uses the `ModelAPIError` default. Requires `fallback`. |
+| `top_p` | float \| null | *null* | Nucleus sampling threshold (0.0-1.0). Dropped on OpenAI reasoning models, like `temperature`. |
+| `top_k` | int \| null | *null* | Top-k sampling cutoff. Dropped on OpenAI reasoning models. |
+| `seed` | int \| null | *null* | Best-effort deterministic sampling on providers that support it |
+| `stop_sequences` | list[str] \| null | *null* | Sequences that end generation when produced |
+| `parallel_tool_calls` | bool \| null | *null* | Whether the model may request multiple tool calls in one turn |
+| `presence_penalty` | float \| null | *null* | Penalize tokens already present (-2.0-2.0). Dropped on OpenAI reasoning models. |
+| `frequency_penalty` | float \| null | *null* | Penalize tokens by frequency (-2.0-2.0). Dropped on OpenAI reasoning models. |
+| `logit_bias` | dict[str, int] \| null | *null* | Per-token likelihood adjustments. Dropped on OpenAI reasoning models. |
+| `extra_headers` | dict[str, str] \| null | *null* | Extra HTTP headers sent with every model request |
+| `extra_body` | dict \| null | *null* | Extra JSON merged into the provider request body (provider-specific routing flags etc.) |
+| `tool_choice` | `auto` \| `none` \| null | *null* | Static tool policy. `none` disables tool calls (text-only mode). `required` and tool-name lists are rejected: they would force a tool call on every step; per-step forcing needs a dynamic capability. |
+| `thinking` | bool \| string \| null | *null* | Native extended-thinking effort (`minimal`/`low`/`medium`/`high`/`xhigh`, `false` disables). Reasoning-capable OpenAI models only. |
+| `prompt_cache` | bool \| mapping \| null | *null* | Provider-native prompt caching (Anthropic, Bedrock only). See [Prompt caching](#prompt-caching). |
+
+## Prompt caching
+
+Anthropic and Bedrock can cache the static prefix of a request (system instructions + tool definitions) so repeated runs of a role reuse it instead of re-billing those input tokens. This is worthwhile for daemons, triggers, and REPLs whose system prompt (role text, skill prompts, large tool surfaces) dwarfs the per-turn user input.
+
+Enable it with the shorthand:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    prompt_cache: true        # caches instructions + tool definitions, 5m TTL
+```
+
+Or tune it:
+
+```yaml
+spec:
+  model:
+    prompt_cache:
+      instructions: true       # cache the system prompt (default true)
+      tools: true              # cache the tool definitions block (default true)
+      ttl: 1h                  # "5m" (default) or "1h"
+```
+
+This maps to PydanticAI's `anthropic_cache_instructions` / `anthropic_cache_tool_definitions` (and the `bedrock_cache_*` equivalents). It is rejected at load time on any other provider, since only Anthropic and Bedrock honor these settings. The first request writes the cache (a small surcharge); subsequent requests within the TTL read it at a large discount. Cache reads/writes show up in the provider's usage as `cache_read`/`cache_write` tokens.
 
 ## Embedding Configuration
 

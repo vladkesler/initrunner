@@ -5,8 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from initrunner.agent.executor import (
-    _retry_model_call,
-    _should_retry,
     check_token_budget,
     execute_run,
     execute_run_stream,
@@ -78,83 +76,53 @@ def _attach_stream_mock(agent: MagicMock, *, text=None, output="Hello", messages
     agent.run_stream = MagicMock(return_value=ctx)
 
 
-class TestShouldRetry:
-    def test_retryable_code_with_attempts_remaining(self):
-        from pydantic_ai.exceptions import ModelHTTPError
+class TestRetryingHttpClient:
+    """Transport-level retries via PydanticAI's AsyncTenacityTransport."""
 
-        exc = ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
-        delay = _should_retry(exc, 0)
-        assert delay is not None
-        assert delay > 0
+    def test_client_has_tenacity_transport(self):
+        from pydantic_ai.retries import AsyncTenacityTransport
 
-    def test_retryable_code_on_last_attempt(self):
-        from pydantic_ai.exceptions import ModelHTTPError
+        from initrunner.agent.executor_retry import build_retrying_async_client
 
-        exc = ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
-        delay = _should_retry(exc, 2)  # attempt 2 is the last (0-indexed, 3 max)
-        assert delay is None
+        client = build_retrying_async_client()
+        assert isinstance(client._transport, AsyncTenacityTransport)
 
-    def test_non_retryable_code(self):
-        from pydantic_ai.exceptions import ModelHTTPError
+    def test_retryable_status_raises_for_retry(self):
+        """The validate_response hook raises only for transient status codes."""
+        import httpx
 
-        exc = ModelHTTPError(status_code=400, model_name="test", body=b"bad request")
-        delay = _should_retry(exc, 0)
-        assert delay is None
+        from initrunner.agent.executor_retry import _raise_for_retryable_status
 
+        for code in (429, 500, 502, 503, 504):
+            resp = httpx.Response(code, request=httpx.Request("GET", "http://x"))
+            with pytest.raises(httpx.HTTPStatusError):
+                _raise_for_retryable_status(resp)
 
-class TestRetryModelCall:
-    def test_on_retry_not_called_on_terminal_failure(self):
-        """on_retry must NOT be called when no further retry will follow."""
-        from pydantic_ai.exceptions import ModelHTTPError
+    def test_permanent_status_passes_through(self):
+        """Permanent errors (401/403/404/422) must not trigger a retry."""
+        import httpx
 
-        retries = []
+        from initrunner.agent.executor_retry import _raise_for_retryable_status
 
-        def _fn():
-            raise ModelHTTPError(status_code=429, model_name="test", body=b"rate limited")
+        for code in (400, 401, 403, 404, 422):
+            resp = httpx.Response(code, request=httpx.Request("GET", "http://x"))
+            # Does not raise -> no retry; the SDK surfaces the error immediately.
+            _raise_for_retryable_status(resp)
 
-        with pytest.raises(ModelHTTPError):
-            _retry_model_call(_fn, on_retry=lambda: retries.append(1))
+    def test_success_passes_through(self):
+        import httpx
 
-        # 3 attempts total, only 2 retries (before attempts 2 and 3)
-        # on_retry should NOT be called on the final (3rd) attempt
-        assert len(retries) == 2
+        from initrunner.agent.executor_retry import _raise_for_retryable_status
 
-    def test_on_retry_called_before_each_retry(self):
-        from pydantic_ai.exceptions import ModelHTTPError
+        resp = httpx.Response(200, request=httpx.Request("GET", "http://x"))
+        _raise_for_retryable_status(resp)
 
-        retries = []
-        call_count = 0
+    def test_attempts_and_max_wait_are_configurable(self):
+        from initrunner.agent.executor_retry import build_retrying_async_client
 
-        def _fn():
-            nonlocal call_count
-            call_count += 1
-            if call_count < 2:
-                raise ModelHTTPError(status_code=500, model_name="test", body=b"error")
-            return "ok"
-
-        result = _retry_model_call(_fn, on_retry=lambda: retries.append(1))
-        assert result == "ok"
-        assert len(retries) == 1
-
-    def test_fallback_exception_group_is_not_retried(self):
-        """FallbackModel has already walked every candidate; the outer loop must not retry."""
-        from pydantic_ai.exceptions import ModelHTTPError
-        from pydantic_ai.models.fallback import FallbackExceptionGroup
-
-        retries = []
-        call_count = 0
-
-        def _fn():
-            nonlocal call_count
-            call_count += 1
-            inner = ModelHTTPError(status_code=500, model_name="openai:x", body=b"err")
-            raise FallbackExceptionGroup("all failed", [inner])
-
-        with pytest.raises(FallbackExceptionGroup):
-            _retry_model_call(_fn, on_retry=lambda: retries.append(1))
-
-        assert call_count == 1  # one attempt, no retry
-        assert retries == []
+        # Smoke test: custom knobs build a valid client without error.
+        client = build_retrying_async_client(attempts=5, max_wait=30.0)
+        assert client is not None
 
 
 class TestHandleRunErrorFallback:

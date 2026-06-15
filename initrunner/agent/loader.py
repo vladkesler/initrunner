@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from pydantic_ai.settings import ModelSettings
 from initrunner._compat import require_provider
 from initrunner._yaml import load_raw_yaml
 from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
+from initrunner.agent.schema.execution import ExecutionConfig
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
@@ -103,19 +105,89 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
             )
 
 
-def _build_single_model(model_config: ModelConfig):
-    """Build one PydanticAI model -- string for standard providers, OpenAIChatModel for custom.
+# Providers whose SDKs route through httpx and accept an injected client.
+# bedrock (boto3) and xai (gRPC) keep their SDKs' native retry handling and
+# are built as plain ``provider:name`` strings.
+_HTTPX_PROVIDERS = frozenset({"openai", "anthropic", "google", "groq", "mistral", "cohere"})
+
+
+def _build_retrying_provider_model(model_config: ModelConfig, http_client, api_key: str | None):
+    """Construct an explicit Model + Provider with a retrying httpx client.
+
+    ``api_key`` is the key InitRunner already resolved (vault/.env/shell). It
+    is passed explicitly so a custom ``api_key_env`` works for standard
+    providers too -- the SDKs only read their canonical env var (e.g.
+    ``OPENAI_API_KEY``) otherwise. When ``None`` the provider falls back to
+    reading its own env var.
+    """
+    name = model_config.name
+    provider = model_config.provider
+    if provider == "openai":
+        # Default OpenAI to the Responses API. It is a superset of Chat
+        # Completions and required for reasoning_effort + tools, builtin
+        # capabilities (WebSearch, ImageGeneration), and newer models.
+        from pydantic_ai.models.openai import OpenAIResponsesModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+
+        return OpenAIResponsesModel(
+            name, provider=OpenAIProvider(api_key=api_key, http_client=http_client)
+        )
+    if provider == "anthropic":
+        from pydantic_ai.models.anthropic import AnthropicModel  # type: ignore[import-not-found]
+        from pydantic_ai.providers.anthropic import (  # type: ignore[import-not-found]
+            AnthropicProvider,
+        )
+
+        return AnthropicModel(
+            name, provider=AnthropicProvider(api_key=api_key, http_client=http_client)
+        )
+    if provider == "google":
+        from pydantic_ai.models.google import GoogleModel  # type: ignore[import-not-found]
+        from pydantic_ai.providers.google import GoogleProvider  # type: ignore[import-not-found]
+
+        return GoogleModel(name, provider=GoogleProvider(api_key=api_key, http_client=http_client))
+    if provider == "groq":
+        from pydantic_ai.models.groq import GroqModel  # type: ignore[import-not-found]
+        from pydantic_ai.providers.groq import GroqProvider  # type: ignore[import-not-found]
+
+        return GroqModel(name, provider=GroqProvider(api_key=api_key, http_client=http_client))
+    if provider == "mistral":
+        from pydantic_ai.models.mistral import MistralModel  # type: ignore[import-not-found]
+        from pydantic_ai.providers.mistral import MistralProvider  # type: ignore[import-not-found]
+
+        return MistralModel(
+            name, provider=MistralProvider(api_key=api_key, http_client=http_client)
+        )
+    if provider == "cohere":
+        from pydantic_ai.models.cohere import CohereModel  # type: ignore[import-not-found]
+        from pydantic_ai.providers.cohere import CohereProvider  # type: ignore[import-not-found]
+
+        return CohereModel(name, provider=CohereProvider(api_key=api_key, http_client=http_client))
+    raise ValueError(f"Provider '{provider}' is not in _HTTPX_PROVIDERS")
+
+
+def _build_single_model(
+    model_config: ModelConfig,
+    *,
+    http_retries: int = 3,
+    http_retry_max_wait: float = 60.0,
+):
+    """Build one PydanticAI model with transport-level HTTP retries.
 
     This is the single construction point for both the primary model and any
     FallbackModel entries.  API keys are resolved and injected into
     ``os.environ`` here, so every Model-like returned by this function is
-    immediately usable.
+    immediately usable. Providers that route through httpx get an
+    ``AsyncTenacityTransport`` client (backoff + Retry-After on 429/5xx);
+    bedrock and xai keep their SDKs' native retry handling.
     """
+    from initrunner.agent.executor_retry import build_retrying_async_client
     from initrunner.credentials import get_resolver
 
     resolver = get_resolver()
     if not model_config.needs_custom_provider():
         env_var = model_config.api_key_env or _PROVIDER_API_KEY_ENVS.get(model_config.provider)
+        resolved_key: str | None = None
         if env_var:
             resolved = resolver.get(env_var)
             if not resolved:
@@ -129,19 +201,35 @@ def _build_single_model(model_config: ModelConfig):
                         f"Or add it to a .env file in your role directory or ~/.initrunner/.env"
                     ),
                 )
+            resolved_key = resolved
             # Standard-provider SDKs (OpenAI, Anthropic, Google, ...) read the
             # API key from os.environ at client construction time. If the value
             # came from the vault rather than the shell, inject it so the SDK
             # sees it. Only set when absent -- a real shell export always wins.
             if not os.environ.get(env_var):
                 os.environ[env_var] = resolved
-        provider = model_config.provider
-        # Default OpenAI to the Responses API. It is a superset of Chat
-        # Completions and required for reasoning_effort + tools, builtin
-        # capabilities (WebSearch, ImageGeneration), and newer models.
-        if provider == "openai":
-            provider = "openai-responses"
-        return f"{provider}:{model_config.name}"
+        if model_config.provider in _HTTPX_PROVIDERS:
+            try:
+                return _build_retrying_provider_model(
+                    model_config,
+                    build_retrying_async_client(
+                        attempts=http_retries, max_wait=http_retry_max_wait
+                    ),
+                    resolved_key,
+                )
+            except ImportError:
+                # Provider SDK not installed. Fall back to the plain
+                # ``provider:name`` string so PydanticAI raises its own
+                # "install the X package" error at run time, exactly as
+                # before this transport-level retry refactor. ``require_provider``
+                # already gates this for the primary build path; this only
+                # matters for un-gated callers (e.g. role-generation wizards).
+                logger.debug(
+                    "Provider '%s' SDK unavailable; using string model without "
+                    "transport-level retries.",
+                    model_config.provider,
+                )
+        return f"{model_config.provider}:{model_config.name}"
 
     from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -173,14 +261,40 @@ def _build_single_model(model_config: ModelConfig):
                 base_url,
             )
 
-    provider = OpenAIProvider(base_url=base_url, api_key=api_key)
+    # Custom OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter, ...) also
+    # route through httpx, so they get the same retrying transport.
+    provider = OpenAIProvider(
+        base_url=base_url,
+        api_key=api_key,
+        http_client=build_retrying_async_client(
+            attempts=http_retries, max_wait=http_retry_max_wait
+        ),
+    )
 
     from pydantic_ai.models.openai import OpenAIChatModel
 
     return OpenAIChatModel(model_config.name, provider=provider)
 
 
-def _build_model(model_config: ModelConfig):
+def _apply_prompt_cache(settings: dict[str, Any], model: ModelConfig) -> None:
+    """Map ``model.prompt_cache`` onto provider-native cache settings.
+
+    Anthropic and Bedrock expose parallel ``{provider}_cache_instructions`` /
+    ``{provider}_cache_tool_definitions`` settings whose value is the TTL. These
+    are provider-specific ``ModelSettings`` keys (validated only for anthropic /
+    bedrock by the schema), so we inject them by name into the settings dict.
+    """
+    cache = model.prompt_cache
+    if cache is None:
+        return
+    prefix = model.provider.lower()  # "anthropic" or "bedrock" (schema-enforced)
+    if cache.instructions:
+        settings[f"{prefix}_cache_instructions"] = cache.ttl
+    if cache.tools:
+        settings[f"{prefix}_cache_tool_definitions"] = cache.ttl
+
+
+def _build_model(model_config: ModelConfig, execution: ExecutionConfig | None = None):
     """Build the agent model, wrapping with FallbackModel when fallbacks are declared.
 
     When ``model_config.fallback`` is empty, returns the primary model
@@ -191,21 +305,80 @@ def _build_model(model_config: ModelConfig):
     ``_build_single_model`` so vault-sourced API keys are injected into
     ``os.environ`` before ``FallbackModel.__init__`` constructs the
     per-provider clients.
+
+    ``execution`` carries the HTTP-retry knobs (``http_retries``,
+    ``http_retry_max_wait``); when omitted, ``_build_single_model`` defaults
+    apply.
     """
-    primary = _build_single_model(model_config)
+    retry_kwargs: dict[str, Any] = {}
+    if execution is not None:
+        retry_kwargs = {
+            "http_retries": execution.http_retries,
+            "http_retry_max_wait": execution.http_retry_max_wait,
+        }
+
+    primary = _build_single_model(model_config, **retry_kwargs)
     if not model_config.fallback:
-        return primary
+        return _apply_concurrency_limit(primary, model_config)
 
     from initrunner.agent.schema.base import _split_provider_and_name
 
     fallback_models = []
     for entry in model_config.fallback:
         prov, name = _split_provider_and_name(entry)
-        fallback_models.append(_build_single_model(ModelConfig(provider=prov, name=name)))
+        fallback_models.append(
+            _build_single_model(ModelConfig(provider=prov, name=name), **retry_kwargs)
+        )
 
     from pydantic_ai.models.fallback import FallbackModel
 
-    return FallbackModel(primary, *fallback_models)
+    if model_config.fallback_on:
+        built = FallbackModel(
+            primary, *fallback_models, fallback_on=_resolve_fallback_on(model_config.fallback_on)
+        )
+    else:
+        built = FallbackModel(primary, *fallback_models)
+    return _apply_concurrency_limit(built, model_config)
+
+
+def _resolve_fallback_on(names: list[str]) -> tuple[type[Exception], ...]:
+    """Map ``fallback_on`` exception names (schema-validated) to their classes."""
+    import pydantic_ai.exceptions as exc
+
+    return tuple(getattr(exc, name) for name in names)
+
+
+# Process-global registry of named shared concurrency limiters. Agents whose
+# model config uses the same ``concurrency.share`` name coordinate against one
+# limiter instance (compose services, team personas, flow nodes in one process).
+_LIMITER_REGISTRY: dict[str, Any] = {}
+_LIMITER_LOCK = threading.Lock()
+
+
+def _get_concurrency_limiter(cfg: Any) -> Any:
+    """Return a ConcurrencyLimiter, reusing a named one from the registry."""
+    from pydantic_ai import ConcurrencyLimiter
+
+    if cfg.share is None:
+        return ConcurrencyLimiter(cfg.max_running, max_queued=cfg.max_queued)
+    with _LIMITER_LOCK:
+        existing = _LIMITER_REGISTRY.get(cfg.share)
+        if existing is None:
+            existing = ConcurrencyLimiter(
+                cfg.max_running, max_queued=cfg.max_queued, name=cfg.share
+            )
+            _LIMITER_REGISTRY[cfg.share] = existing
+        return existing
+
+
+def _apply_concurrency_limit(model: Any, model_config: ModelConfig) -> Any:
+    """Wrap *model* in a ConcurrencyLimitedModel when ``model.concurrency`` is set."""
+    cfg = model_config.concurrency
+    if cfg is None:
+        return model
+    from pydantic_ai.models.concurrency import ConcurrencyLimitedModel
+
+    return ConcurrencyLimitedModel(model, _get_concurrency_limiter(cfg))
 
 
 def _inject_local_fallbacks(caps: list) -> None:
@@ -314,11 +487,36 @@ def _create_agent(
     capabilities: list | None = None,
 ) -> Agent:
     """Build the model and construct the PydanticAI Agent."""
-    model_settings_kwargs: dict[str, Any] = {"max_tokens": role.spec.model.max_tokens}  # type: ignore[union-attr]
-    if not role.spec.model.is_reasoning_model():  # type: ignore[union-attr]
-        model_settings_kwargs["temperature"] = role.spec.model.temperature  # type: ignore[union-attr]
-    if role.spec.model.thinking is not None:  # type: ignore[union-attr]
-        model_settings_kwargs["thinking"] = role.spec.model.thinking  # type: ignore[union-attr]
+    model = role.spec.model
+    model_settings_kwargs: dict[str, Any] = {"max_tokens": model.max_tokens}  # type: ignore[union-attr]
+    if not model.is_reasoning_model():  # type: ignore[union-attr]
+        model_settings_kwargs["temperature"] = model.temperature  # type: ignore[union-attr]
+        # Sampling knobs are dropped alongside temperature: OpenAI reasoning
+        # models reject them just like temperature.
+        for sampling_field in (
+            "top_p",
+            "top_k",
+            "presence_penalty",
+            "frequency_penalty",
+            "logit_bias",
+        ):
+            value = getattr(model, sampling_field)
+            if value is not None:
+                model_settings_kwargs[sampling_field] = value
+    for passthrough_field in (
+        "seed",
+        "stop_sequences",
+        "parallel_tool_calls",
+        "extra_headers",
+        "extra_body",
+        "tool_choice",
+        "thinking",
+    ):
+        value = getattr(model, passthrough_field)
+        if value is not None:
+            model_settings_kwargs[passthrough_field] = value
+    if model.prompt_cache is not None:  # type: ignore[union-attr]
+        _apply_prompt_cache(model_settings_kwargs, model)  # type: ignore[arg-type]
     kwargs: dict[str, Any] = {
         "output_type": output_type,
         "instructions": instructions,
@@ -361,7 +559,7 @@ def _create_agent(
         ProcessHistory(build_history_processor(role.spec.model))  # type: ignore[arg-type]
     )
 
-    return Agent(_build_model(role.spec.model), **kwargs)  # type: ignore[arg-type]
+    return Agent(_build_model(role.spec.model, role.spec.execution), **kwargs)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
