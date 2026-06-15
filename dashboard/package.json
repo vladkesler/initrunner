@@ -29,7 +29,7 @@
   "dependencies": {
     "@dicebear/core": "^9.4.2",
     "@dicebear/rings": "^9.4.2",
-    "@xyflow/svelte": "^1.5.2",
+    "@xyflow/svelte": "^1.6.0",
     "posthog-js": "^1.386.6"
   },
   "pnpm": {
