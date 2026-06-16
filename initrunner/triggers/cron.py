@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from croniter import croniter
 
@@ -19,16 +20,19 @@ class CronTrigger(TriggerBase):
         self._config = config
 
     def _run(self) -> None:
-        cron = croniter(self._config.schedule, datetime.now(UTC))
+        # Evaluate the schedule in the configured timezone (not always UTC), so
+        # e.g. "0 9 * * *" with timezone America/New_York fires at 09:00 local.
+        tz = ZoneInfo(self._config.timezone)
+        cron = croniter(self._config.schedule, datetime.now(tz))
         while not self._stop_event.is_set():
             next_time = cron.get_next(datetime)
-            now = datetime.now(UTC)
+            now = datetime.now(tz)
             wait_seconds = (next_time - now).total_seconds()
             if wait_seconds > 0:
                 # Sleep in 1s increments to allow clean shutdown
                 while wait_seconds > 0 and not self._stop_event.is_set():
                     self._stop_event.wait(min(wait_seconds, 1.0))
-                    wait_seconds = (next_time - datetime.now(UTC)).total_seconds()
+                    wait_seconds = (next_time - datetime.now(tz)).total_seconds()
             if self._stop_event.is_set():
                 break
             event = TriggerEvent(

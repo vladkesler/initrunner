@@ -771,12 +771,18 @@ def build_agent(
     )
 
     if templating_active:
+        from initrunner.agent.templating import env_values as _env_template_values
         from initrunner.agent.templating import render as _render_template
 
         @agent.system_prompt
         def _render_role_prompt() -> str:
-            values = getattr(agent, "_template_values", {}) or {}
-            return _render_template(role.spec.role, role.spec.deps_schema or {}, values)
+            schema = role.spec.deps_schema or {}
+            # Non-CLI runtimes (daemon/trigger/bot) have no --var; fall back to
+            # INITRUNNER_VAR_<KEY> env vars so required placeholders resolve and
+            # the prompt is never sent with literal {{var}} text. CLI values win.
+            explicit = getattr(agent, "_template_values", {}) or {}
+            values = {**_env_template_values(schema), **explicit}
+            return _render_template(role.spec.role, schema, values)
 
     # Register dynamic system prompt for procedural memory injection.
     # The closure reads ``_memory_store`` from the agent so the already-open

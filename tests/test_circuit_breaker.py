@@ -209,6 +209,40 @@ class TestThreadSafety:
         assert sum(results) == 1  # exactly one probe admitted
 
 
+class TestHalfOpenProbeRelease:
+    """Regression: a claimed HALF_OPEN probe slot must be releasable, or the
+    breaker wedges forever rejecting every trigger (silent daemon self-DoS)."""
+
+    def _half_open_with_probe(self) -> CircuitBreaker:
+        cb = _make_breaker(threshold=1, timeout=10)
+        cb.record_failure(ErrorCategory.SERVER_ERROR)
+        cb._opened_at = time.monotonic() - 11
+        assert cb.state == CircuitState.HALF_OPEN
+        assert cb.allow_request()[0] is True  # claim the single probe
+        return cb
+
+    def test_release_probe_allows_next_probe(self):
+        # #5: probe slot claimed, but the run was dropped/paused and never recorded.
+        cb = self._half_open_with_probe()
+        assert cb.allow_request()[0] is False  # blocked while "in flight"
+        cb.release_probe()
+        assert cb.allow_request()[0] is True  # freed -> a fresh probe is admitted
+
+    def test_non_provider_failure_releases_probe(self):
+        # #6: a HALF_OPEN probe that fails with a non-provider error must free the
+        # slot instead of leaving it stuck in flight.
+        cb = self._half_open_with_probe()
+        assert cb.record_failure(ErrorCategory.CONTENT_BLOCKED) is None
+        assert cb.state == CircuitState.HALF_OPEN
+        assert cb.allow_request()[0] is True
+
+    def test_release_probe_noop_when_closed(self):
+        cb = _make_breaker()
+        cb.release_probe()  # no-op in CLOSED
+        assert cb.state == CircuitState.CLOSED
+        assert cb.allow_request()[0] is True
+
+
 class TestTransitionDataclass:
     def test_frozen(self):
         t = CircuitTransition(old_state=CircuitState.CLOSED, new_state=CircuitState.OPEN)

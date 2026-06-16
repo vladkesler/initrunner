@@ -247,6 +247,32 @@ class TestCronTrigger:
         trigger.stop()
         assert trigger._stop_event.is_set()
 
+    def test_schedule_anchored_in_configured_timezone(self):
+        """Regression: the cron schedule must be evaluated in the configured
+        timezone, not always UTC, or jobs fire at the wrong wall-clock time."""
+        from zoneinfo import ZoneInfo
+
+        import initrunner.triggers.cron as cron_mod
+
+        captured: dict[str, object] = {}
+
+        class _FakeCron:
+            def __init__(self, schedule, anchor):
+                captured["anchor"] = anchor
+
+            def get_next(self, _type):  # pragma: no cover - loop is skipped below
+                return captured["anchor"]
+
+        config = CronTriggerConfig(
+            schedule="0 9 * * *", prompt="x", timezone="America/New_York"
+        )
+        trigger = CronTrigger(config, lambda e: None)
+        trigger._stop_event.set()  # so _run computes the anchor then exits the loop
+        with patch.object(cron_mod, "croniter", _FakeCron):
+            trigger._run()
+
+        assert captured["anchor"].tzinfo == ZoneInfo("America/New_York")
+
 
 class TestFileWatchTrigger:
     def test_start_and_stop(self, tmp_path):

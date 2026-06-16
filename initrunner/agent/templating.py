@@ -13,10 +13,13 @@ want to route every agent through ``Agent.from_spec()``, which we don't.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
 _VAR_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
+
+_TRUE_STRINGS = {"true", "1", "yes", "on"}
 
 _SCALAR_JSON_TYPES = {"string", "integer", "number", "boolean"}
 
@@ -83,6 +86,10 @@ def validate_schema_and_template(template: str, schema: dict[str, Any]) -> None:
 def _coerce(value: Any, prop_type: str, name: str) -> str:
     """Render a single scalar into its string form for substitution."""
     if prop_type == "boolean":
+        # Values from --var / env arrive as strings; bool("false") is True, so
+        # parse string booleans by content rather than truthiness.
+        if isinstance(value, str):
+            return "true" if value.strip().lower() in _TRUE_STRINGS else "false"
         return "true" if bool(value) else "false"
     if prop_type in {"integer", "number"}:
         try:
@@ -106,14 +113,36 @@ def render(template: str, schema: dict[str, Any], values: dict[str, Any]) -> str
     missing = [k for k in required if k not in values or values[k] is None]
     if missing:
         raise TemplatingError(
-            f"Missing required template values: {sorted(missing)}. Pass them via --var KEY=VALUE."
+            f"Missing required template values: {sorted(missing)}. Pass them via "
+            f"--var KEY=VALUE (CLI) or INITRUNNER_VAR_<KEY> environment variables "
+            f"(daemon/trigger/bot runtimes)."
         )
 
     def _sub(match: re.Match[str]) -> str:
         name = match.group(1)
         prop = properties.get(name, {})
         if name not in values:
-            return match.group(0)  # undeclared-optional: leave the placeholder as-is
+            # Declared but unset (optional, since required already raised above):
+            # render empty rather than leaking the literal {{placeholder}} into the
+            # prompt -- the exact failure the strip-and-defer machinery prevents.
+            return ""
         return _coerce(values[name], prop.get("type", "string"), name)
 
     return _VAR_RE.sub(_sub, template)
+
+
+def env_values(schema: dict[str, Any]) -> dict[str, str]:
+    """Resolve declared template variables from ``INITRUNNER_VAR_<NAME>`` env vars.
+
+    Gives non-CLI runtimes (daemon, triggers, bots) a way to supply the values
+    the interactive ``--var`` flag provides, so a templated role no longer leaks
+    raw ``{{placeholders}}`` or crashes on a missing required var when run outside
+    the CLI. Explicit CLI values take precedence over these (merged by the caller).
+    """
+    properties = schema.get("properties") or {}
+    found: dict[str, str] = {}
+    for name in properties:
+        env_val = os.environ.get(f"INITRUNNER_VAR_{name.upper()}")
+        if env_val is not None:
+            found[name] = env_val
+    return found
