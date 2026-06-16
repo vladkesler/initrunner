@@ -12,6 +12,38 @@ class TestLanceDocumentStore:
         with LanceDocumentStore(store_path, dimensions=4):
             assert store_path.exists()
 
+    def test_shared_id_counter_across_instances(self, tmp_path):
+        """Regression (F1): two stores opened on the same path share one ID
+        counter, so a second instance does not restart allocation at 1."""
+        store_path = tmp_path / "shared.lance"
+        s1 = LanceDocumentStore(store_path, dimensions=4)
+        s2 = LanceDocumentStore(store_path, dimensions=4)
+        try:
+            a = s1._alloc_ids(3)
+            b = s2._alloc_ids(3)
+            assert set(a).isdisjoint(b)  # before the fix s2 restarted at 1
+            assert min(b) == max(a) + 1
+        finally:
+            s1.close()
+            s2.close()
+
+    def test_concurrent_instances_no_duplicate_chunk_ids(self, tmp_path):
+        """Regression (F1): concurrent writers on one path (retrieval tool,
+        web_scraper, ingestion service) must not produce duplicate chunk IDs."""
+        store_path = tmp_path / "shared_docs.lance"
+        vec = [1.0, 0.0, 0.0, 0.0]
+        s1 = LanceDocumentStore(store_path, dimensions=4)
+        s2 = LanceDocumentStore(store_path, dimensions=4)
+        try:
+            s1.add_documents(["a", "b"], [vec, vec], ["s1", "s1"])
+            s2.add_documents(["c", "d"], [vec, vec], ["s2", "s2"])
+            ids = [r.chunk_id for r in s1.query(vec, top_k=10)]
+            assert len(ids) == 4
+            assert len(set(ids)) == 4  # all unique -- no overlapping ranges
+        finally:
+            s1.close()
+            s2.close()
+
     def test_add_and_count(self, tmp_path):
         store_path = tmp_path / "test.lance"
         with LanceDocumentStore(store_path, dimensions=4) as store:

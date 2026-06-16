@@ -397,7 +397,12 @@ def _extract_and_chunk(
     for f, status in to_process:
         try:
             text = extract_text(f)
-        except (ValueError, OSError) as e:
+        except Exception as e:
+            # Broad on purpose: format-specific extractors raise types well
+            # outside (ValueError, OSError) -- zipfile.BadZipFile, KeyError,
+            # PackageNotFoundError, openpyxl InvalidFileException, RecursionError,
+            # pymupdf errors. One malformed file must mark that file ERROR and
+            # let the rest of the batch ingest, matching _classify_urls.
             _record_error(stats, f, str(e), progress_callback)
             continue
 
