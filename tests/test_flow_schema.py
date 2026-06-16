@@ -187,6 +187,39 @@ class TestFlowSpec:
         )
         assert spec.agents["b"].needs == ["a"]
 
+    def test_durability_with_loop_back_rejected(self):
+        from initrunner.flow.schema import DurabilityConfig, LoopBackConfig
+
+        with pytest.raises(ValidationError, match="durability is incompatible with loop_back"):
+            FlowSpec(
+                durability=DurabilityConfig(enabled=True),
+                agents={
+                    "writer": FlowAgentConfig(
+                        role="w.yaml",
+                        sink=DelegateSinkConfig(
+                            target="critic",
+                            loop_back=LoopBackConfig(target="writer"),
+                        ),
+                    ),
+                    "critic": FlowAgentConfig(role="c.yaml"),
+                },
+            )
+
+    def test_durability_with_plain_delegate_allowed(self):
+        from initrunner.flow.schema import DurabilityConfig
+
+        spec = FlowSpec(
+            durability=DurabilityConfig(enabled=True),
+            agents={
+                "producer": FlowAgentConfig(
+                    role="p.yaml",
+                    sink=DelegateSinkConfig(target="consumer"),
+                ),
+                "consumer": FlowAgentConfig(role="c.yaml"),
+            },
+        )
+        assert spec.durability.active is True
+
     def test_empty_agents_rejected(self):
         with pytest.raises(ValidationError, match="at least 1"):
             FlowSpec(agents={})
