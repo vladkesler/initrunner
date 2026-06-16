@@ -153,6 +153,10 @@ def run_ingest_managed_sync(
     if role.spec.ingest is None:
         return None
 
+    # Enforce the role's declared resource limits on this (attacker-reachable)
+    # dashboard path too, the same way the CLI does. Without them the limits
+    # default to 0 and the size guard is skipped entirely.
+    resources = role.spec.security.resources
     return run_ingest_managed(
         files=files or [],
         urls=urls or [],
@@ -160,4 +164,6 @@ def run_ingest_managed_sync(
         agent_name=role.metadata.name,
         provider=role.spec.model.provider,  # type: ignore[union-attr]
         progress_callback=progress_callback,
+        max_file_size_mb=resources.max_file_size_mb,
+        max_total_ingest_mb=resources.max_total_ingest_mb,
     )

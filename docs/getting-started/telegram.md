@@ -109,6 +109,7 @@ All options go under `spec.triggers[].`:
 | `token_env` | `str` | `"TELEGRAM_BOT_TOKEN"` | Environment variable holding the bot token. |
 | `allowed_users` | `list[str]` | `[]` | Telegram usernames allowed to interact. Empty = allow everyone. |
 | `allowed_user_ids` | `list[int]` | `[]` | Telegram user IDs allowed to interact. Empty = allow everyone. |
+| `allow_all` | `bool` | `false` | Explicitly opt in to responding to **anyone** when no allowlist is set. Without it, an unconfigured bot logs a loud startup warning (a future release will reject unconfigured bots by default). |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's text. |
 
 Example with restrictions:
@@ -124,7 +125,7 @@ triggers:
 
 ## Security and Public Access
 
-By default the bot responds to **anyone** who messages it. Lock it down before making it available to others:
+By default the bot responds to **anyone** who messages it, and logs a loud startup warning saying so. Lock it down before making it available to others (a future release will reject unconfigured bots by default; set `allow_all: true` to keep open access and silence the warning):
 
 - **Prefer `allowed_user_ids` over `allowed_users`.** Usernames are mutable — users can change them at any time. User IDs are permanent. Find your ID via [@userinfobot](https://t.me/userinfobot).
 - **Use `allowed_users`** to restrict access by Telegram username. When either `allowed_users` or `allowed_user_ids` is non-empty, messages from unmatched users are silently ignored.

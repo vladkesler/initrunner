@@ -130,6 +130,7 @@ All options go under `spec.triggers[].`:
 | `channel_ids` | `list[str]` | `[]` | Channel IDs to respond in. Empty = all channels. Does not affect DMs. |
 | `allowed_roles` | `list[str]` | `[]` | Server role names required to interact. Empty = allow everyone. DMs are denied when only roles are configured. |
 | `allowed_user_ids` | `list[str]` | `[]` | Discord user IDs allowed to interact. Works in both guild channels and DMs. |
+| `allow_all` | `bool` | `false` | Explicitly opt in to responding to **anyone** when no allowlist is set. Without it, an unconfigured bot logs a loud startup warning (a future release will reject unconfigured bots by default). |
 | `prompt_template` | `str` | `"{message}"` | Template for the prompt. `{message}` is replaced with the user's text. |
 
 Example with restrictions:
@@ -146,7 +147,7 @@ triggers:
 
 ## Security and Public Access
 
-By default the bot responds to **anyone** who can DM it or @mention it in a shared server. This means every member of every server the bot is in can use it. Lock it down before making it available to others:
+By default the bot responds to **anyone** who can DM it or @mention it in a shared server, and logs a loud startup warning saying so. This means every member of every server the bot is in can use it. Lock it down before making it available to others (a future release will reject unconfigured bots by default; set `allow_all: true` to keep open access and silence the warning).
 
 - **Use `allowed_user_ids`** for the most reliable access control. Unlike `allowed_roles`, user IDs work in DMs. When both `allowed_roles` and `allowed_user_ids` are set, a user ID match grants DM access. To find a user ID: enable Developer Mode (Settings > Advanced), right-click a user > Copy User ID.
 - **Use `allowed_roles`** to restrict access to specific server roles. When only roles are configured, DMs are automatically denied (DMs have no role context).

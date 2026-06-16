@@ -57,6 +57,7 @@ class TelegramTriggerConfig(BaseModel):
     token_env: str = "TELEGRAM_BOT_TOKEN"
     allowed_users: list[str] = []
     allowed_user_ids: list[int] = []
+    allow_all: bool = False
     prompt_template: str = "{message}"
     autonomous: bool = False
 
@@ -75,6 +76,7 @@ class DiscordTriggerConfig(BaseModel):
     channel_ids: list[str] = []
     allowed_roles: list[str] = []
     allowed_user_ids: list[str] = []
+    allow_all: bool = False
     prompt_template: str = "{message}"
     autonomous: bool = False
 
@@ -95,6 +97,7 @@ class SlackTriggerConfig(BaseModel):
     bot_token_env: str = "SLACK_BOT_TOKEN"
     channel_ids: list[str] = []
     allowed_user_ids: list[str] = []
+    allow_all: bool = False
     respond_in_thread: bool = True
     prompt_template: str = "{message}"
     autonomous: bool = False

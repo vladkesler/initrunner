@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import threading
+from collections.abc import Coroutine
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic_ai.models import Model
 
@@ -204,7 +207,7 @@ Do not include any other text."""
 
 # Cache classifier agents by model string to avoid recreating per-call
 _classifier_cache: dict[str, object] = {}
-_classifier_cache_lock = __import__("threading").Lock()
+_classifier_cache_lock = threading.Lock()
 
 
 def _get_classifier_agent(model_override: Model | str | None = None):
@@ -230,14 +233,43 @@ def _get_classifier_agent(model_override: Model | str | None = None):
     return agent
 
 
+def _run_coro_blocking(coro: Coroutine[Any, Any, ValidationResult]) -> ValidationResult:
+    """Run *coro* to completion in a dedicated thread with its own event loop.
+
+    Safe whether or not the calling thread already has a running loop: execute_run
+    wraps orchestration in run_sync -> anyio.run, so this sync helper is reached
+    from inside a running loop, where PydanticAI's run_sync (which calls
+    run_until_complete on the active loop) would raise RuntimeError.
+    """
+    box: dict[str, ValidationResult] = {}
+    err: dict[str, BaseException] = {}
+
+    def _runner() -> None:
+        try:
+            box["value"] = asyncio.run(coro)
+        except BaseException as exc:  # re-raised in the calling thread below
+            err["exc"] = exc
+
+    thread = threading.Thread(target=_runner, name="llm-classifier", daemon=True)
+    thread.start()
+    thread.join()
+    if "exc" in err:
+        raise err["exc"]
+    return box["value"]
+
+
 def _run_llm_classifier_sync(
     prompt: str, allowed_topics_prompt: str, model_override: Model | str | None = None
 ) -> ValidationResult:
-    """Run LLM classifier synchronously using run_sync."""
-    classifier = _get_classifier_agent(model_override)
-    classifier_prompt = f"Policy:\n{allowed_topics_prompt}\n\nUser input:\n{prompt}"
-    result = classifier.run_sync(classifier_prompt)
-    return _parse_classifier_response(str(result.output))
+    """Run the LLM classifier from sync code, safe inside a running event loop.
+
+    Delegates to the async classifier on a worker thread (see _run_coro_blocking)
+    rather than calling ``Agent.run_sync`` directly, which would crash when the
+    sync executor path runs inside anyio's loop.
+    """
+    return _run_coro_blocking(
+        _run_llm_classifier_async(prompt, allowed_topics_prompt, model_override)
+    )
 
 
 async def _run_llm_classifier_async(

@@ -11,7 +11,12 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from initrunner._compat import require_extra
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import SlackTriggerConfig
-from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
+from initrunner.triggers.base import (
+    ChannelAdapter,
+    TriggerEvent,
+    _chunk_text,
+    warn_if_unauthenticated,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -31,14 +36,26 @@ def _check_slack_access(
     channel_id: str,
     allowed_channels: set[str],
     allowed_user_ids: set[str],
+    allow_all: bool = False,
 ) -> bool:
     """Return True if the message should be processed, False to drop it.
 
     Pure function extracted so it can be unit-tested without a live socket.
     """
+    if allow_all:
+        return True
     if allowed_user_ids and user_id not in allowed_user_ids:
         return False
-    if not is_dm and allowed_channels and channel_id not in allowed_channels:
+    if is_dm:
+        # A DM has no channel, so allowed_channels cannot gate it. When the
+        # operator restricted channels but set no user allowlist, deny DMs rather
+        # than leaving them an unrestricted side door past the channel allowlist
+        # (set allowed_user_ids or allow_all to permit DMs). Fully unconfigured
+        # bots (no allowlist at all) keep the current open behavior.
+        if allowed_channels and not allowed_user_ids:
+            return False
+        return True
+    if allowed_channels and channel_id not in allowed_channels:
         return False
     return True
 
@@ -98,6 +115,12 @@ class SlackAdapter(ChannelAdapter):
 
         allowed_channels = set(self._config.channel_ids)
         allowed_user_ids = set(self._config.allowed_user_ids)
+        allow_all = self._config.allow_all
+        warn_if_unauthenticated(
+            "Slack",
+            has_allowlist=bool(allowed_channels or allowed_user_ids),
+            allow_all=allow_all,
+        )
         respond_in_thread = self._config.respond_in_thread
         bot_user_id = self._bot_user_id
         dispatch_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="slack-dispatch")
@@ -139,6 +162,7 @@ class SlackAdapter(ChannelAdapter):
                 channel_id=channel_id,
                 allowed_channels=allowed_channels,
                 allowed_user_ids=allowed_user_ids,
+                allow_all=allow_all,
             ):
                 _logger.debug("Slack message rejected: user=%s channel=%s", user_id, channel_id)
                 return

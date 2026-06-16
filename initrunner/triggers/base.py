@@ -19,6 +19,25 @@ def register_conversational_trigger_type(platform: str) -> None:
     CONVERSATIONAL_TRIGGER_TYPES.add(platform)
 
 
+def warn_if_unauthenticated(platform: str, *, has_allowlist: bool, allow_all: bool) -> None:
+    """Warn loudly when a bot trigger will respond to anyone.
+
+    The default is currently open for backward compatibility; a future release
+    will flip unconfigured bots to fail-closed. Until then, operators get a loud
+    startup warning unless they set an allowlist or explicitly opt in with
+    ``allow_all: true``.
+    """
+    if has_allowlist or allow_all:
+        return
+    _logger.warning(
+        "%s bot has no allowlist and allow_all is not set: it will respond to ANY "
+        "user, consuming model budget and exercising its tools. Restrict it with an "
+        "allowlist (e.g. allowed_user_ids) or set allow_all: true to acknowledge open "
+        "access. A future release will reject unconfigured bots by default.",
+        platform,
+    )
+
+
 @dataclass
 class TriggerEvent:
     trigger_type: str

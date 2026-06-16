@@ -215,3 +215,75 @@ class TestLoaderIntegration:
             if isinstance(result, str):
                 rendered.append(result)
         assert any("hi alice" in r for r in rendered), rendered
+
+    def test_daemon_path_resolves_template_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Regression (G1): outside the CLI there is no --var, so _template_values
+        is empty. A templated role must resolve required vars from
+        INITRUNNER_VAR_<KEY> instead of crashing or sending literal {{name}}."""
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        monkeypatch.setenv("INITRUNNER_VAR_NAME", "env-bob")
+        body = textwrap.dedent("""\
+            apiVersion: initrunner/v1
+            kind: Agent
+            metadata:
+              name: t-agent
+            spec:
+              role: "hi {{name}}"
+              model:
+                provider: openai
+                name: gpt-4o
+              deps_schema:
+                type: object
+                properties:
+                  name: {type: string}
+                required: [name]
+        """)
+        role = load_role(_write(tmp_path, body))
+        agent = build_agent(role)
+
+        # Daemon/trigger path: no _template_values is ever set.
+        hooks = list(agent._system_prompt_functions) + list(
+            agent._system_prompt_dynamic_functions.values()
+        )
+        rendered: list[str] = []
+        for h in hooks:
+            func = h.function  # type: ignore[union-attr]
+            try:
+                result = func()  # type: ignore[call-arg]
+            except TypeError:
+                continue
+            if isinstance(result, str):
+                rendered.append(result)
+        assert any("hi env-bob" in r for r in rendered), rendered
+        assert all("{{name}}" not in r for r in rendered)
+
+
+class TestTemplateValueSourcing:
+    SCHEMA: ClassVar[dict] = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "count": {"type": "integer"},
+            "active": {"type": "boolean"},
+        },
+        "required": ["name"],
+    }
+
+    def test_optional_unset_renders_empty_not_placeholder(self):
+        # Declared optional var, not provided -> empty, never literal {{count}}.
+        assert render("x={{count}}", self.SCHEMA, {"name": "n"}) == "x="
+
+    def test_boolean_string_parsed_by_content(self):
+        # --var / env supply strings; bool("false") is True, so parse by content.
+        assert render("{{active}}", self.SCHEMA, {"name": "n", "active": "false"}) == "false"
+        assert render("{{active}}", self.SCHEMA, {"name": "n", "active": "true"}) == "true"
+
+    def test_env_values_resolves_declared_vars(self, monkeypatch: pytest.MonkeyPatch):
+        from initrunner.agent.templating import env_values
+
+        monkeypatch.setenv("INITRUNNER_VAR_NAME", "alice")
+        monkeypatch.setenv("INITRUNNER_VAR_COUNT", "7")
+        # 'active' has no env var set, so it is omitted.
+        assert env_values(self.SCHEMA) == {"name": "alice", "count": "7"}

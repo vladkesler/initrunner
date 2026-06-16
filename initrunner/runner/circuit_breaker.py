@@ -98,6 +98,11 @@ class CircuitBreaker:
         """Record a failed trigger fire. Returns transition if state changed."""
         with self._lock:
             if category not in _PROVIDER_FAILURES:
+                # Not a provider-health signal, but the probe still finished:
+                # release the HALF_OPEN slot so the breaker can try another probe
+                # instead of wedging forever in HALF_OPEN.
+                if self._state == CircuitState.HALF_OPEN:
+                    self._half_open_in_flight = False
                 return None
             self._failure_count += 1
             if self._state == CircuitState.HALF_OPEN:
@@ -108,6 +113,21 @@ class CircuitBreaker:
             ):
                 return self._transition(CircuitState.OPEN)
             return None
+
+    def release_probe(self) -> None:
+        """Release a claimed HALF_OPEN probe slot without recording a result.
+
+        ``allow_request`` grants exactly one probe in HALF_OPEN by setting the
+        in-flight flag, which is otherwise cleared only by record_success /
+        record_failure. When the trigger that claimed the probe is dropped or
+        paused before it runs (concurrency cap hit, budget exhausted, paused for
+        approval), nothing records a result, so without this the breaker stays
+        wedged in HALF_OPEN rejecting every later trigger. Safe to call on any
+        path: it is a no-op unless a probe is actually in flight.
+        """
+        with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._half_open_in_flight = False
 
     # -- internals ------------------------------------------------------------
 

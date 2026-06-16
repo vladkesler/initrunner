@@ -52,6 +52,8 @@ async def _fetch_and_chunk_async(url, config, store_config):
             timeout=config.timeout_seconds,
             user_agent=config.user_agent,
             max_bytes=config.max_content_bytes,
+            allowed_domains=config.allowed_domains,
+            blocked_domains=config.blocked_domains,
         )
     except SSRFBlocked as e:
         return str(e)

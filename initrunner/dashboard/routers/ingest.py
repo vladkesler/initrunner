@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import (  # type: ignore[import-not-found]
@@ -34,6 +35,32 @@ def _resolve_role(agent_id: str, role_cache: RoleCache):
     if dr.role.spec.ingest is None:
         raise HTTPException(status_code=400, detail="Agent has no ingest configuration")
     return dr
+
+
+async def _save_upload_capped(f: UploadFile, dest: Path, max_bytes: int) -> bool:
+    """Stream *f* to *dest* in chunks, aborting if it exceeds *max_bytes*.
+
+    Returns True on success, or False (deleting the partial file) when the
+    upload is too large -- so a huge file is never fully buffered in memory.
+    """
+    total = 0
+    chunk_size = 1024 * 1024
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await f.read(chunk_size)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    out.close()
+                    dest.unlink(missing_ok=True)
+                    return False
+                out.write(chunk)
+    except OSError:
+        dest.unlink(missing_ok=True)
+        raise
+    return True
 
 
 @router.get("/{agent_id}/ingest/documents")
@@ -112,6 +139,9 @@ async def upload_files(
     role_path = Path(dr.path)
     upload_dir = uploads_dir(dr.role.metadata.name)
 
+    max_mb = dr.role.spec.security.resources.max_file_size_mb
+    max_bytes = int(max_mb * 1024 * 1024)
+
     saved: list[Path] = []
     for f in files:
         if not f.filename:
@@ -122,8 +152,14 @@ async def upload_files(
         dest = (upload_dir / safe_name).resolve()
         if not dest.is_relative_to(upload_dir.resolve()):
             continue
-        content = await f.read()
-        await asyncio.to_thread(dest.write_bytes, content)
+        # Stream to disk with a hard byte ceiling instead of buffering the whole
+        # upload, so an oversized file (or a decompression-bomb archive) cannot
+        # exhaust server memory or bypass the role's max_file_size_mb limit.
+        if not await _save_upload_capped(f, dest, max_bytes):
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{safe_name}' exceeds the {max_mb} MB limit",
+            )
         saved.append(dest)
 
     if not saved:

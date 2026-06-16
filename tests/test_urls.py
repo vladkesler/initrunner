@@ -221,6 +221,32 @@ class TestSSRFSafeTransport:
             transport.handle_request(httpx.Request("GET", "file://etc/passwd"))
         mock_dns.assert_not_called()
 
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_blocks_domain_not_in_allowlist(self, mock_dns):
+        # httpx invokes the transport per hop, so a redirect to an off-allowlist
+        # domain is rejected on EVERY hop -- before DNS / IP pinning even runs.
+        transport = SSRFSafeTransport(allowed_domains=["trusted.example.com"])
+        with pytest.raises(SSRFBlocked, match="allowed domains"):
+            transport.handle_request(httpx.Request("GET", "https://attacker.com/secret"))
+        mock_dns.assert_not_called()
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_blocks_blocklisted_domain(self, mock_dns):
+        transport = SSRFSafeTransport(blocked_domains=["evil.example.com"])
+        with pytest.raises(SSRFBlocked, match="blocked"):
+            transport.handle_request(httpx.Request("GET", "https://evil.example.com/x"))
+        mock_dns.assert_not_called()
+
+    @patch("initrunner.agent._urls.socket.getaddrinfo")
+    def test_allowlisted_domain_proceeds_to_pinning(self, mock_dns):
+        mock_dns.side_effect = _mock_getaddrinfo("93.184.216.34")
+        transport = SSRFSafeTransport(allowed_domains=["example.com"])
+        request = httpx.Request("GET", "https://example.com/path")
+        with patch("httpx.HTTPTransport.handle_request", return_value=MagicMock()) as mock_super:
+            transport.handle_request(request)
+            mock_super.assert_called_once()
+            assert mock_super.call_args.args[0].url.host == "93.184.216.34"
+
     def test_dns_timeout_parameter(self):
         transport = SSRFSafeTransport(dns_timeout=5.0)
         assert transport._dns_timeout == 5.0

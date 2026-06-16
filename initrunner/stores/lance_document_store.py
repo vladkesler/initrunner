@@ -148,6 +148,36 @@ def _rows_to_results(
 # ---------------------------------------------------------------------------
 
 
+class _IdCounter:
+    """Process-wide chunk-ID counter shared by all stores on one db_path."""
+
+    __slots__ = ("lock", "next")
+
+    def __init__(self, start: int) -> None:
+        self.lock = threading.Lock()
+        self.next = start
+
+
+# Unlike memory stores, document stores are not deduplicated, so several
+# LanceDocumentStore instances can be open on the same db_path at once (the
+# retrieval tool, web_scraper, and the ingestion service each open their own).
+# A per-instance counter would let two of them allocate the same chunk-ID range
+# concurrently and silently corrupt the table. Sharing one lock+counter keyed by
+# path makes ID allocation atomic across every same-process instance.
+_id_counters: dict[str, _IdCounter] = {}
+_id_counters_lock = threading.Lock()
+
+
+def _get_id_counter(path_key: str, start: int) -> _IdCounter:
+    """Return the shared counter for *path_key*, creating it from *start* if new."""
+    with _id_counters_lock:
+        counter = _id_counters.get(path_key)
+        if counter is None:
+            counter = _IdCounter(start)
+            _id_counters[path_key] = counter
+        return counter
+
+
 class LanceDocumentStore(DocumentStore):
     """Vector store for ingested documents, backed by LanceDB."""
 
@@ -171,9 +201,11 @@ class LanceDocumentStore(DocumentStore):
         if self._dimensions is not None:
             self._ensure_chunks_table(self._dimensions)
 
-        # Auto-increment counter for chunk IDs
+        # Auto-increment counter for chunk IDs, shared across all instances on
+        # this path so concurrent writers never allocate overlapping IDs.
         raw_next = _read_meta(self._db, "next_chunk_id")
-        self._next_chunk_id = int(raw_next) if raw_next is not None else 1
+        start = int(raw_next) if raw_next is not None else 1
+        self._id_counter = _get_id_counter(str(db_path.resolve()), start)
 
     def _ensure_chunks_table(self, dimensions: int) -> None:
         if "chunks" not in _table_names(self._db):
@@ -196,13 +228,15 @@ class LanceDocumentStore(DocumentStore):
         self._fts_ready = True
 
     def _alloc_ids(self, count: int) -> list[int]:
-        """Allocate *count* sequential IDs."""
-        start = self._next_chunk_id
-        self._next_chunk_id += count
-        return list(range(start, start + count))
+        """Allocate *count* sequential IDs atomically across same-path instances."""
+        with self._id_counter.lock:
+            start = self._id_counter.next
+            self._id_counter.next += count
+            return list(range(start, start + count))
 
     def _flush_counter(self) -> None:
-        _write_meta(self._db, "next_chunk_id", str(self._next_chunk_id))
+        with self._id_counter.lock:
+            _write_meta(self._db, "next_chunk_id", str(self._id_counter.next))
 
     @property
     def dimensions(self) -> int | None:
