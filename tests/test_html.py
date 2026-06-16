@@ -22,9 +22,7 @@ def _patch_transport(text="", *, content_type="text/html", status_code=200, rais
     def handle(request: httpx.Request) -> httpx.Response:
         if raises is not None:
             raise raises
-        return httpx.Response(
-            status_code, headers={"content-type": content_type}, text=text
-        )
+        return httpx.Response(status_code, headers={"content-type": content_type}, text=text)
 
     return patch(
         "initrunner._html.SSRFSafeTransport",
@@ -36,9 +34,7 @@ def _patch_async_transport(text="", *, content_type="text/html", status_code=200
     def handle(request: httpx.Request) -> httpx.Response:
         if raises is not None:
             raise raises
-        return httpx.Response(
-            status_code, headers={"content-type": content_type}, text=text
-        )
+        return httpx.Response(status_code, headers={"content-type": content_type}, text=text)
 
     return patch(
         "initrunner._html.AsyncSSRFSafeTransport",

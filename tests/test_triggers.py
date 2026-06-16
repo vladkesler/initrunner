@@ -263,9 +263,7 @@ class TestCronTrigger:
             def get_next(self, _type):  # pragma: no cover - loop is skipped below
                 return captured["anchor"]
 
-        config = CronTriggerConfig(
-            schedule="0 9 * * *", prompt="x", timezone="America/New_York"
-        )
+        config = CronTriggerConfig(schedule="0 9 * * *", prompt="x", timezone="America/New_York")
         trigger = CronTrigger(config, lambda e: None)
         trigger._stop_event.set()  # so _run computes the anchor then exits the loop
         with patch.object(cron_mod, "croniter", _FakeCron):
