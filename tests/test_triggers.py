@@ -586,11 +586,32 @@ class TestSlackFiltering:
     def test_channel_rejects_wrong_guild(self):
         assert self._check(allowed_channels={"C999"}, channel_id="C888") is False
 
-    def test_channel_filter_skipped_for_dm(self):
-        assert self._check(is_dm=True, allowed_channels={"C999"}, channel_id="C888") is True
+    def test_dm_denied_when_channels_restricted_without_user_allowlist(self):
+        # #13: a DM must not bypass a configured channel allowlist. With channels
+        # restricted and no user allowlist, DMs are denied (the side door is closed).
+        assert self._check(is_dm=True, allowed_channels={"C999"}, channel_id="C888") is False
+
+    def test_dm_allowed_when_fully_unconfigured(self):
+        # #18 non-breaking: with no allowlist at all, DMs are still accepted.
+        assert self._check(is_dm=True) is True
+
+    def test_dm_allowed_with_matching_user_when_channels_restricted(self):
+        assert (
+            self._check(
+                is_dm=True,
+                allowed_channels={"C999"},
+                allowed_user_ids={"U100"},
+                user_id="U100",
+            )
+            is True
+        )
 
     def test_user_id_still_checked_in_dm(self):
         assert self._check(is_dm=True, allowed_user_ids={"U1"}, user_id="U2") is False
+
+    def test_allow_all_bypasses_every_check(self):
+        assert self._check(allow_all=True, allowed_channels={"C999"}, channel_id="C888") is True
+        assert self._check(is_dm=True, allow_all=True, allowed_channels={"C999"}) is True
 
 
 class TestSlackAdapterSend:
@@ -913,3 +934,52 @@ class TestSlackEventRouting:
         }
         events = self._run_listener(cfg, payload)
         assert events[0].metadata["channel_target"] == "C999"
+
+
+class TestDiscordAllowAll:
+    @staticmethod
+    def _check(**kwargs):
+        from initrunner.triggers.discord import _check_discord_access
+
+        defaults = {
+            "is_dm": False,
+            "author_roles": set(),
+            "author_id": "A1",
+            "channel_id": "C1",
+            "allowed_channels": {"C2"},
+            "allowed_roles": set(),
+            "allowed_user_ids": set(),
+        }
+        defaults.update(kwargs)
+        return _check_discord_access(**defaults)  # type: ignore[invalid-argument-type]
+
+    def test_restricted_channel_rejects_without_allow_all(self):
+        assert self._check() is False
+
+    def test_allow_all_bypasses_channel_restriction(self):
+        assert self._check(allow_all=True) is True
+
+
+class TestUnauthenticatedWarning:
+    def test_warns_when_open(self, caplog, monkeypatch):
+        import logging
+
+        from initrunner.triggers.base import warn_if_unauthenticated
+
+        # The 'initrunner' logger sets propagate=False; re-enable so caplog (on
+        # the root logger) can capture child records.
+        monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
+        with caplog.at_level(logging.WARNING, logger="initrunner.triggers.base"):
+            warn_if_unauthenticated("Slack", has_allowlist=False, allow_all=False)
+        assert any("respond to ANY user" in r.message for r in caplog.records)
+
+    def test_silent_when_allowlisted(self, caplog, monkeypatch):
+        import logging
+
+        from initrunner.triggers.base import warn_if_unauthenticated
+
+        monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
+        with caplog.at_level(logging.WARNING, logger="initrunner.triggers.base"):
+            warn_if_unauthenticated("Slack", has_allowlist=True, allow_all=False)
+            warn_if_unauthenticated("Discord", has_allowlist=False, allow_all=True)
+        assert caplog.records == []

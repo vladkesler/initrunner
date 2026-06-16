@@ -11,7 +11,12 @@ from collections.abc import Callable
 from initrunner._async import run_sync
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import DiscordTriggerConfig
-from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
+from initrunner.triggers.base import (
+    ChannelAdapter,
+    TriggerEvent,
+    _chunk_text,
+    warn_if_unauthenticated,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -32,12 +37,16 @@ def _check_discord_access(
     allowed_channels: set[str],
     allowed_roles: set[str],
     allowed_user_ids: set[str],
+    allow_all: bool = False,
 ) -> bool:
     """Return True if the message should be processed, False to drop it.
 
     This is extracted from the on_message handler so it can be unit-tested
     without a real Discord client.
     """
+    if allow_all:
+        return True
+
     user_id_passed = bool(allowed_user_ids and author_id in allowed_user_ids)
 
     # DM handling: roles require guild context, user IDs work everywhere
@@ -99,6 +108,12 @@ class DiscordAdapter(ChannelAdapter):
         allowed_channels = set(self._config.channel_ids)
         allowed_roles = set(self._config.allowed_roles)
         allowed_user_ids = set(self._config.allowed_user_ids)
+        allow_all = self._config.allow_all
+        warn_if_unauthenticated(
+            "Discord",
+            has_allowlist=bool(allowed_channels or allowed_roles or allowed_user_ids),
+            allow_all=allow_all,
+        )
         intents = discord.Intents.default()
         intents.message_content = True
         client = discord.Client(intents=intents)
@@ -130,6 +145,7 @@ class DiscordAdapter(ChannelAdapter):
                 allowed_channels=allowed_channels,
                 allowed_roles=allowed_roles,
                 allowed_user_ids=allowed_user_ids,
+                allow_all=allow_all,
             ):
                 _logger.debug(
                     "Discord message rejected: user=%s (id=%s)",
