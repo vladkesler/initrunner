@@ -60,10 +60,31 @@ class TestCheckToolPermission:
         allowed, _ = check_tool_permission({"path": "data.csv"}, perms)
         assert allowed is False
 
-    def test_bare_pattern_only_matches_strings(self):
+    def test_bare_pattern_coerces_non_strings(self):
+        # Non-string scalars are stringified so a deny rule cannot be bypassed by
+        # passing a sensitive value as a non-string. "*.py" still won't match 42.
         perms = ToolPermissions(default="deny", allow=["*.py"])
-        allowed, _ = check_tool_permission({"count": 42}, perms)
-        assert allowed is False
+        assert check_tool_permission({"count": 42}, perms)[0] is False
+        # ...but a glob that fits the stringified value does match.
+        perms2 = ToolPermissions(default="deny", allow=["80*"])
+        assert check_tool_permission({"port": 8080}, perms2)[0] is True
+
+    def test_deny_matches_nested_and_list_args(self):
+        """Regression (H1): deny rules must reach values nested in dict/list args.
+
+        Previously a sensitive value tucked inside a dict/list argument slipped
+        past deny rules and fell through to the (allow) default."""
+        # Bare glob reaches a value nested inside a dict argument...
+        perms = ToolPermissions(default="allow", deny=["/etc/*"])
+        assert check_tool_permission({"options": {"path": "/etc/passwd"}}, perms)[0] is False
+        # ...and inside a list argument.
+        assert check_tool_permission({"paths": ["/tmp/ok", "/etc/shadow"]}, perms)[0] is False
+        # Dotted arg_name targets a nested value explicitly.
+        perms2 = ToolPermissions(default="allow", deny=["options.path=/etc/*"])
+        assert check_tool_permission({"options": {"path": "/etc/passwd"}}, perms2)[0] is False
+        # Named rule against a list argument matches its leaves.
+        perms3 = ToolPermissions(default="allow", deny=["paths=/etc/*"])
+        assert check_tool_permission({"paths": ["/etc/shadow"]}, perms3)[0] is False
 
     def test_multiple_allow_patterns(self):
         perms = ToolPermissions(

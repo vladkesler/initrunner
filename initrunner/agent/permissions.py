@@ -8,6 +8,7 @@ then allow rules, then the configured default.
 from __future__ import annotations
 
 import fnmatch
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -17,26 +18,60 @@ from pydantic_ai.toolsets import AbstractToolset
 
 from initrunner.agent.schema.tools import ToolPermissions
 
+_UNSET = object()
+
+
+def _iter_leaf_values(value: Any) -> Iterator[str]:
+    """Yield every scalar leaf in *value* (recursing dicts/lists/tuples/sets) as a string.
+
+    Recursion + stringification is a security requirement: a deny rule must not
+    be silently bypassable by nesting a sensitive value inside a dict/list
+    argument or by passing it as a non-string scalar.
+    """
+    if isinstance(value, dict):
+        for sub in value.values():
+            yield from _iter_leaf_values(sub)
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            yield from _iter_leaf_values(item)
+    elif value is not None:
+        yield str(value)
+
+
+def _resolve_arg(tool_args: dict[str, Any], arg_name: str) -> Any:
+    """Resolve a (possibly dotted, e.g. ``options.path``) *arg_name* into nested args."""
+    current: Any = tool_args
+    for part in arg_name.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return _UNSET
+    return current
+
 
 def _matches(pattern: str, tool_args: dict[str, Any]) -> bool:
     """Return True if *pattern* matches any value in *tool_args*.
 
     Pattern format:
-    - ``arg_name=glob`` -- match *glob* against ``tool_args[arg_name]``
-    - bare glob (no ``=``) -- match against every string value in *tool_args*
+    - ``arg_name=glob`` -- match *glob* against ``tool_args[arg_name]``. ``arg_name``
+      may be dotted (``options.path``) to target a nested value. The value is
+      searched leaf-by-leaf, so dict/list arguments and non-string scalars are
+      covered.
+    - bare glob (no ``=``) -- match against every (recursively nested) value in
+      *tool_args*, stringifying non-strings.
     """
     if "=" in pattern:
         arg_name, _, glob = pattern.partition("=")
-        value = tool_args.get(arg_name)
-        if value is None:
+        value = _resolve_arg(tool_args, arg_name)
+        if value is _UNSET:
             return False
-        return fnmatch.fnmatch(str(value), glob)
+        return any(fnmatch.fnmatch(leaf, glob) for leaf in _iter_leaf_values(value))
 
-    # Bare pattern: match against all string values
-    for value in tool_args.values():
-        if isinstance(value, str) and fnmatch.fnmatch(value, pattern):
-            return True
-    return False
+    return any(
+        fnmatch.fnmatch(leaf, pattern)
+        for value in tool_args.values()
+        for leaf in _iter_leaf_values(value)
+    )
 
 
 def check_tool_permission(

@@ -65,9 +65,27 @@ class SpawnPool:
         semaphore = self._semaphore
         assert semaphore is not None
 
+        # Capture the parent run's delegation depth/chain on the CALLING thread.
+        # The pool runs the invoker on a private loop (run_coroutine_threadsafe)
+        # and a fresh worker thread (asyncio.to_thread), neither of which carries
+        # the caller's ContextVars -- so without re-seeding, the spawned agent
+        # would start at depth 0 and the max_depth limit would never accumulate.
+        from initrunner.agent.delegation import (
+            get_current_chain,
+            get_current_depth,
+            seed_delegation_context,
+        )
+
+        parent_depth = get_current_depth()
+        parent_chain = get_current_chain()
+
+        def _invoke_with_inherited_depth() -> str:
+            seed_delegation_context(parent_depth, parent_chain)
+            return invoker.invoke(prompt)
+
         async def _run() -> str:
             async with semaphore:
-                return await asyncio.to_thread(invoker.invoke, prompt)
+                return await asyncio.to_thread(_invoke_with_inherited_depth)
 
         future = asyncio.run_coroutine_threadsafe(
             asyncio.wait_for(_run(), timeout=self._timeout), self._loop

@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
@@ -337,7 +338,14 @@ def _register_sql(mcp: FastMCP, raw_config: dict[str, Any]) -> None:
                 return "Error: only SELECT and PRAGMA queries are allowed in read-only mode"
 
         try:
-            conn = sqlite3.connect(db_path)
+            if cfg.read_only:
+                # Engine-level read-only: SQLite rejects every write -- including
+                # PRAGMA writable_schema / user_version, which the statement-prefix
+                # check above lets through -- regardless of statement text. The
+                # prefix check is now just a friendlier early error, not the boundary.
+                conn = sqlite3.connect(f"file:{quote(db_path)}?mode=ro", uri=True)
+            else:
+                conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
             try:
                 cursor = conn.execute(query)

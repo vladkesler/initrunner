@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
-import threading
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -24,58 +23,72 @@ class DelegationDepthExceeded(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Thread-local delegation context
+# Delegation context (depth + chain)
 # ---------------------------------------------------------------------------
+#
+# Tracked in ContextVars rather than threading.local: asyncio copies the
+# current context into each Task and each ``asyncio.to_thread`` call, so every
+# delegation branch gets an isolated snapshot that starts from the parent's
+# depth. Values are immutable (int / tuple) so a copied context can never
+# mutate a sibling branch's state. The SpawnPool runs sub-agents on a private
+# event loop via ``run_coroutine_threadsafe`` -- which does NOT carry the
+# caller's context -- so it re-seeds the inherited depth explicitly via
+# :func:`seed_delegation_context`. (A plain threading.local reset to 0 on every
+# spawned worker thread silently defeated the depth limit entirely.)
 
-_context = threading.local()
-
-
-@dataclass
-class _DelegationContext:
-    depth: int = 0
-    chain: list[str] = field(default_factory=list)
-
-
-def _get_ctx() -> _DelegationContext:
-    if not hasattr(_context, "ctx"):
-        _context.ctx = _DelegationContext()
-    return _context.ctx
+_depth: contextvars.ContextVar[int] = contextvars.ContextVar("delegation_depth", default=0)
+_chain: contextvars.ContextVar[tuple[str, ...]] = contextvars.ContextVar(
+    "delegation_chain", default=()
+)
 
 
 def enter_delegation(agent_name: str, max_depth: int) -> None:
     """Increment depth and push agent onto chain. Raises on depth exceeded."""
-    ctx = _get_ctx()
-    ctx.depth += 1
-    ctx.chain.append(agent_name)
-    if ctx.depth > max_depth:
-        chain_str = " -> ".join(ctx.chain)
+    depth = _depth.get() + 1
+    chain = (*_chain.get(), agent_name)
+    _depth.set(depth)
+    _chain.set(chain)
+    if depth > max_depth:
+        chain_str = " -> ".join(chain)
         raise DelegationDepthExceeded(
-            f"Delegation depth {ctx.depth} exceeds max_depth {max_depth} (chain: {chain_str})"
+            f"Delegation depth {depth} exceeds max_depth {max_depth} (chain: {chain_str})"
         )
 
 
 def exit_delegation() -> None:
     """Decrement depth and pop agent from chain."""
-    ctx = _get_ctx()
-    if ctx.depth > 0:
-        ctx.depth -= 1
-    if ctx.chain:
-        ctx.chain.pop()
+    depth = _depth.get()
+    if depth > 0:
+        _depth.set(depth - 1)
+    chain = _chain.get()
+    if chain:
+        _chain.set(chain[:-1])
 
 
 def get_current_depth() -> int:
-    return _get_ctx().depth
+    return _depth.get()
 
 
 def get_current_chain() -> list[str]:
-    return list(_get_ctx().chain)
+    return list(_chain.get())
+
+
+def seed_delegation_context(depth: int, chain: tuple[str, ...] | list[str]) -> None:
+    """Seed the depth/chain inherited from a parent run.
+
+    Used at thread/loop boundaries (e.g. the SpawnPool) where the parent's
+    ContextVars are not automatically propagated; the child must start counting
+    from the parent's depth instead of from zero, or the depth limit is silently
+    defeated by spawning.
+    """
+    _depth.set(depth)
+    _chain.set(tuple(chain))
 
 
 def reset_context() -> None:
     """Reset delegation context (for testing)."""
-    ctx = _get_ctx()
-    ctx.depth = 0
-    ctx.chain.clear()
+    _depth.set(0)
+    _chain.set(())
 
 
 # ---------------------------------------------------------------------------

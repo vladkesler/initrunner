@@ -20,17 +20,24 @@ _authz_resolved = False
 
 
 def _ensure_authz() -> None:
-    """One-time: load config, build policy engine, set ContextVar.
+    """One-time: load config and build the policy engine, cached at module level.
 
     Fail-fast: when ``INITRUNNER_POLICY_DIR`` is set but policy loading
     fails, the error propagates (operator explicitly opted in).
+
+    The built engine is cached in ``_cached_engine`` (a plain module global that
+    persists across runs). It is established on the per-run ``_current_engine``
+    ContextVar by :func:`_enter_agent_context`, **not here**: every
+    ``execute_run`` spins up a fresh event loop / fresh ``contextvars`` context,
+    so a ContextVar set during the first run's build would be invisible to every
+    later run -- silently disabling tool authorization after the first run.
     """
     global _cached_engine, _cached_config, _authz_resolved
     if _authz_resolved:
         return
     _authz_resolved = True
 
-    from initrunner.authz import load_authz_config, load_engine, set_current_engine
+    from initrunner.authz import load_authz_config, load_engine
 
     config = load_authz_config()
     if config is None:
@@ -40,7 +47,6 @@ def _ensure_authz() -> None:
     info = engine.info()
     _cached_engine = engine
     _cached_config = config
-    set_current_engine(engine)
     _logger.info(
         "Policy engine enabled: %d policies, %d rules",
         info.policy_count,
@@ -48,21 +54,40 @@ def _ensure_authz() -> None:
     )
 
 
-def _enter_agent_context(role: RoleDefinition) -> contextvars.Token | None:
-    """Set the agent principal ContextVar for the current run."""
+def _enter_agent_context(
+    role: RoleDefinition,
+) -> tuple[contextvars.Token, contextvars.Token] | None:
+    """Establish the policy engine + agent principal ContextVars for this run.
+
+    Both are set **per run** (and reset by :func:`_exit_agent_context`). The
+    engine is re-established every run from the persistent module cache because
+    each ``execute_run`` runs in its own event loop / ``contextvars`` context;
+    relying on a process-once ContextVar set would make tool authorization
+    no-op on every run after the first.
+    """
     _ensure_authz()
     if _cached_engine is None:
         return None
 
-    from initrunner.authz import agent_principal_from_role, set_current_agent_principal
+    from initrunner.authz import (
+        agent_principal_from_role,
+        set_current_agent_principal,
+        set_current_engine,
+    )
 
+    engine_token = set_current_engine(_cached_engine)
     principal = agent_principal_from_role(role.metadata)
-    return set_current_agent_principal(principal)
+    principal_token = set_current_agent_principal(principal)
+    return engine_token, principal_token
 
 
-def _exit_agent_context(token: contextvars.Token | None) -> None:
-    """Reset the agent principal ContextVar."""
-    if token is not None:
-        from initrunner.authz import _current_agent_principal
+def _exit_agent_context(tokens: tuple[contextvars.Token, contextvars.Token] | None) -> None:
+    """Reset the policy engine + agent principal ContextVars."""
+    if tokens is None:
+        return
 
-        _current_agent_principal.reset(token)
+    from initrunner.authz import _current_agent_principal, _current_engine
+
+    engine_token, principal_token = tokens
+    _current_agent_principal.reset(principal_token)
+    _current_engine.reset(engine_token)

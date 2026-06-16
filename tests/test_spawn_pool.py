@@ -5,7 +5,44 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
+from initrunner.agent.delegation import (
+    enter_delegation,
+    get_current_chain,
+    get_current_depth,
+    reset_context,
+)
 from initrunner.agent.tools.spawn import SpawnPool
+
+
+class TestSpawnInheritsDelegationDepth:
+    def test_spawned_worker_inherits_parent_depth(self):
+        """Regression: a spawned sub-agent must start from the parent's delegation
+        depth, not from 0. The pool runs the invoker on a private loop + worker
+        thread, so without explicit re-seeding the max_depth limit never
+        accumulates and a recursive spawn topology fans out unbounded."""
+        reset_context()
+        observed: dict[str, object] = {}
+
+        class _RecordingInvoker:
+            def invoke(self, prompt: str) -> str:
+                # Runs on the spawn worker thread.
+                observed["depth"] = get_current_depth()
+                observed["chain"] = get_current_chain()
+                return "ok"
+
+        pool = SpawnPool(max_concurrent=2, timeout=10)
+        try:
+            enter_delegation("parent", max_depth=5)  # parent run now at depth 1
+            assert get_current_depth() == 1
+            pool.submit("t1", "child", "hi", _RecordingInvoker())
+            tasks = pool.await_tasks(["t1"], timeout=5)
+            assert tasks[0].status == "completed"
+            # Before the fix the worker thread observed depth 0 (fresh thread-local).
+            assert observed["depth"] == 1
+            assert observed["chain"] == ["parent"]
+        finally:
+            reset_context()
+            pool.shutdown()
 
 
 class TestBulkSubmit:
