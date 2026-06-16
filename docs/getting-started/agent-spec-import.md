@@ -77,9 +77,9 @@ If the role prompt contains `{{var}}` placeholders, declare them in `spec.deps_s
 initrunner run greeter/role.yaml "be polite" --var name=Alice --var city=Berlin
 ```
 
-`--var` is repeatable. Missing required variables raise an error at run time; undeclared variables raise at load time. Rendering happens through a dynamic system-prompt hook so the raw `{{...}}` never reaches the model.
+`--var` is repeatable. Outside single-shot `initrunner run` -- in daemon, trigger, bot, and flow runs where there is no `--var` -- supply values via `INITRUNNER_VAR_<NAME>` environment variables (the declared name upper-cased, e.g. `INITRUNNER_VAR_CITY=Berlin` for `{{city}}`); explicit `--var` values take precedence. Missing required variables raise an error; undeclared variables raise at load time; a declared-but-unset optional variable renders as empty rather than leaking the literal `{{...}}`. Rendering happens through a dynamic system-prompt hook so the raw `{{...}}` never reaches the model.
 
-**v1 scope**: `deps_schema` is enforced as a flat-scalar object. Nested objects, arrays, `$ref`, and `oneOf` raise `RoleLoadError`. The `--var` flag is wired into single-shot `initrunner run` only; interactive, autonomous, and daemon modes do not thread variables yet.
+**v1 scope**: `deps_schema` is enforced as a flat-scalar object. Nested objects, arrays, `$ref`, and `oneOf` raise `RoleLoadError`. `--var` is wired into single-shot `initrunner run`; daemon, trigger, bot, and flow runs read `INITRUNNER_VAR_<NAME>` environment variables instead.
 
 ## Exporting
 
