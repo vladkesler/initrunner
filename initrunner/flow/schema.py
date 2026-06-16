@@ -239,6 +239,21 @@ class FlowSpec(BaseModel):
     def _validate_graph(self) -> FlowSpec:
         agent_names = set(self.agents.keys())
 
+        # Durability is incompatible with loop_back: durable checkpoints are keyed
+        # only by (flow_run_id, service_name), so on a loop the target would replay
+        # its first iteration's stored output every round instead of re-running,
+        # silently defeating the refine loop. Reject the combination until
+        # loop-aware checkpoint keys exist.
+        if self.durability.active:
+            for name, agent in self.agents.items():
+                if agent.sink is not None and agent.sink.loop_back is not None:
+                    raise ValueError(
+                        f"durability is incompatible with loop_back (agent '{name}'): "
+                        "durable checkpoints are keyed only by (flow_run_id, service_name), "
+                        "so a loop target would replay its first iteration instead of "
+                        "re-running. Disable durability or remove the loop_back sink."
+                    )
+
         # Validate needs references
         for name, agent in self.agents.items():
             for dep in agent.needs:

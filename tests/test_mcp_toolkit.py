@@ -370,6 +370,33 @@ class TestToolExecution:
         assert "Error" in result
         assert "read-only" in result
 
+    def test_sql_read_only_blocks_pragma_writes(self, tmp_path):
+        """PRAGMA writes pass the statement-prefix gate but must be rejected by the
+        engine-level read-only connection and must NOT persist to the database."""
+        import sqlite3
+
+        db_path = tmp_path / "test.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE users (id INTEGER, name TEXT)")
+        conn.execute("PRAGMA user_version=0")
+        conn.commit()
+        conn.close()
+
+        cfg = ToolkitConfig(tools={"sql": {"database": str(db_path), "read_only": True}})
+        mcp = build_toolkit(cfg)
+        fn = _get_tool_fn(mcp, "sql_query")
+
+        result = fn(query="PRAGMA user_version=1337")
+        assert "error" in result.lower()
+
+        # Read-only SELECT/PRAGMA still works.
+        assert "0" in fn(query="PRAGMA user_version")
+
+        # The write must not have persisted.
+        conn = sqlite3.connect(str(db_path))
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 0
+        conn.close()
+
     def test_http_request_blocked_method(self):
         cfg = ToolkitConfig(
             tools={"http": {"base_url": "https://api.example.com", "allowed_methods": ["GET"]}}

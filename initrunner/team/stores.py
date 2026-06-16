@@ -53,6 +53,7 @@ def run_pre_ingestion(
 ) -> None:
     """Run the ingestion pipeline for shared documents before the persona loop."""
     from initrunner.agent.schema.ingestion import IngestConfig
+    from initrunner.agent.schema.security import ResourceLimits
     from initrunner.ingestion.pipeline import run_ingest
 
     ingest_config = IngestConfig(
@@ -62,11 +63,17 @@ def run_pre_ingestion(
         embeddings=team.spec.shared_documents.embeddings,
         chunking=team.spec.shared_documents.chunking,
     )
+    # Team configs have no per-role security.resources, so bound shared-document
+    # ingest with the standard ResourceLimits defaults (50 MB / 500 MB) instead
+    # of leaving it unlimited. A team-level override could be added later.
+    limits = ResourceLimits()
     run_ingest(
         ingest_config,
         agent_name=team.metadata.name,
         provider=team.spec.model.provider if team.spec.model else "",
         base_dir=team_dir,
+        max_file_size_mb=limits.max_file_size_mb,
+        max_total_ingest_mb=limits.max_total_ingest_mb,
     )
 
 

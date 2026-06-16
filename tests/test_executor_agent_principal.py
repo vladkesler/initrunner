@@ -121,6 +121,40 @@ class TestEnterExitAgentContext:
         assert principal is not None
         assert principal.id == "agent:outer"
 
+    def test_engine_contextvar_reestablished_each_run(self):
+        """Regression: the policy engine must be visible on EVERY run, not just the first.
+
+        execute_run runs each invocation in its own event loop / contextvars context
+        (run_sync -> anyio.run). A process-once engine ContextVar set during the first
+        run's build is lost on every later run, silently disabling tool authorization.
+        _enter_agent_context must re-establish it from the persistent module cache.
+        Before the fix the second run observed get_current_engine() == None.
+        """
+        import anyio
+
+        from initrunner.authz import AuthzConfig, get_current_engine
+
+        config = AuthzConfig(policy_dir=str(POLICIES_DIR), agent_checks=True)
+        role = _make_role("cross-run-agent")
+
+        def _run_once() -> tuple[bool, bool]:
+            # Mirrors execute_run: a fresh anyio.run / fresh context per call.
+            async def _inner() -> tuple[bool, bool]:
+                tokens = _enter_agent_context(role)
+                try:
+                    return tokens is not None, get_current_engine() is not None
+                finally:
+                    _exit_agent_context(tokens)
+
+            return anyio.run(_inner)
+
+        with patch("initrunner.authz.load_authz_config", return_value=config):
+            first = _run_once()
+            second = _run_once()
+
+        assert first == (True, True)
+        assert second == (True, True)
+
 
 class TestEnsureAuthzCaching:
     def test_only_resolves_once(self):
@@ -148,8 +182,13 @@ class TestEnsureAuthzCaching:
             with pytest.raises(PolicyLoadError):
                 auth_mod._ensure_authz()
 
-    def test_loads_engine_from_real_policies(self):
-        """_ensure_authz loads engine from real example policies."""
+    def test_caches_engine_without_setting_contextvar(self):
+        """_ensure_authz caches the engine but does NOT set the per-run ContextVar.
+
+        Setting the engine ContextVar at build time binds it to whichever run
+        first triggered the build; _enter_agent_context establishes it per run
+        instead (see test_engine_contextvar_reestablished_each_run).
+        """
         import initrunner.agent.executor_auth as auth_mod
         from initrunner.authz import AuthzConfig, get_current_engine
 
@@ -159,4 +198,4 @@ class TestEnsureAuthzCaching:
             auth_mod._ensure_authz()
 
         assert auth_mod._cached_engine is not None
-        assert get_current_engine() is not None
+        assert get_current_engine() is None

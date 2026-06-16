@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026.6.5] - 2026-06-16
+
+### Security
+- **Agent tool authorization no longer silently disables itself after the first run.** The policy engine (initguard) was set on a process-once ContextVar during the first run's `anyio.run` loop and was lost on every later run, so `PolicyToolset` and delegation checks read no engine and allowed every call with no error. The engine is now re-established per run (set and reset in `_enter_agent_context` / `_exit_agent_context`) from the persistent module cache. Affects long-lived REPL, daemon, bot, and server processes that opted into `INITRUNNER_POLICY_DIR`.
+- **The MCP toolkit `sql` tool enforces `read_only` at the SQLite engine level.** A statement-prefix check over a read-write connection let `PRAGMA writable_schema=ON` / `PRAGMA user_version=N` write to a database marked read-only. `read_only: true` now opens the connection with `mode=ro`, so SQLite rejects every write regardless of statement text.
+- **URL-fetching tools enforce the domain allow/block list on every redirect hop.** `web_reader`, `web_scraper`, and the MCP browser checked `allowed_domains` / `blocked_domains` only on the initial URL, so a redirect could escape the allowlist to an arbitrary public domain. The policy is now applied per hop inside the SSRF transport, before the host is rewritten to the pinned IP. IP-level SSRF protection is unchanged.
+- **Spawned sub-agents inherit delegation depth, so `max_depth` is enforced across spawns.** Depth and chain state was thread-local and reset to zero on each `asyncio.to_thread` worker, so a recursive spawn topology fanned out unbounded. It now lives in ContextVars and is re-seeded across the SpawnPool thread boundary.
+- **Slack DMs can no longer bypass a configured channel allowlist.** When `channel_ids` is set but `allowed_user_ids` is empty, DMs are now denied (set `allowed_user_ids` or `allow_all` to permit them). Fully unconfigured bots are unaffected.
+- **Argument-level permission deny/allow rules match nested and non-string arguments.** Rules only saw top-level string values, so a sensitive value nested in a dict/list argument or passed as a non-string slipped past deny rules into the `allow` default. Matching now recurses into dict/list values, stringifies scalars, and supports dotted `arg_name` paths (e.g. `options.path`). See `docs/security/tool_permission_system.md`.
+- **URL fetches and dashboard uploads are bounded to prevent memory exhaustion.** `fetch_url_as_markdown` now streams the body to a hard byte ceiling instead of buffering the whole response, and the dashboard upload and team shared-document ingest paths now apply the role's `security.resources` file/total size limits (team ingest uses the standard 50 MB / 500 MB defaults) instead of running unbounded.
+
+### Added
+- **Template values from the environment for non-CLI runs.** Roles using `{{var}}` placeholders with a `deps_schema` can now be supplied values via `INITRUNNER_VAR_<NAME>` environment variables in daemon, trigger, bot, and flow runs, where there is no `--var`. CLI `--var` still takes precedence. See `docs/getting-started/agent-spec-import.md`.
+- **`allow_all` opt-in on Slack, Discord, and Telegram triggers.** Set `allow_all: true` to explicitly respond to anyone when no allowlist is configured.
+
+### Changed
+- **Unconfigured bot triggers now log a loud startup warning** that they will respond to any user. Behavior is otherwise unchanged (still open), so no existing bot breaks on upgrade; a future release will flip the default to fail-closed. Documented in the Discord and Telegram quickstarts.
+
+### Fixed
+- **The LLM input-classifier guardrail no longer crashes the run.** On the sync executor path (which runs inside `anyio.run`), the classifier called PydanticAI's `run_sync` against the already-running loop and raised `RuntimeError`, aborting the run and the guardrail. It now runs the async classifier on a worker thread.
+- **The daemon circuit breaker no longer wedges open.** A HALF_OPEN probe slot claimed by a trigger that was then dropped (concurrency cap or budget), paused for approval, or failed with a non-provider error was never released, so the breaker rejected every later trigger forever. The slot is now released on all of those paths.
+- **The daemon now actually waits for in-flight runs on shutdown.** The shutdown path printed "Waiting for in-flight execution to complete" but never blocked, so a run longer than the trigger-join timeout was killed mid-execution with its post-processing skipped. Shutdown now drains in-flight runs up to a bounded grace period.
+- **Cron triggers fire in the configured timezone.** `CronTriggerConfig.timezone` was ignored and schedules always evaluated in UTC; they now anchor on the configured zone, matching the heartbeat trigger.
+- **Templated role prompts work outside the CLI.** Under daemon and trigger runs a templated role crashed on a required variable or sent the literal `{{var}}` to the model; unset optional variables now render empty and string booleans (`"false"`) are parsed by content rather than truthiness.
+- **A single malformed document no longer aborts an entire ingest run.** Extraction caught only `(ValueError, OSError)`, so a corrupt PDF/DOCX/XLSX (or deeply nested JSON) crashed the whole batch; the bad file is now recorded as an error and the rest still ingest.
+- **Concurrent document-store writers no longer collide on chunk IDs.** Multiple `LanceDocumentStore` instances on one path each kept a private ID counter and allocated overlapping IDs; allocation now uses one process-wide lock and counter per path.
+- **Durable flows reject `loop_back` instead of silently looping on stale output.** A durable flow with a `loop_back` (critic/refine) sink replayed the loop target's first-iteration checkpoint every round, ignoring feedback. The combination is now rejected at flow validation until loop-aware checkpoint keys exist.
+
 ## [2026.6.4] - 2026-06-15
 
 ### Added

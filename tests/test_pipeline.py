@@ -169,6 +169,57 @@ class TestProgressCallback:
         assert stats.new == 2
         assert all(status == FileStatus.NEW for _, status in callback_calls)
 
+    def test_one_malformed_file_does_not_abort_run(self, tmp_path, monkeypatch):
+        """Regression (E1): a file whose extractor raises outside (ValueError,
+        OSError) must be recorded ERROR while the rest of the batch still ingest,
+        instead of crashing the whole run."""
+        from unittest.mock import MagicMock, patch
+
+        import initrunner.ingestion.pipeline as pipeline_mod
+        from initrunner.agent.schema.ingestion import (
+            ChunkingConfig,
+            EmbeddingConfig,
+            IngestConfig,
+        )
+
+        (tmp_path / "good.txt").write_text("hello world content here")
+        (tmp_path / "bad.txt").write_text("triggers an extractor blowup")
+
+        config = IngestConfig(
+            sources=["*.txt"],
+            chunking=ChunkingConfig(strategy="fixed", chunk_size=512, chunk_overlap=0),
+            embeddings=EmbeddingConfig(),
+        )
+
+        real_extract = pipeline_mod.extract_text
+
+        def flaky_extract(path, *args, **kwargs):
+            if Path(path).name == "bad.txt":
+                raise RecursionError("simulated extractor blowup")  # not ValueError/OSError
+            return real_extract(path, *args, **kwargs)
+
+        mock_embedder = MagicMock()
+
+        async def fake_embed(emb, texts, **kw):
+            return [[1.0, 0.0, 0.0, 0.0]] * len(texts)
+
+        with (
+            patch("initrunner.ingestion.pipeline.create_embedder", return_value=mock_embedder),
+            patch("initrunner.ingestion.pipeline.embed_texts", new=fake_embed),
+            patch(
+                "initrunner.ingestion.pipeline._get_store_path",
+                return_value=tmp_path / "store.db",
+            ),
+            patch("initrunner.ingestion.pipeline.extract_text", new=flaky_extract),
+        ):
+            from initrunner.ingestion.pipeline import run_ingest
+
+            stats = run_ingest(config, "test-agent", base_dir=tmp_path)
+
+        # Did not raise; bad file errored, good file still ingested.
+        assert stats.errored == 1
+        assert stats.new == 1
+
 
 class TestUrlClassification:
     def test_classify_urls_new(self, tmp_path):

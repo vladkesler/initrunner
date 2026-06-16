@@ -99,6 +99,12 @@ resume, so any external side effects it produced are not repeated; conversely, a
 re-run sub-agent will repeat its side effects. Design tools that mutate external
 state to be safe under at-least-once execution.
 
+**Not supported with `loop_back`.** A durable flow cannot use a `loop_back`
+(critic/refine) sink. Durable checkpoints are keyed only by `(flow_run_id,
+service_name)`, so a loop target would replay its first iteration's stored output
+every round instead of re-running, silently defeating the loop. The combination
+is rejected at flow validation; disable durability or remove the `loop_back` sink.
+
 ## Daemon flows
 
 A trigger-driven flow daemon (`initrunner flow up`) with durability enabled

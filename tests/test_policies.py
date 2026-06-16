@@ -272,3 +272,57 @@ class TestPipelineOrdering:
         result = validate_input("blocked input", policy)
         assert result.validator == "pattern"
         mock_llm.assert_not_called()
+
+
+class TestLlmClassifierInsideEventLoop:
+    """Regression for A5: execute_run wraps orchestration in run_sync -> anyio.run,
+    so the SYNC validate_input runs inside a live event loop. It used to call
+    PydanticAI Agent.run_sync there, which does run_until_complete on the active
+    loop and raises RuntimeError, crashing the whole run. The classifier must now
+    route through the async path on a worker thread instead."""
+
+    class _FakeResult:
+        def __init__(self, output: str) -> None:
+            self.output = output
+
+    class _FakeClassifier:
+        def __init__(self, output: str) -> None:
+            self._output = output
+
+        async def run(self, prompt: str):
+            return TestLlmClassifierInsideEventLoop._FakeResult(self._output)
+
+        def run_sync(self, prompt: str):
+            raise AssertionError("run_sync must not be used inside a running event loop")
+
+    def _run_validate_in_loop(self, monkeypatch, classifier_output: str) -> ValidationResult:
+        import anyio
+
+        from initrunner.agent import policies
+
+        monkeypatch.setattr(
+            policies,
+            "_get_classifier_agent",
+            lambda model_override=None: self._FakeClassifier(classifier_output),
+        )
+        policy = ContentPolicy(
+            llm_classifier_enabled=True,
+            allowed_topics_prompt="only answer weather questions",
+        )
+
+        async def _inner() -> ValidationResult:
+            # Mirrors execute_run: sync validate_input invoked inside a running loop.
+            return policies.validate_input("what is the weather?", policy)
+
+        return anyio.run(_inner)
+
+    def test_classifier_allows_inside_loop(self, monkeypatch):
+        result = self._run_validate_in_loop(monkeypatch, '{"is_safe": true, "reason": "ok"}')
+        assert result.valid
+
+    def test_classifier_blocks_inside_loop(self, monkeypatch):
+        result = self._run_validate_in_loop(
+            monkeypatch, '{"is_safe": false, "reason": "off-topic"}'
+        )
+        assert not result.valid
+        assert result.validator == "llm_classifier"

@@ -230,3 +230,34 @@ class TestRunIngestManaged:
         )
         assert stats.new == 0
         assert stats.total_chunks == 0
+
+
+class TestManagedSyncResourceLimits:
+    def test_managed_sync_forwards_role_resource_limits(self, tmp_path):
+        """Regression (E2): run_ingest_managed_sync must pass the role's declared
+        security.resources limits, not leave them at the unlimited default of 0."""
+        from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
+        from initrunner.agent.schema.role import AgentSpec, RoleDefinition
+        from initrunner.services.ingestion import run_ingest_managed_sync
+
+        role = RoleDefinition(
+            apiVersion=ApiVersion.V1,
+            kind=Kind.AGENT,
+            metadata=RoleMetadata(name="t-agent", description="d"),
+            spec=AgentSpec(
+                role="r",
+                model=ModelConfig(provider="openai", name="gpt-4o"),
+                ingest=IngestConfig(sources=["*.txt"]),
+            ),
+        )
+        role_path = tmp_path / "role.yaml"
+        role_path.write_text("x: 1")
+
+        with patch("initrunner.ingestion.pipeline.run_ingest_managed") as mock_managed:
+            mock_managed.return_value = IngestStats()
+            run_ingest_managed_sync(role, role_path, files=[tmp_path / "f.txt"])
+
+        kwargs = mock_managed.call_args.kwargs
+        # Role defaults: 50 MB per file, 500 MB total (ResourceLimits defaults).
+        assert kwargs["max_file_size_mb"] == 50.0
+        assert kwargs["max_total_ingest_mb"] == 500.0

@@ -55,6 +55,7 @@ class DaemonRunner:
     """Encapsulates daemon mode state and trigger handling."""
 
     _MAX_CONCURRENT = 4
+    _SHUTDOWN_GRACE_SECONDS = 30
 
     def __init__(
         self,
@@ -175,6 +176,11 @@ class DaemonRunner:
             while not self._stop.wait(timeout=30):
                 pass
 
+            # Drain in-flight runs before the dispatcher tears down the trigger
+            # threads (which only join for ~10s); otherwise a longer run is
+            # abandoned mid-execution and its post-processing never runs.
+            self._drain_in_flight()
+
         if self._reloader is not None:
             self._reloader.stop()
 
@@ -224,6 +230,9 @@ class DaemonRunner:
                 return
 
         if not self._concurrency_semaphore.acquire(blocking=False):
+            # Free any HALF_OPEN probe slot we just claimed: this run won't execute.
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.release_probe()
             console.print(
                 f"\n[yellow]Max concurrent triggers ({self._MAX_CONCURRENT}) reached — "
                 f"skipping trigger ({event.trigger_type})[/yellow]"
@@ -234,6 +243,11 @@ class DaemonRunner:
             self._on_trigger_inner(event)
         finally:
             self._concurrency_semaphore.release()
+            # Release a claimed probe if the run never recorded a result (budget
+            # drop, pause-for-approval, or an unexpected error). No-op once a
+            # success/failure was recorded, since the breaker left HALF_OPEN.
+            if self._circuit_breaker is not None:
+                self._circuit_breaker.release_probe()
 
     def _on_trigger_inner(self, event: TriggerEvent) -> None:
         """Process a single trigger event with retry and circuit breaker."""
@@ -590,6 +604,29 @@ class DaemonRunner:
         from initrunner.runner import maybe_prune_sessions
 
         maybe_prune_sessions(self._role, self._memory_store)
+
+    def _drain_in_flight(self) -> None:
+        """Block until in-flight runs finish, up to a bounded grace period.
+
+        In-flight runs execute on the trigger threads, which the dispatcher only
+        joins for ~10s on stop, so without this drain a longer run is killed
+        mid-execution and its post-processing (sink dispatch, episode capture,
+        history persistence) never runs. This actually waits on the condition
+        the run loop already notifies, instead of just printing that it does.
+        """
+        import time
+
+        deadline = time.monotonic() + self._SHUTDOWN_GRACE_SECONDS
+        with self._in_flight_cond:
+            while self._in_flight_count > 0:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    console.print(
+                        f"[yellow]  Grace period elapsed; {self._in_flight_count} in-flight "
+                        f"run(s) will be interrupted.[/yellow]"
+                    )
+                    return
+                self._in_flight_cond.wait(timeout=remaining)
 
     def _on_first_signal(self) -> None:
         """Handle the first shutdown signal."""

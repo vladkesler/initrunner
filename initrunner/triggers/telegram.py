@@ -10,7 +10,12 @@ from collections.abc import Callable
 from initrunner._async import run_sync
 from initrunner._text import safe_substitute
 from initrunner.agent.schema.triggers import TelegramTriggerConfig
-from initrunner.triggers.base import ChannelAdapter, TriggerEvent, _chunk_text
+from initrunner.triggers.base import (
+    ChannelAdapter,
+    TriggerEvent,
+    _chunk_text,
+    warn_if_unauthenticated,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -58,6 +63,12 @@ class TelegramAdapter(ChannelAdapter):
 
         allowed_usernames = set(self._config.allowed_users)
         allowed_user_ids = set(self._config.allowed_user_ids)
+        allow_all = self._config.allow_all
+        warn_if_unauthenticated(
+            "Telegram",
+            has_allowlist=bool(allowed_usernames or allowed_user_ids),
+            allow_all=allow_all,
+        )
 
         async def on_message(update: Update, context) -> None:
             if update.message is None or update.message.text is None:
@@ -66,7 +77,7 @@ class TelegramAdapter(ChannelAdapter):
             username = user.username if user else None
             user_id = user.id if user else None
 
-            if allowed_usernames or allowed_user_ids:
+            if not allow_all and (allowed_usernames or allowed_user_ids):
                 username_ok = bool(allowed_usernames and username in allowed_usernames)
                 user_id_ok = bool(allowed_user_ids and user_id in allowed_user_ids)
                 if not username_ok and not user_id_ok:

@@ -290,7 +290,12 @@ def _resolve_safe_ip(host: str, port: int, dns_timeout: float) -> str:
     return pinned
 
 
-def _pin_request(request: httpx.Request, dns_timeout: float) -> None:
+def _pin_request(
+    request: httpx.Request,
+    dns_timeout: float,
+    allowed_domains: list[str] | None = None,
+    blocked_domains: list[str] | None = None,
+) -> None:
     """Rewrite *request* in place to connect to a validated, pinned IP.
 
     Validates the scheme, resolves+checks the host once, then points the URL at
@@ -298,11 +303,22 @@ def _pin_request(request: httpx.Request, dns_timeout: float) -> None:
     TLS ``sni_hostname`` so certificate verification still targets the hostname.
     httpx therefore connects to the exact IP we validated -- it does not
     re-resolve -- which closes the DNS-rebinding window. Runs per redirect hop.
+
+    When ``allowed_domains``/``blocked_domains`` are supplied, the domain policy
+    is enforced on EVERY hop (so a redirect cannot escape the allowlist) -- and
+    it is checked against the original host *before* the URL is rewritten to the
+    pinned IP below, since after the rewrite the host is an IP and would never
+    match a domain rule.
     """
     url = request.url
     scheme = url.scheme.lower()
     if scheme not in ("http", "https"):
         raise SSRFBlocked(f"SSRF blocked: scheme '{url.scheme}' is not allowed")
+
+    if allowed_domains or blocked_domains:
+        domain_err = check_domain_filter(str(url), allowed_domains or [], blocked_domains or [])
+        if domain_err:
+            raise SSRFBlocked(domain_err)
 
     host = url.host
     port = url.port or (443 if scheme == "https" else 80)
@@ -327,22 +343,44 @@ class SSRFSafeTransport(httpx.HTTPTransport):
     redirect-based SSRF.
     """
 
-    def __init__(self, *, dns_timeout: float = _DNS_TIMEOUT, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        dns_timeout: float = _DNS_TIMEOUT,
+        allowed_domains: list[str] | None = None,
+        blocked_domains: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self._dns_timeout = dns_timeout
+        self._allowed_domains = allowed_domains
+        self._blocked_domains = blocked_domains
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        _pin_request(request, self._dns_timeout)
+        _pin_request(request, self._dns_timeout, self._allowed_domains, self._blocked_domains)
         return super().handle_request(request)
 
 
 class AsyncSSRFSafeTransport(httpx.AsyncHTTPTransport):
-    """Async httpx transport that rejects requests to private/internal IPs."""
+    """Async httpx transport that rejects requests to private/internal IPs.
 
-    def __init__(self, *, dns_timeout: float = _DNS_TIMEOUT, **kwargs: Any) -> None:
+    Like :class:`SSRFSafeTransport`, also enforces an optional domain
+    allow/block policy on every hop (including redirects).
+    """
+
+    def __init__(
+        self,
+        *,
+        dns_timeout: float = _DNS_TIMEOUT,
+        allowed_domains: list[str] | None = None,
+        blocked_domains: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self._dns_timeout = dns_timeout
+        self._allowed_domains = allowed_domains
+        self._blocked_domains = blocked_domains
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        _pin_request(request, self._dns_timeout)
+        _pin_request(request, self._dns_timeout, self._allowed_domains, self._blocked_domains)
         return await super().handle_async_request(request)

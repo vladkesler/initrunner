@@ -10,10 +10,10 @@ Each rule is a string in the format:
 arg_name=glob_pattern
 ```
 
-- **`arg_name`** — matches the tool function's parameter name (e.g. `command`, `path`, `url`)
+- **`arg_name`** — matches the tool function's parameter name (e.g. `command`, `path`, `url`). Use a dotted path (e.g. `options.path`) to target a value nested inside a dict argument. The resolved value is searched leaf-by-leaf, so dict/list arguments and non-string scalars are covered.
 - **`glob_pattern`** — standard `fnmatch` glob (`*`, `?`, `[seq]`, `[!seq]`)
 
-A **bare pattern** (no `=`) matches against all string argument values.
+A **bare pattern** (no `=`) matches against every argument value, including values nested inside dict/list arguments and non-string scalars (stringified before matching) — so a deny rule cannot be bypassed by nesting a sensitive value or passing it as a non-string.
 
 ## Evaluation order
 
