@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026.6.6] - 2026-06-17
+
+### Security
+- **Resolved all 30 open dependency vulnerability alerts (15 Trivy code-scanning + 15 Dependabot) by bumping four packages together in `uv.lock`.** Each package was flagged independently, but no single Dependabot PR could pass the `pip-audit` CI gate because the gate fails while any vulnerable package remains; bumping all four in one change is what clears it.
+  - Bumped `cryptography` to 49.0.0 (GHSA-537c-gmf6-5ccf). The `vault` and `vault-keyring` extras now require `cryptography>=48`.
+  - Bumped `starlette` to 1.3.1 (CVE-2026-54282, CVE-2026-54283).
+  - Bumped `aiohttp` to 3.14.1 (CVE-2026-54273 through CVE-2026-54280).
+  - Bumped `python-multipart` to 0.0.32 (CVE-2026-53537, CVE-2026-53538, CVE-2026-53539, CVE-2026-53540).
+
 ## [2026.6.5] - 2026-06-16
 
 ### Security
