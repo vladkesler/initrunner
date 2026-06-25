@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.6.8] - 2026-06-25
+
+### Security
+- **Bumped `dompurify` to 3.4.11 in the dashboard frontend (GHSA-cmwh-pvxp-8882).** DOMPurify 3.4.10, pulled transitively by `posthog-js`, had a moderate `ALLOWED_ATTR` pollution issue via `setConfig()` (an incomplete fix of the 3.4.7 hook-pollution patch); 3.4.11 is the patched release. It resolves within `posthog-js`'s existing `^3.3.2` range, so no `posthog-js` change was needed and the dashboard build is unaffected.
+- Confirmed the `pydantic-settings` bump to 2.14.2 shipped in 2026.6.7 resolves GHSA-4xgf-cpjx-pc3j (`NestedSecretsSettingsSource` symlink read, bypassing `secrets_dir_max_size`); no further change required.
+
 ## [2026.6.7] - 2026-06-25
 
 ### Changed
