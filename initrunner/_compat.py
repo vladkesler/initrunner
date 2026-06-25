@@ -26,7 +26,7 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "discord": ("discord", "discord.py"),
     "slack_sdk": ("slack", "slack-sdk"),
     "webview": ("desktop", "pywebview"),
-    "fasta2a": ("a2a", "pydantic-ai-slim[a2a]"),
+    "fasta2a": ("a2a", "fasta2a"),
     "cryptography": ("vault", "cryptography"),
     "keyring": ("vault-keyring", "keyring"),
     "pydantic_evals": ("observability", "pydantic-evals"),
@@ -138,7 +138,7 @@ def require_ingest(package: str) -> None:
 
 def require_a2a() -> None:
     """Check that fasta2a is importable, or raise with install hint."""
-    require_extra("fasta2a", extra="a2a", pip_name="pydantic-ai-slim[a2a]")
+    require_extra("fasta2a", extra="a2a", pip_name="fasta2a")
 
 
 def require_embeddings_local() -> None:

@@ -267,13 +267,19 @@ class TestInstrumentationSettings:
 
 
 # ---------------------------------------------------------------------------
-# Agent creation passes instrument= when observability is set
+# Agent creation wires instrumentation as an Instrumentation capability (v2)
 # ---------------------------------------------------------------------------
 
 
 class TestAgentCreationWithInstrumentation:
     def test_create_agent_passes_instrument(self):
-        """_create_agent should pass instrument kwarg to Agent."""
+        """_create_agent wires instrumentation as an Instrumentation capability.
+
+        v2 removed ``Agent(instrument=...)``; the settings are now carried by a
+        ``pydantic_ai.capabilities.Instrumentation`` appended to ``capabilities``.
+        """
+        from pydantic_ai.capabilities import Instrumentation
+
         from initrunner.agent.loader import _create_agent
 
         mock_settings = MagicMock()
@@ -286,10 +292,16 @@ class TestAgentCreationWithInstrumentation:
                 _create_agent(role, "system prompt", [], str, instrument=mock_settings)
 
                 call_kwargs = MockAgent.call_args
-                assert call_kwargs.kwargs["instrument"] is mock_settings
+                assert "instrument" not in call_kwargs.kwargs
+                caps = call_kwargs.kwargs["capabilities"]
+                instrumentations = [c for c in caps if isinstance(c, Instrumentation)]
+                assert len(instrumentations) == 1
+                assert instrumentations[0].settings is mock_settings
 
     def test_create_agent_no_instrument_by_default(self):
-        """_create_agent without instrument should not pass it to Agent."""
+        """Without instrument, no Instrumentation capability is added."""
+        from pydantic_ai.capabilities import Instrumentation
+
         from initrunner.agent.loader import _create_agent
 
         with patch("initrunner.agent.loader._build_model", return_value="openai:gpt-4o"):
@@ -301,6 +313,8 @@ class TestAgentCreationWithInstrumentation:
 
                 call_kwargs = MockAgent.call_args
                 assert "instrument" not in call_kwargs.kwargs
+                caps = call_kwargs.kwargs.get("capabilities", [])
+                assert not any(isinstance(c, Instrumentation) for c in caps)
 
 
 class TestSpanTreeCapture:

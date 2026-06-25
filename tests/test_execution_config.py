@@ -17,7 +17,7 @@ class TestExecutionConfigDefaults:
         ec = ExecutionConfig()
         assert ec.retries == 1
         assert ec.output_retries is None
-        assert ec.end_strategy == "early"
+        assert ec.end_strategy == "graceful"
         assert ec.tool_timeout_seconds is None
 
     def test_bounds_rejected(self):
@@ -89,7 +89,7 @@ class TestExecutionFieldsWiredToAgent:
         role = load_role(_write_role(tmp_path))
         agent = build_agent(role)
         assert agent._max_tool_retries == 1
-        assert agent.end_strategy == "early"
+        assert agent.end_strategy == "graceful"
         assert agent._tool_timeout is None
 
     def test_overrides_applied(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

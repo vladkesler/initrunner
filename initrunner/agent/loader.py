@@ -145,7 +145,13 @@ def _build_retrying_provider_model(model_config: ModelConfig, http_client, api_k
         from pydantic_ai.models.google import GoogleModel  # type: ignore[import-not-found]
         from pydantic_ai.providers.google import GoogleProvider  # type: ignore[import-not-found]
 
-        return GoogleModel(name, provider=GoogleProvider(api_key=api_key, http_client=http_client))
+        # v2 typed GoogleProvider's api_key as a required ``str``; the implementation
+        # still accepts None and falls back to GOOGLE_API_KEY, as the other providers do.
+        provider = GoogleProvider(
+            api_key=api_key,  # type: ignore[invalid-argument-type]
+            http_client=http_client,
+        )
+        return GoogleModel(name, provider=provider)
     if provider == "groq":
         from pydantic_ai.models.groq import GroqModel  # type: ignore[import-not-found]
         from pydantic_ai.providers.groq import GroqProvider  # type: ignore[import-not-found]
@@ -523,10 +529,12 @@ def _create_agent(
         "model_settings": ModelSettings(**model_settings_kwargs),
         "toolsets": toolsets if toolsets else None,
     }
-    if instrument is not None:
-        kwargs["instrument"] = instrument
     if capabilities:
         kwargs["capabilities"] = capabilities
+    if instrument is not None:
+        from pydantic_ai.capabilities import Instrumentation
+
+        kwargs.setdefault("capabilities", []).append(Instrumentation(settings=instrument))
     if prepare_tools is not None:
         from pydantic_ai.capabilities.prepare_tools import PrepareTools
 

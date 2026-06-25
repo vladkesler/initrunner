@@ -30,11 +30,11 @@ Names are CamelCase class names matching PydanticAI's capability registry. For c
 | Capability | Arguments | Purpose |
 |---|---|---|
 | `Thinking` | `effort`: `minimal`, `low`, `medium`, `high`, `xhigh` | Enable model-level extended thinking |
-| `WebSearch` | `allowed_domains`, `blocked_domains`, `search_context_size`, `max_uses` | Web search with provider-adaptive fallback |
+| `WebSearch` | `allowed_domains`, `blocked_domains`, `search_context_size`, `max_uses` | Native provider web search (raises on models without native web search) |
 | `WebFetch` | `allowed_domains`, `blocked_domains`, `max_uses` | URL fetching with local fallback |
 | `ImageGeneration` | `fallback_model`, `image_model`, `quality`, `size`, `output_format`, `action`, `background`, `moderation` | Provider-native image generation (OpenAI Responses, Google) with optional `fallback_model` delegation on providers that lack it |
 | `MCP` | `url` (required), `id`, `authorization_token`, `headers`, `allowed_tools` | PydanticAI-native MCP server connection |
-| `BuiltinTool` | `tool` (builtin tool spec) | Register individual builtin tools |
+| `NativeTool` | `tool` (native tool spec) | Register individual provider-native tools |
 | `PrefixTools` | `prefix`, `capability` (nested spec) | Namespace tool names to avoid conflicts |
 
 ## Examples

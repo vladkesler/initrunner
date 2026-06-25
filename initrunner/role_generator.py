@@ -104,7 +104,7 @@ def build_schema_reference() -> str:
         "#   - Thinking: high               # single arg (effort level)",
         "#   - MCP: {url: https://...}      # kwargs",
         "# Available: Thinking, WebSearch, WebFetch, ImageGeneration,",
-        "#   MCP, BuiltinTool, PrefixTools",
+        "#   MCP, NativeTool, PrefixTools",
         "# NEVER declare both a capability and its equivalent tool.",
         "# Prefer: WebSearch cap over search tool, web_reader tool over WebFetch cap.",
         "#   WebSearch conflicts with type: search",

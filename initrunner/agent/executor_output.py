@@ -283,6 +283,8 @@ def build_timeline_entry(event: Any) -> dict[str, Any] | None:
     from pydantic_ai.messages import (
         FunctionToolCallEvent,
         FunctionToolResultEvent,
+        OutputToolCallEvent,
+        OutputToolResultEvent,
         PartDeltaEvent,
         ThinkingPartDelta,
         ToolCallPartDelta,
@@ -324,6 +326,29 @@ def build_timeline_entry(event: Any) -> dict[str, Any] | None:
             part_type = type(event.part).__name__ if event.part is not None else None
             return {
                 "type": "function_tool_result",
+                "timestamp_unix_ms": _now_ms(),
+                "content_preview": content_preview,
+                "part_type": part_type,
+            }
+        if isinstance(event, OutputToolCallEvent):
+            part = event.part
+            return {
+                "type": "output_tool_call",
+                "timestamp_unix_ms": _now_ms(),
+                "tool_call_id": part.tool_call_id,
+                "tool_name": part.tool_name,
+                "args_preview": _preview_args(part.args, 120),
+                "args_valid": event.args_valid,
+            }
+        if isinstance(event, OutputToolResultEvent):
+            # OutputToolResultEvent carries no event-level ``content`` (unlike
+            # FunctionToolResultEvent); the result payload lives on the part.
+            part = event.part
+            content = getattr(part, "content", None)
+            content_preview = _truncate_redact(content, 120) if isinstance(content, str) else None
+            part_type = type(part).__name__ if part is not None else None
+            return {
+                "type": "output_tool_result",
                 "timestamp_unix_ms": _now_ms(),
                 "content_preview": content_preview,
                 "part_type": part_type,

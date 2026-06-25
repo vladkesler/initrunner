@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026.6.7] - 2026-06-25
+
+### Changed
+- **Upgraded to PydanticAI v2 (`pydantic-ai>=2.0.0`).** Every `pydantic-ai-slim` and `pydantic-evals` pin moved from `>=1.107.0` to `>=2.0.0`. The base install now uses the `mcp` extra in place of the removed `fastmcp` back-compat extra (which previously supplied `pydantic_ai.mcp.MCPToolset`); InitRunner's own FastMCP server dependency (`fastmcp>=3.2.0`) is unrelated and unchanged. The `a2a` extra now pulls the upstream `fasta2a` package directly, since `pydantic-ai-slim[a2a]` was removed in v2.
+- **`end_strategy` now defaults to `graceful` (previously `early`), matching PydanticAI v2.** A role with no explicit `spec.execution.end_strategy` will now also run the function-tool calls the model requested alongside a successful output, instead of stopping at the first final output. Set `end_strategy: early` to restore the old behavior. The new `graceful` value is also accepted by the `--agent-spec` importer and emitted by the exporter.
+- **The `WebSearch` capability is native-only.** Under v2 it uses the provider's native web search and raises on models that lack one, rather than silently adapting. `WebFetch` still receives InitRunner's injected SSRF-protected local fallback.
+- **The `BuiltinTool` capability is renamed to `NativeTool`.** PydanticAI v2 renamed the underlying class, so a role using `- BuiltinTool` under `spec.capabilities` must switch to `- NativeTool`.
+- **Custom tool builders that register a context-free function must use `@toolset.tool_plain`.** PydanticAI v2 requires the `@toolset.tool` decorator's function to take a `RunContext` as its first parameter; registering a context-free function with `@toolset.tool` now raises at schema-generation time. InitRunner's built-in tools already use `tool_plain`; the tool-creation guide and examples are updated to match.
+- **Agent instrumentation is wired as a `pydantic_ai.capabilities.Instrumentation` capability** instead of the removed `Agent(instrument=...)` constructor argument. The `spec.observability` YAML block and its behavior are unchanged.
+
+### Fixed
+- **Streaming runs use the v2 `run_stream_events()` context-manager form.** v2 makes `Agent.run_stream_events()` an async context manager only; the executor now drives it with `async with ... as events`, restoring event streaming (token callbacks and the audit timeline) under v2.
+- **Tool-mode structured-output calls are recorded in the run-event timeline again.** v2 routes output-tool calls and results through dedicated `OutputToolCallEvent` / `OutputToolResultEvent` rather than the function-tool events; the audit and eval timeline now captures these as `output_tool_call` / `output_tool_result` entries.
+- **Streaming a text-output role with an approval-gated tool now pauses instead of crashing.** When such a role's model calls an `approval: required` tool, the run output becomes a `DeferredToolRequests`; v2's `stream_text()` raises on non-text output, which previously escaped uncaught from the streaming run (CLI `--stream` and the OpenAI-compatible streaming API). The streaming executor now catches that and routes to the human-in-the-loop pause (`status: paused`), matching the non-streaming path.
+
+### Dependencies
+- Bumped `pydantic-settings` from 2.12.0 to 2.14.2 (#165).
+- Bumped `posthog-js` from 1.386.6 to 1.393.4 in the dashboard frontend (#166).
+- Bumped the `actions/checkout` CI action from 6 to 7 (#161).
+
 ## [2026.6.6] - 2026-06-17
 
 ### Security

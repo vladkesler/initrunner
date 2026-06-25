@@ -28,7 +28,7 @@ class AgentSpecImportError(Exception):
     """Raised when an agent-spec YAML file cannot be mapped to a role."""
 
 
-_VALID_END_STRATEGIES = {"early", "exhaustive"}
+_VALID_END_STRATEGIES = {"early", "graceful", "exhaustive"}
 
 
 def _coerce_instructions(value: Any) -> str:

@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -253,9 +254,13 @@ class TestAsyncStreamingEvents:
 
         events_to_yield = [start, delta_1, delta_2, final_event]
 
+        @asynccontextmanager
         async def fake_run_stream_events(*_args, **_kwargs):
-            for ev in events_to_yield:
-                yield ev
+            async def _events():
+                for ev in events_to_yield:
+                    yield ev
+
+            yield _events()
 
         agent = MagicMock()
         agent.run_stream_events = fake_run_stream_events
@@ -367,6 +372,37 @@ class TestBuildTimelineEntry:
         assert "[REDACTED]" in entry["content_preview"]
         assert entry["part_type"] == "ToolReturnPart"
 
+    def test_output_tool_call_recorded(self):
+        from pydantic_ai.messages import OutputToolCallEvent, ToolCallPart
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        part = ToolCallPart(tool_name="final_result", args={"answer": "42"}, tool_call_id="ot-1")
+        ev = OutputToolCallEvent(part=part)
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert entry["type"] == "output_tool_call"
+        assert entry["tool_call_id"] == "ot-1"
+        assert entry["tool_name"] == "final_result"
+        assert entry["args_preview"] == '{"answer": "42"}'
+
+    def test_output_tool_result_recorded_and_redacted(self):
+        from pydantic_ai.messages import OutputToolResultEvent, ToolReturnPart
+
+        from initrunner.agent.executor_output import build_timeline_entry
+
+        secret = "sk-proj-" + "d" * 40
+        part = ToolReturnPart(
+            tool_name="final_result", content=f"result {secret}", tool_call_id="ot-2"
+        )
+        ev = OutputToolResultEvent(part=part)
+        entry = build_timeline_entry(ev)
+        assert entry is not None
+        assert entry["type"] == "output_tool_result"
+        assert entry["part_type"] == "ToolReturnPart"
+        assert secret not in entry["content_preview"]
+        assert "[REDACTED]" in entry["content_preview"]
+
     def test_cap_timeline_keeps_tail(self):
         from initrunner.agent.executor_output import _TIMELINE_MAX_ENTRIES, cap_timeline
 
@@ -418,9 +454,13 @@ class TestStreamEventsTimelinePopulation:
 
         events = [thinking, text, call, result_ev, final_event]
 
+        @asynccontextmanager
         async def fake_run_stream_events(*_args, **_kwargs):
-            for ev in events:
-                yield ev
+            async def _events():
+                for ev in events:
+                    yield ev
+
+            yield _events()
 
         agent = MagicMock()
         agent.run_stream_events = fake_run_stream_events
@@ -471,3 +511,53 @@ class TestStreamEventsTimelinePopulation:
             )
 
         assert result.event_timeline == []
+
+
+class TestStreamingDeferredOutput:
+    @pytest.mark.asyncio
+    async def test_text_role_with_approval_tool_pauses_instead_of_raising(self):
+        """A text-output role whose model calls an approval-gated tool resolves
+        to a DeferredToolRequests. In v2 ``stream_text()`` raises UserError on
+        non-text output; the executor must catch that and pause (status
+        ``paused``) instead of crashing the streaming run. Uses a real
+        FunctionModel + ApprovalRequiredToolset (no mocks) to drive the path.
+        """
+        from pydantic_ai import Agent, DeferredToolRequests
+        from pydantic_ai.models.function import DeltaToolCall, FunctionModel
+        from pydantic_ai.toolsets import ApprovalRequiredToolset, FunctionToolset
+
+        from initrunner.agent.executor import execute_run_stream_async
+
+        role = _make_text_role()
+
+        ts = FunctionToolset()
+
+        @ts.tool_plain
+        def dangerous(command: str) -> str:
+            return f"ran: {command}"
+
+        wrapped = ApprovalRequiredToolset(ts)
+
+        async def stream_fn(messages, info):
+            yield {
+                0: DeltaToolCall(name="dangerous", json_args='{"command": "x"}', tool_call_id="c1")
+            }
+
+        agent = Agent(
+            FunctionModel(stream_function=stream_fn),
+            output_type=[str, DeferredToolRequests],
+            toolsets=[wrapped],
+        )
+
+        tokens: list[str] = []
+        result, _msgs = await execute_run_stream_async(
+            agent,
+            role,
+            "go",
+            on_token=tokens.append,
+            skip_input_validation=True,
+        )
+
+        assert result.status == "paused"
+        assert result.pending_approvals
+        assert result.pending_approvals[0].tool_name == "dangerous"
