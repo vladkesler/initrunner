@@ -21,7 +21,7 @@ class ConcurrencyConfig(BaseModel):
 class ExecutionConfig(BaseModel):
     retries: Annotated[int, Field(ge=0, le=10)] = 1
     output_retries: Annotated[int, Field(ge=0, le=10)] | None = None
-    end_strategy: Literal["early", "exhaustive"] = "early"
+    end_strategy: Literal["early", "graceful", "exhaustive"] = "graceful"
     tool_timeout_seconds: Annotated[float, Field(gt=0)] | None = None
     max_concurrency: ConcurrencyConfig | None = None
     http_retries: Annotated[int, Field(ge=1, le=10)] = 3

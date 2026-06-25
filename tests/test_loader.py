@@ -424,7 +424,14 @@ class TestBuildAgent:
         mock_require.assert_called_once_with("anthropic")
         mock_agent_cls.assert_called_once()
         call_kwargs = mock_agent_cls.call_args
-        assert call_kwargs.args[0] == "anthropic:claude-sonnet-4-5-20250929"
+        # With the anthropic SDK installed, _build_model returns an explicit
+        # AnthropicModel; without it, the plain "provider:name" string. Accept
+        # either so the test is robust regardless of which extras are present.
+        model_arg = call_kwargs.args[0]
+        if isinstance(model_arg, str):
+            assert model_arg == "anthropic:claude-sonnet-4-5-20250929"
+        else:
+            assert model_arg.model_name == "claude-sonnet-4-5-20250929"
         assert call_kwargs.kwargs["instructions"] == "You are helpful."
 
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})

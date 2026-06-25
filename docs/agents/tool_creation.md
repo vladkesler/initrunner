@@ -32,7 +32,7 @@ class RedisToolConfig(ToolConfigBase):
 def build_redis_toolset(config: RedisToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def redis_get(key: str) -> str:
         """Get a value from Redis."""
         import redis
@@ -44,7 +44,7 @@ def build_redis_toolset(config: RedisToolConfig, ctx: ToolBuildContext) -> Funct
 
 The tool is immediately available in role YAML as `type: redis` — no other files need editing.
 
-Tools use [PydanticAI's FunctionToolset](https://ai.pydantic.dev/tools/) under the hood. The `@toolset.tool` decorator registers individual functions, and PydanticAI handles parameter schema generation from type annotations and docstrings.
+Tools use [PydanticAI's FunctionToolset](https://ai.pydantic.dev/tools/) under the hood. The `@toolset.tool_plain` decorator registers individual functions (use `@toolset.tool` only when the function takes a `RunContext` as its first parameter), and PydanticAI handles parameter schema generation from type annotations and docstrings.
 
 ### ToolConfigBase
 
@@ -385,7 +385,7 @@ class SlackToolConfig(BaseModel):
 def build_slack_toolset(config: SlackToolConfig, **kwargs) -> FunctionToolset:
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def send_message(text: str) -> str:
         """Send a message to the configured Slack channel."""
         # ... implementation using config.token and config.channel
@@ -458,7 +458,7 @@ def build_my_http_toolset(config: MyHttpToolConfig, ctx: ToolBuildContext) -> Fu
     if ctx.prefer_async:
         import httpx
 
-        @toolset.tool
+        @toolset.tool_plain
         async def fetch_data(url: str) -> str:
             """Fetch data from a URL."""
             async with httpx.AsyncClient() as client:
@@ -467,7 +467,7 @@ def build_my_http_toolset(config: MyHttpToolConfig, ctx: ToolBuildContext) -> Fu
     else:
         import httpx
 
-        @toolset.tool
+        @toolset.tool_plain
         def fetch_data(url: str) -> str:
             """Fetch data from a URL."""
             with httpx.Client() as client:

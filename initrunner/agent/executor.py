@@ -23,7 +23,7 @@ from collections.abc import Callable
 from typing import Any
 
 from pydantic_ai import Agent, UsageLimits
-from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded
+from pydantic_ai.exceptions import ModelHTTPError, UsageLimitExceeded, UserError
 from pydantic_ai.models import Model
 from pydantic_ai.models.fallback import FallbackExceptionGroup
 
@@ -559,26 +559,29 @@ async def execute_run_stream_async(
                     build_timeline_entry,
                 )
 
-                async for event in agent.run_stream_events(prompt, **run_kwargs):
-                    on_event(event)
-                    if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
-                        text = event.delta.content_delta
-                        if text:
-                            output_parts.append(text)
-                            if on_token is not None:
-                                on_token(text)
-                        continue
-                    if isinstance(event, AgentRunResultEvent):
-                        stream_state["output"] = event.result.output
-                        stream_state["usage"] = event.result.usage
-                        stream_state["messages"] = event.result.all_messages()
-                        stream_state["reasoning_tokens"] = _extract_reasoning_tokens(
-                            event.result.usage
-                        )
-                        continue
-                    entry = build_timeline_entry(event)
-                    if entry is not None:
-                        event_timeline.append(entry)
+                async with agent.run_stream_events(prompt, **run_kwargs) as events:
+                    async for event in events:
+                        on_event(event)
+                        if isinstance(event, PartDeltaEvent) and isinstance(
+                            event.delta, TextPartDelta
+                        ):
+                            text = event.delta.content_delta
+                            if text:
+                                output_parts.append(text)
+                                if on_token is not None:
+                                    on_token(text)
+                            continue
+                        if isinstance(event, AgentRunResultEvent):
+                            stream_state["output"] = event.result.output
+                            stream_state["usage"] = event.result.usage
+                            stream_state["messages"] = event.result.all_messages()
+                            stream_state["reasoning_tokens"] = _extract_reasoning_tokens(
+                                event.result.usage
+                            )
+                            continue
+                        entry = build_timeline_entry(event)
+                        if entry is not None:
+                            event_timeline.append(entry)
 
             await asyncio.wait_for(
                 _do_stream_events(),
@@ -593,10 +596,23 @@ async def execute_run_stream_async(
                             if on_partial is not None:
                                 on_partial(partial)
                     else:
-                        async for chunk in stream.stream_text(delta=True):
-                            output_parts.append(chunk)
-                            if on_token is not None:
-                                on_token(chunk)
+                        # A text-output role widened with DeferredToolRequests
+                        # (an approval-gated tool) resolves to a non-text output
+                        # when the model calls that tool. v2's stream_text()
+                        # raises UserError on non-text output, so stream tokens
+                        # while the response is text and fall through to the
+                        # finalizer -- which records the paused/deferred result
+                        # -- otherwise, matching the non-streaming path.
+                        try:
+                            async for chunk in stream.stream_text(delta=True):
+                                output_parts.append(chunk)
+                                if on_token is not None:
+                                    on_token(chunk)
+                        except UserError:
+                            from pydantic_ai import DeferredToolRequests
+
+                            if not isinstance(await stream.get_output(), DeferredToolRequests):
+                                raise
                     stream_state["messages"] = stream.all_messages()
                     stream_state["usage"] = stream.usage
                     stream_state["output"] = await stream.get_output()

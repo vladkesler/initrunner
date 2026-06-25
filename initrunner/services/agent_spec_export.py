@@ -89,7 +89,7 @@ def role_to_agent_spec(role: RoleDefinition) -> tuple[dict[str, Any], DroppedSec
         spec["retries"] = execution.retries
     if execution.output_retries is not None:
         spec["output_retries"] = execution.output_retries
-    if execution.end_strategy != "early":
+    if execution.end_strategy != "graceful":
         spec["end_strategy"] = execution.end_strategy
     if execution.tool_timeout_seconds is not None:
         spec["tool_timeout"] = execution.tool_timeout_seconds

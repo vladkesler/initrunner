@@ -100,7 +100,7 @@ class TestExecutorPauseDetection:
 
         ts = FunctionToolset()
 
-        @ts.tool
+        @ts.tool_plain
         def dangerous(command: str) -> str:
             return f"ran: {command}"
 

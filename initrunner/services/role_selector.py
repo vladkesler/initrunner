@@ -179,7 +179,7 @@ def _llm_select(prompt: str, top_candidates: list[RoleCandidate]) -> RoleCandida
         "Role:"
     )
 
-    agent: Agent[None, str] = Agent(model_str)
+    agent: Agent[object, str] = Agent(model_str)
     result = agent.run_sync(llm_prompt)
     raw_response = result.output.strip()
 

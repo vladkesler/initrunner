@@ -40,7 +40,7 @@ class DummyConfig(BaseModel):
 def _dummy_builder(config: DummyConfig, **kwargs: object) -> FunctionToolset:
     toolset = FunctionToolset()
 
-    @toolset.tool
+    @toolset.tool_plain
     def dummy_tool(query: str) -> str:
         """A dummy tool."""
         return f"dummy: {query}"
