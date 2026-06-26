@@ -289,6 +289,8 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
 | **Skills** (reusable tool + prompt bundles) | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `--dev`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
+| **Plan** (static dry-run: reachable tools, policies, sandbox, cost; no model call) | `initrunner plan role.yaml` | [Plan](docs/operations/plan.md) |
 | **API server** (OpenAI-compatible endpoint) | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A server** (agent-to-agent protocol) | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |
 | **Multimodal** (images, audio, video, docs) | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
@@ -363,4 +365,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.6.8</sub></p>
+<p align="center"><sub>v2026.6.9</sub></p>

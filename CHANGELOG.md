@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2026.6.9] - 2026-06-26
 
 ### Added
 - **`initrunner tool new "<description>"` scaffolds a custom tool from natural language.** It generates a plain-Python `type: custom` module plus a pytest stub using the configured model, AST-validates the source before writing (the module is never imported during scaffolding), retries once on a validation failure, and prints a paste-ready `tools:` snippet. Generated functions default to `async def`, take config and secrets through an injected `tool_config` dict, and avoid sandbox-blocked imports. `--output` sets the module name (and retargets the generated test's import to match).
