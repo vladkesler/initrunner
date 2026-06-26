@@ -155,6 +155,7 @@ def _run_agent(
     no_stream: bool,
     model: str | None,
     template_values: dict[str, str] | None = None,
+    dev: bool = False,
 ) -> None:
     """Standard agent execution: single-shot, REPL, or autonomous."""
     if autonomous and not prompt:
@@ -223,7 +224,9 @@ def _run_agent(
             autonomous=autonomous,
             output_type=role.spec.output.type,
         )
-        use_stream = effective == "stream"
+        # Developer REPL disables streaming so a breakpoint() in a tool owns the
+        # terminal (Rich Live would otherwise fight pdb for it).
+        use_stream = effective == "stream" and not dev
         _run_single = run_single_stream if use_stream else run_single
 
         run_result = None
@@ -326,6 +329,10 @@ def _run_agent(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
                 stream=use_stream,
+                role_path=role_file,
+                extra_skill_dirs=resolve_skill_dirs(skill_dir),
+                load_model_override=resolved_model,
+                tool_dev=dev,
             )
             suggest_next("run_repl_exit", role, role_file)
         else:
@@ -338,6 +345,10 @@ def _run_agent(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
                 stream=use_stream,
+                role_path=role_file,
+                extra_skill_dirs=resolve_skill_dirs(skill_dir),
+                load_model_override=resolved_model,
+                tool_dev=dev,
             )
             suggest_next("run_repl_exit", role, role_file)
 

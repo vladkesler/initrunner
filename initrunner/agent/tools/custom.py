@@ -132,6 +132,7 @@ def build_custom_toolset(
     """Load custom tool function(s) from a module path."""
     import importlib
     import importlib.util
+    import inspect
     import sys
 
     sandbox = ctx.role.spec.security.tools
@@ -209,6 +210,8 @@ def build_custom_toolset(
 
     toolset = FunctionToolset()
     for func in funcs:
+        # Capture async-ness on the raw function before _inject_config wraps it.
+        is_async = inspect.iscoroutinefunction(func)
         # Inject config if the function accepts tool_config
         func = _inject_config(func, config.config)
 
@@ -218,9 +221,16 @@ def build_custom_toolset(
 
             original_func = func
 
-            def sandboxed_func(*args, _orig=original_func, **kwargs):
-                with sandbox_scope(config=sandbox, agent_name=config.module):
-                    return _orig(*args, **kwargs)
+            if is_async:
+
+                async def sandboxed_func(*args, _orig=original_func, **kwargs):
+                    with sandbox_scope(config=sandbox, agent_name=config.module):
+                        return await _orig(*args, **kwargs)
+            else:
+
+                def sandboxed_func(*args, _orig=original_func, **kwargs):
+                    with sandbox_scope(config=sandbox, agent_name=config.module):
+                        return _orig(*args, **kwargs)
 
             sandboxed_func.__name__ = original_func.__name__  # type: ignore[attr-defined]
             sandboxed_func.__qualname__ = getattr(

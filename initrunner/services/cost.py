@@ -444,13 +444,14 @@ def estimate_role_cost_sync(
         for trigger in role.spec.triggers:
             if isinstance(trigger, CronTriggerConfig):
                 try:
-                    from croniter import croniter  # type: ignore[import-not-found]
-
-                    cron = croniter(trigger.schedule)
-                    # Count firings in a 24h window
+                    # Count firings in a 24h window. Pass a tz-aware base so
+                    # get_next() returns aware datetimes comparable to `end`.
                     from datetime import UTC, datetime, timedelta
 
+                    from croniter import croniter  # type: ignore[import-not-found]
+
                     start = datetime.now(UTC)
+                    cron = croniter(trigger.schedule, start)
                     end = start + timedelta(days=1)
                     count = 0
                     while True:

@@ -29,8 +29,10 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 |---------|-------------|
 | `initrunner run` | Run an agent (ephemeral or from role file), team, flow, or pipeline |
 | `initrunner run <PATH>` | Run an agent from a role file, team, flow, or pipeline (auto-detected from YAML kind) |
+| `initrunner run <PATH> --dev` | Interactive REPL with `/tool add` hot-attach and `breakpoint()`-friendly output (no streaming/spinner) |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
+| `initrunner plan <PATH>` | Static dry-run: reachable tools, would-fire policies, guardrails, sandbox, triggers, heuristic cost (no model call) |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
 | `initrunner ingest <PATH>` | Ingest documents into vector store |
@@ -54,6 +56,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner memory import <PATH> <file>` | Import memories from JSON |
 | `initrunner memory list <PATH>` | List stored memories |
 | `initrunner memory consolidate <PATH>` | Run memory consolidation manually |
+| `initrunner tool new <description>` | LLM-scaffold a custom tool module + pytest stub from a description |
 | `initrunner skill new [name]` | Scaffold a new skill directory |
 | `initrunner skill validate <path>` | Validate a skill definition |
 | `initrunner skill list` | List available skills |

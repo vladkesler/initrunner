@@ -17,6 +17,7 @@ from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
 from initrunner.cli.skill_cmd import app as skill_app
 from initrunner.cli.telemetry_cmd import app as telemetry_app
+from initrunner.cli.tool_cmd import app as tool_app
 
 app = typer.Typer(
     name="initrunner",
@@ -170,6 +171,7 @@ from initrunner.cli.doctor_cmd import doctor  # noqa: E402
 from initrunner.cli.eval_cmd import test  # noqa: E402
 from initrunner.cli.ingest_cmd import ingest  # noqa: E402
 from initrunner.cli.new_cmd import new  # noqa: E402
+from initrunner.cli.plan_cmd import plan  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
     info,
@@ -200,6 +202,7 @@ app.add_typer(export_app, name="export", rich_help_panel="Getting Started")
 app.command(rich_help_panel="Run & Test")(test)
 app.command(rich_help_panel="Run & Test")(ingest)
 app.command(rich_help_panel="Run & Test")(validate)
+app.command(rich_help_panel="Run & Test")(plan)
 app.command(rich_help_panel="Run & Test")(configure)
 
 # --- Interfaces ---
@@ -224,6 +227,7 @@ app.command(rich_help_panel="Package Registry")(whoami)
 
 # --- Agent Internals ---
 app.command(rich_help_panel="Agent Internals")(plugins)
+app.add_typer(tool_app, name="tool", rich_help_panel="Agent Internals")
 app.add_typer(skill_app, name="skill", rich_help_panel="Agent Internals")
 app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
 app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")

@@ -86,17 +86,34 @@ Custom tools load Python functions from a module and register them as agent tool
 
 ### Scaffolding
 
+Describe the tool and let the model write it:
+
 ```bash
-initrunner new --template tool
+initrunner tool new "fetch the diff for a GitHub pull request"
 ```
 
-This creates a `role.py` file with example functions (named after `--output`, defaulting to `role`). Reference it in a role YAML:
+This generates a custom-tool module plus a pytest stub, AST-validates the source (it is never imported during scaffolding), and prints a paste-ready snippet:
 
 ```yaml
 tools:
   - type: custom
-    module: my_tools
+    module: fetch_pr_diff
 ```
+
+The generated functions are plain Python with type hints and docstrings, so the function name, docstring, and parameters become the tool's name, description, and schema. Generated tools default to `async def`, take secrets through an injected `tool_config` dict (never environment variables), and avoid sandbox-blocked imports. Use `--output <path>` to set the module name and `--force` to overwrite. For a static, no-AI starter instead, run `initrunner new --template tool`.
+
+### Hot-attach and debug-in-place
+
+In an interactive session you can add a tool without restarting:
+
+```
+initrunner run role.yaml --dev
+> /tool add fetch_pr_diff
+```
+
+`/tool add <module>` appends a `type: custom` entry, rebuilds the agent, and preserves the conversation history, so the agent can call the new tool on the next turn. Re-running it after editing the module reloads the source. `/reload` does the same after you edit `role.yaml` itself.
+
+Because custom tools are plain Python running in-process, you can drop a `breakpoint()` into a function and step through the agent's real tool call with `pdb`. The `--dev` flag turns off streaming and the status spinner so the debugger owns the terminal. Reliable stepping needs an `async def` tool (it runs on the main loop thread; synchronous tools run on a worker thread), and a `breakpoint()` cannot reach inside an out-of-process sandbox (`bwrap`/`docker`/`ssh`), so use the `none` backend or in-process audit hooks while debugging.
 
 ### Single Function vs. Module Discovery
 
