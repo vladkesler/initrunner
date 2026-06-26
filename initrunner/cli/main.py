@@ -171,6 +171,7 @@ from initrunner.cli.doctor_cmd import doctor  # noqa: E402
 from initrunner.cli.eval_cmd import test  # noqa: E402
 from initrunner.cli.ingest_cmd import ingest  # noqa: E402
 from initrunner.cli.new_cmd import new  # noqa: E402
+from initrunner.cli.plan_cmd import plan  # noqa: E402
 from initrunner.cli.plugin_cmd import plugins  # noqa: E402
 from initrunner.cli.registry_cmd import (  # noqa: E402
     info,
@@ -185,7 +186,6 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     update,
     whoami,
 )
-from initrunner.cli.plan_cmd import plan  # noqa: E402
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import run  # noqa: E402
 from initrunner.cli.vault_cmd import app as vault_app  # noqa: E402
