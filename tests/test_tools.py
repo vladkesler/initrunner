@@ -395,6 +395,45 @@ class TestCustomToolsetEnhanced:
         # Verify the partial was created - the function should work
         assert tool_def is not None
 
+    def test_async_tool_with_audit_hooks_stays_coroutine(self, tmp_path):
+        """An async custom tool wrapped by the audit-hook sandbox must stay a
+        coroutine function, else PydanticAI would receive an un-awaited coroutine.
+
+        (The wrapper's ``_orig`` default leaking into schema generation is a
+        pre-existing quirk of the sync wrapper too; tracked as a follow-up.)"""
+        import inspect
+        import warnings
+
+        from initrunner.agent.schema.role import RoleDefinition
+
+        mod_name = _make_temp_module(
+            "_test_async_audit_tool",
+            """\
+            async def do_async(x: int) -> int:
+                \"\"\"Double x.\"\"\"
+                return x * 2
+            """,
+            tmp_path,
+        )
+        role = RoleDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Agent",
+                "metadata": {"name": "async-agent", "description": "t"},
+                "spec": {
+                    "role": "test",
+                    "model": {"provider": "openai", "name": "gpt-5-mini"},
+                    "security": {"tools": {"audit_hooks_enabled": True}},
+                },
+            }
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            toolset = _build_custom_toolset(
+                CustomToolConfig(module=mod_name), ToolBuildContext(role=role)
+            )
+        assert inspect.iscoroutinefunction(toolset.tools["do_async"].function)
+
     def test_single_function_mode_still_works(self, tmp_path):
         """Specifying function explicitly loads just that one."""
         mod_name = _make_temp_module(

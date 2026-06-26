@@ -17,6 +17,7 @@ from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
 from initrunner.cli.skill_cmd import app as skill_app
 from initrunner.cli.telemetry_cmd import app as telemetry_app
+from initrunner.cli.tool_cmd import app as tool_app
 
 app = typer.Typer(
     name="initrunner",
@@ -224,6 +225,7 @@ app.command(rich_help_panel="Package Registry")(whoami)
 
 # --- Agent Internals ---
 app.command(rich_help_panel="Agent Internals")(plugins)
+app.add_typer(tool_app, name="tool", rich_help_panel="Agent Internals")
 app.add_typer(skill_app, name="skill", rich_help_panel="Agent Internals")
 app.add_typer(memory_app, name="memory", rich_help_panel="Agent Internals")
 app.add_typer(audit_app, name="audit", rich_help_panel="Agent Internals")

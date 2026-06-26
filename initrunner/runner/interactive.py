@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
@@ -11,6 +13,7 @@ from initrunner.agent.prompt import UserPrompt, build_multimodal_prompt
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner.display import _display_budget_warning, _display_save_warning, console
+from initrunner.runner.reload import AgentHandle
 from initrunner.runner.single import run_single, run_single_stream
 from initrunner.sinks.dispatcher import SinkDispatcher
 from initrunner.stores.base import MemoryStoreBase
@@ -57,6 +60,37 @@ def _prompt_and_resume(
     )
 
 
+def _attach_tool(handle: AgentHandle, module: str):
+    """Append a ``type: custom`` config for *module* and rebuild via the handle.
+
+    Reloads an already-imported module so edits are picked up, replaces any
+    existing custom config for the same module (rather than duplicating), and
+    rebuilds through the standard agent build path so the new tool is re-wrapped
+    in the policy/permission/approval/sandbox layers.
+    """
+    import importlib
+    import sys
+
+    from initrunner.agent.schema.tools import CustomToolConfig
+
+    _agent, role = handle.current()
+    if module in sys.modules:
+        try:
+            importlib.reload(sys.modules[module])
+        except Exception:
+            pass  # A fresh import happens in build_custom_toolset regardless.
+
+    cfg = CustomToolConfig(type="custom", module=module)
+    kept = [
+        t
+        for t in role.spec.tools
+        if not (getattr(t, "type", None) == "custom" and getattr(t, "module", None) == module)
+    ]
+    new_spec = role.spec.model_copy(update={"tools": [*kept, cfg]})
+    new_role = role.model_copy(update={"spec": new_spec})
+    return handle.rebuild_from_role(new_role)
+
+
 def run_interactive(
     agent: Agent,
     role: RoleDefinition,
@@ -68,6 +102,11 @@ def run_interactive(
     sink_dispatcher: SinkDispatcher | None = None,
     model_override: Model | str | None = None,
     stream: bool = False,
+    reload_handle: AgentHandle | None = None,
+    role_path: Path | None = None,
+    extra_skill_dirs: list[Path] | None = None,
+    load_model_override: str | None = None,
+    tool_dev: bool = False,
 ) -> None:
     """Run an interactive REPL with multi-turn conversation history."""
     agent_name = role.metadata.name
@@ -93,6 +132,18 @@ def run_interactive(
 
     session_id = generate_id()
 
+    # A single handle owns the live (agent, role) pair so /reload (and the A2
+    # /tool hot-attach) can rebuild and swap them between turns while the loop
+    # keeps message_history intact. Reuse the resume-populated agent above.
+    handle = reload_handle or AgentHandle(
+        agent,
+        role,
+        role_dir=(role_path.parent if role_path is not None else None),
+        role_path=role_path,
+        extra_skill_dirs=extra_skill_dirs,
+        load_model_override=load_model_override,
+    )
+
     session_budget = role.spec.guardrails.session_token_budget
     cumulative_tokens = 0
     pending_attachments: list[str] = []
@@ -103,10 +154,16 @@ def run_interactive(
     console.print("Type [bold]exit[/bold] or [bold]quit[/bold] to leave.")
     console.print(
         "Commands: [bold]/attach <path_or_url>[/bold], "
-        "[bold]/attachments[/bold], [bold]/clear-attachments[/bold]\n"
+        "[bold]/attachments[/bold], [bold]/clear-attachments[/bold], "
+        "[bold]/tool add <module>[/bold], [bold]/reload[/bold]\n"
     )
 
     while True:
+        # Refresh from the handle so a /reload (or /tool attach) applied between
+        # turns takes effect, including an edited session token budget.
+        agent, role = handle.current()
+        session_budget = role.spec.guardrails.session_token_budget
+
         # Check session budget before accepting input
         budget_status = check_token_budget(cumulative_tokens, session_budget)
         if budget_status.exceeded:
@@ -161,6 +218,26 @@ def run_interactive(
             pending_attachments.clear()
             console.print("[dim]Attachments cleared.[/dim]")
             continue
+        if raw_input == "/reload":
+            result = handle.reload_from_disk()
+            agent, role = handle.current()
+            console.print(f"[{'green' if result.ok else 'yellow'}]{result.summary}[/]")
+            if result.error:
+                console.print(f"[dim]{result.error}[/dim]")
+            continue
+        if raw_input.startswith("/tool add"):
+            module = raw_input[len("/tool add") :].strip()
+            if not module:
+                console.print("[yellow]Usage: /tool add <module>[/yellow]")
+                continue
+            result = _attach_tool(handle, module)
+            agent, role = handle.current()
+            console.print(f"[{'green' if result.ok else 'yellow'}]{result.summary}[/]")
+            if result.ok:
+                console.print(f"[dim]Attached custom tool module '{module}'.[/dim]")
+            if result.error:
+                console.print(f"[dim]{result.error}[/dim]")
+            continue
 
         # Build prompt (multimodal if attachments are queued)
         user_prompt: UserPrompt
@@ -183,6 +260,7 @@ def run_interactive(
             message_history=message_history,
             sink_dispatcher=sink_dispatcher,
             model_override=model_override,
+            show_thinking=not tool_dev,
         )
 
         while result.status == "paused":

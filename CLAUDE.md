@@ -90,7 +90,7 @@ Detailed docs live in `docs/`. Key references:
 | Choosing features (goal-to-config) | `docs/getting-started/choosing-features.md` |
 | LangChain agent import | `docs/getting-started/langchain-import.md` |
 | PydanticAI Agent Spec import/export | `docs/getting-started/agent-spec-import.md` |
-| Creating new tools | `docs/agents/tool_creation.md` |
+| Creating, scaffolding (`tool new`) & hot-attaching (`--dev`) tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Security model | `docs/security/security.md` |
 | Human-in-the-loop approval | `docs/security/approvals.md` |

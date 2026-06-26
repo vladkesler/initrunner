@@ -1206,6 +1206,10 @@ def _scaffold_tool(output: Path, provider: str) -> None:
     content = template_tool(py_name, provider)
     out_path.write_text(content)
     console.print(f"[green]Created[/green] {out_path}")
+    console.print(
+        "[dim]Tip: 'initrunner tool new \"<description>\"' scaffolds a tool from a"
+        " description with AI.[/dim]"
+    )
     console.print("\n[bold]Next steps:[/bold]")
     console.print(f"  1. Edit {out_path} to add your tool functions")
     console.print("  2. Reference in role.yaml:")

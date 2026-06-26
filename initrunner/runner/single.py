@@ -46,8 +46,15 @@ def run_single(
     message_history: list | None = None,
     sink_dispatcher: SinkDispatcher | None = None,
     model_override: Model | str | None = None,
+    show_thinking: bool = True,
 ) -> tuple[RunResult, list]:
-    """Execute a single prompt and display the result."""
+    """Execute a single prompt and display the result.
+
+    ``show_thinking=False`` suppresses the Rich ``Live`` spinner so a
+    ``breakpoint()`` in a tool owns the terminal (used by ``run --dev``).
+    """
+    import contextlib
+
     from initrunner.agent.clarify import (
         make_cli_clarify_callback,
         reset_clarify_callback,
@@ -64,8 +71,11 @@ def run_single(
         if clarify_timeout is not None
         else None
     )
+    status_cm = (
+        console.status("Thinking...", spinner="dots") if show_thinking else contextlib.nullcontext()
+    )
     try:
-        with console.status("Thinking...", spinner="dots"):
+        with status_cm:
             result, messages = execute_run(
                 agent,
                 role,
@@ -95,6 +105,7 @@ def run_single_stream(
     message_history: list | None = None,
     sink_dispatcher: SinkDispatcher | None = None,
     model_override: Model | str | None = None,
+    show_thinking: bool = True,
 ) -> tuple[RunResult, list]:
     """Execute a single prompt with streaming output to the console."""
     # Fall back to buffered mode for non-text output types
@@ -107,6 +118,7 @@ def run_single_stream(
             message_history=message_history,
             sink_dispatcher=sink_dispatcher,
             model_override=model_override,
+            show_thinking=show_thinking,
         )
 
     from initrunner.agent.clarify import (
@@ -128,14 +140,16 @@ def run_single_stream(
     )
 
     out = console.file
-    status = console.status("Thinking...", spinner="dots")
-    status.start()
+    status = console.status("Thinking...", spinner="dots") if show_thinking else None
+    if status is not None:
+        status.start()
     first_token = True
 
     def on_token(chunk: str) -> None:
         nonlocal first_token
         if first_token:
-            status.stop()
+            if status is not None:
+                status.stop()
             first_token = False
         out.write(chunk)
         out.flush()
@@ -155,7 +169,7 @@ def run_single_stream(
         if clarify_token is not None:
             reset_clarify_callback(clarify_token)
         reset_tool_event_callback(cb_token)
-        if first_token:
+        if first_token and status is not None:
             status.stop()
 
     # Ensure a newline separates streamed output from follow-up UI

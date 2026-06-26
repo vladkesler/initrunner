@@ -81,6 +81,10 @@ The dedicated [bubblewrap](bubblewrap.md) and [Docker](docker-sandbox.md) pages 
 
 For when a microVM checkbox is the actual question, see [Sandbox Backend Comparison](sandbox-comparison.md).
 
+## Debugging tools with `--dev`
+
+`initrunner run <role> --dev` lets you drop a `breakpoint()` into a custom-tool function and step the agent's real tool call with `pdb` (see [Tool Creation](../agents/tool_creation.md#hot-attach-and-debug-in-place)). A `breakpoint()` only reaches a tool that runs **in-process**: with `backend: none` or the in-process audit-hook sandbox (`security.tools.audit_hooks_enabled`). An out-of-process backend (`bwrap`, `docker`, `ssh`) runs tools in a separate process or container, so a host `pdb` cannot attach there. Use `none` or audit hooks while debugging, then restore your real backend.
+
 ## Mount validation
 
 Mounts fall into two categories:

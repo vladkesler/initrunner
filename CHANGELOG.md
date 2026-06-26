@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **`initrunner tool new "<description>"` scaffolds a custom tool from natural language.** It generates a plain-Python `type: custom` module plus a pytest stub using the configured model, AST-validates the source before writing (the module is never imported during scaffolding), retries once on a validation failure, and prints a paste-ready `tools:` snippet. Generated functions default to `async def`, take config and secrets through an injected `tool_config` dict, and avoid sandbox-blocked imports. `--output` sets the module name (and retargets the generated test's import to match).
+- **`initrunner run <role> --dev` adds a developer REPL.** It turns off streaming and the status spinner so a `breakpoint()` in a custom tool owns the terminal for `pdb`, and enables in-session tool hot-attach.
+- **In-REPL `/tool add <module>` and `/reload`.** `/tool add` appends a `type: custom` tool and rebuilds the agent in place (reloading an edited module), so a freshly scaffolded tool is callable on the next turn with the conversation preserved; `/reload` rebuilds the agent after an edit to `role.yaml`. Both run through a new `AgentHandle` that swaps the live agent under a lock and carries `_template_values` / `_memory_store` / `_resume_context` onto the rebuilt agent.
+
+### Fixed
+- **Async custom tools wrapped by the audit-hook sandbox stay coroutines.** `build_custom_toolset` now wraps an `async def` tool with an async sandbox wrapper instead of the sync wrapper, which previously returned an un-awaited coroutine.
+
 ## [2026.6.8] - 2026-06-25
 
 ### Security

@@ -88,6 +88,14 @@ def run(
     no_stream: Annotated[
         bool, typer.Option("--no-stream", hidden=True, help="Deprecated: use --format rich")
     ] = False,
+    dev: Annotated[
+        bool,
+        typer.Option(
+            "--dev",
+            help="Developer REPL: disable streaming so breakpoint() in a tool owns the "
+            "terminal, and enable /tool add for hot-attaching tools.",
+        ),
+    ] = False,
     sense: Annotated[
         bool, typer.Option("--sense", help="Sense the best role for the given prompt")
     ] = False,
@@ -469,4 +477,5 @@ def run(
         no_stream=no_stream,
         model=effective_model,
         template_values=template_values or None,
+        dev=dev,
     )
