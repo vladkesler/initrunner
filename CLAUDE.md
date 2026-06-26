@@ -137,6 +137,7 @@ Detailed docs live in `docs/`. Key references:
 | Multimodal input | `docs/core/multimodal.md` |
 | Report export | `docs/core/reports.md` |
 | Doctor command | `docs/operations/doctor.md` |
+| Agent dry-run (`plan`) | `docs/operations/plan.md` |
 | Usage telemetry (PostHog, opt-out) | `docs/operations/telemetry.md` |
 | Deprecations & schema versioning | `docs/operations/deprecations.md` |
 | Shareable templates | `docs/getting-started/shareable-templates.md`, `docs/getting-started/template-tutorial.md` |

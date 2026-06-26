@@ -7,8 +7,11 @@
 - **`initrunner run <role> --dev` adds a developer REPL.** It turns off streaming and the status spinner so a `breakpoint()` in a custom tool owns the terminal for `pdb`, and enables in-session tool hot-attach.
 - **In-REPL `/tool add <module>` and `/reload`.** `/tool add` appends a `type: custom` tool and rebuilds the agent in place (reloading an edited module), so a freshly scaffolded tool is callable on the next turn with the conversation preserved; `/reload` rebuilds the agent after an edit to `role.yaml`. Both run through a new `AgentHandle` that swaps the live agent under a lock and carries `_template_values` / `_memory_store` / `_resume_context` onto the rebuilt agent.
 
+- **`initrunner plan <role>` predicts a run without calling the model.** A new command that reports reachable tools (function-level via builder introspection), would-fire initguard policy decisions, applied guardrails, the sandbox that would engage, armed triggers, and a heuristic token/USD cost. Supports `--prompt` (sizes the cost estimate and surfaces the prompt's `tool_search` subset), `--no-introspect` (type-level only), `--no-sandbox-probe`, and `--json`. It never raises: a tool whose builder fails or opens a connection is reported at type level with a caveat.
+
 ### Fixed
 - **Async custom tools wrapped by the audit-hook sandbox stay coroutines.** `build_custom_toolset` now wraps an `async def` tool with an async sandbox wrapper instead of the sync wrapper, which previously returned an un-awaited coroutine.
+- **Cron cost projections work in `cost estimate` and `plan`.** `estimate_role_cost_sync` constructed `croniter` without a timezone-aware base, so `get_next()` returned naive datetimes that failed the 24h firing-window comparison and silently dropped the daily/monthly estimate; it now passes a UTC base.
 
 ## [2026.6.8] - 2026-06-25
 
