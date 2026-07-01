@@ -1,5 +1,5 @@
 <script lang="ts">
-	import yaml from 'js-yaml';
+	import { load, dump } from 'js-yaml';
 	import { Brain, ChevronRight, ExternalLink, Info } from 'lucide-svelte';
 
 	let {
@@ -66,7 +66,7 @@
 
 	function parseState(text: string): CognitionState {
 		try {
-			const doc = yaml.load(text) as Record<string, any> | null;
+			const doc = load(text) as Record<string, any> | null;
 			const spec = doc?.spec ?? {};
 			const tools: any[] = spec.tools ?? [];
 			const thinkTool = tools.find((t: any) => t?.type === 'think');
@@ -138,10 +138,10 @@
 
 	function applyChange(mutate: (doc: Record<string, any>) => void) {
 		try {
-			const doc = (yaml.load(yamlText) as Record<string, any>) ?? {};
+			const doc = (load(yamlText) as Record<string, any>) ?? {};
 			if (!doc.spec) doc.spec = {};
 			mutate(doc);
-			const dumped = yaml.dump(doc, { lineWidth: -1, noRefs: true, sortKeys: false, quotingType: '"' });
+			const dumped = dump(doc, { lineWidth: -1, noRefs: true, sortKeys: false });
 			onUpdate(dumped);
 		} catch {
 			// If YAML is malformed, don't apply
@@ -233,14 +233,14 @@
 
 	const toolCount = $derived.by(() => {
 		try {
-			const doc = yaml.load(yamlText) as Record<string, any> | null;
+			const doc = load(yamlText) as Record<string, any> | null;
 			return (doc?.spec?.tools ?? []).length;
 		} catch { return 0; }
 	});
 
 	const resolvedFuncs = $derived.by(() => {
 		try {
-			const doc = yaml.load(yamlText) as Record<string, any> | null;
+			const doc = load(yamlText) as Record<string, any> | null;
 			const tools: any[] = doc?.spec?.tools ?? [];
 			const result: { func_name: string; tool_type: string }[] = [];
 			for (const t of tools) {
