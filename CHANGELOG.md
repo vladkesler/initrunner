@@ -1,6 +1,13 @@
 # Changelog
 
-## [2026.6.9] - 2026-06-26
+## [2026.7.1] - 2026-07-01
+
+### Security
+- **Bumped `joserfc` to 1.6.7 (GHSA-wphv-vfrh-23q5, CVE-2026-48990, moderate).** With `b64=false` (RFC 7797 unencoded payloads), a JWS could carry a payload that skipped the `JWSRegistry` payload-size limit during deserialization. `joserfc` is a transitive dependency (via `authlib`, which backs the MCP gateway's OAuth), so this is a lockfile-only bump; the MCP gateway and authz test suites pass unchanged.
+
+### Changed
+- **Bumped dashboard frontend dependencies:** `@xyflow/svelte` to 1.6.1, `posthog-js` to 1.396.3, `vite` to 8.1.2, `@sveltejs/kit` to 2.68.0, and `svelte` to 5.56.4. The production build is unaffected.
+- **Migrated the dashboard to `js-yaml` 5.** js-yaml 5.0 removed the CommonJS default export and the `quotingType` dump option, so `CognitionPanel.svelte` now imports `{ load, dump }` by name and drops `quotingType`; `@types/js-yaml` is removed because v5 ships its own type declarations. One behavior change follows from v5's YAML 1.2 (CORE) load schema: in an edited `role.yaml`, bare `yes`/`no`/`on`/`off` now load as strings instead of booleans, and re-dumped strings use single quotes where quoting is required.
 
 ### Added
 - **`initrunner tool new "<description>"` scaffolds a custom tool from natural language.** It generates a plain-Python `type: custom` module plus a pytest stub using the configured model, AST-validates the source before writing (the module is never imported during scaffolding), retries once on a validation failure, and prints a paste-ready `tools:` snippet. Generated functions default to `async def`, take config and secrets through an injected `tool_config` dict, and avoid sandbox-blocked imports. `--output` sets the module name (and retargets the generated test's import to match).
