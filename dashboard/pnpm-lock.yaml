@@ -13,11 +13,11 @@ importers:
   .:
     dependencies:
       '@dicebear/core':
-        specifier: ^9.4.2
-        version: 9.4.2
+        specifier: ^9.4.3
+        version: 9.4.3
       '@dicebear/rings':
         specifier: ^9.4.2
-        version: 9.4.2(@dicebear/core@9.4.2)
+        version: 9.4.2(@dicebear/core@9.4.3)
       '@xyflow/svelte':
         specifier: ^1.6.1
         version: 1.6.1(svelte@5.56.4)
@@ -70,8 +70,8 @@ importers:
 
 packages:
 
-  '@dicebear/core@9.4.2':
-    resolution: {integrity: sha512-MF0042+Z3s8PGZKZLySfhft28bUa3B1iq0e5NSjCvY8gfMi5aIH/iRJGRJa1N9Jz1BNkxYb4yvJ/N9KO8Z6Y+w==}
+  '@dicebear/core@9.4.3':
+    resolution: {integrity: sha512-9ITrQI57k3p5hKuU8HZJ1d0kPdrmTKEJDOdlKQ8CpaChbtmnD1R+dtWmNz5IesYThXM8F64pJ0ZvJ2rsY8Hciw==}
     engines: {node: '>=18.0.0'}
 
   '@dicebear/rings@9.4.2':
@@ -813,13 +813,13 @@ packages:
 
 snapshots:
 
-  '@dicebear/core@9.4.2':
+  '@dicebear/core@9.4.3':
     dependencies:
       '@types/json-schema': 7.0.15
 
-  '@dicebear/rings@9.4.2(@dicebear/core@9.4.2)':
+  '@dicebear/rings@9.4.2(@dicebear/core@9.4.3)':
     dependencies:
-      '@dicebear/core': 9.4.2
+      '@dicebear/core': 9.4.3
 
   '@emnapi/core@1.11.1':
     dependencies:

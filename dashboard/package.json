@@ -26,7 +26,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@dicebear/core": "^9.4.2",
+    "@dicebear/core": "^9.4.3",
     "@dicebear/rings": "^9.4.2",
     "@xyflow/svelte": "^1.6.1",
     "posthog-js": "^1.396.3"
