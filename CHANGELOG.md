@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Rewrote `CLAUDE.md` around conditional `<important if>` guidance blocks.** Foundational context (identity, stack, project map) stays bare; task-specific rules are wrapped with narrow triggers. Also fixed stale content: removed references to `ToolBuildContext.prefer_async` and `_SENSITIVE_ENV_KEYS` (superseded symbols), corrected the `stores/` description to LanceDB, expanded the project map with the missing subpackages, and completed the docs index (16 unindexed pages added, one dead link removed).
+
 ## [2026.7.1] - 2026-07-01
 
 ### Security
