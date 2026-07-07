@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026.7.2] - 2026-07-07
+
+### Security
+- **Bumped `joserfc` to 1.7.2 (GHSA-gg9x-qcx2-xmrh, high).** `joserfc`'s HS256/HS384/HS512 verify accepted an empty or nil HMAC key (a cross-language sibling of CVE-2026-45363), so a token signed with an empty key could pass verification. `joserfc` is a transitive dependency (via `authlib`, which backs the MCP gateway's OAuth) and is not called from first-party code, so this is a lockfile-only bump; the MCP gateway and authz test suites pass unchanged.
+
+### Changed
+- **Bumped dashboard frontend dependencies:** `@sveltejs/kit` to 2.69.1, `vite` to 8.1.3, `tailwindcss` and `@tailwindcss/vite` to 4.3.2, `@dicebear/core` and `@dicebear/rings` to 9.4.3, and `js-yaml` to 5.2.1. The production build is unaffected.
+- **Rewrote `CLAUDE.md` around conditional `<important if>` guidance blocks.** Foundational context (identity, stack, project map) stays bare; task-specific rules are wrapped with narrow triggers. Also fixed stale content: removed references to `ToolBuildContext.prefer_async` and `_SENSITIVE_ENV_KEYS` (superseded symbols), corrected the `stores/` description to LanceDB, expanded the project map with the missing subpackages, and completed the docs index (16 unindexed pages added, one dead link removed).
+
 ## [2026.7.1] - 2026-07-01
 
 ### Security
