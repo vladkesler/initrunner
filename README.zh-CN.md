@@ -140,7 +140,7 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-六种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord。守护进程热重载角色变更无需重启，最多同时运行四个触发器。查看 [触发器](docs/core/triggers.md)。
+七种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord、slack。守护进程热重载角色变更无需重启，最多同时运行四个触发器。查看 [触发器](docs/core/triggers.md)。
 
 ### 自动驾驶
 

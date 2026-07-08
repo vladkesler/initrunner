@@ -140,7 +140,7 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-6種類のトリガー：cron、webhook、file_watch、heartbeat、telegram、discord。再起動なしでロール変更をホットリロード、最大4トリガーを同時実行。[トリガー](docs/core/triggers.md) を参照。
+7種類のトリガー：cron、webhook、file_watch、heartbeat、telegram、discord、slack。再起動なしでロール変更をホットリロード、最大4トリガーを同時実行。[トリガー](docs/core/triggers.md) を参照。
 
 ### オートパイロット
 
