@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026.7.3] - 2026-07-08
+
+### Changed
+- **Bumped `@sveltejs/vite-plugin-svelte` to 7.1.4 in the dashboard frontend** (from 7.1.2, via the `svelte` Dependabot group). A dev-only build dependency; the production build is unaffected.
+- **Refreshed the main README.** Corrected the trigger-type list to seven (the `slack` trigger was missing, also mirrored into the Chinese and Japanese READMEs), added a captured `initrunner new --run` example session, documented the `model.fallback` / `prompt_cache` / `concurrency` resilience settings and `initrunner new --offline`, and noted that the `WebSearch` capability needs a model with native web search.
+
 ## [2026.7.2] - 2026-07-07
 
 ### Security
