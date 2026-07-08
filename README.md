@@ -59,10 +59,32 @@ Eight starters you can run in one command. Browse the full catalog with `initrun
 initrunner new "a research assistant that summarizes papers"
 # generates role.yaml, then asks: "Run it now? [Y/n]"
 
-initrunner new "a regex explainer" --run "what does ^[a-z]+$ match?"
-# generate and execute in one command
-
+initrunner new --offline           # build via a structured form, no LLM call
 initrunner run --ingest ./docs/    # skip YAML entirely, just chat with your docs
+```
+
+`--run` generates and executes in one command. A real session:
+
+```console
+$ initrunner new "a regex explainer" --run 'what does ^[a-z]+$ match?'
+╭────────── regex-explainer -- VALID ──────────╮
+│ apiVersion: initrunner/v1                    │
+│ kind: Agent                                  │
+│ metadata:                                    │
+│   name: regex-explainer                      │
+│ ...                                          │
+╰──────────────────────────────────────────────╯
+Created role.yaml
+
+1) Brief summary
+- Matches a non-empty string made only of ASCII lowercase letters a–z,
+  from start to end (no digits, spaces, punctuation, or uppercase letters).
+...
+3) Example matches (6–10)
+- "a"
+- "abc"
+- "lowercase"
+...
 ```
 
 Browse community agents at [InitHub](https://hub.initrunner.ai/): `initrunner search "code review"` / `initrunner install alice/code-reviewer`.
@@ -107,6 +129,22 @@ initrunner run reviewer.yaml --daemon                    # runs on triggers
 
 The `model:` block is optional. Omit it and InitRunner auto-detects from your API key. Works with Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI, OpenRouter, Ollama, and any OpenAI-compatible endpoint.
 
+### Fallback and caching
+
+A daemon that dies when its provider throws a 500 isn't much of a daemon. List fallback models and the run retries each in order on API errors:
+
+```yaml
+spec:
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
+    fallback: [openai:gpt-5-mini, mistral:mistral-large-latest]
+    concurrency: { max_running: 4 }
+```
+
+`concurrency` caps in-flight model requests, so ten agents in one flow sharing an API key stay under the provider's rate limit. See [Providers](docs/configuration/providers.md).
+
 ### Autonomous
 
 Add `-a` and the agent builds a task list, works each item, reflects on progress, and stops when everything's done. Four reasoning strategies control how: `react` (default), `todo_driven`, `plan_execute`, `reflexion`.
@@ -140,7 +178,7 @@ spec:
       allowed_user_ids: [123456789]
 ```
 
-Six trigger types: cron, webhook, file_watch, heartbeat, telegram, discord. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
+Seven trigger types: cron, webhook, file_watch, heartbeat, telegram, discord, slack. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
 
 ### Autopilot
 
@@ -296,7 +334,7 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 | **Multimodal** (images, audio, video, docs) | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
 | **Structured output** (validated JSON schemas) | `spec: { output: { schema: {...} } }` | [Structured Output](docs/core/structured-output.md) |
 | **Evals** (test agent output quality) | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
-| **Capabilities** (native PydanticAI features) | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
+| **Capabilities** (native PydanticAI features; WebSearch needs a model with built-in search) | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
 | **Observability** (OpenTelemetry) | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
 | **Reasoning** (structured thinking patterns) | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
 | **Tool search** (on-demand tool discovery) | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
@@ -311,7 +349,7 @@ initrunner/
   flow/         Multi-agent orchestration via flow.yaml
   triggers/     Cron, file watcher, webhook, heartbeat, Telegram, Discord
   stores/       Document + memory stores (LanceDB, zvec)
-  ingestion/    Extract -> chunk -> embed -> store pipeline
+  ingestion/    Extract, chunk, embed, store pipeline
   mcp/          MCP server integration and gateway
   audit/        Append-only SQLite audit trail with secret scrubbing
   services/     Shared business logic layer
