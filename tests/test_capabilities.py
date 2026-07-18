@@ -150,6 +150,23 @@ class TestBuildAgentCapabilities:
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
+    def test_raise_content_filter_error_capability(
+        self, mock_require, mock_agent_cls, tmp_path: Path
+    ):
+        """RaiseContentFilterError (new in pydantic-ai 2.13) loads through the
+        dynamic capability path as a bare string and reaches Agent() with no
+        extra allow-list or conflict wiring."""
+        from pydantic_ai.capabilities import RaiseContentFilterError
+
+        p = _write_role(tmp_path, "  capabilities:\n    - RaiseContentFilterError\n")
+        role = load_role(p)
+        build_agent(role)
+        caps = mock_agent_cls.call_args.kwargs["capabilities"]
+        assert any(isinstance(c, RaiseContentFilterError) for c in caps)
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
     def test_warning_thinking_plus_reasoning(
         self, mock_require, mock_agent_cls, tmp_path: Path, caplog, monkeypatch
     ):

@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026.7.4] - 2026-07-18
+
+### Security
+- **Bumped `soupsieve` to 2.8.4 (PYSEC-2026-3071, PYSEC-2026-3072).** `soupsieve` is a transitive dependency (via `beautifulsoup4`), so this is a lockfile-only bump. It clears both advisories from the `pip-audit` gate.
+- **Bumped `click` to 8.4.2 (PYSEC-2026-2132, fixed in 8.3.3).** `click` is a transitive dependency (via `typer` and `uvicorn`) with no Dependabot PR of its own; a fresh lockfile resolve pulls 8.4.2, which is past the fixed release. This was the last advisory keeping the `pip-audit` gate red, which is now green.
+
+### Changed
+- **Upgraded `pydantic-ai` from 2.0.0 to 2.13.0** (`pydantic-ai-slim`, `pydantic-evals`, and `pydantic-graph`), and raised the pin floors from `>=2.0.0` to `>=2.13.0`. Thirteen minor releases of fixes and features; the full test suite, `ty`, and a live run pass unchanged. The upgrade pulls `openai` to 2.46.0, whose stricter typing exposed a latent nullable-response case in the `image_gen` edit tool (now guarded). Note: InitRunner uses no AG-UI or Vercel adapter, so GHSA-jpr8-2v3g-wgf9 (fixed in 2.5.0) never affected its code paths; this moves off the affected release line regardless.
+- **Bumped `mcp` to 1.28.1 (from 1.26.0).** A transitive dependency (via `fastmcp-slim` and `pydantic-ai-slim[mcp]`); a lockfile-only bump. The MCP gateway and the full test suite pass unchanged.
+- **Bumped dashboard frontend dependencies:** `posthog-js` to 1.404.1, `@xyflow/svelte` to 1.6.2, `vite` to 8.1.5, `@sveltejs/kit` to 2.70.0, and `@sveltejs/vite-plugin-svelte` to 7.2.0 (the latter two via the `svelte` Dependabot group). The production build is unaffected.
+
+### Added
+- **Prompt-cache hit ratio in the run summary.** When a provider reports a cache hit, the `tokens: …` stats line now appends `cache hit: NN%` (from PydanticAI 2.13's `usage.cache_hit_ratio`), so the effectiveness of Anthropic/Bedrock prompt caching is visible per run. The suffix is omitted when the ratio is zero or unreported, keeping the line clean for `TestModel` and non-caching providers.
+- **The `RaiseContentFilterError` capability.** A role can declare `capabilities: [RaiseContentFilterError]` to surface a provider content-filter response as a `ContentFilterError` (which can also be named in `model.fallback.on`) instead of receiving a silent empty completion. It loads through the existing dynamic capability path with no extra wiring.
+- **Refreshed the curated model suggestions** in `initrunner new`: Claude Sonnet 5 (direct and via Bedrock), Grok 4.5, and Z.AI GLM-5 and Moonshot Kimi K2.5 via Bedrock. Existing per-provider defaults are unchanged. Any `provider:model` PydanticAI recognizes (for example `moonshotai:kimi-k3`) remains usable directly.
+
 ## [2026.7.3] - 2026-07-08
 
 ### Changed

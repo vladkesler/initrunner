@@ -75,6 +75,43 @@ class TestExecuteRunAsync:
         assert result.output == "response text"
         assert result.tokens_in == 10
         assert result.tokens_out == 20
+        # usage without cache_hit_ratio (older usage / TestModel) stays None
+        assert result.cache_hit_ratio is None
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_ratio_surfaced(self):
+        """cache_hit_ratio (pydantic-ai 2.13) flows onto the RunResult."""
+        role = _make_role()
+
+        @dataclass
+        class FakeUsage:
+            input_tokens: int = 100
+            output_tokens: int = 20
+            total_tokens: int = 120
+            tool_calls: int = 0
+            cache_hit_ratio: float = 0.75
+
+        @dataclass
+        class FakeResult:
+            output: str = "cached response"
+            usage: FakeUsage = field(default_factory=FakeUsage)
+
+            def all_messages(self):
+                return []
+
+        agent = MagicMock()
+        agent.run = AsyncMock(return_value=FakeResult())
+
+        result, _msgs = await execute_run_async(
+            agent, role, "test prompt", skip_input_validation=True
+        )
+        assert result.cache_hit_ratio == 0.75
+
+        from initrunner.runner.display import _cache_suffix
+
+        assert _cache_suffix(result) == " | cache hit: 75%"
+        result.cache_hit_ratio = None
+        assert _cache_suffix(result) == ""
 
     @pytest.mark.asyncio
     async def test_timeout_produces_error(self):

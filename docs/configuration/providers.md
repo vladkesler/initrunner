@@ -109,6 +109,7 @@ spec:
 | `openai` | `gpt-4.1-nano` | Fastest GPT-4.1 |
 | `openai` | `o3-mini` | Reasoning model |
 | `anthropic` | **`claude-sonnet-4-5-20250929`** | Balanced, fast (default) |
+| `anthropic` | `claude-sonnet-5` | Frontier (latest generation) |
 | `anthropic` | `claude-haiku-35-20241022` | Compact, very fast |
 | `anthropic` | `claude-opus-4-20250514` | Most capable |
 | `google` | **`gemini-2.0-flash`** | Fast multimodal (default) |
@@ -124,9 +125,13 @@ spec:
 | `cohere` | `command-r` | Balanced |
 | `cohere` | `command-light` | Fast |
 | `bedrock` | **`us.anthropic.claude-sonnet-4-20250514-v1:0`** | Claude Sonnet via Bedrock (default) |
+| `bedrock` | `us.anthropic.claude-sonnet-5` | Claude Sonnet 5 (latest) |
 | `bedrock` | `us.anthropic.claude-haiku-4-20250514-v1:0` | Claude Haiku via Bedrock |
 | `bedrock` | `us.meta.llama3-2-90b-instruct-v1:0` | Llama 3.2 90B via Bedrock |
+| `bedrock` | `zai.glm-5` | Z.AI GLM-5 via Bedrock |
+| `bedrock` | `moonshotai.kimi-k2.5` | Moonshot Kimi K2.5 via Bedrock |
 | `xai` | **`grok-3`** | Most capable Grok (default) |
+| `xai` | `grok-4.5` | Latest Grok |
 | `xai` | `grok-3-mini` | Fast Grok |
 | `ollama` | **`llama3.2`** | Llama 3.2 (default) |
 | `ollama` | `llama3.1` | Llama 3.1 |
@@ -135,6 +140,8 @@ spec:
 | `ollama` | `phi3` | Microsoft Phi-3 |
 
 For Ollama, the wizard also queries the local Ollama server for installed models and shows those if available.
+
+Moonshot and Z.AI models are also reachable directly (without going through Bedrock) by passing a `provider:model` string such as `moonshotai:kimi-k3` or `zai:glm-5`, since any `provider:model` name PydanticAI recognizes is accepted even when it is not in the curated menu.
 
 ## Ollama (local models)
 
@@ -379,6 +386,8 @@ spec:
 ```
 
 This maps to PydanticAI's `anthropic_cache_instructions` / `anthropic_cache_tool_definitions` (and the `bedrock_cache_*` equivalents). It is rejected at load time on any other provider, since only Anthropic and Bedrock honor these settings. The first request writes the cache (a small surcharge); subsequent requests within the TTL read it at a large discount. Cache reads/writes show up in the provider's usage as `cache_read`/`cache_write` tokens.
+
+To confirm caching is actually paying off, watch the run summary line: when the provider reports a cache hit, InitRunner appends `cache hit: NN%` to the `tokens: …` stats (from PydanticAI's `cache_hit_ratio`, the fraction of input tokens served from cache). The suffix is omitted entirely when the ratio is zero or unreported, so it stays quiet for `TestModel` and non-caching providers.
 
 ## Embedding Configuration
 

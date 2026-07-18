@@ -21,7 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,mcp,retries]>=2.0.0",
+    "pydantic-ai-slim[openai,mcp,retries]>=2.13.0",
     "pydantic>=2.11",
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
@@ -44,17 +44,17 @@ local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
 safety = ["better-profanity>=0.7.0"]
-anthropic = ["pydantic-ai-slim[anthropic]>=2.0.0"]
-google = ["pydantic-ai-slim[google]>=2.0.0"]
-groq = ["pydantic-ai-slim[groq]>=2.0.0"]
-mistral = ["pydantic-ai-slim[mistral]>=2.0.0"]
-all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.0.0"]
+anthropic = ["pydantic-ai-slim[anthropic]>=2.13.0"]
+google = ["pydantic-ai-slim[google]>=2.13.0"]
+groq = ["pydantic-ai-slim[groq]>=2.13.0"]
+mistral = ["pydantic-ai-slim[mistral]>=2.13.0"]
+all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.13.0"]
 # OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
-    "pydantic-evals>=2.0.0",
+    "pydantic-evals>=2.13.0",
 ]
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]
