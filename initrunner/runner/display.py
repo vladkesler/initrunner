@@ -17,11 +17,26 @@ from initrunner.agent.tool_events import ToolEvent
 console = Console()
 
 
+def _cache_suffix(result: RunResult) -> str:
+    """Return a `` | cache hit: NN%`` fragment when prompt caching reported a hit.
+
+    Empty for runs where ``cache_hit_ratio`` is ``None`` or zero, so the stats
+    line stays clean for non-caching providers and ``TestModel``.
+    """
+    ratio = result.cache_hit_ratio
+    if isinstance(ratio, (int, float)) and ratio:
+        return f" | cache hit: {ratio:.0%}"
+    return ""
+
+
 def _display_result(result: RunResult, *, budget_status: TokenBudgetStatus | None = None) -> None:
     """Render a run result as a Rich panel."""
     if result.success:
         md = Markdown(result.output)
-        subtitle = f"tokens: {result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms"
+        subtitle = (
+            f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
+            f"{result.duration_ms}ms{_cache_suffix(result)}"
+        )
         if budget_status is not None and budget_status.budget is not None:
             subtitle += f" | budget: {budget_status.consumed:,}/{budget_status.budget:,}"
         console.print(Panel(md, title="Agent", subtitle=subtitle, border_style="green"))
@@ -86,7 +101,8 @@ def _display_iteration_result(
     if token_budget is not None:
         budget_info = f" | budget: {cumulative_tokens:,}/{token_budget:,}"
     subtitle = (
-        f"tokens: {result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms{budget_info}"
+        f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
+        f"{result.duration_ms}ms{_cache_suffix(result)}{budget_info}"
     )
     if result.success:
         md = Markdown(result.output)
@@ -134,7 +150,10 @@ def _display_autonomous_summary(
 
 def _display_stream_stats(result: RunResult) -> None:
     """Print a compact stats line after streamed output."""
-    stats = f"{result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms"
+    stats = (
+        f"{result.tokens_in}in/{result.tokens_out}out | "
+        f"{result.duration_ms}ms{_cache_suffix(result)}"
+    )
     console.print(f"\n[dim]--- tokens: {stats} ---[/dim]")
 
 
@@ -261,7 +280,10 @@ def _display_result_plain(result: RunResult) -> None:
         if result.output and not result.output.endswith("\n"):
             sys.stdout.write("\n")
         sys.stdout.flush()
-        stats = f"tokens: {result.tokens_in}in/{result.tokens_out}out | {result.duration_ms}ms"
+        stats = (
+            f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
+            f"{result.duration_ms}ms{_cache_suffix(result)}"
+        )
         sys.stderr.write(f"--- {stats} ---\n")
         sys.stderr.flush()
     else:

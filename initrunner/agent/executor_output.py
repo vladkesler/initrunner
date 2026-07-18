@@ -503,6 +503,10 @@ def _finalize_run_output(
         result.total_tokens = usage.total_tokens or 0
         result.thinking_tokens = _extract_thinking_tokens(usage)
         result.tool_calls = usage.tool_calls or 0
+        # cache_hit_ratio is new in pydantic-ai 2.13; guard for older usage
+        # objects and TestModel, which report 0.0 or omit it entirely.
+        ratio = getattr(usage, "cache_hit_ratio", None)
+        result.cache_hit_ratio = float(ratio) if isinstance(ratio, (int, float)) and ratio else None
     result.reasoning_tokens = (
         reasoning_tokens if reasoning_tokens is not None else _extract_reasoning_tokens(usage)
     )

@@ -192,6 +192,8 @@ def _do_edit(
                 response_format="b64_json",
                 n=1,
             )
+        if not response.data or response.data[0].b64_json is None:
+            return "Error: image edit returned no image data"
         b64 = response.data[0].b64_json
         image_bytes = base64.b64decode(b64)
     except Exception as exc:

@@ -63,6 +63,7 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     ],
     "anthropic": [
         ("claude-sonnet-4-6", "Balanced (fast, capable)"),
+        ("claude-sonnet-5", "Frontier (latest generation)"),
         ("claude-opus-4-6", "Frontier (best quality, higher cost)"),
         ("claude-haiku-4-5-20251001", "Lightweight (fastest, lowest cost)"),
     ],
@@ -89,11 +90,15 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     ],
     "bedrock": [
         ("us.anthropic.claude-sonnet-4-6-v1:0", "Claude Sonnet 4.6 (balanced)"),
+        ("us.anthropic.claude-sonnet-5", "Claude Sonnet 5 (latest)"),
         ("us.anthropic.claude-haiku-4-5-v1:0", "Claude Haiku 4.5 (lightweight)"),
         ("us.meta.llama4-scout-17b-instruct-v1:0", "Llama 4 Scout"),
+        ("zai.glm-5", "Z.AI GLM-5"),
+        ("moonshotai.kimi-k2.5", "Moonshot Kimi K2.5"),
     ],
     "xai": [
         ("grok-4", "Frontier (best quality)"),
+        ("grok-4.5", "Frontier (latest)"),
         ("grok-4-fast", "Balanced (fast, 2M context)"),
         ("grok-3-mini-beta", "Lightweight"),
     ],

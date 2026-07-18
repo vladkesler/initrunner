@@ -36,6 +36,7 @@ Names are CamelCase class names matching PydanticAI's capability registry. For c
 | `MCP` | `url` (required), `id`, `authorization_token`, `headers`, `allowed_tools` | PydanticAI-native MCP server connection |
 | `NativeTool` | `tool` (native tool spec) | Register individual provider-native tools |
 | `PrefixTools` | `prefix`, `capability` (nested spec) | Namespace tool names to avoid conflicts |
+| `RaiseContentFilterError` | none | Raise `ContentFilterError` when the model returns a non-empty content-filter response, instead of treating it as an empty completion |
 
 ## Examples
 
@@ -84,6 +85,18 @@ spec:
         url: https://mcp.example.com/api
         authorization_token: ${MCP_TOKEN}
 ```
+
+### Raise on content-filter responses
+
+By default a provider content-filter response arrives as an empty completion, which is easy to mistake for a normal empty answer. Add `RaiseContentFilterError` to surface it as a `ContentFilterError` instead, so a filtered turn fails loudly rather than returning nothing:
+
+```yaml
+spec:
+  capabilities:
+    - RaiseContentFilterError
+```
+
+The raised `ContentFilterError` can also be named in `spec.model.fallback.on` to fail over to another model on a filtered response.
 
 ### Prefixed capabilities (namespace tools)
 

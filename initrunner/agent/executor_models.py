@@ -43,6 +43,11 @@ class RunResult:
     """Reasoning/thinking tokens reported in the final streaming event. Mirrors
     ``thinking_tokens`` for the non-streaming path; the streaming consumer may
     override it from ``AgentRunResultEvent.result.usage``."""
+    cache_hit_ratio: float | None = None
+    """Fraction of input tokens served from the provider prompt cache, reported
+    by PydanticAI's run usage (``0.0`` to ``1.0``). ``None`` when the model or
+    provider does not report cache usage (e.g. ``TestModel`` or a non-caching
+    provider); only meaningful for the Anthropic/Bedrock prompt-caching path."""
     tool_calls: int = 0
     duration_ms: int = 0
     success: bool = True
