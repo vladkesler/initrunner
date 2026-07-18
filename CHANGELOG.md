@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.7.4] - 2026-07-18
+
+### Security
+- **Bumped `soupsieve` to 2.8.4 (PYSEC-2026-3071, PYSEC-2026-3072).** `soupsieve` is a transitive dependency (via `beautifulsoup4`), so this is a lockfile-only bump. It clears both advisories from the `pip-audit` gate.
+- **Bumped `click` to 8.4.2 (PYSEC-2026-2132, fixed in 8.3.3).** `click` is a transitive dependency (via `typer` and `uvicorn`) with no Dependabot PR of its own; a fresh lockfile resolve pulls 8.4.2, which is past the fixed release. This was the last advisory keeping the `pip-audit` gate red, which is now green.
+
+### Changed
+- **Bumped `mcp` to 1.28.1 (from 1.26.0).** A transitive dependency (via `fastmcp-slim` and `pydantic-ai-slim[mcp]`); a lockfile-only bump. The MCP gateway and the full test suite pass unchanged.
+- **Bumped dashboard frontend dependencies:** `posthog-js` to 1.404.1, `@xyflow/svelte` to 1.6.2, `vite` to 8.1.5, `@sveltejs/kit` to 2.70.0, and `@sveltejs/vite-plugin-svelte` to 7.2.0 (the latter two via the `svelte` Dependabot group). The production build is unaffected.
+
 ## [2026.7.3] - 2026-07-08
 
 ### Changed
