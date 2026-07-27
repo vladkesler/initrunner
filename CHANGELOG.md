@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026.7.5] - 2026-07-27
+
+### Security
+- **Bumped `pillow` to 12.3.0.** Clears fourteen advisories, eleven of them high: heap out-of-bounds writes in `Image.paste()` / `Image.crop()` (CVE-2026-59199), `ImageCmsTransform.apply()` (CVE-2026-59205) and `ImageFilter.RankFilter` (CVE-2026-59197); an out-of-bounds read on the mmap path for McIdas AREA files (CVE-2026-54058); decompression-bomb check bypasses in BDF, PCF, GD and generic font loading (CVE-2026-55379, CVE-2026-54059, CVE-2026-55380, CVE-2026-54060) and in `PdfParser.PdfStream.decode()` (CVE-2026-59200); a JPEG2000 tiled-decode buffer-growth DoS (CVE-2026-59204); plus command injection in `WindowsViewer.get_command()` (CVE-2026-55798), a TGA RLE encoder heap-disclosure leak (CVE-2026-59198) and an EPS `%%BeginBinary` infinite loop (CVE-2026-59203). `pillow` is a transitive dependency (via `fastembed`, behind the `local-embeddings` extra) and no first-party module imports `PIL`, so this is a lockfile-only bump.
+- **Bumped `pyasn1` to 0.6.4 (CVE-2026-59885, CVE-2026-59886, both high).** Quadratic complexity in OBJECT IDENTIFIER and RELATIVE-OID processing, and uncontrolled resource consumption when converting decoded REAL values, both reachable as denial of service on attacker-supplied DER. `pyasn1` is a transitive dependency (via `pyasn1-modules` and `google-auth`, which backs the Google model provider), so this is a lockfile-only bump.
+- **Bumped `dompurify` to 3.4.12 in the dashboard (GHSA-c2j3-45gr-mqc4, low).** `CUSTOM_ELEMENT_HANDLING` skipped the `afterSanitizeElements` hook for allowed custom elements. It arrives transitively through `posthog-js`, whose `^3.3.2` range already permitted the patched release, so the lockfile resolve was enough and no `pnpm.overrides` pin was needed.
+
+### Changed
+- **Bumped dashboard frontend dependencies:** `posthog-js` to 1.407.3, `@sveltejs/kit` to 2.70.1, `svelte` to 5.56.8, `tailwindcss` and `@tailwindcss/vite` to 4.3.3, `tailwind-variants` to 3.3.0, and `js-yaml` to 5.2.2. The production build is unaffected.
+- **Bumped `actions/setup-python` and `actions/setup-node` to v7** across the CI, release, TestPyPI and security workflows.
+
 ## [2026.7.4] - 2026-07-18
 
 ### Security
