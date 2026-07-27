@@ -361,4 +361,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.6.1</sub></p>
+<p align="center"><sub>v2026.7.5</sub></p>
