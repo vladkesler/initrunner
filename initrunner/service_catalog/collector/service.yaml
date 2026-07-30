@@ -1,0 +1,45 @@
+apiVersion: initrunner/v1
+kind: Service
+metadata:
+  name: collector
+  version: "1.0.0"
+  description: Continuous monitoring for a target — change detection and alerts
+  tags: [monitor, research, always-on]
+  author: InitRunner Team
+spec:
+  entry:
+    kind: Agent
+    path: role.yaml
+  primary_param: target
+  every: daily
+  params:
+    target:
+      type: string
+      required: true
+      description: Company, person, domain, or topic to monitor
+    alert_severity:
+      type: enum
+      values: [low, medium, high]
+      default: medium
+      description: Minimum significance before alerting
+  defaults:
+    autonomy: false
+    sinks:
+      - type: file
+        path: collector-report.md
+        format: text
+    guardrails:
+      max_tokens_per_run: 40000
+      max_tool_calls: 25
+      timeout_seconds: 180
+      daemon_daily_token_budget: 200000
+    timezone: UTC
+  requires:
+    env: []
+    extras: [search]
+  schedule_prompt: >
+    Monitor target "{{ params.target }}". Gather fresh public signals,
+    compare with what you remember, score significance against alert
+    severity "{{ params.alert_severity }}", remember durable facts, and
+    write a brief only if something meaningful changed (or a short
+    all-clear summary otherwise).

@@ -218,5 +218,5 @@ package-lock.json
 node_modules/
 .svelte-kit/
 
-# Dev role file
-role.yaml
+# Dev role file (repo root only — do not ignore packaged catalog roles)
+/role.yaml

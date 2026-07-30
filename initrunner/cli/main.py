@@ -15,6 +15,7 @@ from initrunner.cli.flow_cmd import app as flow_app
 from initrunner.cli.hub_cmd import app as hub_app
 from initrunner.cli.mcp_cmd import app as mcp_app
 from initrunner.cli.memory_cmd import app as memory_app
+from initrunner.cli.service_cmd import app as service_app
 from initrunner.cli.skill_cmd import app as skill_app
 from initrunner.cli.telemetry_cmd import app as telemetry_app
 from initrunner.cli.tool_cmd import app as tool_app
@@ -211,6 +212,9 @@ app.command(rich_help_panel="Interfaces")(desktop)
 app.add_typer(a2a_app, name="a2a", rich_help_panel="Interfaces")
 app.add_typer(flow_app, name="flow", rich_help_panel="Interfaces")
 app.add_typer(mcp_app, name="mcp", rich_help_panel="Interfaces")
+
+# --- Always-on ---
+app.add_typer(service_app, name="service", rich_help_panel="Always-on")
 
 # --- Package Registry ---
 app.command(rich_help_panel="Package Registry")(install)

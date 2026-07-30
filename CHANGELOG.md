@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026.7.6] - 2026-07-30
+
+### Added
+- **Always-on services (`initrunner service`).** Curated agents you start once and operate without editing YAML: `list`, `info`, `start`, `status`, `run`, `stop`, `logs`. State lives under `~/.initrunner/services/<slug>/` with supervised daemons (Linux).
+- **Shipped `collector` service.** Scheduled monitoring for a target (search + web_reader + memory); start with e.g. `initrunner service start collector acme.com`. Requires `initrunner[search]` and a configured provider. Runtime agent name is `service-collector` so audit, memory, and budgets do not collide with a user role named `collector`.
+- **Operate-time safety:** slug path containment, process identity before signal (boot id + start ticks + cmdline), lifecycle file locks outside instance dirs, generationed instance roles, heal-to-stopped when the daemon is gone, and purge that does not touch audit/memory/budget.
+
+### Changed
+- **Root-only gitignore for `/role.yaml`.** The previous `role.yaml` rule ignored every file of that name (including packaged catalog roles). Catalog `role.yaml` files now ship in the wheel.
+
+### Docs
+- New guide: [Always-on Services](docs/agents/services.md); CLI reference and README pointer for `service` commands.
+
 ## [2026.7.5] - 2026-07-27
 
 ### Security

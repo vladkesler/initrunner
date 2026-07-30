@@ -25,7 +25,7 @@
   English · <a href="README.zh-CN.md">简体中文</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production.
+Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production. Prefer a curated outcome without YAML? Use [always-on services](#always-on-services).
 
 ## Quickstart
 
@@ -180,6 +180,20 @@ spec:
 
 Seven trigger types: cron, webhook, file_watch, heartbeat, telegram, discord, slack. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
 
+### Always-on services
+
+When you want a **productized always-on outcome** without authoring YAML, use services instead of hand-rolling a daemon role. Start once, check status, force a tick, pause cleanly:
+
+```bash
+initrunner service list
+initrunner service start collector acme.com    # Linux; needs initrunner[search]
+initrunner service status collector
+initrunner service run collector               # one tick now (no waiting on cron)
+initrunner service stop collector              # --purge deletes local instance data
+```
+
+Shipped first: **`collector`** (scheduled monitoring for a company, domain, or topic). Instance state lives under `~/.initrunner/services/`. See [Always-on Services](docs/agents/services.md).
+
 ### Autopilot
 
 `--autopilot` is `--daemon` plus the autonomous loop on every trigger. A Telegram message like "find me flights from NYC to London next week" in daemon mode gets one LLM turn. In autopilot, the agent searches flights, compares options, checks dates, and replies with a shortlist.
@@ -326,6 +340,7 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
+| **Always-on services** (curated start/stop/status; no YAML) | `initrunner service start collector acme.com` | [Services](docs/agents/services.md) |
 | **Skills** (reusable tool + prompt bundles) | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
 | **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `--dev`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
 | **Plan** (static dry-run: reachable tools, policies, sandbox, cost; no model call) | `initrunner plan role.yaml` | [Plan](docs/operations/plan.md) |
@@ -344,16 +359,17 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 
 ```
 initrunner/
-  agent/        Role schema, loader, executor, self-registering tools
-  runner/       Single-shot, REPL, autonomous, daemon execution modes
-  flow/         Multi-agent orchestration via flow.yaml
-  triggers/     Cron, file watcher, webhook, heartbeat, Telegram, Discord
-  stores/       Document + memory stores (LanceDB, zvec)
-  ingestion/    Extract, chunk, embed, store pipeline
-  mcp/          MCP server integration and gateway
-  audit/        Append-only SQLite audit trail with secret scrubbing
-  services/     Shared business logic layer
-  cli/          Typer + Rich CLI entry point
+  agent/             Role schema, loader, executor, self-registering tools
+  runner/            Single-shot, REPL, autonomous, daemon execution modes
+  service_catalog/   Shipped always-on service templates (collector, …)
+  flow/              Multi-agent orchestration via flow.yaml
+  triggers/          Cron, file watcher, webhook, heartbeat, Telegram, Discord
+  stores/            Document + memory stores (LanceDB, zvec)
+  ingestion/         Extract, chunk, embed, store pipeline
+  mcp/               MCP server integration and gateway
+  audit/             Append-only SQLite audit trail with secret scrubbing
+  services/          Shared business logic (incl. always-on lifecycle)
+  cli/               Typer + Rich CLI entry point
 ```
 
 Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup.
@@ -370,7 +386,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 |------|----------|
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Quickstarts | [RAG](docs/getting-started/rag-quickstart.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
-| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
+| Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Always-on Services](docs/agents/services.md) · [Providers](docs/configuration/providers.md) |
 | Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
