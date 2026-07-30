@@ -71,6 +71,11 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner flow status <name>` | Show systemd service status |
 | `initrunner flow logs <name>` | Show journald logs |
 | `initrunner flow events` | Query delegate routing events |
+| `initrunner service list` | List curated always-on services ([guide](../agents/services.md)) |
+| `initrunner service start <slug> [primary]` | Start an always-on service (Linux) |
+| `initrunner service status <slug>` | Service health, last run, cost |
+| `initrunner service stop <slug>` | Stop a service (`--purge` deletes instance data) |
+| `initrunner service run <slug>` | Force one scheduled tick now |
 | `initrunner mcp list-tools <PATH>` | List tools from MCP servers in a role |
 | `initrunner mcp serve <PATH>...` | Expose agents as an MCP server |
 | `initrunner login` | Log in to InitHub (browser auth) or OCI registry |

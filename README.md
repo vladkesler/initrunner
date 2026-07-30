@@ -180,6 +180,20 @@ spec:
 
 Seven trigger types: cron, webhook, file_watch, heartbeat, telegram, discord, slack. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
 
+### Always-on services
+
+For a curated outcome without writing YAML, use **services** — productized always-on agents with start/stop/status:
+
+```bash
+initrunner service list
+initrunner service start collector acme.com    # needs initrunner[search] (Linux)
+initrunner service status collector
+initrunner service run collector               # one tick now
+initrunner service stop collector
+```
+
+State lives under `~/.initrunner/services/`. See [Always-on Services](docs/agents/services.md).
+
 ### Autopilot
 
 `--autopilot` is `--daemon` plus the autonomous loop on every trigger. A Telegram message like "find me flights from NYC to London next week" in daemon mode gets one LLM turn. In autopilot, the agent searches flights, compares options, checks dates, and replies with a shortlist.

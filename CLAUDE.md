@@ -131,6 +131,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Creating, scaffolding (`tool new`) & hot-attaching (`--dev`) tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Skills (SKILL.md bundles) | `docs/agents/skills_feature.md` |
+| Always-on services (start/status/stop) | `docs/agents/services.md` |
 | Security model | `docs/security/security.md` |
 | Human-in-the-loop approval | `docs/security/approvals.md` |
 | Credential vault | `docs/security/vault.md` |

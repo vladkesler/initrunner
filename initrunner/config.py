@@ -83,3 +83,8 @@ def get_vault_path() -> Path:
 
 def get_telemetry_config_path() -> Path:
     return get_home_dir() / "telemetry.json"
+
+
+def get_services_dir() -> Path:
+    """Runtime state for always-on services (``~/.initrunner/services``)."""
+    return get_home_dir() / "services"
