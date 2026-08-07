@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026.8.1] - 2026-08-07
+
+### Security
+- **Bumped `cryptography` to 50.0.0 (CVE-2026-69247, GHSA-g6cj-pr64-35w5, high).** From 44.0.0 until 50.0.0, `pkcs7_decrypt_der`, `pkcs7_decrypt_pem` and `pkcs7_decrypt_smime` reported the outcome of decrypting a `RecipientInfo`'s `encryptedKey` in several distinguishable ways, one of which disclosed the exact length recovered from the RSA operation; the same distinction was observable by timing. A service that decrypts attacker-supplied `EnvelopedData` and reflects the outcome hands the attacker a Bleichenbacher oracle against the content-encryption key. InitRunner never calls the PKCS#7 helpers: `cryptography` backs the credential vault (`initrunner/credentials/local_vault.py`), which uses only Fernet and Scrypt, and otherwise arrives transitively through `authlib`. The bump moves off the affected release line regardless.
+- **Bumped `aiohttp` to 3.14.3.** Clears three advisories: an out-of-bounds heap read in the C response parser while building the error snippet for a malformed chunked response (CVE-2026-69244, GHSA-cq5v-8q36-5273, high), a denial of service against the client; HTTP request smuggling via WebSocket upgrade, where an upgrade request carrying a body made the parser switch protocols before the body was fully received, leaving trailing bytes to be handled as upgraded-protocol or pipelined data (CVE-2026-69243, GHSA-mfx4-hv73-q22v); and a WebSocket client that accepted and decompressed frames with the RSV1 bit set even when `permessage-deflate` was never negotiated, spending unexpected CPU and memory on a malicious server's frames (CVE-2026-59881, GHSA-mq44-7p77-q5h7). No first-party module imports `aiohttp`; it arrives through `discord-py` (the `discord` and `channels` extras) and `xai-sdk`, so this is a lockfile-only bump. The smuggling advisory additionally requires an aiohttp server, which InitRunner does not run.
+- **Bumped `postcss` to 8.5.26 in the dashboard (GHSA-fxqj-rqcc-2cmp, medium).** An incomplete fix of GHSA-6g55-p6wh-862q: an attacker-controlled `sourceMappingURL` could read arbitrary `.map` files when `from` is unset. It arrives transitively through `vite`, and the `vite` 8.2 bump resolves `postcss` past the fixed 8.5.23, so no `pnpm.overrides` pin was needed. A dev-only build dependency; the shipped dashboard is unaffected.
+
+### Changed
+- **Bumped dashboard frontend dependencies:** `vite` to 8.2.1, `posthog-js` to 1.414.0, and `@sveltejs/kit` to 2.70.2 (the last via the `svelte` Dependabot group). The `vite` bump carries `rolldown` to 1.2.3 and `nanoid` to 3.3.17 and adds `lightningcss` 1.33.0; `posthog-js` adds `web-vitals` 6.0.0. The production build is unaffected.
+
 ## [2026.7.6] - 2026-07-30
 
 ### Added
