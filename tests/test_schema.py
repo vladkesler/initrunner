@@ -267,6 +267,8 @@ class TestGuardrails:
         assert g.max_request_limit == 30
         assert g.input_tokens_limit is None
         assert g.total_tokens_limit is None
+        assert g.per_request_input_tokens_limit is None
+        assert g.cost_limit is None
         assert g.session_token_budget is None
         assert g.daemon_token_budget is None
         assert g.daemon_daily_token_budget is None
@@ -283,12 +285,16 @@ class TestGuardrails:
     def test_new_token_limit_fields(self):
         g = Guardrails(
             input_tokens_limit=100000,
+            per_request_input_tokens_limit=80000,
+            cost_limit=0.50,
             total_tokens_limit=200000,
             session_token_budget=500000,
             daemon_token_budget=2000000,
             daemon_daily_token_budget=200000,
         )
         assert g.input_tokens_limit == 100000
+        assert g.per_request_input_tokens_limit == 80000
+        assert g.cost_limit == 0.50
         assert g.total_tokens_limit == 200000
         assert g.session_token_budget == 500000
         assert g.daemon_token_budget == 2000000
@@ -297,6 +303,10 @@ class TestGuardrails:
     def test_token_limit_zero_rejected(self):
         with pytest.raises(ValidationError):
             Guardrails(input_tokens_limit=0)
+        with pytest.raises(ValidationError):
+            Guardrails(per_request_input_tokens_limit=0)
+        with pytest.raises(ValidationError):
+            Guardrails(cost_limit=0)
         with pytest.raises(ValidationError):
             Guardrails(total_tokens_limit=0)
         with pytest.raises(ValidationError):

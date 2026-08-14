@@ -21,8 +21,8 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,mcp,retries]>=2.13.0",
-    "pydantic>=2.11",
+    "pydantic-ai-slim[openai,mcp,retries]>=2.30.0",
+    "pydantic>=2.12",
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
     "rich>=14.3.2",
@@ -34,7 +34,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "jinja2>=3.1",
     "initguard>=2026.3.3",
-    "fastmcp>=3.2.0",
+    "fastmcp>=3.3,<4",
     "anyio>=4.13.0",
 ]
 
@@ -44,17 +44,17 @@ local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
 safety = ["better-profanity>=0.7.0"]
-anthropic = ["pydantic-ai-slim[anthropic]>=2.13.0"]
-google = ["pydantic-ai-slim[google]>=2.13.0"]
-groq = ["pydantic-ai-slim[groq]>=2.13.0"]
-mistral = ["pydantic-ai-slim[mistral]>=2.13.0"]
-all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.13.0"]
+anthropic = ["pydantic-ai-slim[anthropic]>=2.30.0"]
+google = ["pydantic-ai-slim[google]>=2.30.0"]
+groq = ["pydantic-ai-slim[groq]>=2.30.0"]
+mistral = ["pydantic-ai-slim[mistral]>=2.30.0"]
+all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.30.0"]
 # OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
-    "pydantic-evals>=2.13.0",
+    "pydantic-evals>=2.30.0",
 ]
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]

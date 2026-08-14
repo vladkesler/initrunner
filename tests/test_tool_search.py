@@ -417,3 +417,75 @@ class TestBuildAgentIntegration:
         assert "prepare_tools" not in call_kwargs.kwargs
         caps = call_kwargs.kwargs.get("capabilities", [])
         assert not any(isinstance(c, PrepareTools) for c in caps)
+
+
+# ---------------------------------------------------------------------------
+# Integration: PydanticAI 2.30 will not execute a hidden tool until revealed
+# ---------------------------------------------------------------------------
+
+
+class TestRevealBeforeCall:
+    def test_hidden_tool_rejected_until_search_reveals_it(self):
+        """PrepareTools hides tools; 2.30 rejects a call until search_tools
+        has added the definition to a later request."""
+        from pydantic_ai import Agent
+        from pydantic_ai.capabilities.prepare_tools import PrepareTools
+        from pydantic_ai.messages import (
+            ModelResponse,
+            RetryPromptPart,
+            TextPart,
+            ToolCallPart,
+            ToolReturnPart,
+        )
+        from pydantic_ai.models.function import AgentInfo, FunctionModel
+        from pydantic_ai.toolsets import FunctionToolset
+
+        hidden = FunctionToolset()
+
+        @hidden.tool_plain
+        def secret_echo(text: str) -> str:
+            return f"echo:{text}"
+
+        manager = ToolSearchManager(always_available=[])
+        search_ts = build_tool_search_toolset(manager)
+        advertised: list[frozenset[str]] = []
+
+        def scripted(messages: list, info: AgentInfo) -> ModelResponse:
+            advertised.append(frozenset(t.name for t in info.function_tools))
+            responses = [m for m in messages if isinstance(m, ModelResponse)]
+            if len(responses) == 0:
+                return ModelResponse(
+                    parts=[ToolCallPart(tool_name="secret_echo", args={"text": "hi"})]
+                )
+            if len(responses) == 1:
+                return ModelResponse(
+                    parts=[ToolCallPart(tool_name="search_tools", args={"query": "echo"})]
+                )
+            if len(responses) == 2:
+                return ModelResponse(
+                    parts=[ToolCallPart(tool_name="secret_echo", args={"text": "hi"})]
+                )
+            return ModelResponse(parts=[TextPart(content="done")])
+
+        agent = Agent(
+            FunctionModel(scripted),
+            toolsets=[hidden, search_ts],
+            capabilities=[PrepareTools(manager.prepare_tools_callback)],
+        )
+        result = agent.run_sync("go")
+
+        assert result.output == "done"
+        assert "secret_echo" not in advertised[0]
+        assert "search_tools" in advertised[0]
+        assert "secret_echo" in advertised[2]
+
+        parts = [p for m in result.all_messages() for p in getattr(m, "parts", ())]
+        retries = [p for p in parts if isinstance(p, RetryPromptPart)]
+        assert retries
+        assert "secret_echo" in retries[0].content
+        assert "Unknown tool name" in retries[0].content
+
+        returns = [p for p in parts if isinstance(p, ToolReturnPart)]
+        echo_returns = [p for p in returns if p.tool_name == "secret_echo"]
+        assert echo_returns
+        assert echo_returns[0].content == "echo:hi"

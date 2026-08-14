@@ -91,7 +91,9 @@ class TestCompactionAboveThreshold:
         # First message is the summary
         summary_msg = result[0]
         assert isinstance(summary_msg, ModelRequest)
-        summary_text = str(summary_msg.parts[0].content)
+        summary_part = summary_msg.parts[0]
+        assert isinstance(summary_part, UserPromptPart)
+        summary_text = str(summary_part.content)
         assert "[CONVERSATION HISTORY SUMMARY]" in summary_text
         assert "Summary of earlier conversation." in summary_text
         # Tail messages preserved
@@ -117,7 +119,9 @@ class TestCompactionPreserveFirst:
         assert len(result) == 6  # 1 + 1 + 4
         assert result[0] is msgs[0]
         assert isinstance(result[1], ModelRequest)
-        assert "[CONVERSATION HISTORY SUMMARY]" in str(result[1].parts[0].content)
+        preserve_part = result[1].parts[0]
+        assert isinstance(preserve_part, UserPromptPart)
+        assert "[CONVERSATION HISTORY SUMMARY]" in str(preserve_part.content)
 
 
 class TestLeadingResponseAbsorbed:

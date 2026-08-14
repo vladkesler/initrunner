@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from initrunner.runner.budget import DaemonTokenTracker
 
 
@@ -132,6 +134,17 @@ class TestDaemonTokenTrackerCostBudget:
         tracker = DaemonTokenTracker(lifetime_budget=None, daily_budget=None)
         tracker.record_usage(100, 50)
         assert tracker.total_consumed == 150
+
+    def test_record_usage_prefers_live_cost(self) -> None:
+        tracker = DaemonTokenTracker(
+            lifetime_budget=None,
+            daily_budget=None,
+            daily_cost_budget=1.0,
+            model="gpt-5-mini",
+            provider="openai",
+        )
+        tracker.record_usage(100, 50, cost_usd=0.42)
+        assert tracker.daily_cost_consumed == pytest.approx(0.42)
 
     def test_reservation_mechanism_preserved(self) -> None:
         """Tentative reservation is correctly adjusted."""

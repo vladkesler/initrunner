@@ -14,11 +14,11 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
-  <a href="https://discord.gg/GRTZmVcW"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://discord.gg/HhnG8JcdJD"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
-  <a href="https://initrunner.ai/">公式サイト</a> · <a href="https://initrunner.ai/docs">ドキュメント</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a>
+  <a href="https://initrunner.ai/">公式サイト</a> · <a href="https://initrunner.ai/docs">ドキュメント</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/HhnG8JcdJD">Discord</a>
 </p>
 
 <p align="center">
@@ -350,7 +350,7 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ## コミュニティ
 
-- [Discord](https://discord.gg/GRTZmVcW): チャット、質問、ロール共有
+- [Discord](https://discord.gg/HhnG8JcdJD): チャット、質問、ロール共有
 - [GitHub Issues](https://github.com/vladkesler/initrunner/issues): バグ報告と機能リクエスト
 - [Changelog](CHANGELOG.md): リリースノート
 - [CONTRIBUTING.md](CONTRIBUTING.md): 開発セットアップと PR ガイドライン

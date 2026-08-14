@@ -22,6 +22,17 @@ from .executor_models import ErrorCategory, PendingApproval, RunResult
 _logger = logging.getLogger(__name__)
 
 
+def _as_cost_usd(value: object) -> float | None:
+    """Coerce PydanticAI ``RunUsage.cost`` (Decimal | None) to a float."""
+    from decimal import Decimal
+
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Input / output validation
 # ---------------------------------------------------------------------------
@@ -507,6 +518,7 @@ def _finalize_run_output(
         # objects and TestModel, which report 0.0 or omit it entirely.
         ratio = getattr(usage, "cache_hit_ratio", None)
         result.cache_hit_ratio = float(ratio) if isinstance(ratio, (int, float)) and ratio else None
+        result.cost_usd = _as_cost_usd(getattr(usage, "cost", None))
     result.reasoning_tokens = (
         reasoning_tokens if reasoning_tokens is not None else _extract_reasoning_tokens(usage)
     )

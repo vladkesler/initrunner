@@ -62,6 +62,62 @@ class TestListStarters:
         assert entry.kind == "Flow"
 
 
+class TestGetStarterForPath:
+    def test_directory_starter_uses_slug_not_stem(self):
+        from initrunner.services.starters import get_starter_for_path
+
+        path = resolve_starter_path("helpdesk")
+        assert path is not None
+        entry = get_starter_for_path(path)
+        assert entry is not None
+        assert entry.slug == "helpdesk"
+
+    def test_single_file_starter_uses_stem(self):
+        from initrunner.services.starters import get_starter_for_path
+
+        path = resolve_starter_path("memory")
+        assert path is not None
+        entry = get_starter_for_path(path)
+        assert entry is not None
+        assert entry.slug == "memory"
+
+
+class TestStarterContent:
+    def test_empty_local_dir_is_missing_not_ready(self, tmp_path):
+        from initrunner.services.starters import starter_content
+
+        entry = get_starter("helpdesk")
+        assert entry is not None
+        empty = tmp_path / "knowledge-base"
+        empty.mkdir()
+        content = starter_content(entry, cwd=tmp_path)
+        assert content.kind == "missing"
+
+    def test_local_files_win(self, tmp_path):
+        from initrunner.services.starters import starter_content
+
+        entry = get_starter("helpdesk")
+        assert entry is not None
+        kb = tmp_path / "knowledge-base"
+        kb.mkdir()
+        (kb / "policy.md").write_text("# Policy\n", encoding="utf-8")
+        content = starter_content(entry, cwd=tmp_path)
+        assert content.kind == "local"
+        assert any(p.name == "policy.md" for p in content.files)
+
+    def test_pdf_source_requires_ingest_extra(self):
+        from initrunner.services.starters import _detect_requires_extras
+
+        extras = _detect_requires_extras({"spec": {"ingest": {"sources": ["./docs/**/*.pdf"]}}})
+        assert "ingest" in extras
+
+    def test_md_source_does_not_require_ingest_extra(self):
+        from initrunner.services.starters import _detect_requires_extras
+
+        extras = _detect_requires_extras({"spec": {"ingest": {"sources": ["./docs/**/*.md"]}}})
+        assert "ingest" not in extras
+
+
 class TestGetStarter:
     def test_existing_starter(self):
         entry = get_starter("helpdesk")
@@ -79,7 +135,8 @@ class TestResolveStarterPath:
         path = resolve_starter_path("helpdesk")
         assert path is not None
         assert path.is_file()
-        assert path.name == "helpdesk.yaml"
+        assert path.name == "role.yaml"
+        assert path.parent.name == "helpdesk"
 
     def test_resolves_composite(self):
         path = resolve_starter_path("pipeline")
@@ -173,19 +230,21 @@ class TestCheckPrerequisites:
             env_errors = [e for e in errors if "DISCORD_BOT_TOKEN" in e]
             assert len(env_errors) > 0
 
-    def test_helpdesk_warns_about_user_data(self):
+    def test_helpdesk_uses_sample_docs(self):
         entry = get_starter("helpdesk")
         assert entry is not None
         assert len(entry.requires_user_data) > 0, "helpdesk should require user data paths"
-        # check_prerequisites should produce warnings for missing dirs
-        _errors, warnings = check_prerequisites(entry)
-        data_warnings = [w for w in warnings if "knowledge-base" in w]
-        assert len(data_warnings) > 0
+        from initrunner.services.starters import starter_content
 
-    def test_helpdesk_requires_ingest_extra(self):
+        content = starter_content(entry, cwd=Path("/tmp/empty-initrunner-cwd"))
+        assert content.kind == "bundled"
+        _errors, warnings = check_prerequisites(entry)
+        assert any("sample docs" in w.lower() for w in warnings)
+
+    def test_helpdesk_md_sources_do_not_require_ingest_extra(self):
         entry = get_starter("helpdesk")
         assert entry is not None
-        assert "ingest" in entry.requires_extras
+        assert "ingest" not in entry.requires_extras
 
     def test_memory_starter_has_no_errors(self):
         """memory starter needs no env vars or extras beyond base."""
@@ -201,6 +260,45 @@ class TestCheckPrerequisites:
         assert entry is not None
         assert "telegram" in entry.requires_extras
         assert "search" in entry.requires_extras
+
+
+class TestApplyContentRoot:
+    def test_rewrites_filesystem_to_bundled_samples(self, tmp_path):
+        from initrunner.agent.loader import load_role
+        from initrunner.services.starters import apply_starter_content_root, get_starter
+
+        entry = get_starter("helpdesk")
+        assert entry is not None
+        role = load_role(entry.path)
+        rewritten = apply_starter_content_root(role, entry.path)
+        fs = next(t for t in rewritten.spec.tools if t.type == "filesystem")
+        assert Path(fs.root_path).is_absolute()
+        assert (Path(fs.root_path) / "faq.md").is_file()
+
+
+class TestSampleFilesPackaged:
+    def test_helpdesk_samples_exist_in_package(self):
+        kb = STARTERS_DIR / "helpdesk" / "knowledge-base"
+        assert (kb / "getting-started.md").is_file()
+        assert (kb / "faq.md").is_file()
+
+
+class TestGlobalEnvToken:
+    def test_token_in_global_env_counts(self, tmp_path, monkeypatch):
+        from initrunner.config import get_home_dir
+
+        home = tmp_path / "irhome"
+        home.mkdir()
+        (home / ".env").write_text("DISCORD_BOT_TOKEN=from-file\n", encoding="utf-8")
+        monkeypatch.setenv("INITRUNNER_HOME", str(home))
+        get_home_dir.cache_clear()
+        monkeypatch.delenv("DISCORD_BOT_TOKEN", raising=False)
+
+        entry = get_starter("discord")
+        assert entry is not None
+        errors, _warnings = check_prerequisites(entry)
+        assert not any("DISCORD_BOT_TOKEN" in e for e in errors)
+        get_home_dir.cache_clear()
 
 
 class TestStartersDir:

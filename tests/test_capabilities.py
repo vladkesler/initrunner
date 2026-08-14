@@ -167,6 +167,30 @@ class TestBuildAgentCapabilities:
     @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
     @patch("initrunner.agent.loader.Agent")
     @patch("initrunner.agent.loader.require_provider")
+    def test_advisor_tool_nested_yaml(self, mock_require, mock_agent_cls, tmp_path: Path):
+        """AdvisorTool is NativeTool(kind=advisor, model=...), not a bare capability."""
+        from pydantic_ai.capabilities import NativeTool
+        from pydantic_ai.native_tools import AdvisorTool
+
+        p = _write_role(
+            tmp_path,
+            "  capabilities:\n"
+            "    - NativeTool:\n"
+            "        kind: advisor\n"
+            "        model: claude-opus-5\n",
+        )
+        role = load_role(p)
+        build_agent(role)
+        caps = mock_agent_cls.call_args.kwargs["capabilities"]
+        native = [c for c in caps if isinstance(c, NativeTool)]
+        assert native
+        assert isinstance(native[0].tool, AdvisorTool)
+        assert native[0].tool.kind == "advisor"
+        assert native[0].tool.model == "claude-opus-5"
+
+    @patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"})
+    @patch("initrunner.agent.loader.Agent")
+    @patch("initrunner.agent.loader.require_provider")
     def test_warning_thinking_plus_reasoning(
         self, mock_require, mock_agent_cls, tmp_path: Path, caplog, monkeypatch
     ):

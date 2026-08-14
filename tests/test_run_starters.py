@@ -23,7 +23,7 @@ class TestResolveRolePathStarters:
         """initrunner run helpdesk should resolve to the starter YAML."""
         resolved = resolve_role_path(Path("helpdesk"))
         assert resolved.is_file()
-        assert "helpdesk" in resolved.name
+        assert "helpdesk" in resolved.parts
         assert STARTERS_DIR in resolved.parents or resolved.parent == STARTERS_DIR
 
     def test_installed_role_takes_priority(self, tmp_path: Path):
@@ -63,6 +63,11 @@ class TestPrepareStarter:
         starter_path = STARTERS_DIR / "memory.yaml"
         result = prepare_starter(starter_path, "anthropic:claude-sonnet-4-5-20250929")
         assert result == "anthropic:claude-sonnet-4-5-20250929"
+
+    def test_directory_helpdesk_is_recognized(self):
+        starter_path = STARTERS_DIR / "helpdesk" / "role.yaml"
+        result = prepare_starter(starter_path, "openai:gpt-5-mini")
+        assert result == "openai:gpt-5-mini"
 
     def test_starter_auto_detects_model(self):
         from initrunner.run_config import RunConfig

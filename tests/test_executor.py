@@ -1,5 +1,6 @@
 """Tests for the executor."""
 
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -387,6 +388,8 @@ class TestExecuteRun:
                     max_tool_calls=10,
                     max_request_limit=25,
                     input_tokens_limit=80000,
+                    per_request_input_tokens_limit=40000,
+                    cost_limit=0.10,
                     total_tokens_limit=150000,
                 ),
             ),
@@ -400,7 +403,11 @@ class TestExecuteRun:
         assert limits.request_limit == 25
         assert limits.tool_calls_limit == 10
         assert limits.input_tokens_limit == 80000
+        assert limits.per_request_input_tokens_limit == 40000
+        assert limits.cost_limit == Decimal("0.10")
         assert limits.total_tokens_limit == 150000
+        assert call_kwargs.kwargs["run_id"]
+        assert call_kwargs.kwargs["conversation_id"] == call_kwargs.kwargs["run_id"]
 
     def test_usage_limits_defaults_none(self):
         """When new limit fields are None, they pass through as None to UsageLimits."""
@@ -416,6 +423,58 @@ class TestExecuteRun:
         assert limits.tool_calls_limit == 20
         assert limits.input_tokens_limit is None
         assert limits.total_tokens_limit is None
+        assert limits.per_request_input_tokens_limit is None
+        assert limits.cost_limit is None
+
+    def test_continuation_inherits_conversation_id(self):
+        """REPL turns with history get a fresh run_id and do not reset conversation_id."""
+        from pydantic_ai.messages import ModelRequest
+
+        agent = _make_mock_agent()
+        history = [ModelRequest.user_text_prompt("hello")]
+        execute_run(agent, _make_role(), "again", message_history=history)
+        kwargs = agent.run.call_args.kwargs
+        assert kwargs["run_id"]
+        assert "conversation_id" not in kwargs
+
+    def test_live_cost_extracted(self):
+        agent = _make_mock_agent()
+        agent.run.return_value.usage.cost = Decimal("0.0123")
+        result, _ = execute_run(agent, _make_role(), "Hello")
+        assert result.cost_usd == pytest.approx(0.0123)
+
+    def test_resume_omits_run_id_and_carries_usage(self):
+        from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart
+        from pydantic_ai.usage import RequestUsage, RunUsage
+
+        from initrunner.agent.executor import execute_run_resume
+
+        agent = _make_mock_agent()
+        history = [
+            ModelRequest.user_text_prompt("go"),
+            ModelResponse(
+                parts=[TextPart(content="calling")],
+                usage=RequestUsage(input_tokens=10, output_tokens=4, cost=Decimal("0.02")),
+            ),
+            ModelRequest(
+                parts=[ToolReturnPart(tool_name="shell", content="ok", tool_call_id="c1")]
+            ),
+        ]
+        execute_run_resume(
+            agent,
+            _make_role(),
+            run_id="abc123",
+            message_history=history,
+            approvals={"c1": True},
+        )
+        kwargs = agent.run.call_args.kwargs
+        assert "run_id" not in kwargs
+        assert isinstance(kwargs["usage"], RunUsage)
+        assert kwargs["usage"].input_tokens == 10
+        assert kwargs["usage"].output_tokens == 4
+        assert kwargs["usage"].cost == Decimal("0.02")
+        assert kwargs["usage"].tool_calls == 1
+        assert kwargs["usage_limits"].request_limit == 30
 
 
 class TestCheckTokenBudget:

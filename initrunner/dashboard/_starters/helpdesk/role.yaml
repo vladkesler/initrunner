@@ -1,32 +1,28 @@
 # Helpdesk Knowledge Base Agent
 #
-# A generic internal helpdesk agent powered by RAG and long-term memory.
-# Populate knowledge-base/ with your own docs and serve as an API.
-#
-# Supports: .md, .txt, .pdf, .html, .docx
-#
-# Prerequisites:
-#   uv pip install initrunner[ingest]   # required for PDF/DOCX support
+# Drop docs in ./knowledge-base/ (or use the bundled samples) and get
+# an AI helpdesk. Markdown and plain text work without extras.
+# PDF / Word need: uv pip install initrunner[ingest]
 #
 # Usage:
-#   initrunner ingest role.yaml
-#   initrunner run role.yaml -i
-#   initrunner run role.yaml --serve --api-key <key>
+#   initrunner run helpdesk -i
+#   initrunner run helpdesk -p "How do I reset my password?"
 
 apiVersion: initrunner/v1
 kind: Agent
 metadata:
   name: helpdesk
   description: >
-    Drop your company docs in and get an AI helpdesk. Ingests markdown,
-    PDF, HTML, Word, and plain text. Answers questions with citations,
-    remembers users across sessions, and serves as an OpenAI-compatible API.
-  version: "1.0.1"
+    Drop your company docs in and get an AI helpdesk. Ingests markdown
+    and plain text (PDF/Word need the ingest extra). Answers with
+    citations and remembers users across sessions.
+  version: "1.1.0"
   author: InitRunner Team
   tags: [helpdesk, rag, memory, api-server, knowledge-base, example]
   bundle:
     include:
-      - README.md
+      - knowledge-base/getting-started.md
+      - knowledge-base/faq.md
 spec:
   role: |
     You are a helpdesk assistant that answers questions using the ingested
@@ -96,9 +92,6 @@ spec:
     sources:
       - "./knowledge-base/**/*.md"
       - "./knowledge-base/**/*.txt"
-      - "./knowledge-base/**/*.pdf"
-      - "./knowledge-base/**/*.html"
-      - "./knowledge-base/**/*.docx"
     chunking:
       strategy: fixed
       chunk_size: 512

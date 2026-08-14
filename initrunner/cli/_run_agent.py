@@ -284,7 +284,11 @@ def _run_agent(
             finally:
                 if tracker is not None:
                     if run_result is not None:
-                        tracker.record_usage(run_result.tokens_in, run_result.tokens_out)
+                        tracker.record_usage(
+                            run_result.tokens_in,
+                            run_result.tokens_out,
+                            cost_usd=run_result.cost_usd,
+                        )
                     else:
                         # Release the reservation taken by check_before_run when
                         # the run never produced a RunResult (e.g. exception).

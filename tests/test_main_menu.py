@@ -1,4 +1,4 @@
-"""Tests for the no-arg CLI entry menu (Dashboard / Quick chat / Create agent)."""
+"""Tests for the no-arg CLI entry menu (Chat / starter / create / dashboard)."""
 
 from __future__ import annotations
 
@@ -19,13 +19,8 @@ class _FakeTTY(io.BytesIO):
         return True
 
 
-# Lazy imports in main.py mean we must patch at the source module, not at
-# initrunner.cli.main.<name>.
 _PATCH_DASHBOARD_AVAILABLE = "initrunner._compat.is_dashboard_available"
-_PATCH_DISPATCH = "initrunner.cli._ephemeral.dispatch_ephemeral"
-_PATCH_LAUNCH_DASHBOARD = "initrunner.cli.dashboard_cmd.launch_dashboard"
-_PATCH_NEW = "initrunner.cli.new_cmd.new"
-_PATCH_NEEDS_SETUP = "initrunner.services.setup.needs_setup"
+_PATCH_DISPATCH = "initrunner.cli._first_run.dispatch_first_run_choice"
 
 
 def _configured_patches(monkeypatch, tmp_path):
@@ -38,86 +33,92 @@ def _configured_patches(monkeypatch, tmp_path):
 
 
 class TestDefaultEntryMenu:
-    def test_dashboard_available_three_options(self, monkeypatch, tmp_path):
-        """When dashboard is available, all 3 options are shown."""
+    def test_dashboard_available_four_options_dashboard_last(self, monkeypatch, tmp_path):
         _configured_patches(monkeypatch, tmp_path)
-        mock_dispatch = MagicMock()
         with (
             patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),
-            patch(_PATCH_DISPATCH, mock_dispatch),
+            patch(_PATCH_DISPATCH, MagicMock()),
         ):
-            result = runner.invoke(app, [], input=_FakeTTY(b"2\n"))
+            result = runner.invoke(app, [], input=_FakeTTY(b"1\n"))
         assert result.exit_code == 0
-        assert "Dashboard" in result.output
-        assert "Quick chat" in result.output
+        assert "Chat" in result.output
+        assert "Try a starter" in result.output
         assert "Create an agent" in result.output
+        assert "Dashboard" in result.output
+        # Dashboard is last: its number is 4
+        assert "4. Dashboard" in result.output or "4]. Dashboard" in result.output.replace("[", "")
+        chat_pos = result.output.index("Chat")
+        dash_pos = result.output.index("Dashboard")
+        assert chat_pos < dash_pos
 
-    def test_dashboard_unavailable_two_options(self, monkeypatch, tmp_path):
-        """When dashboard is unavailable, only 2 options shown."""
+    def test_dashboard_unavailable_three_options(self, monkeypatch, tmp_path):
         _configured_patches(monkeypatch, tmp_path)
-        mock_dispatch = MagicMock()
         with (
             patch(_PATCH_DASHBOARD_AVAILABLE, return_value=False),
-            patch(_PATCH_DISPATCH, mock_dispatch),
+            patch(_PATCH_DISPATCH, MagicMock()),
         ):
             result = runner.invoke(app, [], input=_FakeTTY(b"1\n"))
         assert result.exit_code == 0
         assert "Dashboard" not in result.output
-        assert "Quick chat" in result.output
+        assert "Chat" in result.output
         assert "Create an agent" in result.output
 
-    def test_dashboard_selected_launches_dashboard(self, monkeypatch, tmp_path):
-        """Selecting Dashboard calls launch_dashboard()."""
-        _configured_patches(monkeypatch, tmp_path)
-        mock_launch = MagicMock()
-        with (
-            patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),
-            patch(_PATCH_LAUNCH_DASHBOARD, mock_launch),
-        ):
-            result = runner.invoke(app, [], input=_FakeTTY(b"1\n"))
-        assert result.exit_code == 0
-        mock_launch.assert_called_once()
-
-    def test_repl_selected_launches_dispatch(self, monkeypatch, tmp_path):
-        """Selecting Quick chat calls dispatch_ephemeral()."""
+    def test_enter_selects_chat(self, monkeypatch, tmp_path):
         _configured_patches(monkeypatch, tmp_path)
         mock_dispatch = MagicMock()
         with (
             patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),
             patch(_PATCH_DISPATCH, mock_dispatch),
         ):
-            result = runner.invoke(app, [], input=_FakeTTY(b"2\n"))
+            result = runner.invoke(app, [], input=_FakeTTY(b"\n"))
         assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
+        mock_dispatch.assert_called_once_with("chat")
 
-    def test_new_selected_launches_new(self, monkeypatch, tmp_path):
-        """Selecting 'Create an agent' calls new()."""
+    def test_chat_selected(self, monkeypatch, tmp_path):
         _configured_patches(monkeypatch, tmp_path)
-        mock_new = MagicMock()
+        mock_dispatch = MagicMock()
         with (
-            patch(_PATCH_DASHBOARD_AVAILABLE, return_value=False),
-            patch(_PATCH_NEW, mock_new),
+            patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),
+            patch(_PATCH_DISPATCH, mock_dispatch),
         ):
-            result = runner.invoke(app, [], input=_FakeTTY(b"2\n"))
+            result = runner.invoke(app, [], input=_FakeTTY(b"1\n"))
         assert result.exit_code == 0
-        mock_new.assert_called_once()
+        mock_dispatch.assert_called_once_with("chat")
 
-    def test_repl_shows_bot_hint(self, monkeypatch, tmp_path):
-        """Bot token hint appears when REPL is selected and tokens are set."""
+    def test_starter_selected(self, monkeypatch, tmp_path):
         _configured_patches(monkeypatch, tmp_path)
-        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
-
         mock_dispatch = MagicMock()
         with (
             patch(_PATCH_DASHBOARD_AVAILABLE, return_value=False),
             patch(_PATCH_DISPATCH, mock_dispatch),
         ):
-            result = runner.invoke(app, [], input=_FakeTTY(b"1\n"))
+            result = runner.invoke(app, [], input=_FakeTTY(b"2\n"))
         assert result.exit_code == 0
-        assert "bot tokens detected" in result.output
+        mock_dispatch.assert_called_once_with("starter")
+
+    def test_new_selected(self, monkeypatch, tmp_path):
+        _configured_patches(monkeypatch, tmp_path)
+        mock_dispatch = MagicMock()
+        with (
+            patch(_PATCH_DASHBOARD_AVAILABLE, return_value=False),
+            patch(_PATCH_DISPATCH, mock_dispatch),
+        ):
+            result = runner.invoke(app, [], input=_FakeTTY(b"3\n"))
+        assert result.exit_code == 0
+        mock_dispatch.assert_called_once_with("new")
+
+    def test_dashboard_selected_when_last(self, monkeypatch, tmp_path):
+        _configured_patches(monkeypatch, tmp_path)
+        mock_dispatch = MagicMock()
+        with (
+            patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),
+            patch(_PATCH_DISPATCH, mock_dispatch),
+        ):
+            result = runner.invoke(app, [], input=_FakeTTY(b"4\n"))
+        assert result.exit_code == 0
+        mock_dispatch.assert_called_once_with("dashboard")
 
     def test_ctrl_c_exits_clean(self, monkeypatch, tmp_path):
-        """KeyboardInterrupt during menu exits cleanly."""
         _configured_patches(monkeypatch, tmp_path)
         with (
             patch(_PATCH_DASHBOARD_AVAILABLE, return_value=True),

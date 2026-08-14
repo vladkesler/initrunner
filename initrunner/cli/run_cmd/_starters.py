@@ -27,10 +27,14 @@ def _show_starter_listing() -> None:
     table.add_column("Features", style="green")
     table.add_column("Status")
 
+    from initrunner.services.starters import starter_content
+
     for entry in starters:
         errors, _warnings = check_prerequisites(entry)
         if errors:
             status = f"[yellow]{errors[0]}[/yellow]"
+        elif starter_content(entry).kind == "bundled":
+            status = "[green]Ready (samples)[/green]"
         else:
             status = "[green]Ready[/green]"
 

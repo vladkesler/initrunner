@@ -33,6 +33,11 @@ from initrunner.stores.base import MemoryStoreBase
 _logger = logging.getLogger(__name__)
 
 
+def _sum_costs(values) -> float | None:
+    costs = [c for c in values if c is not None]
+    return sum(costs) if costs else None
+
+
 def _build_autonomous_result(
     autonomous_run_id: str,
     iterations: list[RunResult],
@@ -63,6 +68,7 @@ def _build_autonomous_result(
         total_tokens_in=sum(r.tokens_in for r in iterations),
         total_tokens_out=sum(r.tokens_out for r in iterations),
         total_tokens=cumulative_tokens,
+        total_cost_usd=_sum_costs(r.cost_usd for r in iterations),
         total_tool_calls=sum(r.tool_calls for r in iterations),
         total_duration_ms=total_duration,
         iteration_count=len(iterations),

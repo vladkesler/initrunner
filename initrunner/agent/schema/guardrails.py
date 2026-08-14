@@ -32,6 +32,8 @@ class Guardrails(BaseModel):
     # Per-run limits (mapped to PydanticAI UsageLimits)
     input_tokens_limit: Annotated[int, Field(gt=0)] | None = None
     total_tokens_limit: Annotated[int, Field(gt=0)] | None = None
+    per_request_input_tokens_limit: Annotated[int, Field(gt=0)] | None = None
+    cost_limit: Annotated[float, Field(gt=0)] | None = None
 
     # Cumulative budgets
     session_token_budget: Annotated[int, Field(gt=0)] | None = None

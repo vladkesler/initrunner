@@ -222,8 +222,18 @@ class DaemonTokenTracker:
             self._pending_reservations += 1
             return True, None
 
-    def record_usage(self, tokens_in: int, tokens_out: int) -> None:
-        """Record actual token and cost usage, adjusting for any tentative reservation."""
+    def record_usage(
+        self,
+        tokens_in: int,
+        tokens_out: int,
+        *,
+        cost_usd: float | None = None,
+    ) -> None:
+        """Record actual token and cost usage, adjusting for any tentative reservation.
+
+        Prefer *cost_usd* from PydanticAI ``RunUsage.cost`` when the caller
+        has it. Fall back to a token-based genai-prices estimate otherwise.
+        """
         total = tokens_in + tokens_out
         with self._lock:
             if self._pending_reservations > 0:
@@ -236,7 +246,9 @@ class DaemonTokenTracker:
 
             # Cost accumulation
             if self.daily_cost_budget or self.weekly_cost_budget:
-                cost = self._estimate_cost(tokens_in, tokens_out)
+                cost = (
+                    cost_usd if cost_usd is not None else self._estimate_cost(tokens_in, tokens_out)
+                )
                 if cost is not None:
                     self.daily_cost_consumed += cost
                     self.weekly_cost_consumed += cost

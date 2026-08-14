@@ -30,8 +30,10 @@ spec:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `max_tokens_per_run` | `int > 0` | `50000` | Maximum **output** tokens per single run. Maps to PydanticAI `output_tokens_limit`. |
-| `input_tokens_limit` | `int > 0 \| null` | `null` | Maximum **input** tokens per single run. Maps to PydanticAI `input_tokens_limit`. |
-| `total_tokens_limit` | `int > 0 \| null` | `null` | Maximum **total** (input + output) tokens per single run. Maps to PydanticAI `total_tokens_limit`. |
+| `input_tokens_limit` | `int > 0 \| null` | `null` | Maximum **input** tokens per logical run (pause + resume). Maps to PydanticAI `input_tokens_limit`. |
+| `per_request_input_tokens_limit` | `int > 0 \| null` | `null` | Maximum **input** tokens on one model request, including cached prefix tokens. Maps to PydanticAI `per_request_input_tokens_limit`. |
+| `cost_limit` | `float > 0 \| null` | `null` | Best-effort USD cap per logical run. Maps to PydanticAI `cost_limit`. Converted with `Decimal(str(value))`. Unpriced models skip enforcement and warn. |
+| `total_tokens_limit` | `int > 0 \| null` | `null` | Maximum **total** (input + output) tokens per logical run. Maps to PydanticAI `total_tokens_limit`. |
 | `max_tool_calls` | `int >= 0` | `20` | Maximum tool calls per single run. Maps to PydanticAI `tool_calls_limit`. |
 | `max_request_limit` | `int > 0` | `50` | Maximum model requests (API round-trips) per single run. Maps to PydanticAI `request_limit`. |
 | `timeout_seconds` | `int > 0` | `300` | Wall-clock timeout for a single run (5 minutes). |
@@ -63,12 +65,32 @@ When exceeded, the run fails with `UsageLimitExceeded` and the error is recorded
 
 ### Input Tokens (`input_tokens_limit`)
 
-Caps the number of **input** tokens (prompt + context) consumed in a single run. Useful when agents use large context windows or retrieve many documents.
+Caps the number of **input** tokens (prompt + context) consumed in a logical run, including approval resume. Useful when agents use large context windows or retrieve many documents.
 
 ```yaml
 guardrails:
   input_tokens_limit: 100000
 ```
+
+### Per-request input (`per_request_input_tokens_limit`)
+
+Caps a single model request's context size. Unlike `input_tokens_limit`, this is not cumulative. Cached prefix tokens still count: the cap is context size, not cache-miss cost.
+
+```yaml
+guardrails:
+  per_request_input_tokens_limit: 80000
+```
+
+### Per-run cost (`cost_limit`)
+
+Caps estimated USD spend for one logical run using PydanticAI's `RunUsage.cost` (genai-prices). This is not the provider invoice. If the model has no price data, the cap is not enforced.
+
+```yaml
+guardrails:
+  cost_limit: 0.50
+```
+
+Approval resume keeps the same budget: prior usage from `message_history` is passed back into `agent.run(usage=...)` so tokens and cost do not reset after a pause.
 
 ### Total Tokens (`total_tokens_limit`)
 

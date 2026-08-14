@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+## [2026.8.2] - 2026-08-14
+
+### Security
+- **[GHSA-v2xh-2vp8-57h8](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-v2xh-2vp8-57h8) (moderate, CVSS 6.5, fixed in pydantic-ai 2.24.0).** Unbounded remote downloads via `web_fetch` / `FileUrl` and the multimodal URL types. InitRunner builds `ImageUrl` / `DocumentUrl` / `VideoUrl` / `AudioUrl` from `http(s)` attachments in `initrunner/agent/prompt.py`, so this path is reachable. Local files stay `BinaryContent` (size-capped) and `WebFetch` still injects the 512 KB local fetcher.
+- **[GHSA-3gh4-cghq-f8v4](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-3gh4-cghq-f8v4) (low, fixed in 2.27.1).** `RetryPromptPart` content was not redacted when `InstrumentationSettings(include_content=False)`. Reachable when observability is on, content is excluded (the default), and a non-tool retry fires.
+- **[GHSA-h4xc-3qfq-jf93](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-h4xc-3qfq-jf93) (high, fixed in 2.28.0) and [GHSA-q2xc-rrxj-58x9](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-q2xc-rrxj-58x9) (2.30.0).** `Agent.to_web()` / `clai web` chat CSRF and Host-header DNS rebinding. InitRunner does not use that UI; this moves off the affected release line regardless.
+
+### Added
+- **Per-run USD and per-request input caps.** `spec.guardrails.cost_limit` maps to PydanticAI `UsageLimits.cost_limit` (YAML float → `Decimal(str(value))`). `spec.guardrails.per_request_input_tokens_limit` caps a single request's context, including cached prefix tokens. Approval resume keeps one logical budget by replaying prior `RunUsage` from `message_history`; it does not pass the InitRunner id as PydanticAI `run_id` (that would raise `UserError`).
+- **Live run cost on the result.** When the provider is priced, `RunResult.cost_usd` comes from `RunUsage.cost` and the CLI stats line appends `$0.0123`. Daemon, bot, and delegation budget trackers prefer that live cost and fall back to the token estimate. Historical `initrunner cost` reports still estimate from stored token counts.
+- **Native run / conversation ids on the first turn.** The first `agent.run` passes `run_id` and `conversation_id` equal to the InitRunner run id. REPL continuations mint a fresh native `run_id` and inherit `conversation_id` from history.
+- **Curated model list** in `initrunner new`: GPT-5.6 Luna, Claude Opus 5 (direct and Bedrock), Gemini 3.7 / 3.6 Flash and 3.5 Flash-Lite. OpenAI's default remains `gpt-5.4`.
+- **`AdvisorTool` via `NativeTool`.** YAML form is `NativeTool: {kind: advisor, model: claude-opus-5}` (not a bare capability). Documented in the capabilities guide.
+
+### Changed
+- **Upgraded `pydantic-ai` from 2.13.0 to 2.30.0** (`pydantic-ai-slim`, `pydantic-evals`, and `pydantic-graph`), and raised the pin floors from `>=2.13.0` to `>=2.30.0`. Also raised `pydantic` from `>=2.11` to `>=2.12` and pinned `fastmcp` to `>=3.3,<4` so the lock stays on FastMCP 3. The bump pulls `genai-prices` to 0.1.2 (required by 2.22+); `initrunner cost estimate` and `pricing.estimate_cost()` still price through `RequestUsage` + `calc_price()`. The input-guard classifier now narrows `RunContext.model` (`AbstractModel` in 2.30) before constructing `Agent()`. Hidden tools stay uncallable until `search_tools` reveals them (2.30 deferred-tool enforcement).
+- **Bumped dashboard frontend dependencies:** `js-yaml` to 5.3.0 (Dependabot #217 asked for 5.2.3; the `^5.2.3` range resolved 5.3.0) and `tailwind-variants` to 3.3.1 (#216). Dev-only build dependencies; the production dashboard is unaffected.
+- **Quiet Quick chat.** Ephemeral `initrunner run` (and the no-arg Chat job) attaches the selected tool profile instead of the full catalog. `tool_profile: minimal` (the `run.yaml` default) is datetime + web_reader; `none` attaches no tools; `--tool-profile all` and `--tools` still opt in to `python`/`shell` and the sandbox warnings. Missing Slack env no longer prints a skip line on the default path. Tool search stays off for none/minimal; on `all` only the minimal functions are always-available.
+- **First-run jobs menu.** Bare `initrunner` is Chat / Try a starter / Create an agent, with Dashboard last when the extra is installed. Enter selects Chat. `initrunner setup` no longer asks to open the dashboard; `-y` and non-TTY print Chat / `memory` / `new`.
+- **Honest starters.** Helpdesk is a directory starter with bundled sample docs and shows **Ready (samples)** when you have no local `knowledge-base/`. Markdown/text ingest no longer requires `initrunner[ingest]`. Empty `./knowledge-base/` is not Ready and will not answer from a leftover store. Ingest and `read_file` share the same content root. Missing extras also print `initrunner doctor --fix`.
+
+### Docs
+- Setup guide matches the three-step provider wizard. CLI no-arg menu, README quickstart, RAG scaffold, and the choosing-features multi-agent names (Flow, not Compose) follow the same first-run story.
+- Guardrails, token-control, cost-tracking, capabilities, and PydanticAI-import docs cover `cost_limit`, `per_request_input_tokens_limit`, live run cost, and `NativeTool` advisor YAML.
+- Discord invite in the English, Chinese, and Japanese READMEs now points at `https://discord.gg/HhnG8JcdJD`.
+
 ## [2026.8.1] - 2026-08-07
 
 ### Security

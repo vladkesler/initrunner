@@ -7,6 +7,10 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from initrunner.agent.schema.role import RoleDefinition
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +38,12 @@ STARTER_ORDER = [
     "tasks",
     "planner",
 ]
+
+# Preference order for the first-hour menu. Filtered at display time.
+FIRST_HOUR_STARTERS = ["memory", "helpdesk", "reviewer"]
+
+# Ingest source suffixes that need the ingest extra. .md/.txt/.html are core.
+_INGEST_EXTRA_SUFFIXES = {".pdf", ".docx", ".xlsx"}
 
 FEATURE_MAP: list[tuple[str, str]] = [
     ("ingest", "RAG"),
@@ -124,13 +134,28 @@ def _detect_requires_env(raw_yaml: str, data: dict) -> list[str]:
     return sorted(env_vars)
 
 
+def _source_suffix(source: str) -> str:
+    """Return the file suffix implied by an ingest glob, or ''."""
+    last = source.rsplit("/", 1)[-1]
+    if "." not in last:
+        return ""
+    return "." + last.rsplit(".", 1)[-1].lower()
+
+
 def _detect_requires_extras(data: dict) -> list[str]:
-    """Detect required pip extras from spec sections and tool types."""
+    """Detect required pip extras from tool types and ingest source formats.
+
+    A bare ``ingest:`` block does not require the ingest extra. Only sources
+    whose suffix needs pymupdf/docx/xlsx do.
+    """
     extras: set[str] = set()
     spec = data.get("spec") or {}
 
-    if spec.get("ingest"):
-        extras.add("ingest")
+    ingest = spec.get("ingest") or {}
+    for source in ingest.get("sources") or []:
+        if isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES:
+            extras.add("ingest")
+            break
 
     tools = spec.get("tools") or []
     tool_types = {t.get("type", "") for t in tools if isinstance(t, dict)}
@@ -354,12 +379,145 @@ def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
     if missing_extras:
         extras_str = ",".join(missing_extras)
         errors.append(f'Missing dependencies: uv pip install "initrunner\\[{extras_str}]"')
+        errors.append(f"  Or: initrunner doctor --fix --role {entry.path}")
 
-    # Missing user data
-    for data_path in entry.requires_user_data:
-        if not Path(data_path).exists():
-            warnings.append(
-                f"Starter expects content in {data_path}/ -- add your files there for best results."
-            )
+    content = starter_content(entry)
+    if entry.requires_user_data and content.kind == "missing":
+        dest = entry.requires_user_data[0]
+        errors.append(f"Needs docs in {dest}/ -- add files or use the bundled samples.")
+    elif content.kind == "bundled":
+        warnings.append("Using sample docs. Add files to ./knowledge-base/ to use your own.")
+
+    try:
+        from initrunner.services.providers import check_role_provider_compatibility
+
+        compat = check_role_provider_compatibility(entry.path)
+        if compat.needs_embeddings and not compat.has_embedding_key:
+            errors.append("This starter needs embeddings. Set OPENAI_API_KEY or start Ollama.")
+    except Exception:
+        _logger.debug("embedding compatibility check failed for %s", entry.slug, exc_info=True)
 
     return errors, warnings
+
+
+# ---------------------------------------------------------------------------
+# Identity, content root, readiness
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StarterContent:
+    """Where a starter's user-data files come from."""
+
+    kind: str  # local | bundled | missing | none
+    root: Path | None
+    files: list[Path]
+    data_rel: str | None
+
+
+def get_starter_for_path(role_file: Path) -> StarterEntry | None:
+    """Resolve a YAML path inside STARTERS_DIR to its catalog entry.
+
+    Directory starters use the parent folder name (``helpdesk/role.yaml`` →
+    ``helpdesk``), not ``role_file.stem``.
+    """
+    try:
+        resolved = role_file.resolve()
+        root = STARTERS_DIR.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    try:
+        if not resolved.is_relative_to(root):
+            return None
+    except ValueError:
+        return None
+    rel = resolved.relative_to(root)
+    slug = resolved.stem if len(rel.parts) == 1 else rel.parts[0]
+    return get_starter(slug)
+
+
+def _files_under(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    return sorted(p for p in directory.rglob("*") if p.is_file())
+
+
+def starter_content(entry: StarterEntry, *, cwd: Path | None = None) -> StarterContent:
+    """Pick local files, bundled samples, or missing.
+
+    An existing but empty data directory is ``missing``, not Ready.
+    """
+    if not entry.requires_user_data:
+        return StarterContent(kind="none", root=None, files=[], data_rel=None)
+
+    cwd = cwd or Path.cwd()
+    data_rel = entry.requires_user_data[0]
+    local_dir = cwd / data_rel
+    if local_dir.is_dir():
+        local_files = _files_under(local_dir)
+        if local_files:
+            return StarterContent(kind="local", root=cwd, files=local_files, data_rel=data_rel)
+        # Empty dir: user claimed the path. Do not fall back to samples.
+        return StarterContent(kind="missing", root=None, files=[], data_rel=data_rel)
+
+    bundled_dir = entry.path.parent / data_rel
+    bundled_files = _files_under(bundled_dir)
+    if bundled_files:
+        return StarterContent(
+            kind="bundled",
+            root=entry.path.parent,
+            files=bundled_files,
+            data_rel=data_rel,
+        )
+
+    return StarterContent(kind="missing", root=None, files=[], data_rel=data_rel)
+
+
+def apply_starter_content_root(role: RoleDefinition, role_file: Path) -> RoleDefinition:
+    """Point filesystem tools at the same content root ingest will use."""
+    entry = get_starter_for_path(role_file)
+    if entry is None:
+        return role
+    content = starter_content(entry)
+    if content.root is None:
+        return role
+
+    tools = list(role.spec.tools or [])
+    updated = False
+    new_tools = []
+    for tool in tools:
+        if getattr(tool, "type", None) == "filesystem":
+            rel = getattr(tool, "root_path", None) or "."
+            # Already rewritten to an absolute path on a previous pass.
+            if Path(rel).is_absolute():
+                new_tools.append(tool)
+                continue
+            new_root = str((content.root / rel).resolve())
+            new_tools.append(tool.model_copy(update={"root_path": new_root}))
+            updated = True
+        else:
+            new_tools.append(tool)
+    if not updated:
+        return role
+    new_spec = role.spec.model_copy(update={"tools": new_tools})
+    return role.model_copy(update={"spec": new_spec})
+
+
+def copy_starter_samples(entry: StarterEntry, dest_parent: Path) -> list[Path]:
+    """Copy bundled sample data next to a saved role. No-op if dest exists."""
+    import shutil
+
+    content = starter_content(entry, cwd=dest_parent)
+    if content.kind != "bundled" or not content.data_rel:
+        return []
+    src = entry.path.parent / content.data_rel
+    dest = dest_parent / Path(content.data_rel).name
+    if dest.exists() or not src.is_dir():
+        return []
+    shutil.copytree(src, dest)
+    return _files_under(dest)
+
+
+def is_git_checkout(cwd: Path | None = None) -> bool:
+    here = cwd or Path.cwd()
+    return (here / ".git").exists() or (here / ".git").is_file()

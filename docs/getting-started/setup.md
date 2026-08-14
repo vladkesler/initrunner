@@ -1,47 +1,38 @@
 # Setup Wizard
 
-The `initrunner setup` command is a guided, intent-driven wizard that configures your model provider, API key, and first agent role in one step. It detects existing configuration, installs missing SDKs, validates API keys, and creates a ready-to-run `role.yaml` plus a `~/.initrunner/run.yaml` for `initrunner run`.
+`initrunner setup` configures a model provider, API key, and `~/.initrunner/run.yaml` in three steps. It does not generate a role file. After keys work, a TTY offers Chat, a starter, or `initrunner new`.
 
-> **You don't need to run `setup` first.** If you skip it and run an agent directly with `initrunner run path/to/role.yaml`, the CLI will prompt for the missing API key inline (in interactive terminals only) and persist it to `~/.initrunner/.env` before continuing the run. Use `setup` when you want guided model selection, SDK installation, and a generated role.
+> **You don't need to run `setup` first.** If you skip it and run an agent with `initrunner run path/to/role.yaml`, the CLI prompts for the missing API key in an interactive terminal and saves it to `~/.initrunner/.env`. Use `setup` when you want guided provider and model selection.
 
-> **Prefer a browser?** Run `initrunner dashboard` to configure providers, add API keys, and create agents from the web UI. The dashboard's System page provides full provider management, and the launchpad offers inline key setup for first-time users.
+> **Prefer a browser?** `initrunner dashboard` configures providers and keys in the web UI. That command is separate from setup.
 
 ## Quick Start
 
 ```bash
-# Interactive setup (prompts for intent, provider, key, tools)
+# Interactive: provider, key, model
 initrunner setup
 
-# Non-interactive with all options specified
-initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test -y
+# Non-interactive
+initrunner setup --provider openai --model gpt-5-mini --skip-test -y
 
-# RAG agent with knowledge base
-initrunner setup --intent knowledge --provider openai --skip-test -y
+# Local Ollama (no API key)
+initrunner setup --provider ollama --skip-test -y
 
-# Telegram bot
-initrunner setup --intent telegram-bot --provider anthropic --skip-test -y
-
-# Browse and copy a bundled example
-initrunner setup --intent from-example -y
-
-# Local Ollama setup (no API key needed)
-initrunner setup --provider ollama --intent chatbot -y
-
-# Skip the connectivity test
+# Skip the connectivity check
 initrunner setup --skip-test
 ```
+
+`-y` / `--accept-risks` skips the security notice **and** the post-setup jobs menu. Scripted or non-TTY runs print a next-steps panel instead of prompting.
 
 ## Options Reference
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--provider` | `str` | *(interactive)* | Provider name. Skips the interactive selection prompt. |
-| `--name` | `str` | `my-agent` | Agent name used in the generated role YAML. |
-| `--intent` | `str` | *(interactive)* | What to build: `chatbot`, `knowledge`, `memory`, `telegram-bot`, `discord-bot`, `api-agent`, `daemon`, or `from-example`. |
-| `--model` | `str` | *(interactive)* | Model name. Skips the interactive model selection prompt. |
-| `--skip-test` | `bool` | `false` | Skip the connectivity test after setup. |
-| `--output` | `Path` | `role.yaml` | Output path for the generated role file. |
-| `-y, --accept-risks` | `bool` | `false` | Accept security disclaimer without prompting. |
+| `--name` | `str` | `my-agent` | Name stored in `run.yaml` for ephemeral chat. |
+| `--model` | `str` | *(interactive)* | Model name (e.g. `gpt-5-mini`, `claude-sonnet-4-6`). |
+| `--skip-test` | `bool` | `false` | Skip the connectivity check after setup. |
+| `-y, --accept-risks` | `bool` | `false` | Accept the security notice and skip the jobs menu. |
 | `--skip-run-yaml` | `bool` | `false` | Skip `run.yaml` generation. |
 
 ## Supported Providers
@@ -60,170 +51,74 @@ initrunner setup --skip-test
 
 ## How It Works
 
-### 1. Provider Auto-Detection
+### 1. Provider and model
 
-Before showing any menu, the wizard scans for existing API keys in two places:
+The wizard scans environment variables and `~/.initrunner/.env` for existing keys (Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI, OpenRouter, Ollama).
 
-1. **Environment variables** -- checks each provider's env var (e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
-2. **Global `.env` file** -- reads `~/.initrunner/.env` via `dotenv_values()` (without loading into the process environment).
+- **One provider detected** — confirm it, or pick another.
+- **Several detected** — numbered list of those only.
+- **None detected** — full cloud + Ollama menu.
 
-Detection covers all standard cloud providers (in priority order: Anthropic, OpenAI, Google, Groq, Mistral, Cohere, xAI), custom presets like OpenRouter (`OPENROUTER_API_KEY`), and Ollama (checks if the server is running locally).
+It then checks the provider SDK (and offers to install the extra), records the API key (skipped for Ollama; Bedrock uses AWS credentials + region), and asks for a model.
 
-The result determines which provider selection experience the user sees in step 3.
+OpenRouter is stored as `provider: openai` with `base_url: https://openrouter.ai/api/v1` and `api_key_env: OPENROUTER_API_KEY`.
 
-### 2. Intent Selection
+### 2. Save
 
-The first interactive question is "What do you want to build?":
+Writes `~/.initrunner/run.yaml` unless you passed `--skip-run-yaml`. Keys go to `~/.initrunner/.env` with `0600` permissions.
 
-| # | Intent | Description |
-|---|--------|-------------|
-| 1 | `chatbot` | Conversational AI assistant |
-| 2 | `knowledge` | Answer questions from your documents (RAG) |
-| 3 | `memory` | Assistant that remembers across conversations |
-| 4 | `telegram-bot` | Telegram bot powered by AI |
-| 5 | `discord-bot` | Discord bot powered by AI |
-| 6 | `api-agent` | Agent with REST API tool access |
-| 7 | `daemon` | Runs on a schedule or watches for changes |
-| 8 | `from-example` | Browse and copy a bundled example |
+### 3. Verify
 
-The intent determines which subsequent steps are shown, which tools are pre-selected, and what role YAML template is generated.
+A light connectivity check for OpenAI and Anthropic. Skip with `--skip-test`.
 
-### 3. Provider Selection
+### After setup
 
-When `--provider` is passed, the value is validated against the supported list (including preset names like `openrouter`). Unknown providers cause an immediate error.
+In a TTY, without `-y`:
 
-When `--provider` is not passed, the wizard uses the auto-detection results from step 1:
+```
+  1. Chat
+  2. Try a starter
+  3. Create an agent
+```
 
-- **One provider detected** -- asks for confirmation: `Detected anthropic (ANTHROPIC_API_KEY). Use this provider? [Y/n]`. If declined, shows a chooser with the detected provider(s) plus manual override.
-- **Multiple providers detected** -- shows only the detected providers in a numbered menu, defaulting to the highest-priority one. Any standard provider name can be typed as a manual override.
-- **No providers detected** -- falls back to the full 9-provider menu listing all cloud providers and Ollama.
+Enter selects Chat. Dashboard is not in this list; run `initrunner dashboard` if you want the web UI.
 
-OpenRouter is included in auto-detection when `OPENROUTER_API_KEY` is set. When selected, the wizard stores canonical runtime config (`provider: openai`, `base_url: https://openrouter.ai/api/v1`, `api_key_env: OPENROUTER_API_KEY`) in `run.yaml`.
+Non-TTY and `-y` print:
 
-### 4. SDK Check + Auto-Install
+```
+initrunner run -i
+initrunner run memory -i
+initrunner new
+```
 
-For **Ollama**, the wizard checks that the server is running and queries for available models.
-
-For **Bedrock**, the wizard checks for `boto3` and provides guidance on AWS CLI configuration.
-
-For all other providers, the wizard checks whether the provider SDK is importable and offers to install it automatically.
-
-### 5. API Key / Credentials Entry
-
-Skipped for Ollama (no API key required). For Bedrock, prompts for AWS region. For other providers:
-
-1. Checks for an existing key in the environment, then in `~/.initrunner/.env`.
-2. If found, asks whether to keep it. If not found, prompts for entry (masked input).
-3. For OpenAI and Anthropic, validates the key with a lightweight API call.
-4. Saves the key to `~/.initrunner/.env` with `0600` permissions.
-
-### 6. Model Selection
-
-After the API key is configured, the wizard prompts for a model from a curated list.
-
-### 7. Embedding Config (Conditional)
-
-When `intent=knowledge` or `intent=memory` **and** the provider doesn't offer an embeddings API (Anthropic, Groq, Cohere, Bedrock, xAI, Ollama), the wizard warns the user and optionally prompts for an `OPENAI_API_KEY` for embeddings.
-
-### 8. Tool Selection + Configure
-
-A numbered tool menu is shown with intent-specific defaults pre-marked with `*`. Users pick tools by comma-separated numbers or press Enter for defaults. After selection, per-tool config prompts are shown (e.g., `filesystem` asks for `root_path` and `read_only`).
-
-### 9. Intent-Specific Config
-
-- **knowledge**: Prompts for document sources glob (default: `./docs/**/*.md`)
-- **telegram-bot**: Prompts for `TELEGRAM_BOT_TOKEN`
-- **discord-bot**: Prompts for `DISCORD_BOT_TOKEN`
-- **daemon**: Prompts for trigger type (file_watch or cron) and schedule/paths
-
-### 10. Role + Run YAML Generation
-
-Generates `role.yaml` at the `--output` path and `~/.initrunner/run.yaml` for `initrunner run`. Use `--skip-run-yaml` to skip run.yaml generation.
-
-### 11. Post-Generation Actions
-
-- **knowledge**: Offers to run `initrunner ingest` immediately
-- **All intents**: Connectivity test (skippable with `--skip-test`)
-
-### 12. Summary + Next Steps
-
-A summary panel shows the configured intent, provider, model, and file paths. Next-step commands are tailored to the chosen intent.
-
-### 13. Dashboard Prompt
-
-If the `dashboard` extras are installed and stdin is a terminal, the wizard
-offers to open the web UI:
-
-    Open the dashboard in your browser? [Y/n]
-
-Accepting launches the dashboard at `http://localhost:8100` and opens your
-browser. The role you just created is immediately visible. The CLI "Next steps"
-panel is skipped since the dashboard provides the same functionality visually.
-
-If the dashboard is not installed, a tip to install it is shown instead.
-
-## "from-example" Flow
-
-When selecting intent 8 (`from-example`), the wizard enters a separate flow:
-
-1. Displays a numbered table of bundled examples (roles, flow files, skills)
-2. User selects an example by number or name
-3. Example files are copied to the current directory
-4. **No provider/key/model/role-generation steps** -- the example includes everything
-5. Summary shows copied files and next steps (validate, run)
-
-## Intents
-
-| Intent | Template Key | Description |
-|--------|-------------|-------------|
-| `chatbot` | `basic` | Minimal assistant with guardrails. Pre-selects datetime + web_reader tools. |
-| `knowledge` | `rag` | Knowledge assistant with `ingest` config and `search_documents` tool. Prompts for document sources. |
-| `memory` | `memory` | Assistant with `memory` config. Auto-registers `remember()`, `recall()`, and `list_memories()` tools. |
-| `telegram-bot` | `telegram` | Telegram bot with telegram trigger. Prompts for bot token. |
-| `discord-bot` | `discord` | Discord bot with discord trigger. Prompts for bot token. |
-| `api-agent` | `api` | Agent with declarative REST API tools. Pre-selects http + datetime tools. |
-| `daemon` | `daemon` | Event-driven agent with triggers. Prompts for trigger type and schedule. |
-| `from-example` | — | Browse and copy bundled examples. Separate flow. |
-
-All generated roles include guardrails (`max_tokens_per_run`, `max_tool_calls`, `timeout_seconds`, `max_request_limit`) and use the default model for the selected provider.
+To build a role, use `initrunner new` (describe, template, example, or offline form). Browse examples with `initrunner examples list`.
 
 ## Non-Interactive Usage
 
-For CI, automation, or scripting, pass all options as flags to skip all prompts:
-
 ```bash
-# Fully non-interactive OpenAI chatbot
 export OPENAI_API_KEY="sk-..."
-initrunner setup --provider openai --model gpt-4o --intent chatbot --name my-agent --skip-test -y
+initrunner setup --provider openai --model gpt-5-mini --skip-test -y
 
-# Knowledge agent with Ollama
-initrunner setup --provider ollama --model llama3.2 --intent knowledge --skip-test -y
+initrunner setup --provider ollama --model llama3.2 --skip-test -y
 
-# Skip run.yaml generation
-initrunner setup --provider openai --intent chatbot --skip-test --skip-run-yaml -y
+initrunner setup --provider openai --skip-test --skip-run-yaml -y
 ```
 
-The wizard still requires the API key to be available either in the environment or in `~/.initrunner/.env`. If no key is found and no TTY is available, the prompt will fail.
+The API key must already be in the environment or `~/.initrunner/.env`. Without a TTY and without a key, setup fails.
 
 ## Configuration Files
 
 ### Global `.env`
 
-API keys are stored in `~/.initrunner/.env`:
-
 ```
 OPENAI_API_KEY=sk-...
 ```
 
-The file is created with `0600` permissions (owner read/write only). The path is determined by:
+Path: `INITRUNNER_HOME` > `XDG_DATA_HOME/initrunner` > `~/.initrunner`.
 
-1. `INITRUNNER_HOME` environment variable (if set).
-2. `XDG_DATA_HOME/initrunner` (if `XDG_DATA_HOME` is set).
-3. `~/.initrunner` (default fallback).
+### Run config
 
-### Run Config
-
-`~/.initrunner/run.yaml` is generated during setup:
+`~/.initrunner/run.yaml`:
 
 ```yaml
 provider: openai
@@ -233,7 +128,7 @@ memory: true
 name: ephemeral
 ```
 
-For custom endpoints (e.g. OpenRouter), additional fields are included:
+Custom endpoint (e.g. OpenRouter):
 
 ```yaml
 provider: openai
@@ -246,20 +141,16 @@ api_key_env: OPENROUTER_API_KEY
 |-------|------|---------|-------------|
 | `provider` | string | *null* | Provider name |
 | `model` | string | *null* | Model identifier |
-| `base_url` | string | *null* | Custom endpoint URL (triggers OpenAI-compatible mode) |
+| `base_url` | string | *null* | Custom endpoint URL (OpenAI-compatible) |
 | `api_key_env` | string | *null* | Environment variable containing the API key |
-| `tool_profile` | string | `minimal` | Tool profile: `none`, `minimal`, or `all` |
+| `tool_profile` | string | `minimal` | `none`, `minimal`, or `all` |
 | `memory` | bool | `true` | Enable long-term memory |
-| `tools` | list | `[]` | Extra tool types to enable |
+| `tools` | list | `[]` | Extra tool types |
 | `ingest` | list | `[]` | Paths to ingest for RAG |
 | `personality` | string | *null* | Custom system prompt |
-| `name` | string | `ephemeral` | Agent name |
+| `name` | string | `ephemeral` | Ephemeral agent name |
 
-This file is loaded by `initrunner run` (ephemeral mode), `initrunner new`, `flow new`, and `doctor` to resolve the default provider and model. CLI flags (`--provider`, `--model`) override these defaults when specified.
-
-### Generated Role
-
-The generated `role.yaml` (or custom `--output` path) is a standard InitRunner role definition. See `initrunner validate <path>` to check it, or edit it directly to add tools, triggers, or ingestion config.
+`initrunner run` (ephemeral), `initrunner new`, `flow new`, and `doctor` read this file. CLI `--provider` / `--model` override it.
 
 ## Troubleshooting
 
@@ -269,46 +160,8 @@ The generated `role.yaml` (or custom `--output` path) is a standard InitRunner r
 Error: Unknown provider 'foo'. Choose from: openai, anthropic, google, groq, mistral, cohere, bedrock, xai, ollama
 ```
 
-### Unknown intent
+Include presets such as `openrouter` when you have that key.
 
-```
-Error: Unknown intent 'foo'. Choose from: chatbot, knowledge, memory, telegram-bot, discord-bot, api-agent, daemon, from-example
-```
+### Key validation failed
 
-### SDK installation failed
-
-```
-Warning: Could not install initrunner[anthropic]: ...
-Install manually: uv pip install initrunner[anthropic]
-```
-
-### Embedding warning
-
-```
-Warning: anthropic does not provide an embeddings API.
-RAG and memory features require OPENAI_API_KEY for embeddings.
-```
-
-This appears when using a provider without embeddings support with the `knowledge` or `memory` intent. Set `OPENAI_API_KEY` for embeddings, or configure a custom embedding provider in your role.yaml.
-
-### API key validation failed
-
-```
-Warning: API key validation failed.
-```
-
-Re-enter the key when prompted, or continue with the current key and troubleshoot later.
-
-### Test run failed
-
-```
-Warning: Test run failed: ...
-Setup is still complete -- check your configuration and try again.
-```
-
-The connectivity test failed but setup is still considered complete. Run `initrunner run role.yaml -p "hello"` manually to debug.
-
-## What's Next
-
-- **Choosing features**: Not sure which fields to add? See [What Do I Need?](choosing-features.md)
-- **Hands-on tutorial**: Build a complete agent step by step -- see [Tutorial](tutorial.md)
+The key is wrong or the provider API is unreachable. Re-run `setup` or set the env var and try `initrunner doctor`.

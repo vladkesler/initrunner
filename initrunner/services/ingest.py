@@ -23,14 +23,19 @@ _logger = logging.getLogger(__name__)
 
 
 def effective_ingest_base_dir(role_file: Path) -> Path:
-    """Return CWD for bundled starters, YAML parent for local files."""
-    from initrunner.services.starters import STARTERS_DIR
+    """Return the content root for bundled starters, YAML parent for local files.
 
-    try:
-        if role_file.resolve().is_relative_to(STARTERS_DIR.resolve()):
-            return Path.cwd()
-    except ValueError:
-        pass
+    Starters with local user data use CWD. Starters using bundled samples
+    use the starter directory so ingest does not glob the working tree.
+    """
+    from initrunner.services.starters import get_starter_for_path, starter_content
+
+    entry = get_starter_for_path(role_file)
+    if entry is not None:
+        content = starter_content(entry)
+        if content.root is not None:
+            return content.root
+        return Path.cwd()
     return role_file.parent
 
 
