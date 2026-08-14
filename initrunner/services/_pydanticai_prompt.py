@@ -32,7 +32,9 @@ If nothing was extracted, synthesize a focused system prompt from the tool descr
 - If usage_limits were extracted, map them to spec.guardrails:
   request_limit -> max_request_limit, tool_calls_limit -> max_tool_calls, \
 output_tokens_limit -> max_tokens_per_run, input_tokens_limit -> input_tokens_limit, \
-total_tokens_limit -> total_tokens_limit.
+total_tokens_limit -> total_tokens_limit, \
+per_request_input_tokens_limit -> per_request_input_tokens_limit, \
+cost_limit -> cost_limit (keep fractional USD, do not cast to int).
 - If structured output was detected, set spec.output.type: json_schema and describe \
 the schema in a comment or omit if the schema is complex.
 - NEVER declare both a capability and its equivalent tool.

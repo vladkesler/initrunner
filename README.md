@@ -14,11 +14,11 @@
   <a href="https://hub.docker.com/r/vladkesler/initrunner"><img src="https://img.shields.io/docker/pulls/vladkesler/initrunner?color=%2334D058" alt="Docker pulls"></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-%2334D058" alt="MIT OR Apache-2.0"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/PydanticAI-6e56cf?logo=pydantic&logoColor=white" alt="PydanticAI"></a>
-  <a href="https://discord.gg/GRTZmVcW"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://discord.gg/HhnG8JcdJD"><img src="https://img.shields.io/badge/Discord-InitRunner%20Hub-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
-  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/GRTZmVcW">Discord</a>
+  <a href="https://initrunner.ai/">Website</a> · <a href="https://initrunner.ai/docs">Docs</a> · <a href="https://hub.initrunner.ai/">InitHub</a> · <a href="https://discord.gg/HhnG8JcdJD">Discord</a>
 </p>
 
 <p align="center">
@@ -411,7 +411,7 @@ Run `initrunner doctor --role role.yaml` to check any role file for deprecated f
 
 ## Community
 
-- [Discord](https://discord.gg/GRTZmVcW): chat, ask questions, share roles
+- [Discord](https://discord.gg/HhnG8JcdJD): chat, ask questions, share roles
 - [GitHub Issues](https://github.com/vladkesler/initrunner/issues): bug reports and feature requests
 - [Changelog](CHANGELOG.md): release notes
 - [CONTRIBUTING.md](CONTRIBUTING.md): dev setup and PR guidelines

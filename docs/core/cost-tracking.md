@@ -1,6 +1,6 @@
 # Cost Tracking
 
-InitRunner estimates USD cost for every agent run using the `genai-prices` library (a transitive dependency of `pydantic-ai`). Cost data is derived from token counts already stored in the audit trail -- nothing extra to configure.
+InitRunner estimates USD cost for every agent run using the `genai-prices` library (a transitive dependency of `pydantic-ai`). A live run surfaces PydanticAI's `RunUsage.cost` on the result (and in the CLI stats line) when the model is priced. Historical `initrunner cost` reports still recompute from token counts stored in the audit trail -- nothing extra to configure.
 
 ## CLI Commands
 

@@ -15,9 +15,14 @@ from pydantic_ai import Agent
 
 if TYPE_CHECKING:
     from initrunner.agent.clarify import ClarifyCallback
-    from initrunner.agent.executor_models import AutonomousResult
 
-from initrunner.agent.executor import ErrorCategory, RunResult, execute_run, execute_run_stream
+from initrunner.agent.executor import (
+    AutonomousResult,
+    ErrorCategory,
+    RunResult,
+    execute_run,
+    execute_run_stream,
+)
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
 from initrunner.runner._conversations import ConversationStore
@@ -332,10 +337,16 @@ class DaemonRunner:
                 )
 
                 # Record usage per attempt (failed attempts still burn tokens)
-                if use_autonomous:
-                    self._tracker.record_usage(result.total_tokens_in, result.total_tokens_out)  # type: ignore[union-attr]
+                if isinstance(result, AutonomousResult):
+                    self._tracker.record_usage(
+                        result.total_tokens_in,
+                        result.total_tokens_out,
+                        cost_usd=result.total_cost_usd,
+                    )
                 else:
-                    self._tracker.record_usage(result.tokens_in, result.tokens_out)  # type: ignore[union-attr]
+                    self._tracker.record_usage(
+                        result.tokens_in, result.tokens_out, cost_usd=result.cost_usd
+                    )
 
                 # Persist budget state after each attempt
                 if self._audit_logger is not None:

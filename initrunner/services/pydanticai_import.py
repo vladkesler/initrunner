@@ -106,7 +106,7 @@ class PydanticAIImport:
     instructions: str | None = None
     dynamic_prompts: list[str] = field(default_factory=list)
     output_type_source: str | None = None
-    usage_limits: dict[str, int] = field(default_factory=dict)
+    usage_limits: dict[str, int | float] = field(default_factory=dict)
     custom_tools: list[PydanticAIToolDef] = field(default_factory=list)
     skipped_agents: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -637,7 +637,7 @@ def _find_function_def(
 # ---------------------------------------------------------------------------
 
 
-def _extract_usage_limits(tree: ast.Module) -> dict[str, int]:
+def _extract_usage_limits(tree: ast.Module) -> dict[str, int | float]:
     """Extract UsageLimits(...) kwargs."""
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -649,13 +649,15 @@ def _extract_usage_limits(tree: ast.Module) -> dict[str, int]:
         if bare != "UsageLimits":
             continue
 
-        limits: dict[str, int] = {}
+        limits: dict[str, int | float] = {}
         for kw in node.keywords:
             if kw.arg is None:
                 continue
             val = _get_number_value(kw.value)
-            if val is not None:
-                limits[kw.arg] = int(val)
+            if val is None:
+                continue
+            # cost_limit is USD and may be fractional; other limits are counts.
+            limits[kw.arg] = float(val) if kw.arg == "cost_limit" else int(val)
         return limits
 
     return {}

@@ -34,7 +34,7 @@ Names are CamelCase class names matching PydanticAI's capability registry. For c
 | `WebFetch` | `allowed_domains`, `blocked_domains`, `max_uses` | URL fetching with local fallback |
 | `ImageGeneration` | `fallback_model`, `image_model`, `quality`, `size`, `output_format`, `action`, `background`, `moderation` | Provider-native image generation (OpenAI Responses, Google) with optional `fallback_model` delegation on providers that lack it |
 | `MCP` | `url` (required), `id`, `authorization_token`, `headers`, `allowed_tools` | PydanticAI-native MCP server connection |
-| `NativeTool` | `tool` (native tool spec) | Register individual provider-native tools |
+| `NativeTool` | native tool fields (`kind`, plus tool-specific args) | Register one provider-native tool (web search, advisor, …) |
 | `PrefixTools` | `prefix`, `capability` (nested spec) | Namespace tool names to avoid conflicts |
 | `RaiseContentFilterError` | none | Raise `ContentFilterError` when the model returns a non-empty content-filter response, instead of treating it as an empty completion |
 
@@ -97,6 +97,20 @@ spec:
 ```
 
 The raised `ContentFilterError` can also be named in `spec.model.fallback.on` to fail over to another model on a filtered response.
+
+### Advisor tool (Anthropic / OpenRouter)
+
+`AdvisorTool` is not a bare capability. Wrap it as `NativeTool` with `kind: advisor` and the advisor `model`:
+
+```yaml
+spec:
+  capabilities:
+    - NativeTool:
+        kind: advisor
+        model: claude-opus-5
+```
+
+The executor model can consult that stronger model mid-generation. OpenRouter honors a subset of the fields (`model`, `max_tokens`).
 
 ### Prefixed capabilities (namespace tools)
 

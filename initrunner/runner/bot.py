@@ -189,7 +189,7 @@ def run_bot(
             if clarify_token is not None:
                 reset_clarify_callback(clarify_token)
 
-        tracker.record_usage(result.tokens_in, result.tokens_out)
+        tracker.record_usage(result.tokens_in, result.tokens_out, cost_usd=result.cost_usd)
 
         # Persist budget state
         if audit_logger is not None:

@@ -379,6 +379,15 @@ class TestUsageLimits:
         result = extract_pydanticai_import(source)
         assert result.usage_limits == {"request_limit": 10, "tool_calls_limit": 50}
 
+    def test_fractional_cost_limit_kept(self):
+        source = textwrap.dedent("""\
+            from pydantic_ai import Agent, UsageLimits
+            agent = Agent("openai:gpt-5")
+            limits = UsageLimits(cost_limit=0.15, request_limit=8)
+        """)
+        result = extract_pydanticai_import(source)
+        assert result.usage_limits == {"cost_limit": 0.15, "request_limit": 8}
+
     def test_without_limits(self):
         source = textwrap.dedent("""\
             from pydantic_ai import Agent

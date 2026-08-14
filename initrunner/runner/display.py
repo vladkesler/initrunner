@@ -17,6 +17,14 @@ from initrunner.agent.tool_events import ToolEvent
 console = Console()
 
 
+def _cost_suffix(result: RunResult) -> str:
+    """Return a `` | $0.0123`` fragment when live run cost is known."""
+    cost = result.cost_usd
+    if isinstance(cost, bool) or not isinstance(cost, (int, float)):
+        return ""
+    return f" | ${cost:.4f}"
+
+
 def _cache_suffix(result: RunResult) -> str:
     """Return a `` | cache hit: NN%`` fragment when prompt caching reported a hit.
 
@@ -35,7 +43,7 @@ def _display_result(result: RunResult, *, budget_status: TokenBudgetStatus | Non
         md = Markdown(result.output)
         subtitle = (
             f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
-            f"{result.duration_ms}ms{_cache_suffix(result)}"
+            f"{result.duration_ms}ms{_cache_suffix(result)}{_cost_suffix(result)}"
         )
         if budget_status is not None and budget_status.budget is not None:
             subtitle += f" | budget: {budget_status.consumed:,}/{budget_status.budget:,}"
@@ -102,7 +110,7 @@ def _display_iteration_result(
         budget_info = f" | budget: {cumulative_tokens:,}/{token_budget:,}"
     subtitle = (
         f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
-        f"{result.duration_ms}ms{_cache_suffix(result)}{budget_info}"
+        f"{result.duration_ms}ms{_cache_suffix(result)}{_cost_suffix(result)}{budget_info}"
     )
     if result.success:
         md = Markdown(result.output)
@@ -152,7 +160,7 @@ def _display_stream_stats(result: RunResult) -> None:
     """Print a compact stats line after streamed output."""
     stats = (
         f"{result.tokens_in}in/{result.tokens_out}out | "
-        f"{result.duration_ms}ms{_cache_suffix(result)}"
+        f"{result.duration_ms}ms{_cache_suffix(result)}{_cost_suffix(result)}"
     )
     console.print(f"\n[dim]--- tokens: {stats} ---[/dim]")
 
@@ -282,7 +290,7 @@ def _display_result_plain(result: RunResult) -> None:
         sys.stdout.flush()
         stats = (
             f"tokens: {result.tokens_in}in/{result.tokens_out}out | "
-            f"{result.duration_ms}ms{_cache_suffix(result)}"
+            f"{result.duration_ms}ms{_cache_suffix(result)}{_cost_suffix(result)}"
         )
         sys.stderr.write(f"--- {stats} ---\n")
         sys.stderr.flush()
@@ -300,6 +308,7 @@ def _display_result_json(result: RunResult) -> None:
         "success": result.success,
         "tokens_in": result.tokens_in,
         "tokens_out": result.tokens_out,
+        "cost_usd": result.cost_usd,
         "total_tokens": result.total_tokens,
         "tool_calls": result.tool_calls,
         "tool_call_names": result.tool_call_names,

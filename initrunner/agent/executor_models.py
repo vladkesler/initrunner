@@ -48,6 +48,10 @@ class RunResult:
     by PydanticAI's run usage (``0.0`` to ``1.0``). ``None`` when the model or
     provider does not report cache usage (e.g. ``TestModel`` or a non-caching
     provider); only meaningful for the Anthropic/Bedrock prompt-caching path."""
+    cost_usd: float | None = None
+    """Best-effort USD cost from PydanticAI ``RunUsage.cost`` (genai-prices).
+    ``None`` when the model or provider has no price data. Not the provider
+    invoice; historical audit reports still estimate from stored token counts."""
     tool_calls: int = 0
     duration_ms: int = 0
     success: bool = True
@@ -83,6 +87,7 @@ class AutonomousResult:
     total_tokens_in: int = 0
     total_tokens_out: int = 0
     total_tokens: int = 0
+    total_cost_usd: float | None = None
     total_tool_calls: int = 0
     total_duration_ms: int = 0
     iteration_count: int = 0

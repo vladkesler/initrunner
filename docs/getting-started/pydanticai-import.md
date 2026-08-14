@@ -171,6 +171,8 @@ The converter uses a two-phase approach:
 | `FunctionToolset` tools | `type: custom` + sidecar module |
 | `tools=[func]` kwarg | `type: custom` + sidecar module |
 | `UsageLimits(request_limit=10)` | `spec.guardrails.max_request_limit: 10` |
+| `UsageLimits(cost_limit=0.15)` | `spec.guardrails.cost_limit: 0.15` |
+| `UsageLimits(per_request_input_tokens_limit=80000)` | `spec.guardrails.per_request_input_tokens_limit: 80000` |
 
 ## Tool Extraction and RunContext
 

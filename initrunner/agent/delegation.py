@@ -251,7 +251,9 @@ class InlineInvoker:
                         tracker.record_usage(0, 0)
                     raise
                 if tracker is not None:
-                    tracker.record_usage(result.tokens_in, result.tokens_out)
+                    tracker.record_usage(
+                        result.tokens_in, result.tokens_out, cost_usd=result.cost_usd
+                    )
                 if not result.success:
                     logger.warning("Delegate agent '%s' failed: %s", agent_name, result.error)
                     return f"{_ERROR_PREFIX} Agent '{agent_name}' failed: {result.error}"

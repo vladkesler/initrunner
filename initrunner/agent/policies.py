@@ -10,7 +10,7 @@ from collections.abc import Coroutine
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pydantic_ai.models import Model
+from pydantic_ai.models import AbstractModel, Model
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.security import ContentPolicy
@@ -78,7 +78,7 @@ def validate_input(
     prompt: str,
     policy: ContentPolicy,
     *,
-    model_override: Model | str | None = None,
+    model_override: AbstractModel | str | None = None,
 ) -> ValidationResult:
     """Synchronous input validation pipeline. Fast checks first, LLM classifier last."""
     result = _validate_fast_checks(prompt, policy)
@@ -98,7 +98,7 @@ async def validate_input_async(
     prompt: str,
     policy: ContentPolicy,
     *,
-    model_override: Model | str | None = None,
+    model_override: AbstractModel | str | None = None,
 ) -> ValidationResult:
     """Async input validation pipeline for use in async handlers."""
     result = _validate_fast_checks(prompt, policy)
@@ -210,12 +210,18 @@ _classifier_cache: dict[str, object] = {}
 _classifier_cache_lock = threading.Lock()
 
 
-def _get_classifier_agent(model_override: Model | str | None = None):
+def _get_classifier_agent(model_override: AbstractModel | str | None = None):
     """Return a cached classifier Agent for the given model."""
     from pydantic_ai import Agent
     from pydantic_ai.settings import ModelSettings
 
-    model = model_override or "openai:gpt-5-mini"
+    # RunContext.model is AbstractModel; Agent() still types the ctor as Model.
+    if isinstance(model_override, str):
+        model: Model | str = model_override
+    elif isinstance(model_override, Model):
+        model = model_override
+    else:
+        model = "openai:gpt-5-mini"
     cache_key = str(model)
 
     with _classifier_cache_lock:
@@ -259,7 +265,7 @@ def _run_coro_blocking(coro: Coroutine[Any, Any, ValidationResult]) -> Validatio
 
 
 def _run_llm_classifier_sync(
-    prompt: str, allowed_topics_prompt: str, model_override: Model | str | None = None
+    prompt: str, allowed_topics_prompt: str, model_override: AbstractModel | str | None = None
 ) -> ValidationResult:
     """Run the LLM classifier from sync code, safe inside a running event loop.
 
@@ -273,7 +279,7 @@ def _run_llm_classifier_sync(
 
 
 async def _run_llm_classifier_async(
-    prompt: str, allowed_topics_prompt: str, model_override: Model | str | None = None
+    prompt: str, allowed_topics_prompt: str, model_override: AbstractModel | str | None = None
 ) -> ValidationResult:
     """Run LLM classifier asynchronously."""
     classifier = _get_classifier_agent(model_override)

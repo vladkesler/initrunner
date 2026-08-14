@@ -56,6 +56,7 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     "openai": [
         ("gpt-5.4", "Frontier (best quality, higher cost)"),
         ("gpt-5-mini", "Balanced (good quality, lower cost)"),
+        ("gpt-5.6-luna", "Frontier (latest GPT-5.6)"),
         ("gpt-5-nano", "Lightweight (fastest, lowest cost)"),
         ("gpt-4.1", "Previous gen, reliable"),
         ("o4-mini", "Reasoning, fast"),
@@ -64,13 +65,16 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     "anthropic": [
         ("claude-sonnet-4-6", "Balanced (fast, capable)"),
         ("claude-sonnet-5", "Frontier (latest generation)"),
-        ("claude-opus-4-6", "Frontier (best quality, higher cost)"),
+        ("claude-opus-5", "Frontier (latest Opus, higher cost)"),
+        ("claude-opus-4-6", "Previous Opus, high quality"),
         ("claude-haiku-4-5-20251001", "Lightweight (fastest, lowest cost)"),
     ],
     "google": [
-        ("gemini-2.5-flash", "Balanced (fast multimodal)"),
-        ("gemini-2.5-pro", "Frontier (best quality)"),
-        ("gemini-2.5-flash-lite", "Lightweight (lowest cost)"),
+        ("gemini-3.7-flash", "Frontier (latest flash)"),
+        ("gemini-3.6-flash", "Balanced (fast multimodal)"),
+        ("gemini-3.5-flash-lite", "Lightweight (lowest cost)"),
+        ("gemini-2.5-pro", "Previous gen, best quality"),
+        ("gemini-2.5-flash", "Previous gen, fast"),
     ],
     "groq": [
         ("llama-4-scout-17b-16e", "Llama 4 Scout, ultra-fast"),
@@ -91,6 +95,7 @@ PROVIDER_MODELS: dict[str, list[tuple[str, str]]] = {
     "bedrock": [
         ("us.anthropic.claude-sonnet-4-6-v1:0", "Claude Sonnet 4.6 (balanced)"),
         ("us.anthropic.claude-sonnet-5", "Claude Sonnet 5 (latest)"),
+        ("us.anthropic.claude-opus-5", "Claude Opus 5 (latest)"),
         ("us.anthropic.claude-haiku-4-5-v1:0", "Claude Haiku 4.5 (lightweight)"),
         ("us.meta.llama4-scout-17b-instruct-v1:0", "Llama 4 Scout"),
         ("zai.glm-5", "Z.AI GLM-5"),
@@ -146,6 +151,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # session_token_budget: 500000   # cumulative REPL session limit
 """
@@ -185,6 +192,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # session_token_budget: 500000   # cumulative REPL session limit
 """
@@ -230,6 +239,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # daemon_token_budget: 2000000        # lifetime limit (resets on restart)
     # daemon_daily_token_budget: 200000   # resets daily (UTC midnight)
@@ -269,6 +280,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # session_token_budget: 500000   # cumulative REPL session limit
 """
@@ -302,6 +315,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # session_token_budget: 500000   # cumulative REPL session limit
 """
@@ -407,6 +422,8 @@ spec:
     timeout_seconds: 300
     max_request_limit: 50
     # input_tokens_limit: 100000     # per-run input token cap
+    # per_request_input_tokens_limit: 80000  # single-request context cap
+    # cost_limit: 0.50               # USD cap per logical run (best-effort)
     # total_tokens_limit: 200000     # per-run total token cap
     # session_token_budget: 500000   # cumulative REPL session limit
 """

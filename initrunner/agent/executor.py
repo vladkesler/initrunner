@@ -61,6 +61,54 @@ from .executor_retry import (
     _run_with_timeout,  # noqa: F401
 )
 
+_BUILTIN_CAP_NAMES = {"WebSearch", "WebFetch", "ImageGeneration", "MCP"}
+
+
+def _usage_limits_for_role(role: RoleDefinition) -> UsageLimits:
+    """Map ``spec.guardrails`` onto PydanticAI ``UsageLimits``.
+
+    ``cost_limit`` is converted with ``Decimal(str(...))`` so YAML floats
+    (e.g. ``0.10``) stay exact. Unpriced models do not enforce the cap;
+    PydanticAI warns instead of failing closed.
+    """
+    from decimal import Decimal
+
+    guardrails = role.spec.guardrails
+    has_builtins = any(
+        hasattr(s, "name") and s.name in _BUILTIN_CAP_NAMES for s in role.spec.capabilities
+    )
+    tool_calls_limit = guardrails.max_tool_calls + 20 if has_builtins else guardrails.max_tool_calls
+    cost_limit = Decimal(str(guardrails.cost_limit)) if guardrails.cost_limit is not None else None
+    return UsageLimits(
+        output_tokens_limit=guardrails.max_tokens_per_run,
+        request_limit=guardrails.max_request_limit,
+        tool_calls_limit=tool_calls_limit,
+        input_tokens_limit=guardrails.input_tokens_limit,
+        total_tokens_limit=guardrails.total_tokens_limit,
+        per_request_input_tokens_limit=guardrails.per_request_input_tokens_limit,
+        cost_limit=cost_limit,
+    )
+
+
+def _run_usage_from_history(messages: list) -> Any:
+    """Rebuild ``RunUsage`` from prior turns so resume keeps one logical budget."""
+    from pydantic_ai.messages import ToolReturnPart
+    from pydantic_ai.usage import RunUsage
+
+    acc = RunUsage()
+    for msg in messages:
+        usage = getattr(msg, "usage", None)
+        if usage is not None:
+            try:
+                acc.incr(usage)
+            except (TypeError, AttributeError):
+                pass
+        for part in getattr(msg, "parts", ()):
+            if isinstance(part, ToolReturnPart):
+                acc.tool_calls += 1
+    return acc
+
+
 # ---------------------------------------------------------------------------
 # Shared run preparation
 # ---------------------------------------------------------------------------
@@ -106,30 +154,18 @@ def _prepare_run(
             principal_id=principal_id,
         )
 
-    guardrails = role.spec.guardrails
-
-    # Builtin capabilities (WebSearch, WebFetch, etc.) register model-native
-    # tools that PydanticAI counts against tool_calls_limit.  Disable that
-    # guardrail when builtins are active so they don't starve actual tools.
-    _BUILTIN_CAP_NAMES = {"WebSearch", "WebFetch", "ImageGeneration", "MCP"}
-    has_builtins = any(
-        hasattr(s, "name") and s.name in _BUILTIN_CAP_NAMES for s in role.spec.capabilities
-    )
-    tool_calls_limit = guardrails.max_tool_calls + 20 if has_builtins else guardrails.max_tool_calls
-
-    usage_limits = UsageLimits(
-        output_tokens_limit=guardrails.max_tokens_per_run,
-        request_limit=guardrails.max_request_limit,
-        tool_calls_limit=tool_calls_limit,
-        input_tokens_limit=guardrails.input_tokens_limit,
-        total_tokens_limit=guardrails.total_tokens_limit,
-    )
+    usage_limits = _usage_limits_for_role(role)
 
     run_kwargs: dict[str, Any] = {
         "usage_limits": usage_limits,
         "message_history": message_history,
         "model": model_override,
+        "run_id": run_id,
     }
+    # First turn of a conversation: make the native conversation_id match
+    # InitRunner's run id. Later turns (REPL) inherit from message_history.
+    if not message_history:
+        run_kwargs["conversation_id"] = run_id
     if extra_toolsets:
         run_kwargs["toolsets"] = extra_toolsets
     metadata: dict[str, Any] = {
@@ -301,7 +337,15 @@ async def _execute_resume_async_inner(
             "message_history": message_history,
             "deferred_tool_results": deferred,
             "model": model_override,
-            "metadata": {"input_validated": True},
+            "metadata": {
+                "input_validated": True,
+                "initrunner.run_id": run_id,
+                "initrunner.agent_name": role.metadata.name,
+            },
+            # Do not pass run_id: PydanticAI rejects an id already on history.
+            # conversation_id is inherited from the first turn's messages.
+            "usage_limits": _usage_limits_for_role(role),
+            "usage": _run_usage_from_history(message_history),
         }
         new_messages: list = []
         timeout = role.spec.guardrails.timeout_seconds

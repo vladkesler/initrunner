@@ -368,6 +368,8 @@ def _collect_guardrails(g: Any) -> list[GuardrailItem]:
         ("max_request_limit", g.max_request_limit),
         ("input_tokens_limit", g.input_tokens_limit),
         ("total_tokens_limit", g.total_tokens_limit),
+        ("per_request_input_tokens_limit", g.per_request_input_tokens_limit),
+        ("cost_limit", g.cost_limit),
         ("session_token_budget", g.session_token_budget),
         ("run_token_budget", g.run_token_budget),
         ("daemon_token_budget", g.daemon_token_budget),
