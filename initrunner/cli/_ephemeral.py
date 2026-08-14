@@ -68,15 +68,18 @@ def resolve_extra_tools(extra_types: list[str]) -> list[dict]:
     return result
 
 
-def check_profile_envs() -> set[str]:
-    """Check required env vars for all tools in the ``all`` profile.
+def check_profile_envs(selected_types: set[str] | None = None) -> set[str]:
+    """Check required env vars for *selected* tools only.
 
     Returns tool names that should be skipped due to missing env vars.
-    Prints a warning for each skipped tool.
+    Prints a warning for each skipped tool. When *selected_types* is
+    ``None``, inspects the full ephemeral catalog (legacy). Pass the
+    attached types so a missing Slack webhook does not print under
+    ``minimal`` / ``none``.
     """
     from initrunner.services.providers import check_tool_envs
 
-    missing_map = check_tool_envs()
+    missing_map = check_tool_envs(selected_types)
     for tool_name, missing in missing_map.items():
         console.print(f"[dim]Skipping tool '{tool_name}' -- missing {', '.join(missing)}[/dim]")
     return set(missing_map)
@@ -217,10 +220,7 @@ def dispatch_ephemeral_repl(
     model: str | None,
     prompt: UserPrompt | None,
     interactive: bool,
-    profile_tools: list[dict],
-    extra_tools: list[dict],
-    all_tools: list[dict],
-    always_available: list[str],
+    attached_tools: list[dict],
     audit_db: Path | None,
     no_audit: bool,
     with_memory: bool = True,
@@ -241,7 +241,7 @@ def dispatch_ephemeral_repl(
         role, prov, mod = build_quick_chat_role_sync(
             provider=provider,
             model=model,
-            tool_defs=all_tools if all_tools else None,
+            tool_defs=attached_tools,
             with_memory=with_memory,
             personality=personality,
             name=name,
@@ -252,7 +252,7 @@ def dispatch_ephemeral_repl(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    # Layer on ingest config
+    # Layer on ingest config — keep the same attached tool list (empty stays empty).
     if ingest_paths:
         from initrunner.agent.schema.ingestion import IngestConfig
         from initrunner.services.providers import build_ephemeral_role
@@ -260,7 +260,7 @@ def dispatch_ephemeral_repl(
         ingest_config = IngestConfig(sources=ingest_paths)
         build_kwargs: dict = {
             "name": name,
-            "tools": all_tools if all_tools else None,
+            "tools": attached_tools,
             "memory": role.spec.memory,
             "ingest": ingest_config,
             "tool_search": role.spec.tool_search,
@@ -280,9 +280,11 @@ def dispatch_ephemeral_repl(
     agent = build_agent(role)
 
     console.print(f"[dim]Using {prov}:{mod}[/dim]")
-    console.print(
-        "[dim]Tip: for custom tools and guardrails, create a role with 'initrunner new'[/dim]"
-    )
+    one_shot = bool(prompt) and not interactive
+    if not one_shot:
+        console.print(
+            "[dim]Tip: for custom tools and guardrails, create a role with 'initrunner new'[/dim]"
+        )
 
     # Run ingestion if configured
     if ingest_config is not None:
@@ -327,10 +329,7 @@ def dispatch_ephemeral_bot(
     *,
     provider: str | None,
     model: str | None,
-    profile_tools: list[dict],
-    extra_tools: list[dict],
-    all_tools: list[dict],
-    always_available: list[str],
+    attached_tools: list[dict],
     audit_db: Path | None,
     no_audit: bool,
     with_memory: bool = True,
@@ -409,9 +408,9 @@ def dispatch_ephemeral_bot(
 
     bot_name = name if name != "ephemeral" else f"{platform}-bot"
 
-    from initrunner.agent.schema.role import ToolSearchConfig
+    from initrunner.services.providers import ephemeral_tool_search
 
-    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
+    tool_search = ephemeral_tool_search(attached_tools)
 
     build_kwargs: dict = {
         "name": bot_name,
@@ -423,7 +422,7 @@ def dispatch_ephemeral_bot(
             "Keep responses concise."
         ),
         "triggers": [trigger_config],
-        "tools": all_tools if all_tools else None,
+        "tools": attached_tools,
         "autonomy": {},
         "guardrails": {"daemon_daily_token_budget": 200_000},
         "memory": memory_config,
@@ -516,22 +515,18 @@ def dispatch_ephemeral(
         )
         raise typer.Exit(1)
 
-    # Compute profile tools, filter missing env vars
+    # Attach the selected profile + extras only — never the full catalog.
     profile_tools = list(TOOL_PROFILES.get(tool_profile, []))
+    extras = resolve_extra_tools(extra_tools) if extra_tools else []
+    attached_tools = merge_tools(profile_tools, extras)
 
     from initrunner.services.providers import _load_env
 
     _load_env()
-    skip = check_profile_envs()
-    if skip and tool_profile == "all":
-        profile_tools = [t for t in profile_tools if t["type"] not in skip]
-
-    extras = resolve_extra_tools(extra_tools) if extra_tools else []
-
-    all_ephemeral_tools = [t for t in EPHEMERAL_TOOL_DEFAULTS.values() if t["type"] not in skip]
-    from initrunner.agent.tools.registry import resolve_func_names
-
-    always_available = resolve_func_names(merge_tools(profile_tools, extras))
+    selected_types = {t["type"] for t in attached_tools}
+    skip = check_profile_envs(selected_types)
+    if skip:
+        attached_tools = [t for t in attached_tools if t["type"] not in skip]
 
     ephemeral_name = run_cfg.name
     personality = run_cfg.personality
@@ -552,10 +547,7 @@ def dispatch_ephemeral(
             bot,
             provider=provider,
             model=model,
-            profile_tools=profile_tools,
-            extra_tools=extras,
-            all_tools=all_ephemeral_tools,
-            always_available=always_available,
+            attached_tools=attached_tools,
             audit_db=audit_db,
             no_audit=no_audit,
             with_memory=memory if memory is not None else True,
@@ -573,10 +565,7 @@ def dispatch_ephemeral(
             model=model,
             prompt=user_prompt,
             interactive=interactive,
-            profile_tools=profile_tools,
-            extra_tools=extras,
-            all_tools=all_ephemeral_tools,
-            always_available=always_available,
+            attached_tools=attached_tools,
             audit_db=audit_db,
             no_audit=no_audit,
             with_memory=memory if memory is not None else True,

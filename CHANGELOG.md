@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Quiet Quick chat.** Ephemeral `initrunner run` (and the no-arg Chat job) attaches the selected tool profile instead of the full catalog. `tool_profile: minimal` (the `run.yaml` default) is datetime + web_reader; `none` attaches no tools; `--tool-profile all` and `--tools` still opt in to `python`/`shell` and the sandbox warnings. Missing Slack env no longer prints a skip line on the default path. Tool search stays off for none/minimal; on `all` only the minimal functions are always-available.
+- **First-run jobs menu.** Bare `initrunner` is Chat / Try a starter / Create an agent, with Dashboard last when the extra is installed. Enter selects Chat. `initrunner setup` no longer asks to open the dashboard; `-y` and non-TTY print Chat / `memory` / `new`.
+- **Honest starters.** Helpdesk is a directory starter with bundled sample docs and shows **Ready (samples)** when you have no local `knowledge-base/`. Markdown/text ingest no longer requires `initrunner[ingest]`. Empty `./knowledge-base/` is not Ready and will not answer from a leftover store. Ingest and `read_file` share the same content root. Missing extras also print `initrunner doctor --fix`.
+
+### Docs
+- Setup guide matches the three-step provider wizard. CLI no-arg menu, README quickstart, RAG scaffold, and the choosing-features multi-agent names (Flow, not Compose) follow the same first-run story.
+
 ## [2026.8.1] - 2026-08-07
 
 ### Security

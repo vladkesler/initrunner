@@ -1000,6 +1000,9 @@ def load_and_build(
     _load_dotenv(path.parent)
     role = load_role(path)
     role = resolve_role_model(role, path, model_override=model_override)
+    from initrunner.services.starters import apply_starter_content_root
+
+    role = apply_starter_content_root(role, path)
     agent = build_agent(role, role_dir=path.parent, extra_skill_dirs=extra_skill_dirs)
     return role, agent
 

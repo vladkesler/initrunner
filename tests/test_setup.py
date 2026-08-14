@@ -506,58 +506,33 @@ class TestSecurityDisclaimer:
         assert "security guide" not in result.output
 
 
-class TestDashboardPrompt:
-    """Tests for the dashboard prompt at the end of setup."""
+class TestSetupNextAction:
+    """Setup last step: jobs menu on TTY, next-steps panel on -y / non-TTY."""
 
-    def test_dashboard_prompt_declined_shows_next_steps(self, clean_env, monkeypatch):
-        """Dashboard installed + decline -> shows next steps with starters."""
-        import io
-
+    def test_accept_risks_skips_action_prompt(self, clean_env, monkeypatch):
+        """-y is non-interactive: next-steps panel, no dashboard, no job prompt."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
-        class _FakeTTY(io.BytesIO):
-            def isatty(self):
-                return True
-
-        with patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=True):
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--skip-test",
-                ],
-                input=_FakeTTY(b"n\n"),  # decline dashboard
-            )
-        assert result.exit_code == 0
-        assert "Open the dashboard?" in result.output
-        assert "Next steps" in result.output
-        assert "initrunner run helpdesk" in result.output
-
-    def test_dashboard_not_available_shows_next_steps(self, clean_env, monkeypatch):
-        """Dashboard not installed -> no prompt, shows next steps."""
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-
-        with patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=False):
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--skip-test",
-                ],
-            )
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--skip-test",
+            ],
+        )
         assert result.exit_code == 0
         assert "Open the dashboard?" not in result.output
+        assert "What would you like to do?" not in result.output
         assert "Next steps" in result.output
+        assert "initrunner run -i" in result.output
+        assert "initrunner run memory" in result.output
+        assert "initrunner run helpdesk" not in result.output
+        assert "initrunner run scout" not in result.output
 
 
 class TestSkipRunYaml:
@@ -608,27 +583,28 @@ class TestSummaryPanel:
 
 
 class TestNextStepsStarters:
-    def test_next_steps_show_starter_commands(self, clean_env, monkeypatch):
-        """Next steps should show starter agent commands."""
+    def test_next_steps_show_chat_and_memory(self, clean_env, monkeypatch):
+        """-y next-steps panel points at chat and memory, not helpdesk/scout."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
-        with patch("initrunner.cli.setup_cmd.is_dashboard_available", return_value=False):
-            result = runner.invoke(
-                app,
-                [
-                    "setup",
-                    "-y",
-                    "--provider",
-                    "openai",
-                    "--model",
-                    "gpt-5-mini",
-                    "--skip-test",
-                ],
-            )
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "-y",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-5-mini",
+                "--skip-test",
+            ],
+        )
         assert result.exit_code == 0
-        assert "initrunner run helpdesk" in result.output
-        assert "initrunner run reviewer" in result.output
-        assert "initrunner run scout" in result.output
+        assert "initrunner run -i" in result.output
+        assert "initrunner run memory" in result.output
+        assert "initrunner new" in result.output
+        assert "initrunner run helpdesk" not in result.output
+        assert "initrunner run scout" not in result.output
 
 
 class TestAutoDetectProvider:

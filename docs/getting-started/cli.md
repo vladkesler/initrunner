@@ -97,18 +97,20 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 Running `initrunner` with no subcommand in a TTY shows an action menu:
 
 ```
-  1. Dashboard (web UI)
-  2. Quick chat (REPL)
+  1. Chat
+  2. Try a starter
   3. Create an agent
+  4. Dashboard (web UI)    # only if dashboard extras are installed
 
-What would you like to do? [1/2/3] (1):
+What would you like to do? [1/2/3/4] (1):
 ```
 
-- **Dashboard** launches the web UI at `http://localhost:8100` (only shown when dashboard extras are installed).
-- **Quick chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`.
+- **Chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`. It attaches the `minimal` tool profile (`datetime`, `web_reader`) unless you pass `--tool-profile all`, `--tool-profile none`, or `--tools`. Enter selects Chat.
+- **Try a starter** lists Agent starters that are ready with your current extras and env (no Team/Flow until you pass `-p`).
 - **Create an agent** enters the interactive agent builder (`initrunner new`).
+- **Dashboard** launches the web UI at `http://localhost:8100`. Last in the list, never the default.
 
-The default is Dashboard when available, otherwise Quick chat. If no provider is configured, a "Setup Required" panel is shown instead.
+If no provider is configured, a "Setup Required" panel is shown instead.
 
 In non-TTY contexts (piped input), the help text is printed.
 
@@ -151,8 +153,8 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
 | `--provider TEXT` | Model provider (overrides auto-detection or role config) |
 | `--model TEXT` | Model alias or provider:model (overrides auto-detection or role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
-| `--tool-profile TEXT` | Tool profile: `none`, `minimal` (default for ephemeral), `all` |
-| `--tools TEXT` | Extra tool types to enable (repeatable) |
+| `--tool-profile TEXT` | Tool profile: `none` (no tools), `minimal` (default: `datetime` + `web_reader`), `all` (full ephemeral catalog, including `python`/`shell`) |
+| `--tools TEXT` | Extra tool types to enable (repeatable). Merged onto the selected profile. |
 | `--memory / --no-memory` | Enable or disable persistent memory (default: enabled for ephemeral) |
 | `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable) |
 | `--list-tools` | List available extra tool types and exit |

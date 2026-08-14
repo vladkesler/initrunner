@@ -57,3 +57,115 @@ class TestQuickChatHonorsEndpoint:
         assert role.spec.model.base_url == "https://openrouter.ai/api/v1"
         assert role.spec.model.api_key_env == "OPENROUTER_API_KEY"
         assert role.spec.model.provider == "openai"
+
+
+def _tool_types(role) -> list[str]:
+    return [t.type for t in role.spec.tools]
+
+
+class TestQuickChatToolContract:
+    def test_none_defs_use_minimal(self):
+        from initrunner.services.providers import build_quick_chat_role_sync
+
+        with patch("initrunner.services.providers._load_env"):
+            role, _, _ = build_quick_chat_role_sync(
+                provider="openai",
+                model="gpt-5-mini",
+                tool_defs=None,
+                with_memory=False,
+            )
+
+        assert _tool_types(role) == ["datetime", "web_reader"]
+        assert role.spec.tool_search.enabled is False
+
+    def test_empty_defs_attach_no_tools(self):
+        from initrunner.services.providers import build_quick_chat_role_sync
+
+        with patch("initrunner.services.providers._load_env"):
+            role, _, _ = build_quick_chat_role_sync(
+                provider="openai",
+                model="gpt-5-mini",
+                tool_defs=[],
+                with_memory=False,
+            )
+
+        assert role.spec.tools == []
+        assert role.spec.tool_search.enabled is False
+
+    def test_all_enables_tool_search_with_minimal_pinned(self):
+        from initrunner.services.providers import (
+            TOOL_PROFILES,
+            build_quick_chat_role_sync,
+        )
+
+        with (
+            patch("initrunner.services.providers._load_env"),
+            patch("initrunner.services.providers.check_tool_envs", return_value={}),
+        ):
+            role, _, _ = build_quick_chat_role_sync(
+                provider="openai",
+                model="gpt-5-mini",
+                tool_defs=list(TOOL_PROFILES["all"]),
+                with_memory=False,
+            )
+
+        types = _tool_types(role)
+        assert "python" in types
+        assert "shell" in types
+        assert "datetime" in types
+        from initrunner.agent.tools.registry import resolve_func_names
+
+        assert role.spec.tool_search.enabled is True
+        # Full catalog must not be always-available — only the minimal set.
+        pinned = set(role.spec.tool_search.always_available)
+        expected = set(resolve_func_names(list(TOOL_PROFILES["minimal"])))
+        assert pinned == expected
+        assert "run_python" not in pinned
+
+    def test_minimal_plus_python_does_not_pin_python(self):
+        from initrunner.agent.tools.registry import resolve_func_names
+        from initrunner.services.providers import (
+            EPHEMERAL_TOOL_DEFAULTS,
+            TOOL_PROFILES,
+            build_quick_chat_role_sync,
+        )
+
+        attached = [*TOOL_PROFILES["minimal"], EPHEMERAL_TOOL_DEFAULTS["python"]]
+        with patch("initrunner.services.providers._load_env"):
+            role, _, _ = build_quick_chat_role_sync(
+                provider="openai",
+                model="gpt-5-mini",
+                tool_defs=attached,
+                with_memory=False,
+            )
+
+        assert set(_tool_types(role)) == {"datetime", "web_reader", "python"}
+        assert role.spec.tool_search.enabled is True
+        assert set(role.spec.tool_search.always_available) == set(
+            resolve_func_names(list(TOOL_PROFILES["minimal"]))
+        )
+        assert "run_python" not in role.spec.tool_search.always_available
+
+    def test_skips_only_selected_tools_missing_env(self):
+        from initrunner.services.providers import (
+            EPHEMERAL_TOOL_DEFAULTS,
+            build_quick_chat_role_sync,
+        )
+
+        with (
+            patch("initrunner.services.providers._load_env"),
+            patch(
+                "initrunner.services.providers.check_tool_envs",
+                return_value={"slack": ["SLACK_WEBHOOK_URL"]},
+            ) as mock_check,
+        ):
+            role, _, _ = build_quick_chat_role_sync(
+                provider="openai",
+                model="gpt-5-mini",
+                tool_defs=[EPHEMERAL_TOOL_DEFAULTS["slack"]],
+                with_memory=False,
+            )
+
+        mock_check.assert_called_once()
+        assert mock_check.call_args[0][0] == {"slack"}
+        assert role.spec.tools == []

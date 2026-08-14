@@ -32,6 +32,8 @@ Define an agent in one YAML file. Chat with it. When it works, let it run autono
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh
 initrunner setup        # wizard: pick provider, model, API key
+initrunner run -i       # chat (or press Enter on the post-setup menu)
+initrunner run memory -i
 ```
 
 Or: `uv pip install "initrunner[recommended]"` / `pipx install "initrunner[recommended]"`. See [Installation](docs/getting-started/installation.md).
@@ -40,15 +42,16 @@ New to InitRunner? Start with [the five commands you'll actually use](docs/getti
 
 ### Starters
 
-Eight starters you can run in one command. Browse the full catalog with `initrunner run --list`. The model is auto-detected from your API key.
+Browse the catalog with `initrunner run --list`. The model is auto-detected from your API key. Start with `memory` (API key only). `helpdesk` expects docs in `./knowledge-base/`. `scout` needs `initrunner[search]`.
 
 | Starter | What it does |
 |---------|-------------|
+| `memory` | Personal assistant that remembers across sessions |
 | `helpdesk` | Q&A agent over your docs (markdown, PDF, HTML, Word) with citations and per-user memory |
 | `scholar` | Three-agent research team: planner, web researcher, synthesizer, with shared memory |
 | `reviewer` | Multi-perspective code review: architect, security, maintainer |
 | `reader` | Index a codebase, chat about architecture, remember patterns across sessions |
-| `scout` | Web research with structured briefings and sourced citations |
+| `scout` | Web research with structured briefings and sourced citations (`initrunner[search]`) |
 | `writer` | Topic-to-article pipeline: researcher, writer, editor/fact-checker, driven by webhook or cron |
 | `mail` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
 | `librarian` | Knowledge-base Q&A agent with document ingestion |

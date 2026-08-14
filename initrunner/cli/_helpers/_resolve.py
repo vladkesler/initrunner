@@ -123,15 +123,9 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
     Prints warnings for missing user data.
     Raises ``typer.Exit(1)`` on hard prerequisite failures.
     """
-    from initrunner.services.starters import STARTERS_DIR, check_prerequisites, get_starter
+    from initrunner.services.starters import check_prerequisites, get_starter_for_path
 
-    try:
-        if not role_file.resolve().is_relative_to(STARTERS_DIR.resolve()):
-            return None
-    except ValueError:
-        return None
-
-    entry = get_starter(role_file.stem)
+    entry = get_starter_for_path(role_file)
     if entry is None:
         return None
 

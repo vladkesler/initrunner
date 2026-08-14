@@ -107,57 +107,21 @@ def main(
             raise typer.Exit()
         raise typer.Exit(1)
     else:
-        # TTY + configured: offer action menu
-        from rich.prompt import Prompt
-
+        # TTY + configured: jobs menu (Chat first; dashboard last if installed)
         from initrunner._compat import is_dashboard_available
+        from initrunner.cli._first_run import (
+            configured_menu_options,
+            dispatch_first_run_choice,
+            prompt_job_menu,
+        )
 
-        options: list[tuple[str, str]] = []
-        if is_dashboard_available():
-            options.append(("Dashboard (web UI)", "dashboard"))
-        options.append(("Quick chat (REPL)", "repl"))
-        options.append(("Create an agent", "new"))
-
-        # Default: Dashboard when available, otherwise Quick chat
-        default_idx = "1"
-
-        console.print()
-        for i, (label, _key) in enumerate(options, 1):
-            console.print(f"  [bold]{i}[/bold]. {label}")
-
+        options = configured_menu_options(include_dashboard=is_dashboard_available())
         try:
-            choice = Prompt.ask(
-                "\nWhat would you like to do?",
-                choices=[str(i) for i in range(1, len(options) + 1)],
-                default=default_idx,
-            )
+            selected = prompt_job_menu(options)
         except (KeyboardInterrupt, EOFError):
             raise typer.Exit() from None
 
-        selected = options[int(choice) - 1][1]
-
-        if selected == "dashboard":
-            from initrunner.cli.dashboard_cmd import launch_dashboard
-
-            launch_dashboard()
-        elif selected == "repl":
-            from initrunner.services.providers import detect_bot_tokens
-
-            tokens = detect_bot_tokens()
-            if tokens:
-                platforms = ", ".join(tokens)
-                console.print(
-                    f"[dim]Hint: bot tokens detected ({platforms}). "
-                    f"Use 'initrunner run --bot telegram' or '--bot discord' to launch a bot.[/dim]"
-                )
-
-            from initrunner.cli._ephemeral import dispatch_ephemeral
-
-            dispatch_ephemeral()
-        elif selected == "new":
-            from initrunner.cli.new_cmd import new
-
-            new()
+        dispatch_first_run_choice(selected)
 
 
 # ---------------------------------------------------------------------------

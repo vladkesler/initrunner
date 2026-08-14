@@ -440,6 +440,22 @@ async def save_agent(
 
     try:
         result = await asyncio.to_thread(_run)
+        from initrunner.services.starters import copy_starter_samples, get_starter
+
+        def _copy() -> list[str]:
+            import yaml
+
+            data = yaml.safe_load(output_path.read_text(encoding="utf-8")) or {}
+            name = (data.get("metadata") or {}).get("name")
+            entry = get_starter(str(name)) if name else None
+            if entry is None:
+                return []
+            return [str(p) for p in copy_starter_samples(entry, output_path.parent)]
+
+        try:
+            result.generated_assets.extend(await asyncio.to_thread(_copy))
+        except Exception:
+            pass
     except FileExistsError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except (PermissionError, OSError) as e:

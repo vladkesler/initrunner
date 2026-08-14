@@ -434,18 +434,43 @@ def check_role_provider_compatibility(role_path: Path) -> ProviderCompatibility:
     )
 
 
-def check_tool_envs() -> dict[str, list[str]]:
+def check_tool_envs(tool_types: set[str] | None = None) -> dict[str, list[str]]:
     """Return tool names with their missing env vars.
 
     Returns a mapping of ``tool_name -> [missing_var, ...]`` for tools that
-    have at least one required env var unset.
+    have at least one required env var unset. When *tool_types* is given,
+    only those types are inspected.
     """
     missing_map: dict[str, list[str]] = {}
     for tool_name, env_vars in TOOL_REQUIRED_ENVS.items():
+        if tool_types is not None and tool_name not in tool_types:
+            continue
         missing = [v for v in env_vars if not _has_credential(v)]
         if missing:
             missing_map[tool_name] = missing
     return missing_map
+
+
+def ephemeral_tool_search(attached: list[dict]) -> ToolSearchConfig:
+    """Tool-search config for an ephemeral attached-tool list.
+
+    ``none`` / ``minimal`` (no types beyond the minimal profile): disabled.
+    Larger sets: enabled, with only the minimal-profile functions pinned
+    as always-available so the rest stay discoverable via ``search_tools``.
+    """
+    from initrunner.agent.schema.role import ToolSearchConfig
+    from initrunner.agent.tools.registry import resolve_func_names
+
+    minimal_types = {t["type"] for t in TOOL_PROFILES["minimal"]}
+    attached_types = {t["type"] for t in attached if t.get("type")}
+    if not attached_types - minimal_types:
+        return ToolSearchConfig(enabled=False)
+
+    pinned = [t for t in attached if t.get("type") in minimal_types]
+    return ToolSearchConfig(
+        enabled=True,
+        always_available=resolve_func_names(pinned),
+    )
 
 
 def build_quick_chat_role_sync(
@@ -461,39 +486,35 @@ def build_quick_chat_role_sync(
 ) -> tuple[RoleDefinition, str, str]:
     """Detect provider, filter tools for missing env, build ephemeral role.
 
+    ``tool_defs`` contract:
+
+    * ``None`` — default ``minimal`` profile (datetime + web_reader).
+    * ``[]`` — no tools (``none``).
+    * a list — exactly those tools, after dropping selected types whose
+      required env vars are missing.
+
     Returns (role, provider_name, model_name).
     Raises RuntimeError if no provider detected.
     """
     from initrunner.agent.schema.memory import MemoryConfig
     from initrunner.agent.schema.role import RoleDefinition as RoleDef
-    from initrunner.agent.schema.role import ToolSearchConfig
-    from initrunner.agent.tools.registry import resolve_func_names
 
     _load_env()
 
     prov, mod = resolve_provider_and_model(provider, model)
 
-    # Build tools: filter out those with missing env vars
-    skip = set(check_tool_envs())
-    if tool_defs is None:
-        all_tools: list[dict] = [
-            t for t in EPHEMERAL_TOOL_DEFAULTS.values() if t["type"] not in skip
-        ]
-    else:
-        all_tools = [t for t in tool_defs if t.get("type") not in skip]
+    attached: list[dict] = list(TOOL_PROFILES["minimal"]) if tool_defs is None else list(tool_defs)
+    selected = {t["type"] for t in attached if t.get("type")}
+    skip = set(check_tool_envs(selected))
+    attached = [t for t in attached if t.get("type") not in skip]
 
-    # Compute always_available from the "all" profile tools (minus skipped)
-    always_available = resolve_func_names(
-        [t for t in TOOL_PROFILES["all"] if t["type"] not in skip]
-    )
-
-    tool_search = ToolSearchConfig(enabled=True, always_available=always_available)
+    tool_search = ephemeral_tool_search(attached)
 
     memory_config = MemoryConfig() if with_memory else None
 
     build_kwargs: dict = {
         "name": name,
-        "tools": all_tools if all_tools else None,
+        "tools": attached,
         "memory": memory_config,
         "tool_search": tool_search,
         "base_url": base_url,

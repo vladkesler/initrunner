@@ -13,10 +13,10 @@ Get a document Q&A agent running with three commands. For the full reference, se
 ## Step 1: Scaffold a RAG role
 
 ```bash
-initrunner setup --intent knowledge
+initrunner new --template rag --no-refine
 ```
 
-The wizard configures your provider, API key, and generates a `role.yaml` with ingestion pre-configured for `./docs/**/*.md`.
+This writes a `role.yaml` with ingestion pre-configured for `./docs/**/*.md`. Run `initrunner setup` first if you still need a provider key.
 
 Edit `role.yaml` to point `sources` at your actual documents:
 

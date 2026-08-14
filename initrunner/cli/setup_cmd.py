@@ -8,7 +8,7 @@ import typer
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from initrunner._compat import _PROVIDER_EXTRAS, is_dashboard_available, require_provider
+from initrunner._compat import _PROVIDER_EXTRAS, require_provider
 from initrunner.cli._helpers import check_ollama_running, console, handle_api_key, install_extra
 from initrunner.config import get_global_env_path
 from initrunner.services.setup import (
@@ -353,38 +353,26 @@ def run_setup(
     )
 
     # ---------------------------------------------------------------
-    # Dashboard prompt
+    # Next action: TTY jobs menu (not when -y / non-TTY)
     # ---------------------------------------------------------------
     import sys
 
-    if is_dashboard_available() and sys.stdin.isatty():
-        console.print()
-        if typer.confirm("Open the dashboard?", default=True):
-            from initrunner.cli.dashboard_cmd import launch_dashboard
-
-            launch_dashboard()
-            return
-
-    # ---------------------------------------------------------------
-    # Next steps (shown when dashboard is skipped or unavailable)
-    # ---------------------------------------------------------------
-    _next = [
-        "  [dim]Try a starter agent:[/dim]",
-        "  [bold]initrunner run helpdesk -i[/bold]              [dim]# docs Q&A[/dim]",
-        '  [bold]initrunner run reviewer -p "..."[/bold]        [dim]# code review[/dim]',
-        '  [bold]initrunner run scout -p "..."[/bold]           [dim]# web research[/dim]',
-        "",
-        "  [dim]Or start a REPL:[/dim]",
-        "  [bold]initrunner run -i[/bold]                       [dim]# ephemeral chat[/dim]",
-    ]
-
-    console.print(
-        Panel(
-            "\n".join(_next),
-            title="Next steps",
-            border_style="cyan",
-        )
+    from initrunner.cli._first_run import (
+        dispatch_first_run_choice,
+        print_next_steps_panel,
+        prompt_job_menu,
+        setup_menu_options,
     )
+
+    if sys.stdin.isatty() and not accept_risks:
+        try:
+            selected = prompt_job_menu(setup_menu_options())
+        except (KeyboardInterrupt, EOFError):
+            raise typer.Exit() from None
+        dispatch_first_run_choice(selected)
+        return
+
+    print_next_steps_panel()
 
 
 # ---------------------------------------------------------------------------

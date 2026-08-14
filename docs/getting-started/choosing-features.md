@@ -62,9 +62,9 @@ What does your agent need to do?
              |
              Yes --> See the Multi-Agent Guide
                      docs/orchestration/multi-agent-guide.md
-                     (Team / Compose / Spawn / Delegate -- each has
+                     (Team / Flow / Spawn / Delegate -- each has
                       different config: kind, spec.personas,
-                      spec.services, or spec.tools)
+                      spec.agents, or spec.tools)
 ```
 
 ## Goal-to-Config Matrix
@@ -89,9 +89,9 @@ Every row assumes the base fields (`role`, `model`, `guardrails`) are already se
 | Multiple agents | varies by pattern | delegate, spawn | `reasoning` | `multi-agent/`, `research-team/` | [Multi-Agent Guide](../orchestration/multi-agent-guide.md) |
 | Production hardening | `security`, `observability`, `resources` | any | docker sandbox | `traced-agent.yaml` | [Security](../security/security.md), [Observability](../core/observability.md) |
 
-> **Multi-agent patterns** have distinct config surfaces: `kind: Team` uses `spec.personas`, `kind: Compose` uses `spec.services`, and Spawn/Delegate use `spec.tools`. See the [Multi-Agent Guide](../orchestration/multi-agent-guide.md) for the full decision tree.
+> **Multi-agent patterns** have distinct config surfaces: `kind: Team` uses `spec.personas`, `kind: Flow` uses `spec.agents`, and Spawn/Delegate use `spec.tools`. See the [Multi-Agent Guide](../orchestration/multi-agent-guide.md) for the full decision tree.
 
-All examples are in `examples/roles/`. Run `initrunner setup --intent from-example` to browse and copy them interactively.
+All examples are in `examples/roles/`. Run `initrunner examples list` to browse them, or `initrunner new --from <name>` to copy one.
 
 ## Fields You Probably Don't Need Yet
 
@@ -108,6 +108,6 @@ These fields exist for advanced or production use cases. Skip them until you nee
 ## What's Next
 
 - **First time?** [Tutorial](tutorial.md) -- build a complete agent step by step
-- **Want a ready-made template?** `initrunner setup --intent from-example` -- browse 60+ bundled examples
+- **Want a ready-made template?** `initrunner examples list` / `initrunner new --from <name>` — browse bundled examples
 - **Need multiple agents?** [Multi-Agent Guide](../orchestration/multi-agent-guide.md) -- pick the right coordination pattern
 - **Going to production?** [Security](../security/security.md), [Guardrails](../configuration/guardrails.md), [Observability](../core/observability.md)
