@@ -1,6 +1,23 @@
 ARG PYTHON_VERSION=3.13
 
 # ---------------------------------------------------------------------------
+# Stage 0 — Dashboard UI. `_static/` is gitignored and only produced by
+# `pnpm build`; without this stage the image's default `dashboard` CMD is
+# API-only and `/` 404s after login.
+# Assets are arch-independent: build once on the native builder so the
+# arm64 image does not compile Vite under QEMU.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS dashboard
+WORKDIR /src/dashboard
+RUN corepack enable
+COPY dashboard/package.json dashboard/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY dashboard/ ./
+# adapter-static writes to ../initrunner/dashboard/_static
+RUN mkdir -p /src/initrunner/dashboard && pnpm build \
+    && test -f /src/initrunner/dashboard/_static/index.html
+
+# ---------------------------------------------------------------------------
 # Stage 1 — Builder: install uv, build wheel, install with extras
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
@@ -21,14 +38,20 @@ WORKDIR /build
 # Copy dependency metadata first for layer caching
 COPY pyproject.toml uv.lock ./
 
-# Copy source code
+# Copy source code, then overlay the compiled dashboard so hatch packs it
+# (`[tool.hatch.build] artifacts` includes the gitignored `_static/` tree).
 COPY initrunner/ initrunner/
+COPY --from=dashboard /src/initrunner/dashboard/_static/ initrunner/dashboard/_static/
 COPY README.md LICENSE-MIT LICENSE-APACHE ./
+RUN test -f initrunner/dashboard/_static/index.html
 
 # Build wheel and install into system Python
 RUN uv build --wheel --out-dir /build/dist && \
     WHEEL=$(ls /build/dist/initrunner-*.whl) && \
-    uv pip install --system "${WHEEL}[${EXTRAS}]"
+    uv pip install --system "${WHEEL}[${EXTRAS}]" && \
+    python -c "from pathlib import Path; import initrunner.dashboard as d; \
+p = Path(d.__file__).parent / '_static' / 'index.html'; \
+assert p.is_file(), f'dashboard UI missing from wheel: {p}'"
 
 # ---------------------------------------------------------------------------
 # Stage 2 — Runtime: clean slim image with only installed packages

@@ -7,6 +7,8 @@ build/
 *.egg-info
 .ruff_cache
 .pytest_cache
+**/node_modules
+**/.svelte-kit
 tests/
 docs/
 .github/

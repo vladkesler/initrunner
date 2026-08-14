@@ -73,7 +73,7 @@ Runs `pnpm audit --prod` against the dashboard's frontend dependencies. This job
 
 ### Container Image Scan
 
-The Docker publish workflow (`.github/workflows/docker-publish.yml`) includes a post-publish Trivy scan of the container image. This detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image` category.
+The Docker publish workflow (`.github/workflows/docker-publish.yml`) builds a multi-arch image (`linux/amd64`, `linux/arm64`) from the root `Dockerfile`. A Node stage compiles the SvelteKit dashboard on `$BUILDPLATFORM` (native to the runner) and the Python stage fails the build if `_static/index.html` is missing from the installed wheel. A post-publish Trivy scan of the container image detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image` category.
 
 ## Audit Chain Verification
 
