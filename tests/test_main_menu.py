@@ -46,9 +46,7 @@ class TestDefaultEntryMenu:
         assert "Create an agent" in result.output
         assert "Dashboard" in result.output
         # Dashboard is last: its number is 4
-        assert "4. Dashboard" in result.output or "4]. Dashboard" in result.output.replace(
-            "[", ""
-        )
+        assert "4. Dashboard" in result.output or "4]. Dashboard" in result.output.replace("[", "")
         chat_pos = result.output.index("Chat")
         dash_pos = result.output.index("Dashboard")
         assert chat_pos < dash_pos
