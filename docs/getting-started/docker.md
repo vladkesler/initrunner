@@ -1,6 +1,6 @@
 # Docker
 
-InitRunner is available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Docker Hub](https://hub.docker.com/r/vladkesler/initrunner). The image ships with all extras pre-installed.
+InitRunner is available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Docker Hub](https://hub.docker.com/r/vladkesler/initrunner). The image ships with all extras pre-installed and the compiled web dashboard (the default command).
 
 ## API keys
 
@@ -17,6 +17,8 @@ docker run --rm -it --env-file ~/.initrunner/.env ...
 #    The container reads /data/.env automatically (INITRUNNER_HOME=/data).
 docker run --rm -it -v ~/.initrunner:/data ...
 ```
+
+`--env-file` injects keys only. It does **not** copy `~/.initrunner/run.yaml`. If that file is absent and more than one provider key is set, auto-detect prefers Anthropic. Pin the model you want with `-e INITRUNNER_MODEL=openai:gpt-5-mini`, or use option 3 so the container sees `run.yaml`.
 
 All examples below use `-e OPENAI_API_KEY` for brevity. Replace with `--env-file ~/.initrunner/.env` if your keys live there.
 
@@ -72,6 +74,8 @@ docker run -d -e OPENAI_API_KEY -v ./roles:/roles \
 ```
 
 ## Web dashboard
+
+This is the image default (`CMD`). `--expose` binds `0.0.0.0` and generates an API key if you do not set one; sign in at `/login` with the key printed in the container logs. `/api/health` stays unauthenticated.
 
 ```bash
 # Web dashboard at http://localhost:8100

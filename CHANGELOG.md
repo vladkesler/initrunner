@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## [2026.8.3] - 2026-08-14
+
+### Fixed
+- **Docker image dashboard UI.** The image default is `initrunner dashboard --expose --no-open`, but the Docker build never compiled the SvelteKit frontend (`initrunner/dashboard/_static/` is gitignored and only built in the PyPI workflow). `2026.8.2` served `/api/health` and `/login` and 404'd on `/` after sign-in. The Dockerfile now builds the frontend in a Node stage on `$BUILDPLATFORM` (so the arm64 image does not QEMU-compile Vite) and fails the build if `index.html` is missing from the wheel.
+
+### Docs
+- Docker guide notes that `--env-file` injects keys only (not `run.yaml`), so a second provider key can win auto-detect unless you set `INITRUNNER_MODEL` or mount `~/.initrunner`.
+
 ## [2026.8.2] - 2026-08-14
 
 ### Security
