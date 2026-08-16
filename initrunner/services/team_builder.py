@@ -42,24 +42,21 @@ def build_blank_team_yaml(
             f"    synthesize: {'true' if debate_synthesize else 'false'}\n"
         )
 
+    debate_flat = ""
+    if debate_block:
+        debate_flat = debate_block.replace("  debate:", "debate:").replace("    ", "  ")
     return (
-        f"apiVersion: initrunner/v1\n"
-        f"kind: Team\n"
-        f"metadata:\n"
-        f"  name: {name}\n"
-        f'  description: ""\n'
-        f"spec:\n"
-        f"  model:\n"
-        f"    provider: {provider}\n"
-        f"    name: {model_name}\n"
-        f"  strategy: {strategy}\n"
-        f"{debate_block}"
-        f"  personas:\n"
+        f"name: {name}\n"
+        f'description: ""\n'
+        f"spec_version: 3\n"
+        f"model: {provider}:{model_name}\n"
+        f"run: {strategy}\n"
+        f"{debate_flat}"
+        f"agents:\n"
         f"{personas_block}"
-        f"  tools: []\n"
-        f"  guardrails:\n"
-        f"    max_tokens_per_run: 50000\n"
-        f"    timeout_seconds: 300\n"
+        f"guardrails:\n"
+        f"  max_tokens_per_run: 50000\n"
+        f"  timeout_seconds: 300\n"
     )
 
 
@@ -72,7 +69,7 @@ def _build_personas_block(
         lines = ""
         for i in range(max(persona_count, 2)):
             pname = _persona_name(i)
-            lines += f'    {pname}: "describe this persona\'s role"\n'
+            lines += f'  {pname}: "describe this persona\'s role"\n'
         return lines
 
     lines = ""
@@ -82,20 +79,20 @@ def _build_personas_block(
         model_cfg = entry.get("model")
 
         if model_cfg:
-            lines += f"    {pname}:\n"
+            lines += f"  {pname}:\n"
             role_str = role or "describe this persona's role"
-            lines += f'      role: "{_escape_yaml_str(role_str)}"\n'
-            lines += "      model:\n"
-            lines += f"        provider: {model_cfg['provider']}\n"
-            lines += f"        name: {model_cfg['name']}\n"
+            lines += f'    prompt: "{_escape_yaml_str(role_str)}"\n'
+            lines += "    model:\n"
+            lines += f"      provider: {model_cfg['provider']}\n"
+            lines += f"      name: {model_cfg['name']}\n"
             if model_cfg.get("base_url"):
-                lines += f"        base_url: {model_cfg['base_url']}\n"
+                lines += f"      base_url: {model_cfg['base_url']}\n"
             if model_cfg.get("api_key_env"):
-                lines += f"        api_key_env: {model_cfg['api_key_env']}\n"
+                lines += f"      api_key_env: {model_cfg['api_key_env']}\n"
         elif role:
-            lines += f'    {pname}: "{_escape_yaml_str(role)}"\n'
+            lines += f'  {pname}: "{_escape_yaml_str(role)}"\n'
         else:
-            lines += f'    {pname}: "describe this persona\'s role"\n'
+            lines += f'  {pname}: "describe this persona\'s role"\n'
 
     return lines
 
@@ -128,10 +125,16 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
     if raw is None:
         return None, issues
 
+    from initrunner.agent.schema.adapt import document_to_team
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import normalize_mapping
     from initrunner.deprecations import validate_team_dict
 
     try:
-        team, _hits = validate_team_dict(raw)
+        if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+            team = document_to_team(normalize_mapping(raw).document)
+        else:
+            team, _hits = validate_team_dict(raw)
     except Exception as exc:
         issues.extend(unwrap_pydantic_error(exc))
         return None, issues

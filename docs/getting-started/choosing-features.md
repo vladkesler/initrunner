@@ -1,27 +1,27 @@
 # What Do I Need?
 
-`AgentSpec` has 19 fields but only two are required: `role` and `model`. This page maps your goals to the specific fields you need to add. For interactive setup, use `initrunner setup` ([Setup Wizard](setup.md)). For a hands-on walkthrough, see the [Tutorial](tutorial.md).
+An agent file only needs a name, a `prompt`, and usually a `model`. This page maps your goals to the fields you add. For interactive setup, use `initrunner setup` ([Setup Wizard](setup.md)). For a hands-on walkthrough, see the [Tutorial](tutorial.md).
+
+Envelope files (`apiVersion` / `kind: Agent|Team|Flow`) still load. New files should be flat.
 
 ## Every Agent Needs These
 
 ```yaml
-spec:
-  role: |
-    Your system prompt here.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  guardrails:
-    max_tokens_per_run: 10000
-    max_tool_calls: 5
-    timeout_seconds: 60
+name: my-agent
+model: openai:gpt-5-mini
+prompt: |
+  Your system prompt here.
+guardrails:
+  max_tokens_per_run: 10000
+  max_tool_calls: 5
+  timeout_seconds: 60
 ```
 
 | Field | What it does | Docs |
 |-------|-------------|------|
-| `role` | System prompt defining persona and instructions | [Tutorial Step 1](tutorial.md#step-1-your-first-agent--a-simple-summarizer) |
-| `model` | LLM provider, model name, temperature, max_tokens | [Provider Configuration](../configuration/providers.md) |
-| `guardrails` | Safety limits: token budget, tool call cap, timeout | [Guardrails](../configuration/guardrails.md) |
+| `prompt` | System instructions | [Tutorial Step 1](tutorial.md#step-1-your-first-agent--a-simple-summarizer) |
+| `model` | `provider:name` string, or a mapping | [Provider Configuration](../configuration/providers.md) |
+| `guardrails` | Token budget, tool call cap, timeout | [Guardrails](../configuration/guardrails.md) |
 
 See `examples/roles/hello-world.yaml` for a minimal working agent.
 
@@ -60,11 +60,11 @@ What does your agent need to do?
           |
           Does it need multiple agents?
              |
-             Yes --> See the Multi-Agent Guide
-                     docs/orchestration/multi-agent-guide.md
-                     (Team / Flow / Spawn / Delegate -- each has
-                      different config: kind, spec.personas,
-                      spec.agents, or spec.tools)
+             Yes --> Add `agents:` (inline prompts or `use:` files).
+                     `run: sequential` for a preset pipeline.
+                     `then:` on a child for a graph.
+                     Or add `delegate` / `spawn` tools if the model
+                     should pick who runs.
 ```
 
 ## Goal-to-Config Matrix

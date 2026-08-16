@@ -71,13 +71,12 @@ initrunner run --ingest ./docs/    # skip YAML entirely, just chat with your doc
 ```console
 $ initrunner new "a regex explainer" --run 'what does ^[a-z]+$ match?'
 ╭────────── regex-explainer -- VALID ──────────╮
-│ apiVersion: initrunner/v1                    │
-│ kind: Agent                                  │
-│ metadata:                                    │
-│   name: regex-explainer                      │
+│ name: regex-explainer                        │
+│ model: openai:gpt-5-mini                     │
+│ prompt: You explain regular expressions.     │
 │ ...                                          │
 ╰──────────────────────────────────────────────╯
-Created role.yaml
+Created agent.yaml
 
 1) Brief summary
 - Matches a non-empty string made only of ASCII lowercase letters a–z,
@@ -100,23 +99,19 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 
 ## One file, four modes
 
-Here's a role file:
+Here's an agent file:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -137,11 +132,10 @@ The `model:` block is optional. Omit it and InitRunner auto-detects from your AP
 A daemon that dies when its provider throws a 500 isn't much of a daemon. List fallback models and the run retries each in order on API errors:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-    prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
+model:
+  provider: anthropic
+  name: claude-sonnet-4-5-20250929
+  prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
     fallback: [openai:gpt-5-mini, mistral:mistral-large-latest]
     concurrency: { max_running: 4 }
 ```

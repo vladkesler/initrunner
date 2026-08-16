@@ -198,7 +198,7 @@ def build_flow(
     flow_dict, roles = builders[pattern](**kwargs)
 
     if shared_memory:
-        flow_dict["spec"]["shared_memory"] = {
+        flow_dict["shared_memory"] = {
             "enabled": True,
             "store_path": ".memory",
             "max_memories": 1000,
@@ -283,11 +283,24 @@ def _slot_role_path(
 
 
 def _make_flow_dict(name: str, description: str, agents_dict: dict) -> dict:
+    agents: dict = {}
+    for agent_name, cfg in agents_dict.items():
+        child: dict = {}
+        role = cfg.get("role")
+        if role:
+            child["use"] = role
+        sink = cfg.get("sink")
+        if isinstance(sink, dict) and sink.get("target") is not None:
+            then: dict = {"to": sink["target"]}
+            if sink.get("strategy") and sink["strategy"] != "all":
+                then["strategy"] = sink["strategy"]
+            child["then"] = then
+        agents[agent_name] = child
     return {
-        "apiVersion": "initrunner/v1",
-        "kind": "Flow",
-        "metadata": {"name": name, "description": description},
-        "spec": {"agents": agents_dict},
+        "name": name,
+        "description": description,
+        "spec_version": 3,
+        "agents": agents,
     }
 
 

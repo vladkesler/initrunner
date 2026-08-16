@@ -44,6 +44,9 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
     """
     import yaml
 
+    from initrunner.agent.schema.adapt import document_to_role
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import normalize_mapping
     from initrunner.deprecations import CURRENT_ROLE_SPEC_VERSION, validate_role_dict
 
     # Parse and validate first
@@ -54,6 +57,15 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
 
     if not isinstance(raw, dict):
         raise ValueError("YAML must be a mapping")
+
+    if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+        role = document_to_role(normalize_mapping(raw).document)
+        if path.exists():
+            bak_path = path.with_suffix(path.suffix + ".bak")
+            bak_path.write_text(path.read_text())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml_content if yaml_content.endswith("\n") else yaml_content + "\n")
+        return role
 
     # Normalize spec_version to current before validation and write
     raw.setdefault("metadata", {})["spec_version"] = CURRENT_ROLE_SPEC_VERSION

@@ -129,32 +129,19 @@ def _default_model_name(provider: str) -> str:
 def template_basic(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: A new InitRunner agent
-  tags:
-    - general
-spec:
-  role: |
-    You are a helpful assistant.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # session_token_budget: 500000   # cumulative REPL session limit
+name: {name}
+description: A new InitRunner agent
+spec_version: 3
+tags:
+  - general
+model: {provider}:{model_name}
+prompt: |
+  You are a helpful assistant.
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
@@ -655,48 +642,44 @@ def build_role_yaml(
         model_name = _default_model_name(provider)
 
     role: dict[str, Any] = {
-        "apiVersion": "initrunner/v1",
-        "kind": "Agent",
-        "metadata": {
-            "name": name,
-            "spec_version": 2,
-            "description": description,
-            "tags": tags if tags is not None else [],
-        },
-        "spec": {
-            "role": system_prompt,
-            "model": {
-                "provider": provider,
-                "name": model_name,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            },
-            "guardrails": {
-                "max_tokens_per_run": 50000,
-                "max_tool_calls": 20,
-                "timeout_seconds": 300,
-                "max_request_limit": 50,
-            },
+        "name": name,
+        "description": description,
+        "spec_version": 3,
+        "tags": tags if tags is not None else [],
+        "model": f"{provider}:{model_name}",
+        "prompt": system_prompt,
+        "guardrails": {
+            "max_tokens_per_run": 50000,
+            "max_tool_calls": 20,
+            "timeout_seconds": 300,
+            "max_request_limit": 50,
         },
     }
+    if temperature != 0.1 or max_tokens != 4096:
+        role["model"] = {
+            "provider": provider,
+            "name": model_name,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
 
     if tools:
-        role["spec"]["tools"] = tools  # type: ignore[invalid-assignment]
+        role["tools"] = tools
 
     if triggers:
-        role["spec"]["triggers"] = triggers  # type: ignore[invalid-assignment]
+        role["triggers"] = triggers
 
     if sinks:
-        role["spec"]["sinks"] = sinks  # type: ignore[invalid-assignment]
+        role["sinks"] = sinks
 
     if memory:
-        role["spec"]["memory"] = {  # type: ignore[invalid-assignment]
+        role["memory"] = {
             "max_sessions": 10,
             "max_resume_messages": 20,
             "semantic": {"max_memories": 1000},
         }
 
     if ingest:
-        role["spec"]["ingest"] = ingest  # type: ignore[invalid-assignment]
+        role["ingest"] = ingest
 
     return yaml.dump(role, default_flow_style=False, sort_keys=False, allow_unicode=True)

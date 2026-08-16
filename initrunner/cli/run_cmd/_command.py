@@ -367,8 +367,6 @@ def run(
     # --- Kind-specific flag validation ---
     if kind == "Flow":
         invalid = []
-        if prompt:
-            invalid.append("--prompt")
         if interactive:
             invalid.append("--interactive")
         if autonomous:
@@ -403,7 +401,7 @@ def run(
         return
 
     if kind == "Flow":
-        _dispatch_flow(role_file, audit_db, no_audit)
+        _dispatch_flow(role_file, audit_db, no_audit, prompt=prompt)
         return
 
     # --- Agent mode: flag-based dispatch ---

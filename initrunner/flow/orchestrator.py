@@ -236,19 +236,30 @@ class FlowOrchestrator:
 
         for name, config in self._flow.spec.agents.items():
             try:
-                role_path = self._base_dir / config.role
-
-                if shared_mem_path or shared_doc_path:
-                    _load_dotenv(role_path.parent)
-                    role = load_role(role_path)
-                    role = resolve_role_model(role, role_path)
+                if config.inline_role is not None:
+                    _load_dotenv(self._base_dir)
+                    role = config.inline_role
+                    role = resolve_role_model(role, self._base_dir)
                     if shared_mem_path:
                         apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
                     if shared_doc_path:
                         apply_shared_documents(role, shared_doc, shared_doc_path)
-                    agent = build_agent(role, role_dir=role_path.parent)
+                    agent = build_agent(role, role_dir=self._base_dir)
+                    role_path = self._base_dir
                 else:
-                    role, agent = load_and_build(role_path)
+                    role_path = self._base_dir / config.role
+
+                    if shared_mem_path or shared_doc_path:
+                        _load_dotenv(role_path.parent)
+                        role = load_role(role_path)
+                        role = resolve_role_model(role, role_path)
+                        if shared_mem_path:
+                            apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
+                        if shared_doc_path:
+                            apply_shared_documents(role, shared_doc, shared_doc_path)
+                        agent = build_agent(role, role_dir=role_path.parent)
+                    else:
+                        role, agent = load_and_build(role_path)
 
                 member = FlowMember(
                     name=name,

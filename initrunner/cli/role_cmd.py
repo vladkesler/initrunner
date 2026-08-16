@@ -38,6 +38,11 @@ def validate(
     if kind == "Team":
         _validate_team(role_file)
         return
+    if kind == "Flow":
+        from initrunner.cli.flow_cmd import flow_validate
+
+        flow_validate(role_file)
+        return
 
     role, _kind, issues = validate_yaml_file(role_file)
     if issues:

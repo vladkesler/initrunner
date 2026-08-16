@@ -104,7 +104,13 @@ def flow_validate(
         sink_str = agent.sink.summary() if agent.sink else "(none)"
         needs_str = ", ".join(agent.needs) if agent.needs else "(none)"
         restart_str = agent.restart.condition
-        table.add_row(name, agent.role, sink_str, needs_str, restart_str)
+        if agent.role:
+            role_label = agent.role
+        elif agent.inline_role is not None:
+            role_label = f"(inline: {agent.inline_role.metadata.name})"
+        else:
+            role_label = "(inline)"
+        table.add_row(name, role_label, sink_str, needs_str, restart_str)
 
     console.print(table)
     console.print("[green]Valid[/green]")

@@ -395,7 +395,7 @@ class TestBuilderSessionSeedBlank:
         assert "my-agent" in turn.yaml_text
         assert session.seed_source == "blank"
         raw = yaml.safe_load(turn.yaml_text)
-        assert raw["spec"]["model"]["provider"] == "openai"
+        assert str(raw["model"]).startswith("openai:")
 
     def test_seed_blank_with_model(self):
         session = BuilderSession()

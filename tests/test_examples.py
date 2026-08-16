@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from initrunner.agent.schema.role import RoleDefinition
 from initrunner.flow.schema import FlowDefinition
 from initrunner.team.schema import TeamDefinition
 
@@ -34,8 +33,24 @@ for _p in _ALL_YAMLS:
         _TEAM_YAMLS.append(_p)
     elif _data.get("kind") == "TestSuite":
         _SUITE_YAMLS.append(_p)
+    elif _data.get("kind") == "Service":
+        continue
     else:
-        _ROLE_YAMLS.append(_p)
+        # Envelope Agent or flat v3 (solo / composed).
+        from initrunner.agent.schema.adapt import run_kind_from_mapping
+        from initrunner.agent.schema.document import DocumentClass, classify_mapping
+
+        cls = classify_mapping(_data)
+        if cls.document_class is DocumentClass.FLAT_AGENT:
+            kind = run_kind_from_mapping(_data)
+            if kind == "Flow":
+                _FLOW_YAMLS.append(_p)
+            elif kind == "Team":
+                _TEAM_YAMLS.append(_p)
+            else:
+                _ROLE_YAMLS.append(_p)
+        else:
+            _ROLE_YAMLS.append(_p)
 
 
 def _rel(path: Path) -> str:
@@ -44,9 +59,9 @@ def _rel(path: Path) -> str:
 
 @pytest.mark.parametrize("path", _ROLE_YAMLS, ids=[_rel(p) for p in _ROLE_YAMLS])
 def test_role_yaml_validates(path: Path) -> None:
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    role = RoleDefinition.model_validate(data)
+    from initrunner.agent.loader import load_role
+
+    role = load_role(path)
     assert role.metadata.name
     assert role.spec.role
 
@@ -54,9 +69,9 @@ def test_role_yaml_validates(path: Path) -> None:
 @pytest.mark.parametrize("path", _ROLE_YAMLS, ids=[_rel(p) for p in _ROLE_YAMLS])
 def test_role_skills_resolve(path: Path) -> None:
     """Example roles with skills must resolve without --skill-dir."""
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    role = RoleDefinition.model_validate(data)
+    from initrunner.agent.loader import load_role
+
+    role = load_role(path)
     if not role.spec.skills:
         pytest.skip("No skills")
 

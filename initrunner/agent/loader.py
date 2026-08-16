@@ -42,13 +42,28 @@ class MissingApiKeyError(RoleLoadError):
 
 
 def load_role(path: Path) -> RoleDefinition:
-    """Read a YAML file and validate it as a RoleDefinition."""
+    """Read a YAML file and validate it as a RoleDefinition.
+
+    Accepts the v1 envelope and a flat solo (or single-child) v3 document.
+    """
+    from initrunner.agent.schema.adapt import AdaptError, document_to_role, run_kind_from_mapping
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import NormalizeError, normalize_mapping
     from initrunner.deprecations import validate_role_dict
 
     raw = load_raw_yaml(path, RoleLoadError)
+    classification = classify_mapping(raw)
     try:
-        role, _hits = validate_role_dict(raw)
-    except (ValueError, Exception) as e:
+        if classification.document_class is DocumentClass.FLAT_AGENT:
+            if run_kind_from_mapping(raw) != "Agent":
+                raise RoleLoadError(
+                    f"{path} is a composed agent; run it with `initrunner run` "
+                    "(team/flow), not as a solo role."
+                )
+            role = document_to_role(normalize_mapping(raw).document, base_dir=path.parent)
+        else:
+            role, _hits = validate_role_dict(raw)
+    except (AdaptError, NormalizeError, ValueError, Exception) as e:
         raise RoleLoadError(f"Validation failed for {path}:\n{e}") from e
     validate_capability_tool_conflicts(role)
     _validate_templating(role)

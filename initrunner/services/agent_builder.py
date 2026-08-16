@@ -83,11 +83,17 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
     if raw is None:
         return None, issues
 
+    from initrunner.agent.schema.adapt import AdaptError, document_to_role
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import NormalizeError, normalize_mapping
     from initrunner.deprecations import validate_role_dict
 
     try:
-        role, _hits = validate_role_dict(raw)
-    except Exception as e:
+        if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+            role = document_to_role(normalize_mapping(raw).document)
+        else:
+            role, _hits = validate_role_dict(raw)
+    except (AdaptError, NormalizeError, Exception) as e:
         issues.extend(unwrap_pydantic_error(e))
         return None, issues
 
@@ -277,32 +283,26 @@ Only use type: image_gen if the user needs a non-OpenAI model.
 - When refining, preserve existing choices unless asked to change them.
 - A typical role is 30-50 lines. If yours exceeds 60, you are over-specifying.
 
-Example of a well-structured minimal role:
+Example of a well-structured minimal agent:
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: news-monitor
-  description: Monitors and summarizes breaking news
-  tags: [news, monitoring]
-  spec_version: 2
-spec:
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  role: |
-    You monitor breaking news. Search for the latest headlines,
-    summarize key events, and cite sources with links.
-  tools:
-    - type: web_reader
-  capabilities:
-    - WebSearch
-    - Thinking: low
-  triggers:
-    - type: cron
-      schedule: "0 * * * *"
-      prompt: Summarize the latest breaking news.
-      autonomous: true
+name: news-monitor
+description: Monitors and summarizes breaking news
+spec_version: 3
+tags: [news, monitoring]
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: |
+  You monitor breaking news. Search for the latest headlines,
+  summarize key events, and cite sources with links.
+tools:
+  - web_reader
+capabilities:
+  - WebSearch
+  - Thinking: low
+triggers:
+  - type: cron
+    schedule: "0 * * * *"
+    prompt: Summarize the latest breaking news.
+    autonomous: true
 ```
 
 Add memory, autonomy, ingest, or other sections only when the user's description calls for them.
@@ -451,13 +451,19 @@ class BuilderSession:
 
     def _canonicalize_if_valid(self) -> None:
         """Minimize YAML if it parses and validates without errors."""
+        from initrunner.agent.schema.document import DocumentClass, classify_yaml_text
+
         role, issues = _validate_yaml(self._yaml_text)
         self._role_cache = role
         self._issues_cache = issues
-        if role is not None and not any(i.severity == "error" for i in issues):
-            from initrunner.services.roles import canonicalize_role_yaml
+        if role is None or any(i.severity == "error" for i in issues):
+            return
+        # Keep flat v3 files as the user wrote them.
+        if classify_yaml_text(self._yaml_text).document_class is DocumentClass.FLAT_AGENT:
+            return
+        from initrunner.services.roles import canonicalize_role_yaml
 
-            self._yaml_text = canonicalize_role_yaml(role)
+        self._yaml_text = canonicalize_role_yaml(role)
 
     # -- Agent setup ---------------------------------------------------------
 

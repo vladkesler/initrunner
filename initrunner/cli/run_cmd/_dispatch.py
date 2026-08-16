@@ -15,11 +15,16 @@ from initrunner.cli._helpers import (
 )
 
 
-def _dispatch_flow(flow_file: Path, audit_db: Path | None, no_audit: bool) -> None:
-    """Run a flow file (foreground)."""
+def _dispatch_flow(
+    flow_file: Path,
+    audit_db: Path | None,
+    no_audit: bool,
+    prompt: str | None = None,
+) -> None:
+    """Run a flow file. ``prompt`` does a one-shot graph run; otherwise daemon."""
     from initrunner.flow.loader import FlowLoadError
     from initrunner.runner.display import _make_prefixed_tool_event_printer
-    from initrunner.services.flow import load_flow_sync, run_flow_sync
+    from initrunner.services.flow import load_flow_sync, run_flow_once_sync, run_flow_sync
 
     try:
         flow = load_flow_sync(flow_file)
@@ -30,12 +35,22 @@ def _dispatch_flow(flow_file: Path, audit_db: Path | None, no_audit: bool) -> No
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     try:
-        run_flow_sync(
-            flow,
-            flow_file.parent,
-            audit_logger=audit_logger,
-            on_tool_event=_make_prefixed_tool_event_printer(),
-        )
+        if prompt:
+            result = run_flow_once_sync(
+                flow,
+                flow_file.parent,
+                prompt,
+                audit_logger=audit_logger,
+                on_tool_event=_make_prefixed_tool_event_printer(),
+            )
+            console.print(result.output or "[dim](no output)[/dim]")
+        else:
+            run_flow_sync(
+                flow,
+                flow_file.parent,
+                audit_logger=audit_logger,
+                on_tool_event=_make_prefixed_tool_event_printer(),
+            )
     finally:
         if audit_logger is not None:
             audit_logger.close()
