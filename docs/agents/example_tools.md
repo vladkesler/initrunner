@@ -155,11 +155,13 @@ tools:
             state: "{state}"
             labels: "{labels}"
             per_page: "10"
-          response_extract: "$[*].{number,title,state,labels[*].name}"
-          timeout: 15
+          # response_extract takes a simple dotted path ("$.data.id",
+          # "$.items.0.name"). There is no field projection, so this
+          # list response is returned in full.
+          timeout_seconds: 15
 ```
 
-> Key features at work: `auth` with `${GITHUB_TOKEN}` env var resolution, `{owner}` and `{repo}` path templating, `query_params` for optional filters, and `response_extract` to return only the fields the agent needs. The full example defines 5 endpoints (list_issues, get_issue, create_issue, add_comment, list_repos).
+> Key features at work: `auth` with `${GITHUB_TOKEN}` env var resolution, `{owner}` and `{repo}` path templating, and `query_params` for optional filters. The full example defines 5 endpoints (list_issues, get_issue, create_issue, add_comment, list_repos).
 
 - Full example: [`examples/roles/github-tracker.yaml`](../examples/roles/github-tracker.yaml)
 - Reference: [tools.md — API Tool](tools.md#api-tool)
@@ -339,7 +341,7 @@ tools:
       default_timezone: UTC
 ```
 
-> The think tool returns a constant `"Thought recorded."` — the agent's reasoning is preserved in the tool call arguments, not echoed back. Pair it with other tools when you want the agent to plan before acting. Zero overhead: no API calls, no subprocesses.
+> The think tool returns the whole accumulated chain (`Thoughts (N):` followed by the numbered list), so the agent can re-read its own reasoning on later turns. Pair it with other tools when you want the agent to plan before acting. No API calls and no subprocesses; context cost is bounded by the `max_thoughts` ring buffer (default 50). Set `critique: true` to append a self-critique prompt on every 5th thought.
 
 - Full example: [`examples/roles/thinker.yaml`](../examples/roles/thinker.yaml)
 - Reference: [tools.md — Think Tool](tools.md#think-tool)
@@ -494,13 +496,9 @@ agents:
     use: roles/notifier.yaml
     after:
       - build-analyzer
-    restart:
-      condition: on-failure
-      max_retries: 3
-      delay_seconds: 5
 ```
 
-> Three agents form a pipeline: `webhook-receiver` → `build-analyzer` → `notifier`. Each `then.to` routes the agent's output to the next agent's input queue. `after` controls startup order. `restart` with `condition: on-failure` auto-restarts the notifier up to 3 times if it crashes.
+> Three agents form a pipeline: `webhook-receiver` to `build-analyzer` to `notifier`. Each `then.to` routes the agent's output to the next agent's input queue, and `after` controls startup order.
 
 ```bash
 initrunner flow validate examples/flows/ci-pipeline/flow.yaml

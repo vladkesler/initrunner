@@ -45,10 +45,10 @@ run: sequential
 ```
 
 ```bash
-initrunner run team.yaml --task "review the auth module"
+initrunner run team.yaml -p "review the auth module"
 ```
 
-The `--task` flag is an alias for `--prompt` (`-p`). Both work.
+Team mode requires a prompt via `--prompt` (`-p`).
 
 ## Configuration
 
@@ -331,16 +331,16 @@ The `ObservabilityConfig` is also propagated to each persona's synthesized role.
 
 ```bash
 # Sequential (default)
-initrunner run team.yaml --task "review the auth module"
+initrunner run team.yaml -p "review the auth module"
 
 # Dry run
-initrunner run team.yaml --task "review the auth module" --dry-run
+initrunner run team.yaml -p "review the auth module" --dry-run
 
 # With audit logging
-initrunner run team.yaml --task "review the auth module" --audit-db ./audit.db
+initrunner run team.yaml -p "review the auth module" --audit-db ./audit.db
 
 # Export report
-initrunner run team.yaml --task "review this PR" --export-report
+initrunner run team.yaml -p "review this PR" --report ./team-report.md
 ```
 
 The CLI header shows strategy, shared memory, and shared documents status:

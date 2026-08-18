@@ -190,7 +190,7 @@ tools:
 | `cwd` | `str \| null` | `null` | Working directory for stdio transport. Relative paths resolve against the role file's directory. |
 | `tool_prefix` | `str \| null` | `null` | Prefix added to all tool names (e.g., `"remote"` turns `read_file` into `remote_read_file`). |
 | `max_retries` | `int` | `1` | Retry count on tool failures. |
-| `timeout` | `int \| null` | `null` | Connection timeout in seconds. |
+| `timeout_seconds` | `int \| null` | `null` | Read timeout in seconds for remote transports (`sse`, `streamable-http`). Ignored for `stdio`. |
 | `defer` | `bool` | `false` | Defer MCP server connection until first tool call. Uses cached tool schemas for faster agent startup. |
 
 ### Transport Types
@@ -475,7 +475,7 @@ This registers two tools: `get_repo(owner, repo)` and `create_issue(owner, repo,
 | `body_template` | `dict \| null` | `null` | JSON body template. String values support `{param}` substitution. |
 | `query_params` | `dict[str, str]` | `{}` | Query parameters. String values support `{param}` substitution. |
 | `response_extract` | `str \| null` | `null` | JSONPath (e.g. `$.data.id`) to extract from JSON responses. `null` returns full text. |
-| `timeout` | `int` | `30` | Request timeout in seconds. |
+| `timeout_seconds` | `int` | `30` | Request timeout in seconds. |
 
 ### Parameter Options
 
@@ -849,7 +849,7 @@ tools:
 | `blocked_domains` | `list[str]` | `[]` | Hostnames the agent may not scrape. Ignored when `allowed_domains` is set. |
 | `max_content_bytes` | `int` | `512000` | Maximum response size in bytes before truncation. |
 | `timeout_seconds` | `int` | `15` | HTTP request timeout in seconds. |
-| `user_agent` | `str` | `"initrunner/0.2"` | User-Agent header sent with requests. |
+| `user_agent` | `str` | `"initrunner/{version}"` | User-Agent header sent with requests. |
 
 ### Registered Functions
 
@@ -1050,7 +1050,7 @@ tools:
 
 ## Think Tool
 
-Gives the agent an internal reasoning scratchpad. The agent can think step-by-step before acting — its thoughts are preserved in the tool call arguments but the tool returns a constant acknowledgment, so thought content does not appear in tool results, audit logs, or user-facing output.
+Gives the agent an internal reasoning scratchpad. Each call appends the thought to a per-run ring buffer and returns the whole numbered chain, so the agent can re-read its own reasoning on later turns even after context trimming. The chain goes back to the model only; it is not part of the user-facing answer.
 
 ```yaml
 tools:
@@ -1059,11 +1059,14 @@ tools:
 
 ### Options
 
-The think tool has no configurable options beyond the base `permissions` field shared by all tools.
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `critique` | `bool` | `false` | Append a self-critique nudge to the tool result on every 5th recorded thought |
+| `max_thoughts` | `int` | `50` | Ring buffer capacity (1-200). The oldest thought is evicted once full |
 
 ### Registered Functions
 
-- **`think(thought: str) -> str`** — Record a thought. The `thought` parameter captures the agent's reasoning; the return value is always `"Thought recorded."`. Use for breaking down complex tasks, planning multi-step approaches, reasoning about which tool to use next, or reflecting on results before responding.
+- **`think(thought: str) -> str`** — Record a thought. The `thought` parameter captures the agent's reasoning; the return value is the accumulated numbered chain, formatted as `Thoughts (N):` followed by one indented line per retained thought. With `critique: true`, every 5th call also appends a prompt to re-evaluate the reasoning so far. Use for breaking down complex tasks, planning multi-step approaches, reasoning about which tool to use next, or reflecting on results before responding.
 
 ### When to Use
 
@@ -1073,7 +1076,7 @@ Add the think tool when you want the agent to reason more carefully before actin
 - **Decision-making** — the agent can weigh options before committing to an action.
 - **Self-correction** — the agent can reflect on intermediate results and adjust its approach.
 
-The think tool has zero overhead — it does not make any external calls, spawn subprocesses, or consume API tokens beyond the tool call itself.
+The think tool makes no external calls and spawns no subprocesses. It does consume context tokens: every call returns the accumulated chain, so the cost grows with the number of thoughts recorded and is bounded by `max_thoughts`.
 
 ### Example
 
@@ -1405,7 +1408,7 @@ API keys are resolved from environment variables via `resolve_env_vars()` and ne
 
 ### Async Support
 
-Both functions support async execution when `prefer_async` is enabled. The async path uses `openai.AsyncOpenAI` for the OpenAI provider and `httpx.AsyncClient` for Stability AI.
+Both functions are registered as async tools; there is no sync variant and no flag to toggle. `generate_image` is async end to end, using `openai.AsyncOpenAI` for the OpenAI provider and `httpx.AsyncClient` for Stability AI. `edit_image` is OpenAI only and runs the blocking `openai.OpenAI` client in a thread executor, so it does not block the event loop.
 
 ### Example
 

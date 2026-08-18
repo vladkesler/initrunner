@@ -521,7 +521,7 @@ Stop the daemon with Ctrl+C.
 For production use, change the schedule to something practical:
 
 ```yaml
-  triggers:
+triggers:
     - type: cron
       schedule: "0 * * * *"     # every hour
       prompt: "Monitor https://example.com and save a report."
@@ -530,7 +530,7 @@ For production use, change the schedule to something practical:
 Or daily at 9am:
 
 ```yaml
-  triggers:
+triggers:
     - type: cron
       schedule: "0 9 * * *"    # daily at 9:00 UTC
       prompt: "Monitor https://example.com and save a report."

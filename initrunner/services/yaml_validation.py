@@ -150,7 +150,7 @@ def _flow_role_issues(defn: Any, base_dir: Path) -> list[ValidationIssue]:
         if not role_path.exists():
             issues.append(
                 ValidationIssue(
-                    field=f"spec.agents.{agent_name}.role",
+                    field=f"agents.{agent_name}.use",
                     message=f"Role file not found: {role_path}",
                     severity="error",
                     suggestion="check the path is relative to the flow file directory",

@@ -93,18 +93,17 @@ pip install logfire
 
 ## Configuration
 
-Add an `observability` section to your role's `spec`:
+Add an `observability` section to your role:
 
 ```yaml
-spec:
-  observability:
-    backend: otlp              # "otlp" | "logfire" | "console"
-    endpoint: http://localhost:4317
-    service_name: my-agent     # default: agent metadata.name
-    trace_tool_calls: true
-    trace_token_usage: true
-    sample_rate: 1.0
-    include_content: false     # include prompts/completions in spans
+observability:
+  backend: otlp              # "otlp" | "logfire" | "console"
+  endpoint: http://localhost:4317
+  service_name: my-agent     # default: the agent's name
+  trace_tool_calls: true
+  trace_token_usage: true
+  sample_rate: 1.0
+  include_content: false     # include prompts/completions in spans
 ```
 
 | Field | Type | Default | Description |
@@ -149,10 +148,9 @@ docker compose up -d
 Add observability to your role:
 
 ```yaml
-spec:
-  observability:
-    backend: otlp
-    endpoint: http://localhost:4317
+observability:
+  backend: otlp
+  endpoint: http://localhost:4317
 ```
 
 Run your agent:
@@ -221,9 +219,8 @@ Sends traces via gRPC to any OTLP-compatible collector. Uses `BatchSpanProcessor
 Prints spans to stderr. Useful for quick debugging:
 
 ```yaml
-spec:
-  observability:
-    backend: console
+observability:
+  backend: console
 ```
 
 ### Logfire
@@ -231,10 +228,9 @@ spec:
 Uses [Pydantic Logfire](https://logfire.pydantic.dev/) for managed observability:
 
 ```yaml
-spec:
-  observability:
-    backend: logfire
-    service_name: my-agent
+observability:
+  backend: logfire
+  service_name: my-agent
 ```
 
 Logfire manages its own `TracerProvider` — InitRunner delegates to `logfire.configure()` and does not create a manual provider.
@@ -266,7 +262,7 @@ When observability is enabled, Python log records are automatically enriched wit
 
 ## Zero Overhead When Disabled
 
-When `spec.observability` is not set:
+When `observability` is not set:
 
 - No OTel SDK is imported
 - `trace.get_tracer("initrunner")` returns a no-op tracer

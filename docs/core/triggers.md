@@ -1,6 +1,6 @@
 # Triggers — Configuration Reference
 
-Triggers allow agents to run automatically in response to events — cron schedules, file changes, incoming webhooks, or messaging platforms. They are configured in the `spec.triggers` list and activated with the `initrunner run <role> --daemon` command.
+Triggers allow agents to run automatically in response to events — cron schedules, file changes, incoming webhooks, or messaging platforms. They are configured in the top-level `triggers` list and activated with the `initrunner run <role> --daemon` command.
 
 Triggers follow the same discriminated-union pattern as tools and sinks, keyed on the `type` field.
 
@@ -14,23 +14,23 @@ Triggers follow the same discriminated-union pattern as tools and sinks, keyed o
 | `heartbeat` | Read a markdown checklist on a fixed interval |
 | `telegram` | Respond to Telegram messages via long-polling (outbound only) |
 | `discord` | Respond to Discord DMs and @mentions via WebSocket (outbound only) |
+| `slack` | Respond to Slack @-mentions and DMs via Socket Mode (outbound only) |
 
 ## Quick Example
 
 ```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate weekly status report."
-    - type: file_watch
-      paths: ["./watched"]
-      extensions: [".md", ".txt"]
-      prompt_template: "File changed: {path}. Summarize the changes."
-    - type: webhook
-      path: /webhook
-      port: 8080
-      secret: ${WEBHOOK_SECRET}
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate weekly status report."
+  - type: file_watch
+    paths: ["./watched"]
+    extensions: [".md", ".txt"]
+    prompt_template: "File changed: {path}. Summarize the changes."
+  - type: webhook
+    path: /webhook
+    port: 8080
+    secret: ${WEBHOOK_SECRET}
 ```
 
 Run with:
@@ -142,7 +142,7 @@ triggers:
     path: /webhook          # default: "/webhook"
     port: 8080              # default: 8080
     method: POST            # default: "POST"
-    secret: ${WEBHOOK_SECRET}  # default: null (no verification)
+    secret: ${WEBHOOK_SECRET}  # set explicitly; when omitted a random secret is generated
 ```
 
 ### Options
@@ -152,17 +152,19 @@ triggers:
 | `path` | `str` | `"/webhook"` | URL path to listen on. |
 | `port` | `int` | `8080` | Port to listen on. |
 | `method` | `str` | `"POST"` | HTTP method to accept. Other methods return 405. |
-| `secret` | `str \| null` | `null` | HMAC secret for signature verification. When set, requests must include a valid `X-Hub-Signature-256` header. |
+| `secret` | `str \| null` | *(auto-generated)* | HMAC secret for signature verification. Requests must always include a valid `X-Hub-Signature-256` header. Omitting this field does not disable verification: a random secret is generated at load time and never printed, so every request receives `403`. Set it to a value the sender knows. |
 
 ### HMAC Verification
 
-When `secret` is set, the webhook validates incoming requests using GitHub-style HMAC-SHA256 signatures:
+The webhook always validates incoming requests using GitHub-style HMAC-SHA256 signatures:
 
 1. The server computes `sha256=HMAC(secret, request_body)`.
 2. It compares this with the `X-Hub-Signature-256` header using constant-time comparison.
 3. Requests with invalid or missing signatures receive a `403 Forbidden` response.
 
 This is compatible with GitHub webhook signatures and any system that uses the same signing scheme.
+
+There is no unauthenticated mode. When `secret` is omitted, a random value is generated at load time and never logged or written back to the YAML, so no caller can produce a valid signature.
 
 ### Behavior
 
@@ -315,10 +317,9 @@ initrunner run role.yaml --daemon --no-audit
 By default, the daemon watches the role YAML and referenced skill files for changes. When a change is detected, the role and agent are reloaded without restarting the daemon.
 
 ```yaml
-spec:
-  daemon:
-    hot_reload: true                    # default: true
-    reload_debounce_seconds: 1.0        # default: 1.0
+daemon:
+  hot_reload: true                    # default: true
+  reload_debounce_seconds: 1.0        # default: 1.0
 ```
 
 | Field | Type | Default | Description |
@@ -338,17 +339,16 @@ Hot-reload requires a `role_path` -- it is automatically enabled when running `i
 
 ### Resilience (retry + circuit breaker)
 
-Failed trigger runs can be retried with exponential backoff, and a circuit breaker stops dispatching when the provider is down. Configure both in `spec.guardrails`:
+Failed trigger runs can be retried with exponential backoff, and a circuit breaker stops dispatching when the provider is down. Configure both under the top-level `guardrails` key:
 
 ```yaml
-spec:
-  guardrails:
-    retry_policy:
-      max_attempts: 3
-      backoff_base_seconds: 2.0
-    circuit_breaker:
-      failure_threshold: 5
-      reset_timeout_seconds: 60
+guardrails:
+  retry_policy:
+    max_attempts: 3
+    backoff_base_seconds: 2.0
+  circuit_breaker:
+    failure_threshold: 5
+    reset_timeout_seconds: 60
 ```
 
 See [Guardrails](../configuration/guardrails.md#daemon-resilience) for the full field reference and behavior details.

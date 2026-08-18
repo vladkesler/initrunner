@@ -148,8 +148,8 @@ model:
   provider: anthropic
   name: claude-sonnet-4-5-20250929
   prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
-    fallback: [openai:gpt-5-mini, mistral:mistral-large-latest]
-    concurrency: { max_running: 4 }
+  fallback: [openai:gpt-5-mini, mistral:mistral-large-latest]
+  concurrency: { max_running: 4 }
 ```
 
 `concurrency` caps in-flight model requests, so ten agents in one flow sharing an API key stay under the provider's rate limit. See [Providers](docs/configuration/providers.md).
@@ -159,13 +159,12 @@ model:
 Add `-a` and the agent builds a task list, works each item, reflects on progress, and stops when everything's done. Four reasoning strategies control how: `react` (default), `todo_driven`, `plan_execute`, `reflexion`.
 
 ```yaml
-spec:
-  autonomy:
-    compaction: { enabled: true, threshold: 30 }
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
-    autonomous_timeout_seconds: 600
+autonomy:
+  compaction: { enabled: true, threshold: 30 }
+guardrails:
+  max_iterations: 15
+  autonomous_token_budget: 100000
+  autonomous_timeout_seconds: 600
 ```
 
 Spin guards catch loops without progress. History compaction summarizes old context so long runs don't exhaust the token window. Iteration, token, and wall-clock caps bound every run. See [Autonomy](docs/orchestration/autonomy.md) · [Guardrails](docs/configuration/guardrails.md).
@@ -175,16 +174,15 @@ Spin guards catch loops without progress. History compaction summarizes old cont
 Add triggers and switch to `--daemon`. The agent runs continuously. Each event fires one prompt-response cycle.
 
 ```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-    - type: telegram
-      allowed_user_ids: [123456789]
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+  - type: telegram
+    allowed_user_ids: [123456789]
 ```
 
 Seven trigger types: cron, webhook, file_watch, heartbeat, telegram, discord, slack. The daemon hot-reloads role changes without restarting and runs up to four triggers concurrently. See [Triggers](docs/core/triggers.md).
@@ -214,18 +212,17 @@ initrunner run role.yaml --autopilot
 Or go selective: set `autonomous: true` on individual triggers, leave the rest single-shot.
 
 ```yaml
-spec:
-  triggers:
-    - type: telegram
-      autonomous: true          # think, research, then reply
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-      autonomous: true          # plan, gather data, write, review
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-      # default: single response
+triggers:
+  - type: telegram
+    autonomous: true          # think, research, then reply
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+    autonomous: true          # plan, gather data, write, review
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+    # default: single response
 ```
 
 ### Memory across modes
@@ -237,13 +234,12 @@ Semantic memory (facts the agent learns), episodic memory (what happened in past
 Point your agent at a directory. It extracts, chunks, embeds, and indexes your documents automatically. During conversation, the agent searches the index and cites what it finds. New and changed files re-index on every run.
 
 ```yaml
-spec:
-  ingest:
-    auto: true
-    sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
-  memory:
-    semantic:
-      max_memories: 1000
+ingest:
+  auto: true
+  sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
+memory:
+  semantic:
+    max_memories: 1000
 ```
 
 ```bash
@@ -268,13 +264,13 @@ Five controls ship with the framework and turn on via config keys. Roles without
 **Encrypted credential vault.** `initrunner vault init` creates `~/.initrunner/vault.enc`, encrypted with Fernet + scrypt from your passphrase. API keys resolve from env vars first, then the vault, so existing `api_key_env:` and `${VAR}` placeholders keep working.
 
 ```yaml
-spec:
-  security:
+security:
+  tools:
     audit_hooks_enabled: true
     block_private_ips: true
-    input_guard:
-      max_prompt_chars: 10000
-      blocked_patterns: ["(?i)rm -rf /"]
+  content:
+    max_prompt_length: 10000
+    blocked_input_patterns: ["(?i)rm -rf /"]
 ```
 
 See [Security](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker sandbox](docs/security/docker-sandbox.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
@@ -286,10 +282,9 @@ See [Security](docs/security/security.md) · [Bubblewrap](docs/security/bubblewr
 USD budgets cap daemon spend. Hit the cap and triggers stop firing until the window resets.
 
 ```yaml
-spec:
-  guardrails:
-    daemon_daily_cost_budget: 5.00    # USD per day
-    daemon_weekly_cost_budget: 25.00  # USD per week
+guardrails:
+  daemon_daily_cost_budget: 5.00    # USD per day
+  daemon_weekly_cost_budget: 25.00  # USD per week
 ```
 
 Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to compute spend per model and provider. Every run logs its cost to the audit trail. The dashboard plots cost across agents and time ranges. See [Cost Tracking](docs/core/cost-tracking.md).
@@ -321,7 +316,7 @@ initrunner flow up flow.yaml
 
 Sense routing picks the right target per message using keyword scoring first (zero API calls); only ambiguous cases fall back to an LLM tiebreak.
 
-**Team mode** gives multiple perspectives on one task without a full flow. Define personas in one file with three strategies: sequential handoff, parallel execution, or debate (multi-round argumentation with synthesis). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
+**Team mode** gives multiple perspectives on one task without a full flow. Define the agents in one file and pick a `run:` preset: `sequential` (linear handoff), `parallel` (independent and concurrent), `debate` (multi-round argumentation with synthesis), or `ensemble` (all answer the same task, then a majority vote, a weighted pick, or an LLM judge selects the winner). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
 
 ## MCP and interfaces
 
@@ -351,18 +346,18 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 | Feature | Command / config | Docs |
 |---------|-----------------|------|
 | **Always-on services** (curated start/stop/status; no YAML) | `initrunner service start collector acme.com` | [Services](docs/agents/services.md) |
-| **Skills** (reusable tool + prompt bundles) | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **Skills** (reusable tool + prompt bundles) | `skills: [../skills/web-researcher]` | [Skills](docs/agents/skills_feature.md) |
 | **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `--dev`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
 | **Plan** (static dry-run: reachable tools, policies, sandbox, cost; no model call) | `initrunner plan role.yaml` | [Plan](docs/operations/plan.md) |
 | **API server** (OpenAI-compatible endpoint) | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A server** (agent-to-agent protocol) | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |
 | **Multimodal** (images, audio, video, docs) | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
-| **Structured output** (validated JSON schemas) | `spec: { output: { schema: {...} } }` | [Structured Output](docs/core/structured-output.md) |
+| **Structured output** (validated JSON schemas) | `output: { type: json_schema, schema: {...} }` | [Structured Output](docs/core/structured-output.md) |
 | **Evals** (test agent output quality) | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
-| **Capabilities** (native PydanticAI features; WebSearch needs a model with built-in search) | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
-| **Observability** (OpenTelemetry) | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
-| **Reasoning** (structured thinking patterns) | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
-| **Tool search** (on-demand tool discovery) | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
+| **Capabilities** (native PydanticAI features; WebSearch needs a model with built-in search) | `capabilities: [Thinking, WebSearch]` | [Capabilities](docs/core/capabilities.md) |
+| **Observability** (OpenTelemetry) | `observability: { backend: otlp }` | [Observability](docs/core/observability.md) |
+| **Reasoning** (structured thinking patterns) | `reasoning: { pattern: plan_execute }` | [Reasoning](docs/core/reasoning.md) |
+| **Tool search** (on-demand tool discovery) | `tool_search: { enabled: true }` | [Tool Search](docs/core/tool-search.md) |
 | **Configure** (switch provider/model) | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
 
 ## Architecture
@@ -373,8 +368,8 @@ initrunner/
   runner/            Single-shot, REPL, autonomous, daemon execution modes
   service_catalog/   Shipped always-on service templates (collector, …)
   flow/              Multi-agent orchestration via flow.yaml
-  triggers/          Cron, file watcher, webhook, heartbeat, Telegram, Discord
-  stores/            Document + memory stores (LanceDB, zvec)
+  triggers/          Cron, file watcher, webhook, heartbeat, Telegram, Discord, Slack
+  stores/            Document + memory stores (LanceDB)
   ingestion/         Extract, chunk, embed, store pipeline
   mcp/               MCP server integration and gateway
   audit/             Append-only SQLite audit trail with secret scrubbing
@@ -429,4 +424,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.8.1</sub></p>
+<p align="center"><sub>v2026.8.5</sub></p>

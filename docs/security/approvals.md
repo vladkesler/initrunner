@@ -141,7 +141,7 @@ Every pending `tool_call_id` on that run must carry a decision — `false` denie
 
 The wrapper stack is builder, then `PolicyToolset`, then `PermissionToolset`, then observable events, with `ApprovalRequiredToolset` outermost. The approval gate fires first (before any tool status event), pausing the run. On an approved resume the call still descends through the full stack:
 
-1. Identity-based policy (Cedar, if enabled) rejects calls the principal isn't allowed to make at all.
+1. Identity-based policy ([initguard](./agent-policy.md), if enabled) rejects calls the principal isn't allowed to make at all.
 2. Permission rules reject calls whose arguments match deny globs.
 
 A human approval therefore can never override a policy or permission deny-rule; the approved call is still rejected at execution time.

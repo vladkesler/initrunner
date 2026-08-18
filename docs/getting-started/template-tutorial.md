@@ -13,7 +13,7 @@ This tutorial walks through all three with hands-on exercises. No YAML editing r
 - **An API key** configured — see [Setup](setup.md)
 - **A git repository** with some commit history (your own project works)
 
-The templates use `openai/gpt-5-mini` by default. To use a different provider, see [Make Them Yours](#make-them-yours) below.
+The templates don't pin a model. If you've run `initrunner setup` (or set `INITRUNNER_MODEL=provider:model`), they use that. Otherwise they auto-detect from whichever provider API key you have configured: Anthropic is checked first, then OpenAI, Google, Groq, Mistral, Cohere, and xAI, falling back to a local Ollama server. To pin a specific provider or model in the YAML, see [Make Them Yours](#make-them-yours) below.
 
 > **No API key?** Add `--dry-run` to any `initrunner run` command to simulate with a test model. You can follow the entire tutorial without making API calls.
 
@@ -82,12 +82,12 @@ prompt: |
     Workflow:
     1. Determine the commit range from the user's prompt.
        - If the prompt includes a tag or range (e.g. "since v1.2.0"), run:
-         shell_execute command="git log v1.2.0..HEAD --pretty=format:\"%h %an %s\""
+         run_shell command="git log v1.2.0..HEAD --pretty=format:\"%h %an %s\""
          (adjust the range to match the user's request).
        - Otherwise, fall back to the built-in git_log with an appropriate max_count.
     2. Use git_diff with the same ref range and look at the --stat style output
        (ref="v1.2.0..HEAD" or similar) to collect file-change stats.
-    3. Use get_current_time for the date header.
+    3. Use current_time for the date header.
     4. Categorize each commit by its conventional-commit prefix:
        - feat      → *Features*
        - fix       → *Fixes*
@@ -128,11 +128,6 @@ prompt: |
     - No Markdown headings (#), no triple backticks — these don't render in Slack
 
     Do NOT pad output with disclaimers or preamble — the mrkdwn IS the deliverable.
-model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
 tools:
   - git:
       repo_path: .
@@ -295,11 +290,6 @@ prompt: |
     - Suggest concrete fixes — include code snippets in fenced blocks.
     - Be constructive; explain the "why" behind each finding.
     - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.
-model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
 tools:
   - git:
       repo_path: .
@@ -450,10 +440,7 @@ prompt: |
       you can determine from the logs and git history.
     - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.
 model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.0
-    max_tokens: 4096
+  temperature: 0.0
 tools:
   - filesystem:
       root_path: /
@@ -495,7 +482,7 @@ All three templates share the same customization surface. Copy one and edit:
 cp examples/roles/pr-reviewer.yaml my-reviewer.yaml
 ```
 
-**Swap the model** — any supported provider works:
+**Pin a model**. The templates auto-detect, but you can pin any supported provider:
 
 ```yaml
 model:

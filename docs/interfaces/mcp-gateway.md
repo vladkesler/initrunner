@@ -211,7 +211,7 @@ initrunner mcp serve roles/researcher.yaml roles/writer.yaml roles/reviewer.yaml
 initrunner mcp serve roles/agent.yaml --transport sse --host 0.0.0.0 --port 8080
 ```
 
-Each role becomes an MCP tool. The tool name is derived from `metadata.name` in the role YAML. When names collide, suffixes (`_2`, `_3`, ...) are appended automatically.
+Each role becomes an MCP tool. The tool name is derived from the top-level `name` field in the role YAML. When names collide, suffixes (`_2`, `_3`, ...) are appended automatically.
 
 ## CLI Options
 
@@ -267,21 +267,20 @@ initrunner mcp serve roles/agent.yaml --transport streamable-http --port 9090
 ## How It Works
 
 1. At startup, the gateway loads and builds all specified roles (using `load_and_build`).
-2. Each agent is registered as an MCP tool with the name from `metadata.name`.
+2. Each agent is registered as an MCP tool with the name from the role's top-level `name` field.
 3. When an MCP client calls a tool, the gateway runs the agent with the provided `prompt` string and returns the output.
 4. Agent execution errors are returned as error strings — they never crash the MCP server.
 5. Audit logging works the same as in other execution modes.
 
 ### Tool Naming
 
-Tool names are derived from the role's `metadata.name` field. Characters that are not alphanumeric, hyphens, or underscores are replaced with `_`. When multiple roles share the same name, suffixes are appended:
+Tool names are derived from the role's top-level `name` field. The loader already restricts that field to lowercase letters, digits, and hyphens (`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`), so the name is used verbatim. When multiple roles share the same name, suffixes are appended:
 
 | Role Name | Tool Name |
 |-----------|-----------|
 | `researcher` | `researcher` |
 | `writer` | `writer` |
 | `writer` (duplicate) | `writer_2` |
-| `my agent!` | `my_agent_` |
 
 ### Tool Schema
 
@@ -291,7 +290,7 @@ Each registered tool accepts a single parameter:
 |-----------|------|-------------|
 | `prompt` | `string` | The prompt to send to the agent. |
 
-The tool description is taken from `metadata.description` in the role YAML.
+The tool description is taken from the top-level `description` field in the role YAML.
 
 ## Client Configuration
 
@@ -446,7 +445,7 @@ Agent runs through the gateway are audit-logged the same way as any other execut
 
 ```bash
 # Query audit logs for gateway runs
-initrunner audit query --agent-name researcher
+initrunner audit export --agent researcher
 ```
 
 ## Programmatic API

@@ -5,7 +5,7 @@ PydanticAI 1.71 added [Agent Spec](https://pydantic.dev/docs/ai/core-concepts/ag
 ## Importing
 
 ```bash
-initrunner new greeter --agent-spec ./greeter.agent-spec.yaml
+initrunner new --agent-spec ./greeter.agent-spec.yaml --output greeter/role.yaml
 ```
 
 Given this PydanticAI agent-spec file:
@@ -68,7 +68,7 @@ Dropped with a warning: `instrument` (use `observability` instead), `json_schema
 If the role prompt contains `{{var}}` placeholders, declare them in `deps_schema` (flat scalar object: `string`, `integer`, `number`, `boolean`) and supply values at run time:
 
 ```bash
-initrunner run greeter/role.yaml "be polite" --var name=Alice --var city=Berlin
+initrunner run greeter/role.yaml -p "be polite" --var name=Alice --var city=Berlin
 ```
 
 `--var` is repeatable. Outside single-shot `initrunner run` -- in daemon, trigger, bot, and flow runs where there is no `--var` -- supply values via `INITRUNNER_VAR_<NAME>` environment variables (the declared name upper-cased, e.g. `INITRUNNER_VAR_CITY=Berlin` for `{{city}}`); explicit `--var` values take precedence. Missing required variables raise an error; undeclared variables raise at load time; a declared-but-unset optional variable renders as empty rather than leaking the literal `{{...}}`. Rendering happens through a dynamic system-prompt hook so the raw `{{...}}` never reaches the model.

@@ -31,7 +31,7 @@ See `examples/roles/hello-world.yaml` for a minimal working agent.
 What does your agent need to do?
   |
   Just answer questions (no tools)?
-  |  Yes --> Base agent only (role + model + guardrails)
+  |  Yes --> Base agent only (prompt + model + guardrails)
   |          Example: hello-world.yaml
   |
   No --> Does it need to interact with external systems?
@@ -69,7 +69,7 @@ What does your agent need to do?
 
 ## Goal-to-Config Matrix
 
-Every row assumes the base fields (`role`, `model`, `guardrails`) are already set. **Fields to Add** shows what you layer on top.
+Every row assumes the base fields (`prompt`, `model`, `guardrails`) are already set. **Fields to Add** shows what you layer on top.
 
 | Goal | Fields to Add | Common Tool Types | Optional | Example | Docs |
 |------|--------------|-------------------|----------|---------|------|

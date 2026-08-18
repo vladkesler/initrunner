@@ -120,13 +120,12 @@ initrunner run reviewer.yaml --daemon                    # トリガー駆動で
 `-a` を付けると、エージェントはタスクリストを作り、各項目を処理し、進捗を振り返り、すべて完了したら終了します。4つの推論戦略が思考方法を制御：`react`（デフォルト）、`todo_driven`、`plan_execute`、`reflexion`。
 
 ```yaml
-spec:
-  autonomy:
-    compaction: { enabled: true, threshold: 30 }
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
-    autonomous_timeout_seconds: 600
+autonomy:
+  compaction: { enabled: true, threshold: 30 }
+guardrails:
+  max_iterations: 15
+  autonomous_token_budget: 100000
+  autonomous_timeout_seconds: 600
 ```
 
 スピンガードが進展のないループを検出。ヒストリーコンパクションが古いコンテキストを要約し、長時間実行でもトークンウィンドウを圧迫しません。イテレーション、トークン、ウォールクロックの上限が各実行を有界化します。[自律実行](docs/orchestration/autonomy.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
@@ -136,16 +135,15 @@ spec:
 トリガーを追加して `--daemon` に切り替え。エージェントは継続稼働し、各イベントが1回のプロンプト-応答サイクルを起動します。
 
 ```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-    - type: telegram
-      allowed_user_ids: [123456789]
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+  - type: telegram
+    allowed_user_ids: [123456789]
 ```
 
 7種類のトリガー：cron、webhook、file_watch、heartbeat、telegram、discord、slack。再起動なしでロール変更をホットリロード、最大4トリガーを同時実行。[トリガー](docs/core/triggers.md) を参照。
@@ -161,18 +159,17 @@ initrunner run role.yaml --autopilot
 選択的に有効化することも可能。個別のトリガーに `autonomous: true` を設定し、残りはシングルショットのまま：
 
 ```yaml
-spec:
-  triggers:
-    - type: telegram
-      autonomous: true          # 考え、調査し、返信
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-      autonomous: true          # 計画、データ収集、執筆、レビュー
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-      # デフォルト：単発応答
+triggers:
+  - type: telegram
+    autonomous: true          # 考え、調査し、返信
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+    autonomous: true          # 計画、データ収集、執筆、レビュー
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+    # デフォルト：単発応答
 ```
 
 ### モードをまたぐメモリ
@@ -184,13 +181,12 @@ spec:
 エージェントをディレクトリに向けるだけ。ドキュメントを自動的に抽出、チャンク分割、埋め込み、インデックスします。会話中、エージェントは自動でインデックスを検索し、見つけた内容を引用。新規・変更ファイルは毎回の実行で再インデックスされます。
 
 ```yaml
-spec:
-  ingest:
-    auto: true
-    sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
-  memory:
-    semantic:
-      max_memories: 1000
+ingest:
+  auto: true
+  sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
+memory:
+  semantic:
+    max_memories: 1000
 ```
 
 ```bash
@@ -215,13 +211,13 @@ initrunner run reader -i   # コードをインデックスし、Q&A を開始
 **暗号化クレデンシャルボールト。** `initrunner vault init` で `~/.initrunner/vault.enc` を作成し、パスフレーズから Fernet + scrypt で暗号化します。API キーは環境変数を最初に参照し、次にボールトを参照するので、既存の `api_key_env:` や `${VAR}` プレースホルダーはそのまま動作します。
 
 ```yaml
-spec:
-  security:
+security:
+  tools:
     audit_hooks_enabled: true
     block_private_ips: true
-    input_guard:
-      max_prompt_chars: 10000
-      blocked_patterns: ["(?i)rm -rf /"]
+  content:
+    max_prompt_length: 10000
+    blocked_input_patterns: ["(?i)rm -rf /"]
 ```
 
 [セキュリティ](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker サンドボックス](docs/security/docker-sandbox.md) · [エージェントポリシー](docs/security/agent-policy.md) · [クレデンシャルボールト](docs/security/vault.md) · [監査チェーン](docs/security/audit-chain.md) · [ガードレール](docs/configuration/guardrails.md) を参照。
@@ -231,10 +227,9 @@ spec:
 USD 予算がデーモンの支出に上限を設定。上限に達するとトリガーの発火は停止し、ウィンドウがリセットされるまで再開しません。
 
 ```yaml
-spec:
-  guardrails:
-    daemon_daily_cost_budget: 5.00    # 日あたり USD
-    daemon_weekly_cost_budget: 25.00  # 週あたり USD
+guardrails:
+  daemon_daily_cost_budget: 5.00    # 日あたり USD
+  daemon_weekly_cost_budget: 25.00  # 週あたり USD
 ```
 
 コスト見積もりは [genai-prices](https://pypi.org/project/genai-prices/) でモデルとプロバイダーごとに計算します。各実行のコストは監査証跡に記録。ダッシュボードはエージェントと期間を横断したコストをプロットします。[コスト追跡](docs/core/cost-tracking.md) を参照。
@@ -295,16 +290,16 @@ initrunner dashboard                  # http://localhost:8100 を開く
 
 | 機能 | コマンド / 設定 | ドキュメント |
 |-----|---------------|------------|
-| **スキル**（再利用可能なツール + プロンプトバンドル） | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **スキル**（再利用可能なツール + プロンプトバンドル） | `skills: [../skills/web-researcher]` | [Skills](docs/agents/skills_feature.md) |
 | **API サーバー**（OpenAI 互換エンドポイント） | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A サーバー**（エージェント間プロトコル） | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |
 | **マルチモーダル**（画像、音声、動画、ドキュメント） | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
-| **構造化出力**（バリデーション済み JSON スキーマ） | `spec: { output: { schema: {...} } }` | [Structured Output](docs/core/structured-output.md) |
+| **構造化出力**（バリデーション済み JSON スキーマ） | `output: { type: json_schema, schema: {...} }` | [Structured Output](docs/core/structured-output.md) |
 | **評価**（エージェント出力品質のテスト） | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
-| **ケイパビリティ**（ネイティブ PydanticAI 機能） | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
-| **オブザーバビリティ**（OpenTelemetry） | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
-| **推論**（構造化思考パターン） | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
-| **ツール検索**（オンデマンドツール発見） | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
+| **ケイパビリティ**（ネイティブ PydanticAI 機能） | `capabilities: [Thinking, WebSearch]` | [Capabilities](docs/core/capabilities.md) |
+| **オブザーバビリティ**（OpenTelemetry） | `observability: { backend: console }` | [Observability](docs/core/observability.md) |
+| **推論**（構造化思考パターン） | `reasoning: { pattern: plan_execute }` | [Reasoning](docs/core/reasoning.md) |
+| **ツール検索**（オンデマンドツール発見） | `tool_search: { enabled: true }` | [Tool Search](docs/core/tool-search.md) |
 | **設定変更**（プロバイダー/モデル切替） | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
 
 ## アーキテクチャ
@@ -315,7 +310,7 @@ initrunner/
   runner/       ワンショット、REPL、自律、デーモン実行モード
   flow/         flow.yaml によるマルチエージェントオーケストレーション
   triggers/     Cron、ファイルウォッチャー、webhook、ハートビート、Telegram、Discord
-  stores/       ドキュメント + メモリストア（LanceDB、zvec）
+  stores/       ドキュメント + メモリストア（LanceDB）
   ingestion/    抽出 -> チャンク分割 -> 埋め込み -> 格納 パイプライン
   mcp/          MCP サーバー統合とゲートウェイ
   audit/        追記専用 SQLite 監査証跡、シークレットスクラブ付き
@@ -329,7 +324,7 @@ initrunner/
 
 **InitHub:** [hub.initrunner.ai](https://hub.initrunner.ai/) でコミュニティエージェントを検索・インストール。`initrunner publish` で公開。
 
-**OCI レジストリ:** ロールバンドルを任意の OCI 準拠レジストリにプッシュ: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`。[OCI 配布](docs/core/oci-distribution.md) を参照。
+**OCI レジストリ:** ロールバンドルを任意の OCI 準拠レジストリにプッシュ: `initrunner publish . oci://ghcr.io/org/my-agent --tag 1.0.0`。[OCI 配布](docs/core/oci-distribution.md) を参照。
 
 ## ドキュメント
 
@@ -370,4 +365,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.8.1</sub></p>
+<p align="center"><sub>v2026.8.5</sub></p>

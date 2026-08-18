@@ -361,7 +361,7 @@ run: sequential
 ```
 
 ```bash
-initrunner run team.yaml --task "Pods are pending in staging"
+initrunner run team.yaml -p "Pods are pending in staging"
 ```
 
 ### Key considerations
@@ -536,7 +536,7 @@ Patterns nest inside each other. A few common setups:
 
 **Flow with spawn agents.** A Flow agent uses `type: spawn` internally to parallelize its work. The agent fans out to sub-agents, collects results, and sends the synthesized output through its sink.
 
-**Flow with autonomous agents.** A Flow agent has `reasoning: todo_driven` and `autonomy: {}`. Each trigger starts an iterative agentic loop, not just a single prompt-response.
+**Flow with autonomous agents.** A Flow agent has `reasoning: {pattern: todo_driven}` and `autonomy: {}`. Each trigger starts an iterative agentic loop, not just a single prompt-response.
 
 ## Competitive comparison
 

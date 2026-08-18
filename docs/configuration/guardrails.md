@@ -1,35 +1,34 @@
 # Guardrails
 
-Configurable limits protect against runaway agents. Set them in the `spec.guardrails` block of your role YAML.
+Configurable limits protect against runaway agents. Set them in the top-level `guardrails` block of your role YAML.
 
 ## Configuration
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 50000       # max tokens consumed per run
-    max_tool_calls: 20              # max tool invocations per run
-    timeout_seconds: 300            # hard timeout per run
-    max_request_limit: 50           # max LLM requests per run
-    input_tokens_limit: 10000       # cumulative input tokens per logical run
-    per_request_input_tokens_limit: 80000  # single-request context cap
-    cost_limit: 0.50                # USD cap per logical run (best-effort)
-    total_tokens_limit: 20000       # cumulative total tokens per logical run
-    session_token_budget: 500000    # cumulative budget for REPL session
-    run_token_budget: 50000         # cumulative budget for one CLI invocation, including delegations
-    daemon_token_budget: 1000000    # cumulative budget for daemon lifetime
-    daemon_daily_token_budget: 100000  # daily budget for daemon mode
-    daemon_daily_cost_budget: 5.00    # daily USD cost budget for daemon
-    daemon_weekly_cost_budget: 25.00  # weekly USD cost budget for daemon
+guardrails:
+  max_tokens_per_run: 50000       # max tokens consumed per run
+  max_tool_calls: 20              # max tool invocations per run
+  timeout_seconds: 300            # hard timeout per run
+  max_request_limit: 50           # max LLM requests per run
+  input_tokens_limit: 10000       # cumulative input tokens per logical run
+  per_request_input_tokens_limit: 80000  # single-request context cap
+  cost_limit: 0.50                # USD cap per logical run (best-effort)
+  total_tokens_limit: 20000       # cumulative total tokens per logical run
+  session_token_budget: 500000    # cumulative budget for REPL session
+  run_token_budget: 50000         # cumulative budget for one CLI invocation, including delegations
+  daemon_token_budget: 1000000    # cumulative budget for daemon lifetime
+  daemon_daily_token_budget: 100000  # daily budget for daemon mode
+  daemon_daily_cost_budget: 5.00    # daily USD cost budget for daemon
+  daemon_weekly_cost_budget: 25.00  # weekly USD cost budget for daemon
 
-    # Daemon resilience
-    retry_policy:
-      max_attempts: 3                # retry failed runs up to 3 times
-      backoff_base_seconds: 2.0      # exponential backoff base
-      backoff_max_seconds: 30.0      # backoff cap
-    circuit_breaker:
-      failure_threshold: 5           # open circuit after 5 failures
-      reset_timeout_seconds: 60      # try again after 60s
+  # Daemon resilience
+  retry_policy:
+    max_attempts: 3                # retry failed runs up to 3 times
+    backoff_base_seconds: 2.0      # exponential backoff base
+    backoff_max_seconds: 30.0      # backoff cap
+  circuit_breaker:
+    failure_threshold: 5           # open circuit after 5 failures
+    reset_timeout_seconds: 60      # try again after 60s
 ```
 
 ## Field reference
@@ -39,7 +38,7 @@ spec:
 | `max_tokens_per_run` | int | `50000` | Maximum output tokens consumed per agent run |
 | `max_tool_calls` | int | `20` | Maximum tool invocations per run |
 | `timeout_seconds` | int | `300` | Wall-clock timeout per run |
-| `max_request_limit` | int | `50` | Maximum LLM API round-trips per run |
+| `max_request_limit` | int | *derived* | Maximum LLM API round-trips per run. When omitted it is derived as `max(max_tool_calls + 10, 30)`, which is 30 with the default `max_tool_calls: 20` |
 | `input_tokens_limit` | int | *null* | Cumulative input tokens for one logical run (including approval resume) |
 | `per_request_input_tokens_limit` | int | *null* | Input tokens for a single model request (includes cached prefix tokens) |
 | `cost_limit` | float | *null* | Best-effort USD cap for one logical run (`UsageLimits.cost_limit`). Unpriced models do not enforce it. |
@@ -56,20 +55,19 @@ spec:
 | `retry_policy` | object | `{max_attempts: 1}` | Daemon-level retry policy (see below) |
 | `circuit_breaker` | object | *null* | Circuit breaker config (see below) |
 
-## Execution semantics (`spec.execution`)
+## Execution semantics (`execution`)
 
 The `execution` block mirrors PydanticAI's agent-level execution knobs and is distinct from the budgeting fields above -- use it for retry/termination semantics, not for cost control.
 
 ```yaml
-spec:
-  execution:
-    retries: 3                # per-tool retry attempts on tool failure
-    output_retries: 2         # attempts to coax the model into valid output
-    end_strategy: graceful    # "early", "graceful" (default), or "exhaustive"
-    tool_timeout_seconds: 15  # per-tool wall-clock timeout
-    max_concurrency:          # agent-level backpressure (optional)
-      max_running: 4          # cap on concurrent runs of this agent
-      max_queued: 16          # extra runs held in a queue; null = unbounded wait
+execution:
+  retries: 3                # per-tool retry attempts on tool failure
+  output_retries: 2         # attempts to coax the model into valid output
+  end_strategy: graceful    # "early", "graceful" (default), or "exhaustive"
+  tool_timeout_seconds: 15  # per-tool wall-clock timeout
+  max_concurrency:          # agent-level backpressure (optional)
+    max_running: 4          # cap on concurrent runs of this agent
+    max_queued: 16          # extra runs held in a queue; null = unbounded wait
 ```
 
 | Field | Type | Default | Description |

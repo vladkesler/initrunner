@@ -14,7 +14,7 @@ initrunner plan support-agent.yaml --json
 
 **initguard policy.** When `INITRUNNER_POLICY_DIR` is set, `plan` constructs the agent principal from the role metadata and evaluates each reachable function against the policy engine, showing `allow` or `deny` with the reason. With no policy directory configured, the panel reports that policy is inactive (all tools allowed at runtime).
 
-**Guardrails.** The token, tool-call, timeout, and budget limits from `spec.guardrails`.
+**Guardrails.** The token, tool-call, timeout, and budget limits from `guardrails`.
 
 **Sandbox.** The backend that would engage (`none`, `bwrap`, `docker`, `ssh`) and a non-raising availability probe. A backend that is configured but unavailable on the host is reported, not raised, so the command always completes.
 

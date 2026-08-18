@@ -29,6 +29,8 @@ EXAMPLES_DIR = REPO_ROOT / "examples"
 OUTPUT_FILE = REPO_ROOT / "initrunner" / "_examples_catalog.json"
 
 SKIP_NAMES = {"__pycache__", ".pyc", ".env.example"}
+# Editor and `doctor --fix` leftovers must never ship in a bundled example.
+SKIP_SUFFIXES = {".pyc", ".bak", ".orig", ".rej", ".swp"}
 
 # Categories map top-level dirs to catalog category names
 CATEGORIES = {
@@ -136,7 +138,7 @@ def _collect_files(entry_path: Path, category_dir: Path) -> list[str]:
     for f in sorted(entry_path.rglob("*")):
         if f.is_dir():
             continue
-        if f.name in SKIP_NAMES or f.suffix == ".pyc" or "__pycache__" in f.parts:
+        if f.name in SKIP_NAMES or f.suffix in SKIP_SUFFIXES or "__pycache__" in f.parts:
             continue
         files.append(f.relative_to(category_dir).as_posix())
     return files

@@ -58,9 +58,9 @@ name: my-assistant   # stored at ~/.initrunner/memory/my-assistant.lance
 ### Role-based config
 
 ```yaml
-  memory:
-    semantic:
-      max_memories: 1000
+memory:
+  semantic:
+    max_memories: 1000
 ```
 
 ```bash
@@ -400,8 +400,8 @@ Clear memory data for an agent.
 ```bash
 initrunner memory clear role.yaml              # clear all (prompts for confirmation)
 initrunner memory clear role.yaml --force      # skip confirmation
-initrunner memory clear role.yaml --sessions-only   # clear only sessions
-initrunner memory clear role.yaml --memories-only   # clear only long-term memories
+initrunner memory clear role.yaml --what sessions    # clear only session history
+initrunner memory clear role.yaml --what memories    # clear only long-term memories
 initrunner memory clear role.yaml --type semantic    # clear only semantic memories
 initrunner memory clear role.yaml --type episodic    # clear only episodic memories
 ```
@@ -409,8 +409,7 @@ initrunner memory clear role.yaml --type episodic    # clear only episodic memor
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
-| `--sessions-only` | `bool` | `false` | Only clear session history. |
-| `--memories-only` | `bool` | `false` | Only clear long-term memories. |
+| `--what` | `str` | `"all"` | What to clear: `sessions`, `memories`, or `all`. Any other value is an error. Cannot be combined with `--type` when set to `sessions`. |
 | `--type` | `str` | `null` | Clear only a specific memory type: `episodic`, `semantic`, or `procedural`. |
 | `--force` | `bool` | `false` | Skip the confirmation prompt. |
 

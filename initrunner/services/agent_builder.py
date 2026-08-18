@@ -107,19 +107,19 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
     try:
         _validate_reasoning(role)
     except RoleLoadError as e:
-        issues.append(ValidationIssue(field="spec.reasoning", message=str(e), severity="error"))
+        issues.append(ValidationIssue(field="reasoning", message=str(e), severity="error"))
 
     # Capability / tool conflict validation
     try:
         validate_capability_tool_conflicts(role)
     except RoleLoadError as e:
-        issues.append(ValidationIssue(field="spec.capabilities", message=str(e), severity="error"))
+        issues.append(ValidationIssue(field="capabilities", message=str(e), severity="error"))
 
     # Warnings for common issues
     if role.spec.role and len(role.spec.role.strip()) < 10:
         issues.append(
             ValidationIssue(
-                field="spec.role",
+                field="prompt",
                 message="System prompt is very short",
                 severity="warning",
             )
@@ -135,7 +135,7 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
         if not has_think_critique:
             issues.append(
                 ValidationIssue(
-                    field="spec.tools",
+                    field="tools",
                     message="Think tool with critique: true recommended for reflexion pattern",
                     severity="info",
                 )
@@ -144,7 +144,7 @@ def _validate_yaml(text: str) -> tuple[RoleDefinition | None, list[ValidationIss
     if role.spec.reasoning and role.spec.reasoning.pattern != "react" and not role.spec.autonomy:
         issues.append(
             ValidationIssue(
-                field="spec.autonomy",
+                field="autonomy",
                 message="Autonomy block recommended for non-react reasoning patterns",
                 severity="info",
             )
@@ -263,9 +263,9 @@ Rules:
 Make it specific to the agent's task -- not "hello". \
 Omit the line if the agent is daemon-only (triggers + no useful one-shot mode) \
 or needs ingestion before being useful.
-- metadata.name must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (lowercase, hyphens only).
-- Always include metadata.spec_version: 2.
-- spec.role is the system prompt -- write a focused one for the agent's task.
+- name must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ (lowercase, hyphens only).
+- Always include spec_version: 3.
+- prompt is the system prompt -- write a focused one for the agent's task.
 - NEVER include fields that match their default value. Omit them entirely.
 - NEVER include null or empty fields.
 - NEVER include sections the agent doesn't need (output, auto_skills, tool_search, daemon, \
@@ -555,8 +555,9 @@ class BuilderSession:
                 explanation = text[match.end() :].strip()
             return explanation, yaml_content
 
-        # No fences -- check if the whole thing looks like YAML
-        if text.strip().startswith("apiVersion:"):
+        # No fences -- check if the whole thing looks like YAML. Flat documents
+        # start with `name:`; `apiVersion:` is the removed envelope.
+        if text.strip().startswith(("name:", "apiVersion:")):
             return "", text.strip()
 
         # Fallback: return as explanation, keep current yaml

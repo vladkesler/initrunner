@@ -606,7 +606,7 @@ reasoning:
 
 ### todo + reflexion (self-correcting planner)
 
-The agent plans and executes via todo_driven, then gets one round of self-critique:
+The agent works through the task with the todo tools, then gets one round of self-critique. Leave `pattern` unset so auto-detection selects `reflexion`:
 
 ```yaml
 tools:
@@ -614,10 +614,10 @@ tools:
   - think:
       critique: true
 reasoning:
-  pattern: todo_driven
-  auto_plan: true
   reflection_rounds: 1
 ```
+
+Setting `pattern: todo_driven` explicitly overrides auto-detection and makes `reflection_rounds` inert, so no self-critique round runs. `auto_plan` is read only by the `todo_driven` strategy, so it is omitted here. The reflexion strategy drives the loop and the todo tools stay available for the agent to structure its work.
 
 ## Run-Scoped Tool Architecture
 
@@ -639,19 +639,28 @@ def build_todo_toolset(config, ctx, state):
 
 ### Creating custom run-scoped tools
 
-If you're building a custom tool that needs per-run state:
+Run-scoped construction is not available to third-party tools. `build_toolsets()` (`initrunner/agent/tools/registry.py`) skips anything registered with `run_scoped=True`, and `build_run_scoped_toolsets()` (`initrunner/runner/reasoning.py`) builds only the built-in `todo`, `think`, `spawn`, and `clarify` configs through an explicit `isinstance` chain. The `blackboard` tool is wired separately in `initrunner/flow/graph.py`. Registering a custom tool with `run_scoped=True` means it is never built and never reaches the agent. No error is raised, and `initrunner plan` still lists it as run-scoped.
+
+Register custom tools without `run_scoped`. State held in the builder closure is created once per agent build, and the REPL and daemon runners reuse that agent across turns, so the state is shared by every run in the session. Scope it inside the call, or expose a way to reset it:
 
 ```python
-from initrunner.agent.tools._registry import register_tool, ToolBuildContext
-from initrunner.agent.schema.tools import ToolConfigBase
+from typing import Literal
+
 from pydantic_ai.toolsets.function import FunctionToolset
+
+from initrunner.agent.schema.tools import ToolConfigBase
+from initrunner.agent.tools._registry import ToolBuildContext, register_tool
+
 
 class MyStatefulConfig(ToolConfigBase):
     type: Literal["my_stateful"] = "my_stateful"
 
-@register_tool("my_stateful", MyStatefulConfig, run_scoped=True)
-def build_my_toolset(config, ctx):
-    state = []  # fresh per-run
+
+@register_tool("my_stateful", MyStatefulConfig)
+def build_my_toolset(config: MyStatefulConfig, ctx: ToolBuildContext) -> FunctionToolset:
+    # Built once per agent build, so this list is shared across every run
+    # in a REPL or daemon session.
+    state: list[str] = []
     toolset = FunctionToolset()
 
     @toolset.tool_plain
@@ -659,8 +668,15 @@ def build_my_toolset(config, ctx):
         state.append(value)
         return f"Recorded {len(state)} values."
 
+    @toolset.tool_plain
+    def reset_records() -> str:
+        state.clear()
+        return "Cleared."
+
     return toolset
 ```
+
+If you need genuine per-run isolation, the run-scoped registry is an internal extension point: add a branch to `build_run_scoped_toolsets()` alongside the existing built-ins.
 
 ## Full Example: Autonomous Research Lead
 
@@ -692,8 +708,6 @@ tools:
       root_path: ./output
       read_only: false
 reasoning:
-  pattern: todo_driven
-  auto_plan: true
   reflection_rounds: 1
 autonomy:
   max_plan_steps: 20

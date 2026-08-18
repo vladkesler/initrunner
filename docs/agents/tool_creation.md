@@ -48,7 +48,7 @@ Tools use [PydanticAI's FunctionToolset](https://ai.pydantic.dev/tools/) under t
 
 ### ToolConfigBase
 
-All tool config classes inherit from `ToolConfigBase` (defined in `agent/schema.py`):
+All tool config classes inherit from `ToolConfigBase` (defined in `initrunner/agent/schema/tools/_base.py`, re-exported from `initrunner.agent.schema.tools`):
 
 - **`type: str`** — discriminator field; use `Literal["your_type"]` with a matching default
 - **`summary() -> str`** — human-readable description shown in validation output
@@ -61,7 +61,7 @@ Every builder receives a `ToolBuildContext` instance as its second argument:
 |-------|------|-------------|
 | `role` | `RoleDefinition` | The full parsed role definition |
 | `role_dir` | `Path \| None` | Directory containing the role YAML file |
-| `prefer_async` | `bool` | When `True`, the builder should register async tool closures (default `False`) |
+| `sandbox_backend` | `SandboxBackend` | Runtime sandbox used by subprocess-based tools (`shell`, `script`, `python`); defaults to `NullBackend` when not supplied |
 
 ### Auto-discovery
 
@@ -306,7 +306,7 @@ This registers two tools: `get_repo(owner, repo)` and `create_issue(owner, repo,
 | `body_template` | `dict \| null` | `null` | JSON body template. String values support `{param}` substitution. |
 | `query_params` | `dict[str, str]` | `{}` | Query parameters. String values support `{param}` substitution. |
 | `response_extract` | `str \| null` | `null` | JSONPath expression (e.g. `$.data.id`) to extract from the response. `null` returns the full response text. |
-| `timeout` | `int` | `30` | Request timeout in seconds. |
+| `timeout_seconds` | `int` | `30` | Request timeout in seconds. |
 
 ### Parameter Config
 
@@ -360,17 +360,19 @@ The plugin registry lets third-party packages register tool types that work like
 ### Using Plugins
 
 ```bash
-pip install initrunner-slack    # hypothetical plugin package
+pip install initrunner-linear    # hypothetical plugin package
 ```
 
 ```yaml
 tools:
-  - type: slack
-    channel: "#alerts"
-    token: ${SLACK_TOKEN}
+  - type: linear
+    team: ENG
+    token: ${LINEAR_TOKEN}
 ```
 
 Unknown tool types are automatically routed to the plugin registry. Any keys besides `type` are passed as the plugin's `config` dict.
+
+A plugin type must not collide with a builtin (see [Builtin Tool Types](#builtin-tool-types)). Builtin types are matched first, so a plugin registered under an existing builtin name is never consulted.
 
 List installed plugins:
 
@@ -385,7 +387,7 @@ A plugin package needs two things: a `ToolPlugin` definition and an entry point.
 #### 1. Define the Plugin
 
 ```python
-# initrunner_slack/plugin.py
+# initrunner_linear/plugin.py
 
 from pydantic import BaseModel
 from pydantic_ai.toolsets.function import FunctionToolset
@@ -393,30 +395,30 @@ from pydantic_ai.toolsets.function import FunctionToolset
 from initrunner.agent.plugins import ToolPlugin
 
 
-class SlackToolConfig(BaseModel):
-    type: str = "slack"
-    channel: str = "#general"
+class LinearToolConfig(BaseModel):
+    type: str = "linear"
+    team: str = "ENG"
     token: str = ""
 
 
-def build_slack_toolset(config: SlackToolConfig, **kwargs) -> FunctionToolset:
+def build_linear_toolset(config: LinearToolConfig, **kwargs) -> FunctionToolset:
     toolset = FunctionToolset()
 
     @toolset.tool_plain
-    def send_message(text: str) -> str:
-        """Send a message to the configured Slack channel."""
-        # ... implementation using config.token and config.channel
-        return f"Sent to {config.channel}"
+    def create_issue(title: str) -> str:
+        """Create an issue in the configured Linear team."""
+        # ... implementation using config.token and config.team
+        return f"Created issue in {config.team}"
 
     return toolset
 
 
 def create_plugin() -> ToolPlugin:
     return ToolPlugin(
-        type="slack",
-        config_class=SlackToolConfig,
-        builder=build_slack_toolset,
-        description="Send messages to Slack channels",
+        type="linear",
+        config_class=LinearToolConfig,
+        builder=build_linear_toolset,
+        description="Create and update Linear issues",
     )
 ```
 
@@ -426,7 +428,7 @@ In your package's `pyproject.toml`:
 
 ```toml
 [project.entry-points."initrunner.tools"]
-slack = "initrunner_slack.plugin:create_plugin"
+linear = "initrunner_linear.plugin:create_plugin"
 ```
 
 The entry point must be a callable that returns a `ToolPlugin` instance.
@@ -435,7 +437,7 @@ The entry point must be a callable that returns a `ToolPlugin` instance.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `type` | `str` | Discriminator value used in role YAML (e.g. `"slack"`). |
+| `type` | `str` | Discriminator value used in role YAML (e.g. `"linear"`). |
 | `config_class` | `type[BaseModel]` | Pydantic model for validating the tool config. |
 | `builder` | `Callable` | `(validated_config, **kwargs) -> AbstractToolset` — builds the toolset. |
 | `description` | `str` | Human-readable description shown in `initrunner plugins`. |
@@ -450,8 +452,8 @@ Broken entry points (import errors, invalid return types) are silently skipped s
 
 When a tool type is not found:
 
-- **No plugins installed:** `Tool type 'slack' not found. No plugins installed. Install one with: pip install initrunner-slack`
-- **Plugins installed but not this one:** `Tool type 'slack' not found. Installed plugins: ['jira', 'pagerduty']. Did you forget to pip install initrunner-slack?`
+- **No plugins installed:** `Tool type 'linear' not found. No plugins installed. Install one with: uv pip install initrunner-linear`
+- **Plugins installed but not this one:** `Tool type 'linear' not found. Installed plugins: ['jira', 'pagerduty']. Did you forget to uv pip install initrunner-linear?`
 
 ### Config Validation
 
@@ -461,35 +463,25 @@ The config dict from the YAML is validated against the plugin's `config_class` u
 
 ## Async Tool Builders
 
-Built-in tools can register async closures for use in flow orchestration and API streaming, where an asyncio event loop is available. This avoids thread-pool overhead for I/O-bound operations and enables concurrency via `asyncio.gather`.
+Built-in I/O-bound tools register async closures. This avoids thread-pool overhead for I/O-bound operations and enables concurrency via `asyncio.gather`.
 
 ### How It Works
 
-The `ToolBuildContext.prefer_async` flag is set to `True` when agents are built for flow agents or the API layer. Tool builders check this flag and register either sync or async closures:
+There is no build-time flag to branch on: I/O-bound builders register `async def` closures unconditionally. PydanticAI drives them natively in async runs (flow, team, the API layer) and bridges them for the sync CLI via `run_sync`.
 
 ```python
 @register_tool("my_http_tool", MyHttpToolConfig)
 def build_my_http_toolset(config: MyHttpToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     toolset = FunctionToolset()
 
-    if ctx.prefer_async:
-        import httpx
+    import httpx
 
-        @toolset.tool_plain
-        async def fetch_data(url: str) -> str:
-            """Fetch data from a URL."""
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url)
-                return resp.text
-    else:
-        import httpx
-
-        @toolset.tool_plain
-        def fetch_data(url: str) -> str:
-            """Fetch data from a URL."""
-            with httpx.Client() as client:
-                resp = client.get(url)
-                return resp.text
+    @toolset.tool_plain
+    async def fetch_data(url: str) -> str:
+        """Fetch data from a URL."""
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url)
+            return resp.text
 
     return toolset
 ```
@@ -498,7 +490,7 @@ PydanticAI handles both sync and async closures transparently — sync tools are
 
 ### Built-in Async Tools
 
-The following built-in tools provide async variants when `prefer_async=True`:
+The following built-in tools register async closures:
 
 | Tool | Async Behavior |
 |------|---------------|
@@ -508,7 +500,7 @@ The following built-in tools provide async variants when `prefer_async=True`:
 | `search` | Async HTTP for search APIs (blocking `ddgs` via `run_in_executor`) |
 | `image_gen` | Async OpenAI via `AsyncOpenAI`, async Stability via `httpx.AsyncClient` |
 
-Inherently blocking tools (`filesystem`, `script`, `shell`, `sql`, `git`, `calculator`, `pdf_extract`) ignore `prefer_async` since their I/O is CPU-bound or uses blocking libraries.
+Inherently blocking tools (`filesystem`, `script`, `shell`, `sql`, `git`, `calculator`, `pdf_extract`) stay sync, since their work is CPU-bound or uses blocking libraries.
 
 ### Custom Tools
 

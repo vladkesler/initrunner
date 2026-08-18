@@ -193,7 +193,7 @@ The audit database uses WAL journal mode for concurrent read/write safety.
 |--------|------|-------------|
 | `id` | `INTEGER PRIMARY KEY` | Auto-incrementing row ID |
 | `run_id` | `TEXT` | Unique identifier for the run |
-| `agent_name` | `TEXT` | Agent name from `metadata.name` |
+| `agent_name` | `TEXT` | Agent name from `name` |
 | `timestamp` | `TEXT` | ISO 8601 timestamp of the run |
 | `user_prompt` | `TEXT` | The prompt sent to the agent |
 | `model` | `TEXT` | Model name (e.g. `gpt-5-mini`) |

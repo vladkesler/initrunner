@@ -16,27 +16,26 @@ Get a document Q&A agent running with three commands. For the full reference, se
 initrunner new --template rag --no-refine
 ```
 
-This writes a `role.yaml` with ingestion pre-configured for `./docs/**/*.md`. Run `initrunner setup` first if you still need a provider key.
+This writes an `agent.yaml` with ingestion pre-configured for `./docs/**/*.md`. Run `initrunner setup` first if you still need a provider key.
 
-Edit `role.yaml` to point `sources` at your actual documents:
+Edit `agent.yaml` to point `sources` at your actual documents:
 
 ```yaml
-spec:
-  ingest:
-    sources:
-      - "./my-docs/**/*.md"
-      - "./my-docs/**/*.txt"
+ingest:
+  sources:
+    - "./my-docs/**/*.md"
+    - "./my-docs/**/*.txt"
 ```
 
 ## Step 2: Run the agent (auto-indexes on first run)
 
 ```bash
-initrunner run role.yaml -i
+initrunner run agent.yaml -i
 ```
 
 The first run extracts text, splits it into chunks, generates embeddings, and stores vectors locally. A `search_documents` tool is auto-registered on your agent. Subsequent runs only re-index files that have changed since the last pass; you don't need a separate `initrunner ingest` step for the edit-and-run workflow.
 
-To force a full rebuild (e.g. after switching embedding providers), use `initrunner ingest role.yaml --force`.
+To force a full rebuild (e.g. after switching embedding providers), use `initrunner ingest agent.yaml --force`.
 
 ## Embedding API Key
 
@@ -55,10 +54,10 @@ To force a full rebuild (e.g. after switching embedding providers), use `initrun
 
 ```bash
 # Single question
-initrunner run role.yaml -p "How do I authenticate?"
+initrunner run agent.yaml -p "How do I authenticate?"
 
 # Interactive chat (already covered in Step 2)
-initrunner run role.yaml -i
+initrunner run agent.yaml -i
 ```
 
 The agent calls `search_documents` behind the scenes to find relevant chunks from your docs. If you add or edit files between runs, the next `initrunner run` picks up the changes automatically.
@@ -76,25 +75,24 @@ ollama pull nomic-embed-text
 initrunner setup --provider ollama
 ```
 
-Edit the generated `role.yaml` to add ingestion:
+Edit the `agent.yaml` from Step 1 so `model` and `ingest` read:
 
 ```yaml
-spec:
-  model:
+model:
+  provider: ollama
+  name: llama3.2
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  embeddings:
     provider: ollama
-    name: llama3.2
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    embeddings:
-      provider: ollama
-      model: nomic-embed-text
+    model: nomic-embed-text
 ```
 
 Then run -- the first run auto-indexes:
 
 ```bash
-initrunner run role.yaml -i
+initrunner run agent.yaml -i
 ```
 
 ## Quick Alternative: `run --ingest`

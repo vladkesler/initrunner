@@ -49,8 +49,8 @@ uv run pytest tests/ -v          # tests
 
 | Tool | Version Constraint | Purpose |
 |------|--------------------|---------|
-| Ruff | `>=0.15` | Linting and formatting (`target-version = "py313"`, `line-length = 100`) |
-| ty | `>=0.0.15` | Type checking (`python-version = "3.13"`) |
+| Ruff | `>=0.15.7` | Linting and formatting (`target-version = "py311"`, `line-length = 100`) |
+| ty | `>=0.0.24` | Type checking (`python-version = "3.13"`) |
 | pytest | `>=9.0` | Test runner |
 | pytest-asyncio | `>=1.3` | Async test support |
 
@@ -103,4 +103,4 @@ Related packages are grouped to reduce PR noise (e.g., all pydantic packages upd
 
 ## Python Version Support
 
-The project declares `requires-python = ">=3.11"` and CI tests against 3.11, 3.12, and 3.13. Ruff and ty are both configured to target Python 3.13 for lint and type-check rules.
+The project declares `requires-python = ">=3.11"` and CI tests against 3.11, 3.12, and 3.13. Ruff lints against Python 3.11 (`target-version = "py311"`, the lowest supported version) while ty type-checks against Python 3.13 (`[tool.ty.environment] python-version = "3.13"`).

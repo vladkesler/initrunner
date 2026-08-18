@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from initrunner.agent._subprocess import (
     DEFAULT_ENV_ALLOWLIST,
@@ -152,6 +152,7 @@ def _probe_regexes_safe(patterns: list[str], timeout: float = 5.0) -> str | None
 
 
 class ContentPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     profanity_filter: bool = False
     blocked_input_patterns: list[str] = []
     blocked_output_patterns: list[str] = []
@@ -183,6 +184,7 @@ class ContentPolicy(BaseModel):
 
 
 class ServerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     cors_origins: list[str] = []
     require_https: bool = False
     max_request_body_bytes: Annotated[int, Field(gt=0)] = 1_048_576
@@ -190,16 +192,19 @@ class ServerConfig(BaseModel):
 
 
 class RateLimitConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     requests_per_minute: Annotated[int, Field(gt=0)] = 60
     burst_size: Annotated[int, Field(gt=0)] = 10
 
 
 class ResourceLimits(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     max_file_size_mb: Annotated[float, Field(gt=0)] = 50.0
     max_total_ingest_mb: Annotated[float, Field(gt=0)] = 500.0
 
 
 class ToolSandboxConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     allowed_custom_modules: list[str] = []
     blocked_custom_modules: list[str] = [
         "os",
@@ -292,6 +297,7 @@ _DANGEROUS_WRITE_ROOTS = (
 
 
 class BindMount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     source: str
     target: str
     read_only: bool = True
@@ -309,6 +315,8 @@ DockerRuntime = Literal["runc", "runsc", "kata-runtime", "kata-qemu", "kata-fc",
 
 class DockerBackendConfig(BaseModel):
     """Docker-specific settings nested under sandbox.docker."""
+
+    model_config = ConfigDict(extra="forbid")
 
     image: str = "python:3.12-slim"
     user: Literal["auto"] | str | None = "auto"
@@ -349,6 +357,8 @@ class SSHBackendConfig(BaseModel):
     a couple of explicit overrides.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     host: Annotated[str, Field(min_length=1)]
     config_file: str | None = None
     identity_file: str | None = None
@@ -359,6 +369,8 @@ class SSHBackendConfig(BaseModel):
 
 class SandboxConfig(BaseModel):
     """Backend-agnostic runtime sandbox configuration."""
+
+    model_config = ConfigDict(extra="forbid")
 
     backend: Literal["auto", "bwrap", "docker", "ssh", "none"] = "none"
     network: Literal["none", "bridge", "host"] = "none"
@@ -476,11 +488,13 @@ class SandboxConfig(BaseModel):
 
 
 class AuditConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     max_records: int = 100_000
     retention_days: int = 90
 
 
 class ResourceConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     memory: str = "512Mi"
     cpu: float = 0.5
 
@@ -489,6 +503,7 @@ _DEFAULT_SECURITY_POLICY: SecurityPolicy | None = None
 
 
 class SecurityPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     preset: SecurityPreset | None = None
     content: ContentPolicy = ContentPolicy()
     server: ServerConfig = ServerConfig()

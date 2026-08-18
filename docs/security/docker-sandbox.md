@@ -42,7 +42,7 @@ security:
     docker:
       image: python:3.12-slim
       user: auto            # "auto" | "1000:1000" | null (root)
-      extra_args: []        # dangerous flags blocked by schema
+      extra_args: []        # only allowlisted resource flags accepted
       runtime: null         # null | runc | runsc | kata-runtime | kata-qemu | kata-fc | kata-clh
 ```
 
@@ -109,16 +109,14 @@ Each becomes one `-e KEY=value` flag.
 
 ### `extra_args` validation
 
-`docker.extra_args` accepts additional `docker run` flags (e.g. `--ulimit=nofile=1024`). A blocklist rejects flags that defeat isolation or override fields the schema owns:
+`docker.extra_args` accepts a small **allowlist** of additional `docker run` flags (e.g. `--ulimit=nofile=1024`). Anything not on the list is rejected at load time, including flags that defeat isolation and flags the schema already owns:
 
-- `--privileged`
-- `--cap-add` (any form: bare, `--cap-add=NET_ADMIN`, `--cap-add NET_ADMIN`)
-- `--security-opt`
-- `--pid=host`, `--ipc=host`, `--uts=host`, `--userns=host`, `--network=host`
-- `--device`, `--volume-driver`
-- `--runtime` (use the `docker.runtime` field instead, see below)
+- Permitted: `--ulimit`, `--memory-swap`, `--memory-reservation`, `--memory-swappiness`, `--cpu-shares`, `--cpu-period`, `--cpu-quota`, `--cpus`, `--cpuset-cpus`, `--cpuset-mems`, `--pids-limit`, `--shm-size`, `--oom-kill-disable`, `--oom-score-adj`, `--stop-signal`, `--stop-timeout`, `--label`, `-l`, `--read-only`, `--tmpfs`
+- Rejected: everything else, including `--privileged`, `--cap-add`, `--security-opt`, `-v` / `--volume` / `--mount`, `--pid=host`, `--ipc=host`, `--uts=host`, `--userns=host`, `--network=host`, `--device`, `--volume-driver`, `--gpus`, `--memory` (use the `memory_limit` field), and `--runtime` (use the `docker.runtime` field, see below)
 
-See `initrunner/agent/schema/security.py` for the full `_DOCKER_BLOCKED_ARGS` set.
+Use the `flag=value` form for negative values. `--oom-score-adj=-500` is accepted, but the space-separated `--oom-score-adj -500` is rejected because the bare `-500` token is parsed as a flag.
+
+See the `_DOCKER_ALLOWED_ARGS` set in `initrunner/agent/schema/security.py` for the authoritative list.
 
 ### Hardened runtime (`docker.runtime`)
 
@@ -145,7 +143,7 @@ Install per upstream docs. Verified examples (correct as of 2026-05; check upstr
 - gVisor (Debian 12, x86_64): see https://gvisor.dev/docs/user_guide/install/. After installing the `runsc` binary, register it in `/etc/docker/daemon.json` (`{"runtimes": {"runsc": {"path": "/usr/local/bin/runsc"}}}`) and `systemctl restart docker`.
 - Kata Containers: see https://github.com/kata-containers/kata-containers/blob/main/docs/install/README.md. The package name and registration step vary by distro and hypervisor.
 
-Roles that depend on a hardened runtime should declare it in `metadata.tags` (e.g. `[hardened, gvisor]`) so consumers know the host requirement before they install.
+Roles that depend on a hardened runtime should declare it in the top-level `tags:` field (e.g. `tags: [hardened, gvisor]`) so consumers know the host requirement before they install.
 
 ## Container cleanup on timeout
 

@@ -134,7 +134,7 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--autopilot` | Daemon mode with all triggers autonomous |
 | `--serve` | Serve agent as an OpenAI-compatible API |
 | `--bot TEXT` | Launch as a bot (`telegram` or `discord`) |
-| `--var TEXT` | Template variable in `key=value` format (repeatable) for `{{var}}` placeholders in `spec.role`. Requires `spec.deps_schema`. See [Agent Spec Import](agent-spec-import.md). |
+| `--var TEXT` | Template variable in `key=value` format (repeatable) for `{{var}}` placeholders in `prompt`. Requires `deps_schema`. See [Agent Spec Import](agent-spec-import.md). |
 | `--host TEXT` | Host to bind to (default: `127.0.0.1`). Used with `--serve`. |
 | `--port INT` | Port to listen on (default: `8000`). Used with `--serve`. |
 | `--api-key TEXT` | API key for Bearer token authentication. Used with `--serve`. |
@@ -184,7 +184,7 @@ Set `INITRUNNER_DEFAULT_MODEL` to override the model used for the LLM tiebreaker
 
 See [Intent Sensing](../core/intent_sensing.md) for the full algorithm reference, role tagging guide, and troubleshooting.
 
-Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `spec.guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
+Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 
 Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then continues interactively.
 
@@ -244,9 +244,11 @@ $ initrunner run role.yaml -p "hello"
 │                                                                            │
 │  1 error                                                                   │
 │                                                                            │
-│  [ERROR] spec.model.provider                                               │
-│    Input should be a valid string                                          │
-│    Fix: expected a string; check for missing quotes or a stray number      │
+│  [ERROR] document                                                          │
+│    1 validation error for AgentDocument                                    │
+│  model.provider                                                            │
+│    Input should be a valid string [type=string_type, input_value=123,      │
+│  input_type=int]                                                           │
 │                                                                            │
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -254,8 +256,9 @@ $ initrunner run role.yaml -p "hello"
 The panel shows one row per issue with:
 
 - **Severity label** (`[ERROR]`, `[WARN]`, `[INFO]`).
-- **Field path** -- dotted path into the YAML (e.g. `spec.model.provider`,
-  `metadata.name`). For YAML syntax errors, also includes 1-based line and
+- **Field path** -- dotted path into the YAML (e.g. `name`, `tools`). Schema
+  errors report `document` and carry the exact path (`model.provider`) in the
+  message body. For YAML syntax errors, the path also includes 1-based line and
   column (e.g. `yaml (line 14, col 3)`).
 - **Message** -- the underlying Pydantic or YAML parser message.
 - **Fix hint** -- a short suggestion derived from Pydantic's error type
@@ -268,7 +271,7 @@ endpoint -- they all share one services-layer validator.
 
 ### Recursive flow validation
 
-Flow files reference other role files via `spec.agents.<name>.role`. The
+Flow files reference other role files via `agents.<name>.use`. The
 pre-flight walks every referenced role file and validates each one. Issues
 from a nested role surface with an `agents.<name>.` field prefix so you can
 tell which referenced file is broken without opening each one.
@@ -278,9 +281,11 @@ $ initrunner flow up flow.yaml
 ╭─────────────────── Invalid flow.yaml -- flow.yaml ────────────────────────╮
 │  1 error                                                                   │
 │                                                                            │
-│  [ERROR] agents.worker.spec.model.provider                                 │
-│    Input should be a valid string                                          │
-│    Fix: expected a string; check for missing quotes or a stray number      │
+│  [ERROR] agents.worker.document                                            │
+│    1 validation error for AgentDocument                                    │
+│  model.provider                                                            │
+│    Input should be a valid string [type=string_type, input_value=123,      │
+│  input_type=int]                                                           │
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
 

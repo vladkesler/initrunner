@@ -189,5 +189,6 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Agent dry-run (`plan`) | `docs/operations/plan.md` |
 | Usage telemetry (PostHog, opt-out) | `docs/operations/telemetry.md` |
 | Deprecations & schema versioning | `docs/operations/deprecations.md` |
+| Known gaps & deferred work | `docs/operations/todo.md` |
 | Shareable templates | `docs/getting-started/shareable-templates.md`, `docs/getting-started/template-tutorial.md` |
 </important>
