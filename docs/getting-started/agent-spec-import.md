@@ -30,48 +30,42 @@ tool_timeout: 15.0
 InitRunner writes a valid `role.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: greeter
-  description: Friendly greeter with templated instructions.
-spec:
-  role: "You are greeting {{name}} from {{city}}."
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5
-  execution:
-    retries: 3
-    end_strategy: exhaustive
-    tool_timeout_seconds: 15.0
-  deps_schema:
-    type: object
-    properties:
-      name: {type: string}
-      city: {type: string}
-    required: [name, city]
+name: greeter
+description: Friendly greeter with templated instructions.
+model: anthropic:claude-sonnet-4-5
+prompt: "You are greeting {{name}} from {{city}}."
+execution:
+  retries: 3
+  end_strategy: exhaustive
+  tool_timeout_seconds: 15.0
+deps_schema:
+  type: object
+  properties:
+    name: {type: string}
+    city: {type: string}
+  required: [name, city]
 ```
 
 ### Field mapping
 
 | PydanticAI Agent Spec | InitRunner role.yaml |
 |---|---|
-| `model` | `spec.model` (parses `provider:name`) |
-| `instructions` | `spec.role` |
-| `name` / `metadata.name` / filename stem | `metadata.name` (in that precedence) |
-| `description` | `metadata.description` |
-| `model_settings.max_tokens` / `temperature` | `spec.model.max_tokens` / `temperature` |
-| `capabilities` | `spec.capabilities` (same `NamedSpec` format) |
-| `retries`, `output_retries`, `end_strategy`, `tool_timeout` | `spec.execution.*` |
-| `deps_schema` | `spec.deps_schema` (verbatim) |
-| `output_schema` | `spec.output` with `type: json_schema` |
-| `metadata.tags` / `author` / `team` / `version` | `metadata.tags` / `author` / `team` / `version` (round-trips through export too) |
+| `model` | `model` (parses `provider:name`) |
+| `instructions` | `prompt` |
+| `name` / `metadata.name` / filename stem | `name` (in that precedence) |
+| `description` | `description` |
+| `model_settings.max_tokens` / `temperature` | `model.max_tokens` / `temperature` |
+| `capabilities` | `capabilities` (same `NamedSpec` format) |
+| `retries`, `output_retries`, `end_strategy`, `tool_timeout` | `execution.*` |
+| `deps_schema` | `deps_schema` (verbatim) |
+| `output_schema` | `output` with `type: json_schema` |
+| `metadata.tags` / `author` / `team` / `version` | `tags` / `author` / `team` / `version` (round-trips through export too) |
 
-Dropped with a warning: `instrument` (use `spec.observability` instead), `json_schema_path` (InitRunner doesn't need the companion schema path), any `model_settings` keys beyond `max_tokens` / `temperature`, and `metadata` keys other than the four above.
+Dropped with a warning: `instrument` (use `observability` instead), `json_schema_path` (InitRunner doesn't need the companion schema path), any `model_settings` keys beyond `max_tokens` / `temperature`, and `metadata` keys other than the four above.
 
 ## Running with template variables
 
-If the role prompt contains `{{var}}` placeholders, declare them in `spec.deps_schema` (flat scalar object: `string`, `integer`, `number`, `boolean`) and supply values at run time:
+If the role prompt contains `{{var}}` placeholders, declare them in `deps_schema` (flat scalar object: `string`, `integer`, `number`, `boolean`) and supply values at run time:
 
 ```bash
 initrunner run greeter/role.yaml "be polite" --var name=Alice --var city=Berlin

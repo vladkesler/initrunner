@@ -12,12 +12,12 @@ Make GET requests to a base URL and check endpoint health.
 
 ```yaml
 tools:
-  - type: http
-    base_url: https://api.example.com
-    allowed_methods:
-      - GET
-    headers:
-      Accept: application/json
+  - http:
+      base_url: https://api.example.com
+      allowed_methods:
+        - GET
+      headers:
+        Accept: application/json
 ```
 
 > `allowed_methods: [GET]` restricts the agent to read-only requests — it cannot POST, PUT, or DELETE. The `base_url` is prepended to every path the agent passes to `http_request()`.
@@ -33,11 +33,11 @@ Post messages to Slack channels via an incoming webhook.
 
 ```yaml
 tools:
-  - type: slack
-    webhook_url: "${SLACK_WEBHOOK_URL}"
-    default_channel: "#ops-alerts"
-    username: Uptime Monitor
-    icon_emoji: ":satellite:"
+  - slack:
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      default_channel: "#ops-alerts"
+      username: Uptime Monitor
+      icon_emoji: ":satellite:"
 ```
 
 > `webhook_url` uses `${VAR}` syntax — the env var is resolved at runtime. This keeps secrets out of version control. `default_channel`, `username`, and `icon_emoji` set the appearance of posted messages.
@@ -52,10 +52,10 @@ Query a SQLite database with engine-level write protection.
 
 ```yaml
 tools:
-  - type: sql
-    database: ./sample.db
-    read_only: true
-    max_rows: 100
+  - sql:
+      database: ./sample.db
+      read_only: true
+      max_rows: 100
 ```
 
 > `read_only: true` enables `PRAGMA query_only=ON` at the SQLite engine level — no regex filtering, the engine itself rejects writes. `max_rows` caps result sets to prevent large outputs from consuming context window.
@@ -77,10 +77,10 @@ Execute Python code in an isolated subprocess.
 
 ```yaml
 tools:
-  - type: python
-    working_dir: .
-    require_confirmation: true
-    timeout_seconds: 30
+  - python:
+      working_dir: .
+      require_confirmation: true
+      timeout_seconds: 30
 ```
 
 > `require_confirmation: true` (the default) prompts the user before each execution — a human-in-the-loop safeguard. Sensitive env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `AWS_SECRET`, `DATABASE_URL`) are scrubbed from the subprocess environment. Output is truncated at 100 KB.
@@ -96,15 +96,15 @@ Run shell commands restricted to an explicit allowlist.
 
 ```yaml
 tools:
-  - type: shell
-    allowed_commands:
-      - kubectl
-      - docker
-      - curl
-      - date
-    require_confirmation: false
-    timeout_seconds: 30
-    working_dir: .
+  - shell:
+      allowed_commands:
+        - kubectl
+        - docker
+        - curl
+        - date
+      require_confirmation: false
+      timeout_seconds: 30
+      working_dir: .
 ```
 
 > `allowed_commands` is an allowlist — only these binaries can be invoked. `require_confirmation: false` is safe here because the commands are read-only status checks. For write operations, keep the default `true`. The shell tool also has a built-in blocklist (fork bombs, `rm -rf /`, etc.) and scrubs sensitive env vars.
@@ -119,44 +119,44 @@ Define REST API endpoints as agent tools using pure YAML. Each endpoint becomes 
 
 ```yaml
 tools:
-  - type: api
-    name: github
-    description: GitHub REST API v3
-    base_url: https://api.github.com
-    headers:
-      Accept: application/vnd.github.v3+json
-      User-Agent: initrunner-github-tracker
-    auth:
-      Authorization: "Bearer ${GITHUB_TOKEN}"
-    endpoints:
-      - name: list_issues
-        method: GET
-        path: "/repos/{owner}/{repo}/issues"
-        description: List issues in a repository
-        parameters:
-          - name: owner
-            type: string
-            required: true
-            description: Repository owner (user or org)
-          - name: repo
-            type: string
-            required: true
-            description: Repository name
-          - name: state
-            type: string
-            required: false
-            default: open
-            description: "Filter by state: open, closed, or all"
-          - name: labels
-            type: string
-            required: false
-            description: Comma-separated list of label names
-        query_params:
-          state: "{state}"
-          labels: "{labels}"
-          per_page: "10"
-        response_extract: "$[*].{number,title,state,labels[*].name}"
-        timeout: 15
+  - api:
+      name: github
+      description: GitHub REST API v3
+      base_url: https://api.github.com
+      headers:
+        Accept: application/vnd.github.v3+json
+        User-Agent: initrunner-github-tracker
+      auth:
+        Authorization: "Bearer ${GITHUB_TOKEN}"
+      endpoints:
+        - name: list_issues
+          method: GET
+          path: "/repos/{owner}/{repo}/issues"
+          description: List issues in a repository
+          parameters:
+            - name: owner
+              type: string
+              required: true
+              description: Repository owner (user or org)
+            - name: repo
+              type: string
+              required: true
+              description: Repository name
+            - name: state
+              type: string
+              required: false
+              default: open
+              description: "Filter by state: open, closed, or all"
+            - name: labels
+              type: string
+              required: false
+              description: Comma-separated list of label names
+          query_params:
+            state: "{state}"
+            labels: "{labels}"
+            per_page: "10"
+          response_extract: "$[*].{number,title,state,labels[*].name}"
+          timeout: 15
 ```
 
 > Key features at work: `auth` with `${GITHUB_TOKEN}` env var resolution, `{owner}` and `{repo}` path templating, `query_params` for optional filters, and `response_extract` to return only the fields the agent needs. The full example defines 5 endpoints (list_issues, get_issue, create_issue, add_comment, list_repos).
@@ -174,11 +174,11 @@ Load Python functions from a module and register them as agent tools. Type annot
 
 ```yaml
 tools:
-  - type: custom
-    module: my_tools
-    config:
-      prefix: "DEMO"
-      source: "custom-tools-demo"
+  - custom:
+      module: my_tools
+      config:
+        prefix: "DEMO"
+        source: "custom-tools-demo"
 ```
 
 **Python module (`my_tools.py`):**
@@ -220,18 +220,18 @@ Connect to an MCP server and expose its tools to the agent. Three transport type
 # Uncomment to use GitHub's official MCP server instead of declarative API endpoints:
 #
 # tools:
-#   - type: mcp
-#     transport: stdio
-#     command: npx
-#     args:
-#       - -y
-#       - "@modelcontextprotocol/server-github"
-#     tool_filter:
-#       - list_issues
-#       - get_issue
-#       - create_issue
-#       - add_issue_comment
-#       - search_repositories
+#   - mcp:
+#       transport: stdio
+#       command: npx
+#       args:
+#         - -y
+#         - "@modelcontextprotocol/server-github"
+#       tool_filter:
+#         - list_issues
+#         - get_issue
+#         - create_issue
+#         - add_issue_comment
+#         - search_repositories
 ```
 
 > `tool_filter` restricts which tools from the MCP server are exposed to the agent. Without it, all tools are available. This example shows MCP as a drop-in alternative to the declarative API tool for the same GitHub use case.
@@ -249,12 +249,12 @@ Subprocess-based git operations with read-only default. Two modes:
 
 ```yaml
 tools:
-  - type: git
-    repo_path: .
-    read_only: true
-  - type: filesystem
-    root_path: .
-    read_only: true
+  - git:
+      repo_path: .
+      read_only: true
+  - filesystem:
+      root_path: .
+      read_only: true
 ```
 
 > `read_only: true` (the default) registers only read tools: `git_status`, `git_log`, `git_diff`, `git_show`, `git_blame`, `git_changed_files`, `git_list_files`. Paired with a read-only filesystem tool, this is a safe setup for code review.
@@ -265,15 +265,15 @@ tools:
 
 ```yaml
 tools:
-  - type: git
-    repo_path: .
-    read_only: true
-  - type: filesystem
-    root_path: .
-    read_only: false
-    allowed_extensions:
-      - .md
-  - type: datetime
+  - git:
+      repo_path: .
+      read_only: true
+  - filesystem:
+      root_path: .
+      read_only: false
+      allowed_extensions:
+        - .md
+  - datetime
 ```
 
 > This changelog generator reads git history but writes output via the filesystem tool (restricted to `.md` files). If your agent needs to create commits or tags, set `read_only: false` on the git tool — this unlocks `git_checkout`, `git_commit`, and `git_tag`. Note: `git push` is excluded by design.
@@ -289,10 +289,10 @@ Fetch web pages, extract content as markdown, and store it in the document store
 
 ```yaml
 tools:
-  - type: web_scraper
-    allowed_domains:
-      - docs.example.com
-  - type: datetime
+  - web_scraper:
+      allowed_domains:
+        - docs.example.com
+  - datetime
 ingest:
   sources: []  # web_scraper tool populates the store at runtime
 triggers:
@@ -317,8 +317,8 @@ Search the web and news from inside an agent. DuckDuckGo is the default provider
 
 ```yaml
 tools:
-  - type: search
-  - type: datetime
+  - search
+  - datetime
 ```
 
 > The `search` tool registers two functions: `web_search` for general queries and `news_search` for recent events. Pair it with `datetime` so the agent can reason about time when filtering news. DuckDuckGo requires the `search` extra (`pip install initrunner[search]`); paid providers (SerpAPI, Brave, Tavily) need an `api_key` but use `httpx` which is already bundled.
@@ -334,9 +334,9 @@ Give the agent an internal scratchpad for planning and reasoning before acting. 
 
 ```yaml
 tools:
-  - type: think
-  - type: datetime
-    default_timezone: UTC
+  - think
+  - datetime:
+      default_timezone: UTC
 ```
 
 > The think tool returns a constant `"Thought recorded."` — the agent's reasoning is preserved in the tool call arguments, not echoed back. Pair it with other tools when you want the agent to plan before acting. Zero overhead: no API calls, no subprocesses.
@@ -352,27 +352,27 @@ Define named shell scripts directly in YAML. Each script becomes a separate tool
 
 ```yaml
 tools:
-  - type: script
-    timeout_seconds: 15
-    scripts:
-      - name: disk_usage
-        description: Check disk usage for a path
-        interpreter: /bin/bash
-        allowed_commands: [df]
-        body: |
-          df -h "$TARGET_PATH"
-        parameters:
-          - name: target_path
-            description: Filesystem path to check
-            required: true
-      - name: system_info
-        description: Show basic system information
-        interpreter: /bin/bash
-        body: |
-          echo "Hostname: $(hostname)"
-          echo "Kernel: $(uname -r)"
-          echo "Memory:"
-          free -h 2>/dev/null || echo "free not available"
+  - script:
+      timeout_seconds: 15
+      scripts:
+        - name: disk_usage
+          description: Check disk usage for a path
+          interpreter: /bin/bash
+          allowed_commands: [df]
+          body: |
+            df -h "$TARGET_PATH"
+          parameters:
+            - name: target_path
+              description: Filesystem path to check
+              required: true
+        - name: system_info
+          description: Show basic system information
+          interpreter: /bin/bash
+          body: |
+            echo "Hostname: $(hostname)"
+            echo "Kernel: $(uname -r)"
+            echo "Memory:"
+            free -h 2>/dev/null || echo "free not available"
 ```
 
 > Key features: `interpreter` can be overridden per script (default `/bin/sh`). Parameters like `target_path` are injected as `$TARGET_PATH` in the environment. `allowed_commands: [df]` restricts `disk_usage` to only the `df` command — lines with other commands or shell operators are rejected before execution. Scripts without `allowed_commands` trust the role author and allow any commands. The script body is piped to the interpreter via stdin (no temp files, no `shell=True`). Sensitive env vars are scrubbed.
@@ -408,7 +408,7 @@ Proven patterns from the example roles:
 
 ## Triggers
 
-Triggers run agents automatically on a schedule, file change, or incoming HTTP request. They are configured in `spec.triggers` and used with `initrunner run <path> --daemon`.
+Triggers run agents automatically on a schedule, file change, or incoming HTTP request. They are configured in `triggers` and used with `initrunner run <path> --daemon`.
 
 See [triggers.md](../core/triggers.md) for the full reference.
 
@@ -472,41 +472,35 @@ triggers:
 Flow connects multiple agents into a pipeline. Each agent runs in its own daemon thread, and `DelegateSink` routes outputs between agents via in-memory queues.
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: ci-pipeline
-  description: >
-    CI event processing pipeline. A webhook receiver accepts CI webhooks,
-    a build analyzer diagnoses failures, and a notifier sends Slack alerts
-    and updates GitHub commit status.
-spec:
-  agents:
-    webhook-receiver:
-      role: roles/webhook-receiver.yaml
-      sink:
-        type: delegate
-        target: build-analyzer
+name: ci-pipeline
+description: >
+  CI event processing pipeline. A webhook receiver accepts CI webhooks,
+  a build analyzer diagnoses failures, and a notifier sends Slack alerts
+  and updates GitHub commit status.
+agents:
+  webhook-receiver:
+    use: roles/webhook-receiver.yaml
+    then:
+      to: build-analyzer
 
-    build-analyzer:
-      role: roles/build-analyzer.yaml
-      needs:
-        - webhook-receiver
-      sink:
-        type: delegate
-        target: notifier
+  build-analyzer:
+    use: roles/build-analyzer.yaml
+    then:
+      to: notifier
+    after:
+      - webhook-receiver
 
-    notifier:
-      role: roles/notifier.yaml
-      needs:
-        - build-analyzer
-      restart:
-        condition: on-failure
-        max_retries: 3
-        delay_seconds: 5
+  notifier:
+    use: roles/notifier.yaml
+    after:
+      - build-analyzer
+    restart:
+      condition: on-failure
+      max_retries: 3
+      delay_seconds: 5
 ```
 
-> Three agents form a pipeline: `webhook-receiver` → `build-analyzer` → `notifier`. Each `sink` routes the agent's output to the next agent's input queue. `needs` controls startup order. `restart` with `condition: on-failure` auto-restarts the notifier up to 3 times if it crashes.
+> Three agents form a pipeline: `webhook-receiver` → `build-analyzer` → `notifier`. Each `then.to` routes the agent's output to the next agent's input queue. `after` controls startup order. `restart` with `condition: on-failure` auto-restarts the notifier up to 3 times if it crashes.
 
 ```bash
 initrunner flow validate examples/flows/ci-pipeline/flow.yaml
@@ -521,11 +515,11 @@ Inspect, summarize, and query CSV files within a sandboxed directory. Uses only 
 
 ```yaml
 tools:
-  - type: csv_analysis
-    root_path: .
-    max_rows: 1000
-    max_file_size_mb: 10.0
-    delimiter: ","
+  - csv_analysis:
+      root_path: .
+      max_rows: 1000
+      max_file_size_mb: 10.0
+      delimiter: ","
 ```
 
 > `root_path` is the sandbox boundary — the agent cannot read CSV files outside it. `max_rows` is a hard cap applied on every call to bound memory usage. `max_file_size_mb` rejects oversized files before they are read into memory. Set `delimiter: "\t"` for TSV files.

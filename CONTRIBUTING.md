@@ -98,24 +98,20 @@ For the full guide, see [docs/agents/tool_creation.md](docs/agents/tool_creation
 No Python needed — roles are pure YAML. Start from the hello-world example:
 
 ```yaml
-# examples/roles/hello-world.yaml (27 lines)
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: hello-world
-  description: A friendly greeter agent
-  tags: [example, greeting]
-  author: InitRunner Team
-  version: "1.0.0"
-spec:
-  role: >
-    You are a friendly greeter. Keep your responses short, warm,
-    and cheerful.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.8
-    max_tokens: 1024
+# examples/roles/hello-world.yaml
+name: hello-world
+description: A friendly greeter agent
+tags: [example, greeting]
+author: InitRunner Team
+version: "1.0.0"
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.8
+  max_tokens: 1024
+prompt: >
+  You are a friendly greeter. Keep your responses short, warm,
+  and cheerful.
 ```
 
 Test it locally:

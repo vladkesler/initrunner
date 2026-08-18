@@ -11,32 +11,26 @@ All memory types are backed by a single store per agent using a configurable sto
 ## Quick Start
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: assistant
-  description: Agent with rich memory
-spec:
-  role: |
-    You are a helpful assistant with long-term memory.
-    Use the remember() tool to save important facts.
-    Use the recall() tool to search your memories before answering.
-    Use the learn_procedure() tool to record useful patterns.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  memory:
-    max_sessions: 10
-    max_resume_messages: 20
-    semantic:
-      max_memories: 1000
-    episodic:
-      max_episodes: 500
-    procedural:
-      max_procedures: 100
-    consolidation:
-      enabled: true
-      interval: after_session
+name: assistant
+description: Agent with rich memory
+model: openai:gpt-5-mini
+prompt: |
+  You are a helpful assistant with long-term memory.
+  Use the remember() tool to save important facts.
+  Use the recall() tool to search your memories before answering.
+  Use the learn_procedure() tool to record useful patterns.
+memory:
+  max_sessions: 10
+  max_resume_messages: 20
+  semantic:
+    max_memories: 1000
+  episodic:
+    max_episodes: 500
+  procedural:
+    max_procedures: 100
+  consolidation:
+    enabled: true
+    interval: after_session
 ```
 
 ### Zero-config memory
@@ -111,34 +105,33 @@ Use procedural memory for instructions the agent should always follow, like "alw
 
 ## Configuration
 
-Memory is configured in the `spec.memory` section:
+Memory is configured in the `memory` section:
 
 ```yaml
-spec:
-  memory:
-    max_sessions: 10              # default: 10
-    max_resume_messages: 20       # default: 20
-    store_backend: lancedb        # default: "lancedb"
-    store_path: null              # default: ~/.initrunner/memory/<agent-name>.lance
-    embeddings:
-      provider: ""                # default: "" (derives from spec.model.provider)
-      model: ""                   # default: "" (uses provider default)
-      base_url: ""                # default: "" (custom endpoint URL)
-      api_key_env: ""             # default: "" (env var holding API key)
-    episodic:
-      enabled: true               # default: true
-      max_episodes: 500           # default: 500
-    semantic:
-      enabled: true               # default: true
-      max_memories: 1000          # default: 1000
-    procedural:
-      enabled: true               # default: true
-      max_procedures: 100         # default: 100
-    consolidation:
-      enabled: true               # default: true
-      interval: after_session     # default: "after_session"
-      max_episodes_per_run: 20    # default: 20
-      model_override: null        # default: null (uses agent's model)
+memory:
+  max_sessions: 10              # default: 10
+  max_resume_messages: 20       # default: 20
+  store_backend: lancedb        # default: "lancedb"
+  store_path: null              # default: ~/.initrunner/memory/<agent-name>.lance
+  embeddings:
+    provider: ""                # default: "" (derives from the agent's model provider)
+    model: ""                   # default: "" (uses provider default)
+    base_url: ""                # default: "" (custom endpoint URL)
+    api_key_env: ""             # default: "" (env var holding API key)
+  episodic:
+    enabled: true               # default: true
+    max_episodes: 500           # default: 500
+  semantic:
+    enabled: true               # default: true
+    max_memories: 1000          # default: 1000
+  procedural:
+    enabled: true               # default: true
+    max_procedures: 100         # default: 100
+  consolidation:
+    enabled: true               # default: true
+    interval: after_session     # default: "after_session"
+    max_episodes_per_run: 20    # default: 20
+    model_override: null        # default: null (uses agent's model)
 ```
 
 ### Top-Level Options
@@ -154,7 +147,7 @@ spec:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `embeddings.provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
+| `embeddings.provider` | `str` | `""` | Embedding provider. Empty string derives from the agent's model provider. |
 | `embeddings.model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `embeddings.base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
 | `embeddings.api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (e.g. `OPENAI_API_KEY` for OpenAI/Anthropic, `GOOGLE_API_KEY` for Google). |
@@ -214,7 +207,7 @@ During an active REPL session, message history is trimmed to `max_resume_message
 When saving sessions, all `SystemPromptPart` entries are stripped from `ModelRequest` messages. This ensures that:
 
 - Stale system prompts from a previous `role.yaml` version don't persist.
-- The current `spec.role` is always used when resuming.
+- The current `prompt` is always used when resuming.
 - Session data is more compact.
 
 ### Session Pruning
@@ -245,7 +238,7 @@ Session saving follows a never-raises pattern: if writing to the database fails,
 
 ## Long-Term: Memory Tools
 
-When `spec.memory` is configured, up to five tools are auto-registered depending on which memory types are enabled.
+When `memory` is configured, up to five tools are auto-registered depending on which memory types are enabled.
 
 ### `remember(content: str, category: str = "general") -> str`
 
@@ -258,7 +251,7 @@ Stores a piece of information as a **semantic** memory with an embedding for lat
 
 ### `recall(query: str, top_k: int = 5, memory_types: list[str] | None = None) -> str`
 
-Searches all memory types by semantic similarity. Always registered when `spec.memory` is configured.
+Searches all memory types by semantic similarity. Always registered when `memory` is configured.
 
 - Generates an embedding from the query.
 - Finds the `top_k` most similar memories using vector search.
@@ -279,7 +272,7 @@ The score is `1 - distance` (higher is more similar).
 
 ### `list_memories(category: str | None = None, limit: int = 20, memory_type: str | None = None) -> str`
 
-Lists recent memories, optionally filtered by category or type. Always registered when `spec.memory` is configured. Returns entries formatted as:
+Lists recent memories, optionally filtered by category or type. Always registered when `memory` is configured. Returns entries formatted as:
 
 ```
 [semantic:preferences] (2025-06-01T10:30:00+00:00) The user prefers dark mode.
@@ -381,7 +374,7 @@ Key-value metadata (e.g. dimensions, embedding model):
 |-------|------|-------------|
 | Doc ID | string | Auto-incrementing row ID |
 | `session_id` | STRING (indexed) | Unique session identifier |
-| `agent_name` | STRING (indexed) | Agent name from `metadata.name` |
+| `agent_name` | STRING (indexed) | Agent name from `name` |
 | `timestamp` | STRING | ISO 8601 timestamp |
 | `messages_json` | STRING | JSON-serialized PydanticAI message history |
 
@@ -533,7 +526,7 @@ Override with `store_path` in the memory config. The directory is created automa
 
 Multiple agents can share a single memory database, allowing one agent's `remember()` calls to be visible to another agent's `recall()`. There are two mechanisms:
 
-- **Flow**: set `spec.shared_memory.enabled: true` in a flow definition to give all agents a common store. See [Flow: Shared Memory](../orchestration/flow.md#shared-memory).
+- **Flow**: set `shared_memory.enabled: true` in a flow definition to give all agents a common store. See [Flow: Shared Memory](../orchestration/flow.md#shared-memory).
 - **Delegation**: set `shared_memory.store_path` on a delegate tool to share memory between inline sub-agents. See [Delegation: Shared Memory](../orchestration/delegation.md#shared-memory).
 
 Both work by overriding `store_path` (and optionally `max_memories`) on each agent's memory config at startup, pointing them at the same LanceDB store directory.
@@ -564,7 +557,7 @@ Memory uses the same embedding provider resolution as [Ingestion](ingestion.md#e
 
 1. `memory.embeddings.model` — If set, used directly.
 2. `memory.embeddings.provider` — Used to look up the default model.
-3. `spec.model.provider` — Falls back to the agent's model provider.
+3. The agent's model provider — Falls back to the provider on `model`.
 
 ### Provider Defaults
 

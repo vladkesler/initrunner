@@ -27,6 +27,16 @@
 
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production. Prefer a curated outcome without YAML? Use [always-on services](#always-on-services).
 
+## Upgrading from `apiVersion: initrunner/v1`
+
+Agent, Team, and Flow files are now flat (`name`, `prompt`, `agents` — no `apiVersion` / `kind` / `metadata` / `spec`). Old envelopes still load. Convert a file or directory in place with:
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+That writes `PATH.bak` unless you pass `--no-backup`. `kind: Service` and `kind: TestSuite` are unchanged. See [Envelope migration](docs/getting-started/envelope-migration.md).
+
 ## Quickstart
 
 ```bash
@@ -60,7 +70,7 @@ Browse the catalog with `initrunner run --list`. The model is auto-detected from
 
 ```bash
 initrunner new "a research assistant that summarizes papers"
-# generates role.yaml, then asks: "Run it now? [Y/n]"
+# generates agent.yaml, then asks: "Run it now? [Y/n]"
 
 initrunner new --offline           # build via a structured form, no LLM call
 initrunner run --ingest ./docs/    # skip YAML entirely, just chat with your docs

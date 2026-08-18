@@ -39,29 +39,22 @@ Ollama exposes an OpenAI-compatible API at `http://localhost:11434/v1`. When `pr
 ### Minimal Ollama Role
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: local-agent
-  description: Agent using local Ollama model
-spec:
-  role: |
-    You are a helpful assistant.
-  model:
-    provider: ollama
-    name: llama3.2          # Run: ollama pull llama3.2
+name: local-agent
+description: Agent using local Ollama model
+model: ollama:llama3.2          # Run: ollama pull llama3.2
+prompt: |
+  You are a helpful assistant.
 ```
 
 ### Model Config Reference
 
 ```yaml
-spec:
-  model:
-    provider: ollama               # required — triggers local model setup
-    name: llama3.2                 # required — model name as known to Ollama
-    base_url: http://localhost:11434/v1  # default for ollama; override for remote
-    temperature: 0.1               # default: 0.1
-    max_tokens: 4096               # default: 4096
+model:
+  provider: ollama               # required — triggers local model setup
+  name: llama3.2                 # required — model name as known to Ollama
+  base_url: http://localhost:11434/v1  # default for ollama; override for remote
+  temperature: 0.1               # default: 0.1
+  max_tokens: 4096               # default: 4096
 ```
 
 | Field | Type | Default | Description |
@@ -77,11 +70,10 @@ spec:
 The `base_url` field works with any provider, not just Ollama. Use it to point at vLLM, LiteLLM, llama.cpp, or any other server that exposes an OpenAI-compatible API:
 
 ```yaml
-spec:
-  model:
-    provider: openai
-    name: my-model
-    base_url: http://my-server:8000/v1
+model:
+  provider: openai
+  name: my-model
+  base_url: http://my-server:8000/v1
 ```
 
 When `base_url` is set on a non-ollama provider, the API key is set to `"custom-provider"` to avoid environment variable lookups. If your endpoint requires authentication, set `OPENAI_API_KEY` in the environment and omit `base_url` (use the standard `openai` provider flow).
@@ -91,24 +83,21 @@ When `base_url` is set on a non-ollama provider, the API key is set to `"custom-
 Ollama also serves embeddings. When using ingestion or memory with Ollama, configure the embedding model in the `embeddings` section:
 
 ```yaml
-spec:
-  model:
+model: ollama:llama3.2
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  embeddings:
     provider: ollama
-    name: llama3.2
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    embeddings:
-      provider: ollama
-      model: nomic-embed-text        # Run: ollama pull nomic-embed-text
-      # base_url: http://localhost:11434/v1  # default
+    model: nomic-embed-text        # Run: ollama pull nomic-embed-text
+    # base_url: http://localhost:11434/v1  # default
 ```
 
 ### Embedding Config Reference
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | `str` | `""` | Embedding provider. Set to `"ollama"` for local embeddings. Empty inherits from `spec.model.provider`. |
+| `provider` | `str` | `""` | Embedding provider. Set to `"ollama"` for local embeddings. Empty inherits from the agent's model provider. |
 | `model` | `str` | `""` | Embedding model name. Empty uses provider default (`nomic-embed-text` for Ollama). |
 | `base_url` | `str` | `""` | Custom endpoint URL. Defaults to `http://localhost:11434/v1` when provider is `ollama`. |
 | `api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (not needed for Ollama). |
@@ -137,32 +126,26 @@ See [Ingestion: Dimension & Model Identity Tracking](../core/ingestion.md#dimens
 Full local RAG stack — no external API calls:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: local-rag
-  description: Local RAG agent with Ollama
-  tags:
-    - rag
-    - ollama
-spec:
-  role: |
-    You are a knowledge assistant. Use search_documents to find relevant
-    content before answering. Always cite your sources.
-  model:
+name: local-rag
+description: Local RAG agent with Ollama
+tags:
+  - rag
+  - ollama
+model: ollama:llama3.2
+prompt: |
+  You are a knowledge assistant. Use search_documents to find relevant
+  content before answering. Always cite your sources.
+ingest:
+  sources:
+    - "./docs/**/*.md"
+    - "./docs/**/*.txt"
+  chunking:
+    strategy: fixed
+    chunk_size: 512
+    chunk_overlap: 50
+  embeddings:
     provider: ollama
-    name: llama3.2
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-      - "./docs/**/*.txt"
-    chunking:
-      strategy: fixed
-      chunk_size: 512
-      chunk_overlap: 50
-    embeddings:
-      provider: ollama
-      model: nomic-embed-text
+    model: nomic-embed-text
 ```
 
 ```bash
@@ -177,26 +160,20 @@ initrunner run role.yaml -i
 Long-term memory also works fully offline:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: local-memory
-  description: Local agent with memory
-spec:
-  role: |
-    You are a helpful assistant with long-term memory.
-    Use remember() to save important information.
-    Use recall() to search your memories.
-  model:
+name: local-memory
+description: Local agent with memory
+model: ollama:llama3.2
+prompt: |
+  You are a helpful assistant with long-term memory.
+  Use remember() to save important information.
+  Use recall() to search your memories.
+memory:
+  max_sessions: 10
+  semantic:
+    max_memories: 1000
+  embeddings:
     provider: ollama
-    name: llama3.2
-  memory:
-    max_sessions: 10
-    semantic:
-      max_memories: 1000
-    embeddings:
-      provider: ollama
-      model: nomic-embed-text
+    model: nomic-embed-text
 ```
 
 ## Docker
@@ -204,11 +181,10 @@ spec:
 When running InitRunner inside Docker, `localhost` won't reach the host machine. Use `host.docker.internal` instead:
 
 ```yaml
-spec:
-  model:
-    provider: ollama
-    name: llama3.2
-    base_url: http://host.docker.internal:11434/v1
+model:
+  provider: ollama
+  name: llama3.2
+  base_url: http://host.docker.internal:11434/v1
 ```
 
 InitRunner automatically detects Docker environments (via `/.dockerenv`) and logs a warning if `base_url` contains `localhost` or `127.0.0.1`.
@@ -229,11 +205,10 @@ services:
 ```
 
 ```yaml
-spec:
-  model:
-    provider: ollama
-    name: llama3.2
-    base_url: http://ollama:11434/v1
+model:
+  provider: ollama
+  name: llama3.2
+  base_url: http://ollama:11434/v1
 ```
 
 ## CLI
@@ -289,11 +264,10 @@ curl http://localhost:11434/api/tags
 If using a remote Ollama instance, set `base_url` explicitly:
 
 ```yaml
-spec:
-  model:
-    provider: ollama
-    name: llama3.2
-    base_url: http://remote-host:11434/v1
+model:
+  provider: ollama
+  name: llama3.2
+  base_url: http://remote-host:11434/v1
 ```
 
 ### Model not found

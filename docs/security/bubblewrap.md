@@ -155,31 +155,25 @@ Mounts fall into two categories:
 ## Example: code interpreter
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: bwrap-python-runner
-spec:
-  role: |
-    You are a code execution assistant running in a bubblewrap sandbox.
-    No network access, read-only root filesystem, 256m memory, 1 CPU.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: shell
+name: bwrap-python-runner
+model: openai:gpt-5-mini
+prompt: |
+  You are a code execution assistant running in a bubblewrap sandbox.
+  No network access, read-only root filesystem, 256m memory, 1 CPU.
+tools:
+  - shell:
       blocked_commands: []
-    - type: python
-  security:
-    sandbox:
-      backend: bwrap
-      network: none
-      memory_limit: 256m
-      cpu_limit: 1.0
-      allowed_read_paths:
-        - /usr/share/dict
-      allowed_write_paths:
-        - /srv/workspace
+  - python
+security:
+  sandbox:
+    backend: bwrap
+    network: none
+    memory_limit: 256m
+    cpu_limit: 1.0
+    allowed_read_paths:
+      - /usr/share/dict
+    allowed_write_paths:
+      - /srv/workspace
 ```
 
 Inside the sandbox:

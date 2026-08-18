@@ -29,6 +29,16 @@
 
 用一个 YAML 文件定义 Agent。和它对话。效果满意后，让它自主运行。信任它之后，部署为守护进程，响应 cron 调度、文件变更、webhook 和 Telegram 消息。同一个文件，从原型到生产，无需重写。
 
+## 从 `apiVersion: initrunner/v1` 升级
+
+Agent、Team、Flow 文件现在是扁平格式（`name`、`prompt`、`agents`，不再写 `apiVersion` / `kind` / `metadata` / `spec`）。旧的 envelope 仍可加载。就地转换：
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+默认会写 `PATH.bak`。详见 [Envelope migration](docs/getting-started/envelope-migration.md)。
+
 ## 快速开始
 
 ```bash
@@ -78,20 +88,16 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 一个角色文件：
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -236,19 +242,16 @@ spec:
 将 Agent 串联为 Flow。一个 Agent 的输出传入下一个。
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata: { name: email-chain }
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
-      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
-    researcher: { role: roles/researcher.yaml }
-    responder: { role: roles/responder.yaml }
+name: email-chain
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then: { to: triager }
+  triager:
+    use: roles/triager.yaml
+    then: { to: [researcher, responder], strategy: sense }
+  researcher: { use: roles/researcher.yaml }
+  responder: { use: roles/responder.yaml }
 ```
 
 ```bash

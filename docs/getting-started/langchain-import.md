@@ -36,19 +36,13 @@ This produces two files:
 
 ```yaml
 # role.yaml (generated)
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: weather-bot
-  description: Imported from LangChain weather agent
-  spec_version: 2
-spec:
-  role: You are a helpful weather assistant.
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-6
-  tools:
-    - type: custom
+name: weather-bot
+description: Imported from LangChain weather agent
+spec_version: 2
+prompt: You are a helpful weather assistant.
+model: anthropic:claude-sonnet-4-6
+tools:
+  - custom:
       module: role_tools
 ```
 
@@ -80,18 +74,18 @@ After import, the standard refinement loop runs so you can adjust the result int
 
 | LangChain Construct | InitRunner Equivalent |
 |---|---|
-| `create_agent("openai:gpt-5")` | `spec.model: {provider: openai, name: gpt-5}` |
-| `ChatAnthropic(model="...", temperature=0.7)` | `spec.model: {provider: anthropic, name: ..., temperature: 0.7}` |
-| `init_chat_model("...", max_tokens=1000)` | `spec.model: {max_tokens: 1000}` |
-| `system_prompt="..."` | `spec.role: \|` |
-| `@tool` functions | `type: custom` + sidecar `.py` module |
-| `DuckDuckGoSearchRun()` | `type: search` |
-| `PythonREPLTool()` | `type: python` |
-| `ShellTool()` | `type: shell` |
-| `ReadFileTool()` / `WriteFileTool()` | `type: filesystem` |
-| `create_agent` (ReAct pattern) | `spec.reasoning: {pattern: react}` |
-| `CallLimitMiddleware(max_calls=15)` | `spec.guardrails: {max_iterations: 15}` |
-| `response_format=MySchema` | `spec.output: {type: json_schema}` |
+| `create_agent("openai:gpt-5")` | `model: openai:gpt-5` |
+| `ChatAnthropic(model="...", temperature=0.7)` | `model: {provider: anthropic, name: ..., temperature: 0.7}` |
+| `init_chat_model("...", max_tokens=1000)` | `model: {max_tokens: 1000}` |
+| `system_prompt="..."` | `prompt: \|` |
+| `@tool` functions | `custom` + sidecar `.py` module |
+| `DuckDuckGoSearchRun()` | `search` |
+| `PythonREPLTool()` | `python` |
+| `ShellTool()` | `shell` |
+| `ReadFileTool()` / `WriteFileTool()` | `filesystem` |
+| `create_agent` (ReAct pattern) | `reasoning: {pattern: react}` |
+| `CallLimitMiddleware(max_calls=15)` | `guardrails: {max_iterations: 15}` |
+| `response_format=MySchema` | `output: {type: json_schema}` |
 | Custom `AgentState` subclass | Noted in import warnings |
 
 ## Custom Tools
@@ -134,7 +128,7 @@ The importer recognizes common LangChain tool classes and maps them to built-in 
 | `ReadFileTool`, `WriteFileTool`, `ListDirectoryTool` | `filesystem` |
 | `RequestsGetTool`, `RequestsPostTool` | `http` |
 
-Unrecognized tool classes produce a warning and are skipped. Add them manually via `type: custom` or the appropriate built-in type.
+Unrecognized tool classes produce a warning and are skipped. Add them manually via `custom` or the appropriate built-in type.
 
 ## What Is Not Imported
 
@@ -142,11 +136,11 @@ Some LangChain features have no direct equivalent and produce explicit warnings 
 
 | Feature | Warning | Recommendation |
 |---|---|---|
-| `ConversationBufferMemory` | "LangChain memory not imported" | Configure `spec.memory` manually |
-| LCEL pipelines (`prompt \| model \| parser`) | "LCEL pipeline detected but not importable" | Describe chain logic in `spec.role` |
+| `ConversationBufferMemory` | "LangChain memory not imported" | Configure `memory` manually |
+| LCEL pipelines (`prompt \| model \| parser`) | "LCEL pipeline detected but not importable" | Describe chain logic in `prompt` |
 | LangGraph state machines | "LangGraph state machine detected" | Use `flow.yaml` for orchestration |
-| Retrievers / VectorStores | "Retriever/VectorStore detected" | Configure `spec.ingest` for RAG |
-| Callback handlers | "LangChain callbacks not imported" | Use `spec.observability` for tracing |
+| Retrievers / VectorStores | "Retriever/VectorStore detected" | Configure `ingest` for RAG |
+| Callback handlers | "LangChain callbacks not imported" | Use `observability` for tracing |
 | `HumanInTheLoopMiddleware` | "Human-in-the-loop middleware not imported" | Use `confirmation: true` on tool permissions |
 
 These warnings appear in both the CLI output and the dashboard's editor screen. They are never silently swallowed.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+- **Flat Agent, Team, and Flow YAML.** Public documents no longer write `apiVersion` / `kind` / `metadata` / `spec`. Old envelopes still load. Convert a file or directory in place with `initrunner doctor --fix PATH`. README has an upgrading note above Quickstart; details in [Envelope migration](docs/getting-started/envelope-migration.md). Subsystem docs and examples now show the flat shape (`prompt`, `agents`, `use` / `then` / `after`, `run`). `kind: Service` and `kind: TestSuite` stay enveloped.
+
+### Fixed
+- **Dashboard flow editor.** Seeded flat flow YAML was rejected as missing envelope fields. The dashboard validator now adapts flat documents the same way team and agent validation already do.
+
 ## [2026.8.3] - 2026-08-14
 
 ### Fixed

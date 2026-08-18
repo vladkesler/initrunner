@@ -163,21 +163,15 @@ Run it once per role change so image pulls happen outside the hot path.
 ## Example: code interpreter with a specific runtime
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: docker-node-runner
-spec:
-  role: |
-    You are a JavaScript assistant running in a pinned Node 20 container.
-    Network disabled, 512m memory.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: shell
+name: docker-node-runner
+model: openai:gpt-5-mini
+prompt: |
+  You are a JavaScript assistant running in a pinned Node 20 container.
+  Network disabled, 512m memory.
+tools:
+  - shell:
       allowed_commands: [node, npm]
-    - type: script
+  - script:
       scripts:
         - name: run_js
           body: |
@@ -185,16 +179,16 @@ spec:
           parameters:
             - name: code
               required: true
-  security:
-    sandbox:
-      backend: docker
-      network: none
-      memory_limit: 512m
-      cpu_limit: 1.0
-      read_only_rootfs: true
-      docker:
-        image: node:20-slim
-        user: auto
+security:
+  sandbox:
+    backend: docker
+    network: none
+    memory_limit: 512m
+    cpu_limit: 1.0
+    read_only_rootfs: true
+    docker:
+      image: node:20-slim
+      user: auto
 ```
 
 ## Running initrunner itself in Docker

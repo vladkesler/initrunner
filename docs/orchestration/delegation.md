@@ -11,20 +11,14 @@ Switching modes is a config change — the LLM sees the same tool interface rega
 ## Quick Example
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: coordinator
-  description: Coordinates research and summarization
-spec:
-  role: |
-    You are a coordinator. Use delegate_to_researcher to gather information,
-    then use delegate_to_summarizer to create a summary.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: delegate
+name: coordinator
+description: Coordinates research and summarization
+model: openai:gpt-5-mini
+prompt: |
+  You are a coordinator. Use delegate_to_researcher to gather information,
+  then use delegate_to_summarizer to create a summary.
+tools:
+  - delegate:
       agents:
         - name: researcher
           role_file: ./roles/researcher.yaml
@@ -43,24 +37,24 @@ initrunner run coordinator.yaml -p "Research and summarize recent advances in fu
 
 ## Configuration
 
-The `delegate` tool type is configured in `spec.tools` alongside other tool types (filesystem, http, mcp, custom).
+The `delegate` tool type is configured in `tools` alongside other tool types (filesystem, http, mcp, custom).
 
 ```yaml
 tools:
-  - type: delegate
-    agents:            # required — list of agent references
-      - name: agent-a
-        role_file: ./roles/agent-a.yaml
-        description: "Does A"
-      - name: agent-b
-        role_file: ./roles/agent-b.yaml
-        description: "Does B"
-    mode: inline       # default: "inline" — or "mcp"
-    max_depth: 3       # default: 3
-    timeout_seconds: 120  # default: 120
-    shared_memory:     # optional, inline mode only
-      store_path: ./shared-memory.lance
-      max_memories: 1000
+  - delegate:
+      agents:            # required — list of agent references
+        - name: agent-a
+          role_file: ./roles/agent-a.yaml
+          description: "Does A"
+        - name: agent-b
+          role_file: ./roles/agent-b.yaml
+          description: "Does B"
+      mode: inline       # default: "inline" — or "mcp"
+      max_depth: 3       # default: 3
+      timeout_seconds: 120  # default: 120
+      shared_memory:     # optional, inline mode only
+        store_path: ./shared-memory.lance
+        max_memories: 1000
 ```
 
 ### Top-Level Options
@@ -90,16 +84,16 @@ In inline mode, sub-agents are loaded from local role YAML files and run in the 
 
 ```yaml
 tools:
-  - type: delegate
-    agents:
-      - name: summarizer
-        role_file: ./roles/summarizer.yaml
-        description: "Summarizes long text"
-      - name: researcher
-        role_file: ./roles/researcher.yaml
-        description: "Researches topics"
-    mode: inline
-    max_depth: 3
+  - delegate:
+      agents:
+        - name: summarizer
+          role_file: ./roles/summarizer.yaml
+          description: "Summarizes long text"
+        - name: researcher
+          role_file: ./roles/researcher.yaml
+          description: "Researches topics"
+      mode: inline
+      max_depth: 3
 ```
 
 ### Path Resolution
@@ -131,18 +125,18 @@ In MCP mode, sub-agents are called via HTTP POST to running `initrunner run --se
 
 ```yaml
 tools:
-  - type: delegate
-    agents:
-      - name: summarizer
-        url: http://summarizer:8000
-        description: "Summarizes long text"
-      - name: researcher
-        url: http://researcher:8000
-        description: "Researches topics"
-        headers_env:
-          Authorization: RESEARCHER_AUTH_TOKEN
-    mode: mcp
-    timeout_seconds: 120
+  - delegate:
+      agents:
+        - name: summarizer
+          url: http://summarizer:8000
+          description: "Summarizes long text"
+        - name: researcher
+          url: http://researcher:8000
+          description: "Researches topics"
+          headers_env:
+            Authorization: RESEARCHER_AUTH_TOKEN
+      mode: mcp
+      timeout_seconds: 120
 ```
 
 ### How It Works
@@ -190,11 +184,11 @@ Delegation depth is tracked per-thread to prevent infinite recursion. When agent
 
 ```yaml
 tools:
-  - type: delegate
-    agents:
-      - name: sub-agent
-        role_file: ./sub.yaml
-    max_depth: 3    # allows parent → child → grandchild → great-grandchild
+  - delegate:
+      agents:
+        - name: sub-agent
+          role_file: ./sub.yaml
+      max_depth: 3    # allows parent → child → grandchild → great-grandchild
 ```
 
 The delegation chain is tracked and included in error messages:
@@ -209,18 +203,18 @@ When `shared_memory` is configured on a delegate tool, all inline sub-agents sha
 
 ```yaml
 tools:
-  - type: delegate
-    agents:
-      - name: researcher
-        role_file: ./roles/researcher.yaml
-        description: "Researches topics"
-      - name: writer
-        role_file: ./roles/writer.yaml
-        description: "Writes content"
-    mode: inline
-    shared_memory:
-      store_path: ./shared-memory.lance
-      max_memories: 500
+  - delegate:
+      agents:
+        - name: researcher
+          role_file: ./roles/researcher.yaml
+          description: "Researches topics"
+        - name: writer
+          role_file: ./roles/writer.yaml
+          description: "Writes content"
+      mode: inline
+      shared_memory:
+        store_path: ./shared-memory.lance
+        max_memories: 500
 ```
 
 ### Options
@@ -241,11 +235,10 @@ Shared memory only applies to **inline** mode. MCP agents manage their own memor
 The parent agent is **not** automatically included in the shared store. If the parent should also share memory with its sub-agents, set the same `store_path` in the parent role's own `memory:` config:
 
 ```yaml
-spec:
-  memory:
-    store_path: ./shared-memory.lance
-  tools:
-    - type: delegate
+memory:
+  store_path: ./shared-memory.lance
+tools:
+  - delegate:
       shared_memory:
         store_path: ./shared-memory.lance
 ```
@@ -298,16 +291,16 @@ Local dev:                           k8s / distributed:
 ```yaml
 # coordinator.yaml (for k8s deployment)
 tools:
-  - type: delegate
-    agents:
-      - name: researcher
-        url: http://researcher-svc:8000
-        description: "Researches topics"
-      - name: summarizer
-        url: http://summarizer-svc:8000
-        description: "Summarizes text"
-    mode: mcp
-    timeout_seconds: 300
+  - delegate:
+      agents:
+        - name: researcher
+          url: http://researcher-svc:8000
+          description: "Researches topics"
+        - name: summarizer
+          url: http://summarizer-svc:8000
+          description: "Summarizes text"
+      mode: mcp
+      timeout_seconds: 300
 ```
 
 ## Registered Functions

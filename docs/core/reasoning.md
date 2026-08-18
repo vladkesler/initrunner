@@ -9,33 +9,27 @@ All reasoning tools are **run-scoped** -- built fresh per-run with isolated stat
 Minimal autonomous agent with structured reasoning:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: planner
-  description: Autonomous planner with structured reasoning
-spec:
-  role: |
-    You are a senior project planner. Break tasks into structured
-    todo lists, research each item, and synthesize findings.
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  tools:
-    - type: think
+name: planner
+description: Autonomous planner with structured reasoning
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: |
+  You are a senior project planner. Break tasks into structured
+  todo lists, research each item, and synthesize findings.
+tools:
+  - think:
       critique: true
-    - type: todo
+  - todo:
       max_items: 20
-    - type: search
+  - search:
       provider: duckduckgo
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy:
-    max_plan_steps: 20
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy:
+  max_plan_steps: 20
+guardrails:
+  max_iterations: 15
+  autonomous_token_budget: 100000
 ```
 
 Run it:
@@ -57,9 +51,9 @@ Gives the agent a scratchpad that accumulates reasoning as a numbered chain. Unl
 
 ```yaml
 tools:
-  - type: think
-    critique: true       # nudge self-critique every 5th thought
-    max_thoughts: 30     # ring buffer capacity (default: 50)
+  - think:
+      critique: true       # nudge self-critique every 5th thought
+      max_thoughts: 30     # ring buffer capacity (default: 50)
 ```
 
 | Field | Type | Default | Description |
@@ -86,7 +80,7 @@ The ring buffer evicts the oldest thought when full, bounding token overhead to 
 
 ### When to use
 
-- **Always add** `type: think` for agents doing multi-step reasoning
+- **Always add** a `think` tool for agents doing multi-step reasoning
 - **Enable critique** for complex tasks where self-correction matters
 - **Reduce max_thoughts** for agents with tight token budgets
 
@@ -102,10 +96,10 @@ Priority-aware task management with dependency resolution. Operates on the agent
 
 ```yaml
 tools:
-  - type: todo
-    max_items: 30        # max concurrent items (default: 30)
-    shared: false        # sub-agent visibility (default: false)
-    shared_path: ""      # SQLite path (required when shared: true)
+  - todo:
+      max_items: 30        # max concurrent items (default: 30)
+      shared: false        # sub-agent visibility (default: false)
+      shared_path: ""      # SQLite path (required when shared: true)
 ```
 
 | Field | Type | Default | Description |
@@ -170,9 +164,9 @@ When `shared: true`, the todo list is backed by SQLite with WAL mode for concurr
 
 ```yaml
 tools:
-  - type: todo
-    shared: true
-    shared_path: ./.initrunner/shared_todo.db
+  - todo:
+      shared: true
+      shared_path: ./.initrunner/shared_todo.db
 ```
 
 ## Spawn Tool
@@ -183,19 +177,19 @@ Non-blocking parallel agent execution. Spawn sub-agents as background tasks, pol
 
 ```yaml
 tools:
-  - type: spawn
-    max_concurrent: 3         # parallel task limit (default: 4, max: 16)
-    timeout_seconds: 120      # per-task timeout (default: 300)
-    agents:
-      - name: researcher
-        role_file: ./agents/researcher.yaml
-        description: Researches a specific topic
-      - name: coder
-        role_file: ./agents/coder.yaml
-        description: Writes and reviews code
-    shared_memory:            # optional shared memory for sub-agents
-      store_path: ./.initrunner/shared.db
-      max_memories: 1000
+  - spawn:
+      max_concurrent: 3         # parallel task limit (default: 4, max: 16)
+      timeout_seconds: 120      # per-task timeout (default: 300)
+      agents:
+        - name: researcher
+          role_file: ./agents/researcher.yaml
+          description: Researches a specific topic
+        - name: coder
+          role_file: ./agents/coder.yaml
+          description: Writes and reviews code
+      shared_memory:            # optional shared memory for sub-agents
+        store_path: ./.initrunner/shared.db
+        max_memories: 1000
 ```
 
 | Field | Type | Default | Description |
@@ -240,21 +234,19 @@ The pool is cleaned up when the run ends -- remaining tasks are cancelled and th
 Some OpenAI models run an internal reasoning pass before producing their answer. The `model.thinking` field turns that on and sets how much effort the model spends, mapping directly onto PydanticAI's `ModelSettings['thinking']`.
 
 ```yaml
-spec:
-  model:
-    provider: openai
-    name: o3-mini
-    thinking: high     # minimal | low | medium | high | xhigh | false
+model:
+  provider: openai
+  name: o3-mini
+  thinking: high     # minimal | low | medium | high | xhigh | false
 ```
 
 The level names are strings, but `false` is the YAML boolean (not the string `"false"`), which explicitly disables the internal reasoning pass:
 
 ```yaml
-spec:
-  model:
-    provider: openai
-    name: o3-mini
-    thinking: false    # boolean, turns extended thinking off
+model:
+  provider: openai
+  name: o3-mini
+  thinking: false    # boolean, turns extended thinking off
 ```
 
 | Value | Effect |
@@ -277,18 +269,18 @@ thinking is only supported on reasoning-capable OpenAI models
 (the o-series and the gpt-5 family), not 'anthropic:claude-sonnet-4-5'.
 ```
 
-### Relationship to spec.reasoning
+### Relationship to reasoning
 
-`model.thinking` and `spec.reasoning` are orthogonal:
+`model.thinking` and `reasoning` are orthogonal:
 
 - **`model.thinking`** controls model-level extended thinking inside a single model request.
-- **`spec.reasoning`** controls InitRunner's cross-turn orchestration patterns (react, todo_driven, plan_execute, reflexion) in autonomous mode.
+- **`reasoning`** controls InitRunner's cross-turn orchestration patterns (react, todo_driven, plan_execute, reflexion) in autonomous mode.
 
 You can use both together: a `high`-thinking model running a `todo_driven` strategy, for example. `model.thinking` is also distinct from the judge-gated reflexion loop (`success_criteria`, see [verified reflexion](#reflexion-with-verification)): thinking adjusts effort inside one model request, while verified reflexion runs a separate LLM-as-judge across reflexion rounds. The two are orthogonal and compose freely.
 
 ### Relationship to the Thinking capability
 
-PydanticAI also exposes a `Thinking` capability you can declare under `spec.capabilities`. It does the same thing at the capability layer. Prefer `model.thinking`: it lives next to the rest of the model config and goes through schema validation. If you declare both `model.thinking` and a `Thinking` capability, the loader logs a warning. The old `- Thinking: high` capability form keeps working for backward compatibility.
+PydanticAI also exposes a `Thinking` capability you can declare under `capabilities`. It does the same thing at the capability layer. Prefer `model.thinking`: it lives next to the rest of the model config and goes through schema validation. If you declare both `model.thinking` and a `Thinking` capability, the loader logs a warning. The old `- Thinking: high` capability form keeps working for backward compatibility.
 
 ### Cost and token usage
 
@@ -298,23 +290,22 @@ Use this to see how much of a run's cost went to reasoning rather than the visib
 
 ## Reasoning Strategies
 
-The `spec.reasoning` config controls how the autonomous runner orchestrates agent behavior across turns. Strategies operate in **autonomous mode only** (`-a` flag).
+The `reasoning` config controls how the autonomous runner orchestrates agent behavior across turns. Strategies operate in **autonomous mode only** (`-a` flag).
 
 ### Configuration
 
 ```yaml
-spec:
-  reasoning:
-    pattern: todo_driven     # react | todo_driven | plan_execute | reflexion
-    auto_plan: true          # prepend planning instructions to first turn
-    reflection_rounds: 0     # post-completion self-critique rounds (reflexion only)
-    reflection_dimensions:   # per-round evaluation rubrics (reflexion only)
-      - name: correctness
-        prompt: "Check for errors..."
-    success_criteria:        # judge-verified gating (reflexion only)
-      - correctness
-      - completeness
-    auto_detect: true        # infer pattern from tool/autonomy config
+reasoning:
+  pattern: todo_driven     # react | todo_driven | plan_execute | reflexion
+  auto_plan: true          # prepend planning instructions to first turn
+  reflection_rounds: 0     # post-completion self-critique rounds (reflexion only)
+  reflection_dimensions:   # per-round evaluation rubrics (reflexion only)
+    - name: correctness
+      prompt: "Check for errors..."
+  success_criteria:        # judge-verified gating (reflexion only)
+    - correctness
+    - completeness
+  auto_detect: true        # infer pattern from tool/autonomy config
 ```
 
 | Field | Type | Default | Description |
@@ -362,11 +353,11 @@ reasoning:
 
 Plan-first execution. The runner prepends instructions to create a structured todo list on the first turn. Continuation prompts guide the agent: "Check your todo list. Get the next item and work on it."
 
-**Requires** a `todo` tool in `spec.tools`.
+**Requires** a `todo` tool in `tools`.
 
 ```yaml
 tools:
-  - type: todo
+  - todo
 reasoning:
   pattern: todo_driven
   auto_plan: true        # recommended
@@ -381,11 +372,11 @@ How it works:
 
 Two-phase execution. Phase 1 (planning): the agent creates a comprehensive plan without executing. Phase 2 (execution): the agent works through plan items. The agent explicitly calls `finalize_plan()` to signal that planning is complete and transition to execution.
 
-**Requires** a `todo` tool in `spec.tools`.
+**Requires** a `todo` tool in `tools`.
 
 ```yaml
 tools:
-  - type: todo
+  - todo
 reasoning:
   pattern: plan_execute
 ```
@@ -523,7 +514,7 @@ When `auto_detect: true` (the default) and no explicit `pattern` is set:
 
 | Condition | Detected pattern |
 |-----------|-----------------|
-| Has `todo` tool + `spec.autonomy` configured | `todo_driven` |
+| Has `todo` tool + `autonomy` configured | `todo_driven` |
 | Has `reflection_rounds > 0` | `reflexion` |
 | Everything else | `react` |
 
@@ -538,29 +529,23 @@ The loader validates reasoning config at build time:
 
 ## Zero-Config Examples
 
-You don't need to set `spec.reasoning` explicitly. Auto-detection picks the right pattern:
+You don't need to set `reasoning` explicitly. Auto-detection picks the right pattern:
 
 ### Minimal todo agent (auto-detects `todo_driven`)
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: task-agent
-  description: Agent with structured task tracking
-spec:
-  role: You are a helpful assistant that plans work carefully.
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  tools:
-    - type: think
-    - type: todo
-  autonomy:
-    max_plan_steps: 15
-  guardrails:
-    max_iterations: 10
-    autonomous_token_budget: 50000
+name: task-agent
+description: Agent with structured task tracking
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: You are a helpful assistant that plans work carefully.
+tools:
+  - think
+  - todo
+autonomy:
+  max_plan_steps: 15
+guardrails:
+  max_iterations: 10
+  autonomous_token_budget: 50000
 ```
 
 ```bash
@@ -570,20 +555,14 @@ initrunner run task-agent.yaml -a -p "Summarize the key differences between REST
 ### Single-shot with think (auto-detects `react`)
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: reasoner
-  description: Agent that thinks before answering
-spec:
-  role: |
-    You are a careful analyst. Always use the think tool to reason
-    step by step before giving your answer.
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  tools:
-    - type: think
+name: reasoner
+description: Agent that thinks before answering
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: |
+  You are a careful analyst. Always use the think tool to reason
+  step by step before giving your answer.
+tools:
+  - think:
       critique: true
 ```
 
@@ -601,9 +580,9 @@ The agent uses `think` to reason about each todo item before working on it:
 
 ```yaml
 tools:
-  - type: think
-    critique: true
-  - type: todo
+  - think:
+      critique: true
+  - todo
 reasoning:
   pattern: todo_driven
   auto_plan: true
@@ -615,11 +594,11 @@ The agent creates a todo list, spawns background agents for parallelizable items
 
 ```yaml
 tools:
-  - type: todo
-  - type: spawn
-    agents:
-      - name: researcher
-        role_file: ./agents/researcher.yaml
+  - todo
+  - spawn:
+      agents:
+        - name: researcher
+          role_file: ./agents/researcher.yaml
 reasoning:
   pattern: todo_driven
   auto_plan: true
@@ -631,9 +610,9 @@ The agent plans and executes via todo_driven, then gets one round of self-critiq
 
 ```yaml
 tools:
-  - type: todo
-  - type: think
-    critique: true
+  - todo
+  - think:
+      critique: true
 reasoning:
   pattern: todo_driven
   auto_plan: true
@@ -686,27 +665,21 @@ def build_my_toolset(config, ctx):
 ## Full Example: Autonomous Research Lead
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: research-lead
-  description: Autonomous research lead with parallel workers and self-critique
-spec:
-  role: |
-    You are a research lead. Given a topic:
-    1. Break it into research questions (todo list)
-    2. Spawn researchers for parallelizable questions
-    3. Synthesize findings into a structured report
-    4. Self-critique before finalizing
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  tools:
-    - type: think
+name: research-lead
+description: Autonomous research lead with parallel workers and self-critique
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: |
+  You are a research lead. Given a topic:
+  1. Break it into research questions (todo list)
+  2. Spawn researchers for parallelizable questions
+  3. Synthesize findings into a structured report
+  4. Self-critique before finalizing
+tools:
+  - think:
       critique: true
-    - type: todo
+  - todo:
       max_items: 15
-    - type: spawn
+  - spawn:
       max_concurrent: 3
       agents:
         - name: web-researcher
@@ -715,19 +688,19 @@ spec:
         - name: data-analyst
           role_file: ./agents/data-analyst.yaml
           description: Analyzes data and produces charts
-    - type: filesystem
+  - filesystem:
       root_path: ./output
       read_only: false
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-    reflection_rounds: 1
-  autonomy:
-    max_plan_steps: 20
-  guardrails:
-    max_iterations: 20
-    autonomous_token_budget: 150000
-    timeout_seconds: 600
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+  reflection_rounds: 1
+autonomy:
+  max_plan_steps: 20
+guardrails:
+  max_iterations: 20
+  autonomous_token_budget: 150000
+  timeout_seconds: 600
 ```
 
 ```bash

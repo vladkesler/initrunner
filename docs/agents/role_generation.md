@@ -120,8 +120,9 @@ After the initial seed, the builder shows a syntax-highlighted YAML panel with t
 
 ```
 +-- code-reviewer -------------------- VALID --+
-| apiVersion: initrunner/v1                     |
-| kind: Agent                                   |
+| name: code-reviewer                           |
+| model: openai:gpt-5-mini                      |
+| prompt: You are a code review assistant.      |
 | ...                                           |
 +-----------------------------------------------+
 
@@ -255,7 +256,7 @@ Legacy one-shot generation is still available via `generate_role()` and `generat
 
 ## Security
 
-- **Name validation**: `metadata.name` must match `^[a-z0-9][a-z0-9-]*[a-z0-9]$`
+- **Name validation**: `name` must match `^[a-z0-9][a-z0-9-]*[a-z0-9]$`
 - **Directory restrictions**: API writes are restricted to configured role directories; path traversal (`..`) is rejected
 - **Overwrite protection**: CLI prompts before overwriting; `POST /api/roles` returns `409` if the file exists; `save_role_yaml_sync()` creates a `.bak` backup before overwriting
 - **Validation before write**: YAML is parsed and validated against `RoleDefinition` before being written to disk

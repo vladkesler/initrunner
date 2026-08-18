@@ -1,39 +1,35 @@
 # Structured Output
 
-InitRunner's structured output feature lets agents return validated JSON instead of free-form text. Define a JSON Schema in `spec.output` and the agent's response is guaranteed to match your schema — parsed, validated, and returned as JSON.
+InitRunner's structured output feature lets agents return validated JSON instead of free-form text. Define a JSON Schema in `output` and the agent's response is guaranteed to match your schema — parsed, validated, and returned as JSON.
 
 This is useful for pipelines, automation, and any scenario where downstream code needs to consume agent output programmatically.
 
 ## Quick Start
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: invoice-classifier
-  description: Classifies invoices and extracts structured data
-spec:
-  role: |
-    You are an invoice classifier. Given a description of an invoice,
-    extract the relevant fields and return structured JSON.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.0
-  output:
-    type: json_schema
-    schema:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [approved, rejected, needs_review]
-        amount:
-          type: number
-          description: Invoice amount in USD
-        vendor:
-          type: string
-      required: [status, amount, vendor]
+name: invoice-classifier
+description: Classifies invoices and extracts structured data
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.0
+prompt: |
+  You are an invoice classifier. Given a description of an invoice,
+  extract the relevant fields and return structured JSON.
+output:
+  type: json_schema
+  schema:
+    type: object
+    properties:
+      status:
+        type: string
+        enum: [approved, rejected, needs_review]
+      amount:
+        type: number
+        description: Invoice amount in USD
+      vendor:
+        type: string
+    required: [status, amount, vendor]
 ```
 
 ```bash
@@ -43,15 +39,14 @@ initrunner run invoice-classifier.yaml -p "Acme Corp invoice for $250 for office
 
 ## Configuration
 
-Structured output is configured in the `spec.output` section:
+Structured output is configured in the `output` section:
 
 ```yaml
-spec:
-  output:
-    type: json_schema        # "text" (default) or "json_schema"
-    mode: auto               # how structured output is requested (see below)
-    schema: { ... }          # inline JSON Schema (mutually exclusive with schema_file)
-    schema_file: schema.json # path to external JSON Schema file
+output:
+  type: json_schema        # "text" (default) or "json_schema"
+  mode: auto               # how structured output is requested (see below)
+  schema: { ... }          # inline JSON Schema (mutually exclusive with schema_file)
+  schema_file: schema.json # path to external JSON Schema file
 ```
 
 ### Options
@@ -84,15 +79,14 @@ Validation rules:
 - With `type: text`, only `auto` or `text` are accepted.
 
 ```yaml
-spec:
-  output:
-    type: json_schema
-    mode: native             # opt into the provider's native structured-output API
-    schema:
-      type: object
-      properties:
-        status: { type: string, enum: [approved, rejected] }
-      required: [status]
+output:
+  type: json_schema
+  mode: native             # opt into the provider's native structured-output API
+  schema:
+    type: object
+    properties:
+      status: { type: string, enum: [approved, rejected] }
+    required: [status]
 ```
 
 When a role uses a `FallbackModel` (a primary plus fallbacks across providers), a pinned `native` mode applies to every model in the chain. If a fallback provider does not support native structured output, that request fails over to the next model rather than silently degrading. Pin `tool` (or keep `auto`) for mixed-provider fallback chains.
@@ -122,35 +116,34 @@ Define the schema directly in your role YAML. The supported JSON Schema subset:
 ### Example with nested objects and arrays
 
 ```yaml
-spec:
-  output:
-    type: json_schema
-    schema:
-      type: object
-      properties:
-        title:
-          type: string
-          description: Report title
-        sections:
-          type: array
-          items:
-            type: object
-            properties:
-              heading:
-                type: string
-              body:
-                type: string
-            required: [heading, body]
-        metadata:
+output:
+  type: json_schema
+  schema:
+    type: object
+    properties:
+      title:
+        type: string
+        description: Report title
+      sections:
+        type: array
+        items:
           type: object
           properties:
-            author:
+            heading:
               type: string
-            tags:
-              type: array
-              items:
-                type: string
-      required: [title, sections]
+            body:
+              type: string
+          required: [heading, body]
+      metadata:
+        type: object
+        properties:
+          author:
+            type: string
+          tags:
+            type: array
+            items:
+              type: string
+    required: [title, sections]
 ```
 
 ## External Schema File
@@ -158,10 +151,9 @@ spec:
 For larger schemas, use `schema_file` to reference a separate JSON file:
 
 ```yaml
-spec:
-  output:
-    type: json_schema
-    schema_file: schemas/invoice.json
+output:
+  type: json_schema
+  schema_file: schemas/invoice.json
 ```
 
 The file must contain a valid JSON Schema object. Relative paths are resolved from the role YAML file's directory. Absolute paths are used as-is.
@@ -179,7 +171,7 @@ The file must contain a valid JSON Schema object. Relative paths are resolved fr
 
 ## Pipeline Precedence
 
-When using flow pipelines, a pipeline step's `output_format` overrides the role-level `spec.output` config. This allows the same role to produce different output formats depending on the pipeline context.
+When using flow pipelines, a pipeline step's `output_format` overrides the role-level `output` config. This allows the same role to produce different output formats depending on the pipeline context.
 
 ## Streaming Structured Output
 

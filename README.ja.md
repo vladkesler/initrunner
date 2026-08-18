@@ -29,6 +29,16 @@
 
 1つの YAML ファイルでエージェントを定義。対話する。うまくいったら自律実行させる。信頼できたら、cron スケジュール、ファイル変更、webhook、Telegram メッセージに反応するデーモンとしてデプロイする。同じファイルのまま。プロトタイプから本番まで書き直し不要。
 
+## `apiVersion: initrunner/v1` からのアップグレード
+
+Agent / Team / Flow ファイルはフラット形式です（`name`、`prompt`、`agents`。`apiVersion` / `kind` / `metadata` / `spec` は書きません）。古い envelope はそのまま読み込めます。その場で変換するには:
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+`--no-backup` を付けない限り `PATH.bak` を書き出します。詳細は [Envelope migration](docs/getting-started/envelope-migration.md) を参照。
+
 ## クイックスタート
 
 ```bash
@@ -78,20 +88,16 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 ロールファイル：
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -236,19 +242,16 @@ spec:
 エージェントを Flow に連鎖。あるエージェントの出力が次の入力になります。
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata: { name: email-chain }
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
-      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
-    researcher: { role: roles/researcher.yaml }
-    responder: { role: roles/responder.yaml }
+name: email-chain
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then: { to: triager }
+  triager:
+    use: roles/triager.yaml
+    then: { to: [researcher, responder], strategy: sense }
+  researcher: { use: roles/researcher.yaml }
+  responder: { use: roles/responder.yaml }
 ```
 
 ```bash

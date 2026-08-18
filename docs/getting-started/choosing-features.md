@@ -89,7 +89,7 @@ Every row assumes the base fields (`role`, `model`, `guardrails`) are already se
 | Multiple agents | varies by pattern | delegate, spawn | `reasoning` | `multi-agent/`, `research-team/` | [Multi-Agent Guide](../orchestration/multi-agent-guide.md) |
 | Production hardening | `security`, `observability`, `resources` | any | docker sandbox | `traced-agent.yaml` | [Security](../security/security.md), [Observability](../core/observability.md) |
 
-> **Multi-agent patterns** have distinct config surfaces: `kind: Team` uses `spec.personas`, `kind: Flow` uses `spec.agents`, and Spawn/Delegate use `spec.tools`. See the [Multi-Agent Guide](../orchestration/multi-agent-guide.md) for the full decision tree.
+> **Multi-agent patterns** have distinct config surfaces: Team uses `agents` + `run`, Flow uses `agents` + `then` / `after`, and Spawn/Delegate use `tools`. See the [Multi-Agent Guide](../orchestration/multi-agent-guide.md) for the full decision tree.
 
 All examples are in `examples/roles/`. Run `initrunner examples list` to browse them, or `initrunner new --from <name>` to copy one.
 

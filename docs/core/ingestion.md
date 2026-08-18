@@ -5,26 +5,20 @@ InitRunner's ingestion pipeline extracts text from source files, splits it into 
 ## Quick Start
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: kb-agent
-  description: Knowledge base agent
-spec:
-  role: |
-    You are a knowledge assistant. Use search_documents to find relevant
-    content before answering. Always cite your sources.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-      - "./knowledge-base/**/*.txt"
-    chunking:
-      strategy: fixed
-      chunk_size: 512
-      chunk_overlap: 50
+name: kb-agent
+description: Knowledge base agent
+model: openai:gpt-5-mini
+prompt: |
+  You are a knowledge assistant. Use search_documents to find relevant
+  content before answering. Always cite your sources.
+ingest:
+  sources:
+    - "./docs/**/*.md"
+    - "./knowledge-base/**/*.txt"
+  chunking:
+    strategy: fixed
+    chunk_size: 512
+    chunk_overlap: 50
 ```
 
 ```bash
@@ -51,31 +45,30 @@ resolve sources (globs + URLs) → extract text → chunk → embed → store
 
 ## Configuration
 
-Ingestion is configured in the `spec.ingest` section:
+Ingestion is configured in the `ingest` section:
 
 ```yaml
-spec:
-  ingest:
-    sources:                    # required — glob patterns and/or URLs
-      - "./docs/**/*.md"
-      - "./data/*.csv"
-      - "https://docs.example.com/api/reference"
-    watch: false                # default: false (reserved for future use)
-    chunking:
-      strategy: fixed           # default: "fixed"
-      chunk_size: 512           # default: 512
-      chunk_overlap: 50         # default: 50
-    embeddings:
-      provider: ""              # default: "" (derives from spec.model.provider)
-      model: ""                 # default: "" (uses provider default)
-      base_url: ""              # default: "" (custom endpoint URL)
-      api_key_env: ""           # default: "" (env var holding API key)
-    retriever:
-      strategy: vector          # default: "vector" (vector | hybrid | hybrid_rerank)
-      rrf_k: 60                 # default: 60 (RRF smoothing constant)
-      reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
-    store_backend: lancedb      # default: "lancedb"
-    store_path: null            # default: ~/.initrunner/stores/<agent-name>.lance
+ingest:
+  sources:                    # required — glob patterns and/or URLs
+    - "./docs/**/*.md"
+    - "./data/*.csv"
+    - "https://docs.example.com/api/reference"
+  watch: false                # default: false (reserved for future use)
+  chunking:
+    strategy: fixed           # default: "fixed"
+    chunk_size: 512           # default: 512
+    chunk_overlap: 50         # default: 50
+  embeddings:
+    provider: ""              # default: "" (derives from the agent's model provider)
+    model: ""                 # default: "" (uses provider default)
+    base_url: ""              # default: "" (custom endpoint URL)
+    api_key_env: ""           # default: "" (env var holding API key)
+  retriever:
+    strategy: vector          # default: "vector" (vector | hybrid | hybrid_rerank)
+    rrf_k: 60                 # default: 60 (RRF smoothing constant)
+    reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  store_backend: lancedb      # default: "lancedb"
+  store_path: null            # default: ~/.initrunner/stores/<agent-name>.lance
 ```
 
 ### Ingest Options
@@ -102,7 +95,7 @@ spec:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. |
+| `provider` | `str` | `""` | Embedding provider. Empty string derives from the agent's model provider. |
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
 | `api_key_env` | `str` | `""` | Env var name holding the embedding API key. Works for both standard providers and custom endpoints. When empty, the default key for the resolved provider is used (e.g. `OPENAI_API_KEY` for OpenAI/Anthropic, `GOOGLE_API_KEY` for Google). |
@@ -224,7 +217,7 @@ The embedding provider is determined by this priority:
 
 1. `ingest.embeddings.model` — If set, used directly (e.g. `"openai:text-embedding-3-large"`).
 2. `ingest.embeddings.provider` — Used to look up the default model for that provider.
-3. `spec.model.provider` — Falls back to the agent's model provider.
+3. The agent's model provider — Falls back to the provider on `model`.
 
 ### Provider Defaults
 
@@ -319,7 +312,7 @@ This means re-running ingestion is safe and idempotent — it always reflects th
 
 ## The `search_documents` Tool
 
-When `spec.ingest` is configured, a `search_documents` tool is auto-registered on the agent:
+When `ingest` is configured, a `search_documents` tool is auto-registered on the agent:
 
 ```
 search_documents(query: str, top_k: int = 5, source: str | None = None) -> str
@@ -360,9 +353,8 @@ If no documents have been ingested, the tool returns a message directing the use
 Roles with an `ingest:` block auto-index on every `initrunner run` if sources have changed since the last indexing pass. No separate `initrunner ingest` step is needed for the common edit-and-run workflow:
 
 ```yaml
-spec:
-  ingest:
-    sources: ["./**/*.py", "./**/*.md"]
+ingest:
+  sources: ["./**/*.py", "./**/*.md"]
 ```
 
 ```bash

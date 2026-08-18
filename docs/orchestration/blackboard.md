@@ -19,9 +19,8 @@ If agents only need to pass prose forward, you do not need the blackboard. The d
 Add a `blackboard` tool to any flow agent that should read or write shared state. The tool is only active inside a flow; a standalone single-shot run has no board, so the tool is simply not built there.
 
 ```yaml
-spec:
-  tools:
-    - type: blackboard
+tools:
+  - blackboard:
       max_entries: 50        # board capacity for this run (default 100)
       max_value_chars: 10000 # per-value size cap (default 10000)
 ```
@@ -46,69 +45,50 @@ A planner fans out to two writers that converge on an editor. The planner posts 
 `flow.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: collab-writers
-  description: Planner posts a shared plan, two writers read it, editor merges
-spec:
-  agents:
-    planner:
-      role: ./roles/planner.yaml
-      sink:
-        type: delegate
-        target: [writer-a, writer-b]
-    writer-a:
-      role: ./roles/writer.yaml
-      sink:
-        type: delegate
-        target: editor
-    writer-b:
-      role: ./roles/writer.yaml
-      sink:
-        type: delegate
-        target: editor
-    editor:
-      role: ./roles/editor.yaml
+name: collab-writers
+description: Planner posts a shared plan, two writers read it, editor merges
+agents:
+  planner:
+    use: ./roles/planner.yaml
+    then:
+      to: [writer-a, writer-b]
+  writer-a:
+    use: ./roles/writer.yaml
+    then:
+      to: editor
+  writer-b:
+    use: ./roles/writer.yaml
+    then:
+      to: editor
+  editor:
+    use: ./roles/editor.yaml
 ```
 
 `roles/planner.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: planner
-  description: Splits work and posts decisions to the shared blackboard
-spec:
-  role: |
-    You break the task into parts. Use blackboard_post to record shared
-    decisions other agents will need (post key "plan" with your breakdown).
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: blackboard
+name: planner
+description: Splits work and posts decisions to the shared blackboard
+model: openai:gpt-5-mini
+prompt: |
+  You break the task into parts. Use blackboard_post to record shared
+  decisions other agents will need (post key "plan" with your breakdown).
+tools:
+  - blackboard:
       max_entries: 50
 ```
 
 `roles/writer.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: writer
-  description: Reads the shared plan and drafts a section
-spec:
-  role: |
-    Use blackboard_read with key "plan" to see the planner's breakdown,
-    then draft your section.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: blackboard
+name: writer
+description: Reads the shared plan and drafts a section
+model: openai:gpt-5-mini
+prompt: |
+  Use blackboard_read with key "plan" to see the planner's breakdown,
+  then draft your section.
+tools:
+  - blackboard
 ```
 
 `roles/editor.yaml` is a plain agent with no blackboard tool. When the two writer branches fan in, the join folds the still-posted entries into the editor's input under a `=== Shared blackboard ===` section, attributed by author:

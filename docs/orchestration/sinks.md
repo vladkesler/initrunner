@@ -2,7 +2,7 @@
 
 Sinks route agent results to external destinations after every run. When a trigger fires in daemon mode, a prompt completes in single-shot mode, or a turn finishes in interactive mode, each configured sink receives a structured payload containing the agent's output, token usage, timing, and metadata.
 
-Sinks are configured in the `spec.sinks` list of a role definition. They follow the same discriminated-union pattern as tools and triggers.
+Sinks are configured in the `sinks` list of a role definition. They follow the same discriminated-union pattern as tools and triggers.
 
 ## Sink Types
 
@@ -15,35 +15,29 @@ Sinks are configured in the `spec.sinks` list of a role definition. They follow 
 ## Quick Example
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-daemon
-  description: Daemon that routes results to Slack and a log file
-  tags:
-    - daemon
-spec:
-  role: |
-    You are a monitoring assistant.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate weekly status report."
-  sinks:
-    - type: webhook
-      url: ${SLACK_WEBHOOK_URL}
-      headers:
-        Content-Type: application/json
-      retry_count: 2
-    - type: file
-      path: ./agent-results.jsonl
-      format: json
-  guardrails:
-    max_tokens_per_run: 50000
-    timeout_seconds: 300
+name: my-daemon
+description: Daemon that routes results to Slack and a log file
+tags:
+  - daemon
+model: openai:gpt-5-mini
+prompt: |
+  You are a monitoring assistant.
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate weekly status report."
+sinks:
+  - type: webhook
+    url: ${SLACK_WEBHOOK_URL}
+    headers:
+      Content-Type: application/json
+    retry_count: 2
+  - type: file
+    path: ./agent-results.jsonl
+    format: json
+guardrails:
+  max_tokens_per_run: 50000
+  timeout_seconds: 300
 ```
 
 ## Webhook Sink
@@ -150,7 +144,7 @@ Every sink receives the same `SinkPayload` (delivered as a `dict` for custom sin
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `agent_name` | `str` | Name from `metadata.name` |
+| `agent_name` | `str` | Name from `name` |
 | `run_id` | `str` | Unique identifier for this run |
 | `prompt` | `str` | The prompt that was sent to the agent |
 | `output` | `str` | The agent's response text |
@@ -232,7 +226,7 @@ This is a building block for programmatic wiring. There is no YAML `type: telegr
 
 ## Delegate Sink (Flow Only)
 
-The `delegate` sink type is used exclusively in [flow definitions](flow.md) to route an agent's output to other agents via graph edges. It is not available in standalone role YAML files -- it is configured via the `sink:` field on a flow agent.
+The `delegate` sink type is used exclusively in [flow definitions](flow.md) to route an agent's output to other agents via graph edges. It is not available in standalone role YAML files -- it is configured via the `then:` field on a flow agent.
 
 When targeting multiple agents, set `strategy: keyword` or `strategy: sense` to auto-route messages to the best-matching target instead of fan-out. This uses the same [Intent Sensing](../core/intent_sensing.md) logic as `--sense` in the CLI. See [Flow -- Routing Strategy](flow.md#routing-strategy) for details.
 

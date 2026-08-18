@@ -154,7 +154,7 @@ Doctor checks API key presence, SDK availability, and Ollama reachability. The `
 
 ## Directory path resolution
 
-When you pass a directory instead of a file, InitRunner looks for `role.yaml` or the first `*.yaml` file with `apiVersion: initrunner/v1` and `kind: Agent`. This means you can run:
+When you pass a directory instead of a file, InitRunner looks for `agent.yaml` or `role.yaml`, then a top-level `*.yaml` file that is a flat agent document (or an old envelope). This means you can run:
 
 ```bash
 cd my-agent/

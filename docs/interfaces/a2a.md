@@ -85,18 +85,12 @@ An agent served over A2A must behave identically to the same agent served over O
 Use the delegate tool with `mode: a2a` to call a remote A2A agent from within another agent:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: coordinator
-spec:
-  role: >
-    You coordinate research tasks by delegating to specialized agents.
-  model:
-    provider: openai
-    name: gpt-4o
-  tools:
-    - type: delegate
+name: coordinator
+model: openai:gpt-4o
+prompt: >
+  You coordinate research tasks by delegating to specialized agents.
+tools:
+  - delegate:
       mode: a2a
       timeout_seconds: 120
       agents:

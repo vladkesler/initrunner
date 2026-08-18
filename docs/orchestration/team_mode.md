@@ -22,30 +22,26 @@ Team mode fills the gap between single-agent runs and full Flow orchestration:
 ## Quick Example
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Team
-metadata:
-  name: code-review-team
-  description: Multi-perspective code review
-spec:
-  model:
-    provider: openai
-    name: gpt-5-mini
-  personas:
-    architect: "review for design patterns, SOLID principles, and architecture issues"
-    security: "find security vulnerabilities, injection risks, auth issues"
-    maintainer: "check readability, naming, test coverage gaps, docs"
-  tools:
-    - type: filesystem
+name: code-review-team
+description: Multi-perspective code review
+spec_version: 3
+model: openai:gpt-5-mini
+tools:
+  - filesystem:
       root_path: .
       read_only: true
-    - type: git
+  - git:
       repo_path: .
       read_only: true
-  guardrails:
-    max_tokens_per_run: 50000
-    timeout_seconds: 300
-    team_token_budget: 150000
+guardrails:
+  max_tokens_per_run: 50000
+  timeout_seconds: 300
+  team_token_budget: 150000
+agents:
+  architect: review for design patterns, SOLID principles, and architecture issues
+  security: find security vulnerabilities, injection risks, auth issues
+  maintainer: check readability, naming, test coverage gaps, docs
+run: sequential
 ```
 
 ```bash
@@ -60,36 +56,37 @@ The `--task` flag is an alias for `--prompt` (`-p`). Both work.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `apiVersion` | `"initrunner/v1"` | *(required)* | API version. |
-| `kind` | `"Team"` | *(required)* | Must be `"Team"`. |
-| `metadata.name` | `string` | *(required)* | Kebab-case name matching `^[a-z0-9][a-z0-9-]*[a-z0-9]$`. |
-| `metadata.description` | `string` | `""` | Human-readable description. |
-| `metadata.tags` | `list[string]` | `[]` | Tags for organization. |
+| `name` | `string` | *(required)* | Kebab-case name matching `^[a-z0-9][a-z0-9-]*[a-z0-9]$`. |
+| `description` | `string` | `""` | Human-readable description. |
+| `tags` | `list[string]` | `[]` | Tags for organization. |
+| `spec_version` | `int` | `3` | Flat schema version. |
 
-### Spec Fields
+Old envelopes (`apiVersion` / `kind: Team` / `spec.personas`) still load. Convert them with `initrunner doctor --fix PATH`. See [Envelope migration](../getting-started/envelope-migration.md).
+
+### Team Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | `ModelConfig` | *(required)* | Default model for all personas. |
-| `personas` | `dict[string, string \| PersonaConfig]` | *(required, min 2)* | Persona definitions. Simple strings or extended configs. |
-| `tools` | `list[ToolConfig]` | `[]` | Tools shared by all personas. |
-| `guardrails` | `TeamGuardrails` | *(defaults)* | Per-persona and team-level budget controls. |
-| `handoff_max_chars` | `int` | `4000` | Max chars of prior output passed to next persona (sequential only). |
-| `strategy` | `"sequential" \| "parallel" \| "debate" \| "ensemble"` | `"sequential"` | Execution strategy. |
-| `debate` | `DebateConfig` | `{max_rounds: 3, synthesize: true}` | Debate-specific settings (only used when `strategy: debate`). |
-| `ensemble` | `TeamEnsembleConfig` | `{mode: majority}` | Ensemble voting settings (only used when `strategy: ensemble`). |
-| `shared_memory` | `SharedMemoryConfig` | *(disabled)* | Shared memory store across personas. |
+| `model` | `string` or mapping | *(required)* | Default model for all agents (`openai:gpt-5-mini` or a mapping). |
+| `agents` | `dict[string, string \| AgentConfig]` | *(required, min 2)* | Agent definitions. Simple strings or extended configs. `personas` is not a public word. |
+| `tools` | `list[ToolConfig]` | `[]` | Tools shared by all agents. |
+| `guardrails` | `TeamGuardrails` | *(defaults)* | Per-agent and team-level budget controls. |
+| `handoff_max_chars` | `int` | `4000` | Max chars of prior output passed to the next agent (sequential only). |
+| `run` | `"sequential" \| "parallel" \| "debate" \| "ensemble"` | `"sequential"` | Execution strategy. |
+| `debate` | `DebateConfig` | `{max_rounds: 3, synthesize: true}` | Debate-specific settings (only used when `run: debate`). |
+| `ensemble` | `TeamEnsembleConfig` | `{mode: majority}` | Ensemble voting settings (only used when `run: ensemble`). |
+| `shared_memory` | `SharedMemoryConfig` | *(disabled)* | Shared memory store across agents. |
 | `shared_documents` | `TeamDocumentsConfig` | *(disabled)* | Shared document store with pre-run ingestion. |
 | `observability` | `ObservabilityConfig` | `null` | OpenTelemetry tracing configuration. |
 
-### Persona Configuration
+### Agent Configuration
 
-Personas support two forms:
+Agents support two forms:
 
-**Simple form** -- a string role description:
+**Simple form** -- a string prompt:
 
 ```yaml
-personas:
+agents:
   architect: "review for design patterns and architecture issues"
   security: "find security vulnerabilities and injection risks"
 ```
@@ -97,34 +94,34 @@ personas:
 **Extended form** -- full configuration with overrides:
 
 ```yaml
-personas:
+agents:
   architect:
-    role: "review for design patterns and architecture issues"
+    prompt: "review for design patterns and architecture issues"
     model:
       provider: anthropic
       name: claude-sonnet-4-6
     tools:
-      - type: think
+      - think
     tools_mode: extend   # "extend" (default) or "replace"
     environment:
       REVIEW_DEPTH: thorough
   security: "find security vulnerabilities"  # simple form still works
 ```
 
-You can mix simple and extended forms in the same team file. Simple strings are normalized to `PersonaConfig(role=<string>)` internally.
+You can mix simple and extended forms in the same team file. Simple strings are normalized to `{prompt: <string>}` internally.
 
-**PersonaConfig fields:**
+**Agent fields:**
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `role` | `string` | *(required)* | Persona's role description. |
+| `prompt` | `string` | *(required)* | Agent's role description. |
 | `model` | `ModelConfig` | `null` | Override the team's model. |
-| `tools` | `list[ToolConfig]` | `[]` | Additional tools for this persona. |
-| `tools_mode` | `"extend" \| "replace"` | `"extend"` | How persona tools interact with shared tools. |
-| `environment` | `dict[string, string]` | `{}` | Per-persona environment variables (sequential only). |
+| `tools` | `list[ToolConfig]` | `[]` | Additional tools for this agent. |
+| `tools_mode` | `"extend" \| "replace"` | `"extend"` | How agent tools interact with shared tools. |
+| `environment` | `dict[string, string]` | `{}` | Per-agent environment variables (sequential only). |
 
 **Tools mode:**
-- `extend` (default): persona's tools are appended to the shared tool list.
+- `extend` (default): the agent's tools are appended to the shared tool list.
 - `replace`: persona uses only its own tools, ignoring shared tools.
 
 ### Shared Memory
@@ -132,11 +129,10 @@ You can mix simple and extended forms in the same team file. Simple strings are 
 Enable a shared memory store across all personas. Memory written by one persona is visible to the next.
 
 ```yaml
-spec:
-  shared_memory:
-    enabled: true
-    max_memories: 500
-    store_path: ./data/team-memory.db  # optional, defaults to ~/.initrunner/memory/{name}-shared.db
+shared_memory:
+  enabled: true
+  max_memories: 500
+  store_path: ./data/team-memory.db  # optional, defaults to ~/.initrunner/memory/{name}-shared.db
 ```
 
 Uses the same `SharedMemoryConfig` as flow. The `apply_shared_memory()` function patches each persona's synthesized role at runtime.
@@ -146,19 +142,18 @@ Uses the same `SharedMemoryConfig` as flow. The `apply_shared_memory()` function
 Ingest documents before the pipeline runs so all personas can search them via the `search_documents` tool.
 
 ```yaml
-spec:
-  shared_documents:
-    enabled: true
-    sources:
-      - ./docs/*.md
-      - ./references/**/*.txt
-    embeddings:
-      provider: openai
-      model: text-embedding-3-small
-    chunking:
-      strategy: paragraph
-      chunk_size: 1024
-    store_path: ./data/team-docs.lance  # optional
+shared_documents:
+  enabled: true
+  sources:
+    - ./docs/*.md
+    - ./references/**/*.txt
+  embeddings:
+    provider: openai
+    model: text-embedding-3-small
+  chunking:
+    strategy: paragraph
+    chunk_size: 1024
+  store_path: ./data/team-docs.lance  # optional
 ```
 
 When `sources` is non-empty, the ingestion pipeline runs once before any persona executes. Each persona's agent gets a retrieval tool pointing at the shared store.
@@ -210,8 +205,7 @@ Personas run in insertion order. Each persona receives prior outputs as context.
 All personas run concurrently. No handoff between them.
 
 ```yaml
-spec:
-  strategy: parallel
+run: parallel
 ```
 
 **Semantics:**
@@ -229,15 +223,14 @@ spec:
 Multi-round concurrent argumentation. Each round runs all personas in parallel; between rounds, every persona sees all positions from the previous round (including their own) and refines. Optional synthesis step at the end produces a unified answer.
 
 ```yaml
-spec:
-  strategy: debate
-  personas:
-    optimist: "argue for why this approach will succeed"
-    skeptic: "find flaws, risks, and failure modes"
-    pragmatist: "evaluate trade-offs and propose the practical path"
-  debate:
-    max_rounds: 3      # 2-10, default 3
-    synthesize: true   # add a final synthesis step
+run: debate
+agents:
+  optimist: "argue for why this approach will succeed"
+  skeptic: "find flaws, risks, and failure modes"
+  pragmatist: "evaluate trade-offs and propose the practical path"
+debate:
+  max_rounds: 3      # 2-10, default 3
+  synthesize: true   # add a final synthesis step
 ```
 
 **Semantics:**
@@ -261,14 +254,13 @@ spec:
 Every persona answers the same task in parallel (like `parallel`), then a vote picks one winning answer instead of concatenating them. Use it when you want several personas (or several models) to answer the same question and keep the best or most-agreed-upon response.
 
 ```yaml
-spec:
-  strategy: ensemble
-  personas:
-    alpha: "Answer concisely."
-    beta: "Answer concisely."
-    gamma: "Answer concisely."
-  ensemble:
-    mode: majority          # majority | weighted | judge
+run: ensemble
+agents:
+  alpha: "Answer concisely."
+  beta: "Answer concisely."
+  gamma: "Answer concisely."
+ensemble:
+  mode: majority          # majority | weighted | judge
 ```
 
 - **Concurrency**: all personas run concurrently via the parallel graph.
@@ -324,12 +316,11 @@ The dashboard streams `tool_event` SSE messages with an `agent_name` field, and 
 Configure OpenTelemetry tracing for the team run. The runner initializes the `TracerProvider` before any persona executes and shuts it down in a `finally` block.
 
 ```yaml
-spec:
-  observability:
-    backend: otlp           # otlp, logfire, or console
-    endpoint: http://localhost:4317
-    trace_tool_calls: true
-    trace_token_usage: true
+observability:
+  backend: otlp           # otlp, logfire, or console
+  endpoint: http://localhost:4317
+  trace_tool_calls: true
+  trace_token_usage: true
 ```
 
 The `ObservabilityConfig` is also propagated to each persona's synthesized role.

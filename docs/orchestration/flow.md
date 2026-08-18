@@ -8,22 +8,17 @@ Create a minimal two-agent flow file where a producer delegates its output to a 
 
 ```yaml
 # flow.yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: my-pipeline
-  description: Simple producer-consumer pipeline
-spec:
-  agents:
-    producer:
-      role: roles/producer.yaml
-      sink:
-        type: delegate
-        target: consumer
-    consumer:
-      role: roles/consumer.yaml
-      needs:
-        - producer
+name: my-pipeline
+description: Simple producer-consumer pipeline
+agents:
+  producer:
+    use: roles/producer.yaml
+    then:
+      to: consumer
+  consumer:
+    use: roles/consumer.yaml
+    after:
+      - producer
 ```
 
 Validate the definition:
@@ -52,102 +47,84 @@ This creates a directory with `flow.yaml` and `roles/*.yaml` files, all pre-vali
 
 ## Flow Definition
 
-The top-level structure follows the same `apiVersion`/`kind`/`metadata`/`spec` pattern as role definitions.
+The public document is flat. Old envelopes still load; convert them with `initrunner doctor --fix PATH`. See [Envelope migration](../getting-started/envelope-migration.md).
 
 ```yaml
-apiVersion: initrunner/v1      # required
-kind: Flow                      # required, must be "Flow"
-metadata:
-  name: my-pipeline             # required
-  description: A pipeline       # optional
-spec:
-  agents:                       # required, at least one agent
-    agent-a:
-      role: roles/a.yaml
-      # ... agent config
-    agent-b:
-      role: roles/b.yaml
-      # ... agent config
-  shared_memory:                # optional
-    enabled: false
-    store_path: null
-    max_memories: 1000
-    store_backend: lancedb
-  shared_documents:             # optional
-    enabled: false
-    store_path: null
-    store_backend: lancedb
-    embeddings:
-      provider: ""
-      model: ""
+name: my-pipeline             # required
+description: A pipeline       # optional
+spec_version: 3
+agents:                       # required, at least one agent
+  agent-a:
+    use: roles/a.yaml
+  agent-b:
+    use: roles/b.yaml
+    after:
+      - agent-a
+shared_memory:                # optional
+  enabled: false
+  store_path: null
+  max_memories: 1000
+  store_backend: lancedb
+shared_documents:             # optional
+  enabled: false
+  store_path: null
+  store_backend: lancedb
+  embeddings:
+    provider: ""
+    model: ""
 ```
 
 ### Top-Level Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `apiVersion` | `str` | *(required)* | API version string (e.g. `initrunner/v1`). |
-| `kind` | `"Flow"` | *(required)* | Must be `Flow`. |
-| `metadata.name` | `str` | *(required)* | Name of the flow definition. |
-| `metadata.description` | `str` | `""` | Human-readable description. |
-| `spec.agents` | `dict[str, AgentConfig]` | *(required)* | Map of agent name to configuration. Must contain at least one agent. |
-| `spec.shared_memory` | `SharedMemoryConfig` | disabled | Shared memory configuration across agents. |
-| `spec.shared_memory.enabled` | `bool` | `false` | Enable shared memory across all agents. |
-| `spec.shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.lance`. |
-| `spec.shared_memory.max_memories` | `int` | `1000` | Maximum number of memories in the shared store. |
-| `spec.shared_memory.store_backend` | `str` | `"lancedb"` | Store backend. Uses LanceDB, an in-process vector database. |
-| `spec.shared_documents` | `SharedDocumentsConfig` | disabled | Shared document store configuration across agents. See [Shared Documents](#shared-documents). |
-| `spec.shared_documents.enabled` | `bool` | `false` | Enable a shared document store across all agents. |
-| `spec.shared_documents.store_path` | `str \| null` | `null` | Path to the shared document store. Default: `~/.initrunner/stores/{name}-shared.lance`. |
-| `spec.shared_documents.store_backend` | `str` | `"lancedb"` | Store backend. |
-| `spec.shared_documents.embeddings.provider` | `str` | *(required when enabled)* | Embedding provider. Must be set explicitly when `enabled: true`. |
-| `spec.shared_documents.embeddings.model` | `str` | *(required when enabled)* | Embedding model. Must be set explicitly when `enabled: true`. |
+| `name` | `str` | *(required)* | Name of the flow definition (kebab-case). |
+| `description` | `str` | `""` | Human-readable description. |
+| `spec_version` | `int` | `3` | Flat schema version. |
+| `agents` | `dict[str, AgentConfig]` | *(required)* | Map of agent name to configuration. Must contain at least one agent. |
+| `shared_memory` | `SharedMemoryConfig` | disabled | Shared memory configuration across agents. |
+| `shared_memory.enabled` | `bool` | `false` | Enable shared memory across all agents. |
+| `shared_memory.store_path` | `str \| null` | `null` | Path to the shared memory store. Default: `~/.initrunner/memory/{name}-shared.lance`. |
+| `shared_memory.max_memories` | `int` | `1000` | Maximum number of memories in the shared store. |
+| `shared_memory.store_backend` | `str` | `"lancedb"` | Store backend. Uses LanceDB, an in-process vector database. |
+| `shared_documents` | `SharedDocumentsConfig` | disabled | Shared document store configuration across agents. See [Shared Documents](#shared-documents). |
+| `shared_documents.enabled` | `bool` | `false` | Enable a shared document store across all agents. |
+| `shared_documents.store_path` | `str \| null` | `null` | Path to the shared document store. Default: `~/.initrunner/stores/{name}-shared.lance`. |
+| `shared_documents.store_backend` | `str` | `"lancedb"` | Store backend. |
+| `shared_documents.embeddings.provider` | `str` | *(required when enabled)* | Embedding provider. Must be set explicitly when `enabled: true`. |
+| `shared_documents.embeddings.model` | `str` | *(required when enabled)* | Embedding model. Must be set explicitly when `enabled: true`. |
 
 ## Agent Configuration
 
-Each entry in `spec.agents` configures one agent.
+Each entry in `agents` configures one agent.
 
 ```yaml
 agents:
   my-agent:
-    role: roles/my-role.yaml        # required
-    trigger: null                   # optional, override trigger config
-    sink:                           # optional, delegate sink config
-      type: delegate
-      target: other-agent
-    needs:                          # optional, startup ordering
+    use: roles/my-role.yaml         # path to a role file, or inline prompt:
+    # prompt: You are ...
+    then:                           # optional, graph edge
+      to: other-agent
+    after:                          # optional, startup ordering
       - dependency-agent
-    health_check:                   # optional
-      interval_seconds: 30
-      timeout_seconds: 10
-      retries: 3
-    restart:                        # optional
-      condition: none
-      max_retries: 3
-      delay_seconds: 5
-    environment: {}                 # optional, extra env vars
 ```
 
 ### Options
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `role` | `str` | *(required)* | Path to the role YAML file, relative to the flow file. |
-| `trigger` | `dict \| null` | `null` | Override trigger configuration (reserved). |
-| `sink` | `DelegateSinkConfig \| null` | `null` | Delegate sink for routing output to other agents. |
-| `needs` | `list[str]` | `[]` | Agents that must start before this one. |
-| `health_check` | `HealthCheckConfig` | *(see below)* | Health check parameters. |
-| `restart` | `RestartPolicy` | *(see below)* | Restart policy for the agent. |
-| `environment` | `dict[str, str]` | `{}` | Additional environment variables for the agent. |
+| `use` | `str` | | Path to the role YAML file, relative to the flow file. One of `use` or `prompt` is required. |
+| `prompt` | `str` | | Inline prompt instead of a role file. One of `use` or `prompt` is required. |
+| `then` | `ThenConfig \| null` | `null` | Graph edge for routing output to other agents. |
+| `after` | `list[str]` | `[]` | Agents that must start before this one. |
 
 ## Delegate Sink
 
 Delegate sinks route an agent's output to one or more other agents. The upstream agent's output becomes the downstream agent's input prompt. Each delegation edge carries an immutable `DelegationEnvelope` with the prompt, trace chain, and metadata.
 
 ```yaml
-sink:
-  type: delegate
-  target: consumer              # single target
+then:
+  to: consumer                  # single target
   keep_existing_sinks: false
   queue_size: 100
   timeout_seconds: 60
@@ -158,9 +135,8 @@ sink:
 Or with multiple targets:
 
 ```yaml
-sink:
-  type: delegate
-  target:                       # fan-out to multiple targets
+then:
+  to:                           # fan-out to multiple targets
     - researcher
     - responder
   keep_existing_sinks: true     # also fire role-level sinks
@@ -170,8 +146,7 @@ sink:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `type` | `"delegate"` | *(required)* | Must be `delegate`. |
-| `target` | `str \| list[str]` | *(required)* | Target agent name(s) to route output to. |
+| `to` | `str \| list[str]` | *(required)* | Target agent name(s) to route output to. |
 | `strategy` | `"all" \| "keyword" \| "sense" \| "ensemble"` | `"all"` | Routing strategy for multi-target delegates. See [Routing Strategy](#routing-strategy) and [Ensemble Voting](#ensemble-voting). |
 | `ensemble` | `EnsembleConfig \| None` | `None` | Voting config. Required when `strategy: ensemble`, rejected otherwise. See [Ensemble Voting](#ensemble-voting). |
 | `loop_back` | `LoopBackConfig \| None` | `None` | Bounded loop-back edge for critic/refine patterns. See [Loop-Back Routing](#loop-back-routing). |
@@ -190,27 +165,25 @@ When a delegate sink has multiple targets, the `strategy` field controls how mes
 | `sense` | Keyword scoring first; LLM tiebreaker when ambiguous | 0 or 1 per message |
 | `ensemble` | Fan-out to every target, then vote on the answers and keep one winner | 0 (majority/weighted) or 1 per candidate (judge) |
 
-The `keyword` and `sense` strategies use the same two-pass [Intent Sensing](../core/intent_sensing.md) logic used by `--sense` in the CLI. They score the agent's output text against each target agent's `metadata.name`, `metadata.description`, and `metadata.tags` from its role definition.
+The `keyword` and `sense` strategies use the same two-pass [Intent Sensing](../core/intent_sensing.md) logic used by `--sense` in the CLI. They score the agent's output text against each target agent's `name`, `description`, and `tags` from its role definition.
 
 **Before (static fan-out):** every message goes to ALL targets:
 
 ```yaml
 triager:
-  role: roles/triager.yaml
-  sink:
-    type: delegate
-    target: [researcher, responder, escalator]
+  use: roles/triager.yaml
+  then:
+    to: [researcher, responder, escalator]
 ```
 
 **After (sense picks the right target):**
 
 ```yaml
 triager:
-  role: roles/triager.yaml
-  sink:
-    type: delegate
+  use: roles/triager.yaml
+  then:
+    to: [researcher, responder, escalator]
     strategy: sense              # ← one line added
-    target: [researcher, responder, escalator]
 ```
 
 #### How routing works
@@ -228,22 +201,19 @@ The same tips from [Intent Sensing -- Optimizing Roles](../core/intent_sensing.m
 
 ```yaml
 # roles/researcher.yaml
-metadata:
-  name: researcher
-  description: Researches topics in depth and gathers supporting evidence
-  tags: [research, analysis, investigation, evidence]
+name: researcher
+description: Researches topics in depth and gathers supporting evidence
+tags: [research, analysis, investigation, evidence]
 
 # roles/responder.yaml
-metadata:
-  name: responder
-  description: Responds directly to user queries with concise answers
-  tags: [response, chat, answer, reply]
+name: responder
+description: Responds directly to user queries with concise answers
+tags: [response, chat, answer, reply]
 
 # roles/escalator.yaml
-metadata:
-  name: escalator
-  description: Escalates complex issues to human operators
-  tags: [escalation, support, human, complex]
+name: escalator
+description: Escalates complex issues to human operators
+tags: [escalation, support, human, complex]
 ```
 
 #### Dashboard configuration
@@ -260,11 +230,10 @@ The `ensemble` strategy fans the same prompt out to every target (like `all`), t
 
 ```yaml
 router:
-  role: roles/router.yaml
-  sink:
-    type: delegate
+  use: roles/router.yaml
+  then:
+    to: [gpt-answerer, claude-answerer, llama-answerer]
     strategy: ensemble
-    target: [gpt-answerer, claude-answerer, llama-answerer]
     ensemble:
       mode: majority          # majority | weighted | judge
 ```
@@ -288,10 +257,9 @@ router:
 
 ```yaml
 # weighted: trust the specialist model more
-sink:
-  type: delegate
+then:
+  to: [fast-model, strong-model]
   strategy: ensemble
-  target: [fast-model, strong-model]
   ensemble:
     mode: weighted
     weights:
@@ -299,10 +267,9 @@ sink:
       strong-model: 0.8
 
 # judge: let an LLM pick the clearest, most complete answer
-sink:
-  type: delegate
+then:
+  to: [draft-a, draft-b, draft-c]
   strategy: ensemble
-  target: [draft-a, draft-b, draft-c]
   ensemble:
     mode: judge
     judge_model: openai:gpt-4o-mini
@@ -321,10 +288,9 @@ A `loop_back` edge turns a normal forward delegation into a bounded refine loop:
 
 ```yaml
 writer:
-  role: ./roles/writer.yaml
-  sink:
-    type: delegate
-    target: critic            # forward edge: writer -> critic
+  use: ./roles/writer.yaml
+  then:
+    to: critic                # forward edge: writer -> critic
     loop_back:
       type: loop-back
       target: writer          # back edge: critic output returns to writer
@@ -332,7 +298,7 @@ writer:
       until:
         output: "contains:APPROVED"   # exit early when the critic approves
 critic:
-  role: ./roles/critic.yaml
+  use: ./roles/critic.yaml
 ```
 
 The flow runs `writer -> critic -> writer -> critic -> ...` until one of the two bounds is hit, then the last output becomes the flow result. The loop target is usually the loop source itself (`writer`), but it can be any upstream agent on the path.
@@ -342,7 +308,7 @@ The flow runs `writer -> critic -> writer -> critic -> ...` until one of the two
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | `"loop-back"` | *(required)* | Discriminator. Must be `loop-back`. |
-| `target` | `str` | *(required)* | The agent the loop returns to. Must be a known agent and must not be one of the sink's own forward `target`s. |
+| `target` | `str` | *(required)* | The agent the loop returns to. Must be a known agent and must not be one of the `then.to` forward targets. |
 | `max_iterations` | `int` | `3` | Hard cap on loop rounds. Bounded to `1..20`. The loop always stops once this many rounds complete. |
 | `until` | `dict[str, str] \| None` | `None` | Optional early-exit predicate evaluated against the latest agent output. When omitted, only `max_iterations` bounds the loop. |
 
@@ -385,11 +351,11 @@ When multiple agents delegate to the same downstream target (diamond pattern: A-
 
 ### Role Sink Interaction
 
-By default, when a flow `sink:` is configured, the agent's role-level sinks (from `spec.sinks` in the role YAML) are **not** activated. This prevents duplicate output routing.
+By default, when a flow `then:` is configured, the agent's role-level sinks (from `sinks` in the role YAML) are **not** activated. This prevents duplicate output routing.
 
 Set `keep_existing_sinks: true` to activate both the delegate sink and the role's own sinks. This is useful when you want to both forward output to another agent and log it to a file or webhook.
 
-When no flow `sink:` is configured at all, the agent uses its role-level sinks as if running in standalone daemon mode.
+When no flow `then:` is configured at all, the agent uses its role-level sinks as if running in standalone daemon mode.
 
 ### Failed Runs
 
@@ -405,7 +371,7 @@ Delegation chains are limited to 20 agents. If a chain exceeds this depth (e.g. 
 
 ## Startup Order
 
-Agents start in topological order based on `needs` declarations. Agents without dependencies start first, forming "tiers" of parallel startup.
+Agents start in topological order based on `after` declarations. Agents without dependencies start first, forming "tiers" of parallel startup.
 
 ### Example
 
@@ -414,22 +380,23 @@ Given this configuration:
 ```yaml
 agents:
   inbox-watcher:
-    role: roles/inbox-watcher.yaml
-    sink:
-      type: delegate
-      target: triager
+    use: roles/inbox-watcher.yaml
+    then:
+      to: triager
   triager:
-    role: roles/triager.yaml
-    needs: [inbox-watcher]
-    sink:
-      type: delegate
-      target: [researcher, responder]
+    use: roles/triager.yaml
+    then:
+      to: [researcher, responder]
+    after:
+      - inbox-watcher
   researcher:
-    role: roles/researcher.yaml
-    needs: [triager]
+    use: roles/researcher.yaml
+    after:
+      - triager
   responder:
-    role: roles/responder.yaml
-    needs: [triager]
+    use: roles/responder.yaml
+    after:
+      - triager
 ```
 
 The startup order is:
@@ -497,14 +464,14 @@ health_check:
 Flow agents are standard InitRunner roles. All role features carry over:
 
 - **Triggers**: An agent's role-level triggers (cron, file_watch, webhook) fire normally. The inbox-watcher example uses a cron trigger to poll for new emails.
-- **Sinks**: Role-level sinks activate when no flow `sink:` is set, or when `keep_existing_sinks: true`. See [Sinks](sinks.md).
+- **Sinks**: Role-level sinks activate when no flow `then:` is set, or when `keep_existing_sinks: true`. See [Sinks](sinks.md).
 - **Tools**: All configured tools (built-in, custom, MCP) are available to the agent. See [Tools](../agents/tools.md).
-- **Memory**: Memory-enabled roles persist and recall memories as usual. Session pruning runs after each trigger execution, matching standalone daemon behavior. Use `spec.shared_memory` to give all agents a common memory store -- see [Shared Memory](#shared-memory). See [Memory](../core/memory.md).
-- **Documents**: Use `spec.shared_documents` to give all agents a common document store with flow-owned embedding config -- see [Shared Documents](#shared-documents). See [Ingestion](../core/ingestion.md).
+- **Memory**: Memory-enabled roles persist and recall memories as usual. Session pruning runs after each trigger execution, matching standalone daemon behavior. Use `shared_memory` to give all agents a common memory store -- see [Shared Memory](#shared-memory). See [Memory](../core/memory.md).
+- **Documents**: Use `shared_documents` to give all agents a common document store with flow-owned embedding config -- see [Shared Documents](#shared-documents). See [Ingestion](../core/ingestion.md).
 - **Guardrails**: Timeout, token limits, and tool call limits from the role definition apply to each execution.
 - **Skills**: Skills referenced in the role definition are loaded and available.
 
-Agents without a flow `sink:` behave identically to running the role with `initrunner run <role> --daemon` -- triggers fire, sinks dispatch, and memory persists as configured.
+Agents without a flow `then:` behave identically to running the role with `initrunner run <role> --daemon` -- triggers fire, sinks dispatch, and memory persists as configured.
 
 ## Runtime Architecture
 
@@ -553,21 +520,20 @@ A second Ctrl+C force-exits via `os._exit(1)`.
 
 ## Shared Memory
 
-When `spec.shared_memory.enabled` is `true`, all agents in the flow share a single memory database. Any agent can call `remember()` to store information and any other agent can `recall()` it -- enabling cross-agent knowledge sharing without delegate sinks.
+When `shared_memory.enabled` is `true`, all agents in the flow share a single memory database. Any agent can call `remember()` to store information and any other agent can `recall()` it -- enabling cross-agent knowledge sharing without delegate sinks.
 
 ### Configuration
 
 ```yaml
-spec:
-  shared_memory:
-    enabled: true
-    store_path: ./shared-memory.lance   # optional, default: ~/.initrunner/memory/{name}-shared.lance
-    max_memories: 500                # optional, default: 1000
-  agents:
-    researcher:
-      role: roles/researcher.yaml
-    writer:
-      role: roles/writer.yaml
+shared_memory:
+  enabled: true
+  store_path: ./shared-memory.lance   # optional, default: ~/.initrunner/memory/{name}-shared.lance
+  max_memories: 500                # optional, default: 1000
+agents:
+  researcher:
+    use: roles/researcher.yaml
+  writer:
+    use: roles/writer.yaml
 ```
 
 ### Default Path
@@ -578,7 +544,7 @@ When `store_path` is not set, the shared database is created at:
 ~/.initrunner/memory/{flow-name}-shared.lance
 ```
 
-Where `{flow-name}` comes from `metadata.name`.
+Where `{flow-name}` comes from `name`.
 
 ### How It Works
 
@@ -589,7 +555,7 @@ At startup, `apply_shared_memory()` patches each agent's role definition:
 
 ### Embedding Consistency
 
-All agents sharing a memory store must use compatible embedding models (same dimensions). If one agent embeds with a 1536-dimension model and another uses a 768-dimension model, the second agent will raise a `DimensionMismatchError` on first use. The store also tracks the embedding model identity, so switching models is caught even when dimensions happen to match (raises `EmbeddingModelChangedError`). Keep `memory.embeddings` consistent across roles, or omit it to let all agents derive from their `spec.model.provider` defaults.
+All agents sharing a memory store must use compatible embedding models (same dimensions). If one agent embeds with a 1536-dimension model and another uses a 768-dimension model, the second agent will raise a `DimensionMismatchError` on first use. The store also tracks the embedding model identity, so switching models is caught even when dimensions happen to match (raises `EmbeddingModelChangedError`). Keep `memory.embeddings` consistent across roles, or omit it to let all agents derive from their `model` provider defaults.
 
 ### Concurrency
 
@@ -597,25 +563,24 @@ LanceDB handles concurrent access from multiple agent threads via internal locki
 
 ## Shared Documents
 
-When `spec.shared_documents.enabled` is `true`, all agents in the flow share a single document store. This lets you ingest documents once (e.g. via one agent's `ingest` config) and have every agent's `search_documents` tool query the same store.
+When `shared_documents.enabled` is `true`, all agents in the flow share a single document store. This lets you ingest documents once (e.g. via one agent's `ingest` config) and have every agent's `search_documents` tool query the same store.
 
 Unlike shared memory, shared documents requires **explicit embedding configuration** at the flow level. This prevents embedding model mismatches between roles querying the same store.
 
 ### Configuration
 
 ```yaml
-spec:
-  shared_documents:
-    enabled: true
-    store_path: ./shared-docs.lance   # optional, default: ~/.initrunner/stores/{name}-shared.lance
-    embeddings:
-      provider: openai                # required when enabled
-      model: text-embedding-3-small   # required when enabled
-  agents:
-    researcher:
-      role: roles/researcher.yaml     # has ingest config with sources
-    writer:
-      role: roles/writer.yaml         # no ingest config needed
+shared_documents:
+  enabled: true
+  store_path: ./shared-docs.lance   # optional, default: ~/.initrunner/stores/{name}-shared.lance
+  embeddings:
+    provider: openai                # required when enabled
+    model: text-embedding-3-small   # required when enabled
+agents:
+  researcher:
+    use: roles/researcher.yaml     # has ingest config with sources
+  writer:
+    use: roles/writer.yaml         # no ingest config needed
 ```
 
 ### Default Path
@@ -626,7 +591,7 @@ When `store_path` is not set, the shared document store is created at:
 ~/.initrunner/stores/{flow-name}-shared.lance
 ```
 
-Where `{flow-name}` comes from `metadata.name`.
+Where `{flow-name}` comes from `name`.
 
 ### How It Works
 
@@ -639,7 +604,7 @@ Shared documents is a flow-time config patch only. It does not run ingestion aut
 
 ### Embedding Consistency
 
-The flow definition **owns** the embedding configuration for the shared store. When `shared_documents.enabled` is `true`, both `embeddings.provider` and `embeddings.model` must be set explicitly. This is validated at parse time and prevents the situation where different roles derive different embedding models from their `spec.model.provider`.
+The flow definition **owns** the embedding configuration for the shared store. When `shared_documents.enabled` is `true`, both `embeddings.provider` and `embeddings.model` must be set explicitly. This is validated at parse time and prevents the situation where different roles derive different embedding models from their `model` provider.
 
 ### Usage Pattern
 
@@ -713,7 +678,7 @@ initrunner flow uninstall my-pipeline
 initrunner flow uninstall flow.yaml
 ```
 
-Accepts either the flow `metadata.name` or a path to the flow YAML file.
+Accepts either the flow `name` or a path to the flow YAML file.
 
 ### `flow start`
 
@@ -724,7 +689,7 @@ initrunner flow start my-pipeline
 initrunner flow start flow.yaml
 ```
 
-Accepts either the flow `metadata.name` or a path to the flow YAML file.
+Accepts either the flow `name` or a path to the flow YAML file.
 
 ### `flow stop`
 
@@ -735,7 +700,7 @@ initrunner flow stop my-pipeline
 initrunner flow stop flow.yaml
 ```
 
-Accepts either the flow `metadata.name` or a path to the flow YAML file.
+Accepts either the flow `name` or a path to the flow YAML file.
 
 ### `flow restart`
 
@@ -746,7 +711,7 @@ initrunner flow restart my-pipeline
 initrunner flow restart flow.yaml
 ```
 
-Accepts either the flow `metadata.name` or a path to the flow YAML file.
+Accepts either the flow `name` or a path to the flow YAML file.
 
 ### `flow status`
 
@@ -757,7 +722,7 @@ initrunner flow status my-pipeline
 initrunner flow status flow.yaml
 ```
 
-Accepts either the flow `metadata.name` or a path to the flow YAML file.
+Accepts either the flow `name` or a path to the flow YAML file.
 
 ### `flow logs`
 
@@ -843,7 +808,7 @@ Unit files are written to:
 ~/.config/systemd/user/initrunner-{name}.service
 ```
 
-Where `{name}` is derived from `metadata.name` in the flow definition, sanitized for systemd (non-alphanumeric characters replaced with dashes).
+Where `{name}` is derived from `name` in the flow definition, sanitized for systemd (non-alphanumeric characters replaced with dashes).
 
 ## Example: Email Pipeline
 
@@ -860,45 +825,35 @@ inbox-watcher ──> triager ──> researcher
 1. **inbox-watcher** -- Polls for new emails on a cron schedule (every 5 minutes) and summarizes them.
 2. **triager** -- Analyzes each summary and decides whether it needs research or a direct response. Fans out to both downstream agents.
 3. **researcher** -- Investigates technical questions and produces research summaries.
-4. **responder** -- Drafts professional email replies for simple inquiries. Configured with `on-failure` restart.
+4. **responder** -- Drafts professional email replies for simple inquiries.
 
 ### `flow.yaml`
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: email-pipeline
-  description: Multi-agent email processing pipeline
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink:
-        type: delegate
-        target: triager
-    triager:
-      role: roles/triager.yaml
-      needs:
-        - inbox-watcher
-      sink:
-        type: delegate
-        strategy: sense           # auto-route to the right target
-        target:
-          - researcher
-          - responder
-    researcher:
-      role: roles/researcher.yaml
-      needs:
-        - triager
-    responder:
-      role: roles/responder.yaml
-      needs:
-        - triager
-      restart:
-        condition: on-failure
-        max_retries: 3
-        delay_seconds: 5
+name: email-pipeline
+description: Multi-agent email processing pipeline
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then:
+      to: triager
+  triager:
+    use: roles/triager.yaml
+    then:
+      to:
+        - researcher
+        - responder
+      strategy: sense           # auto-route to the right target
+    after:
+      - inbox-watcher
+  researcher:
+    use: roles/researcher.yaml
+    after:
+      - triager
+  responder:
+    use: roles/responder.yaml
+    after:
+      - triager
 ```
 
 With `strategy: sense`, the triager's output is analyzed and sent to either the researcher or the responder -- not both. Use `strategy: all` (or omit) to fan out to every target.
@@ -908,28 +863,24 @@ With `strategy: sense`, the triager's output is analyzed and sent to either the 
 Each role is a standard InitRunner role definition. For example, `roles/inbox-watcher.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: inbox-watcher
-  description: Monitors inbox and forwards new messages
-  tags: [flow, email]
-spec:
-  role: >
-    You are an inbox monitor. When triggered, summarize the incoming
-    email content and forward it for triage. Output a concise summary
-    including sender, subject, and key points.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-  triggers:
-    - type: cron
-      schedule: "*/5 * * * *"
-      prompt: "Check for new emails and summarize any unread messages."
-  guardrails:
-    max_tokens_per_run: 2000
-    timeout_seconds: 30
+name: inbox-watcher
+description: Monitors inbox and forwards new messages
+tags: [flow, email]
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.1
+prompt: >
+  You are an inbox monitor. When triggered, summarize the incoming
+  email content and forward it for triage. Output a concise summary
+  including sender, subject, and key points.
+triggers:
+  - type: cron
+    schedule: "*/5 * * * *"
+    prompt: "Check for new emails and summarize any unread messages."
+guardrails:
+  max_tokens_per_run: 2000
+  timeout_seconds: 30
 ```
 
 ## Example: Content Pipeline
@@ -946,56 +897,39 @@ content-watcher ──> researcher ──> writer
 
 1. **content-watcher** -- Watches `./drafts/` for new or existing markdown and text files. Uses `process_existing: true` to handle files already in the directory on startup, then monitors for live changes.
 2. **researcher** -- Receives content briefs and produces research summaries. Fans out to both writer and reviewer via delegate sink.
-3. **writer** -- Takes research output and produces polished content. Configured with `on-failure` restart.
-4. **reviewer** -- Runs QA checks on the research output in parallel with the writer. Also configured with `on-failure` restart.
+3. **writer** -- Takes research output and produces polished content.
+4. **reviewer** -- Runs QA checks on the research output in parallel with the writer.
 
 ### `flow.yaml`
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: content-pipeline
-  description: >
-    Multi-agent content creation pipeline. A file watcher monitors ./drafts/
-    for new markdown or text files, extracts the topic, and delegates to a
-    researcher. The researcher fans out to a writer (polished output) and a
-    reviewer (QA checks).
-spec:
-  agents:
-    content-watcher:
-      role: roles/content-watcher.yaml
-      sink:
-        type: delegate
-        target: researcher
-
-    researcher:
-      role: roles/researcher.yaml
-      needs:
-        - content-watcher
-      sink:
-        type: delegate
-        target:
-          - writer
-          - reviewer
-
-    writer:
-      role: roles/writer.yaml
-      needs:
-        - researcher
-      restart:
-        condition: on-failure
-        max_retries: 3
-        delay_seconds: 5
-
-    reviewer:
-      role: roles/reviewer.yaml
-      needs:
-        - researcher
-      restart:
-        condition: on-failure
-        max_retries: 2
-        delay_seconds: 5
+name: content-pipeline
+description: >
+  Multi-agent content creation pipeline. A file watcher monitors ./drafts/
+  for new markdown or text files, extracts the topic, and delegates to a
+  researcher. The researcher fans out to a writer (polished output) and a
+  reviewer (QA checks).
+agents:
+  content-watcher:
+    use: roles/content-watcher.yaml
+    then:
+      to: researcher
+  researcher:
+    use: roles/researcher.yaml
+    then:
+      to:
+        - writer
+        - reviewer
+    after:
+      - content-watcher
+  writer:
+    use: roles/writer.yaml
+    after:
+      - researcher
+  reviewer:
+    use: roles/reviewer.yaml
+    after:
+      - researcher
 ```
 
 Key patterns demonstrated:
@@ -1009,10 +943,10 @@ Key patterns demonstrated:
 
 Flow definitions are validated at load time with Pydantic. The following checks are performed:
 
-- **At least one agent** must be defined in `spec.agents`.
-- **Unknown agent references**: `needs` entries and delegate `target` values must reference agents defined in the same flow file.
+- **At least one agent** must be defined in `agents`.
+- **Unknown agent references**: `after` entries and `then.to` values must reference agents defined in the same flow file.
 - **Self-references**: An agent cannot depend on itself or delegate to itself.
-- **Cycle detection**: Kahn's algorithm detects cycles in both the dependency graph (`needs`) and the delegate graph (`sink.target`). A cycle in either graph is a validation error.
+- **Cycle detection**: Kahn's algorithm detects cycles in both the dependency graph (`after`) and the delegate graph (`then.to`). A cycle in either graph is a validation error.
 - **Role file existence**: `flow validate`, `flow up`, and `flow install` all check that each agent's role file exists on disk.
 - **Recursive role validation**: every referenced role YAML is loaded and validated against the agent schema. Per-field errors from a nested role surface with an `agents.<name>.` field prefix.
 
