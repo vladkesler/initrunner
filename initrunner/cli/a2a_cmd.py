@@ -13,11 +13,20 @@ from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, S
 app = typer.Typer(help="A2A protocol server.")
 
 
+def _default_advertise_url(host: str, port: int) -> str:
+    host_for_url = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    return f"http://{host_for_url}:{port}"
+
+
 @app.command("serve")
 def a2a_serve(
     role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
     host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
+    url: Annotated[
+        str | None,
+        typer.Option("--url", help="Public advertise URL written into the agent card"),
+    ] = None,
     api_key: Annotated[
         str | None,
         typer.Option("--api-key", help="API key for auth"),
@@ -37,6 +46,7 @@ def a2a_serve(
     from initrunner.cli._helpers import (
         command_context,
         resolve_model_override,
+        resolve_role_path,
         resolve_skill_dirs,
     )
 
@@ -48,17 +58,30 @@ def a2a_serve(
     # off-host without auth.
     api_key, generated_key = resolve_exposed_api_key(host, api_key)
 
+    advertised_url = url or _default_advertise_url(host, port)
+    if url is None and host in {"0.0.0.0", "::", "*"}:
+        console.print(
+            f"[yellow]Warning:[/yellow] binding {host} advertises a non-dialable "
+            f"card URL ({advertised_url}). Pass --url with a reachable address."
+        )
+
+    extra_skill_dirs = resolve_skill_dirs(skill_dir)
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
         audit_db=audit_db,
         no_audit=no_audit,
-        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        extra_skill_dirs=extra_skill_dirs,
         model_override=resolved_model,
     ) as (role, agent, audit_logger, _memory_store, _sink_dispatcher):
+        from initrunner.agent.skills import resolve_skills
+
+        resolved_role = resolve_role_path(role_file)
+        resolved_skills = resolve_skills(role.spec.skills, resolved_role.parent, extra_skill_dirs)
+
         console.print(f"[bold]A2A Server:[/bold] {role.metadata.name}")
         console.print(f"  Endpoint:   http://{host}:{port}")
-        console.print(f"  Agent card: http://{host}:{port}/.well-known/agent-card.json")
+        console.print(f"  Agent card: {advertised_url}/.well-known/agent-card.json")
         if generated_key is not None:
             console.print(
                 "  Auth:       [yellow]enabled[/yellow] -- generated key (no --api-key given):\n"
@@ -72,10 +95,10 @@ def a2a_serve(
         a2a_app = build_a2a_app(
             agent,
             role,
-            host=host,
-            port=port,
+            url=advertised_url,
             audit_logger=audit_logger,
             api_key=api_key,
             cors_origins=cors_origin,
+            skills=resolved_skills,
         )
         run_a2a_server(a2a_app, host=host, port=port)

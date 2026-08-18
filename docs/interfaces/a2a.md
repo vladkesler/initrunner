@@ -1,6 +1,8 @@
 # A2A Server -- Agent-to-Agent Protocol
 
-The `initrunner a2a serve` command exposes any agent as an [A2A (Agent-to-Agent)](https://google.github.io/A2A/) server. A2A is Google's open standard for AI agents to communicate across frameworks and vendors. This lets other A2A-compatible agents discover and invoke your InitRunner agents over HTTP.
+The `initrunner a2a serve` command exposes any agent as an [A2A (Agent-to-Agent)](https://a2a-protocol.org/) 1.0 server. A2A is the Linux Foundation protocol for agents to discover and invoke each other across frameworks. Other A2A 1.0 clients can find your InitRunner agent at `/.well-known/agent-card.json` and call it over JSON-RPC.
+
+InitRunner speaks **A2A 1.0 only**. There is no 0.3 compatibility mode. Clients and curl examples must send `A2A-Version: 1.0` on every JSON-RPC request. Method names are gRPC-style: `SendMessage`, `GetTask`, `CancelTask` (not `message/send` / `tasks/get`).
 
 ## Quick Start
 
@@ -16,12 +18,37 @@ initrunner a2a serve role.yaml --api-key my-secret-key
 
 # Custom host/port. Binding a non-loopback host without --api-key fails closed:
 # a key is generated and printed rather than serving the agent unauthenticated.
-initrunner a2a serve role.yaml --host 0.0.0.0 --port 9000 --api-key my-secret-key
+# Pass --url so the card advertises a dialable address (not http://0.0.0.0:9000).
+initrunner a2a serve role.yaml --host 0.0.0.0 --port 9000 \
+  --url http://agent.example:9000 --api-key my-secret-key
 ```
 
 The server exposes:
-- `/.well-known/agent-card.json` -- agent card (discovery)
-- JSON-RPC endpoint at the root URL -- handles `message/send` and `tasks/get`
+
+- `GET /.well-known/agent-card.json` -- agent card (discovery; no auth)
+- `POST /` -- JSON-RPC (`SendMessage`, `GetTask`, `CancelTask`, …)
+
+```bash
+curl -s http://127.0.0.1:8000/.well-known/agent-card.json | jq .supportedInterfaces
+
+curl -s http://127.0.0.1:8000/ \
+  -H 'Content-Type: application/json' \
+  -H 'A2A-Version: 1.0' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "SendMessage",
+    "params": {
+      "message": {
+        "role": "ROLE_USER",
+        "messageId": "m1",
+        "parts": [{"text": "hello"}]
+      }
+    }
+  }' | jq .result.task.status
+```
+
+A request without `A2A-Version: 1.0` is treated as protocol 0.3 and rejected with JSON-RPC error `-32009`.
 
 ## CLI Options
 
@@ -30,6 +57,7 @@ The server exposes:
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
+| `--url` | `str` | `http://{host}:{port}` | Public URL written into the agent card. Required for a dialable card when `--host` is `0.0.0.0` or `::`. |
 | `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all endpoints except the agent card require `Authorization: Bearer <key>`. Binding a non-loopback `--host` without a key fails closed — one is generated and printed so the JSON-RPC endpoint is never served unauthenticated off-host. |
 | `--cors-origin` | `str` | `None` | Allowed CORS origin. Can be repeated. |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
@@ -39,7 +67,7 @@ The server exposes:
 
 ## How It Works
 
-The A2A server uses [FastA2A](https://pydantic.dev/docs/ai/integrations/a2a/#fasta2a) (from PydanticAI) as the ASGI framework, with a custom worker that routes execution through InitRunner's executor. This means A2A-served agents get the same behavior as `--serve` agents:
+The server is a Starlette app assembled from `a2a-sdk` 1.0 routes (`create_agent_card_routes` + `create_jsonrpc_routes`) and `DefaultRequestHandlerV2`. The custom `InitRunnerAgentExecutor` routes every task through `execute_run_async()`, so A2A-served agents match `--serve` and CLI runs:
 
 - Input content validation
 - Role guardrail usage limits
@@ -48,28 +76,52 @@ The A2A server uses [FastA2A](https://pydantic.dev/docs/ai/integrations/a2a/#fas
 - Audit logging
 - Agent-principal context
 
+Blocking `SendMessage` waits until the task is terminal (`COMPLETED`, `FAILED`, `CANCELED`, `REJECTED`) or interrupted (`INPUT_REQUIRED`, `AUTH_REQUIRED`). `configuration.returnImmediately: true` returns the `SUBMITTED`/`WORKING` task and finishes in the background; poll with `GetTask`.
+
+`CancelTask` cancels the running `execute_run_async()` coroutine and marks the task `TASK_STATE_CANCELED`.
+
 ### Agent Card
 
-The agent card at `/.well-known/agent-card.json` is auto-generated from your role YAML:
+The card at `/.well-known/agent-card.json` is built from the role YAML. It includes `supportedInterfaces` (JSON-RPC, protocol version `1.0`), `version` from `role.metadata.version`, one default skill for the role plus one per resolved `SKILL.md`, and a Bearer security scheme when `--api-key` is set.
+
+The SDK serializer also emits a few A2A 0.3 mirror fields (`url`, `preferredTransport`, …). Treat `supportedInterfaces` as the source of truth.
 
 ```json
 {
   "name": "researcher",
   "description": "Gathers and summarizes research from the web",
-  "url": "http://localhost:8000",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "extendedAgentCard": false
+  },
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "researcher",
+      "name": "researcher",
+      "description": "Gathers and summarizes research from the web"
+    }
+  ]
 }
 ```
 
 ### Conversation Context
 
-A2A uses `context_id` to maintain conversation threads across multiple requests. When a client sends messages with the same `context_id`, the server preserves the full message history, enabling multi-turn conversations.
+A2A uses `contextId` to keep conversation threads. The executor stores PydanticAI `message_history` in an in-process LRU (1000 contexts) keyed by `contextId`. Tasks live in the SDK `InMemoryTaskStore`. Both die when the process exits.
 
-### Why we wrap FastA2A
+### Why we wrap the SDK executor
 
-PydanticAI 1.71+ exposes `agent.to_a2a()` as a one-liner ASGI app. We don't use it.
-
-`to_a2a()` calls `agent.run()` directly. The custom `InitRunnerWorker` at `initrunner/a2a/server.py` overrides `Worker.run_task()` so every A2A task routes through `execute_run_async()` instead. Routing through the executor adds:
+`a2a-sdk` samples (and PydanticAI's old `agent.to_a2a()`) call `agent.run()` directly. `InitRunnerAgentExecutor` at `initrunner/a2a/server.py` implements `AgentExecutor.execute()` so every A2A task goes through `execute_run_async()` instead. That keeps:
 
 - Input content validation (guardrail inputs)
 - Usage limits from `role.spec.guardrails`
@@ -78,11 +130,15 @@ PydanticAI 1.71+ exposes `agent.to_a2a()` as a one-liner ASGI app. We don't use 
 - Agent-principal context for authz checks
 - Output post-processing (structured type coercion, deferred-tool handling)
 
-An agent served over A2A must behave identically to the same agent served over OpenAI chat completions (`--serve`) or run from the CLI. If you are tempted to swap the worker for `agent.to_a2a()` to simplify the file, check first whether you need any of the above — you probably do.
+An agent served over A2A must behave like the same agent served over OpenAI chat completions (`--serve`) or run from the CLI. Do not swap the executor for a raw `agent.run()` wrapper.
+
+Inbound parts in this release are text-only (`context.get_user_input()`). Structured output is a data part (plus `json_schema` metadata), not a text dump.
+
+Streaming (`SendStreamingMessage` / token deltas) and multimodal inbound (url / raw / data parts) are a follow-up. Human-in-the-loop pause (`INPUT_REQUIRED` / `AUTH_REQUIRED`) and a durable SQLite task store are documented follow-ups, not implemented.
 
 ## Calling A2A Agents from a Role
 
-Use the delegate tool with `mode: a2a` to call a remote A2A agent from within another agent:
+Use the delegate tool with `mode: a2a` to call a remote A2A 1.0 agent from another agent:
 
 ```yaml
 name: coordinator
@@ -108,10 +164,13 @@ tools:
 
 When the LLM calls `delegate_to_research_agent("find papers on transformers")`, InitRunner:
 
-1. Sends a JSON-RPC `message/send` request to `http://research-server:8000`
-2. If the task completes immediately, extracts the result from A2A artifacts
-3. If the task is async (submitted/working), polls `tasks/get` with exponential backoff until completion or timeout
-4. Returns the result text to the LLM
+1. Resolves `http://research-server:8000/.well-known/agent-card.json` (cached on the invoker)
+2. Sends JSON-RPC `SendMessage` with `A2A-Version: 1.0` and a per-invoker `contextId`
+3. If the task completes, extracts text from artifacts, then `status.message`, then the last agent history message
+4. If the server returns `SUBMITTED` / `WORKING` (it honored `returnImmediately`), polls `GetTask` with exponential backoff until completion or timeout
+5. Returns the result text to the LLM
+
+Repeated `delegate_to_*` calls on the same invoker reuse that `contextId`, so the remote server can keep multi-turn history.
 
 ### Delegate Config Reference
 
@@ -130,21 +189,24 @@ The `mode: a2a` delegate config uses the same fields as `mode: mcp`:
 
 ### Error Handling
 
-All errors are returned as strings prefixed with `[DELEGATION ERROR]` so the LLM can see and handle failures gracefully. Errors include:
+All errors are returned as strings prefixed with `[DELEGATION ERROR]` so the LLM can see and handle failures. Errors include:
 
-- Task failed/rejected/canceled
+- Task failed / rejected / canceled / auth-required / input-required
 - Timeout (connection or polling)
 - HTTP errors
-- JSON-RPC errors
+- JSON-RPC errors (including missing `A2A-Version`)
+- Agent-card resolution failures
 - Policy denial (when agent authorization is configured)
+
+`INPUT_REQUIRED` and `AUTH_REQUIRED` are terminal for delegation today. They become resumable only when HITL lands.
 
 ## Comparison with Other Interfaces
 
 | Feature | `--serve` (OpenAI) | `mcp serve` | `a2a serve` |
 |---------|-------------------|-------------|-------------|
-| Protocol | OpenAI chat completions | MCP (JSON-RPC) | A2A (JSON-RPC) |
+| Protocol | OpenAI chat completions | MCP (JSON-RPC) | A2A 1.0 (JSON-RPC) |
 | Discovery | Manual | MCP tool listing | Agent card at `/.well-known/agent-card.json` |
-| Multi-turn | Server-side via `x-conversation-id` | Per-tool call | Via `context_id` |
+| Multi-turn | Server-side via `x-conversation-id` | Per-tool call | Via `contextId` |
 | Agents per server | 1 | Multiple | 1 |
 | Client tool | `delegate` mode `mcp` | Native MCP clients | `delegate` mode `a2a` |
 | Use case | Drop-in OpenAI replacement | Tool sharing with AI IDEs | Cross-framework agent communication |

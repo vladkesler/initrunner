@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Changed
+- **A2A 1.0 only.** `initrunner a2a serve` and `mode: a2a` delegation speak the Linux Foundation A2A 1.0 wire format via `a2a-sdk[http-server]`. FastA2A / 0.3 peers no longer work. JSON-RPC methods are `SendMessage` / `GetTask` / `CancelTask` (not `message/send` / `tasks/get`). Every JSON-RPC request needs `A2A-Version: 1.0` or the server returns `-32009`. `CancelTask` now cancels the running `execute_run_async()` coroutine. Failed tasks include `result.error` in `status.message`. Structured output is a data part (no `{"result": …}` wrapper). The card advertises `supportedInterfaces`, `metadata.version`, role/SKILL.md skills, and Bearer security when `--api-key` is set. New `--url` is the public card URL (warns when binding `0.0.0.0`/`::` without it). Delegation keeps a per-invoker `contextId` so repeated `delegate_to_*` calls share server history. Tasks and conversation context stay in-process and are lost on restart.
 - **The agent file is the agent.** Public Agent, Team, and Flow YAML is flat: a name, a prompt, the tools — no `apiVersion` / `kind` / `metadata` / `spec` wrapper. Composed documents use `agents`, `run`, `then`, and `after` (startup order). `personas` is not a public word. `kind: Service` and `kind: TestSuite` are unchanged. Filenames stay (`role.yaml`, `flow.yaml`).
 - **Old envelopes still run.** A file with the removed wrapper loads and executes. You get one warning that points at `doctor --fix`. Nothing is renamed on disk until you convert.
 - **One write path.** `initrunner new`, templates, `flow new`, the dashboard builder, imports, and examples write only flat YAML (`spec_version: 3`). Default new-agent output is `agent.yaml`.
@@ -14,6 +15,7 @@
 - **Flat YAML on the rest of the write/read surface.** `configure` updates a `model: provider:name` shorthand. Bundles and registry install previews accept flat roles. Always-on services read the cron prompt from a flat role. Flow members load `.env` from the referenced role directory. The dashboard builder seeds and save paths emit flat YAML.
 
 ### Docs
+- [A2A guide](docs/interfaces/a2a.md) documents the 1.0 wire format, gRPC-style method names, the mandatory `A2A-Version: 1.0` header, `--url`, cancel, and in-memory store limits.
 - README (English, Chinese, Japanese) has a short note above Quickstart: files are simpler, existing files still run, convert with `doctor --fix` when you want. [Envelope migration](docs/getting-started/envelope-migration.md) has the before/after and the rewriter rules.
 - Subsystem guides (CLI, doctor, flow, team, tools, memory, RAG, security, providers, dashboard API snippets, import guides) show the flat shape. TestSuite and Service examples stay enveloped.
 

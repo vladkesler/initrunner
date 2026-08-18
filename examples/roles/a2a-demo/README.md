@@ -19,7 +19,7 @@ In a second terminal, run the coordinator:
 initrunner run coordinator.yaml -p "What are the latest developments in quantum computing?"
 ```
 
-The coordinator will call `delegate_to_a2a_researcher(...)` which sends a JSON-RPC `message/send` request to the A2A server, polls for completion, and returns the result.
+The coordinator will call `delegate_to_a2a_researcher(...)`, which resolves the agent card, sends a JSON-RPC `SendMessage` request (`A2A-Version: 1.0`) to the A2A server, polls `GetTask` if needed, and returns the result.
 
 ## With Authentication
 
