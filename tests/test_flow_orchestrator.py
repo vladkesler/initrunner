@@ -136,6 +136,39 @@ class TestFlowOrchestrator:
         assert "consumer" in orch._members
         assert mock_load.call_count == 2
 
+    def test_inline_override_uses_referenced_role_directory(self, tmp_path):
+        from initrunner.agent.schema.role import RoleDefinition
+
+        role = RoleDefinition.model_validate(_make_role_data())
+        flow = FlowDefinition.model_validate(
+            _make_flow_data(
+                {
+                    "worker": {
+                        "role": "roles/worker.yaml",
+                        "inline_role": role,
+                    }
+                }
+            )
+        )
+        orch = FlowOrchestrator(flow, tmp_path)
+        expected_role_dir = (tmp_path / "roles").resolve()
+
+        with (
+            patch("initrunner.flow.orchestrator._load_dotenv") as mock_dotenv,
+            patch(
+                "initrunner.flow.orchestrator.resolve_role_model",
+                return_value=role,
+            ),
+            patch(
+                "initrunner.flow.orchestrator.build_agent",
+                return_value=MagicMock(),
+            ) as mock_build,
+        ):
+            orch._build_members()
+
+        mock_dotenv.assert_called_once_with(expected_role_dir)
+        mock_build.assert_called_once_with(role, role_dir=expected_role_dir)
+
     @patch("initrunner.flow.orchestrator.load_and_build")
     def test_find_entry(self, mock_load):
         from initrunner.agent.schema.role import RoleDefinition

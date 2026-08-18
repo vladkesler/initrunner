@@ -26,6 +26,7 @@
 	let drawerAgent: { id: string; name: string } | null = $state(null);
 
 	function openQuickRun(agent: AgentSummary) {
+		if (agent.shape && agent.shape !== 'solo') return;
 		drawerAgent = { id: agent.id, name: agent.name };
 	}
 
@@ -239,7 +240,7 @@
 	{#if pendingDelete}
 		<ConfirmDeleteDialog
 			entityName={pendingDelete.name}
-			entityType="agent"
+			entityType={pendingDelete.shape === 'preset' ? 'team' : pendingDelete.shape === 'graph' ? 'flow' : 'agent'}
 			open={true}
 			onConfirm={async () => {
 				const id = pendingDelete!.id;

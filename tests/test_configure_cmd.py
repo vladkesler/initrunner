@@ -20,6 +20,12 @@ ROLE_YAML = textwrap.dedent("""\
         temperature: 0.3
 """)
 
+FLAT_ROLE_YAML = textwrap.dedent("""\
+    name: flat-agent
+    prompt: You are helpful.
+    model: openai:gpt-5-mini
+""")
+
 
 @pytest.fixture()
 def local_role(tmp_path):
@@ -62,6 +68,33 @@ class TestUpdateRoleYaml:
         data = yaml.safe_load(p.read_text())
         assert "base_url" not in data["spec"]["model"]
         assert "api_key_env" not in data["spec"]["model"]
+
+    def test_updates_flat_model_shorthand(self, tmp_path):
+        path = tmp_path / "agent.yaml"
+        path.write_text(FLAT_ROLE_YAML)
+
+        _update_role_yaml(path, "anthropic", "claude-sonnet-4-5-20250929")
+
+        data = yaml.safe_load(path.read_text())
+        assert data["model"] == "anthropic:claude-sonnet-4-5-20250929"
+
+    def test_updates_flat_model_mapping_and_preserves_settings(self, tmp_path):
+        path = tmp_path / "agent.yaml"
+        path.write_text(
+            "name: flat-agent\n"
+            "prompt: You are helpful.\n"
+            "model:\n"
+            "  provider: openai\n"
+            "  name: gpt-5-mini\n"
+            "  temperature: 0.4\n"
+        )
+
+        _update_role_yaml(path, "openai", "gpt-5.4")
+
+        data = yaml.safe_load(path.read_text())
+        assert data["model"]["provider"] == "openai"
+        assert data["model"]["name"] == "gpt-5.4"
+        assert data["model"]["temperature"] == 0.4
 
 
 class TestConfigureNonInteractive:

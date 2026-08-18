@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
+import stat
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -111,7 +114,7 @@ def rewrite_envelope_file(
         bak = path.with_suffix(path.suffix + ".bak")
         if bak.exists() and not force:
             return RewriteResult(path, "failed", f"backup exists: {bak} (pass --force)")
-        bak.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        shutil.copy2(path, bak)
 
     _atomic_write(path, text)
     return RewriteResult(path, "rewritten", "rewrote envelope to flat YAML", backup=bak)
@@ -178,6 +181,17 @@ def _strip_compare(value: Any, *, flow_agent: bool) -> Any:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    mode = stat.S_IMODE(path.stat().st_mode)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        tmp.chmod(mode)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)

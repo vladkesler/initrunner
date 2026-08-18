@@ -52,7 +52,7 @@
 			<AlertTriangle size={11} class="shrink-0 text-fail" />
 		{/if}
 		<div class="ml-auto flex shrink-0 items-center gap-1">
-			{#if onRun}
+			{#if onRun && (!agent.shape || agent.shape === 'solo')}
 				<button
 					class="flex items-center justify-center rounded-[2px] p-0.5 text-fg-faint opacity-0 transition-all duration-150 hover:bg-accent-primary/10 hover:text-accent-primary group-hover:opacity-100"
 					onclick={handleRun}

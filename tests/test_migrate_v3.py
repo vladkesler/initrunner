@@ -87,6 +87,26 @@ def test_rewrite_writes_backup_and_flat(tmp_path: Path) -> None:
     assert "apiVersion" not in data
 
 
+def test_rewrite_preserves_private_file_permissions(tmp_path: Path) -> None:
+    src = tmp_path / "role.yaml"
+    src.write_text(
+        "apiVersion: initrunner/v1\n"
+        "kind: Agent\n"
+        "metadata:\n"
+        "  name: private-agent\n"
+        "spec:\n"
+        "  role: keep this private\n"
+    )
+    src.chmod(0o600)
+
+    result = rewrite_envelope_file(src)
+
+    assert result.action == "rewritten"
+    assert result.backup is not None
+    assert src.stat().st_mode & 0o777 == 0o600
+    assert result.backup.stat().st_mode & 0o777 == 0o600
+
+
 def test_rewrite_refuses_existing_backup(tmp_path: Path) -> None:
     src = tmp_path / "role.yaml"
     src.write_text(
@@ -108,12 +128,7 @@ def test_envelope_still_loads_via_dual_read(tmp_path: Path) -> None:
 
     path = tmp_path / "role.yaml"
     path.write_text(
-        "apiVersion: initrunner/v1\n"
-        "kind: Agent\n"
-        "metadata:\n"
-        "  name: dual-read\n"
-        "spec:\n"
-        "  role: hi\n"
+        "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: dual-read\nspec:\n  role: hi\n"
     )
     role = load_role(path)
     assert role.metadata.name == "dual-read"

@@ -134,7 +134,16 @@ def document_to_flow(document: AgentDocument, *, base_dir: Path | None = None) -
             for target in targets:
                 inbound.setdefault(target, []).append(name)
         if child.use:
-            agents[name] = FlowAgentConfig(role=child.use, sink=sink)
+            inline_role = (
+                _child_to_role(name, child, document, base_dir)
+                if _child_has_role_overrides(child)
+                else None
+            )
+            agents[name] = FlowAgentConfig(
+                role=child.use,
+                inline_role=inline_role,
+                sink=sink,
+            )
         else:
             agents[name] = FlowAgentConfig(
                 role="",
@@ -238,14 +247,44 @@ def _child_to_role(
     base_dir: Path | None,
 ) -> RoleDefinition:
     prompt, model, tools = _resolved_child(name, child, document, base_dir)
-    return _spec_to_role(
-        name=name,
-        description=document.description,
-        tags=document.tags,
-        prompt=prompt,
-        document=document,
-        model=model,
-        tools=tools,
+    if child.use:
+        if base_dir is None:
+            raise AdaptError(f"agent '{name}' has use: {child.use} but no base directory")
+        from initrunner.agent.loader import load_role
+
+        role = load_role((base_dir / child.use).resolve())
+    else:
+        role = _spec_to_role(
+            name=name,
+            description=document.description,
+            tags=document.tags,
+            prompt=prompt,
+            document=document,
+            model=model,
+            tools=tools,
+        )
+
+    updates: dict[str, Any] = {
+        "role": prompt,
+        "model": model,
+        "tools": tools,
+    }
+    if "triggers" in child.model_fields_set:
+        updates["triggers"] = list(child.triggers)
+    if child.guardrails is not None:
+        guardrail_updates = child.guardrails.model_dump(
+            exclude_unset=True,
+            exclude={"team_token_budget", "team_timeout_seconds"},
+        )
+        updates["guardrails"] = role.spec.guardrails.model_copy(update=guardrail_updates)
+    return role.model_copy(update={"spec": role.spec.model_copy(update=updates)})
+
+
+def _child_has_role_overrides(child: AgentChild) -> bool:
+    """Whether a referenced flow child needs an in-memory merged role."""
+    return bool(
+        child.model_fields_set
+        & {"prompt", "model", "tools", "tools_mode", "triggers", "guardrails"}
     )
 
 

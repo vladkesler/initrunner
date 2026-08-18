@@ -333,16 +333,25 @@ async def get_agent_yaml(
 async def delete_agent(
     agent_id: str,
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+    team_cache: Annotated[TeamCache, Depends(get_team_cache)],
+    flow_cache: Annotated[FlowCache, Depends(get_flow_cache)],
 ) -> DeleteResponse:
-    dr = role_cache.get(agent_id)
-    if dr is None:
+    discovered = role_cache.get(agent_id)
+    cache: RoleCache | TeamCache | FlowCache = role_cache
+    if discovered is None:
+        discovered = team_cache.get(agent_id)
+        cache = team_cache
+    if discovered is None:
+        discovered = flow_cache.get(agent_id)
+        cache = flow_cache
+    if discovered is None:
         raise HTTPException(status_code=404, detail="Agent not found")
-    path = dr.path
+    path = discovered.path
     try:
         await asyncio.to_thread(path.unlink, True)
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Cannot delete file: {exc}") from exc
-    role_cache.evict(agent_id)
+    cache.evict(agent_id)
     return DeleteResponse(id=agent_id, path=str(path))
 
 

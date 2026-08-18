@@ -246,6 +246,17 @@ class AgentDocument(BaseModel):
         if not has_then and not has_after and self.run is None:
             self.run = "sequential"
 
+        if not has_then and not has_after and len(self.agents) > 1:
+            for name, child in self.agents.items():
+                if "triggers" in child.model_fields_set:
+                    raise ValueError(
+                        f"Per-child triggers are not supported by preset teams (agent '{name}')"
+                    )
+                if child.guardrails is not None:
+                    raise ValueError(
+                        f"Per-child guardrails are not supported by preset teams (agent '{name}')"
+                    )
+
         if self.durability is not None and not has_then:
             # durability is a Flow journal; presets do not checkpoint
             raise ValueError("'durability' is only valid on a graph (children with 'then')")

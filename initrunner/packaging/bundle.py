@@ -82,16 +82,12 @@ def collect_bundle_files(role_path: Path) -> list[tuple[Path, BundleFile]]:
     3. Schema-referenced data files (output.schema_file, ingest.sources, docker bind_mounts)
     4. Explicit bundle.include globs from metadata
     """
-    import yaml
-
-    from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.agent.loader import load_role
 
     role_path = role_path.resolve()
     role_dir = role_path.parent
 
-    content = role_path.read_text()
-    data = yaml.safe_load(content)
-    role = RoleDefinition.model_validate(data)
+    role = load_role(role_path)
 
     collected: list[tuple[Path, BundleFile]] = []
     seen: set[str] = set()
@@ -165,14 +161,10 @@ def collect_bundle_files(role_path: Path) -> list[tuple[Path, BundleFile]]:
 
 def create_bundle(role_path: Path, output_dir: Path | None = None) -> Path:
     """Create a .tar.gz bundle from a role file. Returns archive path."""
-    import yaml
-
-    from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.agent.loader import load_role
 
     role_path = role_path.resolve()
-    content = role_path.read_text()
-    data = yaml.safe_load(content)
-    role = RoleDefinition.model_validate(data)
+    role = load_role(role_path)
 
     files = collect_bundle_files(role_path)
 

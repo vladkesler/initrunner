@@ -213,8 +213,7 @@ def _build_flow_entry(path: Path, category_dir: Path) -> dict | None:
         files = _collect_files(parent, category_dir)
 
         return {
-            "name": identity.get("name")
-            or (parent.name if parent != category_dir else "flow"),
+            "name": identity.get("name") or (parent.name if parent != category_dir else "flow"),
             "category": "flow",
             "description": identity.get("description") or "",
             "tags": identity.get("tags") or [],

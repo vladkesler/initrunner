@@ -1308,12 +1308,15 @@ def _prompt_from_role(role_path: Path) -> tuple[str, bool]:
         return prompt, autonomous
     if not isinstance(data, dict):
         return prompt, autonomous
-    for t in data.get("spec", {}).get("triggers") or []:
+    from initrunner.services.starters import document_body
+
+    body = document_body(data)
+    for t in body.get("triggers") or []:
         if isinstance(t, dict) and t.get("type") == "cron":
             prompt = str(t.get("prompt") or prompt)
             autonomous = bool(t.get("autonomous", False))
             break
-    if data.get("spec", {}).get("autonomy") is not None:
+    if body.get("autonomy") is not None:
         autonomous = True
     return prompt, autonomous
 

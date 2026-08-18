@@ -349,14 +349,21 @@ def _update_role_yaml(role_path: Path, provider: str, model: str) -> None:
     import yaml
 
     data = yaml.safe_load(role_path.read_text())
-    if "spec" in data and "model" in data["spec"]:
-        old_provider = data["spec"]["model"].get("provider", "")
-        data["spec"]["model"]["provider"] = provider
-        data["spec"]["model"]["name"] = model
+    envelope = data.get("kind") == "Agent" and isinstance(data.get("spec"), dict)
+    container = data["spec"] if envelope else data
+    current = container.get("model")
+    if isinstance(current, dict):
+        old_provider = str(current.get("provider", ""))
+        current["provider"] = provider
+        current["name"] = model
         # Only clear provider-specific fields when the provider actually changes
         if provider != old_provider:
-            data["spec"]["model"].pop("base_url", None)
-            data["spec"]["model"].pop("api_key_env", None)
+            current.pop("base_url", None)
+            current.pop("api_key_env", None)
+    elif envelope:
+        container["model"] = {"provider": provider, "name": model}
+    else:
+        container["model"] = f"{provider}:{model}"
     role_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
 

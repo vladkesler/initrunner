@@ -157,3 +157,23 @@ def test_child_environment_not_allowed_on_graph() -> None:
                 },
             }
         )
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"triggers": []},
+        {"guardrails": {"max_tool_calls": 2}},
+    ],
+)
+def test_per_child_runtime_policy_rejected_on_preset_team(override: dict) -> None:
+    with pytest.raises(ValidationError, match="not supported by preset teams"):
+        AgentDocument.model_validate(
+            {
+                "name": "review-team",
+                "agents": {
+                    "reviewer": {"prompt": "review", **override},
+                    "writer": "write",
+                },
+            }
+        )

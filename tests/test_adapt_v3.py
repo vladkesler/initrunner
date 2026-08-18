@@ -17,12 +17,7 @@ from initrunner.team.loader import load_team
 
 def test_run_kind_flat() -> None:
     assert run_kind_from_mapping({"name": "a", "prompt": "hi"}) == "Agent"
-    assert (
-        run_kind_from_mapping(
-            {"name": "t", "agents": {"a": "one", "b": "two"}}
-        )
-        == "Team"
-    )
+    assert run_kind_from_mapping({"name": "t", "agents": {"a": "one", "b": "two"}}) == "Team"
     assert (
         run_kind_from_mapping(
             {
@@ -77,6 +72,64 @@ def test_document_to_flow_inline() -> None:
     assert flow.spec.agents["writer"].inline_role is not None
     assert flow.spec.agents["writer"].inline_role.spec.role == "write a draft"
     assert flow.spec.agents["editor"].needs == ["writer"]
+
+
+def test_document_to_flow_applies_referenced_child_overrides(tmp_path: Path) -> None:
+    roles_dir = tmp_path / "roles"
+    roles_dir.mkdir()
+    (roles_dir / "base.yaml").write_text(
+        "name: base-agent\n"
+        "prompt: original prompt\n"
+        "model: openai:gpt-5-mini\n"
+        "tools:\n"
+        "  - datetime\n"
+        "guardrails:\n"
+        "  max_tool_calls: 8\n"
+    )
+    result = normalize_mapping(
+        {
+            "name": "pipe",
+            "agents": {
+                "worker": {
+                    "use": "roles/base.yaml",
+                    "prompt": "overridden prompt",
+                    "model": "anthropic:claude-sonnet-4-5",
+                    "tools": ["shell"],
+                    "triggers": [
+                        {
+                            "type": "cron",
+                            "schedule": "0 * * * *",
+                            "prompt": "tick",
+                        }
+                    ],
+                    "guardrails": {"max_tool_calls": 2},
+                }
+            },
+        }
+    )
+
+    flow = document_to_flow(result.document, base_dir=tmp_path)
+    config = flow.spec.agents["worker"]
+    role = config.inline_role
+
+    assert config.role == "roles/base.yaml"
+    assert role is not None
+    assert role.spec.role == "overridden prompt"
+    assert role.spec.model.provider == "anthropic"
+    assert role.spec.model.name == "claude-sonnet-4-5"
+    assert [tool.type for tool in role.spec.tools] == ["datetime", "shell"]
+    assert role.spec.triggers[0].type == "cron"
+    assert role.spec.guardrails.max_tool_calls == 2
+
+
+def test_document_to_flow_keeps_plain_reference_lazy(tmp_path: Path) -> None:
+    (tmp_path / "base.yaml").write_text("name: base-agent\nprompt: original prompt\n")
+    result = normalize_mapping({"name": "pipe", "agents": {"worker": {"use": "base.yaml"}}})
+
+    config = document_to_flow(result.document, base_dir=tmp_path).spec.agents["worker"]
+
+    assert config.role == "base.yaml"
+    assert config.inline_role is None
 
 
 def test_load_team_accepts_flat(tmp_path: Path) -> None:
