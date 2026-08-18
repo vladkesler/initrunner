@@ -25,10 +25,16 @@ def _validate_yaml(text: str) -> tuple[FlowDefinition | None, list[ValidationIss
     if raw is None:
         return None, issues
 
+    from initrunner.agent.schema.adapt import document_to_flow
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import normalize_mapping
     from initrunner.deprecations import validate_flow_dict
 
     try:
-        flow, _hits = validate_flow_dict(raw)
+        if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+            flow = document_to_flow(normalize_mapping(raw).document)
+        else:
+            flow, _hits = validate_flow_dict(raw)
     except Exception as exc:
         issues.extend(unwrap_pydantic_error(exc))
         return None, issues

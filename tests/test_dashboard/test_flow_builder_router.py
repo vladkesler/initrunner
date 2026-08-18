@@ -152,8 +152,9 @@ def test_seed_pipeline_placeholders(client):
     assert data["ready"] is True
 
     parsed = yaml.safe_load(data["flow_yaml"])
-    assert parsed["kind"] == "Flow"
-    assert len(parsed["spec"]["agents"]) == 2
+    assert "apiVersion" not in parsed
+    assert "kind" not in parsed
+    assert len(parsed["agents"]) == 2
 
 
 def test_seed_pipeline_with_existing_agent(client):
@@ -210,7 +211,7 @@ def test_seed_route_fixed(client):
     data = resp.json()
     parsed = yaml.safe_load(data["flow_yaml"])
     expected = {"intake", "researcher", "responder", "escalator"}
-    assert set(parsed["spec"]["agents"].keys()) == expected
+    assert set(parsed["agents"].keys()) == expected
 
 
 def test_seed_invalid_pattern(client):
@@ -247,7 +248,7 @@ def test_seed_shared_memory(client):
     )
     assert resp.status_code == 200
     parsed = yaml.safe_load(resp.json()["flow_yaml"])
-    assert parsed["spec"]["shared_memory"]["enabled"] is True
+    assert parsed["shared_memory"]["enabled"] is True
 
 
 def test_seed_route_with_routing_strategy(client):
@@ -273,8 +274,11 @@ def test_seed_route_with_routing_strategy(client):
         assert resp.status_code == 200
         data = resp.json()
         parsed = yaml.safe_load(data["flow_yaml"])
-        sink = parsed["spec"]["agents"]["intake"]["sink"]
-        assert sink["strategy"] == strategy
+        then = parsed["agents"]["intake"]["then"]
+        if strategy == "all":
+            assert "strategy" not in then
+        else:
+            assert then["strategy"] == strategy
 
 
 def test_seed_route_variable_agent_count(client):
@@ -300,11 +304,11 @@ def test_seed_route_variable_agent_count(client):
     assert resp.status_code == 200
     data = resp.json()
     parsed = yaml.safe_load(data["flow_yaml"])
-    agents = parsed["spec"]["agents"]
+    agents = parsed["agents"]
     assert len(agents) == 5
     assert "intake" in agents
-    sink = agents["intake"]["sink"]
-    assert len(sink["target"]) == 4
+    then = agents["intake"]["then"]
+    assert len(then["to"]) == 4
 
 
 def test_seed_route_defaults_to_sense(client):
@@ -327,7 +331,7 @@ def test_seed_route_defaults_to_sense(client):
     )
     assert resp.status_code == 200
     parsed = yaml.safe_load(resp.json()["flow_yaml"])
-    assert parsed["spec"]["agents"]["intake"]["sink"]["strategy"] == "sense"
+    assert parsed["agents"]["intake"]["then"]["strategy"] == "sense"
 
 
 # -- POST /api/flow-builder/validate ----------------------------------------

@@ -140,8 +140,9 @@ def test_seed_template(builder_client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "apiVersion" in data["yaml_text"]
-    assert "initrunner/v1" in data["yaml_text"]
+    assert "apiVersion" not in data["yaml_text"]
+    assert data["yaml_text"].startswith("name: test-agent")
+    assert "model: openai:" in data["yaml_text"]
     assert isinstance(data["issues"], list)
     assert isinstance(data["ready"], bool)
 
@@ -153,8 +154,8 @@ def test_seed_blank(builder_client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "apiVersion: initrunner/v1" in data["yaml_text"]
-    assert "provider: anthropic" in data["yaml_text"]
+    assert "apiVersion" not in data["yaml_text"]
+    assert "model: anthropic:" in data["yaml_text"]
     # Blank seed should be shorter than a full template
     assert len(data["yaml_text"]) < 500
 
@@ -519,7 +520,7 @@ def test_seed_ollama_default_url(builder_client):
     )
     assert resp.status_code == 200
     yaml_text = resp.json()["yaml_text"]
-    assert "provider: ollama" in yaml_text
+    assert "model: ollama:" in yaml_text
     assert "base_url" not in yaml_text
 
 

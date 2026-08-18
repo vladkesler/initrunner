@@ -383,7 +383,7 @@ def test_seed_custom_preset_resolution(client):
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    persona_cfg = parsed["spec"]["personas"]["router-persona"]
+    persona_cfg = parsed["agents"]["router-persona"]
     assert persona_cfg["model"]["provider"] == "openai"
 
 
@@ -430,7 +430,7 @@ def test_seed_personas_take_precedence(client):
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    assert list(parsed["spec"]["personas"].keys()) == ["alpha", "beta"]
+    assert list(parsed["agents"].keys()) == ["alpha", "beta"]
 
 
 # -- Service unit tests -------------------------------------------------------
@@ -452,7 +452,7 @@ def test_build_blank_with_structured_personas():
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    personas = parsed["spec"]["personas"]
+    personas = parsed["agents"]
     assert list(personas.keys()) == ["writer", "editor"]
     assert personas["writer"] == "Write content"
     assert personas["editor"] == "Edit content"
@@ -481,8 +481,8 @@ def test_build_blank_with_model_override_persona():
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    personas = parsed["spec"]["personas"]
-    assert personas["smart-one"]["role"] == "Deep thinking"
+    personas = parsed["agents"]
+    assert personas["smart-one"]["prompt"] == "Deep thinking"
     assert personas["smart-one"]["model"]["provider"] == "anthropic"
     assert personas["smart-one"]["model"]["name"] == "claude-opus-4-6"
     assert personas["fast-one"] == "Quick thinking"
@@ -505,7 +505,7 @@ def test_build_blank_preserves_order():
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    assert list(parsed["spec"]["personas"].keys()) == ["zulu", "alpha", "mike"]
+    assert list(parsed["agents"].keys()) == ["zulu", "alpha", "mike"]
 
 
 def test_build_blank_fallback_to_count():
@@ -520,7 +520,7 @@ def test_build_blank_fallback_to_count():
     import yaml
 
     parsed = yaml.safe_load(yaml_text)
-    personas = parsed["spec"]["personas"]
+    personas = parsed["agents"]
     assert len(personas) == 4
     assert list(personas.keys()) == ["analyst", "reviewer", "advisor", "checker"]
 
