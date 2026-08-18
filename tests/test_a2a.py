@@ -1074,6 +1074,8 @@ class TestBuildDelegateA2A:
 
 class TestA2ACLI:
     def test_help(self):
+        import re
+
         from typer.testing import CliRunner
 
         from initrunner.cli.main import app
@@ -1081,9 +1083,11 @@ class TestA2ACLI:
         runner = CliRunner()
         result = runner.invoke(app, ["a2a", "serve", "--help"])
         assert result.exit_code == 0
-        assert "A2A" in result.output or "a2a" in result.output
-        assert "ROLE_FILE" in result.output
-        assert "--url" in result.output
+        # Rich splits "--url" with ANSI codes on narrow CI terminals.
+        text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "A2A" in text or "a2a" in text
+        assert "ROLE_FILE" in text
+        assert "--url" in text
 
     def test_default_advertise_url(self):
         from initrunner.cli.a2a_cmd import _default_advertise_url
