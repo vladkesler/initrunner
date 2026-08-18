@@ -137,7 +137,9 @@ Failed URL fetches are logged as errors but do not crash the pipeline. The remai
 
 ### Purge behavior
 
-URL sources are **never auto-purged**. Removing a URL from the `sources` list stops it from being re-ingested, but previously stored content persists in the document store. To remove stored URL content, clear the store with `initrunner memory clear` or delete the store database.
+URL sources are **never auto-purged**. Removing a URL from the `sources` list stops it from being re-ingested, but previously stored content persists in the document store. To remove stored URL content, delete the document store directory (`~/.initrunner/stores/<agent-name>.lance`, or wherever `ingest.store_path` points) and re-run `initrunner ingest`.
+
+Two commands that look like they should help do not. `initrunner memory clear` only clears the memory store at `~/.initrunner/memory/<agent-name>.lance`, which is a separate database. `initrunner ingest --force` re-ingests the configured sources; it wipes the store only when the embedding model has changed.
 
 ## Chunking Strategies
 
@@ -315,12 +317,13 @@ This means re-running ingestion is safe and idempotent — it always reflects th
 When `ingest` is configured, a `search_documents` tool is auto-registered on the agent:
 
 ```
-search_documents(query: str, top_k: int = 5, source: str | None = None) -> str
+search_documents(query: str, top_k: int = 5, source: str | None = None, strategy: str | None = None) -> str
 ```
 
 - **`query`** — The search query. An embedding is created using the same model as ingestion.
 - **`top_k`** — Number of results to return (default: 5).
 - **`source`** — Optional source filter. Pass an exact path (e.g. `"./docs/guide.md"`) or a glob pattern (e.g. `"*.md"`) to restrict results to matching sources.
+- **`strategy`** — Optional per-call retrieval mode override: `"vector"`, `"hybrid"`, or `"hybrid_rerank"` (see [Retriever Options](#retriever-options)). Defaults to the role's configured `retriever.strategy`.
 
 Results are formatted as:
 

@@ -120,13 +120,12 @@ initrunner run reviewer.yaml --daemon                    # 由触发器驱动
 加上 `-a`，Agent 建立任务列表，逐项处理，反思进度，全部完成后自动停止。四种推理策略控制思考方式：`react`（默认）、`todo_driven`、`plan_execute` 和 `reflexion`。
 
 ```yaml
-spec:
-  autonomy:
-    compaction: { enabled: true, threshold: 30 }
-  guardrails:
-    max_iterations: 15
-    autonomous_token_budget: 100000
-    autonomous_timeout_seconds: 600
+autonomy:
+  compaction: { enabled: true, threshold: 30 }
+guardrails:
+  max_iterations: 15
+  autonomous_token_budget: 100000
+  autonomous_timeout_seconds: 600
 ```
 
 空转检测捕获无进展的循环。历史压缩总结旧上下文，防止长时间运行耗尽 Token 窗口。迭代、Token 和墙钟上限约束每次运行。查看 [自主执行](docs/orchestration/autonomy.md) · [护栏](docs/configuration/guardrails.md)。
@@ -136,16 +135,15 @@ spec:
 添加触发器并切换到 `--daemon`。Agent 持续运行。每个事件触发一次提示-响应循环。
 
 ```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-    - type: telegram
-      allowed_user_ids: [123456789]
+triggers:
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+  - type: telegram
+    allowed_user_ids: [123456789]
 ```
 
 七种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord、slack。守护进程热重载角色变更无需重启，最多同时运行四个触发器。查看 [触发器](docs/core/triggers.md)。
@@ -161,18 +159,17 @@ initrunner run role.yaml --autopilot
 也可以有选择地启用。在单个触发器上设置 `autonomous: true`，其余保持单次响应：
 
 ```yaml
-spec:
-  triggers:
-    - type: telegram
-      autonomous: true          # 思考、研究，然后回复
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate the weekly status report."
-      autonomous: true          # 规划、收集数据、撰写、审查
-    - type: file_watch
-      paths: [./src]
-      prompt_template: "File changed: {path}. Review it."
-      # 默认：单次响应
+triggers:
+  - type: telegram
+    autonomous: true          # 思考、研究，然后回复
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate the weekly status report."
+    autonomous: true          # 规划、收集数据、撰写、审查
+  - type: file_watch
+    paths: [./src]
+    prompt_template: "File changed: {path}. Review it."
+    # 默认：单次响应
 ```
 
 ### 跨模式的记忆
@@ -184,13 +181,12 @@ spec:
 将 Agent 指向一个目录。它会自动提取、分块、嵌入并索引文档。对话时，Agent 搜索索引并引用找到的内容。新增和变更的文件每次运行时重新索引。
 
 ```yaml
-spec:
-  ingest:
-    auto: true
-    sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
-  memory:
-    semantic:
-      max_memories: 1000
+ingest:
+  auto: true
+  sources: ["./docs/**/*.md", "./docs/**/*.pdf"]
+memory:
+  semantic:
+    max_memories: 1000
 ```
 
 ```bash
@@ -215,13 +211,13 @@ initrunner run reader -i   # 索引代码，然后开始问答
 **加密凭证保险库。** `initrunner vault init` 创建 `~/.initrunner/vault.enc`，使用 Fernet + scrypt 根据你的口令加密。API 密钥先从环境变量解析，然后从保险库，所以现有的 `api_key_env:` 和 `${VAR}` 占位符继续工作。
 
 ```yaml
-spec:
-  security:
+security:
+  tools:
     audit_hooks_enabled: true
     block_private_ips: true
-    input_guard:
-      max_prompt_chars: 10000
-      blocked_patterns: ["(?i)rm -rf /"]
+  content:
+    max_prompt_length: 10000
+    blocked_input_patterns: ["(?i)rm -rf /"]
 ```
 
 查看 [安全](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker 沙箱](docs/security/docker-sandbox.md) · [Agent 策略](docs/security/agent-policy.md) · [凭证保险库](docs/security/vault.md) · [审计链](docs/security/audit-chain.md) · [护栏](docs/configuration/guardrails.md)。
@@ -231,10 +227,9 @@ spec:
 USD 预算限制守护进程支出。达到上限后，触发器停止发火，直到窗口重置。
 
 ```yaml
-spec:
-  guardrails:
-    daemon_daily_cost_budget: 5.00    # 每日 USD
-    daemon_weekly_cost_budget: 25.00  # 每周 USD
+guardrails:
+  daemon_daily_cost_budget: 5.00    # 每日 USD
+  daemon_weekly_cost_budget: 25.00  # 每周 USD
 ```
 
 成本估算使用 [genai-prices](https://pypi.org/project/genai-prices/) 按模型和提供商计算支出。每次运行的成本记录到审计日志。仪表盘绘制跨 Agent 和时间范围的成本曲线。查看 [成本追踪](docs/core/cost-tracking.md)。
@@ -295,16 +290,16 @@ initrunner dashboard                  # 打开 http://localhost:8100
 
 | 功能 | 命令 / 配置 | 文档 |
 |-----|-----------|------|
-| **技能**（可复用的工具 + 提示词包） | `spec: { skills: [../skills/web-researcher] }` | [Skills](docs/agents/skills_feature.md) |
+| **技能**（可复用的工具 + 提示词包） | `skills: [../skills/web-researcher]` | [Skills](docs/agents/skills_feature.md) |
 | **API 服务器**（OpenAI 兼容端点） | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A 服务器**（Agent 间协议） | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |
 | **多模态**（图像、音频、视频、文档） | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
-| **结构化输出**（验证的 JSON Schema） | `spec: { output: { schema: {...} } }` | [Structured Output](docs/core/structured-output.md) |
+| **结构化输出**（验证的 JSON Schema） | `output: { type: json_schema, schema: {...} }` | [Structured Output](docs/core/structured-output.md) |
 | **评估**（测试 Agent 输出质量） | `initrunner test role.yaml -s eval.yaml` | [Evals](docs/core/evals.md) |
-| **能力**（原生 PydanticAI 功能） | `spec: { capabilities: [Thinking, WebSearch] }` | [Capabilities](docs/core/capabilities.md) |
-| **可观测性**（OpenTelemetry） | `spec: { observability: { enabled: true } }` | [Observability](docs/core/observability.md) |
-| **推理**（结构化思维模式） | `spec: { reasoning: { pattern: plan_execute } }` | [Reasoning](docs/core/reasoning.md) |
-| **工具搜索**（按需工具发现） | `spec: { tool_search: { enabled: true } }` | [Tool Search](docs/core/tool-search.md) |
+| **能力**（原生 PydanticAI 功能） | `capabilities: [Thinking, WebSearch]` | [Capabilities](docs/core/capabilities.md) |
+| **可观测性**（OpenTelemetry） | `observability: { backend: otlp }` | [Observability](docs/core/observability.md) |
+| **推理**（结构化思维模式） | `reasoning: { pattern: plan_execute }` | [Reasoning](docs/core/reasoning.md) |
+| **工具搜索**（按需工具发现） | `tool_search: { enabled: true }` | [Tool Search](docs/core/tool-search.md) |
 | **配置**（切换提供商/模型） | `initrunner configure role.yaml --provider groq` | [Providers](docs/configuration/providers.md) |
 
 ## 架构
@@ -315,7 +310,7 @@ initrunner/
   runner/       一次性、REPL、自主、守护进程执行模式
   flow/         通过 flow.yaml 的多 Agent 编排
   triggers/     Cron、文件监听、webhook、心跳、Telegram、Discord
-  stores/       文档 + 记忆存储（LanceDB、zvec）
+  stores/       文档 + 记忆存储（LanceDB）
   ingestion/    提取 -> 分块 -> 嵌入 -> 存储 流水线
   mcp/          MCP 服务器集成与网关
   audit/        仅追加 SQLite 审计日志，带敏感信息清理
@@ -329,7 +324,7 @@ initrunner/
 
 **InitHub:** 在 [hub.initrunner.ai](https://hub.initrunner.ai/) 浏览和安装社区 Agent。使用 `initrunner publish` 发布你自己的。
 
-**OCI 注册表:** 将角色包推送到任何 OCI 兼容注册表: `initrunner publish oci://ghcr.io/org/my-agent --tag 1.0.0`。查看 [OCI 分发](docs/core/oci-distribution.md)。
+**OCI 注册表:** 将角色包推送到任何 OCI 兼容注册表: `initrunner publish . oci://ghcr.io/org/my-agent --tag 1.0.0`。查看 [OCI 分发](docs/core/oci-distribution.md)。
 
 ## 文档
 
@@ -370,4 +365,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.8.1</sub></p>
+<p align="center"><sub>v2026.8.5</sub></p>

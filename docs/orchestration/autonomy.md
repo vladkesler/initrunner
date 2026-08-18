@@ -292,7 +292,7 @@ guardrails:
 Run it:
 
 ```bash
-initrunner run deployment-checker -a \
+initrunner run examples/roles/deployment-checker/role.yaml -a \
   -p "Verify the staging deployment at https://staging.example.com is healthy"
 ```
 

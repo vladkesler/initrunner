@@ -290,7 +290,7 @@ class TestValidateYamlFile:
         _defn, _kind, issues = validate_yaml_file(flow_path)
         errors = [i for i in issues if i.severity == "error"]
         assert any("missing.yaml" in i.message for i in errors)
-        assert any(i.field == "spec.agents.worker.role" for i in errors)
+        assert any(i.field == "agents.worker.use" for i in errors)
 
     def test_unreadable_file(self, tmp_path):
         defn, _kind, issues = validate_yaml_file(tmp_path / "does-not-exist.yaml")

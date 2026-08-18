@@ -125,22 +125,27 @@ The validation checks:
 
 If any error-severity issues are found, the command exits with code 1. When combined with `--quickstart`, role errors block the smoke test from running.
 
-Example output with deprecation errors:
+Example output for a role with a deprecated field:
 
 ```
        Role Validation: my-agent (spec_version: 1, current: 2)
-┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ ID     ┃ Severity ┃ Issue                                     ┃ Status     ┃
-┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ DEP002 │ error    │ store_backend 'zvec' has been removed...  │ manual fix │
-└────────┴──────────┴───────────────────────────────────────────┴────────────┘
+┏━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓
+┃ ID     ┃ Severity ┃ Issue                                    ┃ Status       ┃
+┡━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━┩
+│ DEP002 │ error    │ store_backend 'zvec' has been removed... │ auto-fixable │
+└────────┴──────────┴──────────────────────────────────────────┴──────────────┘
+Role is valid.
+spec_version 1 is behind current 2.
 ```
+
+Auto-fixable hits do not set the error exit code. Only error-severity issues
+without a migration rule (and schema errors) exit 1.
 
 ## Security Posture Check
 
 When `--role` is provided and the role parses successfully, doctor checks the security posture:
 
-- **External triggers without security config**: Agents with webhook, telegram, or discord triggers but no `security.preset` (or custom security policy) trigger a warning. Internal triggers (cron, file_watch, heartbeat) do not.
+- **External triggers without security config**: Agents with webhook, telegram, discord, or slack triggers but no `security.preset` (or custom security policy) trigger a warning. Internal triggers (cron, file_watch, heartbeat) do not.
 - **Development preset with external triggers**: Warns that rate limits and content filtering are relaxed.
 - **initguard status**: Notes whether `INITRUNNER_POLICY_DIR` is configured for agent-level policy enforcement.
 
@@ -172,7 +177,7 @@ These run automatically with `--role` and have no side effects:
 | **Skills** | Resolves each skill reference (role-local, `INITRUNNER_SKILL_DIR`, `~/.initrunner/skills`). Reports unmet environment variable and binary requirements. |
 | **Custom tools** | Runs `importlib.util.find_spec()` to verify the module is locatable. Validates imports against sandbox policy via AST analysis. Adds `role_dir` to `sys.path` to match runtime behavior. |
 | **Memory store** | Resolves the store path and checks the parent directory exists and is writable. A missing store is reported as info (runtime creates it on first use). |
-| **Triggers** | Validates cron expressions (via `croniter`), checks timezone validity, verifies file_watch/heartbeat paths exist (CWD-relative, matching runtime), checks Telegram/Discord token env vars are set. |
+| **Triggers** | Validates cron expressions (via `croniter`), checks timezone validity, verifies file_watch/heartbeat paths exist (CWD-relative, matching runtime), checks Telegram/Discord/Slack token env vars are set (Slack needs both `app_token_env` for Socket Mode and `bot_token_env` for replies). |
 | **MCP servers** | Listed as "skipped" in static mode (connection requires spawning processes). |
 | **Model name** | Checks `provider:name` against PydanticAI's known model list and suggests the closest match on a likely typo (`gpt-4oo` warns with "Did you mean 'openai:gpt-4o'?"). Advisory only -- unknown names still run, since providers ship models faster than the list updates. Custom endpoints (Ollama, `base_url` overrides) are skipped. |
 
@@ -288,6 +293,7 @@ With `--fix`, doctor rewrites envelope Agent/Team/Flow YAML to flat documents, t
 | Issue | Fix | Requires a role/flow path? |
 |-------|-----|--------------------|
 | Envelope Agent/Team/Flow YAML | Rewrites to flat YAML (backup unless `--no-backup`) | Yes (`PATH`, `--role`, or `--flow`) |
+| Deprecated fields in envelope role YAML (DEP001-DEP003) | Resolved by the rewrite. If the rewrite is refused (for example an existing `.bak` without `--force`), a surgical text patch fixes the field in place and preserves comments and formatting | Yes (`PATH` or `--role`) |
 | Provider SDK missing (key is set) | `install_extra()` installs the pip extra | No |
 | Missing API key | Prompts to enter and persist to `~/.initrunner/.env` | Interactive only (skipped with `--yes`) |
 | Role tools/triggers need uninstalled extras | Installs the matching extras (e.g. `initrunner[search]`) | Yes |
@@ -295,7 +301,8 @@ With `--fix`, doctor rewrites envelope Agent/Team/Flow YAML to flat documents, t
 
 ### What `--fix` does NOT repair
 
-- **Deprecated fields** (e.g. `store_backend: zvec`): these remain diagnostic-only until explicit migration rules exist.
+- **Deprecated values in already-flat YAML** (e.g. `store_backend: zvec` in a flat agent file): these surface as schema errors, not deprecation hits, and require manual editing. Deprecation auto-migration only applies to envelope documents.
+- **Flow/Team deprecations (DEP004-DEP005)**: resolved as a side effect of the envelope rewrite; there is no standalone patch for a flow file the rewriter left alone.
 - **Schema errors**: structural issues in the role YAML require manual editing.
 - **Non-equivalent envelopes**: if the rewriter cannot keep execution semantics, it leaves the file alone and exits non-zero.
 

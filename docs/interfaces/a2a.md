@@ -104,7 +104,7 @@ Blocking `SendMessage` waits until the task is terminal (`COMPLETED`, `FAILED`, 
 
 ### Agent Card
 
-The card at `/.well-known/agent-card.json` is built from the role YAML. It includes `supportedInterfaces` (JSON-RPC, protocol version `1.0`), `version` from `role.metadata.version`, one default skill for the role plus one per resolved `SKILL.md`, and a Bearer security scheme when `--api-key` is set.
+The card at `/.well-known/agent-card.json` is built from the role YAML. It includes `supportedInterfaces` (JSON-RPC, protocol version `1.0`), `version` from the role's top-level `version:` field, one default skill for the role plus one per resolved `SKILL.md`, and a Bearer security scheme when `--api-key` is set.
 
 The SDK serializer also emits a few A2A 0.3 mirror fields (`url`, `preferredTransport`, …). Treat `supportedInterfaces` as the source of truth.
 
@@ -154,7 +154,7 @@ A2A uses `contextId` to keep conversation threads. The executor stores PydanticA
 `a2a-sdk` samples (and PydanticAI's old `agent.to_a2a()`) call `agent.run()` directly. `InitRunnerAgentExecutor` at `initrunner/a2a/server.py` implements `AgentExecutor.execute()` so every A2A task goes through `execute_run_stream_async()` instead. That keeps:
 
 - Input content validation (guardrail inputs)
-- Usage limits from `role.spec.guardrails`
+- Usage limits from the role's `guardrails`
 - Retry/timeout wrapping
 - Audit logging via `AuditLogger`
 - Agent-principal context for authz checks

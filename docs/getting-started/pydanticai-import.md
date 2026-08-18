@@ -54,17 +54,17 @@ def fahrenheit_to_celsius(temp_f: float) -> str:
 ### Import it
 
 ```bash
-initrunner new --pydantic-ai weather_agent.py
+initrunner new --pydantic-ai weather_agent.py --output weather-bot.yaml
 ```
 
 ### After: InitRunner role + sidecar
 
-Two files are generated -- a declarative `role.yaml` and a `weather_agent_tools.py` sidecar with the extracted tool functions.
+Two files are generated -- a declarative `weather-bot.yaml` and a `weather_bot_tools.py` sidecar with the extracted tool functions.
 
 ```yaml
 # weather-bot.yaml
 name: weather-assistant
-spec_version: 2
+spec_version: 3
 prompt: >-
   You are a weather assistant. Use the provided tools to fetch real weather
   data, then return a structured weather report.
@@ -218,7 +218,7 @@ initrunner new --pydantic-ai <file> [options]
 Options:
   --provider TEXT    Model provider (auto-detected if omitted)
   --model TEXT       Model name
-  --output PATH     Output file path (default: role.yaml)
+  --output PATH      Output file path (default: agent.yaml)
   --force            Overwrite existing file
   --no-refine        Skip interactive refinement loop
 ```

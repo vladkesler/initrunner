@@ -71,7 +71,7 @@ Every report includes:
 
 | Field | Description |
 |-------|-------------|
-| Agent name | From `metadata.name` in the role YAML |
+| Agent name | From `name` in the role YAML |
 | Model | Provider and model name (e.g. `openai:gpt-5-mini`) |
 | Run ID | Unique identifier for the run |
 | Timestamp | ISO 8601 UTC timestamp |

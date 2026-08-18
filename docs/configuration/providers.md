@@ -1,6 +1,15 @@
 # Providers & Model Configuration
 
-The default model is `openai`/`gpt-5-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `model` field in your role YAML.
+There is no fixed default model. When a role omits `model`, InitRunner resolves one in this order:
+
+1. The `--model provider:name` flag, or the dashboard model picker.
+2. A provider/model override recorded in the registry, for roles installed with `initrunner install`.
+3. The `INITRUNNER_MODEL` environment variable.
+4. `~/.initrunner/run.yaml`, written by `initrunner setup`.
+5. Auto-detection from your credentials: the first provider with a key available (env var or vault), checked in the order `anthropic`, `openai`, `google`, `groq`, `mistral`, `cohere`, `xai`, skipping any provider whose SDK extra is not installed. Each provider resolves to its first curated model, listed under [Model Selection](#model-selection).
+6. A locally running Ollama instance, using its first available model.
+
+If none of those apply, the run fails with `No model specified and none could be auto-detected`. Pin a specific provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by setting the `model` field in your role YAML.
 
 Every `api_key_env` below is resolved through env vars first, then the [Credential Vault](../security/vault.md) if one is initialized. Existing workflows keep working unchanged.
 
@@ -9,19 +18,19 @@ Every `api_key_env` below is resolved through env vars first, then the [Credenti
 Change `provider` and `name`, then install the matching extra if needed:
 
 ```yaml
-model: anthropic:claude-sonnet-4-20250514
+model: anthropic:claude-sonnet-4-6
 ```
 
 | Provider | Env Var | Extra to install | Example model |
 |----------|---------|-----------------|---------------|
 | `openai` | `OPENAI_API_KEY` | *(included)* | `gpt-5-mini` |
-| `anthropic` | `ANTHROPIC_API_KEY` | `initrunner[anthropic]` | `claude-sonnet-4-20250514` |
-| `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-2.0-flash` |
+| `anthropic` | `ANTHROPIC_API_KEY` | `initrunner[anthropic]` | `claude-sonnet-4-6` |
+| `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-3.7-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
 | `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
 | `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-r-plus` |
-| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
-| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-3` |
+| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-6-v1:0` |
+| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-4` |
 
 Install all provider extras at once with `pip install initrunner[all-models]`.
 
@@ -36,12 +45,12 @@ model: openai:gpt-5-mini
 
 **Anthropic** (`pip install initrunner[anthropic]`):
 ```yaml
-model: anthropic:claude-sonnet-4-5-20250929
+model: anthropic:claude-sonnet-4-6
 ```
 
 **Google** (`pip install initrunner[google]`):
 ```yaml
-model: google:gemini-2.0-flash
+model: google:gemini-3.7-flash
 ```
 
 **Groq** (`pip install initrunner[groq]`):
@@ -61,12 +70,12 @@ model: cohere:command-r-plus
 
 **Bedrock** (`pip install initrunner[all-models]`):
 ```yaml
-model: bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0
+model: bedrock:us.anthropic.claude-sonnet-4-6-v1:0
 ```
 
 **xAI** (`pip install initrunner[all-models]`):
 ```yaml
-model: xai:grok-3
+model: xai:grok-4
 ```
 
 ## Model Selection
@@ -75,42 +84,49 @@ model: xai:grok-3
 
 | Provider | Model | Description |
 |----------|-------|-------------|
-| `openai` | **`gpt-5-mini`** | Fast, affordable (default) |
-| `openai` | `gpt-4o` | High capability GPT-4 |
-| `openai` | `gpt-4.1` | Latest GPT-4.1 |
-| `openai` | `gpt-4.1-mini` | Small GPT-4.1 |
-| `openai` | `gpt-4.1-nano` | Fastest GPT-4.1 |
-| `openai` | `o3-mini` | Reasoning model |
-| `anthropic` | **`claude-sonnet-4-5-20250929`** | Balanced, fast (default) |
+| `openai` | **`gpt-5.4`** | Frontier (best quality, higher cost) (default) |
+| `openai` | `gpt-5-mini` | Balanced (good quality, lower cost) |
+| `openai` | `gpt-5.6-luna` | Frontier (latest GPT-5.6) |
+| `openai` | `gpt-5-nano` | Lightweight (fastest, lowest cost) |
+| `openai` | `gpt-4.1` | Previous gen, reliable |
+| `openai` | `o4-mini` | Reasoning, fast |
+| `openai` | `o3` | Reasoning, frontier |
+| `anthropic` | **`claude-sonnet-4-6`** | Balanced (fast, capable) (default) |
 | `anthropic` | `claude-sonnet-5` | Frontier (latest generation) |
-| `anthropic` | `claude-haiku-35-20241022` | Compact, very fast |
-| `anthropic` | `claude-opus-4-20250514` | Most capable |
-| `google` | **`gemini-2.0-flash`** | Fast multimodal (default) |
-| `google` | `gemini-2.5-pro-preview-05-06` | Most capable |
-| `google` | `gemini-2.0-flash-lite` | Lightweight |
-| `groq` | **`llama-3.3-70b-versatile`** | Fast Llama 70B (default) |
-| `groq` | `llama-3.1-8b-instant` | Ultra-fast 8B |
-| `groq` | `mixtral-8x7b-32768` | Mixtral MoE |
-| `mistral` | **`mistral-large-latest`** | Most capable (default) |
-| `mistral` | `mistral-small-latest` | Fast, efficient |
+| `anthropic` | `claude-opus-5` | Frontier (latest Opus, higher cost) |
+| `anthropic` | `claude-opus-4-6` | Previous Opus, high quality |
+| `anthropic` | `claude-haiku-4-5-20251001` | Lightweight (fastest, lowest cost) |
+| `google` | **`gemini-3.7-flash`** | Frontier (latest flash) (default) |
+| `google` | `gemini-3.6-flash` | Balanced (fast multimodal) |
+| `google` | `gemini-3.5-flash-lite` | Lightweight (lowest cost) |
+| `google` | `gemini-2.5-pro` | Previous gen, best quality |
+| `google` | `gemini-2.5-flash` | Previous gen, fast |
+| `groq` | **`llama-4-scout-17b-16e`** | Llama 4 Scout, ultra-fast (default) |
+| `groq` | `llama-3.3-70b-versatile` | Llama 70B, high quality |
+| `groq` | `llama-3.1-8b-instant` | Llama 8B, lowest latency |
+| `mistral` | **`mistral-large-latest`** | Frontier (best quality) (default) |
+| `mistral` | `mistral-small-latest` | Balanced (fast, efficient) |
 | `mistral` | `codestral-latest` | Code-optimized |
-| `cohere` | **`command-r-plus`** | Advanced RAG (default) |
+| `mistral` | `devstral-small-2505` | Agentic coding |
+| `cohere` | **`command-a`** | Frontier (256K context) (default) |
+| `cohere` | `command-r-plus` | Advanced RAG |
 | `cohere` | `command-r` | Balanced |
-| `cohere` | `command-light` | Fast |
-| `bedrock` | **`us.anthropic.claude-sonnet-4-20250514-v1:0`** | Claude Sonnet via Bedrock (default) |
+| `bedrock` | **`us.anthropic.claude-sonnet-4-6-v1:0`** | Claude Sonnet 4.6 (balanced) (default) |
 | `bedrock` | `us.anthropic.claude-sonnet-5` | Claude Sonnet 5 (latest) |
-| `bedrock` | `us.anthropic.claude-haiku-4-20250514-v1:0` | Claude Haiku via Bedrock |
-| `bedrock` | `us.meta.llama3-2-90b-instruct-v1:0` | Llama 3.2 90B via Bedrock |
-| `bedrock` | `zai.glm-5` | Z.AI GLM-5 via Bedrock |
-| `bedrock` | `moonshotai.kimi-k2.5` | Moonshot Kimi K2.5 via Bedrock |
-| `xai` | **`grok-3`** | Most capable Grok (default) |
-| `xai` | `grok-4.5` | Latest Grok |
-| `xai` | `grok-3-mini` | Fast Grok |
-| `ollama` | **`llama3.2`** | Llama 3.2 (default) |
-| `ollama` | `llama3.1` | Llama 3.1 |
+| `bedrock` | `us.anthropic.claude-opus-5` | Claude Opus 5 (latest) |
+| `bedrock` | `us.anthropic.claude-haiku-4-5-v1:0` | Claude Haiku 4.5 (lightweight) |
+| `bedrock` | `us.meta.llama4-scout-17b-instruct-v1:0` | Llama 4 Scout |
+| `bedrock` | `zai.glm-5` | Z.AI GLM-5 |
+| `bedrock` | `moonshotai.kimi-k2.5` | Moonshot Kimi K2.5 |
+| `xai` | **`grok-4`** | Frontier (best quality) (default) |
+| `xai` | `grok-4.5` | Frontier (latest) |
+| `xai` | `grok-4-fast` | Balanced (fast, 2M context) |
+| `xai` | `grok-3-mini-beta` | Lightweight |
+| `ollama` | **`llama3.2`** | General purpose, 3B (default) |
+| `ollama` | `llama3.1` | General purpose, 8B |
 | `ollama` | `mistral` | Mistral 7B |
-| `ollama` | `codellama` | Code Llama |
-| `ollama` | `phi3` | Microsoft Phi-3 |
+| `ollama` | `codellama` | Code-optimized |
+| `ollama` | `qwen2.5` | Multilingual |
 
 For Ollama, the wizard also queries the local Ollama server for installed models and shows those if available.
 

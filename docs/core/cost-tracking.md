@@ -94,10 +94,9 @@ The estimator uses the raw system prompt only (skills are excluded and labeled c
 In addition to token budgets, daemon and bot modes support USD-based cost limits.
 
 ```yaml
-spec:
-  guardrails:
-    daemon_daily_cost_budget: 5.00    # USD per day
-    daemon_weekly_cost_budget: 25.00  # USD per week
+guardrails:
+  daemon_daily_cost_budget: 5.00    # USD per day
+  daemon_weekly_cost_budget: 25.00  # USD per week
 ```
 
 | Field | Type | Default | Description |
@@ -119,10 +118,9 @@ spec:
 By default, daily and weekly resets use UTC. Configure `budget_timezone` to use a different IANA timezone:
 
 ```yaml
-spec:
-  guardrails:
-    daemon_daily_cost_budget: 5.00
-    budget_timezone: "America/New_York"
+guardrails:
+  daemon_daily_cost_budget: 5.00
+  budget_timezone: "America/New_York"
 ```
 
 Or override from the CLI:
@@ -149,12 +147,11 @@ This prevents silent non-enforcement. Display contexts (CLI `cost report`, dashb
 Token budgets and cost budgets are enforced independently. You can use both:
 
 ```yaml
-spec:
-  guardrails:
-    daemon_token_budget: 5000000
-    daemon_daily_token_budget: 500000
-    daemon_daily_cost_budget: 10.00
-    daemon_weekly_cost_budget: 50.00
+guardrails:
+  daemon_token_budget: 5000000
+  daemon_daily_token_budget: 500000
+  daemon_daily_cost_budget: 10.00
+  daemon_weekly_cost_budget: 50.00
 ```
 
 Either limit being hit will pause the daemon.

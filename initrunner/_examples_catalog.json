@@ -70,8 +70,7 @@
       "test-pipeline/flow.yaml",
       "test-pipeline/roles/change-detector.yaml",
       "test-pipeline/roles/integration-runner.yaml",
-      "test-pipeline/roles/unit-runner.yaml",
-      "test-pipeline/roles/unit-runner.yaml.bak"
+      "test-pipeline/roles/unit-runner.yaml"
     ],
     "primary_file": "flow.yaml",
     "primary_content": "name: email-pipeline\ndescription: Multi-agent email processing pipeline\nspec_version: 3\nguardrails:\n  max_request_limit: 30\nagents:\n  inbox-watcher:\n    use: roles/inbox-watcher.yaml\n    then:\n      to: triager\n  triager:\n    use: roles/triager.yaml\n    then:\n      to:\n      - researcher\n      - responder\n      circuit_breaker_threshold: 5\n    after:\n    - inbox-watcher\n  researcher:\n    use: roles/researcher.yaml\n    after:\n    - triager\n  responder:\n    use: roles/responder.yaml\n    after:\n    - triager\n",
@@ -112,8 +111,7 @@
       "test-pipeline/flow.yaml",
       "test-pipeline/roles/change-detector.yaml",
       "test-pipeline/roles/integration-runner.yaml",
-      "test-pipeline/roles/unit-runner.yaml",
-      "test-pipeline/roles/unit-runner.yaml.bak"
+      "test-pipeline/roles/unit-runner.yaml"
     ],
     "primary_file": "test-pipeline/flow.yaml",
     "primary_content": "name: test-pipeline\ndescription: |\n  Multi-agent test pipeline. A file watcher detects repository changes, analyzes git diff to determine affected modules, and delegates to unit and integration test runners. Each runner posts its own results directly to Slack.\nspec_version: 3\nguardrails:\n  max_request_limit: 30\nagents:\n  change-detector:\n    use: roles/change-detector.yaml\n    then:\n      to:\n      - unit-runner\n      - integration-runner\n  unit-runner:\n    use: roles/unit-runner.yaml\n    after:\n    - change-detector\n  integration-runner:\n    use: roles/integration-runner.yaml\n    after:\n    - change-detector\nshared_memory:\n  enabled: true\n  store_path: ./.initrunner/test-pipeline-shared.db\n",

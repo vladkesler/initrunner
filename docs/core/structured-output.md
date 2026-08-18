@@ -169,9 +169,13 @@ The file must contain a valid JSON Schema object. Relative paths are resolved fr
 }
 ```
 
-## Pipeline Precedence
+## Output Precedence
 
-When using flow pipelines, a pipeline step's `output_format` overrides the role-level `output` config. This allows the same role to produce different output formats depending on the pipeline context.
+The role-level `output` config applies to every run of the role. No YAML key overrides it per flow step or per composed child. `AgentChild` and `ThenConfig` (`initrunner/agent/schema/v3.py`) are `extra="forbid"`, so adding `output` (or `output_format`) to a child under `agents:` fails validation with `extra_forbidden`. On a legacy `flow.yaml` agent block the key is silently ignored instead.
+
+Programmatic callers can override the role's output type by passing an explicit `output_type` to `build_agent()` (`initrunner/agent/loader.py`). It takes precedence over the type resolved from the role's `output` block.
+
+The CLI's `-f/--format` flag (`auto`, `json`, `text`, `rich`) controls only how the result is rendered. It does not change the agent's output type.
 
 ## Streaming Structured Output
 

@@ -50,7 +50,7 @@ When you run `initrunner install`, the following happens:
 3. **Download** the bundle archive from InitHub.
 4. **Extract** the role YAML and any bundled assets from the archive.
 5. **Validate** the file as a valid InitRunner role definition (reuses the same validation as `initrunner validate`).
-6. **Check dependencies** declared in the role's `metadata.dependencies` and warn about any that are missing.
+6. **Check dependencies** declared in the role's top-level `dependencies` list and warn about any that are missing.
 7. **Display a security summary** showing the role name, description, tools, model provider, and other features. Prompt for confirmation.
 8. **Save** the role to `~/.initrunner/roles/{owner}__{name}.yaml`.
 9. **Record** the installation in `~/.initrunner/roles/registry.json` with source, version, and content hash.
@@ -251,17 +251,16 @@ When called without an OCI reference, the role is published to InitHub under the
 
 ## Metadata Extensions
 
-The role `metadata` section supports three optional fields for registry use:
+Three optional top-level fields are used by the registry, alongside the role's required `name`:
 
 ```yaml
-metadata:
-  name: code-reviewer
-  description: Reviews code for best practices and bugs
-  author: jcdenton              # role author
-  version: "1.0.0"              # semantic version
-  dependencies:                 # external dependencies
-    - python>=3.11
-    - ffmpeg
+name: code-reviewer
+description: Reviews code for best practices and bugs
+author: jcdenton              # role author
+version: "1.0.0"              # semantic version
+dependencies:                 # external dependencies
+  - python>=3.11
+  - ffmpeg
 ```
 
 ### Options

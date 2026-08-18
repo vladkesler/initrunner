@@ -4,7 +4,7 @@ For a hands-on walkthrough, see [Templates Tutorial](template-tutorial.md).
 
 These three templates are designed for a specific workflow: **run one command, get output you paste directly into Slack or a GitHub PR**. The formatted output *is* the product — no extra steps, no post-processing.
 
-All templates are read-only (they never modify your repo), use the project default model (`openai/gpt-5-mini`), and work out of the box with no configuration beyond an API key.
+All templates are read-only (they never modify your repo), pin no provider or model name, and work out of the box with no configuration beyond an API key. Each run resolves a model from your environment in this order: the `--model` flag, `INITRUNNER_MODEL`, the default saved by `initrunner setup` in `~/.initrunner/run.yaml`, then auto-detection from whichever provider API key is set (Anthropic is preferred when several are available).
 
 ## Quick Start
 
@@ -111,7 +111,7 @@ initrunner run examples/roles/changelog-slack.yaml -p "What changed between v1.1
 |------|------|---------|
 | `git` | read-only | `git_diff` with ref ranges for file-change stats |
 | `shell` | `allowed_commands: [git]` | `git log <range>` for range-based history (the built-in `git_log` tool has no `ref` parameter) |
-| `datetime` | — | `get_current_time` for the date header |
+| `datetime` | — | `current_time` for the date header |
 
 > **Why shell?** The built-in `git_log(max_count, format)` function accepts no `ref` argument, so range-based changelogs like "since v1.2.0" require `git log v1.2.0..HEAD` via the shell tool. The shell is restricted to `git` commands only.
 

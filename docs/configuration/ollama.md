@@ -76,7 +76,19 @@ model:
   base_url: http://my-server:8000/v1
 ```
 
-When `base_url` is set on a non-ollama provider, the API key is set to `"custom-provider"` to avoid environment variable lookups. If your endpoint requires authentication, set `OPENAI_API_KEY` in the environment and omit `base_url` (use the standard `openai` provider flow).
+When `base_url` is set on a non-ollama provider, InitRunner injects an API key only if you name one: set `api_key_env` to the environment variable (or vault entry) that holds the key. Without `api_key_env` no key is injected (`api_key=None`) and PydanticAI resolves it itself, using `OPENAI_API_KEY` when present and otherwise a placeholder, so keyless local servers (vLLM, llama.cpp) work unauthenticated.
+
+If your endpoint requires authentication, keep `base_url` and add `api_key_env`:
+
+```yaml
+model:
+  provider: openai
+  name: anthropic/claude-sonnet-4
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
+```
+
+See [Providers: OpenRouter / custom endpoints](providers.md#openrouter--custom-endpoints).
 
 ## Embeddings
 

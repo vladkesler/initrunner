@@ -41,20 +41,19 @@ data/                  # schemas, samples, etc. (if any)
 File selection is **deterministic and explicit** -- no implicit directory scanning:
 
 1. **The role file** (`role.yaml`) -- always included
-2. **Resolved skills** -- each `spec.skills` entry resolved to its SKILL.md file
+2. **Resolved skills** -- each `skills` entry resolved to its SKILL.md file
 3. **Schema-referenced data files**:
-   - `spec.output.schema_file` (if set)
-   - `spec.ingest.sources` glob patterns
-   - `spec.security.docker.bind_mounts[].source`
-4. **Explicit `bundle.include`** -- a metadata field for extra files:
+   - `output.schema_file` (if set)
+   - `ingest.sources` glob patterns
+   - `security.sandbox.bind_mounts[].source`
+4. **Explicit `bundle.include`** -- a top-level field for extra files:
 
 ```yaml
-metadata:
-  name: my-agent
-  bundle:
-    include:
-      - data/examples/*.csv
-      - prompts/
+name: my-agent
+bundle:
+  include:
+    - data/examples/*.csv
+    - prompts/
 ```
 
 ## OCI Reference Format

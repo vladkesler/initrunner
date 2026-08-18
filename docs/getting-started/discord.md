@@ -114,7 +114,7 @@ For production, use the `role.yaml` approach with `initrunner run role.yaml --bo
 
 ## Configuration Options
 
-All options go under `spec.triggers[].`:
+All options go under `triggers[]` in the role file:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|

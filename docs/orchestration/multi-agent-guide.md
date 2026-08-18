@@ -54,6 +54,9 @@ One agent that plans, executes, and optionally self-critiques. No sub-agents nee
 
 ```yaml
 name: planner
+prompt: |
+  You plan and execute research tasks. Break the request into steps,
+  work each one, and critique your own findings before answering.
 tools:
   - think:
       critique: true
@@ -121,6 +124,9 @@ A single parent agent spawns sub-agents as non-blocking background tasks. The pa
 
 ```yaml
 name: research-lead
+prompt: |
+  You lead a research team. Break the request into independent topics
+  and spawn a researcher for each, then synthesize their findings.
 tools:
   - todo
   - spawn:
@@ -147,6 +153,9 @@ A parent agent calls sub-agents as blocking tool calls. The sub-agent runs, retu
 
 ```yaml
 name: coordinator
+prompt: |
+  You coordinate specialists. Delegate each part of the request to the
+  right expert, then combine their answers into one response.
 tools:
   - delegate:
       mode: inline

@@ -25,16 +25,16 @@ When `INITRUNNER_POLICY_DIR` is set, policies **must** load successfully or the 
 
 ## How Agent Principals Are Constructed
 
-Every agent run constructs a principal from `role.yaml` metadata:
+Every agent run constructs a principal from the agent's top-level identity fields:
 
 ```yaml
 # role.yaml
-metadata:
-  name: code-reviewer
-  team: platform
-  author: alice
-  tags: [trusted, code]
-  version: "1.0"
+name: code-reviewer
+team: platform
+author: alice
+tags: [trusted, code]
+version: "1.0"
+prompt: Review code for correctness and security issues.
 ```
 
 Produces a principal:
@@ -45,7 +45,7 @@ Produces a principal:
 | **Roles** | `["agent", "team:platform"]` |
 | **Attributes** | `{team: "platform", author: "alice", tags: ["trusted", "code"], version: "1.0"}` |
 
-The `team:<name>` role is only added when `metadata.team` is set. The `tags` attribute is a native list (not CSV), enabling CEL expressions like `request.principal.attr.tags.exists(t, t == "trusted")`.
+The `team:<name>` role is only added when the top-level `team:` is set. The `tags` attribute is a native list (not CSV), enabling CEL expressions like `request.principal.attr.tags.exists(t, t == "trusted")`.
 
 ## Agent Principal Scoping
 

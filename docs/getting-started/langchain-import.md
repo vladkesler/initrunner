@@ -38,7 +38,7 @@ This produces two files:
 # role.yaml (generated)
 name: weather-bot
 description: Imported from LangChain weather agent
-spec_version: 2
+spec_version: 3
 prompt: You are a helpful weather assistant.
 model: anthropic:claude-sonnet-4-6
 tools:
@@ -109,7 +109,7 @@ If extracted tools import modules blocked by the default sandbox policy (`os`, `
 ```
 Import warnings:
   - Sidecar tool module imports 'os' which is blocked by default sandbox policy.
-    Review security.sandbox.blocked_custom_modules.
+    Review security.tools.blocked_custom_modules.
 ```
 
 The import still succeeds -- you decide whether to adjust the tool code or relax the sandbox in your role's `security` block.
@@ -141,7 +141,7 @@ Some LangChain features have no direct equivalent and produce explicit warnings 
 | LangGraph state machines | "LangGraph state machine detected" | Use `flow.yaml` for orchestration |
 | Retrievers / VectorStores | "Retriever/VectorStore detected" | Configure `ingest` for RAG |
 | Callback handlers | "LangChain callbacks not imported" | Use `observability` for tracing |
-| `HumanInTheLoopMiddleware` | "Human-in-the-loop middleware not imported" | Use `confirmation: true` on tool permissions |
+| `HumanInTheLoopMiddleware` | "Human-in-the-loop middleware not imported" | Use `approval: required` on the tool config |
 
 These warnings appear in both the CLI output and the dashboard's editor screen. They are never silently swallowed.
 
@@ -168,7 +168,7 @@ initrunner new --langchain <file> [options]
 | `--langchain <file>` | Path to LangChain Python file |
 | `--provider <name>` | Model provider for the builder LLM (auto-detected if omitted) |
 | `--model <name>` | Model name for the builder LLM |
-| `--output <path>` | Output file path (default: `role.yaml`) |
+| `--output <path>` | Output file path (default: `agent.yaml`) |
 | `--force` | Overwrite existing files |
 | `--no-refine` | Skip the interactive refinement loop |
 

@@ -9,15 +9,14 @@ The **tool search** meta-tool solves both by hiding tools behind a keyword searc
 
 ## Configuration
 
-Add `tool_search` to your role's `spec`:
+Add `tool_search` at the top level of your agent YAML:
 
 ```yaml
-spec:
-  tool_search:
-    enabled: true
-    always_available: [current_time, search_documents]
-    max_results: 5
-    threshold: 0.0
+tool_search:
+  enabled: true
+  always_available: [current_time, search_documents]
+  max_results: 5
+  threshold: 0.0
 ```
 
 | Field | Type | Default | Description |
@@ -50,31 +49,33 @@ Model sees and calls the actual tool (e.g. send_slack_message)
 
 ## Ephemeral Mode
 
-Tool search is **automatically enabled** in ephemeral mode (`initrunner run` without a role file). You don't need a `role.yaml` -- the CLI wires it up for you.
+In ephemeral mode (`initrunner run` without a role file) the CLI configures tool search for you, so you don't need a `role.yaml`. It is not always on: it switches on only once the attached tools reach past the `minimal` profile.
 
 ### How it works
 
-All tools from the built-in extras (`datetime`, `web_reader`, `search`, `python`, `filesystem`, `slack`, `git`, `shell`) are registered but **hidden** behind tool search. The tools from your selected `--tool-profile` are set as `always_available`, so the agent sees them on every turn. Everything else is discoverable via `search_tools()`.
+Only the tools you actually select are attached, the `--tool-profile` you pick plus any `--tools` extras, never the full catalog. When that set is just `datetime` and `web_reader` (or empty), there is nothing worth hiding, so tool search stays off and no `search_tools` function is registered. As soon as anything else is attached, tool search turns on: the attached datetime and web_reader functions are pinned as `always_available`, and every other attached tool is discoverable via `search_tools()`.
 
-| Profile | Always visible | Discoverable via search |
-|---------|---------------|------------------------|
-| `none` | `search_tools` only | All built-in extras |
-| `minimal` | `current_time`, `parse_date`, `fetch_page` + `search_tools` | `web_search`, `run_python`, `read_file`, `shell_exec`, etc. |
-| `all` | Every tool registered as always-visible | Nothing hidden (no search needed) |
+| Profile | Tool search | Always visible | Discoverable via search |
+|---------|-------------|----------------|------------------------|
+| `none` | off | no tools attached | nothing |
+| `minimal` (default) | off | `current_time`, `parse_date`, `fetch_page` | nothing |
+| `all` | on | `current_time`, `parse_date`, `fetch_page` + `search_tools` | `web_search`, `news_search`, `run_python`, `read_file`, `list_directory`, `send_slack_message`, `git_status`, `git_log`, `git_diff`, `git_show`, `git_blame`, `git_changed_files`, `git_list_files`, `run_shell` |
+
+`send_slack_message` only shows up when `SLACK_WEBHOOK_URL` is set; the `slack` tool is dropped otherwise.
 
 ### Example
 
 ```bash
-initrunner run --tool-profile minimal
+initrunner run --tool-profile all
 ```
 
 The agent sees `current_time`, `parse_date`, `fetch_page`, and `search_tools`. When the user asks "search the web for Python 3.13 release notes", the agent calls `search_tools("web search")`, discovers `web_search`, and then calls it — all in the same turn.
 
-Tools added with `--tools` are also set as always-visible. For example, `--tool-profile minimal --tools git` makes `git_log`, `git_diff`, etc. always visible alongside the datetime and web_reader tools.
+Tools added with `--tools` are not pinned. An extra that goes beyond the `minimal` set switches tool search on and lands behind it. For example, `--tool-profile minimal --tools git` keeps `current_time`, `parse_date`, and `fetch_page` always visible, and makes `git_log`, `git_diff`, and the rest of the git functions discoverable through `search_tools`. An extra that is already in the minimal profile (`--tools datetime`, `--tools web_reader`) changes nothing and leaves tool search off.
 
 ### Relationship to `--tool-profile all`
 
-The `all` profile registers every tool as always-visible, so `search_tools` has nothing to discover. This is fine for local use, but the context overhead grows with the number of tools. For bots and resource-constrained models, `minimal` (the default) keeps context tight and relies on tool search for anything beyond the basics.
+The `all` profile attaches every built-in extra (`datetime`, `web_reader`, `search`, `python`, `filesystem`, `slack`, `git`, `shell`), and that is what turns tool search on. The three datetime and web_reader functions stay visible, and the remaining functions are reached through `search_tools`, so context stays bounded even with the full catalog attached. The default `minimal` profile attaches only `datetime` and `web_reader`, which is below the threshold, so tool search stays off and both tools' functions are simply visible.
 
 ## Dashboard Configuration
 

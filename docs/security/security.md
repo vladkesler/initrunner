@@ -223,7 +223,9 @@ Controls custom tool loading, MCP subprocess security, and store path restrictio
 | `allowed_custom_modules` | `list[str]` | `[]` | Module allowlist. If non-empty, **only** these modules are permitted (overrides blocklist). |
 | `blocked_custom_modules` | `list[str]` | *(see below)* | Modules blocked from custom tool imports. |
 | `mcp_command_allowlist` | `list[str]` | `[]` | Allowed MCP stdio commands. Empty means all commands allowed. |
-| `sensitive_env_prefixes` | `list[str]` | *(see below)* | Environment variable prefixes scrubbed from MCP subprocess environments. |
+| `sensitive_env_prefixes` | `list[str]` | *(see below)* | Environment variable name prefixes scrubbed from MCP subprocess environments. Setting this **replaces** the default list, it does not extend it. |
+| `sensitive_env_suffixes` | `list[str]` | *(see below)* | Environment variable name suffixes scrubbed from the same environments. Also a full replacement. |
+| `env_allowlist` | `list[str]` | `["SSH_AGENT_PID", "GPG_AGENT_INFO"]` | Names kept even when they match a prefix or suffix rule. |
 | `restrict_db_paths` | `bool` | `true` | Require store databases to be under `~/.initrunner/`. |
 | `audit_hooks_enabled` | `bool` | `false` | Enable PEP 578 audit hook sandbox for custom tools. |
 | `allowed_write_paths` | `list[str]` | `[]` | Paths custom tools can write to (empty = all writes blocked). |
@@ -236,8 +238,15 @@ Controls custom tool loading, MCP subprocess security, and store path restrictio
 **Default blocked modules**:
 `os`, `subprocess`, `shutil`, `sys`, `importlib`, `ctypes`, `socket`, `http.server`, `pickle`, `shelve`, `marshal`, `code`, `codeop`, `threading`, `_thread`
 
-**Default sensitive env prefixes**:
-`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `AWS_SECRET`, `DATABASE_URL`
+**Default sensitive env prefixes** (excerpt; 86 entries in total, see `DEFAULT_SENSITIVE_ENV_PREFIXES` in `initrunner/agent/_subprocess.py`):
+`OPENAI_`, `ANTHROPIC_`, `GEMINI_`, `AWS_`, `GCP_`, `AZURE_`, `GITHUB_TOKEN`, `GH_TOKEN`, `NPM_TOKEN`, `SLACK_`, `STRIPE_`, `VAULT_TOKEN`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`
+
+Whole-provider prefixes such as `AWS_` are broad on purpose: they catch secret names that end in an unremarkable suffix, like `AWS_ACCESS_KEY_ID`. Dropping a non-secret like `AWS_REGION` along the way is harmless.
+
+**Default sensitive env suffixes** (complete):
+`_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`, `_PASSPHRASE`, `_CREDENTIAL`, `_CREDENTIALS`, `_API_KEY`, `_ACCESS_KEY`, `_PRIVATE_KEY`, `_PAT`, `_DSN`, `_APIKEY`, `_APITOKEN`, `_CONNECTION_STRING`, `_KEY_BASE`
+
+**Default env allowlist** (complete): `SSH_AGENT_PID`, `GPG_AGENT_INFO`
 
 #### AST-Based Import Analysis
 
@@ -373,31 +382,39 @@ security:
 
 #### Environment Scrubbing
 
-MCP stdio subprocesses, Python tool subprocesses, and git tool subprocesses all receive a filtered copy of `os.environ` with sensitive variables removed. Any environment variable whose name starts with a prefix in `sensitive_env_prefixes` is excluded. This prevents API keys from leaking through git hooks, Python child processes, or MCP server environments.
+MCP stdio subprocesses, Python tool subprocesses, and git tool subprocesses all receive a filtered copy of `os.environ` with sensitive variables removed. Any environment variable whose name starts with a prefix in `sensitive_env_prefixes` or ends with a suffix in `sensitive_env_suffixes` is excluded, unless the name appears in `env_allowlist`. This prevents API keys from leaking through git hooks, Python child processes, or MCP server environments.
 
 ### `sandbox` -- Runtime Sandbox
 
-Wraps shell, Python, and script tool execution in a kernel-level sandbox. Pick one of two backends:
+Runs shell, Python, and script tool execution in a separate subprocess, outside the InitRunner process. Pick one of three backends:
 
 - **bubblewrap** (`bwrap`) -- Linux user namespaces, no daemon, no Docker. See [Bubblewrap Sandbox](bubblewrap.md).
 - **Docker** -- cross-platform containers via the Docker daemon. See [Docker Sandbox](docker-sandbox.md).
+- **SSH** -- remote execution on an existing host via OpenSSH. Not a kernel sandbox; it controls *where* code runs, not what it can reach. See [SSH Backend](ssh-sandbox.md).
 
-`backend: auto` tries bwrap on Linux and falls back to Docker. See the [Runtime Sandbox overview](sandbox.md) for the cross-backend reference and migration from the legacy `security.docker` key.
+`backend: auto` tries bwrap on Linux and falls back to Docker. It never selects `ssh`, which needs an explicit remote host. See the [Runtime Sandbox overview](sandbox.md) for the cross-backend reference and migration from the legacy `security.docker` key.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `backend` | `"auto" \| "bwrap" \| "docker" \| "none"` | `"none"` | Isolation mechanism. `auto` prefers bwrap on Linux, falls back to Docker. |
-| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Network mode. `bridge` is Docker-only. |
-| `allowed_read_paths` | `list[str]` | `[]` | Host paths mounted read-only into the sandbox. |
-| `allowed_write_paths` | `list[str]` | `[]` | Host paths mounted read-write into the sandbox. |
+| `backend` | `"auto" \| "bwrap" \| "docker" \| "ssh" \| "none"` | `"none"` | Isolation mechanism. `auto` prefers bwrap on Linux, falls back to Docker. `ssh` is remote execution, not isolation, and must be selected explicitly. |
+| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Network mode. `bridge` is Docker-only, and rejected with `backend: ssh`. |
+| `allowed_read_paths` | `list[str]` | `[]` | Host paths mounted read-only into the sandbox. Rejected with `backend: ssh`. |
+| `allowed_write_paths` | `list[str]` | `[]` | Host paths mounted read-write into the sandbox. Rejected with `backend: ssh`. |
 | `memory_limit` | `str` | `"256m"` | Memory cap. Enforced via `systemd-run` cgroups on bwrap, `-m` on Docker. |
 | `cpu_limit` | `float` | `1.0` | CPU cap, fractional cores. |
 | `read_only_rootfs` | `bool` | `true` | Read-only root filesystem (Docker only). |
-| `bind_mounts` | `list[BindMount]` | `[]` | Host→container bind mounts, validated at load time. |
+| `bind_mounts` | `list[BindMount]` | `[]` | Host-to-container bind mounts, validated at load time. Rejected with `backend: ssh`. |
 | `env_passthrough` | `list[str]` | `[]` | Host env vars that pass through. Everything else gets scrubbed. |
 | `docker.image` | `str` | `"python:3.12-slim"` | Docker-only: image to run. |
 | `docker.user` | `str \| null` | `"auto"` | Docker-only: `auto` maps current uid:gid when writable mounts exist. |
 | `docker.extra_args` | `list[str]` | `[]` | Docker-only: extra `docker run` flags. The schema blocks dangerous ones. |
+| `docker.runtime` | `str \| null` | `null` | Docker-only: OCI runtime. One of `runc`, `runsc`, `kata-runtime`, `kata-qemu`, `kata-fc`, `kata-clh`. |
+| `ssh.host` | `str` | *(required)* | SSH-only: host to run on, resolved through `~/.ssh/config` and `ssh-agent`. |
+| `ssh.remote_cwd` | `str \| null` | `null` | SSH-only: remote working directory. Defaults to the SSH login directory. |
+| `ssh.identity_file` | `str \| null` | `null` | SSH-only: private key override. |
+| `ssh.config_file` | `str \| null` | `null` | SSH-only: alternate `ssh_config` path. |
+| `ssh.connect_timeout` | `int` | `10` | SSH-only: connection timeout in seconds. |
+| `ssh.control_persist` | `str` | `"60s"` | SSH-only: how long the multiplexed control connection stays open. |
 
 Every sandboxed call emits a `sandbox.exec` security event (backend, argv0, rc, duration_ms). Query with `initrunner audit security-events --event-type sandbox.exec`.
 
@@ -421,7 +438,7 @@ Security-relevant events land in a separate `security_events` table in the audit
 | `auth_failure` | Invalid API key |
 | `tool_blocked` | Custom tool import violation |
 | `sandbox_violation` | PEP 578 audit hook violation (write, network, subprocess, import, exec) |
-| `sandbox.exec` | Runtime sandbox executed a tool subprocess (bwrap or Docker) |
+| `sandbox.exec` | Runtime sandbox executed a tool subprocess (bwrap, Docker, or SSH) |
 
 Query with `initrunner audit security-events --event-type <type>`.
 

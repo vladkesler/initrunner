@@ -149,7 +149,7 @@ This catches kernel-disabled user namespaces, AppArmor restrictions, and broken 
 
 Mounts fall into two categories:
 
-1. **User-configured** (`allowed_read_paths`, `allowed_write_paths`, `bind_mounts` from role YAML). Validated at load time against the role's permitted roots via `validate_path_within()`. A typo'd or malicious `/etc` mount fails before the role loads.
+1. **User-configured** (`allowed_read_paths`, `allowed_write_paths`, `bind_mounts` from role YAML). At **load time** the schema refuses any *writable* bind mount, or `allowed_write_paths` entry, whose source is a host system root (`/`, `/etc`, `/usr`, `/home`, ...), so a role can't hand the agent the host filesystem. Read-only binds of system paths are permitted (they cannot write the host), and `allowed_read_paths` is not otherwise restricted. Relative bind sources are confined to the role directory by the backend at **build time**. A mistyped path is not caught at load time.
 2. **Tool-internal** (`extra_mounts` passed by tool code — e.g. `python_exec` binding a tempfile to `/work/_run.py`). Code-controlled, not user-controlled; passes through without validation.
 
 ## Example: code interpreter

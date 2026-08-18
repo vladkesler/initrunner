@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## [2026.8.5] - 2026-08-18
+
+### Fixed
+- **Generated agents came out in the removed envelope.** The system prompts behind `initrunner new`, `--langchain`, and `--pydantic-ai` still told the model to emit `metadata.name`, `metadata.spec_version: 2`, and `spec.role`. 2026.8.4 flattened the write path everywhere except the three places that write YAML by asking a model for it, so a fresh agent was born deprecated and loaded with a migration warning. All three prompts now describe the flat shape and `spec_version: 3`.
+- **Validation reported field paths that no longer exist.** Issues were labelled `spec.role`, `spec.tools`, `spec.model`, `spec.reasoning`, `spec.capabilities`, `spec.autonomy`, `spec.strategy`, and `spec.agents.<name>.role`. Following any of them led to a key the schema rejects. They now name the flat field. The flow member path is `agents.<name>.use`, which is the key you actually write.
+- **Fence-less generator replies were discarded.** When the model answered with bare YAML and no code fence, `agent_builder` recognised the reply only if it started with `apiVersion:`. Flat documents start with `name:`, so valid output was thrown away and the build retried.
+- **`initrunner examples` shipped a `.bak` file.** `examples/flows/test-pipeline/roles/unit-runner.yaml.bak`, a `doctor --fix` leftover, was committed and listed twice in the bundled catalog, so browsing examples surfaced a stale envelope document. Removed, and the catalog builder now skips `.bak`, `.orig`, `.rej`, `.swp`, and `.pyc`.
+
+### Changed
+- **`security` and `observability` reject unknown keys.** Both trees (13 models) are now `extra="forbid"`. Previously `security: {audit_hooks_enabled: true}` validated and silently dropped the setting, because the real path is `security.tools.audit_hooks_enabled`. This is breaking for configs that carry typos or dead keys: they now fail validation instead of being ignored. Run `initrunner validate` on your roles before upgrading. The other config sections still ignore unknown keys; see [Known gaps](docs/operations/todo.md).
+
+### Docs
+- Every YAML example in the README (English, Chinese, Japanese) and `docs/` now uses the flat format. The 2026.8.4 conversion covered the subsystem guides it listed and missed the rest.
+- New `tests/test_docs_yaml.py` extracts every fenced YAML block from the README and `docs/`, then parses it, validates complete agent documents against the real schema, and fails on any leftover envelope. This is the check that was missing when the docs drifted.
+- Corrected prose that named removed paths: `spec.guardrails`, `spec.deps_schema`, `metadata.name` in the audit and report tables, and the flow member reference in the CLI guide. The `initrunner validate` sample output now matches what the command actually prints.
+- New [Known gaps](docs/operations/todo.md) page recording deferred work: the remaining `extra="ignore"` config models, a `flow validate` crash on single-member flows, the loss of per-field paths in schema errors, and the missing schema guard on the docs site.
+
+
 ## [2026.8.4] - 2026-08-18
 
 ### Changed

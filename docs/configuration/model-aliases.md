@@ -27,9 +27,8 @@ export INITRUNNER_MODEL=fast
 initrunner run role.yaml -p "Summarize this"
 
 # In role.yaml (provider becomes optional)
-spec:
-  model:
-    name: fast
+model:
+  name: fast
 ```
 
 ## Alias file format
@@ -76,7 +75,7 @@ When the override is applied, `temperature` and `max_tokens` from the original r
 Model resolution follows this order (highest to lowest):
 
 1. `--model` CLI flag / `INITRUNNER_MODEL` env var
-2. Role YAML `spec.model` (with alias resolution)
+2. Role YAML top-level `model` (with alias resolution)
 3. `run.yaml` defaults (ephemeral mode and `new`/`flow new`/`doctor`)
 4. API key env-var auto-detection
 
@@ -89,24 +88,28 @@ When `provider` is omitted (or empty) in a role YAML, the `name` field is treate
 - An alias (looked up in `models.yaml`)
 - An inline `provider:model` string (split on first colon)
 
+An alias, resolved from `models.yaml`:
+
 ```yaml
-# Using an alias — provider is resolved from models.yaml
-spec:
-  model:
-    name: fast
-    temperature: 0.3
+model:
+  name: fast
+  temperature: 0.3
+```
 
-# Using inline provider:model — no alias lookup needed
-spec:
-  model:
-    name: openai:gpt-4o-mini
-    temperature: 0.3
+An inline `provider:model` string, so no alias lookup happens:
 
-# Explicit provider — no alias resolution, "fast" is the model name
-spec:
-  model:
-    provider: openai
-    name: fast
+```yaml
+model:
+  name: openai:gpt-4o-mini
+  temperature: 0.3
+```
+
+An explicit provider, so no alias resolution happens and `fast` is the model name:
+
+```yaml
+model:
+  provider: openai
+  name: fast
 ```
 
 If `provider` is explicitly set, no alias resolution occurs — the `name` is used as-is.
@@ -135,5 +138,5 @@ When an alias resolves to `provider:model`, the provider is extracted automatica
 | `--model ollama:llama3.2:latest` | Split on first colon: provider=`ollama`, name=`llama3.2:latest` |
 | Role YAML `name: fast` with explicit `provider: openai` | Provider already set — no alias resolution, model named "fast" on OpenAI |
 | Missing/empty `models.yaml` | No aliases — everything works via explicit `provider:model` |
-| Compose mode | Not affected — each service uses its own role file |
+| Flow mode | Not affected: each flow agent resolves its own model, from a referenced role file or an inline `model:` block |
 | Alias-dependent role files | Machine-local; may fail on systems without matching `models.yaml` |

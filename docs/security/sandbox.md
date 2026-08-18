@@ -17,8 +17,8 @@ For an honest comparison across backends and isolation classes (container vs use
 ```yaml
 security:
   sandbox:
-    backend: auto | bwrap | docker | ssh | none   # default: none
-    network: none | bridge | host                  # default: none
+    backend: none                # auto | bwrap | docker | ssh | none
+    network: none                # none | bridge | host
     allowed_read_paths: []
     allowed_write_paths: []
     memory_limit: "256m"

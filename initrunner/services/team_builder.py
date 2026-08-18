@@ -143,7 +143,7 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
     if team.spec.strategy == "parallel" and len(team.spec.personas) == 2:
         issues.append(
             ValidationIssue(
-                field="spec.strategy",
+                field="run",
                 message=(
                     "Parallel strategy with only 2 personas has limited benefit over sequential"
                 ),
@@ -154,7 +154,7 @@ def validate_team_yaml(text: str) -> tuple[TeamDefinition | None, list[Validatio
     if not team.spec.tools and all(not p.tools for p in team.spec.personas.values()):
         issues.append(
             ValidationIssue(
-                field="spec.tools",
+                field="tools",
                 message="No tools configured for team or any persona",
                 severity="info",
             )

@@ -35,9 +35,9 @@ The prompt is tokenized (lowercased, punctuation stripped, stop words removed, s
 
 | Field | Weight | Match type |
 |-------|--------|------------|
-| `metadata.name` | 2.0× | Prefix or substring |
-| `metadata.description` | 1.5× | Exact token |
-| `metadata.tags` | 3.0× | Exact token |
+| `name` | 2.0× | Prefix or substring |
+| `description` | 1.5× | Exact token |
+| `tags` | 3.0× | Exact token |
 
 The raw score is divided by `min(prompt_token_count, 5)` so longer prompts don't automatically dominate. Roles are then ranked by this normalized score.
 
@@ -52,7 +52,7 @@ If both thresholds are met, the top scorer wins immediately — no API call. If 
 
 ### Pass 2 — LLM tiebreaker
 
-The top 5 candidates (by keyword score) are presented to the LLM in a compact single-turn prompt:
+Up to 15 candidates (by keyword score) are presented to the LLM in a compact single-turn prompt:
 
 ```
 Task: "<your prompt>"
@@ -84,12 +84,13 @@ After sensing, the result panel shows one of four methods:
 
 ## Role Discovery
 
-Intent Sensing searches for `role.yaml` files (recursively, up to 3 levels deep) in the following directories, in order:
+Intent Sensing scans every `*.yaml` / `*.yml` file (recursively, at any depth, skipping `node_modules`, `.venv`, `__pycache__`, `.git` and similar) and keeps the ones that load as agent documents. The directories are searched in this order:
 
-1. `--role-dir PATH` — if provided, this is searched **exclusively** (no other dirs)
+1. `--role-dir PATH` (if provided): searched first, **in addition to** the directories below
 2. Current working directory (`.`)
 3. `./examples/roles/` — if the directory exists
-4. Global roles directory (`~/.config/initrunner/roles/` or platform equivalent)
+4. Global roles directory (`~/.initrunner/roles/`, or `$INITRUNNER_HOME/roles/` or `$XDG_DATA_HOME/initrunner/roles/` when those variables are set)
+5. Bundled starter examples shipped with the package
 
 Roles with parse errors are skipped silently. Only successfully loaded roles enter the scoring pool.
 
@@ -98,7 +99,7 @@ Roles with parse errors are skipped silently. Only successfully loaded roles ent
 | Flag | Description |
 |------|-------------|
 | `--sense` | Enable intent sensing (replaces the `role.yaml` argument) |
-| `--role-dir PATH` | Directory to search for roles instead of the defaults |
+| `--role-dir PATH` | Extra directory searched first, in addition to the default directories |
 | `--confirm-role` | Show the sensed role and ask for confirmation before running (requires a TTY) |
 | `--dry-run` | Score roles with keyword matching only — no LLM calls, no agent execution |
 
@@ -120,15 +121,14 @@ The tiebreaker prompt is short (a handful of role descriptions plus the user pro
 
 ## Optimizing Roles for Sensing
 
-Pass 1 scoring relies entirely on what you write in `metadata`. Well-tagged roles are selected faster and more reliably.
+Pass 1 scoring relies entirely on the top-level `name`, `description`, and `tags` you write. Well-tagged roles are selected faster and more reliably.
 
 **Use specific, task-oriented tags.** Tags carry the highest weight (3×):
 
 ```yaml
-metadata:
-  name: web-searcher
-  description: Searches the web and summarizes results into concise reports
-  tags: [search, web, research, summarize, browse]
+name: web-searcher
+description: Searches the web and summarizes results into concise reports
+tags: [search, web, research, summarize, browse]
 ```
 
 **Use domain keywords in `description`.** Description tokens score at 1.5×. One clear sentence beats a vague paragraph:
@@ -244,11 +244,10 @@ Intent Sensing can also auto-route messages between agents in a [flow pipeline](
 
 ```yaml
 triager:
-  role: roles/triager.yaml
-  sink:
-    type: delegate
+  use: roles/triager.yaml
+  then:
+    to: [researcher, responder, escalator]
     strategy: sense
-    target: [researcher, responder, escalator]
 ```
 
 The same two-pass scoring (keyword + optional LLM tiebreak) runs on each message, using the target agents' role metadata (name, description, tags) as candidates. See [Flow -- Routing Strategy](../orchestration/flow.md#routing-strategy) for full details.

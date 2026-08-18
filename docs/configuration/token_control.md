@@ -2,27 +2,25 @@
 
 InitRunner provides guardrails that limit how many tokens an agent can consume. These controls prevent runaway costs in development, enforce budgets in production daemons, and give visibility into token usage across the CLI.
 
-All guardrails are configured under `spec.guardrails` in your `role.yaml`.
+All guardrails are configured under the top-level `guardrails` key in your `role.yaml`.
 
 ## Quick Start
 
 Add guardrails to any role definition to cap per-run output and set a session budget for interactive use:
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 50000
-    session_token_budget: 500000
+guardrails:
+  max_tokens_per_run: 50000
+  session_token_budget: 500000
 ```
 
 For daemon roles, add lifetime and daily budgets:
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 50000
-    daemon_token_budget: 2000000
-    daemon_daily_token_budget: 200000
+guardrails:
+  max_tokens_per_run: 50000
+  daemon_token_budget: 2000000
+  daemon_daily_token_budget: 200000
 ```
 
 ## Guardrails Reference
@@ -35,7 +33,7 @@ spec:
 | `cost_limit` | `float > 0 \| null` | `null` | Best-effort USD cap per logical run. Maps to PydanticAI `cost_limit`. Converted with `Decimal(str(value))`. Unpriced models skip enforcement and warn. |
 | `total_tokens_limit` | `int > 0 \| null` | `null` | Maximum **total** (input + output) tokens per logical run. Maps to PydanticAI `total_tokens_limit`. |
 | `max_tool_calls` | `int >= 0` | `20` | Maximum tool calls per single run. Maps to PydanticAI `tool_calls_limit`. |
-| `max_request_limit` | `int > 0` | `50` | Maximum model requests (API round-trips) per single run. Maps to PydanticAI `request_limit`. |
+| `max_request_limit` | `int > 0 \| null` | *derived* | Maximum model requests (API round-trips) per single run. Maps to PydanticAI `request_limit`. When omitted or `null`, it is derived as `max(max_tool_calls + 10, 30)`, which is `30` with the default `max_tool_calls: 20`. |
 | `timeout_seconds` | `int > 0` | `300` | Wall-clock timeout for a single run (5 minutes). |
 | `session_token_budget` | `int > 0 \| null` | `null` | Cumulative total token budget for a REPL session. |
 | `daemon_token_budget` | `int > 0 \| null` | `null` | Lifetime total token budget for a daemon process. |
@@ -114,7 +112,7 @@ Setting this to `0` disables all tool use for that run.
 
 ### Model Requests (`max_request_limit`)
 
-Limits the number of model API round-trips per run. Each tool call result that gets sent back to the model counts as a new request.
+Limits the number of model API round-trips per run. Each tool call result that gets sent back to the model counts as a new request. Omit the field to let InitRunner derive it from `max_tool_calls`, or set it explicitly to override:
 
 ```yaml
 guardrails:
@@ -184,7 +182,7 @@ guardrails:
   ```
 - After each run, `record_usage()` updates both the lifetime and daily counters.
 - The daily counter resets when the current UTC date advances past the last reset date.
-- Both counters are **in-memory only** and reset when the daemon process restarts. The `daemon_token_budget` is a per-process lifetime, not persistent across restarts.
+- Both counters are held in memory by `DaemonTokenTracker`, but a snapshot is written to the audit database after every run (`save_budget_state`) and restored at startup (`load_budget_state`), keyed by agent name. `daemon_token_budget` is therefore a durable lifetime budget that survives daemon and bot restarts. The daily and weekly counters are re-checked against the current date during restore, so they still roll over normally. Running with `--no-audit` leaves nothing to persist to and makes the counters per-process.
 
 On startup, the daemon displays configured budgets:
 
@@ -273,13 +271,12 @@ Outputs exceeding these limits are truncated with `[truncated]` appended. These 
 Tight per-run limits and a session budget for local development:
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 10000
-    max_tool_calls: 5
-    max_request_limit: 10
-    timeout_seconds: 60
-    session_token_budget: 100000
+guardrails:
+  max_tokens_per_run: 10000
+  max_tool_calls: 5
+  max_request_limit: 10
+  timeout_seconds: 60
+  session_token_budget: 100000
 ```
 
 ### Production Daemon
@@ -287,20 +284,19 @@ spec:
 A cron-triggered daemon with token and cost budgets:
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    daemon_token_budget: 5000000
-    daemon_daily_token_budget: 500000
-    daemon_daily_cost_budget: 10.00
-    daemon_weekly_cost_budget: 50.00
-  triggers:
-    - type: cron
-      schedule: "*/15 * * * *"
-      prompt: "Check system health and report anomalies."
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
+  daemon_token_budget: 5000000
+  daemon_daily_token_budget: 500000
+  daemon_daily_cost_budget: 10.00
+  daemon_weekly_cost_budget: 50.00
+triggers:
+  - type: cron
+    schedule: "*/15 * * * *"
+    prompt: "Check system health and report anomalies."
 ```
 
 ### RAG with Budget
@@ -308,19 +304,18 @@ spec:
 A knowledge assistant with input token limits to control retrieval context size:
 
 ```yaml
-spec:
-  guardrails:
-    max_tokens_per_run: 50000
-    input_tokens_limit: 100000
-    total_tokens_limit: 200000
-    max_tool_calls: 20
-    session_token_budget: 500000
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    chunking:
-      strategy: fixed
-      chunk_size: 512
+guardrails:
+  max_tokens_per_run: 50000
+  input_tokens_limit: 100000
+  total_tokens_limit: 200000
+  max_tool_calls: 20
+  session_token_budget: 500000
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  chunking:
+    strategy: fixed
+    chunk_size: 512
 ```
 
 ---
