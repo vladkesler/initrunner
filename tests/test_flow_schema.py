@@ -453,3 +453,23 @@ class TestComposeHardBreak:
         }
         with pytest.raises(ValueError, match="depends_on -> needs"):
             validate_flow_dict(data)
+
+
+def test_flow_validation_accepts_flat_yaml() -> None:
+    from initrunner.services.flow_validation import _validate_yaml
+
+    flow, issues = _validate_yaml(
+        "name: test-pipe\n"
+        "agents:\n"
+        "  step-1:\n"
+        "    use: roles/step-1.yaml\n"
+        "    then:\n"
+        "      to: step-2\n"
+        "  step-2:\n"
+        "    use: roles/step-2.yaml\n"
+    )
+
+    assert flow is not None
+    assert flow.metadata.name == "test-pipe"
+    assert set(flow.spec.agents) == {"step-1", "step-2"}
+    assert not any(issue.severity == "error" for issue in issues)

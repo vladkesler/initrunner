@@ -28,6 +28,11 @@ def validate(
     from initrunner.services.yaml_validation import validate_yaml_file
 
     role_file = resolve_role_path(role_file)
+    from initrunner.services.migrate import envelope_warning_for
+
+    warning = envelope_warning_for(role_file)
+    if warning:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
     kind = detect_yaml_kind(role_file)
     if kind == "Pipeline":
         console.print(
@@ -37,6 +42,11 @@ def validate(
         raise typer.Exit(1)
     if kind == "Team":
         _validate_team(role_file)
+        return
+    if kind == "Flow":
+        from initrunner.cli.flow_cmd import flow_validate
+
+        flow_validate(role_file)
         return
 
     role, _kind, issues = validate_yaml_file(role_file)
@@ -62,8 +72,6 @@ def validate(
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("API Version", role.apiVersion.value)
-    table.add_row("Kind", role.kind.value)
     table.add_row("Name", role.metadata.name)
     table.add_row("Description", role.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(role.metadata.tags) if role.metadata.tags else "(none)")
@@ -341,14 +349,21 @@ def _update_role_yaml(role_path: Path, provider: str, model: str) -> None:
     import yaml
 
     data = yaml.safe_load(role_path.read_text())
-    if "spec" in data and "model" in data["spec"]:
-        old_provider = data["spec"]["model"].get("provider", "")
-        data["spec"]["model"]["provider"] = provider
-        data["spec"]["model"]["name"] = model
+    envelope = data.get("kind") == "Agent" and isinstance(data.get("spec"), dict)
+    container = data["spec"] if envelope else data
+    current = container.get("model")
+    if isinstance(current, dict):
+        old_provider = str(current.get("provider", ""))
+        current["provider"] = provider
+        current["name"] = model
         # Only clear provider-specific fields when the provider actually changes
         if provider != old_provider:
-            data["spec"]["model"].pop("base_url", None)
-            data["spec"]["model"].pop("api_key_env", None)
+            current.pop("base_url", None)
+            current.pop("api_key_env", None)
+    elif envelope:
+        container["model"] = {"provider": provider, "name": model}
+    else:
+        container["model"] = f"{provider}:{model}"
     role_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
 
 
@@ -367,15 +382,12 @@ def _validate_team(team_file: Path) -> None:
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("API Version", team.apiVersion.value)
-    table.add_row("Kind", team.kind)
     table.add_row("Name", team.metadata.name)
     table.add_row("Description", team.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(team.metadata.tags) if team.metadata.tags else "(none)")
     table.add_row("Model", team.spec.model.to_model_string())
-    table.add_row("Personas", str(len(team.spec.personas)))
-    # Build persona display with inline overrides
-    persona_parts = []
+    table.add_row("Agents", str(len(team.spec.personas)))
+    agent_parts = []
     for pname, pcfg in team.spec.personas.items():
         extras = []
         if pcfg.model:
@@ -385,10 +397,10 @@ def _validate_team(team_file: Path) -> None:
         if pcfg.environment:
             extras.append(f"{len(pcfg.environment)} env vars")
         if extras:
-            persona_parts.append(f"{pname} [{', '.join(extras)}]")
+            agent_parts.append(f"{pname} [{', '.join(extras)}]")
         else:
-            persona_parts.append(pname)
-    table.add_row("Persona Names", ", ".join(persona_parts))
+            agent_parts.append(pname)
+    table.add_row("Agent names", ", ".join(agent_parts))
     table.add_row("Strategy", team.spec.strategy)
 
     if team.spec.tools:

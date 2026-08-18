@@ -1,8 +1,8 @@
 # Tools — Configuration Reference
 
-Tools give agents the ability to interact with the outside world — reading files, making HTTP requests, connecting to MCP servers, calling APIs, or running custom Python functions. They are configured in the `spec.tools` list of a role definition, keyed on the `type` field.
+Tools give agents the ability to interact with the outside world — reading files, making HTTP requests, connecting to MCP servers, calling APIs, or running custom Python functions. They are configured in the `tools` list of a role definition. A bare name (`- search`) enables a tool with defaults; a mapping adds options (`- filesystem: {root_path: .}`).
 
-In addition to explicitly configured tools, InitRunner auto-registers tools when `ingest` or `memory` sections are present in the role definition. Any unrecognized `type` value is routed to the [plugin registry](tool_creation.md#plugin-registry).
+In addition to explicitly configured tools, InitRunner auto-registers tools when `ingest` or `memory` sections are present in the role definition. Any unrecognized tool name is routed to the [plugin registry](tool_creation.md#plugin-registry).
 
 ## Tool Types
 
@@ -37,26 +37,25 @@ In addition to explicitly configured tools, InitRunner auto-registers tools when
 ## Quick Example
 
 ```yaml
-spec:
-  tools:
-    - type: filesystem
+tools:
+  - filesystem:
       root_path: ./src
       read_only: true
       allowed_extensions: [".py", ".md"]
-    - type: http
+  - http:
       base_url: https://api.example.com
       allowed_methods: ["GET", "POST"]
       headers:
         Authorization: Bearer ${API_TOKEN}
-    - type: mcp
+  - mcp:
       transport: stdio
       command: npx
       args: ["-y", "@anthropic/mcp-server-filesystem"]
-    - type: custom
+  - custom:
       module: my_tools              # auto-discover all public functions
       config:
         db_url: "postgres://..."
-    - type: api
+  - api:
       name: weather
       base_url: https://api.weather.com
       endpoints:
@@ -74,13 +73,13 @@ Provides sandboxed file operations within a root directory. Paths are resolved r
 
 ```yaml
 tools:
-  - type: filesystem
-    root_path: ./src        # default: "."
-    read_only: true         # default: true
-    allowed_extensions:     # default: [] (all extensions)
-      - ".py"
-      - ".md"
-      - ".txt"
+  - filesystem:
+      root_path: ./src        # default: "."
+      read_only: true         # default: true
+      allowed_extensions:     # default: [] (all extensions)
+        - ".py"
+        - ".md"
+        - ".txt"
 ```
 
 ### Options
@@ -124,12 +123,12 @@ Makes HTTP requests to a configured base URL. Methods are restricted to the allo
 
 ```yaml
 tools:
-  - type: http
-    base_url: https://api.example.com    # required
-    allowed_methods: ["GET"]              # default: ["GET"]
-    headers:                              # default: {}
-      Authorization: Bearer ${API_TOKEN}
-      Accept: application/json
+  - http:
+      base_url: https://api.example.com    # required
+      allowed_methods: ["GET"]              # default: ["GET"]
+      headers:                              # default: {}
+        Authorization: Bearer ${API_TOKEN}
+        Accept: application/json
 ```
 
 ### Options
@@ -155,25 +154,25 @@ Connects to an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) 
 ```yaml
 tools:
   # Stdio transport (local process)
-  - type: mcp
-    transport: stdio
-    command: npx
-    args: ["-y", "@anthropic/mcp-server-filesystem"]
+  - mcp:
+      transport: stdio
+      command: npx
+      args: ["-y", "@anthropic/mcp-server-filesystem"]
 
   # SSE transport (remote server)
-  - type: mcp
-    transport: sse
-    url: http://localhost:3001/sse
+  - mcp:
+      transport: sse
+      url: http://localhost:3001/sse
 
   # Streamable HTTP transport with auth and tool filtering
-  - type: mcp
-    transport: streamable-http
-    url: http://localhost:3001/mcp
-    headers:
-      Authorization: "Bearer ${MCP_API_TOKEN}"
-    tool_filter:
-      - search
-      - get_document
+  - mcp:
+      transport: streamable-http
+      url: http://localhost:3001/mcp
+      headers:
+        Authorization: "Bearer ${MCP_API_TOKEN}"
+      tool_filter:
+        - search
+        - get_document
 ```
 
 ### Options
@@ -208,61 +207,61 @@ tools:
 
 ```yaml
 tools:
-  - type: mcp
-    transport: sse
-    url: https://mcp.example.com/sse
-    headers:
-      Authorization: "Bearer ${MCP_API_TOKEN}"
+  - mcp:
+      transport: sse
+      url: https://mcp.example.com/sse
+      headers:
+        Authorization: "Bearer ${MCP_API_TOKEN}"
 ```
 
 **Environment variable forwarding for stdio:**
 
 ```yaml
 tools:
-  - type: mcp
-    transport: stdio
-    command: npx
-    args: ["-y", "@org/mcp-server-github"]
-    env:
-      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+  - mcp:
+      transport: stdio
+      command: npx
+      args: ["-y", "@org/mcp-server-github"]
+      env:
+        GITHUB_TOKEN: "${GITHUB_TOKEN}"
 ```
 
 **Working directory for stdio:**
 
 ```yaml
 tools:
-  - type: mcp
-    transport: stdio
-    command: npx
-    args: ["-y", "@anthropic/mcp-server-filesystem"]
-    cwd: ./workspace
+  - mcp:
+      transport: stdio
+      command: npx
+      args: ["-y", "@anthropic/mcp-server-filesystem"]
+      cwd: ./workspace
 ```
 
 **Multi-server with `tool_prefix` to avoid collisions:**
 
 ```yaml
 tools:
-  - type: mcp
-    transport: sse
-    url: https://staging.example.com/mcp
-    tool_prefix: staging
-  - type: mcp
-    transport: sse
-    url: https://prod.example.com/mcp
-    tool_prefix: prod
+  - mcp:
+      transport: sse
+      url: https://staging.example.com/mcp
+      tool_prefix: staging
+  - mcp:
+      transport: sse
+      url: https://prod.example.com/mcp
+      tool_prefix: prod
 ```
 
 **Exclude specific tools:**
 
 ```yaml
 tools:
-  - type: mcp
-    transport: stdio
-    command: npx
-    args: ["-y", "@org/mcp-server"]
-    tool_exclude:
-      - dangerous_tool
-      - admin_reset
+  - mcp:
+      transport: stdio
+      command: npx
+      args: ["-y", "@org/mcp-server"]
+      tool_exclude:
+        - dangerous_tool
+        - admin_reset
 ```
 
 **Deferred loading for faster startup:**
@@ -271,15 +270,15 @@ When an agent has several MCP servers but only uses some of them per run, `defer
 
 ```yaml
 tools:
-  - type: mcp
-    transport: stdio
-    command: npx
-    args: ["-y", "@anthropic/mcp-server-filesystem"]
-    defer: true
-  - type: mcp
-    transport: sse
-    url: https://mcp.example.com/sse
-    defer: true
+  - mcp:
+      transport: stdio
+      command: npx
+      args: ["-y", "@anthropic/mcp-server-filesystem"]
+      defer: true
+  - mcp:
+      transport: sse
+      url: https://mcp.example.com/sse
+      defer: true
 ```
 
 The schema cache lives in `~/.initrunner/cache/mcp/` (respects `INITRUNNER_HOME` and `XDG_DATA_HOME`). If the live server's tool schemas change, InitRunner logs a warning on the next connection and updates the cache automatically.
@@ -314,9 +313,9 @@ Specify `function` to load exactly one tool:
 
 ```yaml
 tools:
-  - type: custom
-    module: my_tools
-    function: search_db
+  - custom:
+      module: my_tools
+      function: search_db
 ```
 
 ### Auto-Discovery
@@ -325,8 +324,8 @@ Omit `function` to register all public functions in the module:
 
 ```yaml
 tools:
-  - type: custom
-    module: my_tools
+  - custom:
+      module: my_tools
 ```
 
 Auto-discovery collects every object in the module that is a function (`inspect.isfunction`), public (name does not start with `_`), and not a class, module, or builtin. If no qualifying functions are found, loading fails with a clear error.
@@ -337,11 +336,11 @@ Pass configuration to tools via the `config` dict. Functions that declare a `too
 
 ```yaml
 tools:
-  - type: custom
-    module: my_tools
-    config:
-      api_key: ${MY_API_KEY}
-      base_url: https://api.example.com
+  - custom:
+      module: my_tools
+      config:
+        api_key: ${MY_API_KEY}
+        base_url: https://api.example.com
 ```
 
 ```python
@@ -382,8 +381,8 @@ def summarize(text: str) -> str:
 ```yaml
 tools:
   # Registers both search_db and summarize
-  - type: custom
-    module: my_tools
+  - custom:
+      module: my_tools
 ```
 
 The module is imported via `importlib.import_module` at agent build time. If the module cannot be imported, the error message identifies the missing dependency and suggests a `pip install` command.
@@ -404,50 +403,50 @@ initrunner new --template api --output weather-agent.yaml
 
 ```yaml
 tools:
-  - type: api
-    name: github
-    description: GitHub REST API
-    base_url: https://api.github.com
-    headers:
-      Accept: application/vnd.github.v3+json
-    auth:
-      Authorization: "Bearer ${GITHUB_TOKEN}"
-    endpoints:
-      - name: get_repo
-        method: GET
-        path: "/repos/{owner}/{repo}"
-        description: Get repository information
-        parameters:
-          - name: owner
-            type: string
-            required: true
-          - name: repo
-            type: string
-            required: true
-        response_extract: "$.full_name"
+  - api:
+      name: github
+      description: GitHub REST API
+      base_url: https://api.github.com
+      headers:
+        Accept: application/vnd.github.v3+json
+      auth:
+        Authorization: "Bearer ${GITHUB_TOKEN}"
+      endpoints:
+        - name: get_repo
+          method: GET
+          path: "/repos/{owner}/{repo}"
+          description: Get repository information
+          parameters:
+            - name: owner
+              type: string
+              required: true
+            - name: repo
+              type: string
+              required: true
+          response_extract: "$.full_name"
 
-      - name: create_issue
-        method: POST
-        path: "/repos/{owner}/{repo}/issues"
-        description: Create a new issue
-        parameters:
-          - name: owner
-            type: string
-            required: true
-          - name: repo
-            type: string
-            required: true
-          - name: title
-            type: string
-            required: true
-          - name: body
-            type: string
-            required: false
-            default: ""
-        body_template:
-          title: "{title}"
-          body: "{body}"
-        response_extract: "$.html_url"
+        - name: create_issue
+          method: POST
+          path: "/repos/{owner}/{repo}/issues"
+          description: Create a new issue
+          parameters:
+            - name: owner
+              type: string
+              required: true
+            - name: repo
+              type: string
+              required: true
+            - name: title
+              type: string
+              required: true
+            - name: body
+              type: string
+              required: false
+              default: ""
+          body_template:
+            title: "{title}"
+            body: "{body}"
+          response_extract: "$.html_url"
 ```
 
 This registers two tools: `get_repo(owner, repo)` and `create_issue(owner, repo, title, body)`.
@@ -511,17 +510,17 @@ Invokes other agents as tool calls. Supports inline mode (in-process, for dev) a
 
 ```yaml
 tools:
-  - type: delegate
-    agents:
-      - name: summarizer
-        role_file: ./roles/summarizer.yaml
-        description: "Summarizes long text"
-      - name: researcher
-        role_file: ./roles/researcher.yaml
-        description: "Researches topics"
-    mode: inline
-    max_depth: 3
-    timeout_seconds: 120
+  - delegate:
+      agents:
+        - name: summarizer
+          role_file: ./roles/summarizer.yaml
+          description: "Summarizes long text"
+        - name: researcher
+          role_file: ./roles/researcher.yaml
+          description: "Researches topics"
+      mode: inline
+      max_depth: 3
+      timeout_seconds: 120
 ```
 
 ### Options
@@ -547,11 +546,11 @@ Provides subprocess-based git operations for reading repository state and option
 
 ```yaml
 tools:
-  - type: git
-    repo_path: .          # default: "."
-    read_only: true       # default: true
-    timeout_seconds: 30   # default: 30
-    max_output_bytes: 102400  # default: 100 KB
+  - git:
+      repo_path: .          # default: "."
+      read_only: true       # default: true
+      timeout_seconds: 30   # default: 30
+      max_output_bytes: 102400  # default: 100 KB
 ```
 
 ### Options
@@ -601,12 +600,12 @@ tools:
 ```yaml
 # Code review agent with read-only git access
 tools:
-  - type: git
-    repo_path: .
-    read_only: true
-  - type: filesystem
-    root_path: .
-    read_only: true
+  - git:
+      repo_path: .
+      read_only: true
+  - filesystem:
+      root_path: .
+      read_only: true
 ```
 
 ## Web Reader Tool
@@ -615,11 +614,11 @@ Fetches a web page and converts the HTML to markdown for the agent to read. Usef
 
 ```yaml
 tools:
-  - type: web_reader
-    allowed_domains:
-      - docs.example.com
-      - blog.example.com
-    timeout_seconds: 15
+  - web_reader:
+      allowed_domains:
+        - docs.example.com
+        - blog.example.com
+      timeout_seconds: 15
 ```
 
 ### Options
@@ -647,11 +646,11 @@ Executes Python code in a subprocess with isolation. Sensitive environment varia
 
 ```yaml
 tools:
-  - type: python
-    timeout_seconds: 30
-    max_output_bytes: 102400
-    require_confirmation: true
-    network_disabled: true
+  - python:
+      timeout_seconds: 30
+      max_output_bytes: 102400
+      require_confirmation: true
+      network_disabled: true
 ```
 
 ### Options
@@ -681,8 +680,8 @@ Provides current time and date parsing. Useful for agents that need to reason ab
 
 ```yaml
 tools:
-  - type: datetime
-    default_timezone: US/Eastern
+  - datetime:
+      default_timezone: US/Eastern
 ```
 
 ### Options
@@ -702,11 +701,11 @@ Queries SQLite databases with configurable read-only enforcement. Results are fo
 
 ```yaml
 tools:
-  - type: sql
-    database: ./data/app.db    # required
-    read_only: true            # default: true
-    max_rows: 100              # default: 100
-    timeout_seconds: 10        # default: 10
+  - sql:
+      database: ./data/app.db    # required
+      read_only: true            # default: true
+      max_rows: 100              # default: 100
+      timeout_seconds: 10        # default: 10
 ```
 
 ### Options
@@ -734,11 +733,11 @@ tools:
 ```yaml
 # Analytics agent with read-only database access
 tools:
-  - type: sql
-    database: ./analytics.db
-    read_only: true
-    max_rows: 50
-  - type: datetime
+  - sql:
+      database: ./analytics.db
+      read_only: true
+      max_rows: 50
+  - datetime
 ```
 
 ## Shell Tool
@@ -747,11 +746,11 @@ Executes commands in a subprocess with command allow/block lists. Commands are t
 
 ```yaml
 tools:
-  - type: shell
-    allowed_commands: []         # default: [] (all commands, subject to blocked list)
-    working_dir: ./workspace     # default: null (role directory)
-    timeout_seconds: 30          # default: 30
-    require_confirmation: true   # default: true
+  - shell:
+      allowed_commands: []         # default: [] (all commands, subject to blocked list)
+      working_dir: ./workspace     # default: null (role directory)
+      timeout_seconds: 30          # default: 30
+      require_confirmation: true   # default: true
 ```
 
 ### Options
@@ -787,11 +786,11 @@ Sends messages to Slack via incoming webhooks. Supports plain text messages, cha
 
 ```yaml
 tools:
-  - type: slack
-    webhook_url: ${SLACK_WEBHOOK_URL}    # required
-    default_channel: "#alerts"           # optional
-    username: InitRunner                 # optional
-    icon_emoji: ":robot_face:"           # optional
+  - slack:
+      webhook_url: ${SLACK_WEBHOOK_URL}    # required
+      default_channel: "#alerts"           # optional
+      username: InitRunner                 # optional
+      icon_emoji: ":robot_face:"           # optional
 ```
 
 ### Options
@@ -819,14 +818,14 @@ tools:
 ```yaml
 # Deploy notifier
 tools:
-  - type: slack
-    webhook_url: ${SLACK_WEBHOOK_URL}
-    default_channel: "#deployments"
-    username: DeployBot
-    icon_emoji: ":rocket:"
-  - type: git
-    repo_path: .
-    read_only: true
+  - slack:
+      webhook_url: ${SLACK_WEBHOOK_URL}
+      default_channel: "#deployments"
+      username: DeployBot
+      icon_emoji: ":rocket:"
+  - git:
+      repo_path: .
+      read_only: true
 ```
 
 ## Web Scraper Tool
@@ -835,11 +834,11 @@ Fetches a web page, converts it to markdown, chunks the content, generates embed
 
 ```yaml
 tools:
-  - type: web_scraper
-    allowed_domains:
-      - docs.example.com
-      - blog.example.com
-    timeout_seconds: 15
+  - web_scraper:
+      allowed_domains:
+        - docs.example.com
+        - blog.example.com
+      timeout_seconds: 15
 ```
 
 ### Options
@@ -868,10 +867,10 @@ tools:
 ```yaml
 # Web monitor agent — scrapes pages on a schedule
 tools:
-  - type: web_scraper
-    allowed_domains:
-      - docs.example.com
-  - type: datetime
+  - web_scraper:
+      allowed_domains:
+        - docs.example.com
+  - datetime
 ingest:
   sources: []  # web_scraper populates the store at runtime
 triggers:
@@ -886,11 +885,11 @@ Searches the web and news using one of four providers. DuckDuckGo is the default
 
 ```yaml
 tools:
-  - type: search
-    provider: duckduckgo     # default
-    max_results: 10          # default: 10
-    safe_search: true        # default: true
-    timeout_seconds: 15      # default: 15
+  - search:
+      provider: duckduckgo     # default
+      max_results: 10          # default: 10
+      safe_search: true        # default: true
+      timeout_seconds: 15      # default: 15
 ```
 
 ### Options
@@ -932,18 +931,18 @@ Paid providers use `httpx`, which is already bundled with InitRunner — no extr
 ```yaml
 # Research assistant with web and news search
 tools:
-  - type: search
-    provider: duckduckgo
-  - type: datetime
+  - search:
+      provider: duckduckgo
+  - datetime
 ```
 
 ```yaml
 # Using a paid provider
 tools:
-  - type: search
-    provider: brave
-    api_key: ${BRAVE_API_KEY}
-    max_results: 5
+  - search:
+      provider: brave
+      api_key: ${BRAVE_API_KEY}
+      max_results: 5
 ```
 
 ## Audio Tool
@@ -952,12 +951,12 @@ Fetches YouTube video transcripts and transcribes local audio/video files. YouTu
 
 ```yaml
 tools:
-  - type: audio
-    youtube_languages: ["en"]        # default: ["en"]
-    include_timestamps: false        # default: false
-    transcription_model: null        # default: null (uses the role's model)
-    max_audio_mb: 20.0               # default: 20.0
-    max_transcript_chars: 50000      # default: 50000
+  - audio:
+      youtube_languages: ["en"]        # default: ["en"]
+      include_timestamps: false        # default: false
+      transcription_model: null        # default: null (uses the role's model)
+      max_audio_mb: 20.0               # default: 20.0
+      max_transcript_chars: 50000      # default: 50000
 ```
 
 ### Options
@@ -1016,13 +1015,10 @@ All of the following URL formats are recognized:
 
 ```yaml
 # Fetch and summarize YouTube videos
-spec:
-  role: You summarize YouTube videos from their transcripts.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: audio
+model: openai:gpt-5-mini
+prompt: You summarize YouTube videos from their transcripts.
+tools:
+  - audio:
       youtube_languages: ["en", "es"]
       include_timestamps: true
 ```
@@ -1031,13 +1027,10 @@ spec:
 
 ```yaml
 # Transcribe local audio files
-spec:
-  role: You transcribe and summarize audio recordings.
-  model:
-    provider: openai
-    name: gpt-4o
-  tools:
-    - type: audio
+model: openai:gpt-4o
+prompt: You transcribe and summarize audio recordings.
+tools:
+  - audio:
       transcription_model: openai:gpt-4o-audio-preview
       max_audio_mb: 50.0
 ```
@@ -1046,16 +1039,13 @@ spec:
 
 ```yaml
 # Research agent that can watch videos and read the web
-spec:
-  role: You are a research assistant.
-  model:
-    provider: openai
-    name: gpt-4o
-  tools:
-    - type: audio
-    - type: search
+model: openai:gpt-4o
+prompt: You are a research assistant.
+tools:
+  - audio
+  - search:
       provider: duckduckgo
-    - type: web_reader
+  - web_reader
 ```
 
 ## Think Tool
@@ -1064,7 +1054,7 @@ Gives the agent an internal reasoning scratchpad. The agent can think step-by-st
 
 ```yaml
 tools:
-  - type: think
+  - think
 ```
 
 ### Options
@@ -1089,16 +1079,13 @@ The think tool has zero overhead — it does not make any external calls, spawn 
 
 ```yaml
 # Careful reasoning agent
-spec:
-  role: >
-    You are a careful, methodical assistant. Before answering any question
-    or taking any action, always use the think tool to reason step-by-step.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: think
-    - type: datetime
+model: openai:gpt-5-mini
+prompt: >
+  You are a careful, methodical assistant. Before answering any question
+  or taking any action, always use the think tool to reason step-by-step.
+tools:
+  - think
+  - datetime
 ```
 
 ## Clarify Tool
@@ -1107,7 +1094,7 @@ Lets the agent pause mid-execution, ask the user a clarifying question, and resu
 
 ```yaml
 tools:
-  - type: clarify
+  - clarify
 ```
 
 ### Options
@@ -1144,26 +1131,20 @@ The tool's docstring instructs the agent to batch questions and avoid using it f
 ### Example
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: research-assistant
-  description: Research assistant that clarifies before diving in
-spec:
-  role: >
-    You are a research assistant. When the user's request is ambiguous
-    or underspecified, use the clarify tool to ask for more details
-    before proceeding. Do not guess -- ask.
-  model:
-    provider: openai
-    name: gpt-4o
-  tools:
-    - type: clarify
+name: research-assistant
+description: Research assistant that clarifies before diving in
+model: openai:gpt-4o
+prompt: >
+  You are a research assistant. When the user's request is ambiguous
+  or underspecified, use the clarify tool to ask for more details
+  before proceeding. Do not guess -- ask.
+tools:
+  - clarify:
       max_clarifications: 3
       timeout_seconds: 300
-    - type: web_reader
-    - type: search
-    - type: think
+  - web_reader
+  - search
+  - think
 ```
 
 ## Script Tool
@@ -1172,21 +1153,21 @@ Defines inline shell scripts in YAML as named, parameterized agent tools. Each s
 
 ```yaml
 tools:
-  - type: script
-    interpreter: /bin/sh           # default interpreter
-    timeout_seconds: 30            # default timeout per script
-    max_output_bytes: 102400       # default: 100 KB
-    working_dir: null              # default: role directory
-    scripts:
-      - name: disk_usage
-        description: Check disk usage for a path
-        interpreter: /bin/bash     # override per script
-        body: |
-          df -h "$TARGET_PATH"
-        parameters:
-          - name: target_path
-            description: Filesystem path to check
-            required: true
+  - script:
+      interpreter: /bin/sh           # default interpreter
+      timeout_seconds: 30            # default timeout per script
+      max_output_bytes: 102400       # default: 100 KB
+      working_dir: null              # default: role directory
+      scripts:
+        - name: disk_usage
+          description: Check disk usage for a path
+          interpreter: /bin/bash     # override per script
+          body: |
+            df -h "$TARGET_PATH"
+          parameters:
+            - name: target_path
+              description: Filesystem path to check
+              required: true
 ```
 
 ### Top-Level Options
@@ -1266,51 +1247,51 @@ When `allowed_commands` is empty (the default), no validation is performed — t
 
 ```yaml
 tools:
-  - type: script
-    scripts:
-      - name: disk_usage
-        description: Check disk usage for a path
-        allowed_commands: [df]
-        body: |
-          df -h "$TARGET_PATH"
-        parameters:
-          - name: target_path
-            required: true
+  - script:
+      scripts:
+        - name: disk_usage
+          description: Check disk usage for a path
+          allowed_commands: [df]
+          body: |
+            df -h "$TARGET_PATH"
+          parameters:
+            - name: target_path
+              required: true
 ```
 
 **Multi-command scripts (no `allowed_commands` — trusts the role author):**
 
 ```yaml
 tools:
-  - type: script
-    scripts:
-      - name: system_info
-        description: Show basic system information
-        interpreter: /bin/bash
-        body: |
-          echo "Hostname: $(hostname)"
-          echo "Kernel: $(uname -r)"
-          echo "Uptime: $(uptime -p 2>/dev/null || uptime)"
-          echo "Memory:"
-          free -h 2>/dev/null || echo "free not available"
+  - script:
+      scripts:
+        - name: system_info
+          description: Show basic system information
+          interpreter: /bin/bash
+          body: |
+            echo "Hostname: $(hostname)"
+            echo "Kernel: $(uname -r)"
+            echo "Uptime: $(uptime -p 2>/dev/null || uptime)"
+            echo "Memory:"
+            free -h 2>/dev/null || echo "free not available"
 ```
 
 **Python interpreter:**
 
 ```yaml
 tools:
-  - type: script
-    scripts:
-      - name: calculate
-        description: Evaluate a math expression
-        interpreter: python3
-        body: |
-          import os, ast
-          print(ast.literal_eval(os.environ["EXPR"]))
-        parameters:
-          - name: expr
-            description: Math expression to evaluate
-            required: true
+  - script:
+      scripts:
+        - name: calculate
+          description: Evaluate a math expression
+          interpreter: python3
+          body: |
+            import os, ast
+            print(ast.literal_eval(os.environ["EXPR"]))
+          parameters:
+            - name: expr
+              description: Math expression to evaluate
+              required: true
 ```
 
 ## Calculator Tool
@@ -1319,7 +1300,7 @@ Safe mathematical expression evaluator. LLMs are unreliable at arithmetic; this 
 
 ```yaml
 tools:
-  - type: calculator
+  - calculator
 ```
 
 ### Options
@@ -1339,14 +1320,11 @@ Expressions are parsed via Python's `ast` module with a strict allowlist of node
 ### Example
 
 ```yaml
-spec:
-  role: You are a financial analyst. Use the calculator for all numeric computations.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: calculator
-    - type: csv_analysis
+model: openai:gpt-5-mini
+prompt: You are a financial analyst. Use the calculator for all numeric computations.
+tools:
+  - calculator
+  - csv_analysis:
       root_path: ./reports
 ```
 
@@ -1358,8 +1336,8 @@ Requires the `ingest` extra: `pip install initrunner[ingest]`
 
 ```yaml
 tools:
-  - type: pdf_extract
-    root_path: ./documents
+  - pdf_extract:
+      root_path: ./documents
 ```
 
 ### Options
@@ -1383,16 +1361,13 @@ File paths are validated against `root_path` using `validate_path_within()`. Onl
 ### Example
 
 ```yaml
-spec:
-  role: You are a document analysis assistant. Extract and summarize PDF content.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: pdf_extract
+model: openai:gpt-5-mini
+prompt: You are a document analysis assistant. Extract and summarize PDF content.
+tools:
+  - pdf_extract:
       root_path: /data/reports
       max_pages: 50
-    - type: think
+  - think
 ```
 
 ## Image Generation Tool
@@ -1401,8 +1376,8 @@ Generate images via OpenAI DALL-E or Stability AI APIs. Images are saved to disk
 
 ```yaml
 tools:
-  - type: image_gen
-    provider: openai
+  - image_gen:
+      provider: openai
 ```
 
 ### Options
@@ -1435,13 +1410,10 @@ Both functions support async execution when `prefer_async` is enabled. The async
 ### Example
 
 ```yaml
-spec:
-  role: You are a creative assistant that generates images based on descriptions.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  tools:
-    - type: image_gen
+model: openai:gpt-5-mini
+prompt: You are a creative assistant that generates images based on descriptions.
+tools:
+  - image_gen:
       provider: openai
       default_size: "1024x1024"
       default_quality: hd
@@ -1450,7 +1422,7 @@ spec:
 
 ## Browser MCP Tool
 
-Browser automation via [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, exposed as an MCP server. Agents consume it through the standard `type: mcp` tool config. Uses agent-browser's snapshot/refs system (`@e1`, `@e2`, ...) which uses 93% less context than raw Playwright accessibility trees.
+Browser automation via [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs, exposed as an MCP server. Agents consume it through the standard `mcp` tool config. Uses agent-browser's snapshot/refs system (`@e1`, `@e2`, ...) which uses 93% less context than raw Playwright accessibility trees.
 
 **Prerequisites:**
 ```bash
@@ -1463,22 +1435,22 @@ agent-browser install
 ```yaml
 # stdio via dedicated entrypoint (recommended)
 tools:
-  - type: mcp
-    transport: stdio
-    command: initrunner-browser-mcp
-    tool_filter:
-      - open_url
-      - snapshot
-      - click
-      - fill
-      - get_text
-      - screenshot
+  - mcp:
+      transport: stdio
+      command: initrunner-browser-mcp
+      tool_filter:
+        - open_url
+        - snapshot
+        - click
+        - fill
+        - get_text
+        - screenshot
 
 # Or connect to a running server
 tools:
-  - type: mcp
-    transport: streamable-http
-    url: http://localhost:8080/mcp
+  - mcp:
+      transport: streamable-http
+      url: http://localhost:8080/mcp
 ```
 
 ### Manual Serving
@@ -1536,16 +1508,16 @@ The following agent-browser features are intentionally excluded from v1: `evalua
 
 ## Plugin Tools
 
-Any `type` value that is not one of the builtins above is resolved via the plugin registry. Plugins are third-party packages that register new tool types through Python entry points.
+Any tool name that is not one of the builtins above is resolved via the plugin registry. Plugins are third-party packages that register new tool types through Python entry points.
 
 ```yaml
 tools:
-  - type: jira           # provided by a hypothetical initrunner-jira package
-    base_url: https://mycompany.atlassian.net
-    token: ${JIRA_TOKEN}
+  - jira:                    # provided by a hypothetical initrunner-jira package
+      base_url: https://mycompany.atlassian.net
+      token: ${JIRA_TOKEN}
 ```
 
-All keys besides `type` are passed as the plugin's config dict. List installed plugins with `initrunner plugins`.
+All keys in the mapping are passed as the plugin's config dict. List installed plugins with `initrunner plugins`.
 
 See [Tool Creation Guide](tool_creation.md#plugin-registry) for how to use and create plugins.
 
@@ -1553,7 +1525,7 @@ See [Tool Creation Guide](tool_creation.md#plugin-registry) for how to use and c
 
 ### Document Search (from `ingest`)
 
-When `spec.ingest` is configured, InitRunner automatically registers a document search tool:
+When `ingest` is configured, InitRunner automatically registers a document search tool:
 
 - **`search_documents(query: str, top_k: int = 5, source: str | None = None) -> str`** — Search ingested documents for relevant content. Returns matching chunks with source attribution and similarity scores. Pass `source` to filter results by exact path or glob pattern (e.g. `"*.md"`).
 
@@ -1563,7 +1535,7 @@ See [Ingestion](../core/ingestion.md) for details on configuring document ingest
 
 ### Memory Tools (from `memory`)
 
-When `spec.memory` is configured, up to five tools are auto-registered depending on which memory types are enabled:
+When `memory` is configured, up to five tools are auto-registered depending on which memory types are enabled:
 
 - **`remember(content: str, category: str = "general") -> str`** — Store a semantic memory (fact/knowledge) with an embedding. Only registered when `semantic.enabled` is `true`.
 - **`recall(query: str, top_k: int = 5, memory_types: list[str] | None = None) -> str`** — Search all memory types by semantic similarity. Pass `memory_types` to filter (e.g. `["semantic", "procedural"]`). Always registered.
@@ -1577,6 +1549,6 @@ See [Memory](../core/memory.md) for details on memory types, consolidation, and 
 
 When an agent is constructed, tools are built in this order:
 
-1. Explicit tools from `spec.tools` (in definition order, including delegate, api, web_scraper, and plugin tools)
-2. Auto-retrieval tool (if `spec.ingest` is configured)
-3. Memory tools (if `spec.memory` is configured)
+1. Explicit tools from `tools` (in definition order, including delegate, api, web_scraper, and plugin tools)
+2. Auto-retrieval tool (if `ingest` is configured)
+3. Memory tools (if `memory` is configured)

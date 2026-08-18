@@ -15,6 +15,10 @@ from initrunner.cli._options import SkillDirOption
 
 
 def doctor(
+    path: Annotated[
+        Path | None,
+        typer.Argument(help="File or directory to check or rewrite with --fix"),
+    ] = None,
     quickstart: Annotated[
         bool, typer.Option("--quickstart", help="Run a smoke prompt to verify end-to-end")
     ] = False,
@@ -30,7 +34,13 @@ def doctor(
     ] = False,
     skill_dir: SkillDirOption = None,
     fix: Annotated[
-        bool, typer.Option("--fix", help="Interactively repair detected issues")
+        bool, typer.Option("--fix", help="Rewrite envelopes and repair detected issues")
+    ] = False,
+    no_backup: Annotated[
+        bool, typer.Option("--no-backup", help="Do not write a .bak next to rewritten files")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Overwrite an existing .bak when rewriting")
     ] = False,
     yes: Annotated[bool, typer.Option("--yes", "-y", help="Auto-confirm all fix prompts")] = False,
 ) -> None:
@@ -42,26 +52,33 @@ def doctor(
     from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
 
     # ----- Flag interaction validation -----
+    if path is not None and role_file is not None:
+        console.print("[red]Error:[/red] PATH and --role are mutually exclusive.")
+        raise typer.Exit(1)
+    if path is not None and flow_file is not None:
+        console.print("[red]Error:[/red] PATH and --flow are mutually exclusive.")
+        raise typer.Exit(1)
     if flow_file is not None and role_file is not None:
         console.print("[red]Error:[/red] --flow and --role are mutually exclusive.")
         raise typer.Exit(1)
     if flow_file is not None and quickstart:
         console.print("[red]Error:[/red] --flow and --quickstart are mutually exclusive.")
         raise typer.Exit(1)
-    if flow_file is not None and fix:
-        console.print("[red]Error:[/red] --flow and --fix are mutually exclusive.")
+    if deep and role_file is None and flow_file is None and path is None:
+        console.print("[red]Error:[/red] --deep requires --role, --flow, or PATH.")
         raise typer.Exit(1)
-    if deep and role_file is None and flow_file is None:
-        console.print("[red]Error:[/red] --deep requires --role or --flow.")
-        raise typer.Exit(1)
-    if skill_dir is not None and role_file is None and flow_file is None:
-        console.print("[red]Error:[/red] --skill-dir requires --role or --flow.")
+    if skill_dir is not None and role_file is None and flow_file is None and path is None:
+        console.print("[red]Error:[/red] --skill-dir requires --role, --flow, or PATH.")
         raise typer.Exit(1)
 
     if fix and not yes and not sys.stdin.isatty():
         console.print("[red]Error:[/red] --fix requires --yes in non-interactive mode.")
         raise typer.Exit(1)
 
+    if path is not None and path.is_file():
+        from initrunner.cli._helpers import resolve_role_path
+
+        path = resolve_role_path(path)
     if role_file is not None:
         from initrunner.cli._helpers import resolve_role_path
 
@@ -70,6 +87,8 @@ def doctor(
     # Load .env so that .env-only setups are detected
     if role_file is not None:
         _load_dotenv(role_file.parent)
+    elif path is not None:
+        _load_dotenv(path.parent if path.is_file() else path)
     else:
         _load_dotenv(Path.cwd())
 
@@ -156,10 +175,45 @@ def doctor(
         "[dim](anonymous, opt-in; initrunner telemetry status)[/dim]"
     )
 
-    # ----- Fix: providers (when --fix) -----
+    # ----- Fix: rewrite envelopes, then providers -----
     fixed: list[str] = []
+    rewrite_failed = False
+    rewrite_target = path if path is not None else role_file if role_file is not None else flow_file
+    if fix and rewrite_target is not None:
+        from initrunner.services.migrate import rewrite_envelopes
+
+        for item in rewrite_envelopes(rewrite_target, backup=not no_backup, force=force):
+            if item.action == "rewritten":
+                note = f"Rewrote {item.path} to flat YAML"
+                if item.backup is not None:
+                    note += f" (backup {item.backup.name})"
+                fixed.append(note)
+            elif item.action == "failed":
+                rewrite_failed = True
+                console.print(f"[red]Rewrite failed:[/red] {item.path}: {item.message}")
+            elif item.action == "skipped" and path is not None:
+                console.print(f"[dim]Skipped {item.path}: {item.message}[/dim]")
+
+    provider_target = role_file
+    if provider_target is None and path is not None and path.is_file():
+        provider_target = path
     if fix:
-        fixed.extend(_fix_providers(role_file, yes))
+        fixed.extend(_fix_providers(provider_target, yes))
+
+    # Treat a positional file as --role / --flow for the existing health checks.
+    if path is not None and path.is_file() and role_file is None and flow_file is None:
+        from initrunner._yaml import load_raw_yaml
+        from initrunner.agent.schema.adapt import run_kind_from_mapping
+
+        try:
+            raw = load_raw_yaml(path, ValueError)
+            kind = run_kind_from_mapping(raw) if isinstance(raw, dict) else "Agent"
+        except Exception:
+            kind = "Agent"
+        if kind == "Flow":
+            flow_file = path
+        elif kind != "Team":
+            role_file = path
 
     # ----- Role Validation (when --role provided) -----
     has_role_errors = False
@@ -185,7 +239,7 @@ def doctor(
             )
         )
 
-    if has_flow_errors:
+    if has_flow_errors or rewrite_failed:
         raise typer.Exit(1)
 
     if not quickstart or has_role_errors:
@@ -373,6 +427,11 @@ def _check_and_fix_role_health(
         )
         return True, fixed
 
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+
+    if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+        return _check_flat_role_health(path, raw, fix=fix, yes=yes, deep=deep, skill_dir=skill_dir)
+
     # Stage 2: inspect (non-raising except future version)
     try:
         inspection = inspect_role_data(raw)
@@ -479,6 +538,50 @@ def _check_and_fix_role_health(
                 pass  # keep original has_errors
 
     return has_errors, fixed
+
+
+def _check_flat_role_health(
+    path: Path,
+    raw: dict,
+    *,
+    fix: bool,
+    yes: bool,
+    deep: bool,
+    skill_dir: Path | None,
+) -> tuple[bool, list[str]]:
+    """Health-check a flat agent file. Envelope deprecation patches do not apply."""
+    from initrunner.agent.loader import load_role
+    from initrunner.cli._helpers import install_extra, resolve_skill_dirs
+    from initrunner.services.doctor import (
+        diagnose_role_deep,
+        diagnose_role_extras,
+        diagnose_security,
+    )
+
+    fixed: list[str] = []
+    try:
+        role = load_role(path)
+    except Exception as exc:
+        console.print(Panel(f"[red]{exc}[/red]", title="Role Validation", border_style="red"))
+        return True, fixed
+
+    console.print("[green]Role is valid.[/green]")
+    sec_diag = diagnose_security(role)
+    if sec_diag.warning:
+        console.print(f"  [yellow]Warning:[/yellow] {sec_diag.warning}")
+    extra_dirs = resolve_skill_dirs(skill_dir)
+    diag = diagnose_role_deep(role, path.parent, deep=deep, extra_skill_dirs=extra_dirs)
+    _render_role_diagnostics(diag)
+
+    if fix:
+        for gap in diagnose_role_extras(raw):
+            if yes or typer.confirm(
+                f"Install initrunner[{gap.extras_name}] (needed by {gap.feature})?",
+                default=True,
+            ):
+                if install_extra(gap.extras_name):
+                    fixed.append(f"Installed initrunner[{gap.extras_name}]")
+    return False, fixed
 
 
 def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:

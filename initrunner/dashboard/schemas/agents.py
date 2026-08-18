@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 from initrunner.dashboard.schemas._common import ItemSummary, SkillRef
@@ -26,6 +28,7 @@ class AgentSummary(BaseModel):
     features: list[str]
     path: str
     error: str | None = None
+    shape: Literal["solo", "preset", "graph"] = "solo"
 
 
 class AgentDetail(BaseModel):

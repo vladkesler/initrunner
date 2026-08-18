@@ -15,23 +15,19 @@ evident.
 
 ## Enabling durability
 
-Add a `durability` block to the flow `spec`:
+Add a `durability` block to the flow:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: durable-pipeline
-spec:
-  durability:
-    enabled: true
-  agents:
-    researcher:
-      role: ./researcher.yaml
-      sink:
-        target: writer
-    writer:
-      role: ./writer.yaml
+name: durable-pipeline
+durability:
+  enabled: true
+agents:
+  researcher:
+    use: ./researcher.yaml
+    then:
+      to: writer
+  writer:
+    use: ./writer.yaml
 ```
 
 `enabled: true` is all you need. It selects the `journal` backend, the only

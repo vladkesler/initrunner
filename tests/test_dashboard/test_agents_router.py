@@ -1,12 +1,16 @@
 """Tests for /api/agents routes."""
 
+import asyncio
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from initrunner.agent.schema.base import ModelConfig
 from initrunner.agent.schema.guardrails import Guardrails
 from initrunner.agent.schema.output import OutputConfig
-from initrunner.dashboard.deps import _role_id, get_role_cache
+from initrunner.dashboard.deps import (
+    _role_id,
+    get_role_cache,
+)
 from tests.test_dashboard.conftest import MockRoleCache
 
 
@@ -99,6 +103,55 @@ def test_delete_agent(client, mock_roles, tmp_path):
 def test_delete_agent_not_found(client):
     resp = client.delete("/api/agents/doesnotexist")
     assert resp.status_code == 404
+
+
+def test_delete_team_from_unified_agents_endpoint(tmp_path):
+    from initrunner.dashboard.routers.agents import delete_agent
+
+    yaml_file = tmp_path / "team.yaml"
+    yaml_file.write_text("name: review-team\nagents:\n  a: one\n  b: two\n")
+    discovered = MagicMock(path=yaml_file)
+    role_cache = MagicMock()
+    role_cache.get.return_value = None
+    team_cache = MagicMock()
+    team_cache.get.return_value = discovered
+    flow_cache = MagicMock()
+
+    item_id = _role_id(yaml_file)
+    with patch(
+        "initrunner.dashboard.routers.agents.asyncio.to_thread",
+        new=AsyncMock(side_effect=lambda fn, *args: fn(*args)),
+    ):
+        response = asyncio.run(delete_agent(item_id, role_cache, team_cache, flow_cache))
+
+    assert response.id == item_id
+    assert not yaml_file.exists()
+    team_cache.evict.assert_called_once_with(item_id)
+
+
+def test_delete_flow_from_unified_agents_endpoint(tmp_path):
+    from initrunner.dashboard.routers.agents import delete_agent
+
+    yaml_file = tmp_path / "flow.yaml"
+    yaml_file.write_text("name: review-flow\nagents:\n  a:\n    prompt: one\n")
+    discovered = MagicMock(path=yaml_file)
+    role_cache = MagicMock()
+    role_cache.get.return_value = None
+    team_cache = MagicMock()
+    team_cache.get.return_value = None
+    flow_cache = MagicMock()
+    flow_cache.get.return_value = discovered
+
+    item_id = _role_id(yaml_file)
+    with patch(
+        "initrunner.dashboard.routers.agents.asyncio.to_thread",
+        new=AsyncMock(side_effect=lambda fn, *args: fn(*args)),
+    ):
+        response = asyncio.run(delete_agent(item_id, role_cache, team_cache, flow_cache))
+
+    assert response.id == item_id
+    assert not yaml_file.exists()
+    flow_cache.evict.assert_called_once_with(item_id)
 
 
 def _make_detail_role(path: str, name: str, provider: str = "openai", model: str = "gpt-4o"):

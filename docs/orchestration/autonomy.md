@@ -21,27 +21,21 @@ This is useful for research tasks, multi-step workflows, and any work that requi
 Minimal role YAML:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-  description: An autonomous agent
-spec:
-  role: |
-    You are a helpful assistant. Break complex tasks into steps
-    and work through them methodically.
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-  tools:
-    - type: think
-    - type: todo
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  guardrails:
-    max_iterations: 10
-    autonomous_token_budget: 50000
+name: my-agent
+description: An autonomous agent
+model: openai:gpt-5.4-mini-2026-03-17
+prompt: |
+  You are a helpful assistant. Break complex tasks into steps
+  and work through them methodically.
+tools:
+  - think
+  - todo
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+guardrails:
+  max_iterations: 10
+  autonomous_token_budget: 50000
 ```
 
 Run it:
@@ -54,7 +48,7 @@ The `-a` / `--autonomous` flag activates the agentic loop.
 
 ## Configuration Reference
 
-### `spec.autonomy`
+### `autonomy`
 
 Controls loop behavior. All fields are optional — defaults apply if the `autonomy:` block is omitted entirely.
 
@@ -73,7 +67,7 @@ Controls loop behavior. All fields are optional — defaults apply if the `auton
 | `compaction.model_override` | `str \| null` | `null` | Model to use for summarization. Defaults to the role's model. |
 | `compaction.summary_prefix` | `str` | `"[CONVERSATION HISTORY SUMMARY]\n"` | Prefix prepended to the LLM summary. |
 
-### `spec.guardrails` (autonomous fields)
+### `guardrails` (autonomous fields)
 
 These fields in the `guardrails:` block control autonomous execution limits:
 
@@ -87,7 +81,7 @@ These fields in the `guardrails:` block control autonomous execution limits:
 
 ### Run-scoped reasoning tools
 
-When your role declares `type: todo` and/or `type: think` in `spec.tools`, those toolsets are built fresh per-run with isolated state. The todo tool provides CRUD task management with priorities and dependencies; the think tool provides an accumulated reasoning chain. See [Reasoning Primitives](../core/reasoning.md) for full documentation.
+When your role declares `todo` and/or `think` in `tools`, those toolsets are built fresh per-run with isolated state. The todo tool provides CRUD task management with priorities and dependencies; the think tool provides an accumulated reasoning chain. See [Reasoning Primitives](../core/reasoning.md) for full documentation.
 
 ### `finish_task`
 
@@ -190,23 +184,22 @@ initrunner run role.yaml --autopilot   # all triggers use autonomous loop
 Set `autonomous: true` on any trigger config:
 
 ```yaml
-spec:
-  triggers:
-    - type: cron
-      schedule: "0 */6 * * *"
-      prompt: "Check for new research papers and summarize findings"
-      autonomous: true
-    - type: webhook
-      path: /research
-      port: 8080
-      autonomous: true
+triggers:
+  - type: cron
+    schedule: "0 */6 * * *"
+    prompt: "Check for new research papers and summarize findings"
+    autonomous: true
+  - type: webhook
+    path: /research
+    port: 8080
+    autonomous: true
 ```
 
-When a trigger with `autonomous: true` fires, the agent runs through the full agentic loop (not a single-shot response). Scheduled follow-up runs (via `schedule_followup` / `schedule_followup_at`) also use the agentic loop if `spec.autonomy` is configured.
+When a trigger with `autonomous: true` fires, the agent runs through the full agentic loop (not a single-shot response). Scheduled follow-up runs (via `schedule_followup` / `schedule_followup_at`) also use the agentic loop if `autonomy` is configured.
 
 ### Scheduling
 
-When `spec.autonomy` is configured, daemon-mode agents gain access to the `schedule_followup` and `schedule_followup_at` tools. These allow the agent to create one-shot follow-up runs.
+When `autonomy` is configured, daemon-mode agents gain access to the `schedule_followup` and `schedule_followup_at` tools. These allow the agent to create one-shot follow-up runs.
 
 Important caveats:
 
@@ -216,7 +209,7 @@ Important caveats:
 
 ## Memory Integration
 
-When `spec.memory` is configured:
+When `memory` is configured:
 
 - The autonomous run's session (all iterations) is saved for `--resume` in interactive mode
 - **Episodic auto-capture**: when `finish_task` is called with a summary, the summary is persisted as an episodic memory with category `autonomous_run` and structured metadata
@@ -234,16 +227,16 @@ Multiple layers of limits prevent runaway execution:
 
 | Limit | Scope | Default | Config location |
 |---|---|---|---|
-| `max_iterations` | Per autonomous run | `10` | `spec.guardrails` |
-| `autonomous_token_budget` | Per autonomous run | Unlimited | `spec.guardrails` |
-| `max_tokens_per_run` | Per single iteration | `50000` | `spec.guardrails` |
-| `max_tool_calls` | Per single iteration | `20` | `spec.guardrails` |
-| `timeout_seconds` | Per single iteration | `300` | `spec.guardrails` |
-| `max_scheduled_per_run` | Per trigger fire | `3` | `spec.autonomy` |
-| `max_scheduled_total` | Per daemon lifetime | `50` | `spec.autonomy` |
-| `iteration_delay_seconds` | Between iterations | `0` | `spec.autonomy` |
-| `daemon_token_budget` | Per daemon lifetime | Unlimited | `spec.guardrails` |
-| `daemon_daily_token_budget` | Per calendar day | Unlimited | `spec.guardrails` |
+| `max_iterations` | Per autonomous run | `10` | `guardrails` |
+| `autonomous_token_budget` | Per autonomous run | Unlimited | `guardrails` |
+| `max_tokens_per_run` | Per single iteration | `50000` | `guardrails` |
+| `max_tool_calls` | Per single iteration | `20` | `guardrails` |
+| `timeout_seconds` | Per single iteration | `300` | `guardrails` |
+| `max_scheduled_per_run` | Per trigger fire | `3` | `autonomy` |
+| `max_scheduled_total` | Per daemon lifetime | `50` | `autonomy` |
+| `iteration_delay_seconds` | Between iterations | `0` | `autonomy` |
+| `daemon_token_budget` | Per daemon lifetime | Unlimited | `guardrails` |
+| `daemon_daily_token_budget` | Per calendar day | Unlimited | `guardrails` |
 
 For production autonomous agents, it is recommended to set `autonomous_token_budget` and keep `max_iterations` reasonable.
 
@@ -252,52 +245,48 @@ For production autonomous agents, it is recommended to set `autonomous_token_bud
 Full annotated example from `examples/roles/deployment-checker/role.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: deployment-checker
-  description: Autonomous deployment verification agent
-  tags: [devops, autonomous, deployment, reasoning]
-spec:
-  role: |
-    You are a deployment verification agent. When given one or more URLs to check,
-    create a verification checklist, execute each step, and produce a pass/fail report.
+name: deployment-checker
+description: Autonomous deployment verification agent
+tags: [devops, autonomous, deployment, reasoning]
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.0
+prompt: |
+  You are a deployment verification agent. When given one or more URLs to check,
+  create a verification checklist, execute each step, and produce a pass/fail report.
 
-    Workflow:
-    1. Create a todo list with one item per URL to verify (use batch_add_todos)
-    2. Work through each item: run curl to check the URL
-    3. Mark each item completed (2xx) or failed (anything else)
-    4. If a check fails, add a retry or investigation item with high priority
-    5. When all checks are done, send a Slack summary with pass/fail results
-    6. Call finish_task with the overall status
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-    temperature: 0.0
-  tools:
-    - type: think
-    - type: todo
+  Workflow:
+  1. Create a todo list with one item per URL to verify (use batch_add_todos)
+  2. Work through each item: run curl to check the URL
+  3. Mark each item completed (2xx) or failed (anything else)
+  4. If a check fails, add a retry or investigation item with high priority
+  5. When all checks are done, send a Slack summary with pass/fail results
+  6. Call finish_task with the overall status
+tools:
+  - think
+  - todo:
       max_items: 15
-    - type: shell
+  - shell:
       allowed_commands:
         - curl
       require_confirmation: false
       timeout_seconds: 30
-    - type: slack
+  - slack:
       webhook_url: "${SLACK_WEBHOOK_URL}"
       default_channel: "#deployments"
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy:
-    max_history_messages: 20
-    iteration_delay_seconds: 1
-  guardrails:
-    max_iterations: 8
-    autonomous_token_budget: 30000
-    autonomous_timeout_seconds: 300
-    max_tokens_per_run: 10000
-    max_tool_calls: 20
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy:
+  max_history_messages: 20
+  iteration_delay_seconds: 1
+guardrails:
+  max_iterations: 8
+  autonomous_token_budget: 30000
+  autonomous_timeout_seconds: 300
+  max_tokens_per_run: 10000
+  max_tool_calls: 20
 ```
 
 Run it:
@@ -322,7 +311,7 @@ The agent may reach `max_iterations` without explicitly finishing. To fix:
 
 The run stopped with status `budget_exceeded`. Options:
 
-- Increase `autonomous_token_budget` in `spec.guardrails`
+- Increase `autonomous_token_budget` in `guardrails`
 - Reduce `max_history_messages` to trim context sent per iteration
 - Use a smaller/cheaper model to reduce tokens per iteration
 
@@ -335,12 +324,11 @@ Scheduled follow-ups (`schedule_followup` / `schedule_followup_at`) are in-memor
 By default, old messages are silently dropped when history exceeds `max_history_messages`. Enable compaction to summarize old messages instead:
 
 ```yaml
-spec:
-  autonomy:
-    compaction:
-      enabled: true
-      threshold: 30
-      tail_messages: 6
+autonomy:
+  compaction:
+    enabled: true
+    threshold: 30
+    tail_messages: 6
 ```
 
 This uses an LLM call to produce a summary of the dropped messages, preserving key decisions, tool results, and open tasks. The summary is injected as a single message before the recent tail. You can use `model_override` to route summarization to a cheaper model.
@@ -369,14 +357,13 @@ Changes made by the processor are permanent for the rest of the run (PydanticAI 
 
 ### Configuration
 
-Set `context_window` on `spec.model` to tell the guard your model's context size:
+Set `context_window` on `model` to tell the guard your model's context size:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-20250514
-    context_window: 200000  # tokens
+model:
+  provider: anthropic
+  name: claude-sonnet-4-20250514
+  context_window: 200000  # tokens
 ```
 
 If `context_window` is not set, the guard uses provider-level defaults:

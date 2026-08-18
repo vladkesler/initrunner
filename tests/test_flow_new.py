@@ -53,7 +53,7 @@ class TestPipelinePattern:
         result = scaffold_flow_project("p", agents=5, output_dir=tmp_path, provider="openai")
         assert len(result.role_paths) == 5
         data = yaml.safe_load(result.flow_path.read_text())
-        assert len(data["spec"]["agents"]) == 5
+        assert len(data["agents"]) == 5
 
     def test_min_agents(self, tmp_path: Path) -> None:
         result = scaffold_flow_project("p", agents=2, output_dir=tmp_path, provider="openai")
@@ -66,10 +66,10 @@ class TestPipelinePattern:
     def test_sink_chain(self, tmp_path: Path) -> None:
         result = scaffold_flow_project("p", agents=3, output_dir=tmp_path, provider="openai")
         data = yaml.safe_load(result.flow_path.read_text())
-        agents = data["spec"]["agents"]
-        assert agents["step-1"]["sink"]["target"] == "step-2"
-        assert agents["step-2"]["sink"]["target"] == "step-3"
-        assert "sink" not in agents["step-3"]
+        agents = data["agents"]
+        assert agents["step-1"]["then"]["to"] == "step-2"
+        assert agents["step-2"]["then"]["to"] == "step-3"
+        assert "then" not in agents["step-3"]
 
 
 class TestFanOutPattern:
@@ -85,8 +85,8 @@ class TestFanOutPattern:
             "fo", pattern="fan-out", output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        agents = data["spec"]["agents"]
-        assert agents["dispatcher"]["sink"]["target"] == ["worker-1", "worker-2"]
+        agents = data["agents"]
+        assert agents["dispatcher"]["then"]["to"] == ["worker-1", "worker-2"]
 
     def test_flow_yaml_is_valid(self, tmp_path: Path) -> None:
         from initrunner.flow.loader import load_flow
@@ -103,7 +103,7 @@ class TestFanOutPattern:
         )
         assert len(result.role_paths) == 6
         data = yaml.safe_load(result.flow_path.read_text())
-        assert len(data["spec"]["agents"]["dispatcher"]["sink"]["target"]) == 5
+        assert len(data["agents"]["dispatcher"]["then"]["to"]) == 5
 
     def test_below_min_agents_errors(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="at least 3"):
@@ -125,7 +125,7 @@ class TestRoutePattern:
             "rt", pattern="route", output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        assert set(data["spec"]["agents"].keys()) == {
+        assert set(data["agents"].keys()) == {
             "intake",
             "researcher",
             "responder",
@@ -136,7 +136,7 @@ class TestRoutePattern:
             "rt", pattern="route", agents=4, output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        assert set(data["spec"]["agents"].keys()) == {
+        assert set(data["agents"].keys()) == {
             "intake",
             "researcher",
             "responder",
@@ -148,8 +148,8 @@ class TestRoutePattern:
             "rt", pattern="route", output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        sink = data["spec"]["agents"]["intake"]["sink"]
-        assert sink["strategy"] == "sense"
+        then = data["agents"]["intake"]["then"]
+        assert then["strategy"] == "sense"
 
     def test_specialist_tags(self, tmp_path: Path) -> None:
         from initrunner.agent.loader import load_role
@@ -168,10 +168,10 @@ class TestRoutePattern:
         )
         assert len(result.role_paths) == 5
         data = yaml.safe_load(result.flow_path.read_text())
-        assert "intake" in data["spec"]["agents"]
+        assert "intake" in data["agents"]
         # 4 specialist targets
-        sink = data["spec"]["agents"]["intake"]["sink"]
-        assert len(sink["target"]) == 4
+        then = data["agents"]["intake"]["then"]
+        assert len(then["to"]) == 4
 
     def test_flow_yaml_is_valid(self, tmp_path: Path) -> None:
         from initrunner.flow.loader import load_flow
@@ -197,7 +197,7 @@ class TestSharedMemory:
             "sm", shared_memory=True, output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        sm = data["spec"]["shared_memory"]
+        sm = data["shared_memory"]
         assert sm["enabled"] is True
         assert sm["store_path"] == ".memory"
 
@@ -206,15 +206,15 @@ class TestSharedMemory:
             "sm", pattern="fan-out", shared_memory=True, output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        assert data["spec"]["shared_memory"]["enabled"] is True
-        assert "dispatcher" in data["spec"]["agents"]
+        assert data["shared_memory"]["enabled"] is True
+        assert "dispatcher" in data["agents"]
 
     def test_works_with_route(self, tmp_path: Path) -> None:
         result = scaffold_flow_project(
             "sm", pattern="route", shared_memory=True, output_dir=tmp_path, provider="openai"
         )
         data = yaml.safe_load(result.flow_path.read_text())
-        assert data["spec"]["shared_memory"]["enabled"] is True
+        assert data["shared_memory"]["enabled"] is True
 
     def test_flow_valid_with_shared_memory(self, tmp_path: Path) -> None:
         from initrunner.flow.loader import load_flow
@@ -231,7 +231,7 @@ class TestOptions:
         result = scaffold_flow_project("p", output_dir=tmp_path, provider="anthropic")
         for rp in result.role_paths:
             data = yaml.safe_load(rp.read_text())
-            assert data["spec"]["model"]["provider"] == "anthropic"
+            assert str(data["model"]).startswith("anthropic:")
 
     def test_model_propagated(self, tmp_path: Path) -> None:
         result = scaffold_flow_project(
@@ -239,7 +239,7 @@ class TestOptions:
         )
         for rp in result.role_paths:
             data = yaml.safe_load(rp.read_text())
-            assert data["spec"]["model"]["name"] == "gpt-4o"
+            assert data["model"] == "openai:gpt-4o"
 
     def test_output_directory(self, tmp_path: Path) -> None:
         subdir = tmp_path / "sub"
@@ -349,4 +349,4 @@ class TestFlowNewCLI:
             )
         assert result.exit_code == 0
         data = yaml.safe_load((tmp_path / "demo" / "flow.yaml").read_text())
-        assert data["spec"]["shared_memory"]["enabled"] is True
+        assert data["shared_memory"]["enabled"] is True

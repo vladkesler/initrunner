@@ -107,7 +107,8 @@ def test_seed_pydanticai_success(mock_agent_cls, mock_build_model, builder_clien
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "apiVersion" in data["yaml_text"]
+    assert "apiVersion" not in data["yaml_text"]
+    assert "name: greeter" in data["yaml_text"]
     assert data["sidecar_source"] is not None
     assert "def greet" in data["sidecar_source"]
     assert isinstance(data["import_warnings"], list)

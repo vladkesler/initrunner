@@ -13,6 +13,7 @@ from initrunner.agent.schema.service import ProcessIdentity, ServiceStatus
 from initrunner.services.always_on import (
     ProcessObservation,
     ServiceError,
+    _prompt_from_role,
     check_requires,
     discover_catalog,
     forced_run,
@@ -32,6 +33,22 @@ from initrunner.services.always_on import (
     stop_service,
     validate_slug,
 )
+
+
+def test_prompt_from_flat_role(tmp_path: Path) -> None:
+    role = tmp_path / "role.yaml"
+    role.write_text(
+        "name: service-probe\n"
+        "prompt: monitor things\n"
+        "triggers:\n"
+        "  - type: cron\n"
+        "    schedule: '0 * * * *'\n"
+        "    prompt: run the hourly check\n"
+        "    autonomous: true\n"
+        "autonomy: {}\n"
+    )
+
+    assert _prompt_from_role(role) == ("run the hourly check", True)
 
 
 @pytest.fixture

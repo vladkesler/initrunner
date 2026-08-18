@@ -1,21 +1,14 @@
-apiVersion: initrunner/v1
-kind: Team
-metadata:
-  name: reviewer
-  description: Multi-perspective code review
-spec:
-  personas:
-    architect: "review for design patterns, SOLID principles, and architecture issues"
-    security: "find security vulnerabilities, injection risks, auth issues"
-    maintainer: "check readability, naming, test coverage gaps, docs"
-  tools:
-    - type: filesystem
-      root_path: .
-      read_only: true
-    - type: git
-      repo_path: .
-      read_only: true
-  guardrails:
-    max_tokens_per_run: 50000
-    timeout_seconds: 300
-    team_token_budget: 150000
+name: reviewer
+description: Multi-perspective code review
+spec_version: 3
+tools:
+- filesystem
+- git
+guardrails:
+  max_request_limit: 30
+  team_token_budget: 150000
+agents:
+  architect: review for design patterns, SOLID principles, and architecture issues
+  security: find security vulnerabilities, injection risks, auth issues
+  maintainer: check readability, naming, test coverage gaps, docs
+run: sequential

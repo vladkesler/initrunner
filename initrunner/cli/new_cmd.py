@@ -210,7 +210,7 @@ def new(
     ] = False,
     provider: Annotated[str | None, typer.Option(help="Model provider")] = None,
     model: Annotated[str | None, typer.Option(help="Model name")] = None,
-    output: Annotated[Path, typer.Option(help="Output file path")] = Path("role.yaml"),
+    output: Annotated[Path, typer.Option(help="Output file path")] = Path("agent.yaml"),
     force: Annotated[bool, typer.Option("--force", help="Overwrite existing file")] = False,
     no_refine: Annotated[bool, typer.Option("--no-refine", help="Skip refinement loop")] = False,
     run: Annotated[

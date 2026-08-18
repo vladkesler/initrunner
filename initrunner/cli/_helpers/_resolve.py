@@ -21,9 +21,10 @@ def resolve_role_path(path: Path) -> Path:
     """Resolve a directory, file, or installed role name to its role YAML file.
 
     When *path* is a file, return it unchanged.  When it is a directory:
-    1. If ``<dir>/role.yaml`` exists, use it.
-    2. Otherwise scan top-level ``*.yaml`` / ``*.yml`` for files whose
-       ``apiVersion`` is in ``initrunner/v1`` and ``kind`` is Agent or Team.
+    1. If ``<dir>/agent.yaml`` exists, use it.
+    2. If ``<dir>/role.yaml`` exists, use it.
+    3. Otherwise scan top-level ``*.yaml`` / ``*.yml`` for an envelope or
+       flat agent document.
     3. Exactly one match -> use it.
     4. Zero -> exit with error.
     5. Multiple -> exit with error listing the names.
@@ -35,13 +36,14 @@ def resolve_role_path(path: Path) -> Path:
         return path
 
     if path.is_dir():
-        # 1. Convention: role.yaml
-        default = path / "role.yaml"
-        if default.is_file():
-            return default
+        for default_name in ("agent.yaml", "role.yaml"):
+            default = path / default_name
+            if default.is_file():
+                return default
 
-        # 2. Scan top-level YAML files
         import yaml
+
+        from initrunner.agent.schema.document import DocumentClass, classify_mapping
 
         candidates: list[Path] = []
         for ext in ("*.yaml", "*.yml"):
@@ -51,9 +53,18 @@ def resolve_role_path(path: Path) -> Path:
                 try:
                     with open(f) as fh:
                         data = yaml.safe_load(fh)
-                    if (
-                        isinstance(data, dict)
-                        and data.get("apiVersion") in _INITRUNNER_API_VERSIONS
+                    if not isinstance(data, dict):
+                        continue
+                    classification = classify_mapping(data)
+                    if classification.document_class in {
+                        DocumentClass.FLAT_AGENT,
+                        DocumentClass.ENVELOPE_AGENT,
+                        DocumentClass.ENVELOPE_TEAM,
+                        DocumentClass.ENVELOPE_FLOW,
+                    }:
+                        candidates.append(f)
+                    elif (
+                        data.get("apiVersion") in _INITRUNNER_API_VERSIONS
                         and data.get("kind") in _INITRUNNER_KINDS
                     ):
                         candidates.append(f)

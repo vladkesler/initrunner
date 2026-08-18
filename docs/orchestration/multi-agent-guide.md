@@ -37,7 +37,7 @@ Do you need multiple agents?
 | | Single + Reasoning | Team | Flow | Spawn | Delegate |
 |--|-------------------|------|------|-------|----------|
 | **Kind** | Agent | Team | Flow | Agent (tool) | Agent (tool) |
-| **Config** | `spec.reasoning` | `spec.personas` | `spec.agents` | `spec.tools` | `spec.tools` |
+| **Config** | `reasoning` | `agents` | `agents` | `tools` | `tools` |
 | **Who decides** | You + LLM | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
 | **Execution** | Iterative loop | Sequential/parallel | Trigger-driven | Non-blocking | Blocking |
 | **Lifetime** | One run | One run | Daemon | Within parent run | Within parent run |
@@ -53,16 +53,15 @@ Do you need multiple agents?
 One agent that plans, executes, and optionally self-critiques. No sub-agents needed.
 
 ```yaml
-kind: Agent
-spec:
-  tools:
-    - type: think
+name: planner
+tools:
+  - think:
       critique: true
-    - type: todo
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy: {}
+  - todo
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy: {}
 ```
 
 ```bash
@@ -76,18 +75,15 @@ Use when: the task is complex but a single agent with the right tools can handle
 Multiple personas process the same task, each with a different perspective. Output flows sequentially (persona A's output becomes persona B's input) or all run in parallel on the same prompt.
 
 ```yaml
-kind: Team
-spec:
-  personas:
-    triage:
-      role: Gather cluster state and classify the issue.
-    diagnostician:
-      role: Analyze gathered data and identify root cause.
-    advisor:
-      role: Write fix commands with rollback plans.
-  mode: sequential
-  shared_memory:
-    enabled: true
+name: kube-advisor-team
+model: openai:gpt-5-mini
+agents:
+  triage: Gather cluster state and classify the issue.
+  diagnostician: Analyze gathered data and identify root cause.
+  advisor: Write fix commands with rollback plans.
+run: sequential
+shared_memory:
+  enabled: true
 ```
 
 ```bash
@@ -101,20 +97,16 @@ Use when: you want structured multi-perspective analysis with a fixed set of rol
 Long-running daemon with independent agents, each with their own triggers (cron, file watcher, webhook) and optional sinks that route output to other agents.
 
 ```yaml
-kind: Flow
-spec:
-  agents:
-    watcher:
-      role: ./agents/watcher.yaml
-      trigger:
-        type: file_watch
-        path: ./inbox
-        patterns: ["*.md"]
-      sink:
-        type: delegate
-        target: processor
-    processor:
-      role: ./agents/processor.yaml
+name: inbox-pipeline
+agents:
+  watcher:
+    use: ./agents/watcher.yaml
+    then:
+      to: processor
+  processor:
+    use: ./agents/processor.yaml
+    after:
+      - watcher
 ```
 
 ```bash
@@ -128,20 +120,19 @@ Use when: you need event-driven agents that run continuously and route work betw
 A single parent agent spawns sub-agents as non-blocking background tasks. The parent polls for results or awaits completion. The LLM decides what to parallelize at runtime.
 
 ```yaml
-kind: Agent
-spec:
-  tools:
-    - type: todo
-    - type: spawn
+name: research-lead
+tools:
+  - todo
+  - spawn:
       max_concurrent: 3
       agents:
         - name: researcher
           role_file: ./agents/researcher.yaml
           description: Web research specialist
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy: {}
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy: {}
 ```
 
 ```bash
@@ -155,10 +146,9 @@ Use when: you need the agent to dynamically decide what to parallelize (e.g., re
 A parent agent calls sub-agents as blocking tool calls. The sub-agent runs, returns its result, and the parent continues reasoning with that result.
 
 ```yaml
-kind: Agent
-spec:
-  tools:
-    - type: delegate
+name: coordinator
+tools:
+  - delegate:
       mode: inline
       agents:
         - name: sql-expert
@@ -183,13 +173,13 @@ The lead creates a todo list, spawns researchers for parallelizable items, await
 
 ```yaml
 tools:
-  - type: think
-    critique: true
-  - type: todo
-  - type: spawn
-    agents:
-      - name: researcher
-        role_file: ./agents/researcher.yaml
+  - think:
+      critique: true
+  - todo
+  - spawn:
+      agents:
+        - name: researcher
+          role_file: ./agents/researcher.yaml
 reasoning:
   pattern: todo_driven
   auto_plan: true
@@ -200,16 +190,16 @@ reasoning:
 Multiple personas share memory so later personas can reference earlier findings.
 
 ```yaml
-kind: Team
-spec:
-  personas:
-    researcher: ...
-    critic: ...
-    writer: ...
-  mode: sequential
-  shared_memory:
-    enabled: true
-    store_path: ./.initrunner/team_memory.db
+name: analysis-team
+model: openai:gpt-5-mini
+agents:
+  researcher: ...
+  critic: ...
+  writer: ...
+run: sequential
+shared_memory:
+  enabled: true
+  store_path: ./.initrunner/team_memory.db
 ```
 
 ### Flow + Delegate Sinks (Event-Driven with Routing)
@@ -217,20 +207,21 @@ spec:
 Agents trigger on events and route output to the best-fit downstream agent.
 
 ```yaml
-kind: Flow
-spec:
-  agents:
-    intake:
-      role: ./agents/intake.yaml
-      trigger:
-        type: webhook
-        port: 8080
-      sink:
-        type: delegate
-        target: [researcher, responder]
-        strategy: sense
-    researcher: ...
-    responder: ...
+name: support-desk
+agents:
+  intake:
+    use: ./agents/intake.yaml
+    then:
+      to: [researcher, responder]
+      strategy: sense
+  researcher:
+    use: ./agents/researcher.yaml
+    after:
+      - intake
+  responder:
+    use: ./agents/responder.yaml
+    after:
+      - intake
 ```
 
 ## Upgrading Between Patterns

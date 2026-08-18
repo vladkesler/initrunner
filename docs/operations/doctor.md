@@ -1,6 +1,6 @@
 # Doctor
 
-The `doctor` command checks your InitRunner environment -- API keys, provider SDKs, and service connectivity -- in a single command. With `--role` or `--flow`, it validates tools, skills, memory stores, triggers, and MCP servers before you run anything. With `--quickstart`, it runs a real agent prompt to verify the entire stack end-to-end.
+The `doctor` command checks your InitRunner environment -- API keys, provider SDKs, and service connectivity -- in a single command. Pass a `PATH`, `--role`, or `--flow` to validate tools, skills, memory stores, triggers, and MCP servers before you run anything. With `--quickstart`, it runs a real agent prompt to verify the entire stack end-to-end. With `--fix PATH`, it also rewrites old envelope YAML to the flat public format.
 
 ## Quick Start
 
@@ -13,6 +13,7 @@ initrunner doctor --quickstart
 
 # Test a specific role file (static checks)
 initrunner doctor --role role.yaml
+initrunner doctor role.yaml          # same thing via PATH
 
 # Active checks: connect to MCP servers, import custom tools, open memory DBs
 initrunner doctor --role role.yaml --deep
@@ -20,8 +21,8 @@ initrunner doctor --role role.yaml --deep
 # Validate a flow and all its agent roles
 initrunner doctor --flow flow.yaml
 
-# Auto-fix: install missing SDKs, missing role extras, bump spec_version
-initrunner doctor --fix --role role.yaml
+# Rewrite old envelopes to flat YAML, then repair SDKs / extras
+initrunner doctor --fix PATH --yes
 
 # Non-interactive (CI) -- auto-confirm all fix prompts
 initrunner doctor --fix --yes --role role.yaml
@@ -31,18 +32,22 @@ initrunner doctor --fix --yes --role role.yaml
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
+| `PATH` | `Path` | -- | File or directory to check, or to rewrite with `--fix`. Mutually exclusive with `--role` and `--flow`. |
 | `--quickstart` | `bool` | `false` | Run a smoke prompt to verify end-to-end connectivity. |
 | `--role` | `Path` | -- | Role file to test. Used for `.env` loading and as the agent for `--quickstart`. |
 | `--flow` | `Path` | -- | Flow YAML file to validate. Checks flow topology and runs diagnostics on all referenced roles. |
-| `--deep` | `bool` | `false` | Run active checks (MCP connectivity, tool imports, DB open). Requires `--role` or `--flow`. |
-| `--skill-dir` | `Path` | -- | Extra skill search directory. Requires `--role` or `--flow`. |
-| `--fix` | `bool` | `false` | Interactively repair detected issues (missing SDKs, extras, stale spec_version). |
+| `--deep` | `bool` | `false` | Run active checks (MCP connectivity, tool imports, DB open). Requires `--role`, `--flow`, or `PATH`. |
+| `--skill-dir` | `Path` | -- | Extra skill search directory. Requires `--role`, `--flow`, or `PATH`. |
+| `--fix` | `bool` | `false` | Rewrite envelopes to flat YAML and repair detected issues (missing SDKs, extras, stale spec_version). |
+| `--no-backup` | `bool` | `false` | Do not write a `.bak` next to rewritten files. |
+| `--force` | `bool` | `false` | Overwrite an existing `.bak` when rewriting. |
 | `--yes` / `-y` | `bool` | `false` | Auto-confirm all fix prompts. Required with `--fix` in non-interactive (piped) mode. |
 
 ### Flag interactions
 
-- `--flow` is mutually exclusive with `--role`, `--quickstart`, and `--fix`.
-- `--deep` and `--skill-dir` require `--role` or `--flow`.
+- `PATH`, `--role`, and `--flow` are mutually exclusive with each other.
+- `--flow` is mutually exclusive with `--quickstart`.
+- `--deep` and `--skill-dir` require `--role`, `--flow`, or `PATH`.
 
 ## Config Scan
 
@@ -274,12 +279,15 @@ This is useful for verifying that a role's provider, model, and SDK configuratio
 
 ## Auto-Fix (`--fix`)
 
-With `--fix`, doctor offers to repair the issues it finds. Each fix is prompted interactively (or auto-confirmed with `--yes`).
+With `--fix`, doctor rewrites envelope Agent/Team/Flow YAML to flat documents, then offers to repair the issues it finds. Each non-rewrite fix is prompted interactively (or auto-confirmed with `--yes`).
+
+`PATH` may be a file or a directory. The rewriter refuses to change a file when it cannot keep execution semantics (for example a Flow whose `metadata.name` is not kebab-case). It writes `PATH.bak` unless you pass `--no-backup`. Already-flat files and `kind: Service` / `kind: TestSuite` are skipped. See [Envelope migration](../getting-started/envelope-migration.md).
 
 ### What `--fix` repairs
 
-| Issue | Fix | Requires `--role`? |
+| Issue | Fix | Requires a role/flow path? |
 |-------|-----|--------------------|
+| Envelope Agent/Team/Flow YAML | Rewrites to flat YAML (backup unless `--no-backup`) | Yes (`PATH`, `--role`, or `--flow`) |
 | Provider SDK missing (key is set) | `install_extra()` installs the pip extra | No |
 | Missing API key | Prompts to enter and persist to `~/.initrunner/.env` | Interactive only (skipped with `--yes`) |
 | Role tools/triggers need uninstalled extras | Installs the matching extras (e.g. `initrunner[search]`) | Yes |
@@ -289,12 +297,13 @@ With `--fix`, doctor offers to repair the issues it finds. Each fix is prompted 
 
 - **Deprecated fields** (e.g. `store_backend: zvec`): these remain diagnostic-only until explicit migration rules exist.
 - **Schema errors**: structural issues in the role YAML require manual editing.
+- **Non-equivalent envelopes**: if the rewriter cannot keep execution semantics, it leaves the file alone and exits non-zero.
 
 ### Targeted API key repair
 
 When `--fix` runs interactively (no `--yes`):
 
-- With `--role`: derives the target provider from `spec.model.provider` and prompts for that key only.
+- With `--role`: derives the target provider from the role's model and prompts for that key only.
 - Without `--role`: if exactly one provider needs a key, targets it automatically. If multiple need keys, asks you to choose.
 
 With `--yes`, API key repair is skipped (keys require interactive secret input).
@@ -302,14 +311,12 @@ With `--yes`, API key repair is skipped (keys require interactive secret input).
 ### Example
 
 ```bash
-$ initrunner doctor --fix --yes --role role.yaml
+$ initrunner doctor --fix --yes ./agents
 
 # Output:
-# Installed initrunner[anthropic]
-# ...
 # ╭──── Fixed ────╮
-# │  Installed initrunner[anthropic]  │
-# │  Bumped spec_version to 2         │
+# │  Rewrote agents/role.yaml to flat YAML (backup role.yaml.bak)  │
+# │  Installed initrunner[anthropic]                               │
 # ╰──────────────╯
 ```
 

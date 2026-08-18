@@ -31,21 +31,15 @@ and http_request for API calls. Always summarize findings concisely.
 Reference it from a role:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-  description: Agent with skills
-spec:
-  role: |
-    You are a helpful research assistant.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  skills:
-    - web-researcher
-  tools:
-    - type: datetime
+name: my-agent
+description: Agent with skills
+model: openai:gpt-5-mini
+prompt: |
+  You are a helpful research assistant.
+skills:
+  - web-researcher
+tools:
+  - datetime
 ```
 
 Validate and list skills:
@@ -76,7 +70,7 @@ A SKILL.md file has two parts: YAML frontmatter (delimited by `---`) and a Markd
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `tools` | `list[ToolConfig]` | `[]` | Tool configurations contributed by the skill. Same format as `spec.tools` in a role. |
+| `tools` | `list[ToolConfig]` | `[]` | Tool configurations contributed by the skill. Same format as `tools` in a role. |
 | `requires` | `RequiresConfig` | `{}` | External dependencies to check at load time. |
 
 Unknown frontmatter fields are silently ignored (`extra="ignore"`) to maintain compatibility with community SKILL.md files that may include additional fields.
@@ -108,54 +102,49 @@ Both are equivalent. The directory format is preferred when a skill needs auxili
 
 ## Referencing Skills from Roles
 
-Skills are referenced in the `spec.skills` list of a role definition. Each entry is a string that is resolved to a SKILL.md file.
+Skills are referenced in the `skills` list of a role definition. Each entry is a string that is resolved to a SKILL.md file.
 
 ```yaml
-spec:
-  skills:
-    # Bare name — resolved via search dirs
-    - web-researcher
+skills:
+  # Bare name — resolved via search dirs
+  - web-researcher
 
-    # Explicit .md path (relative to role file)
-    - ../skills/code-tools.md
+  # Explicit .md path (relative to role file)
+  - ../skills/code-tools.md
 
-    # Explicit directory (looks for SKILL.md inside)
-    - ../skills/web-researcher
+  # Explicit directory (looks for SKILL.md inside)
+  - ../skills/web-researcher
 
-    # Explicit directory with SKILL.md
-    - ../skills/web-researcher/SKILL.md
+  # Explicit directory with SKILL.md
+  - ../skills/web-researcher/SKILL.md
 ```
 
 ### Full Example
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: skill-demo
-  description: Demonstration of skill-based composition
-  tags:
-    - demo
-    - skills
-spec:
-  role: |
-    You are a versatile research assistant that can browse the web,
-    read code, and tell the time. Use the appropriate skills for each task.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
-  skills:
-    - ../skills/web-researcher
-    - ../skills/code-tools.md
-  tools:
-    - type: datetime
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
+name: skill-demo
+description: Demonstration of skill-based composition
+tags:
+  - demo
+  - skills
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.1
+  max_tokens: 4096
+prompt: |
+  You are a versatile research assistant that can browse the web,
+  read code, and tell the time. Use the appropriate skills for each task.
+skills:
+  - ../skills/web-researcher
+  - ../skills/code-tools.md
+tools:
+  - datetime
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 ```
 
 ## Skill Resolution
@@ -215,7 +204,7 @@ When skills contribute tools, they are merged with the role's own tools using de
 
 ### Order
 
-1. **Skill tools** are added first, in skill declaration order (the order of `spec.skills`).
+1. **Skill tools** are added first, in skill declaration order (the order of `skills`).
 2. **Role tools** are added last.
 
 ### Override Rules
@@ -231,7 +220,7 @@ This means role-level tools always take precedence, giving the role author final
 
 Skills contribute to the agent's system prompt in a structured format:
 
-1. The **role prompt** (`spec.role`) comes first — this defines the agent's identity.
+1. The **role prompt** (`prompt`) comes first — this defines the agent's identity.
 2. A `## Skills` section follows, with a brief introduction.
 3. Each skill's Markdown body is rendered under a `### Skill: {name}` sub-header.
 
@@ -258,7 +247,7 @@ the codebase and run_python to execute Python snippets.
 
 ## Auto-Discovered Skills (Progressive Disclosure)
 
-InitRunner supports automatic skill discovery following the [agentskills.io](https://agentskills.io) progressive disclosure model. Skills placed in well-known directories are automatically found and made available to agents without explicit `spec.skills` configuration.
+InitRunner supports automatic skill discovery following the [agentskills.io](https://agentskills.io) progressive disclosure model. Skills placed in well-known directories are automatically found and made available to agents without explicit `skills` configuration.
 
 ### How It Works
 
@@ -286,25 +275,23 @@ Paths are resolved relative to `role_dir` (the role file's parent directory):
 
 Higher-priority scopes override lower-priority scopes on name collision. A warning is logged when shadowing occurs.
 
-Only directory format (`{name}/SKILL.md`) is supported for auto-discovery. Flat `.md` files remain available for explicit `spec.skills` references only.
+Only directory format (`{name}/SKILL.md`) is supported for auto-discovery. Flat `.md` files remain available for explicit `skills` references only.
 
 ### Configuration
 
 Auto-discovery is enabled by default. Configure it in your role YAML:
 
 ```yaml
-spec:
-  auto_skills:
-    enabled: true    # default: true
-    max_skills: 50   # default: 50, max: 200
+auto_skills:
+  enabled: true    # default: true
+  max_skills: 50   # default: 50, max: 200
 ```
 
 To disable auto-discovery:
 
 ```yaml
-spec:
-  auto_skills:
-    enabled: false
+auto_skills:
+  enabled: false
 ```
 
 ### Scanning Rules
@@ -313,11 +300,11 @@ spec:
 - Only 1 level deep inside each skills dir (only `{name}/SKILL.md`, no recursive nesting)
 - Total discovered skills capped at `max_skills` (default 50)
 - Skills without a `description` in frontmatter are skipped
-- Skills already referenced in `spec.skills` are excluded by resolved path to avoid duplication
+- Skills already referenced in `skills` are excluded by resolved path to avoid duplication
 
 ### Interaction with Explicit Skills
 
-Explicit skills (listed in `spec.skills`) are loaded eagerly with their full prompt and tools merged into the agent at build time. Auto-discovered skills are lazy -- only their name and description are injected initially.
+Explicit skills (listed in `skills`) are loaded eagerly with their full prompt and tools merged into the agent at build time. Auto-discovered skills are lazy -- only their name and description are injected initially.
 
 If a skill is both explicitly referenced and present in an auto-discovery directory, the auto-discovery system skips it (deduplication by resolved file path).
 
@@ -329,7 +316,7 @@ Project-level skills (`{role_dir}/.agents/skills/`) are loaded with the same tru
 
 Auto-discovered skills are ambient capabilities by design. Two machines with different installed skills see different catalogs. This is consistent with the agentskills.io model (skills are like extensions/plugins).
 
-- **Bundles**: only include explicit `spec.skills`, not auto-discovered skills
+- **Bundles**: only include explicit `skills`, not auto-discovered skills
 - **Daemon hot-reload**: only watches explicit skill refs; auto-skill directory changes require daemon restart
 
 ## Security

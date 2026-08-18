@@ -63,39 +63,33 @@ Two files are generated -- a declarative `role.yaml` and a `weather_agent_tools.
 
 ```yaml
 # weather-bot.yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: weather-assistant
-  spec_version: 2
-spec:
-  role: >-
-    You are a weather assistant. Use the provided tools to fetch real weather
-    data, then return a structured weather report.
-  model:
-    provider: openai
-    name: gpt-4o-mini
-  output:
-    type: json_schema
-    schema:
-      type: object
-      additionalProperties: false
-      properties:
-        city:
-          type: string
-        temperature_f:
-          type: number
-        condition:
-          type: string
-        summary:
-          type: string
-      required:
-        - city
-        - temperature_f
-        - condition
-        - summary
-  tools:
-    - type: custom
+name: weather-assistant
+spec_version: 2
+prompt: >-
+  You are a weather assistant. Use the provided tools to fetch real weather
+  data, then return a structured weather report.
+model: openai:gpt-4o-mini
+output:
+  type: json_schema
+  schema:
+    type: object
+    additionalProperties: false
+    properties:
+      city:
+        type: string
+      temperature_f:
+        type: number
+      condition:
+        type: string
+      summary:
+        type: string
+    required:
+      - city
+      - temperature_f
+      - condition
+      - summary
+tools:
+  - custom:
       module: weather_bot_tools
 ```
 
@@ -129,10 +123,10 @@ def fahrenheit_to_celsius(temp_f: float) -> str:
 
 What changed:
 
-- `Agent("openai:gpt-4o-mini")` became `spec.model: {provider: openai, name: gpt-4o-mini}`
-- `system_prompt=` became `spec.role`
-- `ModelSettings(temperature=0.1)` became `spec.model.temperature` (omitted since 0.1 is the default)
-- `output_type=WeatherReport` became `spec.output` with the full JSON schema
+- `Agent("openai:gpt-4o-mini")` became `model: openai:gpt-4o-mini`
+- `system_prompt=` became `prompt`
+- `ModelSettings(temperature=0.1)` became `model.temperature` (omitted since 0.1 is the default)
+- `output_type=WeatherReport` became `output` with the full JSON schema
 - `@agent.tool` and `@agent.tool_plain` decorators were stripped
 - `ctx: RunContext[None]` was removed from the async tool signature
 - `pydantic_ai` imports were filtered out; `httpx` and `pydantic` imports were kept
@@ -157,22 +151,22 @@ The converter uses a two-phase approach:
 
 | PydanticAI Construct | InitRunner role.yaml |
 |---|---|
-| `Agent("openai:gpt-5")` | `spec.model: {provider: openai, name: gpt-5}` |
-| `Agent(OpenAIModel("gpt-5"))` | `spec.model: {provider: openai, name: gpt-5}` |
-| `system_prompt="..."` | `spec.role` |
-| `instructions="..."` | `spec.role` (combined with system_prompt) |
-| `@agent.system_prompt` decorator | `spec.role` (static return extracted) |
-| `@agent.instructions` decorator | `spec.role` (static return extracted) |
-| `ModelSettings(temperature=0.7)` | `spec.model.temperature: 0.7` |
-| `ModelSettings(max_tokens=4096)` | `spec.model.max_tokens: 4096` |
-| `output_type=MySchema` | `spec.output: {type: json_schema}` |
-| `output_type=NativeOutput(MySchema)` | `spec.output: {type: json_schema}` |
-| `@agent.tool` / `@agent.tool_plain` | `type: custom` + sidecar module |
-| `FunctionToolset` tools | `type: custom` + sidecar module |
-| `tools=[func]` kwarg | `type: custom` + sidecar module |
-| `UsageLimits(request_limit=10)` | `spec.guardrails.max_request_limit: 10` |
-| `UsageLimits(cost_limit=0.15)` | `spec.guardrails.cost_limit: 0.15` |
-| `UsageLimits(per_request_input_tokens_limit=80000)` | `spec.guardrails.per_request_input_tokens_limit: 80000` |
+| `Agent("openai:gpt-5")` | `model: openai:gpt-5` |
+| `Agent(OpenAIModel("gpt-5"))` | `model: openai:gpt-5` |
+| `system_prompt="..."` | `prompt` |
+| `instructions="..."` | `prompt` (combined with system_prompt) |
+| `@agent.system_prompt` decorator | `prompt` (static return extracted) |
+| `@agent.instructions` decorator | `prompt` (static return extracted) |
+| `ModelSettings(temperature=0.7)` | `model.temperature: 0.7` |
+| `ModelSettings(max_tokens=4096)` | `model.max_tokens: 4096` |
+| `output_type=MySchema` | `output: {type: json_schema}` |
+| `output_type=NativeOutput(MySchema)` | `output: {type: json_schema}` |
+| `@agent.tool` / `@agent.tool_plain` | `custom` + sidecar module |
+| `FunctionToolset` tools | `custom` + sidecar module |
+| `tools=[func]` kwarg | `custom` + sidecar module |
+| `UsageLimits(request_limit=10)` | `guardrails.max_request_limit: 10` |
+| `UsageLimits(cost_limit=0.15)` | `guardrails.cost_limit: 0.15` |
+| `UsageLimits(per_request_input_tokens_limit=80000)` | `guardrails.per_request_input_tokens_limit: 80000` |
 
 ## Tool Extraction and RunContext
 
@@ -205,8 +199,8 @@ These PydanticAI features are detected and produce warnings:
 | Feature | Recommendation |
 |---|---|
 | `pydantic_graph` | Use InitRunner `flow.yaml` |
-| `logfire` / `instrument=` | Use `spec.observability` |
-| `MCPServerStdio` / `MCPServerHTTP` | Use `type: mcp` in tools |
+| `logfire` / `instrument=` | Use `observability` |
+| `MCPServerStdio` / `MCPServerHTTP` | Use `mcp` in tools |
 | `builtin_tools=[...]` | Add equivalent InitRunner tools manually |
 | `@agent.output_validator` | Not portable -- validate in tool logic |
 | `TextOutput` / `StructuredDict` output types | Not directly portable |

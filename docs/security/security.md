@@ -497,15 +497,9 @@ security:
 Omit the `security:` key entirely -- all checks are disabled by default:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: dev-agent
-spec:
-  role: You are a helpful assistant.
-  model:
-    provider: openai
-    name: gpt-5-mini
+name: dev-agent
+model: openai:gpt-5-mini
+prompt: You are a helpful assistant.
 ```
 
 ## Middleware Execution Order
@@ -544,12 +538,11 @@ security:
 Webhook triggers have their own rate limiter independent of the server:
 
 ```yaml
-spec:
-  triggers:
-    - type: webhook
-      path: /webhook
-      port: 8080
-      rate_limit_rpm: 60  # default
+triggers:
+  - type: webhook
+    path: /webhook
+    port: 8080
+    rate_limit_rpm: 60  # default
 ```
 
 Burst size derives automatically as `rate_limit_rpm / 6`, roughly 10 seconds of capacity. The webhook returns 429 when the bucket empties.

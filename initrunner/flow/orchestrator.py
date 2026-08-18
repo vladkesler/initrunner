@@ -11,6 +11,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from pydantic_ai import Agent
 from rich.console import Console
@@ -236,19 +237,35 @@ class FlowOrchestrator:
 
         for name, config in self._flow.spec.agents.items():
             try:
-                role_path = self._base_dir / config.role
-
-                if shared_mem_path or shared_doc_path:
-                    _load_dotenv(role_path.parent)
-                    role = load_role(role_path)
-                    role = resolve_role_model(role, role_path)
+                if config.inline_role is not None:
+                    role_dir = (
+                        (self._base_dir / config.role).resolve().parent
+                        if config.role
+                        else self._base_dir
+                    )
+                    _load_dotenv(role_dir)
+                    role = cast(RoleDefinition, config.inline_role)
+                    role = resolve_role_model(role, role_dir)
                     if shared_mem_path:
                         apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
                     if shared_doc_path:
                         apply_shared_documents(role, shared_doc, shared_doc_path)
-                    agent = build_agent(role, role_dir=role_path.parent)
+                    agent = build_agent(role, role_dir=role_dir)
                 else:
-                    role, agent = load_and_build(role_path)
+                    role_path = self._base_dir / config.role
+                    role_dir = role_path.parent
+
+                    if shared_mem_path or shared_doc_path:
+                        _load_dotenv(role_dir)
+                        role = load_role(role_path)
+                        role = resolve_role_model(role, role_path)
+                        if shared_mem_path:
+                            apply_shared_memory(role, shared_mem_path, shared_mem.max_memories)
+                        if shared_doc_path:
+                            apply_shared_documents(role, shared_doc, shared_doc_path)
+                        agent = build_agent(role, role_dir=role_dir)
+                    else:
+                        role, agent = load_and_build(role_path)
 
                 member = FlowMember(
                     name=name,
@@ -264,7 +281,6 @@ class FlowOrchestrator:
                     or (config.sink is not None and config.sink.keep_existing_sinks)
                 )
                 if should_build_role_sinks and role.spec.sinks:
-                    role_dir = role_path.parent
                     for sink_config in role.spec.sinks:
                         sink = build_sink(sink_config, role_dir)
                         if sink:

@@ -77,9 +77,19 @@ def _scan_yaml_kind(dirs: list[Path], kind: str) -> Iterator[Path]:
                 try:
                     with open(p) as f:
                         raw = yaml.safe_load(f)
-                    if not isinstance(raw, dict) or raw.get("apiVersion") != "initrunner/v1":
+                    if not isinstance(raw, dict):
                         continue
-                    if raw.get("kind") != kind:
+                    from initrunner.agent.schema.adapt import run_kind_from_mapping
+                    from initrunner.agent.schema.document import (
+                        DocumentClass,
+                        classify_mapping,
+                    )
+
+                    classification = classify_mapping(raw)
+                    if classification.document_class is DocumentClass.FLAT_AGENT:
+                        if run_kind_from_mapping(raw) != kind:
+                            continue
+                    elif raw.get("apiVersion") != "initrunner/v1" or raw.get("kind") != kind:
                         continue
                 except Exception as e:
                     _logger.debug("Skipping %s: %s", p, e)

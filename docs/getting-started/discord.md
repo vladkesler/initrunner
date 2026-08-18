@@ -56,26 +56,18 @@ A `.env` file next to your `role.yaml` also works. Running `initrunner setup` wr
 Create a `role.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: discord-assistant
-  description: A Discord bot that responds to DMs and @mentions
-spec:
-  role: |
-    You are a helpful assistant responding to Discord messages.
-    Keep responses concise.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
-  triggers:
-    - type: discord
-      token_env: DISCORD_BOT_TOKEN
-  guardrails:
-    max_tokens_per_run: 50000
-    daemon_daily_token_budget: 200000
+name: discord-assistant
+description: A Discord bot that responds to DMs and @mentions
+model: openai:gpt-5-mini
+prompt: |
+  You are a helpful assistant responding to Discord messages.
+  Keep responses concise.
+triggers:
+  - type: discord
+    token_env: DISCORD_BOT_TOKEN
+guardrails:
+  max_tokens_per_run: 50000
+  daemon_daily_token_budget: 200000
 ```
 
 Start the daemon:

@@ -1,24 +1,22 @@
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: a2a-researcher
-  description: Research agent exposed via A2A protocol
-  tags:
-    - example
-    - a2a
-    - research
-spec:
-  role: |
-    You are a research assistant. When given a topic, provide a concise
-    summary of key facts, recent developments, and relevant context.
-    Keep responses focused and well-structured.
-  model:
-    temperature: 0.3
-    max_tokens: 2048
-  tools:
-    - type: search
-    - type: datetime
-  guardrails:
-    max_tokens_per_run: 20000
-    max_tool_calls: 5
-    timeout_seconds: 120
+name: a2a-researcher
+description: Research agent exposed via A2A protocol
+spec_version: 3
+tags:
+- example
+- a2a
+- research
+model:
+  temperature: 0.3
+  max_tokens: 2048
+prompt: |
+  You are a research assistant. When given a topic, provide a concise
+  summary of key facts, recent developments, and relevant context.
+  Keep responses focused and well-structured.
+tools:
+- search
+- datetime
+guardrails:
+  max_tokens_per_run: 20000
+  max_tool_calls: 5
+  timeout_seconds: 120
+  max_request_limit: 30

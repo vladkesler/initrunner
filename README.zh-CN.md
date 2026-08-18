@@ -29,6 +29,18 @@
 
 用一个 YAML 文件定义 Agent。和它对话。效果满意后，让它自主运行。信任它之后，部署为守护进程，响应 cron 调度、文件变更、webhook 和 Telegram 消息。同一个文件，从原型到生产，无需重写。
 
+## Agent 文件更简单了
+
+以前每个 Agent 都要包一层 `apiVersion`、`kind`、`metadata`、`spec`。现在文件本身就是 Agent：名字、提示词、工具。
+
+你现有的文件还能跑。想整理的时候再转换：
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+会先留一份 `.bak`。[改写说明](docs/getting-started/envelope-migration.md)。
+
 ## 快速开始
 
 ```bash
@@ -78,20 +90,16 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 一个角色文件：
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -231,24 +239,25 @@ spec:
 
 成本估算使用 [genai-prices](https://pypi.org/project/genai-prices/) 按模型和提供商计算支出。每次运行的成本记录到审计日志。仪表盘绘制跨 Agent 和时间范围的成本曲线。查看 [成本追踪](docs/core/cost-tracking.md)。
 
+### 内存占用
+
+普通 Agent 进程的 RSS 约为 150 到 220 MB。几乎全部来自 Python AI 栈（提供商 SDK、PydanticAI、Pydantic）；InitRunner 自身大约 7 MB，LanceDB 仅在角色使用 RAG 或向量记忆时加载。成本按进程计，不按 Agent 计：`flow up` 在一个进程中运行整个多 Agent Flow，`--serve` / `--daemon` 保持一个热进程，而不是为每个任务支付启动成本。测量拆解和容器规格见 [Memory Footprint](docs/operations/memory-footprint.md)。
+
 ## 多 Agent 编排
 
 将 Agent 串联为 Flow。一个 Agent 的输出传入下一个。
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata: { name: email-chain }
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
-      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
-    researcher: { role: roles/researcher.yaml }
-    responder: { role: roles/responder.yaml }
+name: email-chain
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then: { to: triager }
+  triager:
+    use: roles/triager.yaml
+    then: { to: [researcher, responder], strategy: sense }
+  researcher: { use: roles/researcher.yaml }
+  responder: { use: roles/responder.yaml }
 ```
 
 ```bash
@@ -335,7 +344,7 @@ initrunner/
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | 安全 | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## 示例
 

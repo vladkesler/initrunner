@@ -15,13 +15,13 @@ class TestBuildSchemaReference:
 
     def test_contains_preamble(self):
         result = build_schema_reference()
-        assert "apiVersion: initrunner/v1" in result
-        assert "kind: Agent" in result
+        assert "flat" in result
+        assert "spec_version: 3" in result
 
     def test_contains_metadata(self):
         result = build_schema_reference()
-        assert "metadata" in result
         assert "name" in result
+        assert "description" in result
 
     def test_contains_model_section(self):
         result = build_schema_reference()
@@ -53,13 +53,13 @@ class TestBuildSchemaReference:
 
     def test_contains_optional_sections(self):
         result = build_schema_reference()
-        assert "Ingest (spec.ingest)" in result
+        assert "Ingest (ingest)" in result
         assert "Required: sources" in result
-        assert "Memory (spec.memory)" in result
-        assert "Reasoning (spec.reasoning)" in result
-        assert "Autonomy (spec.autonomy)" in result
-        assert "Security (spec.security)" in result
-        assert "Observability (spec.observability)" in result
+        assert "Memory (memory)" in result
+        assert "Reasoning (reasoning)" in result
+        assert "Autonomy (autonomy)" in result
+        assert "Security (security)" in result
+        assert "Observability (observability)" in result
 
     def test_no_default_values_exposed(self):
         """Schema reference must not expose default values that cause over-specification."""

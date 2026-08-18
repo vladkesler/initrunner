@@ -151,6 +151,6 @@ class TestMetadataRoundTrip:
         p.write_text(content)
         spec, _dropped = role_to_agent_spec(load_role(p))
         role_dict = agent_spec_to_role_dict(spec, fallback_name="x")
-        assert role_dict["metadata"]["tags"] == ["demo"]
-        assert role_dict["metadata"]["author"] == "jc"
+        assert role_dict["tags"] == ["demo"]
+        assert role_dict["author"] == "jc"
         assert "_import_warnings" not in role_dict

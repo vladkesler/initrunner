@@ -1,219 +1,238 @@
-"""A2A server -- expose an InitRunner agent as an A2A server."""
+"""A2A 1.0 server -- expose an InitRunner agent over JSON-RPC."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
+from collections import OrderedDict
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from contextlib import asynccontextmanager, suppress
+from typing import TYPE_CHECKING
 
-from fasta2a.applications import FastA2A  # type: ignore[import-not-found]
-from fasta2a.broker import InMemoryBroker  # type: ignore[import-not-found]
-from fasta2a.schema import (  # type: ignore[import-not-found]
-    Artifact,
-    DataPart,
-    FilePart,
-    Message,
-    TaskIdParams,
-    TaskSendParams,
-    TextPart,
+from a2a.helpers.proto_helpers import new_task, new_text_part  # type: ignore[import-not-found]
+from a2a.server.agent_execution import (  # type: ignore[import-not-found]
+    AgentExecutor,
+    RequestContext,
 )
-from fasta2a.storage import InMemoryStorage  # type: ignore[import-not-found]
-from fasta2a.worker import Worker  # type: ignore[import-not-found]
-from pydantic_ai import ModelMessage
+from a2a.server.events.event_queue import EventQueue  # type: ignore[import-not-found]
+from a2a.server.request_handlers import DefaultRequestHandlerV2  # type: ignore[import-not-found]
+from a2a.server.routes import (  # type: ignore[import-not-found]
+    create_agent_card_routes,
+    create_jsonrpc_routes,
+)
+from a2a.server.tasks import InMemoryTaskStore, TaskUpdater  # type: ignore[import-not-found]
+from a2a.types import TaskState  # type: ignore[import-not-found]
+from a2a.utils.constants import (  # type: ignore[import-not-found]
+    AGENT_CARD_WELL_KNOWN_PATH,
+    DEFAULT_RPC_URL,
+)
+from starlette.applications import Starlette
+
+from initrunner.a2a.card import build_agent_card
+from initrunner.a2a.convert import message_to_prompt, output_to_parts
+from initrunner.services.execution import execute_run_stream_async
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
+    from pydantic_ai.messages import ModelMessage
 
     from initrunner.agent.schema.role import RoleDefinition
+    from initrunner.agent.skills import ResolvedSkill
     from initrunner.audit.logger import AuditLogger
 
 _logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Custom worker that routes through InitRunner's executor
-# ---------------------------------------------------------------------------
+_CONTEXT_LRU_MAX = 1000
 
 
-@dataclass
-class InitRunnerWorker(Worker[list[ModelMessage]]):
-    """Worker that calls ``execute_run_async()`` instead of ``agent.run()``.
+class InitRunnerAgentExecutor(AgentExecutor):
+    """Route every A2A task through ``execute_run_stream_async()``.
 
-    This preserves InitRunner's executor semantics: input validation, usage
-    limits, retry/timeout wrapping, output processing, audit logging, and
-    agent-principal context.
+    Conversation context is an in-process LRU keyed by A2A ``context_id``.
+    It has the same durability as the old FastA2A in-memory store: lost on
+    process restart. Tasks themselves live in the SDK ``InMemoryTaskStore``.
+    Token deltas are published as append-artifact events on the same loop.
     """
 
-    agent: Agent = field(repr=False)
-    role: RoleDefinition = field(repr=False)
-    audit_logger: AuditLogger | None = field(default=None, repr=False)
+    def __init__(
+        self,
+        agent: Agent,
+        role: RoleDefinition,
+        audit_logger: AuditLogger | None = None,
+    ) -> None:
+        self.agent = agent
+        self.role = role
+        self.audit_logger = audit_logger
+        self._contexts: OrderedDict[str, list[ModelMessage]] = OrderedDict()
 
-    async def run_task(self, params: TaskSendParams) -> None:
-        task = await self.storage.load_task(params["id"])
-        if task is None:
-            raise ValueError(f"Task {params['id']} not found")
+    def _history_for(self, context_id: str) -> list[ModelMessage] | None:
+        history = self._contexts.get(context_id)
+        if history is not None:
+            self._contexts.move_to_end(context_id)
+        return history
 
-        if task["status"]["state"] != "submitted":
-            raise ValueError(
-                f"Task {params['id']} already processed (state: {task['status']['state']})"
+    def _store_history(self, context_id: str, messages: list[ModelMessage]) -> None:
+        if context_id in self._contexts:
+            self._contexts.move_to_end(context_id)
+        self._contexts[context_id] = messages
+        while len(self._contexts) > _CONTEXT_LRU_MAX:
+            self._contexts.popitem(last=False)
+
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        task_id = context.task_id
+        context_id = context.context_id
+        if not task_id or not context_id:
+            raise ValueError("A2A request is missing task_id or context_id")
+
+        if context.current_task is None:
+            if context.message is None:
+                raise ValueError("A2A request is missing a user message")
+            await event_queue.enqueue_event(
+                new_task(
+                    task_id,
+                    context_id,
+                    TaskState.TASK_STATE_SUBMITTED,
+                    history=[context.message],
+                )
             )
 
-        await self.storage.update_task(task["id"], state="working")
-
-        # Load conversation context from previous tasks in this thread
-        message_history = await self.storage.load_context(task["context_id"]) or []
-
-        # Extract prompt text from the incoming A2A message parts
-        prompt = self._extract_prompt(task.get("history", []))
+        updater = TaskUpdater(event_queue, task_id, context_id)
+        await updater.start_work()
 
         try:
-            from initrunner.services.execution import execute_run_async
+            prompt = message_to_prompt(context.message)
+        except ValueError as exc:
+            await updater.failed(
+                message=updater.new_agent_message([new_text_part(str(exc) or "invalid input")])
+            )
+            return
 
-            result, messages = await execute_run_async(
+        message_history = self._history_for(context_id)
+        token_q: asyncio.Queue[str | None] = asyncio.Queue()
+        stream_artifact_id = str(uuid.uuid4())
+        streamed = False
+
+        def on_token(delta: str) -> None:
+            nonlocal streamed
+            if not delta:
+                return
+            streamed = True
+            token_q.put_nowait(delta)
+
+        async def drain() -> None:
+            first_chunk = True
+            while True:
+                delta = await token_q.get()
+                if delta is None:
+                    return
+                await updater.add_artifact(
+                    [new_text_part(delta)],
+                    artifact_id=stream_artifact_id,
+                    name="result",
+                    append=not first_chunk,
+                    last_chunk=False,
+                )
+                first_chunk = False
+
+        drain_task: asyncio.Task[None] | None = asyncio.create_task(drain())
+        try:
+            result, messages = await execute_run_stream_async(
                 self.agent,
                 self.role,
                 prompt,
                 audit_logger=self.audit_logger,
                 message_history=message_history if message_history else None,
+                on_token=on_token,
             )
-
-            # Store full message history for conversation continuity
-            await self.storage.update_context(task["context_id"], messages)
+            token_q.put_nowait(None)
+            await drain_task
+            drain_task = None
+            self._store_history(context_id, messages)
 
             if not result.success:
-                await self.storage.update_task(task["id"], state="failed")
+                await updater.failed(
+                    message=updater.new_agent_message(
+                        [new_text_part(result.error or "agent run failed")]
+                    )
+                )
                 return
 
-            artifacts = self.build_artifacts(result.output)
-            # Build agent response message for task history
-            msg_parts: list[TextPart | FilePart | DataPart] = [
-                TextPart(kind="text", text=result.output),
-            ]
-            a2a_messages: list[Message] = [
-                Message(
-                    role="agent",
-                    parts=msg_parts,
-                    kind="message",
-                    message_id=str(uuid.uuid4()),
+            if streamed:
+                await updater.add_artifact(
+                    [new_text_part("")],
+                    artifact_id=stream_artifact_id,
+                    name="result",
+                    append=True,
+                    last_chunk=True,
                 )
-            ]
-        except Exception:
-            await self.storage.update_task(task["id"], state="failed")
-            raise
-        else:
-            await self.storage.update_task(
-                task["id"],
-                state="completed",
-                new_artifacts=artifacts,
-                new_messages=a2a_messages,
+            parts = output_to_parts(result.output)
+            if not streamed:
+                await updater.add_artifact(parts, name="result")
+            await updater.complete(message=updater.new_agent_message(parts))
+        except Exception as exc:
+            _logger.exception("A2A agent execution failed for task %s", task_id)
+            await updater.failed(
+                message=updater.new_agent_message([new_text_part(str(exc) or "agent run failed")])
             )
+        finally:
+            if drain_task is not None and not drain_task.done():
+                drain_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await drain_task
 
-    async def cancel_task(self, params: TaskIdParams) -> None:
-        pass
-
-    def build_message_history(self, history: list[Message]) -> list[ModelMessage]:
-        """Convert A2A messages to PydanticAI format for context continuity."""
-        from pydantic_ai import ModelRequest, ModelResponse, UserPromptPart
-        from pydantic_ai import TextPart as PydanticTextPart
-
-        model_messages: list[ModelMessage] = []
-        for message in history:
-            if message["role"] == "user":
-                parts_text = []
-                for part in message["parts"]:
-                    if part["kind"] == "text":
-                        parts_text.append(part["text"])
-                if parts_text:
-                    model_messages.append(
-                        ModelRequest(parts=[UserPromptPart(content="\n".join(parts_text))])
-                    )
-            else:
-                parts_text = []
-                for part in message["parts"]:
-                    if part["kind"] == "text":
-                        parts_text.append(part["text"])
-                if parts_text:
-                    model_messages.append(
-                        ModelResponse(parts=[PydanticTextPart(content=t) for t in parts_text])
-                    )
-        return model_messages
-
-    def build_artifacts(self, result: Any) -> list[Artifact]:
-        """Convert agent output to A2A artifacts."""
-        artifact_id = str(uuid.uuid4())
-        if isinstance(result, str):
-            part: TextPart | DataPart = TextPart(kind="text", text=result)
-        else:
-            from pydantic import TypeAdapter
-
-            output_type = type(result)
-            adapter = TypeAdapter(output_type)
-            data = adapter.dump_python(result, mode="json")
-            json_schema = adapter.json_schema(mode="serialization")
-            part = DataPart(
-                kind="data",
-                data={"result": data},
-                metadata={"json_schema": json_schema},
-            )
-        artifact_parts: list[TextPart | FilePart | DataPart] = [part]
-        return [Artifact(artifact_id=artifact_id, name="result", parts=artifact_parts)]
-
-    def _extract_prompt(self, history: list[Message]) -> str:
-        """Extract text prompt from the most recent user message in task history."""
-        for message in reversed(history):
-            if message["role"] == "user":
-                texts = []
-                for part in message["parts"]:
-                    if part["kind"] == "text":
-                        texts.append(part["text"])
-                if texts:
-                    return "\n".join(texts)
-        return ""
-
-
-# ---------------------------------------------------------------------------
-# App construction and server entry point
-# ---------------------------------------------------------------------------
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        task_id = context.task_id
+        context_id = context.context_id
+        if not task_id or not context_id:
+            raise ValueError("A2A cancel is missing task_id or context_id")
+        await TaskUpdater(event_queue, task_id, context_id).cancel()
 
 
 @asynccontextmanager
-async def _worker_lifespan(
-    app: FastA2A,
-    worker: InitRunnerWorker,
+async def _handler_lifespan(
+    app: Starlette,
+    handler: DefaultRequestHandlerV2,
 ) -> AsyncIterator[None]:
-    """Start the worker during application startup."""
-    async with app.task_manager:
-        async with worker.run():
-            yield
+    """Drain in-flight A2A tasks on shutdown."""
+    try:
+        yield
+    finally:
+        await handler.aclose()
 
 
 def build_a2a_app(
     agent: Agent,
     role: RoleDefinition,
     *,
-    host: str = "127.0.0.1",
-    port: int = 8000,
+    url: str,
     audit_logger: AuditLogger | None = None,
     api_key: str | None = None,
     cors_origins: list[str] | None = None,
-) -> FastA2A:
-    """Build a FastA2A application for an InitRunner agent."""
+    skills: list[ResolvedSkill] | None = None,
+) -> Starlette:
+    """Build a Starlette app that speaks A2A 1.0 JSON-RPC."""
     from functools import partial
 
     from starlette.middleware import Middleware
     from starlette.middleware.cors import CORSMiddleware
 
-    storage: InMemoryStorage[list[ModelMessage]] = InMemoryStorage()
-    broker = InMemoryBroker()
-    worker = InitRunnerWorker(  # type: ignore[unknown-argument]  # broker/storage from Worker base
-        broker=broker,  # type: ignore[unknown-argument]
-        storage=storage,  # type: ignore[unknown-argument]
+    executor = InitRunnerAgentExecutor(
         agent=agent,
         role=role,
         audit_logger=audit_logger,
+    )
+    card = build_agent_card(
+        role,
+        url=url,
+        require_auth=bool(api_key),
+        streaming=True,
+        skills=skills,
+    )
+    handler = DefaultRequestHandlerV2(
+        agent_executor=executor,
+        task_store=InMemoryTaskStore(),
+        agent_card=card,
     )
 
     middleware: list[Middleware] = []
@@ -248,28 +267,24 @@ def build_a2a_app(
                 BaseHTTPMiddleware,  # type: ignore[arg-type]
                 dispatch=make_auth_dispatch(
                     api_key=api_key,
-                    applies_to=all_paths_predicate(exclude={"/.well-known/agent-card.json"}),
+                    applies_to=all_paths_predicate(exclude={AGENT_CARD_WELL_KNOWN_PATH}),
                     error_response=_a2a_error_response,
                 ),
             )
         )
 
-    url = f"http://{host}:{port}"
-    lifespan = partial(_worker_lifespan, worker=worker)
-
-    return FastA2A(
-        storage=storage,
-        broker=broker,
-        name=role.metadata.name,
-        url=url,
-        description=role.metadata.description,
+    return Starlette(
+        routes=[
+            *create_agent_card_routes(card),
+            *create_jsonrpc_routes(handler, DEFAULT_RPC_URL),
+        ],
         middleware=middleware,
-        lifespan=lifespan,
+        lifespan=partial(_handler_lifespan, handler=handler),
     )
 
 
 def run_a2a_server(
-    app: FastA2A,
+    app: Starlette,
     *,
     host: str = "127.0.0.1",
     port: int = 8000,

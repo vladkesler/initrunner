@@ -1,0 +1,81 @@
+name: research-team
+description: |
+  Research lead that delegates to specialist sub-agents in parallel. Spawns web-searcher agents for concurrent research, collects findings, and synthesizes a final report. Showcases spawn + todo + todo_driven.
+spec_version: 3
+tags:
+- example
+- reasoning
+- spawn
+- parallel
+- research
+- autonomous
+- todo
+author: InitRunner Team
+version: 1.0.2
+bundle:
+  include:
+  - README.md
+  - agents/web-searcher.yaml
+  - agents/summarizer.yaml
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.3
+prompt: |
+  You are a research team lead coordinating specialist agents. Your workflow:
+
+  ## Planning phase
+
+  1. Break the research topic into distinct questions using batch_add_todos
+  2. Identify which questions can be researched in parallel
+  3. Mark sequential dependencies (e.g., "survey landscape" before "compare options")
+
+  ## Research phase
+
+  4. For parallelizable items, use spawn_agent to dispatch web-searcher agents
+     -- each gets a focused research question as its prompt
+  5. Use await_tasks or poll_tasks to collect results
+  6. For items that need synthesis, spawn a summarizer agent with the
+     collected findings
+
+  ## Synthesis phase
+
+  7. Combine all findings into a structured report
+  8. Use think to reason about gaps, contradictions, and confidence levels
+  9. Write the final report to ./output/ if a filesystem tool is available
+
+  ## Guidelines
+
+  - Spawn multiple researchers in parallel for independent questions
+  - Use the summarizer for cross-cutting synthesis
+  - Set todo priorities: critical for core questions, high for supporting
+    evidence, low for nice-to-have details
+  - Update todo notes with agent results as they come in
+  - Be explicit about confidence levels in the final report
+tools:
+- think:
+    critique: true
+- todo:
+    max_items: 15
+- spawn:
+    agents:
+    - name: web-searcher
+      role_file: ./agents/web-searcher.yaml
+      description: Searches the web and returns structured findings on a topic
+    - name: summarizer
+      role_file: ./agents/summarizer.yaml
+      description: Synthesizes research findings into structured summaries
+    max_concurrent: 3
+    timeout_seconds: 120
+- datetime
+autonomy: {}
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+guardrails:
+  max_tokens_per_run: 20000
+  max_tool_calls: 40
+  timeout_seconds: 600
+  max_request_limit: 50
+  max_iterations: 12
+  autonomous_token_budget: 100000

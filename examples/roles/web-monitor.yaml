@@ -1,29 +1,30 @@
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: web-monitor
-  description: Periodically scrapes web pages and stores content for search
-  tags: [example, web, scraper, cron]
-spec:
-  role: |
-    You are a web content monitor. When triggered, scrape the configured URLs
-    and store their content. Report what changed since the last scrape.
-    Use search_documents to compare new content with previously stored versions.
-  tools:
-    - type: web_scraper
-      allowed_domains:
-        - docs.example.com
-    - type: datetime
-  ingest:
-    sources: []  # web_scraper tool populates the store at runtime
-  triggers:
-    - type: cron
-      schedule: "0 */6 * * *"
-      prompt: |
-        Scrape these pages and report any changes:
-        - https://docs.example.com/changelog
-        - https://docs.example.com/api/reference
-  guardrails:
-    max_tokens_per_run: 20000
-    max_tool_calls: 20
-    timeout_seconds: 120
+name: web-monitor
+description: Periodically scrapes web pages and stores content for search
+spec_version: 3
+tags:
+- example
+- web
+- scraper
+- cron
+prompt: |
+  You are a web content monitor. When triggered, scrape the configured URLs
+  and store their content. Report what changed since the last scrape.
+  Use search_documents to compare new content with previously stored versions.
+tools:
+- web_scraper:
+    allowed_domains:
+    - docs.example.com
+- datetime
+triggers:
+- type: cron
+  schedule: 0 */6 * * *
+  prompt: |
+    Scrape these pages and report any changes:
+    - https://docs.example.com/changelog
+    - https://docs.example.com/api/reference
+ingest:
+  sources: []
+guardrails:
+  max_tokens_per_run: 20000
+  timeout_seconds: 120
+  max_request_limit: 30

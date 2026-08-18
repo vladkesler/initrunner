@@ -45,22 +45,35 @@ _logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/builder", tags=["builder"])
 
 
+def _copy_starter_samples_for_document(output_path: Path) -> list[str]:
+    """Copy bundled starter data referenced by a saved flat or envelope agent."""
+    import yaml
+
+    from initrunner.services.starters import (
+        copy_starter_samples,
+        document_identity,
+        get_starter,
+    )
+
+    data = yaml.safe_load(output_path.read_text(encoding="utf-8")) or {}
+    name = document_identity(data).get("name")
+    entry = get_starter(str(name)) if name else None
+    if entry is None:
+        return []
+    return [str(path) for path in copy_starter_samples(entry, output_path.parent)]
+
+
 # ---------------------------------------------------------------------------
 # Constants & helpers
 # ---------------------------------------------------------------------------
 
 _BLANK_TEMPLATE = """\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  description: ""
-spec:
-  role: |
-    You are a helpful assistant.
-  model:
-    provider: {provider}
-    name: {model}
+name: {name}
+description: ""
+spec_version: 3
+model: {provider}:{model}
+prompt: |
+  You are a helpful assistant.
 """
 
 
@@ -440,20 +453,10 @@ async def save_agent(
 
     try:
         result = await asyncio.to_thread(_run)
-        from initrunner.services.starters import copy_starter_samples, get_starter
-
-        def _copy() -> list[str]:
-            import yaml
-
-            data = yaml.safe_load(output_path.read_text(encoding="utf-8")) or {}
-            name = (data.get("metadata") or {}).get("name")
-            entry = get_starter(str(name)) if name else None
-            if entry is None:
-                return []
-            return [str(p) for p in copy_starter_samples(entry, output_path.parent)]
-
         try:
-            result.generated_assets.extend(await asyncio.to_thread(_copy))
+            result.generated_assets.extend(
+                await asyncio.to_thread(_copy_starter_samples_for_document, output_path)
+            )
         except Exception:
             pass
     except FileExistsError as e:

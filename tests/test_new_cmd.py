@@ -99,7 +99,8 @@ class TestNewBlank:
         assert output.exists()
         content = output.read_text()
         assert "my-agent" in content
-        assert "initrunner/v1" in content
+        assert "prompt:" in content
+        assert "apiVersion" not in content
 
     def test_blank_with_provider(self, tmp_path):
         output = tmp_path / "role.yaml"

@@ -32,13 +32,12 @@ InitRunner has two systems for giving agents access to information beyond their 
 You can use both together — ingestion for your docs, memory for user preferences:
 
 ```yaml
-spec:
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-  memory:
-    semantic:
-      max_memories: 500
+ingest:
+  sources:
+    - "./docs/**/*.md"
+memory:
+  semantic:
+    max_memories: 500
 ```
 
 ## End-to-End Walkthrough
@@ -48,25 +47,19 @@ spec:
 Create `role.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: docs-agent
-  description: Documentation Q&A agent
-spec:
-  role: |
-    You are a documentation assistant. ALWAYS call search_documents
-    before answering questions. Cite your sources.
-  model:
-    provider: openai
-    name: gpt-5-mini
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    chunking:
-      strategy: paragraph
-      chunk_size: 512
-      chunk_overlap: 50
+name: docs-agent
+description: Documentation Q&A agent
+model: openai:gpt-5-mini
+prompt: |
+  You are a documentation assistant. ALWAYS call search_documents
+  before answering questions. Cite your sources.
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  chunking:
+    strategy: paragraph
+    chunk_size: 512
+    chunk_overlap: 50
 ```
 
 ### 2. Add some documents
@@ -163,18 +156,17 @@ URL content is hashed — re-running `ingest` skips unchanged pages.
 Use a `file_watch` trigger to re-ingest when source files change:
 
 ```yaml
-spec:
-  ingest:
-    sources:
-      - "./knowledge-base/**/*.md"
-  triggers:
-    - type: file_watch
-      paths:
-        - ./knowledge-base
-      extensions:
-        - .md
-      prompt_template: "Knowledge base updated: {path}. Re-index."
-      debounce_seconds: 1.0
+ingest:
+  sources:
+    - "./knowledge-base/**/*.md"
+triggers:
+  - type: file_watch
+    paths:
+      - ./knowledge-base
+    extensions:
+      - .md
+    prompt_template: "Knowledge base updated: {path}. Re-index."
+    debounce_seconds: 1.0
 ```
 
 ### Using `source` filter to scope searches
@@ -182,16 +174,15 @@ spec:
 When your knowledge base spans multiple topics, use the `source` parameter to narrow results:
 
 ```yaml
-spec:
-  role: |
-    You are a support agent. When the user asks about billing, search
-    only billing docs: search_documents(query, source="*billing*").
-    For technical issues, search: search_documents(query, source="*troubleshooting*").
-  ingest:
-    sources:
-      - "./kb/billing/**/*.md"
-      - "./kb/troubleshooting/**/*.md"
-      - "./kb/general/**/*.md"
+prompt: |
+  You are a support agent. When the user asks about billing, search
+  only billing docs: search_documents(query, source="*billing*").
+  For technical issues, search: search_documents(query, source="*troubleshooting*").
+ingest:
+  sources:
+    - "./kb/billing/**/*.md"
+    - "./kb/troubleshooting/**/*.md"
+    - "./kb/general/**/*.md"
 ```
 
 ### Hybrid retrieval (vector + keyword)
@@ -202,12 +193,11 @@ and a BM25 full-text search, then fuses the two rankings with reciprocal rank
 fusion (RRF). Set the mode under `ingest.retriever`:
 
 ```yaml
-spec:
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    retriever:
-      strategy: hybrid
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  retriever:
+    strategy: hybrid
 ```
 
 `strategy` accepts three values:
@@ -229,14 +219,13 @@ candidates for higher precision. The cross-encoder backend is optional: when
 sentence-transformers` and tune the model:
 
 ```yaml
-spec:
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    retriever:
-      strategy: hybrid_rerank
-      reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
-      rrf_k: 60
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  retriever:
+    strategy: hybrid_rerank
+    reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+    rrf_k: 60
 ```
 
 The agent can also override the configured mode per call:
@@ -247,16 +236,13 @@ The agent can also override the configured mode per call:
 No external API keys needed — use Ollama for both the LLM and embeddings:
 
 ```yaml
-spec:
-  model:
+model: ollama:llama3.2
+ingest:
+  sources:
+    - "./docs/**/*.md"
+  embeddings:
     provider: ollama
-    name: llama3.2
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-    embeddings:
-      provider: ollama
-      model: nomic-embed-text
+    model: nomic-embed-text
 ```
 
 See the [Ollama configuration guide](../../docs/configuration/ollama.md) for setup instructions.
@@ -285,11 +271,10 @@ The default embedding model depends on your agent's provider. You can override i
 To override the default:
 
 ```yaml
-spec:
-  ingest:
-    embeddings:
-      provider: openai
-      model: text-embedding-3-large
+ingest:
+  embeddings:
+    provider: openai
+    model: text-embedding-3-large
 ```
 
 See [Providers: Embedding Configuration](../configuration/providers.md#embedding-configuration) for the full resolution logic.

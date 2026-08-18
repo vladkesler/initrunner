@@ -345,6 +345,11 @@ def run(
 
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
+    from initrunner.services.migrate import envelope_warning_for
+
+    warning = envelope_warning_for(role_file)
+    if warning:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     # --- --save: copy starter to local directory (no prerequisites needed) ---
     if save is not None:
@@ -367,8 +372,6 @@ def run(
     # --- Kind-specific flag validation ---
     if kind == "Flow":
         invalid = []
-        if prompt:
-            invalid.append("--prompt")
         if interactive:
             invalid.append("--interactive")
         if autonomous:
@@ -403,7 +406,7 @@ def run(
         return
 
     if kind == "Flow":
-        _dispatch_flow(role_file, audit_db, no_audit)
+        _dispatch_flow(role_file, audit_db, no_audit, prompt=prompt)
         return
 
     # --- Agent mode: flag-based dispatch ---

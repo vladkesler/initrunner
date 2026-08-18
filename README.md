@@ -27,6 +27,18 @@
 
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production. Prefer a curated outcome without YAML? Use [always-on services](#always-on-services).
 
+## Agent files are simpler now
+
+You used to wrap every agent in `apiVersion`, `kind`, `metadata`, and `spec`. The file is the agent now: a name, a prompt, the tools.
+
+Nothing you already have breaks. Convert a file or folder when you want:
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+That keeps a `.bak` copy. [How the rewrite works](docs/getting-started/envelope-migration.md).
+
 ## Quickstart
 
 ```bash
@@ -60,7 +72,7 @@ Browse the catalog with `initrunner run --list`. The model is auto-detected from
 
 ```bash
 initrunner new "a research assistant that summarizes papers"
-# generates role.yaml, then asks: "Run it now? [Y/n]"
+# generates agent.yaml, then asks: "Run it now? [Y/n]"
 
 initrunner new --offline           # build via a structured form, no LLM call
 initrunner run --ingest ./docs/    # skip YAML entirely, just chat with your docs
@@ -71,13 +83,12 @@ initrunner run --ingest ./docs/    # skip YAML entirely, just chat with your doc
 ```console
 $ initrunner new "a regex explainer" --run 'what does ^[a-z]+$ match?'
 ╭────────── regex-explainer -- VALID ──────────╮
-│ apiVersion: initrunner/v1                    │
-│ kind: Agent                                  │
-│ metadata:                                    │
-│   name: regex-explainer                      │
+│ name: regex-explainer                        │
+│ model: openai:gpt-5-mini                     │
+│ prompt: You explain regular expressions.     │
 │ ...                                          │
 ╰──────────────────────────────────────────────╯
-Created role.yaml
+Created agent.yaml
 
 1) Brief summary
 - Matches a non-empty string made only of ASCII lowercase letters a–z,
@@ -100,23 +111,19 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 
 ## One file, four modes
 
-Here's a role file:
+Here's an agent file:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -137,11 +144,10 @@ The `model:` block is optional. Omit it and InitRunner auto-detects from your AP
 A daemon that dies when its provider throws a 500 isn't much of a daemon. List fallback models and the run retries each in order on API errors:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-    prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
+model:
+  provider: anthropic
+  name: claude-sonnet-4-5-20250929
+  prompt_cache: true    # provider-native prompt caching (Anthropic, Bedrock)
     fallback: [openai:gpt-5-mini, mistral:mistral-large-latest]
     concurrency: { max_running: 4 }
 ```
@@ -288,24 +294,25 @@ spec:
 
 Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to compute spend per model and provider. Every run logs its cost to the audit trail. The dashboard plots cost across agents and time ranges. See [Cost Tracking](docs/core/cost-tracking.md).
 
+### Memory footprint
+
+A plain agent process runs at 150 to 220 MB of RSS. Nearly all of that is the Python AI stack (provider SDK, PydanticAI, Pydantic); InitRunner's own code adds about 7 MB, and LanceDB only loads if the role uses RAG or vector memory. The cost is per process, not per agent: `flow up` runs an entire multi-agent flow in one process, and `--serve` / `--daemon` keep one warm process instead of paying startup cost per task. See [Memory Footprint](docs/operations/memory-footprint.md) for the measured breakdown and container sizing tips.
+
 ## Multi-agent orchestration
 
 Chain agents into flows. One agent's output feeds the next.
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata: { name: email-chain }
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
-      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
-    researcher: { role: roles/researcher.yaml }
-    responder: { role: roles/responder.yaml }
+name: email-chain
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then: { to: triager }
+  triager:
+    use: roles/triager.yaml
+    then: { to: [researcher, responder], strategy: sense }
+  researcher: { use: roles/researcher.yaml }
+  responder: { use: roles/responder.yaml }
 ```
 
 ```bash
@@ -396,7 +403,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Security | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Telemetry](docs/operations/telemetry.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Telemetry](docs/operations/telemetry.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples
 

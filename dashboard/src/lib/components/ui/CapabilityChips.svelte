@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { Database, Brain, Zap, Workflow, Users, ExternalLink } from 'lucide-svelte';
+	import { Database, Brain, Zap, Workflow, ExternalLink } from 'lucide-svelte';
 
 	const chips = [
 		{ label: 'RAG', icon: Database, href: 'https://www.initrunner.ai/docs/rag-quickstart', external: true },
 		{ label: 'Memory', icon: Brain, href: 'https://www.initrunner.ai/docs/memory', external: true },
 		{ label: 'Triggers', icon: Zap, href: 'https://www.initrunner.ai/docs/triggers', external: true },
-		{ label: 'Flows', icon: Workflow, href: '/flows/new', external: false },
-		{ label: 'Teams', icon: Users, href: '/teams/new', external: false },
+		{ label: 'Compose', icon: Workflow, href: '/agents/new', external: false },
 	];
 </script>
 

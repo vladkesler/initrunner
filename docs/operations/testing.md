@@ -65,7 +65,7 @@ This lets you write self-contained test suites that validate your assertion logi
 
 ## Test Suite Format
 
-Test suites use the same YAML envelope pattern as role definitions:
+Test suites still use the YAML envelope (`apiVersion` / `kind: TestSuite`). Role, team, and flow files are flat.
 
 ```yaml
 apiVersion: initrunner/v1

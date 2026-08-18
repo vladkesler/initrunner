@@ -215,17 +215,18 @@ def diagnose_providers() -> list[ProviderDiagnosis]:
 def diagnose_role_extras(raw_data: dict) -> list[RoleExtrasGap]:
     """Scan a raw role dict for tools/triggers/features needing missing extras."""
     markers = _build_extra_markers()
-    spec = raw_data.get("spec", {})
+    from initrunner.services.starters import document_body, tool_types_from
+
+    spec = document_body(raw_data)
     seen: set[str] = set()
     gaps: list[RoleExtrasGap] = []
 
     # Collect tool and trigger type names
-    feature_names: set[str] = set()
-    for tool in spec.get("tools") or []:
-        if isinstance(tool, dict) and tool.get("type"):
-            feature_names.add(tool["type"])
+    feature_names: set[str] = tool_types_from(spec.get("tools") or [])
     for trigger in spec.get("triggers") or []:
-        if isinstance(trigger, dict) and trigger.get("type"):
+        if isinstance(trigger, str):
+            feature_names.add(trigger)
+        elif isinstance(trigger, dict) and trigger.get("type"):
             feature_names.add(trigger["type"])
 
     # Check spec-level sections
@@ -519,17 +520,21 @@ def derive_role_provider(raw_data: dict) -> tuple[str, str] | None:
     provider cannot be determined.
     """
     from initrunner.services.providers import PROVIDER_KEY_ENVS_DICT as _PROVIDER_API_KEY_ENVS
+    from initrunner.services.starters import document_body
 
-    spec = raw_data.get("spec", {})
+    spec = document_body(raw_data)
     model = spec.get("model", {})
-    if not isinstance(model, dict):
-        return None
-
-    provider = model.get("provider")
+    provider = ""
+    api_key_env = None
+    if isinstance(model, str) and ":" in model:
+        provider = model.split(":", 1)[0]
+    elif isinstance(model, dict):
+        provider = model.get("provider") or ""
+        api_key_env = model.get("api_key_env")
     if not provider:
         return None
 
-    env_var = model.get("api_key_env") or _PROVIDER_API_KEY_ENVS.get(provider)
+    env_var = api_key_env or _PROVIDER_API_KEY_ENVS.get(provider)
     if not env_var:
         return None
 
@@ -975,7 +980,8 @@ def diagnose_model_name(role: object) -> ModelNameDiagnosis | None:
     """
     spec = role.spec  # type: ignore[attr-defined]
     model = spec.model
-    if not model.is_resolved():
+    # Flat agents may omit `model:` entirely (auto-detect at runtime).
+    if model is None or not model.is_resolved():
         return None
 
     label = model.to_model_string()
@@ -1062,19 +1068,11 @@ def diagnose_flow(
             continue
 
         try:
-            from initrunner._yaml import load_raw_yaml
-            from initrunner.deprecations import inspect_role_data
+            from initrunner.agent.loader import load_role
 
-            raw = load_raw_yaml(role_path, ValueError)
-            inspection = inspect_role_data(raw)
-
-            if inspection.role is None:
-                role_errors[agent_name] = inspection.schema_error or "Failed to validate role"
-                agent_diagnostics[agent_name] = None
-                continue
-
+            role = load_role(role_path)
             agent_diagnostics[agent_name] = diagnose_role_deep(
-                inspection.role,
+                role,
                 role_path.parent,
                 deep=deep,
                 extra_skill_dirs=extra_skill_dirs,

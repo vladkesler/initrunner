@@ -456,15 +456,23 @@ def materialize_instance_role(
     if not isinstance(data, dict):
         raise ServiceError("Rendered role YAML must be a mapping")
 
-    # Force runtime agent name for audit/memory/budget isolation
-    meta = data.setdefault("metadata", {})
-    if not isinstance(meta, dict):
-        raise ServiceError("Rendered role metadata must be a mapping")
-    meta["name"] = runtime_agent_name(entry.slug)
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
 
-    spec = data.setdefault("spec", {})
-    if not isinstance(spec, dict):
-        raise ServiceError("Rendered role spec must be a mapping")
+    classification = classify_mapping(data)
+    flat = classification.document_class is DocumentClass.FLAT_AGENT
+    if flat:
+        data["name"] = runtime_agent_name(entry.slug)
+        spec = data
+    else:
+        # Force runtime agent name for audit/memory/budget isolation
+        meta = data.setdefault("metadata", {})
+        if not isinstance(meta, dict):
+            raise ServiceError("Rendered role metadata must be a mapping")
+        meta["name"] = runtime_agent_name(entry.slug)
+
+        spec = data.setdefault("spec", {})
+        if not isinstance(spec, dict):
+            raise ServiceError("Rendered role spec must be a mapping")
 
     prompt = _substitute_params(definition.spec.schedule_prompt, params)
     spec["triggers"] = [
@@ -1300,12 +1308,15 @@ def _prompt_from_role(role_path: Path) -> tuple[str, bool]:
         return prompt, autonomous
     if not isinstance(data, dict):
         return prompt, autonomous
-    for t in data.get("spec", {}).get("triggers") or []:
+    from initrunner.services.starters import document_body
+
+    body = document_body(data)
+    for t in body.get("triggers") or []:
         if isinstance(t, dict) and t.get("type") == "cron":
             prompt = str(t.get("prompt") or prompt)
             autonomous = bool(t.get("autonomous", False))
             break
-    if data.get("spec", {}).get("autonomy") is not None:
+    if body.get("autonomy") is not None:
         autonomous = True
     return prompt, autonomous
 

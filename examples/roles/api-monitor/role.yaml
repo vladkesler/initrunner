@@ -1,0 +1,219 @@
+name: api-monitor
+description: |
+  Monitors API endpoints on a heartbeat, detects degradation trends using long-term memory, and alerts Slack when things go wrong. Auto-discovers analysis skills for latency trends, SSL certificates, and response validation.
+spec_version: 3
+tags:
+- monitoring
+- heartbeat
+- api
+- memory
+- skills
+- slack
+- structured-output
+author: InitRunner Team
+version: 1.0.2
+bundle:
+  include:
+  - README.md
+  - endpoints.md
+  - skills/latency-analysis/SKILL.md
+  - skills/ssl-certificate/SKILL.md
+  - skills/response-validation/SKILL.md
+prompt: |
+  You are an API health monitor. You detect degradation trends over time,
+  not just point-in-time failures. You remember previous check results and
+  use that history to distinguish a single spike from a sustained problem.
+
+  ## Check command
+
+  For each endpoint, run:
+  ```
+  curl -s -o /dev/null -w '%{http_code} %{time_total}' --max-time 10 <URL>
+  ```
+  This returns the HTTP status code and total response time in one call.
+  Multiply time_total by 1000 to get milliseconds.
+
+  ## Workflow (per heartbeat)
+
+  1. Use datetime to get the current timestamp.
+  2. For each endpoint in the checklist:
+     - Run the curl check command
+     - Parse status_code and latency_ms from the output
+  3. Recall previous check data from episodic memory for each endpoint
+     (search for the last 5-10 episodes with category "check").
+  4. Compare current latency against the historical baseline (median of
+     recalled values).
+  5. Activate skills if needed:
+     - latency-analysis for detailed trend reasoning
+     - ssl-certificate for cert expiry checks
+     - response-validation if responses look unexpected
+  6. Classify each endpoint:
+     - **healthy**: 2xx status, latency within normal range
+     - **degraded**: 2xx status but latency >2x baseline for 3+ checks
+     - **down**: non-2xx status or timeout
+  7. Record this check as an episodic memory:
+     record_episode(content="<endpoint> <status> <latency_ms>ms <timestamp>",
+                    category="check")
+  8. Alert logic (Slack):
+     - **DOWN** (non-2xx or timeout): immediate alert, severity critical
+     - **DEGRADED** (latency >2x baseline for 3+ consecutive checks):
+       warning with trend data
+     - **RECOVERED** (was down in last episode, now healthy): recovery
+       notice, severity info
+     - **HEALTHY**: silent -- record in memory only, no Slack noise
+  9. Output the structured JSON report.
+
+  ## Slack message format
+
+  Use Slack mrkdwn (not standard markdown):
+  - *bold* (single asterisks, not double)
+  - _italic_ (single underscores)
+  - No # headings (Slack doesn't render them)
+  - Links: <https://example.com|Display Text>
+
+  ## Memory usage
+
+  - **Semantic memory**: store endpoint baselines, known maintenance
+    windows, expected behavior. Category: "baseline", "maintenance".
+  - **Episodic memory**: every check result (endpoint, status, latency,
+    timestamp). Category: "check". This is the raw data for trend
+    detection.
+  - **Procedural memory**: learned patterns like "staging is slow 2-4am
+    during backups" or "this endpoint 503s during deploys".
+    Category: "pattern".
+  - **Consolidation**: after each run, old episodes get compressed into
+    trend summaries automatically.
+
+  ## Rules
+
+  - Never alert on the first check for an endpoint (no baseline yet).
+  - Always state the baseline value and current value in alerts.
+  - Include trend direction (improving, stable, degrading) in degradation
+    alerts.
+  - Recovery alerts are important -- teams want to know when things are
+    back to normal.
+output:
+  type: json_schema
+  schema_:
+    type: object
+    properties:
+      checks:
+        type: array
+        items:
+          type: object
+          properties:
+            endpoint:
+              type: string
+              description: Full URL that was checked
+            status_code:
+              type: integer
+            latency_ms:
+              type: number
+              description: Response time in milliseconds
+            healthy:
+              type: boolean
+            error:
+              type: string
+              description: Error message if unhealthy, empty string if healthy
+          required:
+          - endpoint
+          - status_code
+          - latency_ms
+          - healthy
+          - error
+      summary:
+        type: object
+        properties:
+          total:
+            type: integer
+          healthy:
+            type: integer
+          degraded:
+            type: integer
+          down:
+            type: integer
+        required:
+        - total
+        - healthy
+        - degraded
+        - down
+      alerts:
+        type: array
+        items:
+          type: object
+          properties:
+            endpoint:
+              type: string
+            type:
+              type: string
+              enum:
+              - down
+              - degraded
+              - recovered
+              - ssl_warning
+            message:
+              type: string
+            severity:
+              type: string
+              enum:
+              - critical
+              - warning
+              - info
+          required:
+          - endpoint
+          - type
+          - message
+          - severity
+      timestamp:
+        type: string
+    required:
+    - checks
+    - summary
+    - alerts
+    - timestamp
+tools:
+- shell:
+    allowed_commands:
+    - curl
+    - openssl
+    - dig
+    max_output_bytes: 51200
+    require_confirmation: false
+- slack:
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    default_channel: '#ops-alerts'
+    username: API Monitor
+    icon_emoji: ':satellite:'
+- think
+- datetime
+triggers:
+- type: heartbeat
+  file: ./endpoints.md
+  interval_seconds: 300
+  prompt_prefix: |
+    Heartbeat check. Process the endpoint checklist below.
+    For each endpoint, run the health check, record results,
+    compare against memory for trends, and alert Slack if needed.
+  active_hours:
+  - 6
+  - 22
+  autonomous: true
+memory:
+  episodic:
+    max_episodes: 2000
+  semantic:
+    max_memories: 500
+  procedural:
+    max_procedures: 50
+  consolidation:
+    interval: after_autonomous
+autonomy:
+  max_plan_steps: 8
+guardrails:
+  max_tokens_per_run: 25000
+  max_tool_calls: 30
+  timeout_seconds: 180
+  max_request_limit: 40
+  daemon_daily_token_budget: 400000
+auto_skills:
+  max_skills: 10

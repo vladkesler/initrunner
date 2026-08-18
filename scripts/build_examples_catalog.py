@@ -68,12 +68,41 @@ def _parse_skill_frontmatter(text: str) -> dict:
     return _parse_yaml(fm_text)
 
 
+def _identity(data: dict) -> dict:
+    """Name/description/tags from an envelope or a flat document."""
+    if isinstance(data.get("metadata"), dict):
+        meta = data["metadata"]
+        return {
+            "name": meta.get("name"),
+            "description": meta.get("description") or "",
+            "tags": meta.get("tags") or [],
+        }
+    return {
+        "name": data.get("name"),
+        "description": data.get("description") or "",
+        "tags": data.get("tags") or [],
+    }
+
+
+def _body(data: dict) -> dict:
+    spec = data.get("spec")
+    return spec if isinstance(spec, dict) else data
+
+
 def _extract_tools(spec: dict) -> list[str]:
-    """Extract tool type names from a role spec."""
+    """Extract tool type names from a role spec or flat document."""
     tools = spec.get("tools", [])
     if not isinstance(tools, list):
         return []
-    return [t["type"] for t in tools if isinstance(t, dict) and "type" in t]
+    names: list[str] = []
+    for item in tools:
+        if isinstance(item, str):
+            names.append(item)
+        elif isinstance(item, dict) and "type" in item:
+            names.append(item["type"])
+        elif isinstance(item, dict) and len(item) == 1:
+            names.append(str(next(iter(item))))
+    return names
 
 
 def _detect_features(spec: dict) -> list[str]:
@@ -87,7 +116,7 @@ def _detect_features(spec: dict) -> list[str]:
 
 def _classify_difficulty(data: dict, multi_file: bool) -> str:
     """Heuristic difficulty classification."""
-    spec = data.get("spec", {})
+    spec = _body(data)
     tools = _extract_tools(spec)
     features = _detect_features(spec)
 
@@ -119,14 +148,14 @@ def _build_role_entry(path: Path, category_dir: Path) -> dict | None:
         # Single-file role
         content = path.read_text(encoding="utf-8")
         data = _parse_yaml(content)
-        metadata = data.get("metadata", {})
-        spec = data.get("spec", {})
+        identity = _identity(data)
+        spec = _body(data)
 
         return {
-            "name": metadata.get("name", path.stem),
+            "name": identity.get("name") or path.stem,
             "category": "role",
-            "description": metadata.get("description", ""),
-            "tags": metadata.get("tags", []),
+            "description": identity.get("description") or "",
+            "tags": identity.get("tags") or [],
             "files": _collect_files(path, category_dir),
             "primary_file": path.relative_to(category_dir).as_posix(),
             "primary_content": content,
@@ -151,14 +180,14 @@ def _build_role_entry(path: Path, category_dir: Path) -> dict | None:
 
         content = primary.read_text(encoding="utf-8")
         data = _parse_yaml(content)
-        metadata = data.get("metadata", {})
-        spec = data.get("spec", {})
+        identity = _identity(data)
+        spec = _body(data)
 
         return {
-            "name": metadata.get("name", path.name),
+            "name": identity.get("name") or path.name,
             "category": "role",
-            "description": metadata.get("description", ""),
-            "tags": metadata.get("tags", []),
+            "description": identity.get("description") or "",
+            "tags": identity.get("tags") or [],
             "files": _collect_files(path, category_dir),
             "primary_file": primary.relative_to(category_dir).as_posix(),
             "primary_content": content,
@@ -177,17 +206,17 @@ def _build_flow_entry(path: Path, category_dir: Path) -> dict | None:
         # Top-level flow file with roles/ subdir
         content = path.read_text(encoding="utf-8")
         data = _parse_yaml(content)
-        metadata = data.get("metadata", {})
+        identity = _identity(data)
         parent = path.parent
 
         # Collect all files under the parent dir
         files = _collect_files(parent, category_dir)
 
         return {
-            "name": metadata.get("name", parent.name if parent != category_dir else "flow"),
+            "name": identity.get("name") or (parent.name if parent != category_dir else "flow"),
             "category": "flow",
-            "description": metadata.get("description", ""),
-            "tags": metadata.get("tags", []),
+            "description": identity.get("description") or "",
+            "tags": identity.get("tags") or [],
             "files": files,
             "primary_file": path.relative_to(category_dir).as_posix(),
             "primary_content": content,
@@ -206,13 +235,13 @@ def _build_flow_entry(path: Path, category_dir: Path) -> dict | None:
 
         content = flow_file.read_text(encoding="utf-8")
         data = _parse_yaml(content)
-        metadata = data.get("metadata", {})
+        identity = _identity(data)
 
         return {
-            "name": metadata.get("name", path.name),
+            "name": identity.get("name") or path.name,
             "category": "flow",
-            "description": metadata.get("description", ""),
-            "tags": metadata.get("tags", []),
+            "description": identity.get("description") or "",
+            "tags": identity.get("tags") or [],
             "files": _collect_files(path, category_dir),
             "primary_file": flow_file.relative_to(category_dir).as_posix(),
             "primary_content": content,

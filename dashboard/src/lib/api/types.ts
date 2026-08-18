@@ -8,6 +8,7 @@ export interface AgentSummary {
 	features: string[];
 	path: string;
 	error: string | null;
+	shape?: 'solo' | 'preset' | 'graph';
 }
 
 // -- Agent Detail -------------------------------------------------------------

@@ -44,6 +44,9 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
     """
     import yaml
 
+    from initrunner.agent.schema.adapt import document_to_role
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+    from initrunner.agent.schema.normalize import normalize_mapping
     from initrunner.deprecations import CURRENT_ROLE_SPEC_VERSION, validate_role_dict
 
     # Parse and validate first
@@ -54,6 +57,15 @@ def save_role_yaml_sync(path: Path, yaml_content: str) -> RoleDefinition:
 
     if not isinstance(raw, dict):
         raise ValueError("YAML must be a mapping")
+
+    if classify_mapping(raw).document_class is DocumentClass.FLAT_AGENT:
+        role = document_to_role(normalize_mapping(raw).document)
+        if path.exists():
+            bak_path = path.with_suffix(path.suffix + ".bak")
+            bak_path.write_text(path.read_text())
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml_content if yaml_content.endswith("\n") else yaml_content + "\n")
+        return role
 
     # Normalize spec_version to current before validation and write
     raw.setdefault("metadata", {})["spec_version"] = CURRENT_ROLE_SPEC_VERSION
@@ -102,116 +114,13 @@ def build_role_yaml_sync(
 
 
 def canonicalize_role_yaml(role: RoleDefinition) -> str:
-    """Serialize a RoleDefinition to minimal YAML, omitting default and null values.
+    """Serialize a RoleDefinition as public flat YAML."""
+    from initrunner.agent.schema.normalize import role_to_v3_mapping
+    from initrunner.agent.schema.render import render_document
+    from initrunner.agent.schema.v3 import AgentDocument
 
-    Uses Pydantic's ``exclude_defaults`` + ``exclude_none`` to strip fields that
-    match their schema default.  ``metadata.spec_version`` is always re-injected.
-    Multiline strings render as YAML block scalars for readability.
-
-    Optional spec sections whose default is ``None`` (e.g. ``memory``,
-    ``autonomy``) are preserved as empty mappings when explicitly present,
-    because their existence enables features even when all sub-fields are
-    defaults.
-    """
-    import yaml
-
-    data = role.model_dump(mode="json", by_alias=True, exclude_defaults=True, exclude_none=True)
-
-    # Discriminated union items (tools, triggers, sinks) need special handling:
-    # exclude_defaults strips the `type` discriminator, but we need it for
-    # deserialization. Dump each item with exclude_defaults, then re-inject type.
-    for key in ("tools", "triggers", "sinks"):
-        items = getattr(role.spec, key, [])
-        if items:
-            serialized = []
-            for item in items:
-                d = item.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
-                d = {"type": item.type, **d}
-                serialized.append(d)
-            data.setdefault("spec", {})[key] = serialized
-
-    # Remove empty dicts/lists left after stripping defaults
-    def _prune(d: dict) -> dict:
-        return {
-            k: _prune(v) if isinstance(v, dict) else v
-            for k, v in d.items()
-            if v != {} and v != [] and v is not None
-        }
-
-    data = _prune(data)
-
-    # Security: use compact_dump() to preserve preset one-liner.
-    # Without this, exclude_defaults emits both preset and all expanded
-    # sub-fields, defeating the one-line config promise.
-    if role.spec.security.preset:
-        data.setdefault("spec", {})["security"] = role.spec.security.compact_dump(
-            mode="json", exclude_none=True
-        )
-
-    # Restore optional spec sections whose presence is semantically
-    # significant.  Fields that default to None but were explicitly set on
-    # the role may collapse to {} after exclude_defaults + _prune; re-inject
-    # them so the YAML round-trips with the same feature semantics.
-    from initrunner.agent.schema.role import AgentSpec
-
-    spec_data = data.get("spec", {})
-    for name, field_info in AgentSpec.model_fields.items():
-        if (
-            field_info.default is None
-            and getattr(role.spec, name, None) is not None
-            and name not in spec_data
-        ):
-            spec_data[name] = {}
-    if spec_data and "spec" not in data:
-        data["spec"] = spec_data
-
-    # Always include these structural fields
-    data.setdefault("apiVersion", "initrunner/v1")
-    data.setdefault("kind", "Agent")
-    data.setdefault("metadata", {})["spec_version"] = 2
-
-    # spec.role is always required even if it matched defaults
-    if "spec" in data:
-        spec = data["spec"]
-        spec.setdefault("role", role.spec.role)
-        if role.spec.model and role.spec.model.name:
-            model_data = role.spec.model.model_dump(mode="json", exclude_none=True)
-            spec.setdefault("model", model_data)
-
-        # Capabilities: serialize NamedSpec back to YAML-native form.
-        # model_dump produces {"name": "Thinking", "arguments": ("high",)}
-        # but YAML expects "Thinking: high" or bare "Thinking".
-        if role.spec.capabilities:
-            yaml_caps = []
-            for cap_spec in role.spec.capabilities:
-                name = cap_spec.name
-                args = cap_spec.arguments
-                if args is None:
-                    yaml_caps.append(name)
-                elif isinstance(args, tuple) and len(args) == 1:
-                    yaml_caps.append({name: args[0]})
-                else:
-                    yaml_caps.append({name: args})
-            spec["capabilities"] = yaml_caps
-
-    # Block-scalar representer for multiline strings
-    class _BlockDumper(yaml.SafeDumper):
-        pass
-
-    def _str_representer(dumper: yaml.SafeDumper, data: str) -> yaml.ScalarNode:
-        if "\n" in data:
-            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data)
-
-    _BlockDumper.add_representer(str, _str_representer)
-
-    return yaml.dump(
-        data,
-        Dumper=_BlockDumper,
-        default_flow_style=False,
-        sort_keys=False,
-        allow_unicode=True,
-    )
+    document = AgentDocument.model_validate(role_to_v3_mapping(role))
+    return render_document(document)
 
 
 def explain_role(role: RoleDefinition) -> list[tuple[str, str]]:

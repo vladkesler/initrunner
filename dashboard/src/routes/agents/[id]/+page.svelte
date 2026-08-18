@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats, fetchTimeline } from '$lib/api/agents';
+	import { getAgent, getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats, fetchTimeline } from '$lib/api/agents';
 	import { fetchAuditStats } from '$lib/api/system';
 	import type { AgentDetail, AuditStats, TriggerStat } from '$lib/api/types';
 	import { loadOr404 } from '$lib/utils/load';
@@ -106,6 +106,20 @@
 	}
 
 	onMount(async () => {
+		try {
+			const summary = await getAgent(agentId);
+			if (summary.shape === 'preset') {
+				await goto(`/teams/${agentId}`, { replaceState: true });
+				return;
+			}
+			if (summary.shape === 'graph') {
+				await goto(`/flows/${agentId}`, { replaceState: true });
+				return;
+			}
+		} catch {
+			// Fall through to the solo-agent load path.
+		}
+
 		// Restore saved tab
 		try {
 			const saved = localStorage.getItem(tabKey);

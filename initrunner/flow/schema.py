@@ -220,13 +220,20 @@ class DurabilityConfig(BaseModel):
 
 
 class FlowAgentConfig(BaseModel):
-    role: str
+    role: str = ""
+    inline_role: object | None = None  # RoleDefinition; set by the v3 adapter only
     trigger: TriggerConfig | None = None
     sink: DelegateSinkConfig | None = None
     needs: list[str] = []
     health_check: HealthCheckConfig = HealthCheckConfig()
     restart: RestartPolicy = RestartPolicy()
     environment: dict[str, str] = {}
+
+    @model_validator(mode="after")
+    def _role_or_inline(self) -> FlowAgentConfig:
+        if not self.role and self.inline_role is None:
+            raise ValueError("each flow agent needs a role path or an inline_role")
+        return self
 
 
 class FlowSpec(BaseModel):

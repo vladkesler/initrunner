@@ -16,9 +16,10 @@ All commands that accept a role path also accept a **directory** or an **install
 
 1. If the path is a file, use it.
 2. If the path is a directory:
-   a. If `<dir>/role.yaml` exists, use it.
-   b. Otherwise scan top-level `*.yaml`/`*.yml` for files with `apiVersion: initrunner/v1`.
-   c. Exactly one match is used; zero or multiple matches produce an error.
+   a. If `<dir>/agent.yaml` exists, use it.
+   b. If `<dir>/role.yaml` exists, use it.
+   c. Otherwise scan top-level `*.yaml`/`*.yml` for a flat or envelope Agent/Team/Flow document.
+   d. Exactly one match is used; zero or multiple matches produce an error.
 3. Otherwise, look up the name in the installed role registry (exact key, owner/name, or display name).
 
 This means `initrunner run .` works from inside an agent directory, and `initrunner run code-reviewer` works after `initrunner install alice/code-reviewer`.

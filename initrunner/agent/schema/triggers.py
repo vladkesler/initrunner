@@ -6,7 +6,7 @@ import secrets
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 
 class CronTriggerConfig(BaseModel):
@@ -41,15 +41,24 @@ class WebhookTriggerConfig(BaseModel):
     secret: str | None = None
     rate_limit_rpm: int = 60
     autonomous: bool = False
+    _secret_from_user: bool = PrivateAttr(default=False)
 
     @model_validator(mode="after")
     def _auto_generate_secret(self) -> WebhookTriggerConfig:
         if self.secret is None:
+            self._secret_from_user = False
             self.secret = secrets.token_urlsafe(32)
+        else:
+            self._secret_from_user = True
         return self
 
     def summary(self) -> str:
         return f"webhook: :{self.port}{self.path}"
+
+    def omit_generated_secret(self, dumped: dict) -> None:
+        """Drop auto-generated secrets so rewrites do not invent one."""
+        if not self._secret_from_user:
+            dumped.pop("secret", None)
 
 
 class TelegramTriggerConfig(BaseModel):

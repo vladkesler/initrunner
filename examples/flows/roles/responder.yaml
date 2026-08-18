@@ -1,20 +1,16 @@
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: responder
-  description: Drafts email responses
-  tags:
-    - compose
-    - email
-spec:
-  role: >
-    You are an email response agent. Given a triaged email that needs
-    a direct response, draft a professional, helpful reply. Keep the
-    tone friendly and concise.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.5
-  guardrails:
-    max_tokens_per_run: 3000
-    timeout_seconds: 30
+name: responder
+description: Drafts email responses
+spec_version: 3
+tags:
+- compose
+- email
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.5
+prompt: |
+  You are an email response agent. Given a triaged email that needs a direct response, draft a professional, helpful reply. Keep the tone friendly and concise.
+guardrails:
+  max_tokens_per_run: 3000
+  timeout_seconds: 30
+  max_request_limit: 30

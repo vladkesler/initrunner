@@ -45,6 +45,8 @@ def _detect_code_exec_warnings(role_dir) -> list[str]:
     """
     import yaml
 
+    from initrunner.services.starters import document_body
+
     in_process = {"custom", "plugin"}
     subprocess_tools = {"shell", "python", "script"}
     warnings: list[str] = []
@@ -55,15 +57,25 @@ def _detect_code_exec_warnings(role_dir) -> list[str]:
             continue
         if not isinstance(data, dict):
             continue
-        tools = (data.get("spec") or {}).get("tools") or []
+        tools = document_body(data).get("tools") or []
         found: set[str] = set()
         for t in tools:
-            if not isinstance(t, dict):
+            has_command = False
+            if isinstance(t, str):
+                ttype = t
+            elif isinstance(t, dict) and "type" in t:
+                ttype = t.get("type")
+                has_command = bool(t.get("command"))
+            elif isinstance(t, dict) and len(t) == 1:
+                ttype, raw_config = next(iter(t.items()))
+                has_command = isinstance(raw_config, dict) and any(
+                    key == "command" and bool(value) for key, value in raw_config.items()
+                )
+            else:
                 continue
-            ttype = t.get("type")
             if ttype in in_process or ttype in subprocess_tools:
-                found.add(ttype)
-            elif ttype == "mcp" and t.get("command"):
+                found.add(str(ttype))
+            elif ttype == "mcp" and has_command:
                 found.add("mcp(command)")
         if found:
             warnings.append(

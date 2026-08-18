@@ -30,6 +30,15 @@ MINIMAL_ROLE_YAML = textwrap.dedent("""\
         name: gpt-5-mini
 """)
 
+MINIMAL_FLAT_ROLE_YAML = textwrap.dedent("""\
+    name: flat-agent
+    description: A flat test agent
+    author: tester
+    version: "2.0.0"
+    model: openai:gpt-5-mini
+    prompt: You are helpful.
+""")
+
 ROLE_WITH_SKILLS_YAML = textwrap.dedent("""\
     apiVersion: initrunner/v1
     kind: Agent
@@ -120,6 +129,14 @@ class TestCollectBundleFiles:
         assert len(files) == 1
         assert files[0][1].path == "role.yaml"
         assert files[0][1].kind == "role"
+
+    def test_minimal_flat_role(self, tmp_path):
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(MINIMAL_FLAT_ROLE_YAML)
+
+        files = collect_bundle_files(role_file)
+        assert len(files) == 1
+        assert files[0][1].path == "role.yaml"
 
     def test_role_with_skills(self, tmp_path):
         role_file = tmp_path / "role.yaml"
@@ -216,6 +233,17 @@ class TestCreateBundle:
 
         archive = create_bundle(role_file)
         assert archive.parent == tmp_path
+
+    def test_create_flat_role(self, tmp_path):
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(MINIMAL_FLAT_ROLE_YAML)
+
+        archive = create_bundle(role_file, output_dir=tmp_path / "output")
+        manifest = validate_bundle(archive)
+
+        assert archive.name == "flat-agent-2.0.0.tar.gz"
+        assert manifest.name == "flat-agent"
+        assert manifest.description == "A flat test agent"
 
 
 class TestValidateBundle:

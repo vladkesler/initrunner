@@ -1,16 +1,16 @@
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: web-reader
-  description: Fetch and summarize web pages
-  tags: [example, web]
-spec:
-  role: |
-    You are a web page reader. When given a URL, fetch it and provide a
-    concise summary of the page content. Highlight key information.
-  tools:
-    - type: web_reader
-  guardrails:
-    max_tokens_per_run: 10000
-    max_tool_calls: 5
-    timeout_seconds: 60
+name: web-reader
+description: Fetch and summarize web pages
+spec_version: 3
+tags:
+- example
+- web
+prompt: |
+  You are a web page reader. When given a URL, fetch it and provide a
+  concise summary of the page content. Highlight key information.
+tools:
+- web_reader
+guardrails:
+  max_tokens_per_run: 10000
+  max_tool_calls: 5
+  timeout_seconds: 60
+  max_request_limit: 30

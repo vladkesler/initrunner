@@ -395,7 +395,7 @@ class TestBuilderSessionSeedBlank:
         assert "my-agent" in turn.yaml_text
         assert session.seed_source == "blank"
         raw = yaml.safe_load(turn.yaml_text)
-        assert raw["spec"]["model"]["provider"] == "openai"
+        assert str(raw["model"]).startswith("openai:")
 
     def test_seed_blank_with_model(self):
         session = BuilderSession()
@@ -426,7 +426,7 @@ class TestBuilderSessionSeedTemplate:
         turn = session.seed_template("memory", "openai")
         assert "memory" in turn.yaml_text
         parsed = yaml.safe_load(turn.yaml_text)
-        assert "memory" in parsed["spec"], "memory YAML key missing after canonicalization"
+        assert "memory" in parsed, "memory YAML key missing after canonicalization"
 
     def test_seed_template_unknown_raises(self):
         session = BuilderSession()
@@ -637,7 +637,7 @@ class TestGenerateRoleWrapper:
 
         result = generate_role("a simple chatbot", provider="openai")
         assert "test-agent" in result
-        assert "apiVersion" in result
+        assert "prompt" in result or "role:" in result
 
 
 # ---------------------------------------------------------------------------

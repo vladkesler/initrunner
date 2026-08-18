@@ -29,6 +29,18 @@
 
 1つの YAML ファイルでエージェントを定義。対話する。うまくいったら自律実行させる。信頼できたら、cron スケジュール、ファイル変更、webhook、Telegram メッセージに反応するデーモンとしてデプロイする。同じファイルのまま。プロトタイプから本番まで書き直し不要。
 
+## エージェントファイルが簡単になりました
+
+これまでエージェントは `apiVersion`、`kind`、`metadata`、`spec` で包んでいました。今はファイルそのものがエージェントです。名前、プロンプト、ツール。
+
+手元のファイルはそのまま動きます。きれいにしたくなったら:
+
+```bash
+initrunner doctor --fix PATH --yes
+```
+
+先に `.bak` を残します。[書き換えの説明](docs/getting-started/envelope-migration.md)。
+
 ## クイックスタート
 
 ```bash
@@ -78,20 +90,16 @@ docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -
 ロールファイル：
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: code-reviewer
-  description: Reviews code for bugs and style issues
-spec:
-  role: |
-    You are a senior engineer. Review code for correctness and readability.
-    Use git tools to examine changes and read files for context.
-  model: { provider: openai, name: gpt-5-mini }
-  tools:
-    - type: git
+name: code-reviewer
+description: Reviews code for bugs and style issues
+model: openai:gpt-5-mini
+prompt: |
+  You are a senior engineer. Review code for correctness and readability.
+  Use git tools to examine changes and read files for context.
+tools:
+  - git:
       repo_path: .
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
 ```
@@ -231,24 +239,25 @@ spec:
 
 コスト見積もりは [genai-prices](https://pypi.org/project/genai-prices/) でモデルとプロバイダーごとに計算します。各実行のコストは監査証跡に記録。ダッシュボードはエージェントと期間を横断したコストをプロットします。[コスト追跡](docs/core/cost-tracking.md) を参照。
 
+### メモリフットプリント
+
+素のエージェントプロセスの RSS は 150〜220 MB です。ほぼすべてが Python の AI スタック（プロバイダー SDK、PydanticAI、Pydantic）で、InitRunner 本体は約 7 MB、LanceDB は RAG やベクトルメモリを使うロールだけが読み込みます。コストはエージェントごとではなくプロセスごとです。`flow up` はマルチエージェント Flow を 1 プロセスで動かし、`--serve` / `--daemon` はタスクごとに起動コストを払わず 1 つの温かいプロセスを保ちます。内訳とコンテナサイズの目安は [Memory Footprint](docs/operations/memory-footprint.md) を参照。
+
 ## マルチエージェントオーケストレーション
 
 エージェントを Flow に連鎖。あるエージェントの出力が次の入力になります。
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata: { name: email-chain }
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink: { type: delegate, target: triager }
-    triager:
-      role: roles/triager.yaml
-      sink: { type: delegate, strategy: sense, target: [researcher, responder] }
-    researcher: { role: roles/researcher.yaml }
-    responder: { role: roles/responder.yaml }
+name: email-chain
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then: { to: triager }
+  triager:
+    use: roles/triager.yaml
+    then: { to: [researcher, responder], strategy: sense }
+  researcher: { use: roles/researcher.yaml }
+  responder: { use: roles/responder.yaml }
 ```
 
 ```bash
@@ -335,7 +344,7 @@ initrunner/
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | セキュリティ | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## サンプル
 

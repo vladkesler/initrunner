@@ -149,7 +149,9 @@ def test_get_flow_yaml(client):
     assert "yaml" in data
     assert "flow.yaml" in data["path"]
     parsed = yaml.safe_load(data["yaml"])
-    assert parsed["kind"] == "Flow"
+    assert parsed["name"] == "test-flow"
+    assert "agents" in parsed
+    assert "apiVersion" not in parsed
 
 
 # -- GET /api/flows/{id}/events ----------------------------------------------

@@ -4,26 +4,24 @@ InitRunner uses a centralized deprecation system to manage removed or renamed co
 
 ## spec_version
 
-Role YAML files include a `metadata.spec_version` field that tracks which schema version the file was written against.
+Flat Agent/Team/Flow files use a top-level `spec_version: 3`. Old envelopes still use `metadata.spec_version` (currently 2) and still load. Convert them with `initrunner doctor --fix PATH` — see [Envelope migration](../getting-started/envelope-migration.md).
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: my-agent
-  spec_version: 2   # current version
-  description: ...
+name: my-agent
+spec_version: 3
+description: ...
+prompt: ...
 ```
 
-**Behavior:**
+**Behavior (envelope `metadata.spec_version`):**
 
 | spec_version | Runtime | Doctor |
 |---|---|---|
-| Current (2) | Loads normally | "Valid and up to date" |
+| Current envelope (2) | Loads normally | "Valid and up to date" |
 | Older (1) | Loads normally | Shows informational note |
-| Future (>2) | Rejected with error | Rejected with error |
+| Future (>2 on an envelope) | Rejected with error | Rejected with error |
 
-When you save or generate a role through InitRunner (builder, templates, `initrunner new`), `spec_version` is automatically set to the current version.
+When you save or generate a role through InitRunner (builder, templates, `initrunner new`), `spec_version` is set to `3` on the flat document.
 
 ## Current Deprecation Rules
 
@@ -35,7 +33,7 @@ When you save or generate a role through InitRunner (builder, templates, `initru
 | DEP004 | Flow, Team | `spec.shared_memory.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 | DEP005 | Flow, Team | `spec.shared_documents.store_backend: zvec` | zvec has been removed. Use `lancedb`. |
 
-All current rules are error-severity with automatic migration. Run `initrunner doctor --fix --role <path>` to auto-patch deprecated fields with interactive confirmation. Use `--yes` to skip prompts.
+All current rules are error-severity with automatic migration. Run `initrunner doctor --fix PATH --yes` to rewrite envelopes and auto-patch deprecated fields. Use `--yes` to skip prompts.
 
 ## Checking Your Role
 

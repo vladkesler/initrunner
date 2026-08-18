@@ -62,7 +62,7 @@ slack = ["slack-sdk>=3.27"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3", "slack-sdk>=3.27"]
 dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
 desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
-a2a = ["fasta2a>=0.6.1"]
+a2a = ["a2a-sdk[http-server]>=1.1.2", "uvicorn>=0.42.0"]
 vault = ["cryptography>=48"]
 vault-keyring = ["cryptography>=48", "keyring>=25"]
 recommended = [

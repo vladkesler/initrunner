@@ -6,7 +6,7 @@ InitRunner uses GitHub Actions for continuous integration. Every push to `main` 
 
 ### Lint
 
-Runs on Python 3.13 and checks code quality with three tools in sequence:
+Runs on Python 3.12 and checks code quality with three tools in sequence. The job syncs `--dev --extra dashboard --extra a2a` so type checking sees optional A2A imports.
 
 ```bash
 uv run ruff check .          # linting (pycodestyle, pyflakes, isort, pyupgrade, bugbear, ruff)
@@ -27,7 +27,7 @@ Runs `pytest` across a Python version matrix:
 | 3.13   | `ubuntu-latest` |
 
 ```bash
-uv sync --dev
+uv sync --dev --extra dashboard --extra a2a
 uv run pytest tests/ -v
 ```
 
@@ -38,6 +38,7 @@ All three versions must pass for the job to succeed.
 Run the same checks locally before pushing:
 
 ```bash
+uv sync --dev --extra dashboard --extra a2a
 uv run ruff check .              # lint
 uv run ruff format --check .     # format check (or omit --check to auto-fix)
 uv run ty check initrunner/      # type check

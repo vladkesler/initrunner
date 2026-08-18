@@ -1,6 +1,6 @@
 # Providers & Model Configuration
 
-The default model is `openai`/`gpt-5-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `spec.model` block in your role YAML.
+The default model is `openai`/`gpt-5-mini`. You can switch to any supported provider, a local Ollama instance, or a custom OpenAI-compatible endpoint by changing the `model` field in your role YAML.
 
 Every `api_key_env` below is resolved through env vars first, then the [Credential Vault](../security/vault.md) if one is initialized. Existing workflows keep working unchanged.
 
@@ -9,10 +9,7 @@ Every `api_key_env` below is resolved through env vars first, then the [Credenti
 Change `provider` and `name`, then install the matching extra if needed:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-20250514
+model: anthropic:claude-sonnet-4-20250514
 ```
 
 | Provider | Env Var | Extra to install | Example model |
@@ -34,66 +31,42 @@ Install all provider extras at once with `pip install initrunner[all-models]`.
 
 **OpenAI** (no extra required):
 ```yaml
-spec:
-  model:
-    provider: openai
-    name: gpt-5-mini
+model: openai:gpt-5-mini
 ```
 
 **Anthropic** (`pip install initrunner[anthropic]`):
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
+model: anthropic:claude-sonnet-4-5-20250929
 ```
 
 **Google** (`pip install initrunner[google]`):
 ```yaml
-spec:
-  model:
-    provider: google
-    name: gemini-2.0-flash
+model: google:gemini-2.0-flash
 ```
 
 **Groq** (`pip install initrunner[groq]`):
 ```yaml
-spec:
-  model:
-    provider: groq
-    name: llama-3.3-70b-versatile
+model: groq:llama-3.3-70b-versatile
 ```
 
 **Mistral** (`pip install initrunner[mistral]`):
 ```yaml
-spec:
-  model:
-    provider: mistral
-    name: mistral-large-latest
+model: mistral:mistral-large-latest
 ```
 
 **Cohere** (`pip install initrunner[all-models]`):
 ```yaml
-spec:
-  model:
-    provider: cohere
-    name: command-r-plus
+model: cohere:command-r-plus
 ```
 
 **Bedrock** (`pip install initrunner[all-models]`):
 ```yaml
-spec:
-  model:
-    provider: bedrock
-    name: us.anthropic.claude-sonnet-4-20250514-v1:0
+model: bedrock:us.anthropic.claude-sonnet-4-20250514-v1:0
 ```
 
 **xAI** (`pip install initrunner[all-models]`):
 ```yaml
-spec:
-  model:
-    provider: xai
-    name: grok-3
+model: xai:grok-3
 ```
 
 ## Model Selection
@@ -148,20 +121,16 @@ Moonshot and Z.AI models are also reachable directly (without going through Bedr
 Set `provider: ollama`. No API key is needed — the runner defaults to `http://localhost:11434/v1`:
 
 ```yaml
-spec:
-  model:
-    provider: ollama
-    name: llama3.2
+model: ollama:llama3.2
 ```
 
 Override the URL if Ollama is on a different host or port:
 
 ```yaml
-spec:
-  model:
-    provider: ollama
-    name: llama3.2
-    base_url: http://192.168.1.50:11434/v1
+model:
+  provider: ollama
+  name: llama3.2
+  base_url: http://192.168.1.50:11434/v1
 ```
 
 > **Docker note:** If the runner is inside Docker and Ollama is on the host, use `http://host.docker.internal:11434/v1` as the `base_url`.
@@ -196,12 +165,11 @@ The ephemeral REPL (`initrunner run -i` or the no-subcommand Quick chat) automat
 Any OpenAI-compatible API works in role YAML. Set `provider: openai`, point `base_url` at the endpoint, and tell the runner which env var holds the API key:
 
 ```yaml
-spec:
-  model:
-    provider: openai
-    name: anthropic/claude-sonnet-4
-    base_url: https://openrouter.ai/api/v1
-    api_key_env: OPENROUTER_API_KEY
+model:
+  provider: openai
+  name: anthropic/claude-sonnet-4
+  base_url: https://openrouter.ai/api/v1
+  api_key_env: OPENROUTER_API_KEY
 ```
 
 This also works for vLLM, LiteLLM, Azure OpenAI, or any other service that exposes the OpenAI chat completions format.
@@ -263,9 +231,8 @@ You can define semantic aliases (`fast`, `smart`, `local`) in `~/.initrunner/mod
 initrunner run role.yaml -p "hello" --model fast
 
 # Use alias in role YAML (provider auto-resolved)
-spec:
-  model:
-    name: fast
+model:
+  name: fast
 ```
 
 ## Multi-provider fallback
@@ -273,13 +240,12 @@ spec:
 Set `model.fallback` to a list of `provider:model` strings (or aliases from `~/.initrunner/models.yaml`) to get automatic provider failover. InitRunner wraps the primary and fallbacks in PydanticAI's [`FallbackModel`](https://ai.pydantic.dev/models/#fallback); on any API error from the primary (including 429 and 5xx), the next candidate is tried, in declaration order.
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-    fallback:
-      - openai:gpt-4o-mini
-      - google:gemini-2.5-flash
+model:
+  provider: anthropic
+  name: claude-sonnet-4-5-20250929
+  fallback:
+    - openai:gpt-4o-mini
+    - google:gemini-2.5-flash
 ```
 
 Notes:
@@ -292,12 +258,11 @@ Notes:
 - By default, failover triggers on `ModelAPIError` (any provider API/HTTP failure). Narrow or widen the trigger with `fallback_on`:
 
   ```yaml
-  spec:
-    model:
-      provider: anthropic
-      name: claude-sonnet-4-5-20250929
-      fallback: [openai:gpt-4o-mini]
-      fallback_on: [ModelHTTPError, ContentFilterError]
+  model:
+    provider: anthropic
+    name: claude-sonnet-4-5-20250929
+    fallback: [openai:gpt-4o-mini]
+    fallback_on: [ModelHTTPError, ContentFilterError]
   ```
 
   Valid names are PydanticAI exception types: `ModelAPIError` (the default; base for API/HTTP failures), `ModelHTTPError` (HTTP status errors only), `UnexpectedModelBehavior`, and `ContentFilterError`. `fallback_on` requires a non-empty `fallback` list.
@@ -306,13 +271,12 @@ Notes:
 
 Every model request is retried at the HTTP transport layer on transient errors (status `429`, `500`, `502`, `503`, `504`) using PydanticAI's [`AsyncTenacityTransport`](https://ai.pydantic.dev/retries/). Retries use exponential backoff and honor a `Retry-After` response header when the provider sends one. Permanent errors (`400`, `401`, `403`, `404`, `422`, ...) are **not** retried -- they surface immediately. The transport applies to OpenAI, Anthropic, Google, Groq, Mistral, Cohere, and every custom OpenAI-compatible endpoint (Ollama, vLLM, OpenRouter). Bedrock (boto3) and xAI (gRPC) rely on their own SDKs' native retry handling.
 
-Tune it under `spec.execution`:
+Tune it under `execution`:
 
 ```yaml
-spec:
-  execution:
-    http_retries: 3          # total attempts per request (1-10, default 3)
-    http_retry_max_wait: 60  # cap in seconds for one backoff/Retry-After wait (default 60)
+execution:
+  http_retries: 3          # total attempts per request (1-10, default 3)
+  http_retry_max_wait: 60  # cap in seconds for one backoff/Retry-After wait (default 60)
 ```
 
 Because retries live in the httpx transport (below the agent loop), they apply uniformly to one-shot, REPL, streaming, and daemon runs without restarting the whole agent turn. Daemon trigger runs additionally have their own higher-level [retry policy and circuit breaker](guardrails.md) for retrying an entire run.
@@ -322,12 +286,11 @@ Because retries live in the httpx transport (below the agent loop), they apply u
 Cap how many model requests are in flight at once, optionally sharing one budget across several agents in the same process (compose services, team personas, flow nodes). This is distinct from `execution.max_concurrency`, which bounds an agent's parallel *tool* execution; this bounds *model requests* and is the lever for staying under a provider's rate limit when many agents share an API key.
 
 ```yaml
-spec:
-  model:
-    concurrency:
-      max_running: 4          # max concurrent in-flight requests
-      max_queued: 50          # optional: reject once this many are waiting
-      share: openai-pool      # optional: agents with the same name share one budget
+model:
+  concurrency:
+    max_running: 4          # max concurrent in-flight requests
+    max_queued: 50          # optional: reject once this many are waiting
+    share: openai-pool      # optional: agents with the same name share one budget
 ```
 
 Without `share`, the cap is per-agent. With a `share` name, every agent (in the same process) whose model config uses that name coordinates against a single `ConcurrencyLimiter` -- so a pool of five personas hitting one OpenAI key can be held to, say, four concurrent requests total. The first config registered for a given name sets its limits. Maps to PydanticAI's `ConcurrencyLimitedModel`.
@@ -367,22 +330,20 @@ Anthropic and Bedrock can cache the static prefix of a request (system instructi
 Enable it with the shorthand:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-    prompt_cache: true        # caches instructions + tool definitions, 5m TTL
+model:
+  provider: anthropic
+  name: claude-sonnet-4-5-20250929
+  prompt_cache: true        # caches instructions + tool definitions, 5m TTL
 ```
 
 Or tune it:
 
 ```yaml
-spec:
-  model:
-    prompt_cache:
-      instructions: true       # cache the system prompt (default true)
-      tools: true              # cache the tool definitions block (default true)
-      ttl: 1h                  # "5m" (default) or "1h"
+model:
+  prompt_cache:
+    instructions: true       # cache the system prompt (default true)
+    tools: true              # cache the tool definitions block (default true)
+    ttl: 1h                  # "5m" (default) or "1h"
 ```
 
 This maps to PydanticAI's `anthropic_cache_instructions` / `anthropic_cache_tool_definitions` (and the `bedrock_cache_*` equivalents). It is rejected at load time on any other provider, since only Anthropic and Bedrock honor these settings. The first request writes the cache (a small surcharge); subsequent requests within the TTL read it at a large discount. Cache reads/writes show up in the provider's usage as `cache_read`/`cache_write` tokens.
@@ -391,11 +352,11 @@ To confirm caching is actually paying off, watch the run summary line: when the 
 
 ## Embedding Configuration
 
-When using RAG (`spec.ingest`) or memory (`spec.memory`), InitRunner needs an embedding model to generate vectors. The embedding provider is resolved separately from the agent's LLM provider.
+When using RAG (`ingest`) or memory (`memory`), InitRunner needs an embedding model to generate vectors. The embedding provider is resolved separately from the agent's LLM provider.
 
 ### Default Resolution
 
-The embedding model is determined by the agent's `spec.model.provider` unless overridden:
+The embedding model is determined by the agent's model provider unless overridden:
 
 | Agent Provider | Default Embedding Model | Requires |
 |---------------|------------------------|----------|
@@ -417,15 +378,12 @@ The embedding model is determined by the agent's `spec.model.provider` unless ov
 Set `embeddings.provider` and `embeddings.model` in your `ingest` or `memory` config:
 
 ```yaml
-spec:
-  model:
-    provider: anthropic
-    name: claude-sonnet-4-5-20250929
-  ingest:
-    sources: ["./docs/**/*.md"]
-    embeddings:
-      provider: openai
-      model: text-embedding-3-large
+model: anthropic:claude-sonnet-4-5-20250929
+ingest:
+  sources: ["./docs/**/*.md"]
+  embeddings:
+    provider: openai
+    model: text-embedding-3-large
 ```
 
 ### Local in-process embeddings (fastembed)
@@ -441,12 +399,11 @@ uv pip install "initrunner[local-embeddings]"
 Then set `provider: local` in your `ingest` or `memory` embeddings config:
 
 ```yaml
-spec:
-  ingest:
-    sources: ["./docs/**/*.md"]
-    embeddings:
-      provider: local
-      model: BAAI/bge-small-en-v1.5   # 384 dimensions, default; omit to use it
+ingest:
+  sources: ["./docs/**/*.md"]
+  embeddings:
+    provider: local
+    model: BAAI/bge-small-en-v1.5   # 384 dimensions, default; omit to use it
 ```
 
 The model is downloaded from Hugging Face on first use (a few hundred MB) and cached
@@ -481,20 +438,19 @@ to list every model fastembed supports.
 For self-hosted or third-party embedding services, use `base_url` and `api_key_env`:
 
 ```yaml
-spec:
-  ingest:
-    embeddings:
-      provider: openai
-      model: my-embedding-model
-      base_url: https://my-embedding-service.example.com/v1
-      api_key_env: MY_EMBEDDING_API_KEY
+ingest:
+  embeddings:
+    provider: openai
+    model: my-embedding-model
+    base_url: https://my-embedding-service.example.com/v1
+    api_key_env: MY_EMBEDDING_API_KEY
 ```
 
 ### Embedding Config Reference
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | `str` | `""` | Embedding provider. Empty string derives from `spec.model.provider`. Use `local` for in-process fastembed (no HTTP, no key). |
+| `provider` | `str` | `""` | Embedding provider. Empty string derives from the agent's model provider. Use `local` for in-process fastembed (no HTTP, no key). |
 | `model` | `str` | `""` | Embedding model name. Empty string uses the provider default. |
 | `base_url` | `str` | `""` | Custom endpoint URL. Triggers OpenAI-compatible mode. |
 | `api_key_env` | `str` | `""` | Env var holding the embedding API key. Works for all providers (not just custom endpoints). When empty, the default key for the resolved provider is used automatically. |
@@ -506,52 +462,48 @@ See [Ingestion: Embedding Models](../core/ingestion.md#embedding-models) for the
 A complete role definition showing model, tools, ingestion, triggers, and guardrails:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: support-agent
-  description: Answers questions from the support knowledge base
-  tags:
-    - support
-    - rag
-spec:
-  role: |
-    You are a support agent. Use search_documents to find relevant
-    articles before answering. Always cite your sources.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
-  ingest:
-    sources:
-      - "./knowledge-base/**/*.md"
-      - "./docs/**/*.pdf"
-    chunking:
-      strategy: fixed
-      chunk_size: 512
-      chunk_overlap: 50
-  tools:
-    - type: filesystem
+name: support-agent
+description: Answers questions from the support knowledge base
+tags:
+  - support
+  - rag
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.1
+  max_tokens: 4096
+prompt: |
+  You are a support agent. Use search_documents to find relevant
+  articles before answering. Always cite your sources.
+ingest:
+  sources:
+    - "./knowledge-base/**/*.md"
+    - "./docs/**/*.pdf"
+  chunking:
+    strategy: fixed
+    chunk_size: 512
+    chunk_overlap: 50
+tools:
+  - filesystem:
       root_path: ./src
       read_only: true
-    - type: mcp
+  - mcp:
       transport: stdio
       command: npx
       args: ["-y", "@anthropic/mcp-server-filesystem"]
-  triggers:
-    - type: file_watch
-      paths: ["./knowledge-base"]
-      extensions: [".html", ".md"]
-      prompt_template: "Knowledge base updated: {path}. Re-index."
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate weekly support coverage report."
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
+triggers:
+  - type: file_watch
+    paths: ["./knowledge-base"]
+    extensions: [".html", ".md"]
+    prompt_template: "Knowledge base updated: {path}. Re-index."
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate weekly support coverage report."
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 ```
 
 ## Architecture

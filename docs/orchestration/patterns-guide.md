@@ -10,8 +10,8 @@ This guide covers all five patterns side-by-side: what they do, when to pick eac
 
 | | Solo | Delegate | Spawn | Team | Flow |
 |--|------|----------|-------|------|------|
-| **Kind** | `Agent` | `Agent` | `Agent` | `Team` | `Flow` |
-| **Key config** | `spec.reasoning` | `spec.tools[type:delegate]` | `spec.tools[type:spawn]` | `spec.personas` | `spec.agents` |
+| **Kind** | Agent | Agent | Agent | Team | Flow |
+| **Key config** | `reasoning` | `tools` (`delegate`) | `tools` (`spawn`) | `agents` | `agents` |
 | **Who decides routing** | You + LLM | LLM (runtime) | LLM (runtime) | You (YAML) | You (YAML) |
 | **Execution** | Iterative loop | Blocking tool call | Non-blocking tasks | Sequential or parallel | Graph-based (parallel fan-out) |
 | **Lifetime** | One run | Within parent run | Within parent run | One run | One-shot or daemon |
@@ -57,7 +57,7 @@ One agent with reasoning tools. It plans, executes, reflects, and finishes on it
 
 **Use when** the task is complex but a single agent with the right tools can handle it. Most tasks start here. Add more patterns only when Solo is not enough.
 
-**Kind**: `Agent` | **Key config**: `spec.reasoning`, `spec.autonomy`
+**Kind**: Agent | **Key config**: `reasoning`, `autonomy`
 
 ### How it works
 
@@ -75,38 +75,34 @@ The agent receives a prompt, builds a plan using the `todo` tool, works through 
 ### Example: deployment verification
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: deployment-checker
-  description: Checks endpoints and reports pass/fail results
-spec:
-  role: |
-    You are a deployment verification agent. When given URLs to check:
-    1. Create a todo list with one item per URL
-    2. curl each endpoint and record the status code
-    3. If a check fails, add a retry item with high priority
-    4. Call finish_task with the overall status
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-    temperature: 0.0
-  tools:
-    - type: think
-    - type: todo
+name: deployment-checker
+description: Checks endpoints and reports pass/fail results
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.0
+prompt: |
+  You are a deployment verification agent. When given URLs to check:
+  1. Create a todo list with one item per URL
+  2. curl each endpoint and record the status code
+  3. If a check fails, add a retry item with high priority
+  4. Call finish_task with the overall status
+tools:
+  - think
+  - todo:
       max_items: 15
-    - type: shell
+  - shell:
       allowed_commands: [curl]
       timeout_seconds: 30
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy:
-    max_history_messages: 20
-  guardrails:
-    max_iterations: 8
-    autonomous_token_budget: 30000
-    max_tool_calls: 20
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy:
+  max_history_messages: 20
+guardrails:
+  max_iterations: 8
+  autonomous_token_budget: 30000
+  max_tool_calls: 20
 ```
 
 ```bash
@@ -130,7 +126,7 @@ A parent agent calls sub-agents as blocking tool calls. The parent sends a promp
 
 **Use when** the parent needs to consult specialists one at a time and the LLM decides who to call at runtime. Good for conditional routing ("if the user asks about SQL, delegate to the SQL expert").
 
-**Kind**: `Agent` | **Key config**: `spec.tools[type:delegate]`
+**Kind**: Agent | **Key config**: `tools` (`delegate`)
 
 ### How it works
 
@@ -154,26 +150,22 @@ Each delegation is a blocking tool call. The sub-agent runs with a fresh context
 ### Example: research coordinator
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: research-coordinator
-  description: Delegates research and writing to specialist agents
-spec:
-  role: |
-    You are a research coordinator. Your workflow:
-    1. Break the request into research questions
-    2. Delegate each question to the researcher agent
-    3. Collect findings, then delegate to the writer for a polished report
-    4. Review and return the final output
+name: research-coordinator
+description: Delegates research and writing to specialist agents
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.2
+prompt: |
+  You are a research coordinator. Your workflow:
+  1. Break the request into research questions
+  2. Delegate each question to the researcher agent
+  3. Collect findings, then delegate to the writer for a polished report
+  4. Review and return the final output
 
-    Always delegate. Do not research or write long-form content yourself.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.2
-  tools:
-    - type: delegate
+  Always delegate. Do not research or write long-form content yourself.
+tools:
+  - delegate:
       mode: inline
       max_depth: 2
       timeout_seconds: 120
@@ -187,10 +179,10 @@ spec:
         - name: writer
           role_file: ./agents/writer.yaml
           description: Turns research notes into polished, structured writing
-  guardrails:
-    max_tokens_per_run: 100000
-    max_tool_calls: 30
-    timeout_seconds: 600
+guardrails:
+  max_tokens_per_run: 100000
+  max_tool_calls: 30
+  timeout_seconds: 600
 ```
 
 ```bash
@@ -214,7 +206,7 @@ A parent agent spawns sub-agents as non-blocking background tasks. The parent fi
 
 **Use when** you need the LLM to decide what to parallelize at runtime. The classic use case is research: "investigate these 3 topics concurrently, then synthesize."
 
-**Kind**: `Agent` | **Key config**: `spec.tools[type:spawn]`
+**Kind**: Agent | **Key config**: `tools` (`spawn`)
 
 ### How it works
 
@@ -234,37 +226,33 @@ The parent calls `spawn_agent()` which returns a task ID immediately. Multiple a
 ### Example: research team
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: research-team
-  description: Spawns parallel researchers and synthesizes findings
-spec:
-  role: |
-    You are a research team lead. Your workflow:
+name: research-team
+description: Spawns parallel researchers and synthesizes findings
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.3
+prompt: |
+  You are a research team lead. Your workflow:
 
-    ## Planning
-    1. Break the topic into distinct research questions (batch_add_todos)
-    2. Identify which questions can run in parallel
+  ## Planning
+  1. Break the topic into distinct research questions (batch_add_todos)
+  2. Identify which questions can run in parallel
 
-    ## Research
-    3. Spawn web-searcher agents for parallel questions
-    4. Use await_tasks to collect results
-    5. Spawn a summarizer for cross-cutting synthesis
+  ## Research
+  3. Spawn web-searcher agents for parallel questions
+  4. Use await_tasks to collect results
+  5. Spawn a summarizer for cross-cutting synthesis
 
-    ## Synthesis
-    6. Combine findings into a structured report
-    7. Use think to reason about gaps and confidence levels
-  model:
-    provider: openai
-    name: gpt-5.4-mini-2026-03-17
-    temperature: 0.3
-  tools:
-    - type: think
+  ## Synthesis
+  6. Combine findings into a structured report
+  7. Use think to reason about gaps and confidence levels
+tools:
+  - think:
       critique: true
-    - type: todo
+  - todo:
       max_items: 15
-    - type: spawn
+  - spawn:
       max_concurrent: 3
       timeout_seconds: 120
       agents:
@@ -274,15 +262,15 @@ spec:
         - name: summarizer
           role_file: ./agents/summarizer.yaml
           description: Synthesizes research findings into structured summaries
-  reasoning:
-    pattern: todo_driven
-    auto_plan: true
-  autonomy:
-    max_history_messages: 40
-  guardrails:
-    max_iterations: 12
-    autonomous_token_budget: 100000
-    max_tool_calls: 40
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+autonomy:
+  max_history_messages: 40
+guardrails:
+  max_iterations: 12
+  autonomous_token_budget: 100000
+  max_tool_calls: 40
 ```
 
 ```bash
@@ -306,7 +294,7 @@ Multiple personas process the same task in a single YAML file. In sequential mod
 
 **Use when** you want structured multi-perspective analysis with a fixed set of roles. The roles are defined at design time in YAML, not chosen by the LLM at runtime.
 
-**Kind**: `Team` | **Key config**: `spec.personas`
+**Kind**: Team | **Key config**: `agents`
 
 ### How it works
 
@@ -323,56 +311,53 @@ In sequential mode (the default), the task flows through personas in order. Each
 ### Example: Kubernetes troubleshooting
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Team
-metadata:
-  name: kube-advisor-team
-  description: Multi-persona Kubernetes troubleshooting pipeline
-spec:
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-  shared_memory:
-    enabled: true
-    max_memories: 500
-  personas:
-    triage: |
-      You are a Kubernetes triage agent. Gather initial cluster state
-      and identify the problem layer.
-      1. Run cluster_health for a cluster-wide overview
-      2. Scope to the affected namespace with recent_events
-      3. Categorize: pod, network, node, storage, config, or rollout
-      Output a structured triage summary with affected resources,
-      symptoms, events, and initial hypothesis.
-    diagnostician: |
-      You are a Kubernetes diagnostician. You receive a triage summary
-      and perform deep investigation to find the root cause.
-      1. Run the appropriate diagnostic script for the affected layer
-      2. Use think to reason through the evidence chain
-      Output: root cause, evidence, confidence level.
-      Do not propose fixes -- that is the advisor's job.
-    advisor: |
-      You are a remediation advisor. You receive a diagnosis and
-      provide actionable fix instructions.
-      - Include exact kubectl commands for each step
-      - Rank fixes by risk (safest first)
-      - Include rollback plans for destructive operations
-      - Add verification commands after each step
-  tools:
-    - type: shell
+name: kube-advisor-team
+description: Multi-persona Kubernetes troubleshooting pipeline
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.1
+shared_memory:
+  enabled: true
+  max_memories: 500
+agents:
+  triage: |
+    You are a Kubernetes triage agent. Gather initial cluster state
+    and identify the problem layer.
+    1. Run cluster_health for a cluster-wide overview
+    2. Scope to the affected namespace with recent_events
+    3. Categorize: pod, network, node, storage, config, or rollout
+    Output a structured triage summary with affected resources,
+    symptoms, events, and initial hypothesis.
+  diagnostician: |
+    You are a Kubernetes diagnostician. You receive a triage summary
+    and perform deep investigation to find the root cause.
+    1. Run the appropriate diagnostic script for the affected layer
+    2. Use think to reason through the evidence chain
+    Output: root cause, evidence, confidence level.
+    Do not propose fixes -- that is the advisor's job.
+  advisor: |
+    You are a remediation advisor. You receive a diagnosis and
+    provide actionable fix instructions.
+    - Include exact kubectl commands for each step
+    - Rank fixes by risk (safest first)
+    - Include rollback plans for destructive operations
+    - Add verification commands after each step
+tools:
+  - shell:
       allowed_commands: [kubectl, helm]
       timeout_seconds: 30
-    - type: think
-    - type: filesystem
+  - think
+  - filesystem:
       root_path: ./references
       read_only: true
-  handoff_max_chars: 8000
-  guardrails:
-    max_tokens_per_run: 40000
-    max_tool_calls: 25
-    team_token_budget: 120000
-    team_timeout_seconds: 600
+handoff_max_chars: 8000
+guardrails:
+  max_tokens_per_run: 40000
+  max_tool_calls: 25
+  team_token_budget: 120000
+  team_timeout_seconds: 600
+run: sequential
 ```
 
 ```bash
@@ -384,7 +369,7 @@ initrunner run team.yaml --task "Pods are pending in staging"
 - Sequential mode: each persona sees all prior output. With many personas or long outputs, the last persona's context grows large. Use `handoff_max_chars` to cap it.
 - Everything is in one file. No separate role files needed. Good for tight collaboration where personas share tools and memory.
 - `team_token_budget` caps total tokens across all personas. `max_tokens_per_run` caps each individual persona.
-- Parallel mode (`strategy: parallel`) is useful when personas do not need to see each other's work (e.g., independent code reviews).
+- Parallel mode (`run: parallel`) is useful when personas do not need to see each other's work (e.g., independent code reviews).
 
 **Deep dive**: [Team mode](team_mode.md)
 
@@ -396,7 +381,7 @@ Long-running daemon with independent agents, triggers, and message routing. Each
 
 **Use when** you need event-driven agents that run continuously and route work between each other. Flow is for always-on pipelines: monitoring bots, support desks, CI/CD watchers.
 
-**Kind**: `Flow` | **Key config**: `spec.agents`
+**Kind**: Flow | **Key config**: `agents`
 
 ### How it works
 
@@ -416,40 +401,31 @@ The flow topology is compiled into a pydantic-graph execution graph. Each agent 
 ### Example: support desk
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: support-desk
-  description: >
-    Support desk with intelligent auto-routing. Intake summarizes
-    incoming requests, sense routing sends each to the right handler.
-spec:
-  agents:
-    intake:
-      role: roles/intake.yaml
-      sink:
-        type: delegate
-        strategy: sense          # keyword scoring + LLM tiebreak
-        target:
-          - researcher
-          - responder
-          - escalator
-
-    researcher:
-      role: roles/researcher.yaml
-      needs: [intake]
-
-    responder:
-      role: roles/responder.yaml
-      needs: [intake]
-      restart:
-        condition: on-failure
-        max_retries: 3
-        delay_seconds: 5
-
-    escalator:
-      role: roles/escalator.yaml
-      needs: [intake]
+name: support-desk
+description: >
+  Support desk with intelligent auto-routing. Intake summarizes
+  incoming requests, sense routing sends each to the right handler.
+agents:
+  intake:
+    use: roles/intake.yaml
+    then:
+      to:
+        - researcher
+        - responder
+        - escalator
+      strategy: sense          # keyword scoring + LLM tiebreak
+  researcher:
+    use: roles/researcher.yaml
+    after:
+      - intake
+  responder:
+    use: roles/responder.yaml
+    after:
+      - intake
+  escalator:
+    use: roles/escalator.yaml
+    after:
+      - intake
 ```
 
 ```bash
@@ -459,9 +435,8 @@ initrunner flow up support-desk/flow.yaml
 ### Key considerations
 
 - Flow agents stay alive between triggers. Good for steady workloads, overkill for rare events (use a webhook-triggered Solo agent instead).
-- `needs` controls startup order. Delegate sink targets do not need to be listed in `needs` -- the orchestrator handles that.
-- `restart` policies (`on-failure`, `always`) keep agents resilient. Set `max_retries` to avoid infinite restart loops.
-- `strategy: sense` calls the LLM to pick the best target. Use `keyword` for zero API calls, `all` to fan out everywhere.
+- `after` controls startup order. Delegate targets do not need to be listed in `after` -- the orchestrator handles that.
+- `then.strategy: sense` calls the LLM to pick the best target. Use `keyword` for zero API calls, omit `strategy` to fan out everywhere.
 - Flow can run as a systemd service for production. See [Flow orchestration](flow.md) for `flow install`.
 
 **Deep dive**: [Flow orchestration](flow.md) | [Sinks and routing](sinks.md)
@@ -488,14 +463,14 @@ Your Solo agent needs to research 3 topics in parallel. Add a `spawn` tool to it
 
 ```yaml
 tools:
-  - type: think
-  - type: todo
-  - type: spawn           # add this
-    max_concurrent: 3
-    agents:
-      - name: researcher
-        role_file: ./agents/researcher.yaml
-        description: Web research specialist
+  - think
+  - todo
+  - spawn:                # add this
+      max_concurrent: 3
+      agents:
+        - name: researcher
+          role_file: ./agents/researcher.yaml
+          description: Web research specialist
 ```
 
 Everything else stays the same. The agent now has `spawn_agent()` and `await_tasks()` available.
@@ -506,14 +481,14 @@ Your Solo agent needs specialized SQL expertise. Add a `delegate` tool:
 
 ```yaml
 tools:
-  - type: think
-  - type: delegate         # add this
-    mode: inline
-    max_depth: 2
-    agents:
-      - name: sql-expert
-        role_file: ./agents/sql-expert.yaml
-        description: Writes and optimizes SQL queries
+  - think
+  - delegate:              # add this
+      mode: inline
+      max_depth: 2
+      agents:
+        - name: sql-expert
+          role_file: ./agents/sql-expert.yaml
+          description: Writes and optimizes SQL queries
 ```
 
 ### Spawn/Delegate to Team
@@ -521,18 +496,19 @@ tools:
 Your research agent with spawn tools now needs a fixed editorial review step after synthesis. Create a Team YAML that wraps the researcher as one persona and adds an editor:
 
 ```yaml
-kind: Team
-spec:
-  personas:
-    researcher: |
-      You are a research lead. Use spawn tools to gather information.
-    editor: |
-      You review the research output for accuracy and clarity.
-  tools:
-    - type: spawn
+name: research-review
+model: openai:gpt-5-mini
+agents:
+  researcher: |
+    You are a research lead. Use spawn tools to gather information.
+  editor: |
+    You review the research output for accuracy and clarity.
+tools:
+  - spawn:
       agents:
         - name: web-searcher
           role_file: ./agents/web-searcher.yaml
+run: sequential
 ```
 
 ### Team to Flow
@@ -540,20 +516,16 @@ spec:
 Your Team pipeline needs to run on a schedule and respond to webhooks. Move each persona to its own role file and wire them in a Flow definition:
 
 ```yaml
-kind: Flow
-spec:
-  agents:
-    researcher:
-      role: roles/researcher.yaml
-      trigger:
-        type: cron
-        schedule: "0 9 * * *"    # daily at 9am
-      sink:
-        type: delegate
-        target: editor
-    editor:
-      role: roles/editor.yaml
-      needs: [researcher]
+name: scheduled-research
+agents:
+  researcher:
+    use: roles/researcher.yaml   # cron/webhook triggers live on the role file
+    then:
+      to: editor
+  editor:
+    use: roles/editor.yaml
+    after:
+      - researcher
 ```
 
 ## Pattern combinations
@@ -638,11 +610,11 @@ Mental models for token usage and latency across patterns. No benchmarks (they g
 
 | I want to... | Pattern | Kind | Key config |
 |--------------|---------|------|------------|
-| Run one agent with planning | Solo | `Agent` | `spec.reasoning` + `spec.autonomy` |
-| Consult specialists one at a time | Delegate | `Agent` | `spec.tools[type:delegate]` |
-| Run specialists in parallel | Spawn | `Agent` | `spec.tools[type:spawn]` |
-| Fixed multi-role review pipeline | Team | `Team` | `spec.personas` |
-| Event-driven daemon with routing | Flow | `Flow` | `spec.agents` |
+| Run one agent with planning | Solo | Agent | `reasoning` + `autonomy` |
+| Consult specialists one at a time | Delegate | Agent | `tools` (`delegate`) |
+| Run specialists in parallel | Spawn | Agent | `tools` (`spawn`) |
+| Fixed multi-role review pipeline | Team | Team | `agents` |
+| Event-driven daemon with routing | Flow | Flow | `agents` |
 
 ## Further reading
 

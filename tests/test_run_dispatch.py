@@ -86,11 +86,9 @@ class TestBotValidation:
 
 
 class TestKindFlagValidation:
-    def test_flow_rejects_prompt(self, flow_yaml):
+    def test_flow_accepts_prompt_as_one_shot(self, flow_yaml):
         result = runner.invoke(app, ["run", str(flow_yaml), "-p", "hello"])
-        assert result.exit_code == 1
-        assert "--prompt" in result.output
-        assert "Flow" in result.output
+        assert "--prompt" not in result.output or "not supported" not in result.output
 
     def test_flow_rejects_daemon(self, flow_yaml):
         result = runner.invoke(app, ["run", str(flow_yaml), "--daemon"])

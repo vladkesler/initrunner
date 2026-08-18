@@ -35,26 +35,18 @@ A `.env` file next to your `role.yaml` also works. Running `initrunner setup` wr
 Create a `role.yaml`:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: telegram-assistant
-  description: A Telegram bot that responds to messages via long-polling
-spec:
-  role: |
-    You are a helpful assistant responding to Telegram messages.
-    Keep responses concise and well-formatted for mobile reading.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 4096
-  triggers:
-    - type: telegram
-      token_env: TELEGRAM_BOT_TOKEN
-  guardrails:
-    max_tokens_per_run: 50000
-    daemon_daily_token_budget: 200000
+name: telegram-assistant
+description: A Telegram bot that responds to messages via long-polling
+model: openai:gpt-5-mini
+prompt: |
+  You are a helpful assistant responding to Telegram messages.
+  Keep responses concise and well-formatted for mobile reading.
+triggers:
+  - type: telegram
+    token_env: TELEGRAM_BOT_TOKEN
+guardrails:
+  max_tokens_per_run: 50000
+  daemon_daily_token_budget: 200000
 ```
 
 Start the daemon:

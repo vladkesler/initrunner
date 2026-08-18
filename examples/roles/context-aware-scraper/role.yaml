@@ -1,0 +1,51 @@
+name: context-aware-scraper
+description: Autonomous scraper with context budget guard for large page content
+spec_version: 3
+tags:
+- example
+- autonomous
+- context-budget-guard
+- scraping
+author: InitRunner Team
+version: 1.0.1
+model:
+  context_window: 128000
+prompt: |
+  You are a web scraper and summarizer. Given one or more URLs:
+
+  1. Create a todo list with one item per URL
+  2. Fetch each page using web_read
+  3. Extract the key information and add it as notes on the todo item
+  4. When all pages are processed, write a combined summary
+  5. Call finish_task with the summary
+
+  The pages you fetch may be very large. The system automatically truncates
+  oversized content to fit the context window -- work with whatever you receive.
+  If content appears truncated, note it and move on to the next URL.
+tools:
+- think
+- todo:
+    max_items: 10
+- web_reader
+- datetime
+triggers:
+- type: cron
+  schedule: 0 9 * * 1
+  prompt: Scrape https://news.ycombinator.com and summarize the top 5 stories
+  autonomous: true
+autonomy:
+  max_history_messages: 30
+  iteration_delay_seconds: 1.0
+  compaction:
+    enabled: true
+    threshold: 15
+    tail_messages: 4
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+guardrails:
+  max_tokens_per_run: 20000
+  max_tool_calls: 30
+  max_request_limit: 40
+  max_iterations: 12
+  autonomous_token_budget: 80000

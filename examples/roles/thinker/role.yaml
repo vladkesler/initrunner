@@ -1,0 +1,28 @@
+name: thinker
+description: An agent that reasons step-by-step with self-critique before acting
+spec_version: 3
+tags:
+- example
+- think
+- reasoning
+author: InitRunner Team
+version: 2.0.2
+bundle:
+  include:
+  - README.md
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.3
+  max_tokens: 2048
+prompt: |
+  You are a careful, methodical assistant. Before answering any question or taking any action, always use the think tool to reason step-by-step. Break down complex problems, consider edge cases, and plan your approach before responding. Use the datetime tool when time-related information is needed.
+tools:
+- think:
+    critique: true
+    max_thoughts: 20
+- datetime
+guardrails:
+  max_tokens_per_run: 10000
+  timeout_seconds: 60
+  max_request_limit: 30

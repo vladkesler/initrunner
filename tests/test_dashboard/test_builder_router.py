@@ -140,8 +140,9 @@ def test_seed_template(builder_client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "apiVersion" in data["yaml_text"]
-    assert "initrunner/v1" in data["yaml_text"]
+    assert "apiVersion" not in data["yaml_text"]
+    assert data["yaml_text"].startswith("name: test-agent")
+    assert "model: openai:" in data["yaml_text"]
     assert isinstance(data["issues"], list)
     assert isinstance(data["ready"], bool)
 
@@ -153,8 +154,8 @@ def test_seed_blank(builder_client):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert "apiVersion: initrunner/v1" in data["yaml_text"]
-    assert "provider: anthropic" in data["yaml_text"]
+    assert "apiVersion" not in data["yaml_text"]
+    assert "model: anthropic:" in data["yaml_text"]
     # Blank seed should be shorter than a full template
     assert len(data["yaml_text"]) < 500
 
@@ -370,6 +371,25 @@ spec:
     assert "saved-agent" in saved.read_text()
 
 
+def test_save_flat_helpdesk_copies_bundled_samples(role_dir):
+    from initrunner.dashboard.routers.builder import _copy_starter_samples_for_document
+    from initrunner.services.starters import STARTERS_DIR
+
+    role_dir.mkdir(parents=True, exist_ok=True)
+    output_path = role_dir / "helpdesk.yaml"
+    output_path.write_text(
+        (STARTERS_DIR / "helpdesk" / "role.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    generated_assets = _copy_starter_samples_for_document(output_path)
+
+    generated = {Path(path).name for path in generated_assets}
+    assert generated == {"faq.md", "getting-started.md"}
+    assert (role_dir / "knowledge-base" / "faq.md").is_file()
+    assert (role_dir / "knowledge-base" / "getting-started.md").is_file()
+
+
 def test_save_conflict(builder_client, role_dir):
     """Saving to an existing file without force returns 409."""
     existing = role_dir / "existing.yaml"
@@ -500,7 +520,7 @@ def test_seed_ollama_default_url(builder_client):
     )
     assert resp.status_code == 200
     yaml_text = resp.json()["yaml_text"]
-    assert "provider: ollama" in yaml_text
+    assert "model: ollama:" in yaml_text
     assert "base_url" not in yaml_text
 
 

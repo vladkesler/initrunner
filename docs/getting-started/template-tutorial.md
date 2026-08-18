@@ -66,20 +66,16 @@ initrunner run examples/roles/changelog-slack.yaml -p "Last 20 commits"
 <summary>Full YAML: changelog-slack.yaml</summary>
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: changelog-slack
-  description: Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel
-  tags:
-    - example
-    - shareable
-    - git
-    - developer-tools
-  author: initrunner
-  version: "1.0.0"
-spec:
-  role: |
+name: changelog-slack
+description: Generates a changelog formatted in Slack mrkdwn, ready to paste into a channel
+tags:
+  - example
+  - shareable
+  - git
+  - developer-tools
+author: initrunner
+version: "1.0.0"
+prompt: |
     You are a release-notes writer. Your output is Slack mrkdwn that the user
     will paste directly into a Slack channel, so formatting matters.
 
@@ -132,22 +128,22 @@ spec:
     - No Markdown headings (#), no triple backticks — these don't render in Slack
 
     Do NOT pad output with disclaimers or preamble — the mrkdwn IS the deliverable.
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
-    - type: git
+tools:
+  - git:
       repo_path: .
       read_only: true
-    - type: shell
+  - shell:
       allowed_commands:
         - git
       require_confirmation: false
       timeout_seconds: 30
-    - type: datetime
-  guardrails:
+  - datetime
+guardrails:
     max_tokens_per_run: 30000
     max_tool_calls: 15
     timeout_seconds: 120
@@ -241,20 +237,16 @@ git checkout main && git branch -D demo-review
 <summary>Full YAML: pr-reviewer.yaml</summary>
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: pr-reviewer
-  description: Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment
-  tags:
-    - example
-    - shareable
-    - engineering
-    - review
-  author: initrunner
-  version: "1.0.0"
-spec:
-  role: |
+name: pr-reviewer
+description: Reviews PR changes and produces GitHub-flavored Markdown ready to paste into a PR comment
+tags:
+  - example
+  - shareable
+  - engineering
+  - review
+author: initrunner
+version: "1.0.0"
+prompt: |
     You are a senior engineer performing a pull-request review. Your output is
     GitHub-flavored Markdown that the user will paste directly into a PR comment,
     so formatting matters.
@@ -303,19 +295,19 @@ spec:
     - Suggest concrete fixes — include code snippets in fenced blocks.
     - Be constructive; explain the "why" behind each finding.
     - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
-    - type: git
+tools:
+  - git:
       repo_path: .
       read_only: true
-    - type: filesystem
+  - filesystem:
       root_path: .
       read_only: true
-  guardrails:
+guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 30
     timeout_seconds: 300
@@ -403,20 +395,16 @@ rm /tmp/build.log
 <summary>Full YAML: ci-explainer.yaml</summary>
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: ci-explainer
-  description: Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue
-  tags:
-    - example
-    - shareable
-    - devops
-    - ci
-  author: initrunner
-  version: "1.0.0"
-spec:
-  role: |
+name: ci-explainer
+description: Reads a CI/CD log file and produces a GitHub-flavored Markdown failure explanation ready to paste into a PR comment or issue
+tags:
+  - example
+  - shareable
+  - devops
+  - ci
+author: initrunner
+version: "1.0.0"
+prompt: |
     You are a CI/CD failure analyst. Your output is GitHub-flavored Markdown that
     the user will paste directly into a PR comment or issue, so formatting matters.
 
@@ -461,13 +449,13 @@ spec:
     - The footer line fields (Stage, File, Since) are optional — include only what
       you can determine from the logs and git history.
     - Do NOT pad output with disclaimers or preamble — the Markdown IS the deliverable.
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.0
     max_tokens: 4096
-  tools:
-    - type: filesystem
+tools:
+  - filesystem:
       root_path: /
       read_only: true
       allowed_extensions:
@@ -485,10 +473,10 @@ spec:
         - .java
         - .rb
         - .sh
-    - type: git
+  - git:
       repo_path: .
       read_only: true
-  guardrails:
+guardrails:
     max_tokens_per_run: 40000
     max_tool_calls: 20
     timeout_seconds: 180
@@ -527,7 +515,7 @@ guardrails:
   timeout_seconds: 600    # increase for slow models or big repos
 ```
 
-**Edit the system prompt** — `spec.role` is free-text. Quick tweaks:
+**Edit the system prompt** — `prompt` is free-text. Quick tweaks:
 
 - Focus on security: add "Focus exclusively on security vulnerabilities. Ignore style and formatting issues."
 - Match your stack: add "This is a Django project using PostgreSQL. Flag Django-specific anti-patterns."
