@@ -980,7 +980,8 @@ def diagnose_model_name(role: object) -> ModelNameDiagnosis | None:
     """
     spec = role.spec  # type: ignore[attr-defined]
     model = spec.model
-    if not model.is_resolved():
+    # Flat agents may omit `model:` entirely (auto-detect at runtime).
+    if model is None or not model.is_resolved():
         return None
 
     label = model.to_model_string()

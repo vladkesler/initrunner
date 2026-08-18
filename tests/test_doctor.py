@@ -1654,6 +1654,27 @@ class TestDoctorFlagInteractions:
         assert data["agents"]["writer"]["then"]["to"] == "editor"
         assert data["agents"]["editor"]["after"] == ["writer"]
 
+    def test_fix_model_less_envelope_does_not_crash(self, tmp_path, monkeypatch) -> None:
+        """Rewrite then health-check an envelope with no spec.model."""
+        _clear_provider_keys(monkeypatch)
+        path = tmp_path / "old.yaml"
+        path.write_text(
+            "apiVersion: initrunner/v1\n"
+            "kind: Agent\n"
+            "metadata:\n"
+            "  name: backup-me\n"
+            "spec:\n"
+            "  role: hi\n"
+        )
+        with _PATCH_DOTENV, _PATCH_OLLAMA:
+            result = runner.invoke(app, ["doctor", "--fix", str(path), "--yes", "--no-backup"])
+        assert result.exit_code == 0, result.output
+        assert "is_resolved" not in result.output
+        data = yaml.safe_load(path.read_text())
+        assert data["name"] == "backup-me"
+        assert "apiVersion" not in data
+        assert "model" not in data
+
 
 class TestDiagnoseModelName:
     def _role(self, provider: str, name: str, **model_kw):
@@ -1698,6 +1719,22 @@ class TestDiagnoseModelName:
         diag = diagnose_model_name(self._role("some-proxy", "whatever"))
         assert diag is not None
         assert not diag.checked and diag.recognized
+
+    def test_missing_model_is_skipped(self):
+        from initrunner.agent.schema.role import RoleDefinition
+        from initrunner.services.doctor import diagnose_model_name, diagnose_role_deep
+
+        role = RoleDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Agent",
+                "metadata": {"name": "test-role", "spec_version": 2},
+                "spec": {"role": "x"},
+            }
+        )
+        assert role.spec.model is None
+        assert diagnose_model_name(role) is None
+        diagnose_role_deep(role, None)
 
     def test_check_rendering(self):
         from initrunner.services.doctor import diagnose_role_deep, role_diagnostics_to_checks
