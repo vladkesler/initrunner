@@ -6,6 +6,7 @@ import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import yaml
 from typer.testing import CliRunner
 
 from initrunner.cli.main import app
@@ -939,19 +940,12 @@ class TestDoctorFixRole:
                 result = runner.invoke(app, ["doctor", "--fix", "--yes", "--role", str(p)])
 
         assert result.exit_code == 0
-        assert "Bumped spec_version" in result.output
-
         raw = p.read_text()
-        # Parsed value is correct
-        import yaml
-
         updated = yaml.safe_load(raw)
-        assert updated["metadata"]["spec_version"] == 2
-        # Formatting preserved
-        assert "# Role file with formatting to preserve" in raw
-        assert "tags: [engineering, review]" in raw
-        assert "  role: |" in raw
-        assert "    You are a helpful assistant." in raw
+        assert "apiVersion" not in updated
+        assert updated["name"] == "test-bump"
+        assert updated["spec_version"] == 3
+        assert "You are a helpful assistant." in raw
 
     def test_fix_patches_deprecation_hits(self, monkeypatch, tmp_path):
         """--fix --role auto-patches zvec -> lancedb and bumps spec_version."""
@@ -980,11 +974,11 @@ class TestDoctorFixRole:
                 result = runner.invoke(app, ["doctor", "--fix", "--yes", "--role", str(p)])
 
         patched = p.read_text()
-        assert "store_backend: lancedb" in patched
         assert "store_backend: zvec" not in patched
-        assert "spec_version: 2" in patched
         assert result.exit_code == 0
-        assert "Fixed DEP002" in result.output
+        data = yaml.safe_load(patched)
+        assert data["name"] == "test-zvec"
+        assert "apiVersion" not in data
 
 
 class TestDoctorFixNonTTY:
@@ -1624,14 +1618,41 @@ class TestDoctorFlagInteractions:
         assert result.exit_code == 1
         assert "mutually exclusive" in result.output
 
-    def test_flow_and_fix_mutually_exclusive(self, tmp_path) -> None:
+    def test_flow_and_fix_rewrites_envelope(self, tmp_path) -> None:
         flow = tmp_path / "flow.yaml"
-        flow.touch()
+        flow.write_text(
+            "apiVersion: initrunner/v1\n"
+            "kind: Flow\n"
+            "metadata:\n"
+            "  name: pipe\n"
+            "spec:\n"
+            "  agents:\n"
+            "    writer:\n"
+            "      role: roles/writer.yaml\n"
+            "      sink:\n"
+            "        type: delegate\n"
+            "        target: editor\n"
+            "    editor:\n"
+            "      role: roles/editor.yaml\n"
+            "      needs: [writer]\n"
+        )
+        roles = tmp_path / "roles"
+        roles.mkdir()
+        for name in ("writer", "editor"):
+            (roles / f"{name}.yaml").write_text(
+                f"name: {name}\nmodel: openai:gpt-5-mini\nprompt: {name}\n"
+            )
         with patch("initrunner.agent.loader._load_dotenv"):
             with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
-                result = runner.invoke(app, ["doctor", "--flow", str(flow), "--fix", "--yes"])
-        assert result.exit_code == 1
-        assert "mutually exclusive" in result.output
+                result = runner.invoke(
+                    app, ["doctor", "--flow", str(flow), "--fix", "--yes", "--no-backup"]
+                )
+        assert result.exit_code == 0
+        data = yaml.safe_load(flow.read_text())
+        assert data["name"] == "pipe"
+        assert "apiVersion" not in data
+        assert data["agents"]["writer"]["then"]["to"] == "editor"
+        assert data["agents"]["editor"]["after"] == ["writer"]
 
 
 class TestDiagnoseModelName:

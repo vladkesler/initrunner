@@ -28,6 +28,11 @@ def validate(
     from initrunner.services.yaml_validation import validate_yaml_file
 
     role_file = resolve_role_path(role_file)
+    from initrunner.services.migrate import envelope_warning_for
+
+    warning = envelope_warning_for(role_file)
+    if warning:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
     kind = detect_yaml_kind(role_file)
     if kind == "Pipeline":
         console.print(
@@ -67,8 +72,6 @@ def validate(
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("API Version", role.apiVersion.value)
-    table.add_row("Kind", role.kind.value)
     table.add_row("Name", role.metadata.name)
     table.add_row("Description", role.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(role.metadata.tags) if role.metadata.tags else "(none)")
@@ -372,15 +375,12 @@ def _validate_team(team_file: Path) -> None:
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("API Version", team.apiVersion.value)
-    table.add_row("Kind", team.kind)
     table.add_row("Name", team.metadata.name)
     table.add_row("Description", team.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(team.metadata.tags) if team.metadata.tags else "(none)")
     table.add_row("Model", team.spec.model.to_model_string())
-    table.add_row("Personas", str(len(team.spec.personas)))
-    # Build persona display with inline overrides
-    persona_parts = []
+    table.add_row("Agents", str(len(team.spec.personas)))
+    agent_parts = []
     for pname, pcfg in team.spec.personas.items():
         extras = []
         if pcfg.model:
@@ -390,10 +390,10 @@ def _validate_team(team_file: Path) -> None:
         if pcfg.environment:
             extras.append(f"{len(pcfg.environment)} env vars")
         if extras:
-            persona_parts.append(f"{pname} [{', '.join(extras)}]")
+            agent_parts.append(f"{pname} [{', '.join(extras)}]")
         else:
-            persona_parts.append(pname)
-    table.add_row("Persona Names", ", ".join(persona_parts))
+            agent_parts.append(pname)
+    table.add_row("Agent names", ", ".join(agent_parts))
     table.add_row("Strategy", team.spec.strategy)
 
     if team.spec.tools:

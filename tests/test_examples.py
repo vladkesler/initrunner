@@ -5,9 +5,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from initrunner.flow.schema import FlowDefinition
-from initrunner.team.schema import TeamDefinition
-
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 
 _ALL_YAMLS = sorted(EXAMPLES_DIR.rglob("*.yaml"))
@@ -83,18 +80,18 @@ def test_role_skills_resolve(path: Path) -> None:
 
 @pytest.mark.parametrize("path", _FLOW_YAMLS, ids=[_rel(p) for p in _FLOW_YAMLS])
 def test_flow_yaml_validates(path: Path) -> None:
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    flow = FlowDefinition.model_validate(data)
+    from initrunner.flow.loader import load_flow
+
+    flow = load_flow(path)
     assert flow.metadata.name
     assert len(flow.spec.agents) >= 1
 
 
 @pytest.mark.parametrize("path", _TEAM_YAMLS, ids=[_rel(p) for p in _TEAM_YAMLS])
 def test_team_yaml_validates(path: Path) -> None:
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    team = TeamDefinition.model_validate(data)
+    from initrunner.team.loader import load_team
+
+    team = load_team(path)
     assert team.metadata.name
     assert len(team.spec.personas) >= 2
 
@@ -108,6 +105,25 @@ def test_suite_yaml_validates(path: Path) -> None:
     suite = TestSuiteDefinition.model_validate(data)
     assert suite.metadata.name
     assert len(suite.cases) >= 1
+
+
+_ALLOWED_ENVELOPE_KINDS = {"Service", "TestSuite"}
+
+
+@pytest.mark.parametrize("path", _ALL_YAMLS, ids=[_rel(p) for p in _ALL_YAMLS])
+def test_examples_have_no_agent_team_flow_envelope(path: Path) -> None:
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        return
+    api = data.get("apiVersion", "")
+    if isinstance(api, str) and api.startswith("initguard/"):
+        return
+    kind = data.get("kind")
+    if data.get("apiVersion") == "initrunner/v1" and kind in {"Agent", "Team", "Flow"}:
+        raise AssertionError(f"{path} still uses a public Agent/Team/Flow envelope")
+    if kind in _ALLOWED_ENVELOPE_KINDS:
+        return
 
 
 # ---------------------------------------------------------------------------

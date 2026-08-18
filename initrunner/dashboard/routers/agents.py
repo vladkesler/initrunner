@@ -8,7 +8,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore[import-not-found]
 
-from initrunner.dashboard.deps import RoleCache, SkillCache, get_role_cache, get_skill_cache
+from initrunner.dashboard.deps import (
+    FlowCache,
+    RoleCache,
+    SkillCache,
+    TeamCache,
+    get_flow_cache,
+    get_role_cache,
+    get_skill_cache,
+    get_team_cache,
+)
 from initrunner.dashboard.schemas import (
     AgentDetail,
     AgentDoctorResponse,
@@ -72,26 +81,96 @@ def _summary_from(role_id: str, discovered) -> AgentSummary:
         model=spec.model.name if spec.model else "",
         features=list(spec.features),
         path=str(discovered.path),
+        shape="solo",
+    )
+
+
+def _team_summary(team_id: str, discovered) -> AgentSummary:
+    if discovered.error or discovered.team is None:
+        return AgentSummary(
+            id=team_id,
+            name=discovered.path.stem,
+            description="",
+            tags=[],
+            provider="",
+            model="",
+            features=["agents"],
+            path=str(discovered.path),
+            error=discovered.error,
+            shape="preset",
+        )
+    team = discovered.team
+    model = team.spec.model
+    return AgentSummary(
+        id=team_id,
+        name=team.metadata.name,
+        description=team.metadata.description or "",
+        tags=list(team.metadata.tags or []),
+        provider=model.provider if model else "",
+        model=model.name if model else "",
+        features=["agents"],
+        path=str(discovered.path),
+        shape="preset",
+    )
+
+
+def _flow_summary(flow_id: str, discovered) -> AgentSummary:
+    if discovered.error or discovered.flow is None:
+        return AgentSummary(
+            id=flow_id,
+            name=discovered.path.stem,
+            description="",
+            tags=[],
+            provider="",
+            model="",
+            features=["then"],
+            path=str(discovered.path),
+            error=discovered.error,
+            shape="graph",
+        )
+    flow = discovered.flow
+    return AgentSummary(
+        id=flow_id,
+        name=flow.metadata.name,
+        description=flow.metadata.description or "",
+        tags=[],
+        provider="",
+        model="",
+        features=["then"],
+        path=str(discovered.path),
+        shape="graph",
     )
 
 
 @router.get("")
 async def list_agents(
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+    team_cache: Annotated[TeamCache, Depends(get_team_cache)],
+    flow_cache: Annotated[FlowCache, Depends(get_flow_cache)],
 ) -> list[AgentSummary]:
-    roles = role_cache.all()
-    return [_summary_from(rid, dr) for rid, dr in roles.items()]
+    items = [_summary_from(rid, dr) for rid, dr in role_cache.all().items()]
+    items.extend(_team_summary(tid, dt) for tid, dt in team_cache.all().items())
+    items.extend(_flow_summary(fid, df) for fid, df in flow_cache.all().items())
+    return items
 
 
 @router.get("/{agent_id}")
 async def get_agent(
     agent_id: str,
     role_cache: Annotated[RoleCache, Depends(get_role_cache)],
+    team_cache: Annotated[TeamCache, Depends(get_team_cache)],
+    flow_cache: Annotated[FlowCache, Depends(get_flow_cache)],
 ) -> AgentSummary:
     dr = role_cache.get(agent_id)
-    if dr is None:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    return _summary_from(agent_id, dr)
+    if dr is not None:
+        return _summary_from(agent_id, dr)
+    dt = team_cache.get(agent_id)
+    if dt is not None:
+        return _team_summary(agent_id, dt)
+    df = flow_cache.get(agent_id)
+    if df is not None:
+        return _flow_summary(agent_id, df)
+    raise HTTPException(status_code=404, detail="Agent not found")
 
 
 def _check_provider(discovered) -> str | None:

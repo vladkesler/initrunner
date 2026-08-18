@@ -1,0 +1,226 @@
+name: security-scanner
+description: |
+  Runs static analysis scanners, triages findings with LLM intelligence, and reports only high-confidence vulnerabilities. Auto-discovers language-specific scanning skills based on your project.
+spec_version: 3
+tags:
+- security
+- sast
+- autonomous
+- skills
+- structured-output
+- cron
+- memory
+author: InitRunner Team
+version: 1.0.2
+bundle:
+  include:
+  - README.md
+  - skills/python-sast/SKILL.md
+  - skills/javascript-sast/SKILL.md
+  - skills/secret-detection/SKILL.md
+  - skills/container-scan/SKILL.md
+prompt: |
+  You are a security auditor that runs automated static analysis scanners
+  and triages findings with LLM intelligence. You report only vulnerabilities
+  you are confident about, suppressing noise and false positives.
+
+  ## Workflow
+
+  Follow these steps for every scan:
+
+  1. **Detect project languages** -- Use filesystem and find to check for
+     pyproject.toml, setup.py, requirements.txt (Python), package.json
+     (JavaScript/Node), Dockerfile, docker-compose.yaml (containers),
+     go.mod (Go), Gemfile (Ruby), pom.xml (Java). List all detected
+     languages.
+  2. **Activate scanner skills** -- Based on detected languages, use
+     activate_skill to load the relevant scanner instructions from your
+     skill catalog. Always activate secret-detection regardless of language.
+  3. **Run each scanner** -- Follow each activated skill's instructions to
+     run the appropriate scanner via shell. Collect raw output.
+  4. **Parse findings** -- Extract individual findings from scanner output
+     (file, line, severity, description).
+  5. **Triage each finding** -- For every finding:
+     - Read 10-15 lines of source context around the flagged line
+     - Trace data flow: is the input user-controlled or constant?
+     - Classify confidence (see policy below)
+     - Skip LOW confidence findings entirely
+  6. **Check memory** -- Use recall to search for known false positives and
+     accepted risks. Suppress any matches. Count suppressed findings.
+  7. **Output structured report** -- Return the JSON report with findings,
+     summary, and scan metadata.
+
+  ## Confidence policy
+
+  - **HIGH**: Vulnerable pattern confirmed AND attacker-controlled input
+    reaches the vulnerable sink. Report these.
+  - **MEDIUM**: Vulnerable pattern found but input source is unclear or
+    requires manual verification. Report as "needs verification".
+  - **LOW**: Theoretical risk only, best-practice suggestion, or pattern
+    in dead code. Do NOT include these in the report.
+
+  ## Never flag
+
+  - Test files (test_*, *_test.py, *.test.js, *.spec.ts)
+  - Dead code (commented out, unreachable)
+  - Documentation and comments
+  - .env.example with placeholder values
+  - Constants and config-controlled values with no user input path
+
+  ## Always flag as critical
+
+  - eval()/exec() with user-controlled input
+  - pickle.loads() on network/file input
+  - yaml.load() without SafeLoader
+  - subprocess with shell=True and variable interpolation
+  - SQL queries built with string formatting using user input
+  - Hardcoded secrets (real API keys, private keys, passwords)
+
+  ## Memory usage
+
+  - **recall(query)** before reporting: check if a finding was previously
+    marked as false positive or accepted risk
+  - **remember(content, category="false_positive")** when told a finding
+    is not a real issue
+  - **remember(content, category="accepted_risk")** when told a finding
+    is known but accepted
+  - **record_episode(content, category="scan")** after each scan with
+    summary of findings count, languages, skills used
+  - **learn_procedure(content, category="skip_rule")** when a pattern
+    should always be skipped (e.g. "bandit B101 in test files")
+output:
+  type: json_schema
+  schema_:
+    type: object
+    properties:
+      findings:
+        type: array
+        items:
+          type: object
+          properties:
+            file:
+              type: string
+              description: File path relative to repo root
+            line:
+              type: integer
+              description: Line number of the finding
+            severity:
+              type: string
+              enum:
+              - critical
+              - high
+              - medium
+              - low
+            category:
+              type: string
+              description: Vulnerability category (e.g. injection, deserialization,
+                secrets)
+            description:
+              type: string
+              description: What the vulnerability is and why it matters
+            evidence:
+              type: string
+              description: The vulnerable code snippet
+            recommendation:
+              type: string
+              description: How to fix it
+            confidence:
+              type: string
+              enum:
+              - high
+              - medium
+              description: Confidence that this is a real vulnerability
+          required:
+          - file
+          - line
+          - severity
+          - category
+          - description
+          - evidence
+          - recommendation
+          - confidence
+      summary:
+        type: object
+        properties:
+          total:
+            type: integer
+          critical:
+            type: integer
+          high:
+            type: integer
+          medium:
+            type: integer
+          low:
+            type: integer
+          suppressed:
+            type: integer
+            description: Findings suppressed via memory (known false positives)
+        required:
+        - total
+        - critical
+        - high
+        - medium
+        - low
+        - suppressed
+      scan_metadata:
+        type: object
+        properties:
+          languages_detected:
+            type: array
+            items:
+              type: string
+          skills_activated:
+            type: array
+            items:
+              type: string
+          timestamp:
+            type: string
+        required:
+        - languages_detected
+        - skills_activated
+        - timestamp
+    required:
+    - findings
+    - summary
+    - scan_metadata
+tools:
+- shell:
+    allowed_commands:
+    - bandit
+    - semgrep
+    - npm
+    - rg
+    - find
+    - cat
+    - head
+    - wc
+    working_dir: .
+    timeout_seconds: 120
+    require_confirmation: false
+- filesystem
+- git
+- think
+- datetime
+triggers:
+- type: cron
+  schedule: 0 2 * * *
+  prompt: |
+    Run a full security scan of the repository. Detect project languages, activate the relevant scanner skills, run each scanner, triage findings, and output the structured report.
+  autonomous: true
+memory:
+  episodic:
+    max_episodes: 200
+  semantic:
+    max_memories: 500
+  consolidation:
+    interval: after_autonomous
+autonomy:
+  max_plan_steps: 10
+guardrails:
+  max_tokens_per_run: 40000
+  max_tool_calls: 40
+  timeout_seconds: 600
+  max_request_limit: 50
+  daemon_daily_token_budget: 300000
+auto_skills:
+  max_skills: 10

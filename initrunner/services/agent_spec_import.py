@@ -119,9 +119,9 @@ def agent_spec_to_role_dict(spec: dict[str, Any], *, fallback_name: str) -> dict
                 f"Use InitRunner's spec.capabilities / spec.guardrails instead."
             )
 
-    # --- spec ---------------------------------------------------------------
+    # --- flat document ------------------------------------------------------
     role_spec: dict[str, Any] = {
-        "role": _coerce_instructions(spec.get("instructions")),
+        "prompt": _coerce_instructions(spec.get("instructions")),
         "model": model_block,
     }
 
@@ -173,10 +173,10 @@ def agent_spec_to_role_dict(spec: dict[str, Any], *, fallback_name: str) -> dict
         )
 
     role_dict: dict[str, Any] = {
-        "apiVersion": "initrunner/v1",
-        "kind": "Agent",
-        "metadata": metadata,
-        "spec": role_spec,
+        "name": metadata["name"],
+        "spec_version": 3,
+        **{k: v for k, v in metadata.items() if k != "name"},
+        **role_spec,
     }
     if warnings:
         role_dict["_import_warnings"] = warnings

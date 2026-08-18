@@ -70,18 +70,16 @@ def build_schema_reference() -> str:
 
     # Structure
     sections.append(
-        "# Role YAML structure\n"
-        "# apiVersion: initrunner/v1\n"
-        "# kind: Agent\n"
-        "# metadata: name (required), description, tags, spec_version: 2\n"
-        "# spec: role (required), model (required), plus optional sections below"
+        "# Role YAML structure (flat, no apiVersion/kind envelope)\n"
+        "# name (required), description, tags, spec_version: 3\n"
+        "# prompt (required), model (required), plus optional sections below"
     )
 
     # Model config
-    sections.append(_format_model_fields("Model (spec.model)", ModelConfig))
+    sections.append(_format_model_fields("Model (model)", ModelConfig))
 
     # Guardrails
-    sections.append(_format_model_fields("Guardrails (spec.guardrails)", Guardrails))
+    sections.append(_format_model_fields("Guardrails (guardrails)", Guardrails))
 
     # Tool types from registry
     tool_types = get_tool_types()
@@ -94,11 +92,11 @@ def build_schema_reference() -> str:
             t = type_field.default
             if t not in tool_types:
                 tool_items.append((t, subcls))
-    sections.append(_typed_items("Tools (spec.tools list)", tool_items))
+    sections.append(_typed_items("Tools (tools list)", tool_items))
 
     # Capabilities (PydanticAI native)
     cap_lines = [
-        "# Capabilities (spec.capabilities list):",
+        "# Capabilities (capabilities list):",
         "# Syntax: bare string, single-value dict, or kwargs dict",
         "#   - WebSearch                     # no args",
         "#   - Thinking: high               # single arg (effort level)",
@@ -127,7 +125,7 @@ def build_schema_reference() -> str:
         type_field = cls.model_fields.get("type")
         type_name = type_field.default if type_field else "?"
         trigger_items.append((type_name, cls))
-    sections.append(_typed_items("Triggers (spec.triggers list)", trigger_items))
+    sections.append(_typed_items("Triggers (triggers list)", trigger_items))
 
     # Sinks
     sink_items = []
@@ -135,7 +133,7 @@ def build_schema_reference() -> str:
         type_field = cls.model_fields.get("type")
         type_name = type_field.default if type_field else "?"
         sink_items.append((type_name, cls))
-    sections.append(_typed_items("Sinks (spec.sinks list)", sink_items))
+    sections.append(_typed_items("Sinks (sinks list)", sink_items))
 
     # Optional sections -- field-level references
     from initrunner.agent.schema.autonomy import AutonomyConfig
@@ -149,12 +147,12 @@ def build_schema_reference() -> str:
         "# Optional spec sections (include only if needed):\n"
         "# Omit sections that use defaults. The output will be minimized automatically."
     )
-    sections.append(_format_model_fields("Ingest (spec.ingest)", IngestConfig))
-    sections.append(_format_model_fields("Memory (spec.memory)", MemoryConfig))
-    sections.append(_format_model_fields("Reasoning (spec.reasoning)", ReasoningConfig))
-    sections.append(_format_model_fields("Autonomy (spec.autonomy)", AutonomyConfig))
-    sections.append(_format_model_fields("Security (spec.security)", SecurityPolicy))
-    sections.append(_format_model_fields("Observability (spec.observability)", ObservabilityConfig))
+    sections.append(_format_model_fields("Ingest (ingest)", IngestConfig))
+    sections.append(_format_model_fields("Memory (memory)", MemoryConfig))
+    sections.append(_format_model_fields("Reasoning (reasoning)", ReasoningConfig))
+    sections.append(_format_model_fields("Autonomy (autonomy)", AutonomyConfig))
+    sections.append(_format_model_fields("Security (security)", SecurityPolicy))
+    sections.append(_format_model_fields("Observability (observability)", ObservabilityConfig))
 
     return "\n\n".join(sections)
 

@@ -358,8 +358,25 @@ def rewrite_model_block(
     for line in lines:
         stripped = line.lstrip()
 
-        # Detect entry into spec.model block
-        if not in_model and stripped == "model:" and line.startswith("  model:"):
+        # Detect shorthand ``model: provider:name`` (flat documents).
+        if not in_model and stripped.startswith("model:") and stripped != "model:":
+            value = stripped[len("model:") :].strip()
+            indent = line[: len(line) - len(stripped)]
+            old_provider, old_name = ("", value)
+            if ":" in value:
+                old_provider, old_name = value.split(":", 1)
+            sub = f"{indent}  "
+            result.append(f"{indent}model:")
+            result.append(f"{sub}provider: {provider or old_provider}")
+            result.append(f"{sub}name: {name or old_name}")
+            if base_url is not None:
+                result.append(f"{sub}base_url: {base_url}")
+            if api_key_env is not None:
+                result.append(f"{sub}api_key_env: {api_key_env}")
+            continue
+
+        # Detect entry into a model mapping (flat top-level or envelope spec.model)
+        if not in_model and stripped == "model:":
             in_model = True
             model_indent = len(line) - len(stripped)
             result.append(line)

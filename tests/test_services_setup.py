@@ -116,8 +116,8 @@ class TestGenerateRoleYaml:
         config = SetupConfig(intent="chatbot", provider="openai", model="gpt-5-mini")
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert data["spec"]["model"]["provider"] == "openai"
-        assert "You are a helpful assistant" in data["spec"]["role"]
+        assert "openai" in str(data.get("model"))
+        assert "You are a helpful assistant" in data["prompt"]
 
     def test_knowledge_intent_has_ingest(self):
         config = SetupConfig(
@@ -128,8 +128,8 @@ class TestGenerateRoleYaml:
         )
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert "ingest" in data["spec"]
-        assert data["spec"]["ingest"]["sources"] == ["./docs/**/*.md"]
+        assert "ingest" in data
+        assert data["ingest"]["sources"] == ["./docs/**/*.md"]
 
     def test_ollama_with_knowledge_not_overridden(self):
         """BUG FIX TEST: Ollama + knowledge should produce RAG YAML, not ollama template."""
@@ -141,21 +141,21 @@ class TestGenerateRoleYaml:
         )
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert "ingest" in data["spec"]
-        assert data["spec"]["model"]["provider"] == "ollama"
-        assert "knowledge assistant" in data["spec"]["role"].lower()
+        assert "ingest" in data
+        assert "ollama" in str(data.get("model"))
+        assert "knowledge assistant" in data["prompt"].lower()
 
     def test_memory_intent(self):
         config = SetupConfig(intent="memory", provider="openai", model="gpt-5-mini")
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert "memory" in data["spec"]
+        assert "memory" in data
 
     def test_daemon_intent(self):
         config = SetupConfig(intent="daemon", provider="openai", model="gpt-5-mini")
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert "triggers" in data["spec"]
+        assert "triggers" in data
 
     def test_telegram_intent(self):
         config = SetupConfig(intent="telegram-bot", provider="openai", model="gpt-5-mini")
@@ -176,10 +176,12 @@ class TestGenerateRoleYaml:
         )
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
-        assert "tools" in data["spec"]
-        tool_types = [t["type"] for t in data["spec"]["tools"]]
-        assert "datetime" in tool_types
-        assert "web_reader" in tool_types
+        assert "tools" in data
+        from initrunner.services.starters import tool_types_from
+
+        types = tool_types_from(data["tools"])
+        assert "datetime" in types
+        assert "web_reader" in types
 
     @pytest.mark.parametrize("intent", list(INTENT_TEMPLATE_MAP.keys()))
     def test_every_intent_produces_valid_yaml(self, intent):
@@ -187,7 +189,7 @@ class TestGenerateRoleYaml:
         content = generate_role_yaml(config)
         data = yaml.safe_load(content)
         assert data is not None
-        assert "spec" in data
+        assert data.get("prompt") or data.get("name")
 
 
 class TestGenerateChatYaml:

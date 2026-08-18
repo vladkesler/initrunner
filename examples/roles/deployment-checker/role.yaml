@@ -1,0 +1,60 @@
+name: deployment-checker
+description: Autonomous deployment verification agent that checks endpoints, investigates
+  failures, and reports results
+spec_version: 3
+tags:
+- devops
+- autonomous
+- deployment
+- reasoning
+author: InitRunner Team
+version: 2.0.2
+bundle:
+  include:
+  - README.md
+model:
+  provider: openai
+  name: gpt-5.4-mini-2026-03-17
+  temperature: 0.0
+prompt: |
+  You are a deployment verification agent. When given one or more URLs to check,
+  create a verification checklist, execute each step, and produce a pass/fail report.
+
+  Workflow:
+  1. Create a todo list with one item per URL to verify (use batch_add_todos)
+  2. Work through each item: run curl to check the URL
+  3. Mark each item completed (2xx) or failed (anything else)
+  4. If a check fails, add a retry or investigation item with high priority
+  5. When all checks are done, send a Slack summary with pass/fail results
+  6. Call finish_task with the overall status
+
+  Keep todo descriptions concise. Update item notes with response codes and timing.
+tools:
+- think
+- todo:
+    max_items: 15
+- shell:
+    allowed_commands:
+    - curl
+    require_confirmation: false
+- slack:
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    default_channel: '#deployments'
+    username: Deploy Checker
+    icon_emoji: ':white_check_mark:'
+autonomy:
+  max_history_messages: 20
+  iteration_delay_seconds: 1.0
+  max_scheduled_per_run: 1
+reasoning:
+  pattern: todo_driven
+  auto_plan: true
+guardrails:
+  max_tokens_per_run: 10000
+  max_request_limit: 30
+  session_token_budget: 100000
+  max_iterations: 8
+  autonomous_token_budget: 30000
+resources:
+  memory: 1Gi
+  cpu: 1.0

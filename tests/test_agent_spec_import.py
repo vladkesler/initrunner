@@ -27,10 +27,9 @@ class TestAgentSpecToRoleDict:
             {"model": "anthropic:claude-sonnet-4-5", "instructions": "hi"},
             fallback_name="fallback",
         )
-        assert role["apiVersion"] == "initrunner/v1"
-        assert role["metadata"]["name"] == "fallback"
-        assert role["spec"]["role"] == "hi"
-        assert role["spec"]["model"] == {
+        assert role["name"] == "fallback"
+        assert role["prompt"] == "hi"
+        assert role["model"] == {
             "provider": "anthropic",
             "name": "claude-sonnet-4-5",
         }
@@ -44,7 +43,7 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="from-stem",
         )
-        assert role["metadata"]["name"] == "from-spec"
+        assert role["name"] == "from-spec"
 
     def test_name_precedence_metadata_name(self):
         role = agent_spec_to_role_dict(
@@ -54,14 +53,14 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="from-stem",
         )
-        assert role["metadata"]["name"] == "from-metadata"
+        assert role["name"] == "from-metadata"
 
     def test_name_precedence_stem_fallback(self):
         role = agent_spec_to_role_dict(
             {"model": "anthropic:claude-sonnet-4-5"},
             fallback_name="from-stem",
         )
-        assert role["metadata"]["name"] == "from-stem"
+        assert role["name"] == "from-stem"
 
     def test_execution_fields_mapped(self):
         role = agent_spec_to_role_dict(
@@ -74,7 +73,7 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="f",
         )
-        assert role["spec"]["execution"] == {
+        assert role["execution"] == {
             "retries": 3,
             "output_retries": 2,
             "end_strategy": "exhaustive",
@@ -89,7 +88,7 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="f",
         )
-        assert role["spec"]["role"] == "first rule\n\nsecond rule"
+        assert role["prompt"] == "first rule\n\nsecond rule"
 
     def test_model_settings_extracted(self):
         role = agent_spec_to_role_dict(
@@ -99,8 +98,8 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="f",
         )
-        assert role["spec"]["model"]["max_tokens"] == 2048
-        assert role["spec"]["model"]["temperature"] == 0.2
+        assert role["model"]["max_tokens"] == 2048
+        assert role["model"]["temperature"] == 0.2
         assert any("top_p" in w for w in role["_import_warnings"])
 
     def test_instrument_warned(self):
@@ -123,8 +122,8 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="f",
         )
-        assert role["spec"]["deps_schema"] == schema
-        assert role["spec"]["role"] == "hi {{name}}"
+        assert role["deps_schema"] == schema
+        assert role["prompt"] == "hi {{name}}"
 
     def test_output_schema_mapped(self):
         role = agent_spec_to_role_dict(
@@ -134,8 +133,8 @@ class TestAgentSpecToRoleDict:
             },
             fallback_name="f",
         )
-        assert role["spec"]["output"]["type"] == "json_schema"
-        assert role["spec"]["output"]["schema"]["type"] == "object"
+        assert role["output"]["type"] == "json_schema"
+        assert role["output"]["schema"]["type"] == "object"
 
     def test_invalid_end_strategy_errors(self):
         with pytest.raises(AgentSpecImportError, match="end_strategy"):
@@ -183,7 +182,7 @@ class TestLoadAgentSpec:
             name="my-agent.yaml",
         )
         role_dict = load_agent_spec(spec_path)
-        assert role_dict["metadata"]["name"] == "my-agent"
+        assert role_dict["name"] == "my-agent"
 
 
 class TestMetadataImport:
@@ -197,10 +196,10 @@ class TestMetadataImport:
             },
             fallback_name="x",
         )
-        assert role["metadata"]["tags"] == ["a"]
-        assert role["metadata"]["author"] == "jc"
-        assert role["metadata"]["team"] == "core"
-        assert role["metadata"]["version"] == "2"
+        assert role["tags"] == ["a"]
+        assert role["author"] == "jc"
+        assert role["team"] == "core"
+        assert role["version"] == "2"
         assert "_import_warnings" not in role
 
     def test_unknown_metadata_keys_warn(self):

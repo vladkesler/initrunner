@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Compass, Blocks, Workflow, Users, Sparkles, Cable, ScanEye, Receipt, Gavel, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+	import { Compass, Blocks, Sparkles, Cable, ScanEye, Receipt, Gavel, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
 	import { getMcpHealthSummary } from '$lib/api/mcp';
 	import { onMount } from 'svelte';
 	import { approvals, subscribeApprovals } from '$lib/stores/approvals.svelte';
@@ -14,8 +14,6 @@
 
 	const buildItems = [
 		{ href: '/agents', label: 'Agents', icon: Blocks },
-		{ href: '/flows', label: 'Flows', icon: Workflow },
-		{ href: '/teams', label: 'Teams', icon: Users },
 		{ href: '/skills', label: 'Skills', icon: Sparkles }
 	];
 

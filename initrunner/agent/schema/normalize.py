@@ -99,18 +99,20 @@ def document_to_ir(
         )
 
     has_then = any(child.then is not None for child in document.agents.values())
+    has_after = any(child.after for child in document.agents.values())
+    is_graph = has_then or has_after
     children = tuple(
         _child_ir(name, child, extra_needs.get(name, ())) for name, child in document.agents.items()
     )
     return CompositionIR(
         name=document.name,
-        shape="graph" if has_then else "preset",
+        shape="graph" if is_graph else "preset",
         prompt=None,
         model=model,
         tools=tools,
         run=document.run,
         children=children,
-        handoff="flow" if has_then else "team",
+        handoff="flow" if is_graph else "team",
         description=document.description,
         tags=tuple(document.tags),
         author=document.author,
@@ -130,10 +132,11 @@ def document_to_ir(
     )
 
 
-def _child_ir(name: str, child: AgentChild, needs: tuple[str, ...]) -> ChildIR:
+def _child_ir(name: str, child: AgentChild, extra_needs: tuple[str, ...]) -> ChildIR:
     then = None
     if child.then is not None:
         then = _then_ir(child.then)
+    needs = tuple(child.after) if child.after else extra_needs
     return ChildIR(
         name=name,
         prompt=child.prompt,
@@ -192,42 +195,68 @@ def _envelope_agent_to_v3(data: dict[str, Any]) -> dict[str, Any]:
     from initrunner.deprecations import validate_role_dict
 
     role, _hits = validate_role_dict(data)
+    return role_to_v3_mapping(role)
+
+
+def role_to_v3_mapping(role: Any) -> dict[str, Any]:
+    """Project a ``RoleDefinition`` onto a flat AgentDocument mapping."""
     spec = role.spec
     out = _identity_from_metadata(role.metadata)
     out["prompt"] = spec.role
     if spec.model is not None:
-        out["model"] = spec.model.model_dump(exclude_defaults=True)
+        dumped = spec.model.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+        if dumped:
+            out["model"] = dumped
     if spec.tools:
-        out["tools"] = [t.model_dump(exclude_defaults=True) for t in spec.tools]
+        out["tools"] = _dump_discriminated(spec.tools)
     if spec.skills:
         out["skills"] = list(spec.skills)
     if spec.capabilities:
-        out["capabilities"] = [
-            c.model_dump() if hasattr(c, "model_dump") else c for c in spec.capabilities
-        ]
+        out["capabilities"] = list(spec.capabilities)
     if spec.deps_schema is not None:
         out["deps_schema"] = spec.deps_schema
     if spec.triggers:
-        out["triggers"] = [t.model_dump(exclude_defaults=True) for t in spec.triggers]
+        out["triggers"] = _dump_discriminated(spec.triggers)
     if spec.sinks:
-        out["sinks"] = [s.model_dump(exclude_defaults=True) for s in spec.sinks]
-    if spec.ingest is not None:
-        out["ingest"] = spec.ingest.model_dump(exclude_defaults=True)
-    if spec.memory is not None:
-        out["memory"] = spec.memory.model_dump(exclude_defaults=True)
-    if spec.autonomy is not None:
-        out["autonomy"] = spec.autonomy.model_dump(exclude_defaults=True)
-    if spec.reasoning is not None:
-        out["reasoning"] = spec.reasoning.model_dump(exclude_defaults=True)
-    guardrails = spec.guardrails.model_dump(exclude_defaults=True)
+        out["sinks"] = _dump_discriminated(spec.sinks)
+    for optional in ("ingest", "memory", "autonomy", "reasoning", "observability"):
+        obj = getattr(spec, optional)
+        if obj is None:
+            continue
+        dumped = obj.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+        out[optional] = dumped if dumped else {}
+    guardrails = spec.guardrails.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
     if guardrails:
         out["guardrails"] = guardrails
-    if spec.observability is not None:
-        out["observability"] = spec.observability.model_dump(exclude_defaults=True)
-    output = spec.output.model_dump(exclude_defaults=True)
+    output = spec.output.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
     if output:
         out["output"] = output
+    for section in ("execution", "resources", "auto_skills", "tool_search", "daemon"):
+        obj = getattr(spec, section)
+        dumped = obj.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+        if dumped:
+            out[section] = dumped
+    security = spec.security
+    if security.preset:
+        dumped = security.compact_dump(mode="json", exclude_none=True)
+    else:
+        dumped = security.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+    if dumped:
+        out["security"] = dumped
     return out
+
+
+def _dump_discriminated(items: list[Any]) -> list[dict[str, Any]]:
+    """Dump union items without dropping the ``type`` discriminator."""
+    serialized: list[dict[str, Any]] = []
+    for item in items:
+        dumped = item.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+        dumped = {"type": item.type, **dumped}
+        omit = getattr(item, "omit_generated_secret", None)
+        if callable(omit):
+            omit(dumped)
+        serialized.append(dumped)
+    return serialized
 
 
 def _envelope_team_to_v3(data: dict[str, Any]) -> dict[str, Any]:
@@ -240,7 +269,7 @@ def _envelope_team_to_v3(data: dict[str, Any]) -> dict[str, Any]:
     out = _identity_from_metadata(team.metadata)
     if spec.model is not None:
         out["model"] = spec.model.model_dump()
-    out["tools"] = [t.model_dump() for t in spec.tools]
+    out["tools"] = _dump_discriminated(spec.tools) if spec.tools else []
     out["guardrails"] = {
         "max_tokens_per_run": spec.guardrails.max_tokens_per_run,
         "max_tool_calls": spec.guardrails.max_tool_calls,
@@ -262,7 +291,7 @@ def _envelope_team_to_v3(data: dict[str, Any]) -> dict[str, Any]:
         if persona.model is not None:
             child["model"] = persona.model.model_dump()
         if persona.tools:
-            child["tools"] = [t.model_dump() for t in persona.tools]
+            child["tools"] = _dump_discriminated(persona.tools)
         if persona.tools_mode != "extend":
             child["tools_mode"] = persona.tools_mode
         if persona.environment:
@@ -281,8 +310,11 @@ def _envelope_flow_to_v3(
     raw_agents = data.get("spec", {}).get("agents", {})
     warnings: list[str] = []
     extra_needs: dict[str, tuple[str, ...]] = {}
+    name = flow.metadata.name
+    if not _NAME_RE.fullmatch(name):
+        raise NormalizeError(f"rename metadata.name to kebab-case (got {name!r})")
     out: dict[str, Any] = {
-        "name": _slugify_flow_name(flow.metadata.name),
+        "name": name,
         "description": flow.metadata.description,
         "shared_memory": flow.spec.shared_memory.model_dump(),
         "shared_documents": _flow_docs_to_team(flow.spec.shared_documents),
@@ -300,9 +332,10 @@ def _envelope_flow_to_v3(
         child: dict[str, Any] = {"use": cfg.role}
         if cfg.sink is not None:
             child["then"] = _sink_to_then(cfg.sink)
-        agents[name] = child
         if cfg.needs:
+            child["after"] = list(cfg.needs)
             extra_needs[name] = tuple(cfg.needs)
+        agents[name] = child
     out["agents"] = agents
     return out, extra_needs, warnings
 
@@ -331,13 +364,3 @@ def _flow_docs_to_team(docs: SharedDocumentsConfig) -> dict[str, Any]:
         store_backend=docs.store_backend,
         embeddings=docs.embeddings,
     ).model_dump()
-
-
-def _slugify_flow_name(name: str) -> str:
-    """Flow metadata.name is a free string; v3 name has a kebab-case pattern."""
-    import re
-
-    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
-    if _NAME_RE.fullmatch(slug):
-        return slug
-    return slug if slug else "flow"

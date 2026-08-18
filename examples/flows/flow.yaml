@@ -1,34 +1,27 @@
-apiVersion: initrunner/v1
-kind: Flow
-metadata:
-  name: email-pipeline
-  description: Multi-agent email processing pipeline
-spec:
-  agents:
-    inbox-watcher:
-      role: roles/inbox-watcher.yaml
-      sink:
-        type: delegate
-        target: triager
-    triager:
-      role: roles/triager.yaml
-      needs:
-        - inbox-watcher
-      sink:
-        type: delegate
-        target:
-          - researcher
-          - responder
-        circuit_breaker_threshold: 5
-    researcher:
-      role: roles/researcher.yaml
-      needs:
-        - triager
-    responder:
-      role: roles/responder.yaml
-      needs:
-        - triager
-      restart:
-        condition: on-failure
-        max_retries: 3
-        delay_seconds: 5
+name: email-pipeline
+description: Multi-agent email processing pipeline
+spec_version: 3
+guardrails:
+  max_request_limit: 30
+agents:
+  inbox-watcher:
+    use: roles/inbox-watcher.yaml
+    then:
+      to: triager
+  triager:
+    use: roles/triager.yaml
+    then:
+      to:
+      - researcher
+      - responder
+      circuit_breaker_threshold: 5
+    after:
+    - inbox-watcher
+  researcher:
+    use: roles/researcher.yaml
+    after:
+    - triager
+  responder:
+    use: roles/responder.yaml
+    after:
+    - triager

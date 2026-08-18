@@ -148,129 +148,82 @@ guardrails:
 def template_rag(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: RAG agent with document ingestion
-  tags:
-    - rag
-spec:
-  role: |
-    You are a knowledge assistant. Use search_documents to find relevant
-    content before answering. Always cite your sources.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  ingest:
-    sources:
-      - "./docs/**/*.md"
-      - "./docs/**/*.txt"
-    chunking:
-      strategy: fixed
-      chunk_size: 512
-      chunk_overlap: 50
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # session_token_budget: 500000   # cumulative REPL session limit
+name: {name}
+description: RAG agent with document ingestion
+spec_version: 3
+tags:
+  - rag
+model: {provider}:{model_name}
+prompt: |
+  You are a knowledge assistant. Use search_documents to find relevant
+  content before answering. Always cite your sources.
+ingest:
+  sources:
+    - "./docs/**/*.md"
+    - "./docs/**/*.txt"
+  chunking:
+    strategy: fixed
+    chunk_size: 512
+    chunk_overlap: 50
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
 def template_daemon(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Daemon agent with triggers
-  tags:
-    - daemon
-spec:
-  role: |
-    You are a monitoring assistant that responds to events.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  triggers:
-    - type: file_watch
-      paths: ["./watched"]
-      extensions: [".md", ".txt"]
-      prompt_template: "File changed: {{path}}. Summarize the changes."
-    - type: cron
-      schedule: "0 9 * * 1"
-      prompt: "Generate weekly status report."
-  # sinks:
-  #   - type: webhook
-  #     url: ${{SLACK_WEBHOOK_URL}}
-  #     retry_count: 2
-  #   - type: file
-  #     path: ./agent-results.jsonl
-  #     format: json
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # daemon_token_budget: 2000000        # lifetime limit (resets on restart)
-    # daemon_daily_token_budget: 200000   # resets daily (UTC midnight)
+name: {name}
+description: Daemon agent with triggers
+spec_version: 3
+tags:
+  - daemon
+model: {provider}:{model_name}
+prompt: |
+  You are a monitoring assistant that responds to events.
+triggers:
+  - type: file_watch
+    paths: ["./watched"]
+    extensions: [".md", ".txt"]
+    prompt_template: "File changed: {{path}}. Summarize the changes."
+  - type: cron
+    schedule: "0 9 * * 1"
+    prompt: "Generate weekly status report."
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
 def template_memory(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Agent with long-term memory
-  tags:
-    - memory
-spec:
-  role: |
-    You are a helpful assistant with long-term memory.
-    Use the remember() tool to save important information.
-    Use the recall() tool to search your memories before answering.
-    Use the list_memories() tool to browse recent memories.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  memory:
-    max_sessions: 10
-    max_resume_messages: 20
-    semantic:
-      max_memories: 1000
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # session_token_budget: 500000   # cumulative REPL session limit
+name: {name}
+description: Agent with long-term memory
+spec_version: 3
+tags:
+  - memory
+model: {provider}:{model_name}
+prompt: |
+  You are a helpful assistant with long-term memory.
+  Use the remember() tool to save important information.
+  Use the recall() tool to search your memories before answering.
+  Use the list_memories() tool to browse recent memories.
+memory:
+  max_sessions: 10
+  max_resume_messages: 20
+  semantic:
+    max_memories: 1000
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
@@ -278,34 +231,20 @@ def template_ollama(name: str, provider: str, model_name: str | None = None) -> 
     # Always use ollama provider for this template, regardless of --provider flag
     model_name = model_name or _default_model_name("ollama")
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Agent using local Ollama model
-  tags:
-    - ollama
-    - local
-spec:
-  role: |
-    You are a helpful assistant running on a local Ollama model.
-  model:
-    provider: ollama
-    name: {model_name}  # Run: ollama pull {model_name}
-    # base_url: http://localhost:11434/v1  # default; override for remote Ollama
-    temperature: 0.1
-    max_tokens: 4096
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # session_token_budget: 500000   # cumulative REPL session limit
+name: {name}
+description: Agent using local Ollama model
+spec_version: 3
+tags:
+  - ollama
+  - local
+model: ollama:{model_name}
+prompt: |
+  You are a helpful assistant running on a local Ollama model.
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
@@ -352,25 +291,17 @@ def add_numbers(a: int, b: int) -> str:
 def template_api(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Agent with declarative API tools
-  tags:
-    - api
-spec:
-  role: |
-    You are a helpful assistant with API access.
-    Use the available tools to fetch data from external APIs.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  tools:
-    - type: api
+name: {name}
+description: Agent with declarative API tools
+spec_version: 3
+tags:
+  - api
+model: {provider}:{model_name}
+prompt: |
+  You are a helpful assistant with API access.
+  Use the available tools to fetch data from external APIs.
+tools:
+  - api:
       name: weather
       description: Weather API
       base_url: https://api.example.com
@@ -403,87 +334,66 @@ spec:
               description: Number of forecast days
           query_params:
             days: "{{days}}"
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    # input_tokens_limit: 100000     # per-run input token cap
-    # per_request_input_tokens_limit: 80000  # single-request context cap
-    # cost_limit: 0.50               # USD cap per logical run (best-effort)
-    # total_tokens_limit: 200000     # per-run total token cap
-    # session_token_budget: 500000   # cumulative REPL session limit
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
 """
 
 
 def template_telegram(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Telegram bot agent
-  tags:
-    - telegram
-    - daemon
-spec:
-  role: |
-    You are a helpful assistant responding to Telegram messages.
-    Keep responses concise and well-formatted for mobile reading.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  triggers:
-    - type: telegram
-      token_env: TELEGRAM_BOT_TOKEN
-      allowed_users: []  # add usernames to restrict access
-      prompt_template: "{{message}}"
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    daemon_daily_token_budget: 200000
+name: {name}
+description: Telegram bot agent
+spec_version: 3
+tags:
+  - telegram
+  - daemon
+model: {provider}:{model_name}
+prompt: |
+  You are a helpful assistant responding to Telegram messages.
+  Keep responses concise and well-formatted for mobile reading.
+triggers:
+  - type: telegram
+    token_env: TELEGRAM_BOT_TOKEN
+    allowed_users: []  # add usernames to restrict access
+    prompt_template: "{{message}}"
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
+  daemon_daily_token_budget: 200000
 """
 
 
 def template_discord(name: str, provider: str, model_name: str | None = None) -> str:
     model_name = model_name or _default_model_name(provider)
     return f"""\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  spec_version: 2
-  description: Discord bot agent
-  tags:
-    - discord
-    - daemon
-spec:
-  role: |
-    You are a helpful assistant responding to Discord messages.
-    Keep responses concise. You respond to DMs and @mentions.
-  model:
-    provider: {provider}
-    name: {model_name}
-    temperature: 0.1
-    max_tokens: 4096
-  triggers:
-    - type: discord
-      token_env: DISCORD_BOT_TOKEN
-      channel_ids: []     # restrict to specific channels
-      allowed_roles: []   # restrict to specific roles
-      prompt_template: "{{message}}"
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
-    daemon_daily_token_budget: 200000
+name: {name}
+description: Discord bot agent
+spec_version: 3
+tags:
+  - discord
+  - daemon
+model: {provider}:{model_name}
+prompt: |
+  You are a helpful assistant responding to Discord messages.
+  Keep responses concise. You respond to DMs and @mentions.
+triggers:
+  - type: discord
+    token_env: DISCORD_BOT_TOKEN
+    channel_ids: []     # restrict to specific channels
+    allowed_roles: []   # restrict to specific roles
+    prompt_template: "{{message}}"
+guardrails:
+  max_tokens_per_run: 50000
+  max_tool_calls: 20
+  timeout_seconds: 300
+  max_request_limit: 50
+  daemon_daily_token_budget: 200000
 """
 
 

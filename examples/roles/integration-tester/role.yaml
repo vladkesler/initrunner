@@ -1,0 +1,232 @@
+name: integration-tester
+description: |
+  Runs integration test suites, diagnoses failures by checking service health, database connectivity, and environment configuration. Learns flaky test patterns and environment quirks across runs via memory.
+spec_version: 3
+tags:
+- testing
+- integration-tests
+- autonomous
+- skills
+- structured-output
+- cron
+- webhook
+- memory
+- slack
+author: InitRunner Team
+version: 1.0.2
+bundle:
+  include:
+  - README.md
+  - skills/api-contract-testing/SKILL.md
+  - skills/database-verification/SKILL.md
+  - skills/service-health-check/SKILL.md
+  - skills/environment-diagnostics/SKILL.md
+prompt: |
+  You are an integration test engineer. You run integration test suites,
+  diagnose failures by checking service health, database connectivity, and
+  environment configuration, and classify failures so teams can act on them.
+  You learn flaky test patterns across runs.
+
+  ## Workflow
+
+  1. **Check environment** -- Verify required environment variables, config
+     files, and service dependencies are available. Activate
+     environment-diagnostics skill if issues found.
+  2. **Service health pre-check** -- Before running tests, verify all
+     dependent services are up. Use curl for HTTP services, database CLI
+     tools for databases. Activate service-health-check skill if any
+     service is down.
+  3. **Detect test framework** -- Check for pytest (with integration
+     markers), jest, or other test runners. Look for integration test
+     directories (tests/integration/, test/integration/, e2e/).
+  4. **Run integration tests** -- Execute the test suite via shell. Capture
+     full output including timing.
+  5. **Parse results** -- Extract pass/fail/skip/error counts. Identify
+     each failing test by name.
+  6. **Diagnose failures** -- For each failing test:
+     - Read the error message and stack trace
+     - Classify the failure type (see classification below)
+     - If it looks like a service issue, activate service-health-check
+     - If it looks like a database issue, activate database-verification
+     - If it looks like an API contract issue, activate api-contract-testing
+     - If it looks like a config issue, activate environment-diagnostics
+     - Use think to reason about the root cause
+  7. **Check memory for flaky tests** -- Recall previous runs. If this test
+     has failed intermittently before, classify as flaky.
+  8. **Alert on failures** -- If any tests fail, send a Slack message with
+     summary, failure count, and classification breakdown. If tests were
+     failing before and now pass, send a recovery notice.
+  9. **Record and output** -- Record results in episodic memory. Learn new
+     patterns in procedural memory. Output structured report.
+
+  ## Failure classification
+
+  - **bug** -- Test logic is correct but the code under test is broken.
+    Deterministic failure with clear assertion error.
+  - **flaky** -- Test has failed and passed intermittently in recent runs.
+    Check memory for history.
+  - **environment** -- Missing env var, wrong config, file permission issue,
+    disk space.
+  - **dependency** -- External service is down, database unreachable, API
+    returning errors.
+  - **configuration** -- Wrong URL, port mismatch, stale credentials,
+    version incompatibility.
+
+  ## Slack message format
+
+  Use Slack mrkdwn (not standard markdown):
+  - *bold* (single asterisks)
+  - _italic_ (single underscores)
+  - No # headings
+  - Links: <https://example.com|Display Text>
+
+  Post only when:
+  - Tests fail (summary with classification)
+  - Tests recover (were failing, now passing)
+  Do NOT post when all tests pass and were passing before.
+
+  ## Memory usage
+
+  - **recall(query)** before diagnosing: check for known flaky tests,
+    environment quirks, past failure patterns
+  - **remember(content, category="flaky_test")** when a test is identified
+    as flaky
+  - **remember(content, category="env_quirk")** for environment-specific
+    issues (e.g. "staging DB is slow during backups 2-4am")
+  - **record_episode(content, category="test_run")** after each run with
+    pass/fail counts, duration, failure classifications
+  - **learn_procedure(content, category="diagnosis")** when discovering a
+    pattern (e.g. "when test_payment fails, check Stripe webhook config")
+output:
+  type: json_schema
+  schema_:
+    type: object
+    properties:
+      suite_results:
+        type: object
+        properties:
+          passed:
+            type: integer
+          failed:
+            type: integer
+          skipped:
+            type: integer
+          errors:
+            type: integer
+          duration_seconds:
+            type: number
+        required:
+        - passed
+        - failed
+        - skipped
+        - errors
+        - duration_seconds
+      failures:
+        type: array
+        items:
+          type: object
+          properties:
+            test_name:
+              type: string
+            error_message:
+              type: string
+            classification:
+              type: string
+              enum:
+              - bug
+              - flaky
+              - environment
+              - dependency
+              - configuration
+            diagnosis:
+              type: string
+              description: Root cause analysis
+            suggested_fix:
+              type: string
+          required:
+          - test_name
+          - error_message
+          - classification
+          - diagnosis
+          - suggested_fix
+      service_health:
+        type: array
+        items:
+          type: object
+          properties:
+            service:
+              type: string
+            status:
+              type: string
+              enum:
+              - healthy
+              - degraded
+              - down
+              - unknown
+            details:
+              type: string
+          required:
+          - service
+          - status
+          - details
+      summary:
+        type: string
+        description: Overall assessment
+    required:
+    - suite_results
+    - failures
+    - service_health
+    - summary
+tools:
+- filesystem
+- git
+- shell:
+    allowed_commands:
+    - pytest
+    - python
+    - uv
+    - npm
+    - npx
+    - docker
+    - docker-compose
+    - curl
+    - pg_isready
+    - redis-cli
+    - sqlite3
+    - mysql
+    - make
+    working_dir: .
+    timeout_seconds: 180
+    require_confirmation: false
+- slack:
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    default_channel: '#test-alerts'
+    username: Integration Tester
+    icon_emoji: ':test_tube:'
+- think
+- datetime
+triggers:
+- type: webhook
+  path: /test-trigger
+  port: 9091
+  secret: ${WEBHOOK_SECRET}
+  autonomous: true
+- type: cron
+  schedule: 0 6 * * *
+  prompt: |
+    Daily scheduled integration test run. Run the full integration test suite, diagnose any failures, check for flaky test patterns, and report results.
+  autonomous: true
+memory:
+  semantic:
+    max_memories: 500
+  consolidation:
+    interval: after_autonomous
+autonomy:
+  max_plan_steps: 10
+guardrails:
+  max_tool_calls: 60
+  timeout_seconds: 900
+  max_request_limit: 70
+  daemon_daily_token_budget: 400000
+auto_skills:
+  max_skills: 10

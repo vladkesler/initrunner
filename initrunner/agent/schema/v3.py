@@ -99,6 +99,7 @@ class AgentChild(BaseModel):
     environment: dict[str, str] = {}
     triggers: list[TriggerConfig] = []
     then: ThenConfig | None = None
+    after: list[str] = []
     guardrails: AgentGuardrails | None = None
 
     @field_validator("model", mode="before")
@@ -239,16 +240,17 @@ class AgentDocument(BaseModel):
                 )
 
         has_then = any(child.then is not None for child in self.agents.values())
-        if has_then and self.run is not None:
-            raise ValueError("pick 'run' (preset) or 'then' (graph), not both")
-        if not has_then and self.run is None:
+        has_after = any(child.after for child in self.agents.values())
+        if (has_then or has_after) and self.run is not None:
+            raise ValueError("pick 'run' (preset) or 'then'/'after' (graph), not both")
+        if not has_then and not has_after and self.run is None:
             self.run = "sequential"
 
         if self.durability is not None and not has_then:
             # durability is a Flow journal; presets do not checkpoint
             raise ValueError("'durability' is only valid on a graph (children with 'then')")
 
-        concurrent = has_then or (self.run in ("parallel", "debate", "ensemble"))
+        concurrent = has_then or has_after or (self.run in ("parallel", "debate", "ensemble"))
         if concurrent:
             for name, child in self.agents.items():
                 if child.environment:
@@ -256,25 +258,27 @@ class AgentDocument(BaseModel):
                         f"Per-child environment is only valid with run: sequential (agent '{name}')"
                     )
 
-        if has_then:
-            names = set(self.agents)
-            for name, child in self.agents.items():
-                if child.then is None:
-                    continue
-                targets = child.then.to if isinstance(child.then.to, list) else [child.then.to]
-                for target in targets:
-                    if target not in names:
-                        raise ValueError(f"Agent '{name}' then.to references unknown '{target}'")
-                    if target == name:
-                        raise ValueError(f"Agent '{name}' cannot then.to itself")
-                if child.then.loop_back is not None:
-                    lb = child.then.loop_back.target
-                    if lb not in names:
-                        raise ValueError(f"Agent '{name}' loops back to unknown '{lb}'")
-                    if lb in targets:
-                        raise ValueError(
-                            f"Agent '{name}' cannot loop back to its then target '{lb}'"
-                        )
+        names = set(self.agents)
+        for name, child in self.agents.items():
+            for dep in child.after:
+                if dep not in names:
+                    raise ValueError(f"Agent '{name}' after references unknown '{dep}'")
+                if dep == name:
+                    raise ValueError(f"Agent '{name}' cannot after itself")
+            if child.then is None:
+                continue
+            targets = child.then.to if isinstance(child.then.to, list) else [child.then.to]
+            for target in targets:
+                if target not in names:
+                    raise ValueError(f"Agent '{name}' then.to references unknown '{target}'")
+                if target == name:
+                    raise ValueError(f"Agent '{name}' cannot then.to itself")
+            if child.then.loop_back is not None:
+                lb = child.then.loop_back.target
+                if lb not in names:
+                    raise ValueError(f"Agent '{name}' loops back to unknown '{lb}'")
+                if lb in targets:
+                    raise ValueError(f"Agent '{name}' cannot loop back to its then target '{lb}'")
 
         return self
 

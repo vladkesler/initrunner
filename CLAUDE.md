@@ -120,6 +120,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Installer script internals (`curl \| sh`) | `docs/getting-started/installer.md` |
 | Setup wizard (`initrunner setup`) | `docs/getting-started/setup.md` |
 | Tutorial (build a site monitor agent) | `docs/getting-started/tutorial.md` |
+| Envelope → flat YAML (`doctor --fix`) | `docs/getting-started/envelope-migration.md` |
 | Docker image | `docs/getting-started/docker.md` |
 | CLI commands & usage | `docs/getting-started/cli.md` |
 | Choosing features (goal-to-config) | `docs/getting-started/choosing-features.md` |

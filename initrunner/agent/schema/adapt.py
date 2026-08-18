@@ -37,7 +37,10 @@ def run_kind_from_mapping(data: dict[str, Any]) -> str:
         agents = data.get("agents")
         if not isinstance(agents, dict) or not agents:
             return "Agent"
-        if any(isinstance(v, dict) and v.get("then") is not None for v in agents.values()):
+        if any(
+            isinstance(v, dict) and (v.get("then") is not None or v.get("after"))
+            for v in agents.values()
+        ):
             return "Flow"
         if len(agents) == 1:
             return "Agent"
@@ -73,7 +76,7 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
     """Preset composition → TeamDefinition."""
     if not document.agents or len(document.agents) < 2:
         raise AdaptError("team adapter needs at least two agents")
-    if any(c.then is not None for c in document.agents.values()):
+    if any(c.then is not None or c.after for c in document.agents.values()):
         raise AdaptError("graph documents are not teams; use the flow adapter")
 
     personas: dict[str, PersonaConfig] = {}
@@ -140,7 +143,11 @@ def document_to_flow(document: AgentDocument, *, base_dir: Path | None = None) -
             )
 
     for name, cfg in agents.items():
-        cfg.needs = list(inbound.get(name, []))
+        child = document.agents[name]
+        if child.after:
+            cfg.needs = list(child.after)
+        else:
+            cfg.needs = list(inbound.get(name, []))
 
     spec = FlowSpec(
         agents=agents,

@@ -45,6 +45,11 @@
 						</td>
 						<td class="px-3 py-2">
 							<a href="/agents/{agent.id}" class="text-[13px] font-medium text-fg transition-[color] duration-150 hover:text-fg">{agent.name}</a>
+							{#if agent.shape === 'preset'}
+								<span class="ml-1.5 rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">agents</span>
+							{:else if agent.shape === 'graph'}
+								<span class="ml-1.5 rounded-full border border-edge bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint">then</span>
+							{/if}
 						</td>
 						<td class="hidden max-w-xs truncate px-3 py-2 text-[13px] text-fg-muted md:table-cell">
 							{agent.description || '\u2014'}
@@ -63,6 +68,7 @@
 						</td>
 						{#if onRun}
 							<td class="w-10 px-2 py-2">
+								{#if !agent.shape || agent.shape === 'solo'}
 								<button
 									class="flex items-center justify-center rounded-[2px] p-1 text-fg-faint opacity-0 transition-all duration-150 hover:bg-accent-primary/10 hover:text-accent-primary group-hover:opacity-100"
 									onclick={(e) => { e.stopPropagation(); onRun(agent); }}
@@ -70,6 +76,7 @@
 								>
 									<Play size={13} />
 								</button>
+								{/if}
 							</td>
 						{/if}
 						{#if onDelete}

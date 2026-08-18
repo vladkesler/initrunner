@@ -50,17 +50,12 @@ router = APIRouter(prefix="/api/builder", tags=["builder"])
 # ---------------------------------------------------------------------------
 
 _BLANK_TEMPLATE = """\
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: {name}
-  description: ""
-spec:
-  role: |
-    You are a helpful assistant.
-  model:
-    provider: {provider}
-    name: {model}
+name: {name}
+description: ""
+spec_version: 3
+model: {provider}:{model}
+prompt: |
+  You are a helpful assistant.
 """
 
 

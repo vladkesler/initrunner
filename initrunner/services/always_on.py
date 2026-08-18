@@ -456,15 +456,23 @@ def materialize_instance_role(
     if not isinstance(data, dict):
         raise ServiceError("Rendered role YAML must be a mapping")
 
-    # Force runtime agent name for audit/memory/budget isolation
-    meta = data.setdefault("metadata", {})
-    if not isinstance(meta, dict):
-        raise ServiceError("Rendered role metadata must be a mapping")
-    meta["name"] = runtime_agent_name(entry.slug)
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
 
-    spec = data.setdefault("spec", {})
-    if not isinstance(spec, dict):
-        raise ServiceError("Rendered role spec must be a mapping")
+    classification = classify_mapping(data)
+    flat = classification.document_class is DocumentClass.FLAT_AGENT
+    if flat:
+        data["name"] = runtime_agent_name(entry.slug)
+        spec = data
+    else:
+        # Force runtime agent name for audit/memory/budget isolation
+        meta = data.setdefault("metadata", {})
+        if not isinstance(meta, dict):
+            raise ServiceError("Rendered role metadata must be a mapping")
+        meta["name"] = runtime_agent_name(entry.slug)
+
+        spec = data.setdefault("spec", {})
+        if not isinstance(spec, dict):
+            raise ServiceError("Rendered role spec must be a mapping")
 
     prompt = _substitute_params(definition.spec.schedule_prompt, params)
     spec["triggers"] = [

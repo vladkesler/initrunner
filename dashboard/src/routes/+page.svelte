@@ -254,20 +254,6 @@
 						New Agent
 					</a>
 					<a
-						href="/flows/new"
-						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
-					>
-						<Workflow size={14} />
-						New Flow
-					</a>
-					<a
-						href="/teams/new"
-						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
-					>
-						<Users size={14} />
-						New Team
-					</a>
-					<a
 						href="/system"
 						class="flex items-center gap-2 rounded-[2px] border border-edge bg-transparent px-5 py-2 text-[13px] font-medium text-fg-muted transition-[color,border-color] duration-150 hover:border-accent-primary-dim hover:text-fg"
 					>

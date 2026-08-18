@@ -1,22 +1,16 @@
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: skill-demo
-  description: Demonstration of skill-based composition
-  tags:
-    - demo
-    - skills
-spec:
-  role: |
-    You are a versatile research assistant that can browse the web,
-    read code, and tell the time. Use the appropriate skills for each task.
-  skills:
-    - ../skills/web-researcher
-    - ../skills/code-tools.md
-  tools:
-    - type: datetime
-  guardrails:
-    max_tokens_per_run: 50000
-    max_tool_calls: 20
-    timeout_seconds: 300
-    max_request_limit: 50
+name: skill-demo
+description: Demonstration of skill-based composition
+spec_version: 3
+tags:
+- demo
+- skills
+prompt: |
+  You are a versatile research assistant that can browse the web,
+  read code, and tell the time. Use the appropriate skills for each task.
+tools:
+- datetime
+skills:
+- ../skills/web-researcher
+- ../skills/code-tools.md
+guardrails:
+  max_request_limit: 50

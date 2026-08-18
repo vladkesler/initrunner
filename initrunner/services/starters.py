@@ -88,14 +88,51 @@ class StarterEntry:
 # ---------------------------------------------------------------------------
 
 
+def document_identity(data: dict) -> dict:
+    """Name/description/tags from an envelope or a flat document."""
+    if isinstance(data.get("metadata"), dict):
+        meta = data["metadata"]
+        return {
+            "name": meta.get("name"),
+            "description": meta.get("description") or "",
+            "tags": meta.get("tags") or [],
+        }
+    return {
+        "name": data.get("name"),
+        "description": data.get("description") or "",
+        "tags": data.get("tags") or [],
+    }
+
+
+def document_body(data: dict) -> dict:
+    """Feature-bearing mapping: envelope ``spec`` or the flat document itself."""
+    spec = data.get("spec")
+    if isinstance(spec, dict):
+        return spec
+    return data
+
+
+def tool_types_from(tools: list) -> set[str]:
+    """Type names from envelope ``{type: ...}`` items or flat shorthand."""
+    types: set[str] = set()
+    for item in tools:
+        if isinstance(item, str):
+            types.add(item)
+        elif isinstance(item, dict):
+            if "type" in item:
+                types.add(str(item["type"]))
+            elif len(item) == 1:
+                types.add(str(next(iter(item))))
+    return types
+
+
 def derive_features(spec: dict) -> list[str]:
-    """Derive user-facing feature labels from a role spec dict."""
+    """Derive user-facing feature labels from a role spec or flat document."""
     features: list[str] = []
     for key, label in FEATURE_MAP:
         if spec.get(key):
             features.append(label)
-    tools = spec.get("tools") or []
-    tool_types = {t.get("type", "") for t in tools if isinstance(t, dict)}
+    tool_types = tool_types_from(spec.get("tools") or [])
     if "search" in tool_types or "web_reader" in tool_types:
         features.append("Web")
     if "shell" in tool_types:
@@ -121,12 +158,25 @@ def _detect_requires_env(raw_yaml: str, data: dict) -> list[str]:
     """Detect required environment variables from triggers and ${VAR} patterns."""
     env_vars: set[str] = set()
 
+    _default_token_env = {
+        "telegram": "TELEGRAM_BOT_TOKEN",
+        "discord": "DISCORD_BOT_TOKEN",
+    }
     # Trigger *_token_env fields (token_env, app_token_env, bot_token_env)
-    for trigger in data.get("spec", {}).get("triggers") or []:
+    for trigger in document_body(data).get("triggers") or []:
+        if isinstance(trigger, str):
+            if trigger in _default_token_env:
+                env_vars.add(_default_token_env[trigger])
+            continue
         if isinstance(trigger, dict):
             for field in _TRIGGER_TOKEN_ENV_FIELDS:
                 if trigger.get(field):
                     env_vars.add(trigger[field])
+            ttype = trigger.get("type")
+            if ttype in _default_token_env and not any(
+                trigger.get(field) for field in _TRIGGER_TOKEN_ENV_FIELDS
+            ):
+                env_vars.add(_default_token_env[ttype])
 
     # ${VAR} interpolation patterns
     env_vars.update(_ENV_VAR_RE.findall(raw_yaml))
@@ -149,7 +199,7 @@ def _detect_requires_extras(data: dict) -> list[str]:
     whose suffix needs pymupdf/docx/xlsx do.
     """
     extras: set[str] = set()
-    spec = data.get("spec") or {}
+    spec = document_body(data)
 
     ingest = spec.get("ingest") or {}
     for source in ingest.get("sources") or []:
@@ -157,11 +207,12 @@ def _detect_requires_extras(data: dict) -> list[str]:
             extras.add("ingest")
             break
 
-    tools = spec.get("tools") or []
-    tool_types = {t.get("type", "") for t in tools if isinstance(t, dict)}
+    tool_types = tool_types_from(spec.get("tools") or [])
 
     for trigger in spec.get("triggers") or []:
-        if isinstance(trigger, dict) and trigger.get("type"):
+        if isinstance(trigger, str):
+            tool_types.add(trigger)
+        elif isinstance(trigger, dict) and trigger.get("type"):
             tool_types.add(trigger["type"])
 
     for tool_type in tool_types:
@@ -174,7 +225,7 @@ def _detect_requires_extras(data: dict) -> list[str]:
 def _detect_requires_user_data(data: dict) -> list[str]:
     """Detect local content paths from ingest.sources."""
     paths: list[str] = []
-    ingest = (data.get("spec") or {}).get("ingest")
+    ingest = document_body(data).get("ingest")
     if not ingest:
         return paths
 
@@ -212,16 +263,20 @@ def _load_single_yaml(path: Path) -> tuple[str, dict] | None:
 
 def _build_entry(slug: str, raw: str, data: dict, path: Path) -> StarterEntry:
     """Build a StarterEntry from parsed YAML data."""
-    meta = data.get("metadata") or {}
-    spec = data.get("spec") or {}
-    kind = data.get("kind", "Agent")
+    from initrunner.agent.schema.adapt import run_kind_from_mapping
+
+    identity = document_identity(data)
+    try:
+        kind = run_kind_from_mapping(data)
+    except Exception:
+        kind = data.get("kind") or "Agent"
 
     return StarterEntry(
         slug=slug,
-        name=meta.get("name", slug),
-        description=(meta.get("description") or "").strip(),
-        tags=meta.get("tags") or [],
-        features=derive_features(spec),
+        name=identity.get("name") or slug,
+        description=(identity.get("description") or "").strip(),
+        tags=identity.get("tags") or [],
+        features=derive_features(document_body(data)),
         kind=kind,
         path=path,
         requires_env=_detect_requires_env(raw, data),

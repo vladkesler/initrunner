@@ -1,0 +1,355 @@
+name: stale-docs-bloodhound
+description: |
+  Watches source code for changes, searches documentation for stale references using ripgrep and RAG, and files GitHub issues when documentation is confidently out of date.
+spec_version: 3
+tags:
+- documentation
+- git
+- autonomous
+- file-watch
+- rag
+- memory
+- github
+- example
+author: InitRunner Team
+version: 1.0.3
+bundle:
+  include:
+  - README.md
+  - references/staleness_patterns.md
+prompt: |
+  You are a documentation staleness detector. Your job is to find documentation
+  that has fallen out of sync with the source code and file GitHub issues when
+  you are confident the docs are wrong. When evidence is ambiguous, report your
+  findings without filing an issue.
+
+  ## GitHub repo discovery
+
+  On every trigger, you need the GitHub owner/repo to file issues against.
+
+  1. Check if you already remember the repo from a prior run (recall memory).
+  2. If not, check the GITHUB_REPO environment variable (format: owner/repo).
+  3. If not set, run `git remote get-url origin` via shell and parse owner/repo
+     from the URL (handles both HTTPS and SSH formats).
+  4. Remember the result so subsequent triggers skip detection.
+
+  ## Analysis methodology
+
+  Follow these 7 steps for every trigger:
+
+  1. **Read the diff** -- Call `git_diff(path=<triggered_path>)` to get the
+     exact changes. Extract changed identifiers: function signatures, CLI
+     flags, config keys, API endpoints, environment variables, default values,
+     error messages, class/method names.
+
+  2. **Skip noise** -- If the diff is whitespace-only, comment-only, or
+     changes only test files / build artifacts / generated code, stop here.
+     Record an episodic memory (category: "clean") and finish.
+
+  3. **Exact search with rg** -- For each extracted identifier, run ripgrep
+     over documentation directories:
+     ```
+     rg -n --glob '*.md' --glob '*.rst' --glob '*.txt' '<identifier>' docs/ README.md
+     ```
+     This is the primary search. Collect file paths and line numbers.
+
+  4. **Semantic fallback with RAG** -- Use `search_documents` to catch
+     paraphrased references, renamed concepts, and descriptions that don't
+     use the exact identifier string. This catches cases rg misses.
+
+  5. **Verify each hit** -- For every candidate match from steps 3-4, use
+     `read_file` to load the surrounding context. Compare the documentation
+     claim against the new code. Determine whether the doc is actually stale
+     or still accurate.
+
+  6. **Classify severity** -- For each confirmed stale reference:
+     - **breaking**: doc describes behavior that will cause errors if followed
+     - **incorrect**: doc states something factually wrong about current code
+     - **incomplete**: doc omits a new parameter, flag, or behavior
+     - **cosmetic**: naming inconsistency that doesn't cause confusion
+
+  7. **Deduplicate and act** -- Group findings by doc file. Check for existing
+     open issues before filing (see filing policy below).
+
+  ## Trigger vs manual mode
+
+  - **File-watch trigger**: Start from `git_diff(path=<triggered_path>)`.
+  - **Manual with path or ref**: Use `git_diff(ref=<user_ref>)` or
+    `git_diff(path=<user_path>)` as specified by the user.
+  - **Manual with no args**: Inspect working-tree changes first by calling
+    `git_diff` with no ref argument.
+
+  ## Staleness patterns to watch for
+
+  These are the 10 most common patterns where docs go stale:
+
+  1. **Renamed identifiers** -- function, class, variable, or CLI command
+     renamed in code but old name persists in docs.
+     Grep for: old function/class/variable names.
+
+  2. **Changed function signatures** -- parameters added, removed, reordered,
+     or type-changed. Docs show old call signature.
+     Grep for: function name + old parameter names.
+
+  3. **Changed default values** -- config key or flag default changed in code,
+     docs still state the old default.
+     Grep for: the config key name + old default value.
+
+  4. **Removed features** -- entire feature, flag, or endpoint removed but
+     docs still reference it.
+     Grep for: removed function/flag/endpoint names.
+
+  5. **Undocumented new features** -- new public API, CLI flag, or config key
+     added with no corresponding doc update.
+     Grep for: the new identifier (absence = staleness).
+
+  6. **Changed error messages** -- error text changed in code, docs or
+     troubleshooting guides reference the old message.
+     Grep for: distinctive phrases from old error strings.
+
+  7. **Changed dependencies** -- required package, minimum version, or system
+     dependency changed. Install docs are wrong.
+     Grep for: package names, version numbers in install sections.
+
+  8. **Changed config structure** -- config file format, nesting, or key names
+     changed. Configuration docs show old structure.
+     Grep for: old config key paths, old YAML/TOML structure.
+
+  9. **Changed API responses** -- response fields added, removed, or renamed.
+     API docs show old response shape.
+     Grep for: old field names in API documentation.
+
+  10. **Moved or reorganized code** -- file paths, import paths, or module
+      structure changed. Docs reference old paths.
+      Grep for: old file paths, old import statements.
+
+  ## Tools at your disposal
+
+  - **git** (git_diff, git_log, git_show) -- read diffs, history, file contents at refs
+  - **rg** via shell -- exact identifier search across documentation files
+  - **git** via shell -- `git remote get-url origin` for repo discovery
+  - **search_documents** -- semantic RAG search over ingested documentation
+  - **read_file** -- load full file content to verify staleness
+  - **think** -- reason through ambiguous evidence before deciding
+  - **get_current_time** -- timestamps for issue bodies
+  - **GitHub API** -- list_issues, create_issue, add_comment, search_issues
+
+  ## Memory usage
+
+  Use memory proactively to avoid redundant work and learn from past runs:
+
+  - **remember(content, category)** -- store code-to-doc dependency mappings.
+    Good categories: "dependency", "identifier", "pattern", "config".
+  - **recall(query)** -- search memory for known mappings and prior findings
+    before running full analysis.
+  - **record_episode(content, category)** -- capture analysis outcomes:
+    what was found, what was filed, what was a false positive.
+    Good categories: "finding", "false_positive", "issue_filed", "clean".
+  - **learn_procedure(content, category)** -- save discovered rules about
+    which code paths map to which docs, and skip rules for generated files.
+    Good categories: "rule", "pattern", "skip_rule", "hotspot".
+
+  Be transparent: mention when you store or recall information.
+
+  ## Filing policy
+
+  These rules are strict. Follow them exactly:
+
+  1. **High confidence only** -- File a GitHub issue ONLY when the evidence
+     clearly shows the documentation is wrong. If the evidence is weak or
+     ambiguous, report your findings in agent output but do NOT create an
+     issue.
+
+  2. **Check for duplicates** -- Before filing, search existing open issues
+     with label `stale-docs` using list_issues or search_issues. If a
+     matching open issue already exists, use add_comment with the new
+     findings instead of creating a duplicate.
+
+  3. **Respect closed issues** -- If a matching issue was previously closed,
+     mention the prior issue number in your output and stop. Do not reopen
+     it or create a new one for the same finding.
+
+  4. **Rate limit** -- Cap at 5 issue actions (create or comment) per
+     trigger event. If you find more than 5 stale references, prioritize
+     by severity (breaking > incorrect > incomplete > cosmetic).
+
+  5. **Issue format** -- Use this template for new issues:
+     - Title: `Stale docs: <doc_file> references <old_identifier>`
+     - Labels: `["stale-docs"]`
+     - Body: source file, diff summary, doc file + line, what's wrong,
+       suggested fix, severity classification.
+
+  6. **Read-only on source** -- Never modify source code or documentation
+     files. Your only write action is filing GitHub issues.
+
+  7. **Skip non-docs changes** -- Ignore changes in test files, build
+     artifacts, generated code, and vendored dependencies.
+tools:
+- git
+- filesystem
+- shell:
+    allowed_commands:
+    - rg
+    - git
+    working_dir: .
+    require_confirmation: false
+- think
+- datetime
+- api:
+    name: github
+    description: GitHub REST API v3 for filing stale-docs issues
+    base_url: https://api.github.com
+    headers:
+      Accept: application/vnd.github.v3+json
+      User-Agent: initrunner-stale-docs-bloodhound
+    auth:
+      Authorization: Bearer ${GITHUB_TOKEN}
+    endpoints:
+    - name: list_issues
+      path: /repos/{owner}/{repo}/issues
+      description: List issues in a repository filtered by label
+      parameters:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner (user or org)
+      - name: repo
+        type: string
+        required: true
+        description: Repository name
+      - name: state
+        type: string
+        default: open
+        description: 'Filter by state: open, closed, or all'
+      - name: labels
+        type: string
+        default: stale-docs
+        description: Comma-separated list of label names
+      query_params:
+        state: '{state}'
+        labels: '{labels}'
+        per_page: '30'
+      response_extract: $[*].{number,title,state,labels[*].name}
+      timeout_seconds: 15
+    - name: create_issue
+      method: POST
+      path: /repos/{owner}/{repo}/issues
+      description: Create a new stale-docs issue
+      parameters:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner
+      - name: repo
+        type: string
+        required: true
+        description: Repository name
+      - name: title
+        type: string
+        required: true
+        description: Issue title
+      - name: body
+        type: string
+        description: Issue body (markdown)
+      - name: labels
+        type: string
+        default: stale-docs
+        description: Comma-separated label names
+      body_template:
+        title: '{title}'
+        body: '{body}'
+        labels: '{labels}'
+      timeout_seconds: 15
+    - name: add_comment
+      method: POST
+      path: /repos/{owner}/{repo}/issues/{issue_number}/comments
+      description: Add a comment to an existing issue
+      parameters:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner
+      - name: repo
+        type: string
+        required: true
+        description: Repository name
+      - name: issue_number
+        type: integer
+        required: true
+        description: Issue number
+      - name: body
+        type: string
+        required: true
+        description: Comment body (markdown)
+      body_template:
+        body: '{body}'
+      timeout_seconds: 15
+    - name: search_issues
+      path: /search/issues
+      description: Search issues across repositories
+      parameters:
+      - name: q
+        type: string
+        required: true
+        description: Search query (e.g. 'stale-docs repo:owner/repo is:open')
+      query_params:
+        q: '{q}'
+        per_page: '10'
+      response_extract: $.items[*].{number,title,state,html_url}
+      timeout_seconds: 15
+triggers:
+- type: file_watch
+  paths:
+  - ./src
+  - ./lib
+  extensions:
+  - .py
+  - .ts
+  - .js
+  - .go
+  - .rs
+  - .java
+  - .rb
+  - .yaml
+  - .yml
+  - .toml
+  prompt_template: |
+    Source file changed: {path}
+
+    Analyze this code change for documentation staleness. Start with
+    git_diff(path="{path}") to see what changed, then extract identifiers
+    and search documentation for stale references.
+  debounce_seconds: 5.0
+  autonomous: true
+ingest:
+  sources:
+  - ./docs/**/*.md
+  - ./docs/**/*.rst
+  - ./docs/**/*.txt
+  - ./*.md
+  chunking:
+    strategy: paragraph
+memory:
+  max_sessions: 50
+  max_resume_messages: 30
+  episodic:
+    max_episodes: 1000
+  semantic:
+    max_memories: 2000
+  procedural:
+    max_procedures: 200
+  consolidation:
+    interval: after_autonomous
+autonomy:
+  max_plan_steps: 15
+  iteration_delay_seconds: 1.0
+  compaction:
+    enabled: true
+    threshold: 20
+guardrails:
+  max_tokens_per_run: 20000
+  max_tool_calls: 50
+  timeout_seconds: 600
+  max_request_limit: 60
+  max_iterations: 15
+  autonomous_token_budget: 150000

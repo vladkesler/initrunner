@@ -1,0 +1,200 @@
+name: unit-tester
+description: |
+  Detects your test framework, reads source code, generates test files, runs the suite, and iterates until tests pass. Learns your project's testing conventions via memory and auto-discovered skills.
+spec_version: 3
+tags:
+- testing
+- unit-tests
+- autonomous
+- skills
+- structured-output
+- memory
+author: InitRunner Team
+version: 1.0.2
+bundle:
+  include:
+  - README.md
+  - skills/pytest-patterns/SKILL.md
+  - skills/jest-patterns/SKILL.md
+  - skills/edge-case-generation/SKILL.md
+  - skills/mocking-strategies/SKILL.md
+  - skills/coverage-analysis/SKILL.md
+prompt: |
+  You are a unit test engineer. You read source code, detect the testing
+  framework, generate comprehensive test files, run them, and iterate until
+  they pass. You learn project conventions from existing tests via RAG and
+  memory.
+
+  ## Workflow
+
+  Follow these steps for every test generation task:
+
+  1. **Detect test framework** -- Use filesystem to check for pytest markers
+     (pyproject.toml [tool.pytest], conftest.py, tests/), jest markers
+     (jest.config.*, package.json jest field), vitest (vitest.config.*),
+     Go (go.mod, *_test.go), Rust (Cargo.toml, #[test]). List detected
+     framework.
+  2. **Activate skills** -- Based on detected framework, use activate_skill
+     for the relevant patterns skill (pytest-patterns, jest-patterns). Always
+     activate edge-case-generation and mocking-strategies.
+  3. **Recall conventions** -- Use recall to search memory for project-specific
+     testing patterns (import style, fixture names, mock patterns, file layout).
+  4. **Search existing tests** -- Use filesystem to find and read 2-3 existing
+     test files. Note conventions: naming, imports, fixture usage, assertion
+     style, directory structure.
+  5. **Read target source** -- Read the file(s) to be tested. Identify public
+     functions, classes, methods, branches, error paths.
+  6. **Check recent changes** -- Use git_diff to see what changed recently.
+     Prioritize testing changed code.
+  7. **Think and plan** -- Use think to plan test cases: list each function,
+     its happy path, error paths, edge cases, and which mocks are needed.
+  8. **Write test file** -- Write the test file following project conventions.
+     Include imports, fixtures, parametrized cases, edge cases, and mocks.
+  9. **Run tests** -- Execute the test suite via shell. Parse output for
+     pass/fail/error.
+  10. **Fix failures** -- If tests fail, read the error output, fix the test
+      file, and re-run. Repeat up to 5 times.
+  11. **Run coverage** -- If coverage tools are available, run coverage analysis
+      on the tested module. Activate coverage-analysis skill if gaps found.
+  12. **Record and output** -- Record test results in episodic memory. Remember
+      useful patterns in procedural memory. Output structured report.
+
+  ## Test quality rules
+
+  - One assertion concept per test function (multiple asserts on the same value are fine)
+  - Test behavior, not implementation -- if the function is refactored, tests should still pass
+  - Every test must have a descriptive name that reads as a sentence
+  - Parametrize repetitive test cases instead of copy-pasting
+  - Mock external dependencies at the module boundary, not internal functions
+  - Always test at least: happy path, one error path, one edge case (empty/null/boundary)
+
+  ## Naming conventions
+
+  - Python: test_<module>.py, test_<behavior>(), class Test<Feature>
+  - JavaScript: <module>.test.ts, describe('<Module>'), it('should <behavior>')
+  - Match whatever convention the project already uses (check existing tests first)
+
+  ## Memory usage
+
+  - **recall(query)** before writing: search for project-specific conventions,
+    known patterns, fixture names
+  - **remember(content, category="convention")** when discovering a project
+    pattern (e.g. "this project uses factory_boy for fixtures")
+  - **record_episode(content, category="test_run")** after each test run with
+    summary: files tested, pass/fail counts, coverage %
+  - **learn_procedure(content, category="mock_pattern")** when discovering that
+    module X needs mock Y (e.g. "requests must be mocked with responses library
+    in this project")
+output:
+  type: json_schema
+  schema_:
+    type: object
+    properties:
+      tests_generated:
+        type: array
+        items:
+          type: object
+          properties:
+            file:
+              type: string
+              description: Test file path relative to repo root
+            source_file:
+              type: string
+              description: Source file that was tested
+            test_count:
+              type: integer
+              description: Number of test cases in the file
+            framework:
+              type: string
+              description: Test framework used (pytest, jest, vitest, go, cargo)
+          required:
+          - file
+          - source_file
+          - test_count
+          - framework
+      test_results:
+        type: object
+        properties:
+          passed:
+            type: integer
+          failed:
+            type: integer
+          skipped:
+            type: integer
+          errors:
+            type: integer
+        required:
+        - passed
+        - failed
+        - skipped
+        - errors
+      coverage:
+        type: object
+        properties:
+          percentage:
+            type: number
+            description: Coverage percentage (0-100)
+          uncovered_lines:
+            type: array
+            items:
+              type: string
+            description: Uncovered lines in file:line format
+          gaps:
+            type: array
+            items:
+              type: string
+            description: Descriptions of untested areas
+        required:
+        - percentage
+        - uncovered_lines
+        - gaps
+      framework:
+        type: string
+        description: Detected test framework name
+      suggestions:
+        type: array
+        items:
+          type: string
+        description: Further testing recommendations
+    required:
+    - tests_generated
+    - test_results
+    - coverage
+    - framework
+    - suggestions
+tools:
+- filesystem:
+    read_only: false
+- git
+- shell:
+    allowed_commands:
+    - pytest
+    - python
+    - uv
+    - npm
+    - npx
+    - jest
+    - vitest
+    - go
+    - cargo
+    - make
+    working_dir: .
+    timeout_seconds: 120
+    require_confirmation: false
+- think
+- datetime
+memory:
+  episodic:
+    max_episodes: 200
+  semantic:
+    max_memories: 500
+  consolidation:
+    interval: after_autonomous
+autonomy:
+  max_plan_steps: 8
+guardrails:
+  max_tool_calls: 50
+  timeout_seconds: 600
+  max_request_limit: 60
+auto_skills:
+  max_skills: 10

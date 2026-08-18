@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from initrunner.agent.schema.document import DocumentClass
@@ -12,7 +13,6 @@ from initrunner.agent.schema.normalize import (
     NormalizeError,
     normalize_mapping,
 )
-from initrunner.agent.schema.v3 import AgentDocument
 
 
 def test_normalize_envelope_agent() -> None:
@@ -93,7 +93,7 @@ def test_normalize_envelope_flow_then_and_needs() -> None:
     assert children["intake"].then.to == ("writer",)
     assert children["writer"].needs == ("intake",)
     assert result.document.agents is not None
-    assert "needs" not in result.document.agents["writer"].model_dump()
+    assert result.document.agents["writer"].after == ["intake"]
     assert any("restart" in w for w in result.warnings)
     assert "restart" in INERT_FLOW_CHILD_FIELDS
 
@@ -128,6 +128,10 @@ def test_bundled_examples_normalize() -> None:
 
 
 def test_equivalence_team_envelope_and_flat() -> None:
+    from initrunner.agent.schema.adapt import adapt_mapping
+    from initrunner.agent.schema.render import render_document
+    from initrunner.services.migrate import runner_models_equivalent
+
     envelope = {
         "apiVersion": "initrunner/v1",
         "kind": "Team",
@@ -141,12 +145,26 @@ def test_equivalence_team_envelope_and_flat() -> None:
         },
     }
     first = normalize_mapping(envelope)
-    dumped = first.document.model_dump(exclude_none=True)
-    # Re-parse as a flat document (what doctor --fix would write, minus comments).
-    flat = AgentDocument.model_validate(dumped)
-    second = normalize_mapping(flat.model_dump(exclude_none=True))
+    text = render_document(first.document)
+    rendered = yaml.safe_load(text)
+    second = normalize_mapping(rendered)
     assert first.ir.shape == second.ir.shape
     assert first.ir.run == second.ir.run
     assert [c.name for c in first.ir.children] == [c.name for c in second.ir.children]
     assert [c.prompt for c in first.ir.children] == [c.prompt for c in second.ir.children]
     assert first.ir.handoff == second.ir.handoff
+    _, old_model, _ = adapt_mapping(envelope)
+    _, new_model, _ = adapt_mapping(rendered)
+    assert runner_models_equivalent(old_model, new_model)
+
+
+def test_non_kebab_flow_name_is_rejected() -> None:
+    with pytest.raises(NormalizeError, match="kebab-case"):
+        normalize_mapping(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Flow",
+                "metadata": {"name": "Support Desk"},
+                "spec": {"agents": {"intake": {"role": "roles/intake.yaml"}}},
+            }
+        )

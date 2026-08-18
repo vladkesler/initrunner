@@ -25,33 +25,31 @@ mkdir site-monitor && cd site-monitor
 Every agent starts with a `role.yaml` file. Create one with the minimum required fields:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
-    You are a site monitoring assistant. You help users track changes
-    to web pages by fetching content, summarizing it, and reporting
-    what changed. Be concise and focus on meaningful changes.
-  model:
-    provider: openai
-    name: gpt-5-mini
-    temperature: 0.1
-    max_tokens: 2048
-  guardrails:
-    max_tokens_per_run: 10000
-    max_tool_calls: 5
-    timeout_seconds: 60
+name: site-monitor
+description: Monitors websites and summarizes changes
+model:
+  provider: openai
+  name: gpt-5-mini
+  temperature: 0.1
+  max_tokens: 2048
+prompt: |
+  You are a site monitoring assistant. You help users track changes
+  to web pages by fetching content, summarizing it, and reporting
+  what changed. Be concise and focus on meaningful changes.
+guardrails:
+  max_tokens_per_run: 10000
+  max_tool_calls: 5
+  timeout_seconds: 60
 ```
 
-Every role file has four top-level keys:
+A role file is a flat mapping:
 
-- **`apiVersion`**: Always `initrunner/v1`
-- **`kind`**: Always `Agent`
-- **`metadata`**: Name (lowercase, hyphens only), description, and optional tags/author/version
-- **`spec`**: The agent's behavior — system prompt (`role`), model, tools, and guardrails
+- **`name`**: lowercase, hyphens only
+- **`prompt`**: the system prompt
+- **`model`**: `provider:name` shorthand or a mapping
+- Optional **`tools`**, **`guardrails`**, **`triggers`**, **`memory`**, and the rest
+
+Old `apiVersion`/`kind` envelopes still load. Convert them with `initrunner doctor --fix PATH`. See [Envelope migration](envelope-migration.md).
 
 Validate the file, then run it:
 
@@ -91,13 +89,9 @@ The agent keeps context within a session — it remembers what you discussed ear
 Tools give your agent capabilities beyond conversation. Add three tools to fetch web pages, get timestamps, and save reports:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -110,12 +104,12 @@ spec:
     5. Include the date, URL, and summary in the report content
 
     Always use timestamped filenames so reports can be searched by date.
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
+tools:
     - type: web_reader
     - type: datetime
     - type: filesystem
@@ -123,7 +117,7 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  guardrails:
+guardrails:
     max_tokens_per_run: 30000
     max_tool_calls: 15
     timeout_seconds: 120
@@ -163,13 +157,9 @@ Autonomous mode lets the agent execute multi-step tasks in a loop — plan, act,
 Add `max_iterations: 5` to guardrails to limit the agentic loop:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -186,12 +176,12 @@ spec:
     for each site, then write a consolidated comparison report.
 
     Always use timestamped filenames so reports can be searched by date.
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
+tools:
     - type: web_reader
     - type: datetime
     - type: filesystem
@@ -199,7 +189,7 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  guardrails:
+guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 20
     timeout_seconds: 300
@@ -222,13 +212,9 @@ The agent autonomously fetches each URL, writes individual reports, then produce
 Memory lets your agent persist information across sessions. Add a `memory:` block:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -253,12 +239,12 @@ spec:
     - Before reporting, use recall() to check what you found last time
       and highlight what changed
     - Use list_memories() when asked for a summary of past observations
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
+tools:
     - type: web_reader
     - type: datetime
     - type: filesystem
@@ -266,12 +252,12 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  memory:
+memory:
     max_sessions: 10
     semantic:
       max_memories: 1000
     max_resume_messages: 20
-  guardrails:
+guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 20
     timeout_seconds: 300
@@ -352,13 +338,9 @@ EOF
 Add the `ingest:` block to your role:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -390,12 +372,12 @@ spec:
     - Cite the report date and URL when referencing past findings
     - Use read_file() to view a full report when the search snippet
       isn't enough context
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
+tools:
     - type: web_reader
     - type: datetime
     - type: filesystem
@@ -403,19 +385,19 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  ingest:
+ingest:
     sources:
       - ./reports/**/*.md
     chunking:
       strategy: fixed
       chunk_size: 512
       chunk_overlap: 50
-  memory:
+memory:
     max_sessions: 10
     semantic:
       max_memories: 1000
     max_resume_messages: 20
-  guardrails:
+guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 20
     timeout_seconds: 300
@@ -445,13 +427,9 @@ When you add or edit reports between runs, the next `initrunner run` picks up th
 Triggers let your agent run automatically on a schedule. Add a `triggers:` block with a cron schedule and a `sinks:` block to log results:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -483,12 +461,12 @@ spec:
     - Cite the report date and URL when referencing past findings
     - Use read_file() to view a full report when the search snippet
       isn't enough context
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:
+tools:
     - type: web_reader
     - type: datetime
     - type: filesystem
@@ -496,27 +474,27 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  ingest:
+ingest:
     sources:
       - ./reports/**/*.md
     chunking:
       strategy: fixed
       chunk_size: 512
       chunk_overlap: 50
-  memory:
+memory:
     max_sessions: 10
     semantic:
       max_memories: 1000
     max_resume_messages: 20
-  triggers:
+triggers:
     - type: cron
       schedule: "* * * * *"
       prompt: "Monitor https://example.com and save a report. Compare with previous findings."
-  sinks:
+sinks:
     - type: file
       path: ./logs/monitor.jsonl
       format: json
-  guardrails:
+guardrails:
     max_tokens_per_run: 50000
     max_tool_calls: 20
     timeout_seconds: 300
@@ -568,13 +546,9 @@ For more on triggers and daemon mode, see [Triggers](../core/triggers.md) and [S
 Here's the full `role.yaml` with every feature assembled:
 
 ```yaml
-apiVersion: initrunner/v1
-kind: Agent
-metadata:
-  name: site-monitor
-  description: Monitors websites and summarizes changes
-spec:
-  role: |
+name: site-monitor
+description: Monitors websites and summarizes changes
+prompt: |
     You are a site monitoring assistant. You fetch web pages, summarize
     their content, and save reports.
 
@@ -606,12 +580,12 @@ spec:
     - Cite the report date and URL when referencing past findings
     - Use read_file() to view a full report when the search snippet
       isn't enough context
-  model:
+model:
     provider: openai
     name: gpt-5-mini
     temperature: 0.1
     max_tokens: 4096
-  tools:                            # Step 3: agent capabilities
+tools:                            # Step 3: agent capabilities
     - type: web_reader              # fetch_page(url)
     - type: datetime                # current_time(), parse_date()
     - type: filesystem              # read_file(), write_file(), list_directory()
@@ -619,27 +593,27 @@ spec:
       read_only: false
       allowed_extensions:
         - .md
-  ingest:                           # Step 6: searchable knowledge base
+ingest:                           # Step 6: searchable knowledge base
     sources:
       - ./reports/**/*.md
     chunking:
       strategy: fixed
       chunk_size: 512
       chunk_overlap: 50
-  memory:                           # Step 5: persistent memory
+memory:                           # Step 5: persistent memory
     max_sessions: 10
     semantic:
       max_memories: 1000
     max_resume_messages: 20
-  triggers:                         # Step 7: scheduled execution
+triggers:                         # Step 7: scheduled execution
     - type: cron
       schedule: "0 * * * *"
       prompt: "Monitor https://example.com and save a report. Compare with previous findings."
-  sinks:                            # Step 7: result logging
+sinks:                            # Step 7: result logging
     - type: file
       path: ./logs/monitor.jsonl
       format: json
-  guardrails:                       # Safety limits
+guardrails:                       # Safety limits
     max_tokens_per_run: 50000
     max_tool_calls: 20
     timeout_seconds: 300

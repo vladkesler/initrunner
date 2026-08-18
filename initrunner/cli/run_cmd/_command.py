@@ -345,6 +345,11 @@ def run(
 
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
+    from initrunner.services.migrate import envelope_warning_for
+
+    warning = envelope_warning_for(role_file)
+    if warning:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     # --- --save: copy starter to local directory (no prerequisites needed) ---
     if save is not None:
