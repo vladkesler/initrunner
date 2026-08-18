@@ -3,10 +3,19 @@
 ## Unreleased
 
 ### Changed
-- **Flat Agent, Team, and Flow YAML.** Public documents no longer write `apiVersion` / `kind` / `metadata` / `spec`. Old envelopes still load. Convert a file or directory in place with `initrunner doctor --fix PATH`. README has an upgrading note above Quickstart; details in [Envelope migration](docs/getting-started/envelope-migration.md). Subsystem docs and examples now show the flat shape (`prompt`, `agents`, `use` / `then` / `after`, `run`). `kind: Service` and `kind: TestSuite` stay enveloped.
+- **The agent file is the agent.** Public Agent, Team, and Flow YAML is flat: a name, a prompt, the tools — no `apiVersion` / `kind` / `metadata` / `spec` wrapper. Composed documents use `agents`, `run`, `then`, and `after` (startup order). `personas` is not a public word. `kind: Service` and `kind: TestSuite` are unchanged. Filenames stay (`role.yaml`, `flow.yaml`).
+- **Old envelopes still run.** A file with the removed wrapper loads and executes. You get one warning that points at `doctor --fix`. Nothing is renamed on disk until you convert.
+- **One write path.** `initrunner new`, templates, `flow new`, the dashboard builder, imports, and examples write only flat YAML (`spec_version: 3`). Default new-agent output is `agent.yaml`.
+- **Directory resolution.** `initrunner run .` prefers `agent.yaml`, then `role.yaml`, then a single flat or envelope document in the directory.
+- **`initrunner doctor --fix` rewrites envelopes.** Pass a file or directory. It converts Agent, Team, and Flow YAML in place, writes `PATH.bak` unless you pass `--no-backup`, and refuses when a rewrite would change behavior (for example a Flow whose `metadata.name` is not kebab-case). Already-flat files and Service/TestSuite documents are skipped. `--force` overwrites an existing `.bak`. `--yes` is required when stdin is not a TTY.
 
 ### Fixed
-- **Dashboard flow editor.** Seeded flat flow YAML was rejected as missing envelope fields. The dashboard validator now adapts flat documents the same way team and agent validation already do.
+- **Dashboard flow editor.** Seeded flat flow YAML was rejected as missing envelope fields (`apiVersion`, `kind`, `metadata`, `spec`). The dashboard validator now adapts flat documents the same way team and agent validation already do.
+- **Flat YAML on the rest of the write/read surface.** `configure` updates a `model: provider:name` shorthand. Bundles and registry install previews accept flat roles. Always-on services read the cron prompt from a flat role. Flow members load `.env` from the referenced role directory. The dashboard builder seeds and save paths emit flat YAML.
+
+### Docs
+- README (English, Chinese, Japanese) has a short note above Quickstart: files are simpler, existing files still run, convert with `doctor --fix` when you want. [Envelope migration](docs/getting-started/envelope-migration.md) has the before/after and the rewriter rules.
+- Subsystem guides (CLI, doctor, flow, team, tools, memory, RAG, security, providers, dashboard API snippets, import guides) show the flat shape. TestSuite and Service examples stay enveloped.
 
 ## [2026.8.3] - 2026-08-14
 

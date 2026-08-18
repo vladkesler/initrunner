@@ -29,15 +29,17 @@
 
 1つの YAML ファイルでエージェントを定義。対話する。うまくいったら自律実行させる。信頼できたら、cron スケジュール、ファイル変更、webhook、Telegram メッセージに反応するデーモンとしてデプロイする。同じファイルのまま。プロトタイプから本番まで書き直し不要。
 
-## `apiVersion: initrunner/v1` からのアップグレード
+## エージェントファイルが簡単になりました
 
-Agent / Team / Flow ファイルはフラット形式です（`name`、`prompt`、`agents`。`apiVersion` / `kind` / `metadata` / `spec` は書きません）。古い envelope はそのまま読み込めます。その場で変換するには:
+これまでエージェントは `apiVersion`、`kind`、`metadata`、`spec` で包んでいました。今はファイルそのものがエージェントです。名前、プロンプト、ツール。
+
+手元のファイルはそのまま動きます。きれいにしたくなったら:
 
 ```bash
 initrunner doctor --fix PATH --yes
 ```
 
-`--no-backup` を付けない限り `PATH.bak` を書き出します。詳細は [Envelope migration](docs/getting-started/envelope-migration.md) を参照。
+先に `.bak` を残します。[書き換えの説明](docs/getting-started/envelope-migration.md)。
 
 ## クイックスタート
 

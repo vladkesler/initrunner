@@ -29,15 +29,17 @@
 
 用一个 YAML 文件定义 Agent。和它对话。效果满意后，让它自主运行。信任它之后，部署为守护进程，响应 cron 调度、文件变更、webhook 和 Telegram 消息。同一个文件，从原型到生产，无需重写。
 
-## 从 `apiVersion: initrunner/v1` 升级
+## Agent 文件更简单了
 
-Agent、Team、Flow 文件现在是扁平格式（`name`、`prompt`、`agents`，不再写 `apiVersion` / `kind` / `metadata` / `spec`）。旧的 envelope 仍可加载。就地转换：
+以前每个 Agent 都要包一层 `apiVersion`、`kind`、`metadata`、`spec`。现在文件本身就是 Agent：名字、提示词、工具。
+
+你现有的文件还能跑。想整理的时候再转换：
 
 ```bash
 initrunner doctor --fix PATH --yes
 ```
 
-默认会写 `PATH.bak`。详见 [Envelope migration](docs/getting-started/envelope-migration.md)。
+会先留一份 `.bak`。[改写说明](docs/getting-started/envelope-migration.md)。
 
 ## 快速开始
 
