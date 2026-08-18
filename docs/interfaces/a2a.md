@@ -26,7 +26,7 @@ initrunner a2a serve role.yaml --host 0.0.0.0 --port 9000 \
 The server exposes:
 
 - `GET /.well-known/agent-card.json` -- agent card (discovery; no auth)
-- `POST /` -- JSON-RPC (`SendMessage`, `GetTask`, `CancelTask`, …)
+- `POST /` -- JSON-RPC (`SendMessage`, `SendStreamingMessage`, `GetTask`, `CancelTask`, `SubscribeToTask`, …)
 
 ```bash
 curl -s http://127.0.0.1:8000/.well-known/agent-card.json | jq .supportedInterfaces
@@ -50,6 +50,26 @@ curl -s http://127.0.0.1:8000/ \
 
 A request without `A2A-Version: 1.0` is treated as protocol 0.3 and rejected with JSON-RPC error `-32009`.
 
+Token stream (SSE):
+
+```bash
+curl -N http://127.0.0.1:8000/ \
+  -H 'Content-Type: application/json' \
+  -H 'A2A-Version: 1.0' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "SendStreamingMessage",
+    "params": {
+      "message": {
+        "role": "ROLE_USER",
+        "messageId": "m1",
+        "parts": [{"text": "hello"}]
+      }
+    }
+  }'
+```
+
 ## CLI Options
 
 | Option | Type | Default | Description |
@@ -67,7 +87,7 @@ A request without `A2A-Version: 1.0` is treated as protocol 0.3 and rejected wit
 
 ## How It Works
 
-The server is a Starlette app assembled from `a2a-sdk` 1.0 routes (`create_agent_card_routes` + `create_jsonrpc_routes`) and `DefaultRequestHandlerV2`. The custom `InitRunnerAgentExecutor` routes every task through `execute_run_async()`, so A2A-served agents match `--serve` and CLI runs:
+The server is a Starlette app assembled from `a2a-sdk` 1.0 routes (`create_agent_card_routes` + `create_jsonrpc_routes`) and `DefaultRequestHandlerV2`. The custom `InitRunnerAgentExecutor` routes every task through `execute_run_stream_async()`, so A2A-served agents match `--serve` and CLI runs:
 
 - Input content validation
 - Role guardrail usage limits
@@ -78,7 +98,9 @@ The server is a Starlette app assembled from `a2a-sdk` 1.0 routes (`create_agent
 
 Blocking `SendMessage` waits until the task is terminal (`COMPLETED`, `FAILED`, `CANCELED`, `REJECTED`) or interrupted (`INPUT_REQUIRED`, `AUTH_REQUIRED`). `configuration.returnImmediately: true` returns the `SUBMITTED`/`WORKING` task and finishes in the background; poll with `GetTask`.
 
-`CancelTask` cancels the running `execute_run_async()` coroutine and marks the task `TASK_STATE_CANCELED`.
+`CancelTask` cancels the running `execute_run_stream_async()` coroutine and marks the task `TASK_STATE_CANCELED`.
+
+`SendStreamingMessage` (and `SubscribeToTask`) stream over SSE. Text roles emit append-artifact chunks as tokens arrive (`lastChunk: true` on the final delta). Structured output is published once at the end as a data part. Delegation (`A2AInvoker`) stays on blocking `SendMessage`.
 
 ### Agent Card
 
@@ -99,11 +121,19 @@ The SDK serializer also emits a few A2A 0.3 mirror fields (`url`, `preferredTran
     }
   ],
   "capabilities": {
-    "streaming": false,
+    "streaming": true,
     "pushNotifications": false,
     "extendedAgentCard": false
   },
-  "defaultInputModes": ["text/plain"],
+  "defaultInputModes": [
+    "text/plain",
+    "application/json",
+    "image/*",
+    "audio/*",
+    "video/*",
+    "application/pdf",
+    "application/octet-stream"
+  ],
   "defaultOutputModes": ["text/plain", "application/json"],
   "skills": [
     {
@@ -121,7 +151,7 @@ A2A uses `contextId` to keep conversation threads. The executor stores PydanticA
 
 ### Why we wrap the SDK executor
 
-`a2a-sdk` samples (and PydanticAI's old `agent.to_a2a()`) call `agent.run()` directly. `InitRunnerAgentExecutor` at `initrunner/a2a/server.py` implements `AgentExecutor.execute()` so every A2A task goes through `execute_run_async()` instead. That keeps:
+`a2a-sdk` samples (and PydanticAI's old `agent.to_a2a()`) call `agent.run()` directly. `InitRunnerAgentExecutor` at `initrunner/a2a/server.py` implements `AgentExecutor.execute()` so every A2A task goes through `execute_run_stream_async()` instead. That keeps:
 
 - Input content validation (guardrail inputs)
 - Usage limits from `role.spec.guardrails`
@@ -132,9 +162,9 @@ A2A uses `contextId` to keep conversation threads. The executor stores PydanticA
 
 An agent served over A2A must behave like the same agent served over OpenAI chat completions (`--serve`) or run from the CLI. Do not swap the executor for a raw `agent.run()` wrapper.
 
-Inbound parts in this release are text-only (`context.get_user_input()`). Structured output is a data part (plus `json_schema` metadata), not a text dump.
+Inbound parts: text is joined; `data` is JSON-dumped into the text prompt; `url` becomes `ImageUrl` / `AudioUrl` / `VideoUrl` / `DocumentUrl` (media type first, then file extension); `raw` becomes `BinaryContent` and is rejected above 20 MB. Text-only messages stay a plain `str`. Structured output is a data part (plus `json_schema` metadata), not a text dump.
 
-Streaming (`SendStreamingMessage` / token deltas) and multimodal inbound (url / raw / data parts) are a follow-up. Human-in-the-loop pause (`INPUT_REQUIRED` / `AUTH_REQUIRED`) and a durable SQLite task store are documented follow-ups, not implemented.
+Human-in-the-loop pause (`INPUT_REQUIRED` / `AUTH_REQUIRED`) and a durable SQLite task store are documented follow-ups, not implemented.
 
 ## Calling A2A Agents from a Role
 

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
 
 from a2a.helpers.proto_helpers import new_task, new_text_part  # type: ignore[import-not-found]
@@ -28,8 +30,8 @@ from a2a.utils.constants import (  # type: ignore[import-not-found]
 from starlette.applications import Starlette
 
 from initrunner.a2a.card import build_agent_card
-from initrunner.a2a.convert import output_to_parts
-from initrunner.services.execution import execute_run_async
+from initrunner.a2a.convert import message_to_prompt, output_to_parts
+from initrunner.services.execution import execute_run_stream_async
 
 if TYPE_CHECKING:
     from pydantic_ai import Agent
@@ -45,11 +47,12 @@ _CONTEXT_LRU_MAX = 1000
 
 
 class InitRunnerAgentExecutor(AgentExecutor):
-    """Route every A2A task through ``execute_run_async()``.
+    """Route every A2A task through ``execute_run_stream_async()``.
 
     Conversation context is an in-process LRU keyed by A2A ``context_id``.
     It has the same durability as the old FastA2A in-memory store: lost on
     process restart. Tasks themselves live in the SDK ``InMemoryTaskStore``.
+    Token deltas are published as append-artifact events on the same loop.
     """
 
     def __init__(
@@ -97,17 +100,54 @@ class InitRunnerAgentExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task_id, context_id)
         await updater.start_work()
 
-        prompt = context.get_user_input()
-        message_history = self._history_for(context_id)
-
         try:
-            result, messages = await execute_run_async(
+            prompt = message_to_prompt(context.message)
+        except ValueError as exc:
+            await updater.failed(
+                message=updater.new_agent_message([new_text_part(str(exc) or "invalid input")])
+            )
+            return
+
+        message_history = self._history_for(context_id)
+        token_q: asyncio.Queue[str | None] = asyncio.Queue()
+        stream_artifact_id = str(uuid.uuid4())
+        streamed = False
+
+        def on_token(delta: str) -> None:
+            nonlocal streamed
+            if not delta:
+                return
+            streamed = True
+            token_q.put_nowait(delta)
+
+        async def drain() -> None:
+            first_chunk = True
+            while True:
+                delta = await token_q.get()
+                if delta is None:
+                    return
+                await updater.add_artifact(
+                    [new_text_part(delta)],
+                    artifact_id=stream_artifact_id,
+                    name="result",
+                    append=not first_chunk,
+                    last_chunk=False,
+                )
+                first_chunk = False
+
+        drain_task: asyncio.Task[None] | None = asyncio.create_task(drain())
+        try:
+            result, messages = await execute_run_stream_async(
                 self.agent,
                 self.role,
                 prompt,
                 audit_logger=self.audit_logger,
                 message_history=message_history if message_history else None,
+                on_token=on_token,
             )
+            token_q.put_nowait(None)
+            await drain_task
+            drain_task = None
             self._store_history(context_id, messages)
 
             if not result.success:
@@ -118,14 +158,28 @@ class InitRunnerAgentExecutor(AgentExecutor):
                 )
                 return
 
+            if streamed:
+                await updater.add_artifact(
+                    [new_text_part("")],
+                    artifact_id=stream_artifact_id,
+                    name="result",
+                    append=True,
+                    last_chunk=True,
+                )
             parts = output_to_parts(result.output)
-            await updater.add_artifact(parts, name="result")
+            if not streamed:
+                await updater.add_artifact(parts, name="result")
             await updater.complete(message=updater.new_agent_message(parts))
         except Exception as exc:
             _logger.exception("A2A agent execution failed for task %s", task_id)
             await updater.failed(
                 message=updater.new_agent_message([new_text_part(str(exc) or "agent run failed")])
             )
+        finally:
+            if drain_task is not None and not drain_task.done():
+                drain_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await drain_task
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task_id = context.task_id
@@ -172,7 +226,7 @@ def build_a2a_app(
         role,
         url=url,
         require_auth=bool(api_key),
-        streaming=False,
+        streaming=True,
         skills=skills,
     )
     handler = DefaultRequestHandlerV2(

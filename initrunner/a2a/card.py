@@ -19,6 +19,8 @@ from a2a.utils.constants import (  # type: ignore[import-not-found]
     TransportProtocol,
 )
 
+from initrunner.a2a.convert import INPUT_MODES
+
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.agent.skills import ResolvedSkill
@@ -29,13 +31,13 @@ def build_agent_card(
     *,
     url: str,
     require_auth: bool,
-    streaming: bool = False,
+    streaming: bool = True,
     skills: list[ResolvedSkill] | None = None,
 ) -> AgentCard:
     """Construct a 1.0 AgentCard advertised at ``/.well-known/agent-card.json``.
 
-    ``streaming`` is False for the PR1 cutover. Task and conversation context
-    live in process memory and are lost on restart.
+    Task and conversation context live in process memory and are lost on
+    restart. ``streaming`` advertises ``SendStreamingMessage`` / token chunks.
     """
     card_skills = [
         AgentSkill(
@@ -71,7 +73,7 @@ def build_agent_card(
             push_notifications=False,
             extended_agent_card=False,
         ),
-        default_input_modes=["text/plain"],
+        default_input_modes=list(INPUT_MODES),
         default_output_modes=["text/plain", "application/json"],
         skills=card_skills,
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -169,6 +170,9 @@ class TestBuildAgentCard:
         assert data["skills"][0]["id"] == "researcher"
         assert data["skills"][1]["id"] == "web-search"
         assert data["securitySchemes"]["bearer"]["httpAuthSecurityScheme"]["scheme"] == "bearer"
+        assert data["capabilities"]["streaming"] is True
+        assert "image/*" in data["defaultInputModes"]
+        assert "application/json" in data["defaultInputModes"]
 
     def test_output_to_parts_text_and_structured(self):
         from pydantic import BaseModel
@@ -185,6 +189,63 @@ class TestBuildAgentCard:
         data_parts = output_to_parts(Score(score=0.95))
         assert data_parts[0].HasField("data")
         assert "json_schema" in data_parts[0].metadata
+
+    def test_parts_to_prompt_text_only_is_str(self):
+        from a2a.helpers.proto_helpers import new_text_part
+
+        from initrunner.a2a.convert import parts_to_prompt
+
+        assert parts_to_prompt([new_text_part("hello"), new_text_part("world")]) == "hello\nworld"
+
+    def test_parts_to_prompt_url_uses_media_type(self):
+        from a2a.types import Part
+        from pydantic_ai.messages import AudioUrl, DocumentUrl, ImageUrl
+
+        from initrunner.a2a.convert import parts_to_prompt
+
+        image = parts_to_prompt(
+            [Part(text="see"), Part(url="https://ex.com/x.bin", media_type="image/png")]
+        )
+        assert isinstance(image, list)
+        assert image[0] == "see"
+        assert isinstance(image[1], ImageUrl)
+        assert image[1].url == "https://ex.com/x.bin"
+
+        audio = parts_to_prompt([Part(url="https://ex.com/a.bin", media_type="audio/wav")])
+        assert isinstance(audio[0], AudioUrl)
+
+        doc = parts_to_prompt([Part(url="https://ex.com/d.bin", media_type="application/pdf")])
+        assert isinstance(doc[0], DocumentUrl)
+
+    def test_parts_to_prompt_url_falls_back_to_extension(self):
+        from a2a.types import Part
+        from pydantic_ai.messages import ImageUrl
+
+        from initrunner.a2a.convert import parts_to_prompt
+
+        prompt = parts_to_prompt([Part(url="https://ex.com/cat.png")])
+        assert isinstance(prompt[0], ImageUrl)
+
+    def test_parts_to_prompt_raw_and_data(self):
+        from a2a.types import Part
+        from pydantic_ai.messages import BinaryContent
+
+        from initrunner.a2a.convert import MAX_INBOUND_BYTES, PartTooLargeError, parts_to_prompt
+
+        raw = parts_to_prompt([Part(text="cap"), Part(raw=b"xyz", media_type="image/png")])
+        assert raw[0] == "cap"
+        assert isinstance(raw[1], BinaryContent)
+        assert raw[1].data == b"xyz"
+        assert raw[1].media_type == "image/png"
+
+        from a2a.helpers.proto_helpers import new_data_part
+
+        data = parts_to_prompt([new_data_part({"score": 0.95})])
+        assert isinstance(data, str)
+        assert "0.95" in data
+
+        with pytest.raises(PartTooLargeError, match="MB cap"):
+            parts_to_prompt([Part(raw=b"x" * (MAX_INBOUND_BYTES + 1))])
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +324,7 @@ class TestA2AProtocol:
         role = make_role(name="researcher")
         result = _run_result(output="Hello back!")
         with patch(
-            "initrunner.a2a.server.execute_run_async",
+            "initrunner.a2a.server.execute_run_stream_async",
             new_callable=AsyncMock,
             return_value=(result, []),
         ):
@@ -292,7 +353,7 @@ class TestA2AProtocol:
         role = make_role(name="scorer")
         result = _run_result(output=Score(score=0.95))
         with patch(
-            "initrunner.a2a.server.execute_run_async",
+            "initrunner.a2a.server.execute_run_stream_async",
             new_callable=AsyncMock,
             return_value=(result, []),
         ):
@@ -313,7 +374,7 @@ class TestA2AProtocol:
         role = make_role(name="researcher")
         result = _run_result(success=False, error="model error")
         with patch(
-            "initrunner.a2a.server.execute_run_async",
+            "initrunner.a2a.server.execute_run_stream_async",
             new_callable=AsyncMock,
             return_value=(result, []),
         ):
@@ -335,7 +396,7 @@ class TestA2AProtocol:
         first = _run_result(output="turn-1")
         second = _run_result(output="turn-2")
         mock_run = AsyncMock(side_effect=[(first, prior), (second, prior)])
-        with patch("initrunner.a2a.server.execute_run_async", new=mock_run):
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=mock_run):
             app = build_a2a_app(MagicMock(), role, url="http://test")
             async with await self._client(app) as client:
                 first_resp = await client.post(
@@ -361,7 +422,7 @@ class TestA2AProtocol:
         role = make_role(name="researcher")
         result = _run_result(output="done")
         with patch(
-            "initrunner.a2a.server.execute_run_async",
+            "initrunner.a2a.server.execute_run_stream_async",
             new_callable=AsyncMock,
             return_value=(result, []),
         ):
@@ -392,7 +453,7 @@ class TestA2AProtocol:
                 raise
             return _run_result(), []
 
-        with patch("initrunner.a2a.server.execute_run_async", new=_blocked):
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=_blocked):
             app = build_a2a_app(MagicMock(), role, url="http://test")
             async with await self._client(app) as client:
                 sent = await client.post(
@@ -469,7 +530,7 @@ class TestA2AProtocol:
             await gate.wait()
             return _run_result(output="later"), []
 
-        with patch("initrunner.a2a.server.execute_run_async", new=_slow):
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=_slow):
             app = build_a2a_app(MagicMock(), role, url="http://test")
             async with await self._client(app) as client:
                 sent = await client.post(
@@ -497,6 +558,110 @@ class TestA2AProtocol:
                         break
                     await asyncio.sleep(0.01)
         assert state == "TASK_STATE_COMPLETED"
+
+    @pytest.mark.anyio
+    async def test_inbound_url_part_reaches_executor(self):
+        from pydantic_ai.messages import ImageUrl
+
+        from initrunner.a2a.server import build_a2a_app
+
+        captured: list[Any] = []
+
+        async def _capture(_agent, _role, prompt, **_kwargs):
+            captured.append(prompt)
+            return _run_result(output="ok"), []
+
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=_capture):
+            app = build_a2a_app(MagicMock(), make_role(name="researcher"), url="http://test")
+            async with await self._client(app) as client:
+                resp = await client.post(
+                    "/",
+                    json=_rpc(
+                        "SendMessage",
+                        {
+                            "message": {
+                                "role": "ROLE_USER",
+                                "messageId": "m1",
+                                "parts": [
+                                    {"text": "what is this"},
+                                    {
+                                        "url": "https://ex.com/cat.bin",
+                                        "mediaType": "image/png",
+                                    },
+                                ],
+                            }
+                        },
+                    ),
+                )
+        assert resp.json()["result"]["task"]["status"]["state"] == "TASK_STATE_COMPLETED"
+        assert len(captured) == 1
+        prompt = captured[0]
+        assert isinstance(prompt, list)
+        assert prompt[0] == "what is this"
+        assert isinstance(prompt[1], ImageUrl)
+        assert prompt[1].url == "https://ex.com/cat.bin"
+
+    @pytest.mark.anyio
+    async def test_oversize_raw_fails_task(self):
+        from initrunner.a2a.server import build_a2a_app
+
+        mock_run = AsyncMock(return_value=(_run_result(), []))
+        with (
+            patch("initrunner.a2a.convert.MAX_INBOUND_BYTES", 4),
+            patch("initrunner.a2a.server.execute_run_stream_async", new=mock_run),
+        ):
+            app = build_a2a_app(MagicMock(), make_role(name="researcher"), url="http://test")
+            async with await self._client(app) as client:
+                resp = await client.post(
+                    "/",
+                    json=_rpc(
+                        "SendMessage",
+                        {
+                            "message": {
+                                "role": "ROLE_USER",
+                                "messageId": "m1",
+                                "parts": [{"raw": "aGVsbG8=", "mediaType": "text/plain"}],
+                            }
+                        },
+                    ),
+                )
+        assert mock_run.await_count == 0
+        task = resp.json()["result"]["task"]
+        assert task["status"]["state"] == "TASK_STATE_FAILED"
+        assert "MB cap" in task["status"]["message"]["parts"][0]["text"]
+
+    @pytest.mark.anyio
+    async def test_send_streaming_message_emits_token_artifacts(self):
+        from initrunner.a2a.server import build_a2a_app
+
+        async def _stream(_agent, _role, _prompt, *, on_token=None, **_kwargs):
+            if on_token is not None:
+                on_token("Hel")
+                on_token("lo")
+            return _run_result(output="Hello"), []
+
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=_stream):
+            app = build_a2a_app(MagicMock(), make_role(name="researcher"), url="http://test")
+            async with await self._client(app) as client:
+                async with client.stream(
+                    "POST",
+                    "/",
+                    json=_rpc("SendStreamingMessage", {"message": _user_message("hi")}),
+                ) as resp:
+                    body = await resp.aread()
+        assert resp.status_code == 200
+        chunks: list[str] = []
+        for line in body.decode().splitlines():
+            if not line.startswith("data:"):
+                continue
+            payload = json.loads(line[5:].strip())
+            result = payload.get("result") or {}
+            artifact = (result.get("artifactUpdate") or {}).get("artifact") or {}
+            for part in artifact.get("parts") or []:
+                if part.get("text"):
+                    chunks.append(part["text"])
+        assert "Hel" in chunks
+        assert "lo" in chunks
 
 
 # ---------------------------------------------------------------------------
@@ -537,7 +702,7 @@ class TestA2AInvokerSuccess:
                 (_run_result(output="second"), ["hist", "more"]),
             ]
         )
-        with patch("initrunner.a2a.server.execute_run_async", new=mock_run):
+        with patch("initrunner.a2a.server.execute_run_stream_async", new=mock_run):
             app = build_a2a_app(MagicMock(), role, url="http://test")
             invoker = _make_invoker(_httpx_client_factory=_factory_for(app))
             assert invoker.invoke("one") == "first"
