@@ -154,6 +154,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Discord bot quickstart | `docs/getting-started/discord.md` |
 | Telegram bot quickstart | `docs/getting-started/telegram.md` |
 | Cost tracking & budgets | `docs/core/cost-tracking.md` |
+| Memory footprint (RSS budget, fleet sizing) | `docs/operations/memory-footprint.md` |
 | Token usage control (guardrail budgets) | `docs/configuration/token_control.md` |
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |

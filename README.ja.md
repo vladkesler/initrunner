@@ -239,6 +239,10 @@ spec:
 
 コスト見積もりは [genai-prices](https://pypi.org/project/genai-prices/) でモデルとプロバイダーごとに計算します。各実行のコストは監査証跡に記録。ダッシュボードはエージェントと期間を横断したコストをプロットします。[コスト追跡](docs/core/cost-tracking.md) を参照。
 
+### メモリフットプリント
+
+素のエージェントプロセスの RSS は 150〜220 MB です。ほぼすべてが Python の AI スタック（プロバイダー SDK、PydanticAI、Pydantic）で、InitRunner 本体は約 7 MB、LanceDB は RAG やベクトルメモリを使うロールだけが読み込みます。コストはエージェントごとではなくプロセスごとです。`flow up` はマルチエージェント Flow を 1 プロセスで動かし、`--serve` / `--daemon` はタスクごとに起動コストを払わず 1 つの温かいプロセスを保ちます。内訳とコンテナサイズの目安は [Memory Footprint](docs/operations/memory-footprint.md) を参照。
+
 ## マルチエージェントオーケストレーション
 
 エージェントを Flow に連鎖。あるエージェントの出力が次の入力になります。
@@ -340,7 +344,7 @@ initrunner/
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | セキュリティ | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| 運用 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## サンプル
 

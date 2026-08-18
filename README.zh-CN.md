@@ -239,6 +239,10 @@ spec:
 
 成本估算使用 [genai-prices](https://pypi.org/project/genai-prices/) 按模型和提供商计算支出。每次运行的成本记录到审计日志。仪表盘绘制跨 Agent 和时间范围的成本曲线。查看 [成本追踪](docs/core/cost-tracking.md)。
 
+### 内存占用
+
+普通 Agent 进程的 RSS 约为 150 到 220 MB。几乎全部来自 Python AI 栈（提供商 SDK、PydanticAI、Pydantic）；InitRunner 自身大约 7 MB，LanceDB 仅在角色使用 RAG 或向量记忆时加载。成本按进程计，不按 Agent 计：`flow up` 在一个进程中运行整个多 Agent Flow，`--serve` / `--daemon` 保持一个热进程，而不是为每个任务支付启动成本。测量拆解和容器规格见 [Memory Footprint](docs/operations/memory-footprint.md)。
+
 ## 多 Agent 编排
 
 将 Agent 串联为 Flow。一个 Agent 的输出传入下一个。
@@ -340,7 +344,7 @@ initrunner/
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | 安全 | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| 运维 | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## 示例
 
