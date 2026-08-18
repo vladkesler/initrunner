@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [2026.8.4] - 2026-08-18
+
 ### Changed
 - **A2A streaming and multimodal inbound.** The card advertises `streaming: true` and wider `defaultInputModes`. `SendStreamingMessage` / `SubscribeToTask` stream token deltas as append-artifact events. Inbound `url` / `raw` / `data` parts map to PydanticAI content (raw parts over 20 MB fail the task). Delegation stays on blocking `SendMessage`.
 - **A2A 1.0 only.** `initrunner a2a serve` and `mode: a2a` delegation speak the Linux Foundation A2A 1.0 wire format via `a2a-sdk[http-server]`. FastA2A / 0.3 peers no longer work. JSON-RPC methods are `SendMessage` / `GetTask` / `CancelTask` (not `message/send` / `tasks/get`). Every JSON-RPC request needs `A2A-Version: 1.0` or the server returns `-32009`. `CancelTask` now cancels the running `execute_run_async()` coroutine. Failed tasks include `result.error` in `status.message`. Structured output is a data part (no `{"result": …}` wrapper). The card advertises `supportedInterfaces`, `metadata.version`, role/SKILL.md skills, and Bearer security when `--api-key` is set. New `--url` is the public card URL (warns when binding `0.0.0.0`/`::` without it). Delegation keeps a per-invoker `contextId` so repeated `delegate_to_*` calls share server history. Tasks and conversation context stay in-process and are lost on restart.
@@ -10,12 +12,15 @@
 - **One write path.** `initrunner new`, templates, `flow new`, the dashboard builder, imports, and examples write only flat YAML (`spec_version: 3`). Default new-agent output is `agent.yaml`.
 - **Directory resolution.** `initrunner run .` prefers `agent.yaml`, then `role.yaml`, then a single flat or envelope document in the directory.
 - **`initrunner doctor --fix` rewrites envelopes.** Pass a file or directory. It converts Agent, Team, and Flow YAML in place, writes `PATH.bak` unless you pass `--no-backup`, and refuses when a rewrite would change behavior (for example a Flow whose `metadata.name` is not kebab-case). Already-flat files and Service/TestSuite documents are skipped. `--force` overwrites an existing `.bak`. `--yes` is required when stdin is not a TTY.
+- **Bumped dashboard frontend dependencies:** `@sveltejs/vite-plugin-svelte` to 7.3.0 and `svelte` to 5.56.9 (#221); `@xyflow/svelte` to 1.6.3 (#222); `posthog-js` to 1.418.0 (Dependabot #223 asked for 1.417.0; the `^1.417.0` range resolved 1.418.0). `svelte` / `vite-plugin-svelte` are build-time; `@xyflow/svelte` (flow editor) and `posthog-js` (opt-in telemetry) ship in the compiled dashboard.
 
 ### Fixed
 - **Dashboard flow editor.** Seeded flat flow YAML was rejected as missing envelope fields (`apiVersion`, `kind`, `metadata`, `spec`). The dashboard validator now adapts flat documents the same way team and agent validation already do.
 - **Flat YAML on the rest of the write/read surface.** `configure` updates a `model: provider:name` shorthand. Bundles and registry install previews accept flat roles. Always-on services read the cron prompt from a flat role. Flow members load `.env` from the referenced role directory. The dashboard builder seeds and save paths emit flat YAML.
+- **`doctor --fix` on a model-less agent.** After rewriting an envelope with no `spec.model`, the follow-up health check crashed on `model.is_resolved()` because auto-detect agents have `spec.model is None`. The rewrite itself succeeded. The command now skips the model-name check and exits 0.
 
 ### Docs
+- New [Memory Footprint](docs/operations/memory-footprint.md) page: measured RSS breakdown of an agent process (interpreter, Pydantic, provider SDK, PydanticAI, InitRunner, LanceDB), what loads lazily, why the cost is per process rather than per agent, and container sizing tips (`MALLOC_ARENA_MAX=2`, limits from measurement). README (English, Chinese, Japanese) links it with a short note under Cost control.
 - [A2A guide](docs/interfaces/a2a.md) documents the 1.0 wire format, gRPC-style method names, the mandatory `A2A-Version: 1.0` header, `--url`, cancel, and in-memory store limits.
 - README (English, Chinese, Japanese) has a short note above Quickstart: files are simpler, existing files still run, convert with `doctor --fix` when you want. [Envelope migration](docs/getting-started/envelope-migration.md) has the before/after and the rewriter rules.
 - Subsystem guides (CLI, doctor, flow, team, tools, memory, RAG, security, providers, dashboard API snippets, import guides) show the flat shape. TestSuite and Service examples stay enveloped.
