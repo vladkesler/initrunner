@@ -117,7 +117,8 @@ def test_no_triggers_anywhere_is_an_error(tmp_path: Path, capsys) -> None:
     runners = _run_group(roster, prepared)
 
     assert runners == []
-    assert "no agent in group 'desk' has triggers" in capsys.readouterr().out
+    out = " ".join(capsys.readouterr().out.split())
+    assert "no agent in group 'desk' has triggers" in out
 
 
 def test_reload_keeps_group_settings(tmp_path: Path) -> None:
