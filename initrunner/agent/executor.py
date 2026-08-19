@@ -53,6 +53,7 @@ from .executor_output import (
     _create_run_span,
     _finalize_run_output,
     _handle_run_error,
+    _log_run_failure,
     _process_agent_output,
     _record_span_metrics,
     _validate_input_or_fail,
@@ -249,6 +250,7 @@ async def _execute_orchestrated_async(
         if judge_verdicts:
             result.judge_verdicts = list(judge_verdicts)
 
+        _log_run_failure(result, role)
         _audit_result(
             result,
             role,
@@ -376,6 +378,7 @@ async def _execute_resume_async_inner(
             result.duration_ms = int((time.monotonic() - start) * 1000)
             _record_span_metrics(span, result)
 
+        _log_run_failure(result, role)
         _audit_result(
             result,
             role,

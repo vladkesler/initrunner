@@ -231,6 +231,30 @@ All errors are returned as strings prefixed with `[DELEGATION ERROR]` so the LLM
 
 `INPUT_REQUIRED` and `AUTH_REQUIRED` are terminal for delegation today. They become resumable only when HITL lands.
 
+## Debugging a Failed Task
+
+When a run fails, the reason travels two ways. The client gets it in the failed task's status message:
+
+```json
+"status": {"state": "TASK_STATE_FAILED", "message": {"parts": [{"text":
+  "Model API error: status_code: 401, model_name: gpt-4o-mini, body:
+   {'message': 'Invalid API key provided', 'code': 'invalid_api_key'}"}]}}
+```
+
+The server logs the same failure, so an operator watching the process does not need the client to report it:
+
+```
+[agent.run] run 01b147e59c75 of agent 'support-bot' failed [auth]: Model API error: status_code: 401, ...
+```
+
+For the provider request behind the failure (useful against a self-hosted OpenAI-compatible endpoint such as LiteLLM or vLLM), start the server with debug logging:
+
+```bash
+INITRUNNER_LOG_LEVEL=DEBUG initrunner a2a serve role.yaml
+```
+
+See [Logging](../operations/logging.md) for the full set of levels.
+
 ## Comparison with Other Interfaces
 
 | Feature | `--serve` (OpenAI) | `mcp serve` | `a2a serve` |

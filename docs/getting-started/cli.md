@@ -90,6 +90,7 @@ This means `initrunner run .` works from inside an agent directory, and `initrun
 | `initrunner hub publish [PATH]` | (deprecated) Publish an agent pack to InitHub |
 | `initrunner hub info <PACKAGE>` | (deprecated) Show InitHub package details |
 | `initrunner --version` | Print version |
+| `initrunner --verbose <CMD>` | Run any command with debug logging (see [Logging](../operations/logging.md)) |
 
 > **PATH** can be a role YAML file (`role.yaml`, `pdf-agent.yaml`), a pipeline file, a flow file, a team file, or a directory containing one. See [Path resolution](#path-resolution).
 
@@ -627,4 +628,5 @@ initrunner hub info owner/package-name
 | Variable | Effect |
 |----------|--------|
 | `INITRUNNER_AUDIT_DB` | Default audit database path (overridden by `--audit-db`) |
+| `INITRUNNER_LOG_LEVEL` | Log level: `ERROR`, `WARNING` (default), `INFO`, `DEBUG` (overridden by `--verbose`). See [Logging](../operations/logging.md) |
 | `INITRUNNER_SKILL_DIR` | Extra skill search directory (CLI `--skill-dir` takes precedence, but env dir is also searched) |

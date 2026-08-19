@@ -6,7 +6,7 @@ import logging
 
 import pytest
 
-from initrunner._log import get_logger, setup_logging
+from initrunner._log import _PROVIDER_LOGGERS, _resolve_level, get_logger, setup_logging
 
 
 @pytest.fixture()
@@ -67,3 +67,78 @@ class TestLogOutput:
             log.warning("test message")
         assert "[audit] test message" in caplog.text
         assert "[initrunner.audit]" not in caplog.text
+
+
+class TestLogLevelEnv:
+    """``INITRUNNER_LOG_LEVEL`` selects the level when ``--verbose`` is absent."""
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("DEBUG", logging.DEBUG),
+            ("debug", logging.DEBUG),
+            ("INFO", logging.INFO),
+            ("10", logging.DEBUG),
+            ("", logging.WARNING),
+            ("TRACE", logging.WARNING),
+        ],
+    )
+    def test_resolve_level_from_env(self, monkeypatch, raw, expected):
+        monkeypatch.setenv("INITRUNNER_LOG_LEVEL", raw)
+        level, _ = _resolve_level(verbose=False)
+        assert level == expected
+
+    def test_unset_env_is_warning(self, monkeypatch):
+        monkeypatch.delenv("INITRUNNER_LOG_LEVEL", raising=False)
+        assert _resolve_level(verbose=False) == (logging.WARNING, None)
+
+    def test_verbose_beats_env(self, monkeypatch):
+        monkeypatch.setenv("INITRUNNER_LOG_LEVEL", "ERROR")
+        assert _resolve_level(verbose=True) == (logging.DEBUG, None)
+
+    def test_invalid_env_is_reported(self, monkeypatch):
+        monkeypatch.setenv("INITRUNNER_LOG_LEVEL", "LOUD")
+        assert _resolve_level(verbose=False) == (logging.WARNING, "LOUD")
+
+
+class TestProviderLoggers:
+    """At DEBUG the provider HTTP loggers share the InitRunner handler."""
+
+    def test_provider_loggers_raised_at_debug(self, monkeypatch):
+        monkeypatch.setattr("initrunner._log._setup_done", False)
+        monkeypatch.setenv("INITRUNNER_LOG_LEVEL", "DEBUG")
+        saved = {
+            name: (
+                logging.getLogger(name).level,
+                list(logging.getLogger(name).handlers),
+                logging.getLogger(name).propagate,
+            )
+            for name in _PROVIDER_LOGGERS
+        }
+        initrunner_saved = list(logging.getLogger("initrunner").handlers)
+        try:
+            setup_logging()
+            for name in _PROVIDER_LOGGERS:
+                provider = logging.getLogger(name)
+                assert provider.level == logging.DEBUG
+                assert provider.handlers
+                assert provider.propagate is False
+        finally:
+            for name, (level, handlers, propagate) in saved.items():
+                provider = logging.getLogger(name)
+                provider.setLevel(level)
+                provider.handlers = handlers
+                provider.propagate = propagate
+            logging.getLogger("initrunner").handlers = initrunner_saved
+
+    def test_provider_loggers_untouched_at_default_level(self, monkeypatch):
+        monkeypatch.setattr("initrunner._log._setup_done", False)
+        monkeypatch.delenv("INITRUNNER_LOG_LEVEL", raising=False)
+        httpx_logger = logging.getLogger("httpx")
+        before = list(httpx_logger.handlers)
+        initrunner_saved = list(logging.getLogger("initrunner").handlers)
+        try:
+            setup_logging()
+            assert list(httpx_logger.handlers) == before
+        finally:
+            logging.getLogger("initrunner").handlers = initrunner_saved

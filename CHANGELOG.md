@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026.8.8] - 2026-08-19
+
+### Fixed
+- **A failed run left no trace in the process log.** The executor classified the error, filled in `RunResult.error`, and wrote it to the audit trail, but nothing logged it. Only the CLI rendered it to a human, so in `a2a serve`, `--serve`, `--daemon`, flow, team, and dashboard modes an operator watching stderr saw nothing at all when a run failed. A wrong API key against a self-hosted OpenAI-compatible endpoint produced a failed task and a silent server. Every failed run now emits one WARNING at the default level, carrying the run id, the agent name, the error category, and the message: `[agent.run] run 01b147e59c75 of agent 'support-bot' failed [auth]: Model API error: status_code: 401, ...`. Known secret formats are scrubbed the same way they are in the audit trail.
+
+### Added
+- **`INITRUNNER_LOG_LEVEL`** sets the log level (`ERROR`, `WARNING`, `INFO`, `DEBUG`, or a numeric level) without a command-line flag, which is what containers, systemd units, and long-running services actually need. `--verbose` still wins when both are set, and an unrecognized value is reported rather than silently ignored.
+- **`DEBUG` now includes provider HTTP traffic.** `--verbose` raised the `initrunner` logger only, so the request that came back 401 stayed hidden at the deepest level available. The `httpx`, `openai`, `anthropic`, and `pydantic_ai` loggers are now raised alongside it, which is the difference between guessing and reading the response. There is no level above `DEBUG`.
+- **`-v`** as a short form of the global `--verbose` flag.
+
+### Docs
+- New [Logging](docs/operations/logging.md) page: levels, the environment variable, the log format, what a failed run looks like in each mode, and how to debug a provider connection. `--verbose` had never been documented, including the part where it is a global option and has to come before the subcommand.
+- [A2A](docs/interfaces/a2a.md) gains a "Debugging a Failed Task" section showing both surfaces the failure reaches: the client's task status message and the server log.
+
 ## [2026.8.7] - 2026-08-19
 
 ### Docs

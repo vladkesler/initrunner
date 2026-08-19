@@ -187,6 +187,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Multimodal input | `docs/core/multimodal.md` |
 | Report export | `docs/core/reports.md` |
 | Doctor command | `docs/operations/doctor.md` |
+| Logging & verbosity (`--verbose`, `INITRUNNER_LOG_LEVEL`) | `docs/operations/logging.md` |
 | Agent dry-run (`plan`) | `docs/operations/plan.md` |
 | Usage telemetry (PostHog, opt-out) | `docs/operations/telemetry.md` |
 | Deprecations & schema versioning | `docs/operations/deprecations.md` |

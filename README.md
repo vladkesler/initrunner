@@ -431,7 +431,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Security | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
-| Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Telemetry](docs/operations/telemetry.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
+| Operations | [Audit](docs/core/audit.md) · [Cost Tracking](docs/core/cost-tracking.md) · [Memory Footprint](docs/operations/memory-footprint.md) · [Reports](docs/core/reports.md) · [Evals](docs/core/evals.md) · [Doctor](docs/operations/doctor.md) · [Logging](docs/operations/logging.md) · [Telemetry](docs/operations/telemetry.md) · [Observability](docs/core/observability.md) · [CI/CD](docs/operations/cicd.md) |
 
 ## Examples
 
@@ -457,4 +457,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.8.7</sub></p>
+<p align="center"><sub>v2026.8.8</sub></p>

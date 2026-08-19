@@ -20,6 +20,8 @@ from initrunner.audit.logger import AuditLogger, AuditRecord
 from .executor_models import ErrorCategory, PendingApproval, RunResult
 
 _logger = logging.getLogger(__name__)
+# Operator-facing run outcomes; separate name so failures read as "[agent.run] ..."
+_run_logger = logging.getLogger("initrunner.agent.run")
 
 
 def _as_cost_usd(value: object) -> float | None:
@@ -69,6 +71,7 @@ def _validate_input_or_fail(
                     principal_id=principal_id,
                 )
             )
+        _log_run_failure(result, role)
         return result
     return None
 
@@ -162,6 +165,25 @@ def _apply_output_validation(result: RunResult, role: RoleDefinition) -> None:
 # ---------------------------------------------------------------------------
 # Audit logging
 # ---------------------------------------------------------------------------
+
+
+def _log_run_failure(result: RunResult, role: RoleDefinition) -> None:
+    """Emit one WARNING for a failed run.
+
+    Only the CLI renders ``result.error`` to a human. Server, A2A, daemon and
+    dashboard modes have no such surface, so without this line an operator
+    watching the process log sees nothing at all when a run fails.
+    """
+    if result.success:
+        return
+    category = result.error_category.value if result.error_category else "unknown"
+    _run_logger.warning(
+        "run %s of agent '%s' failed [%s]: %s",
+        result.run_id,
+        role.metadata.name,
+        category,
+        scrub_secrets(result.error or "no error detail"),
+    )
 
 
 def _audit_result(
