@@ -123,7 +123,7 @@ def _validate_flat_document(
 
     try:
         data = yaml.safe_load(text)
-        _legacy, defn, _ir = adapt_mapping(data, base_dir=path.parent)
+        _legacy, defn, _ir = adapt_mapping(data, base_dir=path.parent, source_path=path.resolve())
     except (AdaptError, NormalizeError, Exception) as exc:
         return (
             None,
@@ -136,9 +136,40 @@ def _validate_flat_document(
             ],
         )
     issues: list[ValidationIssue] = []
-    if kind == "Flow" and defn is not None:
-        issues.extend(_flow_role_issues(defn, path.parent))
+    if defn is not None:
+        if kind == "Flow":
+            issues.extend(_flow_role_issues(defn, path.parent))
+        elif kind == "Group":
+            issues.extend(_group_member_issues(defn))
     return defn, issues
+
+
+def _group_member_issues(defn: Any) -> list[ValidationIssue]:
+    """Validate every role a group references, prefixing each member's issues."""
+    issues: list[ValidationIssue] = []
+    for name, ref in defn.members.items():
+        if not ref.path.exists():
+            issues.append(
+                ValidationIssue(
+                    field=f"agents.{name}.use",
+                    message=f"Role file not found: {ref.path}",
+                    severity="error",
+                    suggestion="check the path is relative to the group file directory",
+                )
+            )
+            continue
+        _, member_kind, sub_issues = validate_yaml_file(ref.path)
+        if member_kind != "Agent":
+            issues.append(
+                ValidationIssue(
+                    field=f"agents.{name}.use",
+                    message=f"{ref.use} is a {member_kind}, and a group's members are agents",
+                    severity="error",
+                    suggestion="point this member at a single agent file",
+                )
+            )
+        issues.extend(_prefix_issues(sub_issues, f"agents.{name}."))
+    return issues
 
 
 def _flow_role_issues(defn: Any, base_dir: Path) -> list[ValidationIssue]:

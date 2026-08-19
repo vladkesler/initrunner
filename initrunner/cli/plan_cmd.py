@@ -52,6 +52,16 @@ def plan(
         console.print(
             f"[red]Error:[/red] `initrunner plan` supports Agent roles; this file is `{kind}`."
         )
+        if kind == "Group":
+            from initrunner.group.loader import GroupLoadError, load_group_definition
+
+            try:
+                group = load_group_definition(role_file)
+            except GroupLoadError:
+                raise typer.Exit(1) from None
+            console.print("Plan one of its agents:")
+            for ref in group.members.values():
+                console.print(f"  [bold]initrunner plan {ref.path}[/bold]")
         raise typer.Exit(1)
 
     try:

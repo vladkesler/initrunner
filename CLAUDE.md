@@ -159,6 +159,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Observability (OpenTelemetry) | `docs/core/observability.md` |
 | Autonomous execution | `docs/orchestration/autonomy.md` |
 | Team mode (multi-persona) | `docs/orchestration/team_mode.md` |
+| Grouped agents (deploy N agents as one unit) | `docs/orchestration/groups.md` |
 | Orchestration patterns (all 5, side-by-side) | `docs/orchestration/patterns-guide.md` |
 | Multi-agent guide (choosing patterns) | `docs/orchestration/multi-agent-guide.md` |
 | Flow orchestration (comprehensive guide) | `docs/orchestration/flow.md` |

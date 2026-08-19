@@ -15,6 +15,8 @@ from initrunner.cli._helpers._display import ingest_status_color
 from initrunner.cli._helpers._resolve import resolve_role_path
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic_ai import Agent
 
     from initrunner.agent.schema.role import RoleDefinition
@@ -156,6 +158,7 @@ def load_and_build_or_exit(
     role_file: Path,
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
+    role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
     from initrunner.agent.loader import MissingApiKeyError, RoleLoadError
@@ -167,6 +170,7 @@ def load_and_build_or_exit(
             role_file,
             extra_skill_dirs=extra_skill_dirs,
             model_override=model_override,
+            role_mutator=role_mutator,
         )
 
     prompted = False
@@ -316,10 +320,14 @@ def command_context(
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
     dry_run: bool = False,
+    role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ):
     """Context manager for agent setup and resource cleanup.
 
     Yields (role, agent, audit_logger, memory_store, sink_dispatcher).
+
+    *role_mutator* is applied to the role just before the agent is built; a
+    group member passes one in to pick up the group's shared stores.
     """
     role_file = resolve_role_path(role_file)
     from initrunner.stores.factory import managed_memory_store
@@ -329,7 +337,10 @@ def command_context(
     audit_logger = create_audit_logger(audit_db, no_audit)
 
     role, agent = load_and_build_or_exit(
-        role_file, extra_skill_dirs=extra_skill_dirs, model_override=model_override
+        role_file,
+        extra_skill_dirs=extra_skill_dirs,
+        model_override=model_override,
+        role_mutator=role_mutator,
     )
 
     # Setup observability after load so TracerProvider is active before

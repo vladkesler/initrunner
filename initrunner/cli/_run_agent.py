@@ -17,6 +17,8 @@ from initrunner.cli._helpers import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic_ai import Agent
     from pydantic_ai.models import Model
 
@@ -156,6 +158,7 @@ def _run_agent(
     model: str | None,
     template_values: dict[str, str] | None = None,
     dev: bool = False,
+    role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> None:
     """Standard agent execution: single-shot, REPL, or autonomous."""
     if autonomous and not prompt:
@@ -205,6 +208,7 @@ def _run_agent(
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
         dry_run=dry_run,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         if template_values is not None:
             if role.spec.deps_schema is None:

@@ -119,11 +119,12 @@ In non-TTY contexts (piped input), the help text is printed.
 
 Synopsis: `initrunner run [PATH] [OPTIONS]`
 
-The path argument is optional when `--sense` is used. The `run` command auto-detects the YAML kind (Agent, Team, Flow, Pipeline) and dispatches accordingly.
+The path argument is optional when `--sense` is used. The `run` command auto-detects the YAML kind (Agent, Group, Team, Flow) and dispatches accordingly.
 
 | Flag | Description |
 |------|-------------|
 | `-p, --prompt TEXT` | Single prompt to send |
+| `--agent NAME` | Which agent to run, for a [group of agents](../orchestration/groups.md). Without it, a group lists its members and exits 1. |
 | `-i, --interactive` | Interactive REPL mode |
 | `-a, --autonomous` | Autonomous agentic loop mode (requires `-p`) |
 | `--max-iterations N` | Override max iterations for autonomous mode |
@@ -147,8 +148,8 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
 | `--report PATH` | Export a markdown report to PATH after the run. See [Report Export](../core/reports.md). |
 | `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
-| `--sense` | Sense the best role for the given prompt (replaces the path argument). |
-| `--role-dir PATH` | Directory to search for roles when using `--sense`. |
+| `--sense` | Sense the best role for the given prompt (replaces the path argument, or picks a member when the path is a group). |
+| `--role-dir PATH` | Directory to search for roles when using `--sense`. Not used with a group, which senses over its own members. |
 | `-f, --format TEXT` | Output format: `auto` (default), `json`, `text`, `rich`. See [Output Formats](#output-formats). |
 | `--no-stream` | **Deprecated.** Use `--format rich`. Hidden from `--help`. |
 | `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
@@ -174,6 +175,9 @@ initrunner run --sense --confirm-role -p "review my code for bugs"
 
 # Dry-run: discover + score roles without any LLM calls
 initrunner run --sense --dry-run -p "task description"
+
+# Sense within a group: scores its members, not the roles on disk
+initrunner run desk.yaml --sense -p "write the customer reply"
 ```
 
 Intent Sensing uses a two-pass strategy:
@@ -187,6 +191,18 @@ See [Intent Sensing](../core/intent_sensing.md) for the full algorithm reference
 Token budgets (`max_tokens_per_run`, `autonomous_token_budget`, etc.) are set in `guardrails` in the role YAML. See [Guardrails](../configuration/guardrails.md).
 
 Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then continues interactively.
+
+### Running one agent from a group
+
+A [group file](../orchestration/groups.md) lists agents that deploy together but run independently, so `run` needs to know which one you mean:
+
+```bash
+initrunner run desk.yaml                        # lists the members, exits 1
+initrunner run desk.yaml --agent intake -p "…"  # runs that member
+initrunner run desk.yaml --agent intake -i      # every single-agent flag works
+```
+
+A member picked this way behaves exactly as if you had run its own file, plus whatever the group shares. Flags that steer a single run (`-i`, `-a`, `--attach`, `--report`, `--resume`, `--var`) need `--agent`.
 
 ## Output Formats
 

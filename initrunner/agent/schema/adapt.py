@@ -23,6 +23,7 @@ from initrunner.flow.schema import (
     FlowMetadata,
     FlowSpec,
 )
+from initrunner.group.schema import GroupDefinition, GroupMemberRef
 from initrunner.team.schema import PersonaConfig, TeamDefinition, TeamGuardrails, TeamSpec
 
 
@@ -42,6 +43,12 @@ def run_kind_from_mapping(data: dict[str, Any]) -> str:
             for v in agents.values()
         ):
             return "Flow"
+        if "run" in data:
+            return "Team"
+        if all(isinstance(v, dict) and set(v) == {"use"} for v in agents.values()):
+            # Nothing but references to other agent files: a deployment group of
+            # independent agents, with no orchestration to run.
+            return "Group"
         if len(agents) == 1:
             return "Agent"
         return "Team"
@@ -130,6 +137,47 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
     return team
 
 
+def document_to_group(
+    document: AgentDocument,
+    *,
+    base_dir: Path | None = None,
+    source_path: Path | None = None,
+) -> GroupDefinition:
+    """Reference-only composition → GroupDefinition.
+
+    Member role files are not read here; ``load_group`` does that so validation
+    can report per-member problems instead of stopping at the first one.
+    """
+    if not document.agents:
+        raise AdaptError("group adapter needs agents")
+
+    root = base_dir if base_dir is not None else Path.cwd()
+    members: dict[str, GroupMemberRef] = {}
+    for name, child in document.agents.items():
+        if not child.use:
+            raise AdaptError(f"group member '{name}' has no 'use:' reference")
+        members[name] = GroupMemberRef(
+            key=name,
+            use=child.use,
+            path=(root / child.use).resolve(),
+        )
+
+    return GroupDefinition(
+        name=document.name,
+        members=members,
+        shared_memory=document.shared_memory,
+        shared_documents=document.shared_documents,
+        security=document.security,
+        observability=document.observability,
+        description=document.description,
+        tags=tuple(document.tags),
+        author=document.author,
+        version=document.version,
+        dependencies=tuple(document.dependencies),
+        source_path=source_path,
+    )
+
+
 def document_to_flow(document: AgentDocument, *, base_dir: Path | None = None) -> FlowDefinition:
     """Graph composition → FlowDefinition."""
     if not document.agents:
@@ -186,7 +234,12 @@ def adapt_mapping(
     data: dict[str, Any],
     *,
     base_dir: Path | None = None,
-) -> tuple[str, RoleDefinition | TeamDefinition | FlowDefinition, CompositionIR]:
+    source_path: Path | None = None,
+) -> tuple[
+    str,
+    RoleDefinition | TeamDefinition | FlowDefinition | GroupDefinition,
+    CompositionIR,
+]:
     """Normalize *data* and return ``(legacy_kind, runner_model, ir)``."""
     result = normalize_mapping(data)
     kind = run_kind_from_mapping(data)
@@ -194,6 +247,9 @@ def adapt_mapping(
         return kind, document_to_team(result.document, base_dir=base_dir), result.ir
     if kind == "Flow":
         return kind, document_to_flow(result.document, base_dir=base_dir), result.ir
+    if kind == "Group":
+        group = document_to_group(result.document, base_dir=base_dir, source_path=source_path)
+        return kind, group, result.ir
     if kind == "Agent":
         return kind, document_to_role(result.document, base_dir=base_dir), result.ir
     raise AdaptError(f"cannot adapt document as {kind}")

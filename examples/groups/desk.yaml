@@ -1,0 +1,15 @@
+# A group of independent agents deployed together.
+#
+# There is no orchestration here: members never hand off to each other. The file
+# says which agents ship as a unit and what they share. Run one with
+# `--agent <name>`, or serve them all from one process with `--serve`.
+name: desk
+description: Support desk agents, deployed as one unit
+
+agents:
+  intake:
+    use: roles/intake.yaml
+  researcher:
+    use: roles/researcher.yaml
+  writer:
+    use: roles/writer.yaml

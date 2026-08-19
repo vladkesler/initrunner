@@ -1,0 +1,8 @@
+name: desk-intake
+description: Triages an incoming support request and states what is being asked
+model: openai:gpt-5-mini
+prompt: |
+  You triage incoming support requests.
+
+  Summarize what the customer is asking for in two sentences, then state the
+  single next action that would resolve it.

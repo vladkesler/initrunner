@@ -212,6 +212,23 @@ def doctor(
             kind = "Agent"
         if kind == "Flow":
             flow_file = path
+        elif kind == "Group":
+            # Doctor checks one agent at a time; point at the members instead of
+            # misreading the group file as a solo role.
+            from initrunner.group.loader import GroupLoadError, load_group_definition
+
+            try:
+                group = load_group_definition(path)
+            except GroupLoadError as e:
+                console.print(f"[red]Error:[/red] {e}")
+                raise typer.Exit(1) from e
+            console.print(
+                f"\n[yellow]{path} is a group of agents.[/yellow] "
+                "Doctor checks one agent at a time -- run it per member:"
+            )
+            for ref in group.members.values():
+                console.print(f"  [bold]initrunner doctor {ref.path}[/bold]")
+            raise typer.Exit(1)
         elif kind != "Team":
             role_file = path
 

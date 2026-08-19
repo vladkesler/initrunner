@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -13,6 +14,15 @@ from initrunner.cli._helpers import (
     resolve_model_override,
     resolve_skill_dirs,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from initrunner.agent.schema.role import RoleDefinition
+
+    # Applied to the role just before its agent is built. A group member passes
+    # one in so it picks up the group's shared stores; solo runs pass nothing.
+    RoleMutator = Callable[[RoleDefinition], RoleDefinition] | None
 
 
 def _dispatch_flow(
@@ -66,6 +76,7 @@ def _dispatch_serve(
     no_audit: bool,
     skill_dir: Path | None,
     model: str | None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Serve an agent as an OpenAI-compatible API."""
     from initrunner.server.app import run_server
@@ -77,6 +88,7 @@ def _dispatch_serve(
         no_audit=no_audit,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, _memory_store, _sink_dispatcher):
         console.print(f"Serving [cyan]{role.metadata.name}[/cyan] at http://{host}:{port}")
         console.print(f"  Model ID: {role.metadata.name}")
@@ -108,6 +120,7 @@ def _dispatch_daemon(
     *,
     autopilot: bool = False,
     budget_timezone: str | None = None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
@@ -122,6 +135,7 @@ def _dispatch_daemon(
         with_sinks=True,
         extra_skill_dirs=extra_skill_dirs,
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         if budget_timezone is not None:
             role.spec.guardrails.budget_timezone = budget_timezone
@@ -148,6 +162,7 @@ def _dispatch_bot(
     model: str | None,
     *,
     budget_timezone: str | None = None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Launch an agent as a Telegram or Discord bot."""
     from initrunner.runner import run_bot
@@ -161,6 +176,7 @@ def _dispatch_bot(
         with_sinks=True,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         if budget_timezone is not None:
             role.spec.guardrails.budget_timezone = budget_timezone

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-Shape = Literal["solo", "preset", "graph"]
+Shape = Literal["solo", "preset", "graph", "roster"]
 Handoff = Literal["team", "flow"]
 RunPreset = Literal["sequential", "parallel", "debate", "ensemble"]
 
