@@ -291,7 +291,9 @@ Cost estimation uses [genai-prices](https://pypi.org/project/genai-prices/) to c
 
 ### Memory footprint
 
-A plain agent process runs at 150 to 220 MB of RSS. Nearly all of that is the Python AI stack (provider SDK, PydanticAI, Pydantic); InitRunner's own code adds about 7 MB, and LanceDB only loads if the role uses RAG or vector memory. The cost is per process, not per agent: `flow up` runs an entire multi-agent flow in one process, and `--serve` / `--daemon` keep one warm process instead of paying startup cost per task. See [Memory Footprint](docs/operations/memory-footprint.md) for the measured breakdown and container sizing tips.
+A plain agent process runs at 150 to 220 MB of RSS. Nearly all of that is the Python AI stack (provider SDK, PydanticAI, Pydantic); InitRunner's own code adds about 7 MB, and LanceDB only loads if the role uses RAG or vector memory.
+
+**That cost is per process, not per agent.** Adding an agent to a running process costs about 1 MB, because the stack is already loaded: a [group](docs/orchestration/groups.md) of five agents served together measures about 145 MB, against about 142 MB for one. Ten agents is one ~150 MB process, not 2 GB. `flow up` runs a whole flow in one process, a group runs unrelated agents in one process, and `--serve` / `--daemon` keep that process warm instead of paying startup cost per task. See [Memory Footprint](docs/operations/memory-footprint.md) for the measured breakdown and container sizing tips.
 
 ## Multi-agent orchestration
 
@@ -345,7 +347,9 @@ $ curl -s localhost:8000/v1/models | jq -c '.data[].id'
 "writer"
 ```
 
-`--daemon` runs every member's triggers in one process, and `initrunner mcp serve desk.yaml` turns each into an MCP tool. For Kubernetes or Argo CD, mount the group next to its role files and point the container at it: adding an agent is one new file plus one line. See [Grouped Agents](docs/orchestration/groups.md).
+`--daemon` runs every member's triggers in one process, and `initrunner mcp serve desk.yaml` turns each into an MCP tool. For Kubernetes or Argo CD, mount the group next to its role files and point the container at it: adding an agent is one new file plus one line.
+
+**You are not paying for a runtime per agent.** The Python AI stack loads once and every member shares it, so each extra agent costs about 1 MB: measured, one agent served alone is about 142 MB and five together about 145 MB. Ten agents is one ~150 MB container, not ten. See [Grouped Agents](docs/orchestration/groups.md) and [Memory Footprint](docs/operations/memory-footprint.md).
 
 ## MCP and interfaces
 
@@ -453,4 +457,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.8.6</sub></p>
+<p align="center"><sub>v2026.8.7</sub></p>

@@ -170,6 +170,17 @@ Keep `desk.yaml` and the role files in one Git directory and let Argo CD sync it
 
 Check what came up with `GET /v1/models`; it lists one entry per member.
 
+### Sizing the container
+
+One container, not one per agent. The Python AI stack (provider SDK, PydanticAI, Pydantic) loads once and every member shares it, so members are nearly free after the first:
+
+| Agents in the process | RSS |
+|---|---|
+| 1 | ~142 MB |
+| 5 | ~145 MB |
+
+About 1 MB per extra agent, so ten agents fit in the same ~150 MB as one. Size the limit from a real measurement of your own roles with roughly 30% headroom; a group of plain agents is comfortable at 256 MB, and one that uses RAG or vector memory needs 512 MB because LanceDB adds ~102 MB when it loads. See [Memory Footprint](../operations/memory-footprint.md).
+
 ## Limits
 
 - Members must be agents, not nested groups, teams or flows.

@@ -236,7 +236,9 @@ guardrails:
 
 ### 内存占用
 
-普通 Agent 进程的 RSS 约为 150 到 220 MB。几乎全部来自 Python AI 栈（提供商 SDK、PydanticAI、Pydantic）；InitRunner 自身大约 7 MB，LanceDB 仅在角色使用 RAG 或向量记忆时加载。成本按进程计，不按 Agent 计：`flow up` 在一个进程中运行整个多 Agent Flow，`--serve` / `--daemon` 保持一个热进程，而不是为每个任务支付启动成本。测量拆解和容器规格见 [Memory Footprint](docs/operations/memory-footprint.md)。
+普通 Agent 进程的 RSS 约为 150 到 220 MB。几乎全部来自 Python AI 栈（提供商 SDK、PydanticAI、Pydantic）；InitRunner 自身大约 7 MB，LanceDB 仅在角色使用 RAG 或向量记忆时加载。
+
+**这份成本按进程计，不按 Agent 计。**向已运行的进程中增加一个 Agent 只需约 1 MB，因为整套栈已经加载：一个包含五个 Agent 的[分组](docs/orchestration/groups.md)实测约 145 MB，而单个 Agent 约 142 MB。十个 Agent 是一个约 150 MB 的进程，而不是 2 GB。`flow up` 在一个进程中运行整个 Flow，分组在一个进程中运行互不相关的 Agent，`--serve` / `--daemon` 则保持该进程常驻，而不是为每个任务支付启动成本。测量拆解和容器规格见 [Memory Footprint](docs/operations/memory-footprint.md)。
 
 ## 多 Agent 编排
 
@@ -290,7 +292,9 @@ $ curl -s localhost:8000/v1/models | jq -c '.data[].id'
 "writer"
 ```
 
-`--daemon` 在一个进程里运行所有成员的触发器，`initrunner mcp serve desk.yaml` 把每个成员变成一个 MCP 工具。用 Kubernetes 或 Argo CD 部署时，把组文件和角色文件挂载在一起，让容器指向它：新增一个 Agent 就是一个新文件加一行配置。查看 [Agent 分组](docs/orchestration/groups.md)。
+`--daemon` 在一个进程里运行所有成员的触发器，`initrunner mcp serve desk.yaml` 把每个成员变成一个 MCP 工具。用 Kubernetes 或 Argo CD 部署时，把组文件和角色文件挂载在一起，让容器指向它：新增一个 Agent 就是一个新文件加一行配置。
+
+**你不需要为每个 Agent 付一份运行时。**Python AI 栈只加载一次，所有成员共享，因此每多一个 Agent 只增加约 1 MB：实测单个 Agent 独立运行约 142 MB，五个一起约 145 MB。十个 Agent 是一个约 150 MB 的容器，而不是十个。查看 [Agent 分组](docs/orchestration/groups.md) 和 [Memory Footprint](docs/operations/memory-footprint.md)。
 
 ## MCP 与界面
 
@@ -394,4 +398,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.8.6</sub></p>
+<p align="center"><sub>v2026.8.7</sub></p>
