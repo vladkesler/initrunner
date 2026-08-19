@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -13,6 +14,15 @@ from initrunner.cli._helpers import (
     resolve_model_override,
     resolve_skill_dirs,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from initrunner.agent.schema.role import RoleDefinition
+
+    # Applied to the role just before its agent is built. A group member passes
+    # one in so it picks up the group's shared stores; solo runs pass nothing.
+    RoleMutator = Callable[[RoleDefinition], RoleDefinition] | None
 
 
 def _dispatch_flow(
@@ -66,10 +76,15 @@ def _dispatch_serve(
     no_audit: bool,
     skill_dir: Path | None,
     model: str | None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Serve an agent as an OpenAI-compatible API."""
+    from initrunner.middleware import resolve_exposed_api_key
     from initrunner.server.app import run_server
 
+    # Fail closed: the completions endpoint drives the agent, so don't serve it
+    # off-host without auth.
+    api_key, generated_key = resolve_exposed_api_key(host, api_key)
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
@@ -77,12 +92,18 @@ def _dispatch_serve(
         no_audit=no_audit,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, _memory_store, _sink_dispatcher):
         console.print(f"Serving [cyan]{role.metadata.name}[/cyan] at http://{host}:{port}")
         console.print(f"  Model ID: {role.metadata.name}")
         console.print(f"  Health:   http://{host}:{port}/health")
         console.print(f"  Models:   http://{host}:{port}/v1/models")
-        if api_key:
+        if generated_key is not None:
+            console.print(
+                "  Auth:     [yellow]enabled[/yellow] -- generated key (no --api-key given):\n"
+                f"            [bold]{generated_key}[/bold]"
+            )
+        elif api_key:
             console.print("  Auth:     [yellow]enabled[/yellow] (Bearer token required)")
         if cors_origin:
             console.print(f"  CORS:     {', '.join(cors_origin)}")
@@ -108,6 +129,7 @@ def _dispatch_daemon(
     *,
     autopilot: bool = False,
     budget_timezone: str | None = None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Run agent in daemon mode with triggers."""
     from initrunner.runner import run_daemon
@@ -122,6 +144,7 @@ def _dispatch_daemon(
         with_sinks=True,
         extra_skill_dirs=extra_skill_dirs,
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         if budget_timezone is not None:
             role.spec.guardrails.budget_timezone = budget_timezone
@@ -148,6 +171,7 @@ def _dispatch_bot(
     model: str | None,
     *,
     budget_timezone: str | None = None,
+    role_mutator: RoleMutator = None,
 ) -> None:
     """Launch an agent as a Telegram or Discord bot."""
     from initrunner.runner import run_bot
@@ -161,6 +185,7 @@ def _dispatch_bot(
         with_sinks=True,
         extra_skill_dirs=resolve_skill_dirs(skill_dir),
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, memory_store, sink_dispatcher):
         if budget_timezone is not None:
             role.spec.guardrails.budget_timezone = budget_timezone

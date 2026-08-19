@@ -64,6 +64,23 @@ def test_normalize_envelope_team_personas() -> None:
     assert names == ["architect", "security"]
 
 
+def test_group_normalizes_to_roster() -> None:
+    """Reference-only compositions hand off to nothing, so they are not presets."""
+    result = normalize_mapping(
+        {
+            "name": "desk",
+            "agents": {
+                "intake": {"use": "roles/intake.yaml"},
+                "writer": {"use": "roles/writer.yaml"},
+            },
+        }
+    )
+    assert result.ir.shape == "roster"
+    assert result.ir.handoff is None
+    assert result.ir.run is None
+    assert [c.use for c in result.ir.children] == ["roles/intake.yaml", "roles/writer.yaml"]
+
+
 def test_normalize_envelope_flow_then_and_needs() -> None:
     result = normalize_mapping(
         {

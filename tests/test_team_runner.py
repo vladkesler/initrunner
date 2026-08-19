@@ -1211,3 +1211,63 @@ class TestBackwardCompat:
         # Verify the roles were built from PersonaConfig
         first_call_role = mock_build.call_args_list[0].args[0]
         assert first_call_role.spec.role == "first role"
+
+
+class TestReferencedPersonaRuntime:
+    """Personas declared with `use:` run the referenced role from its own directory."""
+
+    @staticmethod
+    def _team_with_reference(tmp_path):
+        from initrunner.agent.schema.adapt import document_to_team
+        from initrunner.agent.schema.normalize import normalize_mapping
+
+        roles_dir = tmp_path / "roles"
+        roles_dir.mkdir()
+        (roles_dir / "researcher.yaml").write_text(
+            "name: researcher\nprompt: research things\nmodel: openai:gpt-5-mini\n"
+        )
+        (roles_dir / ".env").write_text("TEAM_MEMBER_ENV=from-member\n")
+        result = normalize_mapping(
+            {
+                "name": "desk",
+                "run": "sequential",
+                "model": "openai:gpt-5-mini",
+                "agents": {
+                    "researcher": {"use": "roles/researcher.yaml"},
+                    "writer": {"prompt": "write it up"},
+                },
+            }
+        )
+        return document_to_team(result.document, base_dir=tmp_path), roles_dir
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_sequential_builds_with_member_dir(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        team, roles_dir = self._team_with_reference(tmp_path)
+        mock_build.return_value = MagicMock()
+        mock_exec.side_effect = [_ok_result("r1", "out1"), _ok_result("r2", "out2")]
+
+        result = run_team(team, "task", team_dir=tmp_path)
+
+        assert result.success is True
+        role_dirs = [call.kwargs["role_dir"] for call in mock_build.call_args_list]
+        assert role_dirs == [roles_dir.resolve(), tmp_path]
+        # The referenced role, not a stub synthesized from the persona.
+        assert mock_build.call_args_list[0].args[0].metadata.name == "researcher"
+        # The member's own .env is loaded alongside the team's.
+        assert [c.args[0] for c in mock_dotenv.call_args_list] == [tmp_path, roles_dir.resolve()]
+
+    @patch("initrunner.agent.loader.build_agent")
+    @patch("initrunner.agent.executor.execute_run")
+    @patch("initrunner.agent.loader._load_dotenv")
+    def test_parallel_builds_with_member_dir(self, mock_dotenv, mock_exec, mock_build, tmp_path):
+        team, roles_dir = self._team_with_reference(tmp_path)
+        mock_build.return_value = MagicMock()
+        mock_exec.side_effect = [_ok_result("r1", "out1"), _ok_result("r2", "out2")]
+
+        result = run_team_parallel(team, "task", team_dir=tmp_path)
+
+        assert result.success is True
+        role_dirs = {call.kwargs["role_dir"] for call in mock_build.call_args_list}
+        assert role_dirs == {roles_dir.resolve(), tmp_path}

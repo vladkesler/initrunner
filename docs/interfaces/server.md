@@ -21,10 +21,10 @@ Use `initrunner run <role> --serve` with the following flags:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `role_file` | `Path` | *(required)* | Path to the role YAML file. |
+| `role_file` | `Path` | *(required)* | Path to the role YAML file, or a [group file](../orchestration/groups.md) to serve several agents from one process. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
-| `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all `/v1/*` endpoints require `Authorization: Bearer <key>`. |
+| `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all `/v1/*` endpoints require `Authorization: Bearer <key>`. Env: `INITRUNNER_API_KEY`. Binding off-host without one generates a key rather than serving unauthenticated. |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 | `--cors-origin` | `str` | `None` | Allowed CORS origin. Can be repeated. Merged with `security.server.cors_origins` from role YAML. |
@@ -44,7 +44,7 @@ Not protected by authentication even when `--api-key` is set.
 
 ### `GET /v1/models`
 
-Lists available models. Returns the agent's `metadata.name` as the model ID.
+Lists available models. Returns the agent's `metadata.name` as the model ID, or one entry per member when serving a group.
 
 ```json
 {
@@ -68,7 +68,7 @@ The main chat completions endpoint. Accepts the standard OpenAI request format.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | `str` | `""` | Model name (ignored — the agent's model is used). |
+| `model` | `str` | `""` | Which agent to run. Ignored when serving a single agent; **required** when serving a group, where it selects the member (see [Serving a group](#serving-a-group)). |
 | `messages` | `list[ChatMessage]` | `[]` | Conversation messages. |
 | `stream` | `bool` | `false` | Enable Server-Sent Events streaming. |
 | `temperature` | `float \| null` | `null` | Ignored (uses role config). |
@@ -197,6 +197,36 @@ The response includes an `X-Conversation-Id` header so clients can capture it fo
 ### Conversation TTL
 
 Conversations are stored in memory and expire after **1 hour** of inactivity (last access time). Expired conversations are cleaned up lazily on the next access. All conversations are cleared when the server shuts down.
+
+## Serving a group
+
+Point `--serve` at a [group file](../orchestration/groups.md) to serve every one of its agents from one process:
+
+```bash
+initrunner run desk.yaml --serve
+```
+
+```console
+Serving group desk at http://127.0.0.1:8000
+  Model ID: intake (desk-intake)
+  Model ID: researcher (desk-researcher)
+  Model ID: writer (desk-writer)
+```
+
+Each member is one OpenAI model ID, so ordinary OpenAI clients pick an agent the way they pick a model:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "writer", "messages": [{"role": "user", "content": "draft the reply"}]}'
+```
+
+Things worth knowing:
+
+- `model` is required here. Omitting it, or naming an agent the server does not host, returns `400` listing the valid IDs rather than guessing and answering as the wrong agent.
+- Conversation history is kept per agent. Two agents given the same `X-Conversation-Id` keep separate histories, so reusing one ID across a group never leaks one agent's conversation into another.
+- Approvals resume without extra parameters: `POST /v1/approvals/{run_id}` finds the agent that paused the run.
+- The listener's authentication, rate limit, CORS and body-size settings come from the group's `security.server` and `security.rate_limit`. Each member's own `security.content` still applies to its own requests.
 
 ## Authentication
 

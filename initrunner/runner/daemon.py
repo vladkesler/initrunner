@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 from pydantic_ai import Agent
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from initrunner.agent.clarify import ClarifyCallback
 
 from initrunner.agent.executor import (
@@ -73,6 +75,10 @@ class DaemonRunner:
         role_path: Path | None = None,
         extra_skill_dirs: list[Path] | None = None,
         autopilot: bool = False,
+        stop_event: threading.Event | None = None,
+        install_signal_handler: bool = True,
+        rebuild: Callable[[Path], tuple[RoleDefinition, Agent]] | None = None,
+        label: str = "",
     ) -> None:
         self._agent = agent
         self._role = role
@@ -83,8 +89,16 @@ class DaemonRunner:
         self._memory_store = memory_store
         self._role_path = role_path
         self._extra_skill_dirs = extra_skill_dirs
+        # A group shares one stop event across its runners, and only the main
+        # thread may install signal handlers, so both are injectable.
+        self._install_signal_handler = install_signal_handler
+        self._rebuild = rebuild
+        self._label = label
+        # Members of a group log to one terminal, so say who is speaking.
+        # No square brackets: these strings are Rich markup, which would eat them.
+        self._prefix = f"{label} | " if label else ""
 
-        self._stop = threading.Event()
+        self._stop = stop_event if stop_event is not None else threading.Event()
         self._in_flight_count = 0
         self._in_flight_cond = threading.Condition()
         self._concurrency_semaphore = threading.Semaphore(self._MAX_CONCURRENT)
@@ -169,9 +183,10 @@ class DaemonRunner:
         )
 
         with self._dispatcher:
-            from initrunner._signal import install_shutdown_handler
+            if self._install_signal_handler:
+                from initrunner._signal import install_shutdown_handler
 
-            install_shutdown_handler(self._stop, on_first_signal=self._on_first_signal)
+                install_shutdown_handler(self._stop, on_first_signal=self._on_first_signal)
 
             # Start hot-reload watcher if configured
             self._maybe_start_reloader()
@@ -265,10 +280,14 @@ class DaemonRunner:
 
         allowed, reason = self._tracker.check_before_run()
         if not allowed:
-            console.print(f"\n[yellow]Budget exceeded — skipping trigger: {reason}[/yellow]")
+            console.print(
+                f"\n[yellow]{self._prefix}Budget exceeded — skipping trigger: {reason}[/yellow]"
+            )
             return
 
-        console.print(f"\n[dim]Trigger ({event.trigger_type}):[/dim] {event.prompt[:80]}")
+        console.print(
+            f"\n[dim]{self._prefix}Trigger ({event.trigger_type}):[/dim] {event.prompt[:80]}"
+        )
 
         # Build extra toolsets for this trigger
         extra_ts: list = []
@@ -566,8 +585,6 @@ class DaemonRunner:
         if conv_key is None or reply_fn is None:
             return None
 
-        from collections.abc import Callable
-
         reply: Callable[[str], None] = reply_fn  # type: ignore[assignment]
 
         def _daemon_clarify(question: str) -> str:
@@ -683,7 +700,12 @@ class DaemonRunner:
         from initrunner.agent.loader import load_and_build
 
         try:
-            new_role, new_agent = load_and_build(path, extra_skill_dirs=self._extra_skill_dirs)
+            if self._rebuild is not None:
+                # A group member rebuilds through its group so the reloaded role
+                # keeps the group's shared stores.
+                new_role, new_agent = self._rebuild(path)
+            else:
+                new_role, new_agent = load_and_build(path, extra_skill_dirs=self._extra_skill_dirs)
         except Exception:
             _logger.warning("Hot-reload failed — keeping current config", exc_info=True)
             return

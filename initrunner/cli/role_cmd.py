@@ -48,6 +48,9 @@ def validate(
 
         flow_validate(role_file)
         return
+    if kind == "Group":
+        _validate_group(role_file)
+        return
 
     role, _kind, issues = validate_yaml_file(role_file)
     if issues:
@@ -365,6 +368,34 @@ def _update_role_yaml(role_path: Path, provider: str, model: str) -> None:
     else:
         container["model"] = f"{provider}:{model}"
     role_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+
+def _validate_group(group_file: Path) -> None:
+    """Validate a group and every role it references."""
+    from initrunner.cli._validation_panel import render_validation_panel
+    from initrunner.services.yaml_validation import validate_yaml_file
+
+    group, _kind, issues = validate_yaml_file(group_file)
+    if issues:
+        console.print(render_validation_panel(group_file, "Group", issues))
+    if any(i.severity == "error" for i in issues) or group is None:
+        raise typer.Exit(1)
+
+    table = Table(title=f"Group: {group.name}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    table.add_row("Name", group.name)
+    table.add_row("Description", group.description or "(none)")
+    table.add_row("Tags", ", ".join(group.tags) if group.tags else "(none)")
+    table.add_row("Agents", str(len(group.members)))
+    for name, ref in group.members.items():
+        table.add_row(f"  {name}", ref.use)
+    table.add_row("Shared Memory", "enabled" if group.shared_memory.enabled else "disabled")
+    table.add_row("Shared Documents", "enabled" if group.shared_documents.enabled else "disabled")
+    table.add_row("Observability", "enabled" if group.observability else "disabled")
+    console.print(table)
+    console.print("[green]Valid[/green]")
 
 
 def _validate_team(team_file: Path) -> None:

@@ -57,6 +57,32 @@ def list_tools(
 _VALID_TRANSPORTS = {"stdio", "sse", "streamable-http"}
 
 
+def _expand_groups(paths: list[Path]) -> tuple[list[Path], dict]:
+    """Replace each group file with its members' role files.
+
+    Returns the expanded paths plus the overlay to apply to each member, so a
+    grouped agent exposed over MCP still gets the group's shared stores.
+    """
+    from initrunner.cli._helpers import detect_yaml_kind
+
+    expanded: list[Path] = []
+    mutators: dict = {}
+    for path in paths:
+        if detect_yaml_kind(path) != "Group":
+            expanded.append(path)
+            continue
+
+        from initrunner.group.loader import load_group
+        from initrunner.group.prepare import make_group_overlay
+
+        roster = load_group(path)
+        overlay = make_group_overlay(roster.group)
+        for member in roster.members.values():
+            expanded.append(member.path)
+            mutators[member.path] = overlay
+    return expanded, mutators
+
+
 @app.command("serve")
 def mcp_serve(
     role_files: Annotated[
@@ -99,6 +125,11 @@ def mcp_serve(
 
     # Resolve directories to role files
     role_files = resolve_role_paths(role_files)
+    try:
+        role_files, role_mutators = _expand_groups(role_files)
+    except Exception as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from e
 
     audit_logger = create_audit_logger(audit_db, no_audit)
     extra_skill_dirs = resolve_skill_dirs(skill_dir)
@@ -110,6 +141,7 @@ def mcp_serve(
             audit_logger=audit_logger,
             pass_through=pass_through,
             extra_skill_dirs=extra_skill_dirs,
+            role_mutators=role_mutators,
         )
     except Exception as e:
         err_console.print(f"[red]Error:[/red] {e}")

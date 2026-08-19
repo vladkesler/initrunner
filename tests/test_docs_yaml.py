@@ -34,8 +34,19 @@ NON_AGENT_BLOCKS = {
 }
 
 
+# Blocks that show a mistake on purpose, so the docs can explain the error.
+# Keyed the same way as NON_AGENT_BLOCKS.
+INVALID_BY_DESIGN_BLOCKS = {
+    ("docs/orchestration/groups.md", "# inline -- error"),
+}
+
+
 def _is_non_agent_block(rel: str, text: str) -> bool:
     return any(rel == f and marker in text for f, marker in NON_AGENT_BLOCKS)
+
+
+def _is_invalid_by_design(rel: str, text: str) -> bool:
+    return any(rel == f and marker in text for f, marker in INVALID_BY_DESIGN_BLOCKS)
 
 
 _FENCE = re.compile(r"^(\s*)```+(\w[\w+-]*)?\s*$")
@@ -117,6 +128,10 @@ def test_yaml_block_validates(rel: str, line: int, text: str) -> None:
         pytest.skip("documents a non-InitRunner format")
     if classify_mapping(data).document_class not in _DOCUMENT_CLASSES:
         pytest.skip("not a complete agent document")
+    if _is_invalid_by_design(rel, text):
+        with pytest.raises(Exception):  # noqa: B017 - the message is the doc's subject
+            normalize_mapping(data)
+        return
     try:
         normalize_mapping(data)
     except Exception as exc:

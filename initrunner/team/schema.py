@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from initrunner.agent.schema.base import ApiVersion, Metadata, PartialModelConfig
 from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
@@ -13,6 +14,9 @@ from initrunner.agent.schema.role import parse_tool_list
 from initrunner.agent.schema.tools import ToolConfig
 from initrunner.flow.schema import SharedMemoryConfig
 from initrunner.stores.base import StoreBackend
+
+if TYPE_CHECKING:
+    from initrunner.agent.schema.role import RoleDefinition
 
 
 class PersonaConfig(BaseModel):
@@ -166,3 +170,19 @@ class TeamDefinition(BaseModel):
     kind: Literal["Team"]
     metadata: Metadata
     spec: TeamSpec
+
+    # Personas adapted from a `use:` reference keep the full referenced role and
+    # the directory it was loaded from, so skills, custom tools, .env files and
+    # schema paths resolve against the referenced file rather than the team file.
+    # Empty for inline personas and for envelope teams.
+    _member_roles: dict[str, RoleDefinition] = PrivateAttr(default_factory=dict)
+    _member_role_dirs: dict[str, Path] = PrivateAttr(default_factory=dict)
+
+    def set_member_provenance(self, name: str, role: RoleDefinition, role_dir: Path) -> None:
+        """Record the referenced role and source directory backing a persona."""
+        self._member_roles[name] = role
+        self._member_role_dirs[name] = role_dir
+
+    def member_provenance(self, name: str) -> tuple[RoleDefinition | None, Path | None]:
+        """Referenced role and source directory for a persona, if it has one."""
+        return self._member_roles.get(name), self._member_role_dirs.get(name)

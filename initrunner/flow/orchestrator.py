@@ -26,60 +26,25 @@ from initrunner.agent.loader import (
     load_role,
     resolve_role_model,
 )
-from initrunner.agent.schema.memory import MemoryConfig, SemanticMemoryConfig
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.agent.tool_events import ToolEvent
 from initrunner.audit.logger import AuditLogger
-from initrunner.flow.schema import FlowAgentConfig, FlowDefinition, SharedDocumentsConfig
+from initrunner.flow.schema import FlowAgentConfig, FlowDefinition
 from initrunner.sinks.dispatcher import SinkDispatcher, build_sink
+from initrunner.stores.shared import apply_shared_documents, apply_shared_memory
 
 console = Console()
 logger = get_logger("flow.orchestrator")
 
 
-def apply_shared_memory(role: RoleDefinition, store_path: str, max_memories: int = 1000) -> None:
-    """Patch a role's memory config to point at a shared store.
-
-    If the role already has memory configured, override ``store_path`` and
-    ``semantic.max_memories``.  Otherwise inject a new ``MemoryConfig``.
-    """
-    if role.spec.memory is not None:
-        updated_semantic = role.spec.memory.semantic.model_copy(
-            update={"max_memories": max_memories}
-        )
-        role.spec.memory = role.spec.memory.model_copy(
-            update={"store_path": store_path, "semantic": updated_semantic}
-        )
-    else:
-        role.spec.memory = MemoryConfig(
-            store_path=store_path,
-            semantic=SemanticMemoryConfig(max_memories=max_memories),
-        )
-
-
-def apply_shared_documents(
-    role: RoleDefinition, cfg: SharedDocumentsConfig, store_path: str
-) -> None:
-    """Inject a shared document store into *role* so a ``retrieval``
-    retrieval tool is registered.
-    """
-    from initrunner.agent.schema.ingestion import IngestConfig
-
-    if role.spec.ingest is not None:
-        role.spec.ingest = role.spec.ingest.model_copy(
-            update={
-                "store_path": store_path,
-                "store_backend": cfg.store_backend,
-                "embeddings": cfg.embeddings,
-            }
-        )
-    else:
-        role.spec.ingest = IngestConfig(
-            sources=[],
-            store_path=store_path,
-            store_backend=cfg.store_backend,
-            embeddings=cfg.embeddings,
-        )
+# Shared-store wiring lives in initrunner.stores.shared; teams, flows and groups
+# all use it. Re-exported here because callers already import it from this module.
+__all__ = [
+    "FlowMember",
+    "FlowOrchestrator",
+    "apply_shared_documents",
+    "apply_shared_memory",
+]
 
 
 @dataclass

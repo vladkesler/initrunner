@@ -1003,6 +1003,7 @@ def load_and_build(
     path: Path,
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
+    role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     """Load a role YAML and build the corresponding agent.
 
@@ -1011,6 +1012,10 @@ def load_and_build(
     was installed via the registry and the user set a provider override,
     that override is applied automatically.  If no model is specified in
     the YAML, auto-detects from env vars / ``run.yaml``.
+
+    *role_mutator* runs last, just before the agent is built. Group members use
+    it to apply shared stores, which is what lets a member run through every
+    normal single-agent path unchanged.
     """
     _load_dotenv(path.parent)
     role = load_role(path)
@@ -1018,6 +1023,8 @@ def load_and_build(
     from initrunner.services.starters import apply_starter_content_root
 
     role = apply_starter_content_root(role, path)
+    if role_mutator is not None:
+        role = role_mutator(role)
     agent = build_agent(role, role_dir=path.parent, extra_skill_dirs=extra_skill_dirs)
     return role, agent
 

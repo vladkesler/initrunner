@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from initrunner.agent.loader import load_role
 from initrunner.agent.schema.adapt import (
@@ -160,3 +161,121 @@ def test_load_flow_accepts_flat(tmp_path: Path) -> None:
     flow = load_flow(p)
     assert "writer" in flow.spec.agents
     assert flow.spec.agents["writer"].sink is not None
+
+
+def _write_rich_role(roles_dir: Path) -> None:
+    """A referenced role using fields PersonaConfig cannot express."""
+    roles_dir.mkdir(exist_ok=True)
+    (roles_dir / "researcher.yaml").write_text(
+        "name: researcher\n"
+        "prompt: research things\n"
+        "model: openai:gpt-5-mini\n"
+        "tools:\n"
+        "  - datetime\n"
+        "memory:\n"
+        "  store_path: /tmp/researcher-memory.db\n"
+        "guardrails:\n"
+        "  max_tool_calls: 7\n"
+        "security:\n"
+        "  content:\n"
+        "    pii_redaction: true\n"
+    )
+
+
+def test_team_child_use_preserves_full_role(tmp_path: Path) -> None:
+    _write_rich_role(tmp_path / "roles")
+    result = normalize_mapping(
+        {
+            "name": "desk",
+            "run": "sequential",
+            "agents": {
+                "researcher": {"use": "roles/researcher.yaml"},
+                "writer": {"prompt": "write it up"},
+            },
+        }
+    )
+
+    team = document_to_team(result.document, base_dir=tmp_path)
+    role, role_dir = team.member_provenance("researcher")
+
+    assert role is not None
+    # Fields PersonaConfig drops on the floor survive on the referenced role.
+    assert role.spec.memory is not None
+    assert role.spec.memory.store_path == "/tmp/researcher-memory.db"
+    assert role.spec.security.content.pii_redaction is True
+    assert role.metadata.name == "researcher"
+    # ...and it resolves relative paths against its own directory.
+    assert role_dir == (tmp_path / "roles").resolve()
+
+    # Inline personas keep synthesizing a role at runtime.
+    assert team.member_provenance("writer") == (None, None)
+
+
+def test_team_child_use_tool_precedence(tmp_path: Path) -> None:
+    _write_rich_role(tmp_path / "roles")
+    result = normalize_mapping(
+        {
+            "name": "desk",
+            "run": "sequential",
+            "tools": ["calculator"],
+            "agents": {
+                "researcher": {"use": "roles/researcher.yaml", "tools": ["shell"]},
+                "writer": {"prompt": "write it up"},
+            },
+        }
+    )
+
+    team = document_to_team(result.document, base_dir=tmp_path)
+    role, _ = team.member_provenance("researcher")
+
+    assert role is not None
+    assert [t.type for t in role.spec.tools] == ["calculator", "datetime", "shell"]
+
+
+def test_team_child_use_guardrails_not_clobbered(tmp_path: Path) -> None:
+    _write_rich_role(tmp_path / "roles")
+    doc: dict[str, Any] = {
+        "name": "desk",
+        "run": "sequential",
+        "agents": {
+            "researcher": {"use": "roles/researcher.yaml"},
+            "writer": {"prompt": "write it up"},
+        },
+    }
+
+    team = document_to_team(normalize_mapping(doc).document, base_dir=tmp_path)
+    role, _ = team.member_provenance("researcher")
+    assert role is not None
+    assert role.spec.guardrails.max_tool_calls == 7
+
+    # An explicit team-level guardrail still wins over the referenced role.
+    doc["guardrails"] = {"max_tool_calls": 3}
+    team = document_to_team(normalize_mapping(doc).document, base_dir=tmp_path)
+    role, _ = team.member_provenance("researcher")
+    assert role is not None
+    assert role.spec.guardrails.max_tool_calls == 3
+
+
+def test_team_member_role_is_copied_per_resolve(tmp_path: Path) -> None:
+    """Runners patch shared stores onto the role in place, so each build gets a copy."""
+    from initrunner.team.roles import resolve_persona_role
+
+    _write_rich_role(tmp_path / "roles")
+    result = normalize_mapping(
+        {
+            "name": "desk",
+            "run": "sequential",
+            "agents": {
+                "researcher": {"use": "roles/researcher.yaml"},
+                "writer": {"prompt": "write it up"},
+            },
+        }
+    )
+    team = document_to_team(result.document, base_dir=tmp_path)
+
+    first, _ = resolve_persona_role("researcher", team.spec.personas["researcher"], team)
+    first.spec.memory.store_path = "/tmp/mutated.db"  # type: ignore[union-attr]
+    second, _ = resolve_persona_role("researcher", team.spec.personas["researcher"], team)
+
+    assert second.spec.memory is not None
+    assert second.spec.memory.store_path == "/tmp/researcher-memory.db"

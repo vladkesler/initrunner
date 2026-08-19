@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from initrunner.agent.schema.document import Classification, DocumentClass, classify_mapping
-from initrunner.agent.schema.ir import ChildIR, CompositionIR, ThenIR
+from initrunner.agent.schema.ir import ChildIR, CompositionIR, Shape, ThenIR
 from initrunner.agent.schema.v3 import _NAME_RE, AgentChild, AgentDocument, ThenConfig
 from initrunner.flow.schema import DelegateSinkConfig, SharedDocumentsConfig
 from initrunner.team.schema import TeamDocumentsConfig
@@ -101,18 +101,27 @@ def document_to_ir(
     has_then = any(child.then is not None for child in document.agents.values())
     has_after = any(child.after for child in document.agents.values())
     is_graph = has_then or has_after
+    # Only a group of independent agents survives validation without a run
+    # preset, and it hands off to nothing.
+    is_roster = not is_graph and document.run is None
     children = tuple(
         _child_ir(name, child, extra_needs.get(name, ())) for name, child in document.agents.items()
     )
+    if is_graph:
+        shape: Shape = "graph"
+    elif is_roster:
+        shape = "roster"
+    else:
+        shape = "preset"
     return CompositionIR(
         name=document.name,
-        shape="graph" if is_graph else "preset",
+        shape=shape,
         prompt=None,
         model=model,
         tools=tools,
         run=document.run,
         children=children,
-        handoff="flow" if is_graph else "team",
+        handoff=None if is_roster else ("flow" if is_graph else "team"),
         description=document.description,
         tags=tuple(document.tags),
         author=document.author,

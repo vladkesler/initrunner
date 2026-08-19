@@ -74,7 +74,8 @@ curl -N http://127.0.0.1:8000/ \
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `role_file` | `Path` | *(required)* | Path to the role YAML file. |
+| `role_file` | `Path` | *(required)* | Path to the role YAML file, or a [group file](../orchestration/groups.md) together with `--agent`. |
+| `--agent` | `str` | `None` | Which member of a group to serve. A2A publishes one agent card per URL, so a group target requires it. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
 | `--url` | `str` | `http://{host}:{port}` | Public URL written into the agent card. Required for a dialable card when `--host` is `0.0.0.0` or `::`. |

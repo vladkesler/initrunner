@@ -23,6 +23,7 @@ from initrunner.flow.schema import (
     FlowMetadata,
     FlowSpec,
 )
+from initrunner.group.schema import GroupDefinition, GroupMemberRef
 from initrunner.team.schema import PersonaConfig, TeamDefinition, TeamGuardrails, TeamSpec
 
 
@@ -42,6 +43,12 @@ def run_kind_from_mapping(data: dict[str, Any]) -> str:
             for v in agents.values()
         ):
             return "Flow"
+        if "run" in data:
+            return "Team"
+        if all(isinstance(v, dict) and set(v) == {"use"} for v in agents.values()):
+            # Nothing but references to other agent files: a deployment group of
+            # independent agents, with no orchestration to run.
+            return "Group"
         if len(agents) == 1:
             return "Agent"
         return "Team"
@@ -80,8 +87,15 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
         raise AdaptError("graph documents are not teams; use the flow adapter")
 
     personas: dict[str, PersonaConfig] = {}
+    member_roles: dict[str, RoleDefinition] = {}
+    member_dirs: dict[str, Path] = {}
     for name, child in document.agents.items():
         personas[name] = _child_to_persona(name, child, document, base_dir)
+        if child.use:
+            # _child_to_persona already rejected a missing base_dir.
+            assert base_dir is not None
+            member_roles[name] = _team_member_role(name, child, document, base_dir)
+            member_dirs[name] = (base_dir / child.use).resolve().parent
 
     g = document.guardrails
     spec = TeamSpec(
@@ -103,7 +117,7 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
         debate=document.debate,
         ensemble=document.ensemble,
     )
-    return TeamDefinition(
+    team = TeamDefinition(
         apiVersion=ApiVersion.V1,
         kind="Team",
         metadata=RoleMetadata(
@@ -117,6 +131,50 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
             bundle=document.bundle,
         ),
         spec=spec,
+    )
+    for name, role in member_roles.items():
+        team.set_member_provenance(name, role, member_dirs[name])
+    return team
+
+
+def document_to_group(
+    document: AgentDocument,
+    *,
+    base_dir: Path | None = None,
+    source_path: Path | None = None,
+) -> GroupDefinition:
+    """Reference-only composition → GroupDefinition.
+
+    Member role files are not read here; ``load_group`` does that so validation
+    can report per-member problems instead of stopping at the first one.
+    """
+    if not document.agents:
+        raise AdaptError("group adapter needs agents")
+
+    root = base_dir if base_dir is not None else Path.cwd()
+    members: dict[str, GroupMemberRef] = {}
+    for name, child in document.agents.items():
+        if not child.use:
+            raise AdaptError(f"group member '{name}' has no 'use:' reference")
+        members[name] = GroupMemberRef(
+            key=name,
+            use=child.use,
+            path=(root / child.use).resolve(),
+        )
+
+    return GroupDefinition(
+        name=document.name,
+        members=members,
+        shared_memory=document.shared_memory,
+        shared_documents=document.shared_documents,
+        security=document.security,
+        observability=document.observability,
+        description=document.description,
+        tags=tuple(document.tags),
+        author=document.author,
+        version=document.version,
+        dependencies=tuple(document.dependencies),
+        source_path=source_path,
     )
 
 
@@ -176,7 +234,12 @@ def adapt_mapping(
     data: dict[str, Any],
     *,
     base_dir: Path | None = None,
-) -> tuple[str, RoleDefinition | TeamDefinition | FlowDefinition, CompositionIR]:
+    source_path: Path | None = None,
+) -> tuple[
+    str,
+    RoleDefinition | TeamDefinition | FlowDefinition | GroupDefinition,
+    CompositionIR,
+]:
     """Normalize *data* and return ``(legacy_kind, runner_model, ir)``."""
     result = normalize_mapping(data)
     kind = run_kind_from_mapping(data)
@@ -184,6 +247,9 @@ def adapt_mapping(
         return kind, document_to_team(result.document, base_dir=base_dir), result.ir
     if kind == "Flow":
         return kind, document_to_flow(result.document, base_dir=base_dir), result.ir
+    if kind == "Group":
+        group = document_to_group(result.document, base_dir=base_dir, source_path=source_path)
+        return kind, group, result.ir
     if kind == "Agent":
         return kind, document_to_role(result.document, base_dir=base_dir), result.ir
     raise AdaptError(f"cannot adapt document as {kind}")
@@ -312,6 +378,33 @@ def _child_to_persona(
         tools_mode=child.tools_mode,
         environment=dict(child.environment),
     )
+
+
+def _team_member_role(
+    name: str,
+    child: AgentChild,
+    document: AgentDocument,
+    base_dir: Path,
+) -> RoleDefinition:
+    """Full referenced role backing a ``use:`` persona.
+
+    ``PersonaConfig`` only carries prompt/model/tools, so the referenced role's
+    skills, memory, ingest, output schema, security and the rest would be lost
+    if the runner rebuilt the persona from it. Team-level guardrails and
+    observability are overlaid only where the document set them explicitly, so
+    the referenced role's own settings otherwise stand.
+    """
+    role = _child_to_role(name, child, document, base_dir)
+    if "guardrails" in document.model_fields_set:
+        overlay = document.guardrails.model_dump(
+            exclude_unset=True,
+            exclude={"team_token_budget", "team_timeout_seconds"},
+        )
+        if overlay:
+            role.spec.guardrails = role.spec.guardrails.model_copy(update=overlay)
+    if document.observability is not None and role.spec.observability is None:
+        role.spec.observability = document.observability
+    return role
 
 
 def _resolved_child(

@@ -23,11 +23,17 @@ def build_agent_sync(
     path: Path,
     extra_skill_dirs: list[Path] | None = None,
     model_override: str | None = None,
+    role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     """Load and build an agent from a role file (sync)."""
     from initrunner.agent.loader import load_and_build
 
-    return load_and_build(path, extra_skill_dirs=extra_skill_dirs, model_override=model_override)
+    return load_and_build(
+        path,
+        extra_skill_dirs=extra_skill_dirs,
+        model_override=model_override,
+        role_mutator=role_mutator,
+    )
 
 
 def build_agent_from_role_sync(role: RoleDefinition) -> Agent:

@@ -313,3 +313,34 @@ class TestExamplesCLI:
         # Primary file is rag-agent/rag-agent.yaml, not rag-agent/docs/faq.md
         assert "initrunner validate rag-agent/rag-agent.yaml" in result.output
         assert "initrunner run rag-agent/rag-agent.yaml" in result.output
+
+
+class TestGroupExamples:
+    """A group example downloads its member roles from examples/groups/."""
+
+    def test_catalog_ships_the_group_example(self):
+        from initrunner.examples import get_example
+
+        entry = get_example("desk")
+
+        assert entry.category == "group"
+        assert entry.primary_file == "desk.yaml"
+        # The member role files travel with the group file.
+        assert "roles/intake.yaml" in entry.files
+
+    def test_member_files_download_from_the_groups_directory(self, tmp_path: Path):
+        """The URL is built from the directory name, not the category name."""
+        from initrunner.examples import copy_example
+
+        urls: list[str] = []
+
+        def _fake_download(url: str) -> bytes:
+            urls.append(url)
+            return b"name: member\nprompt: hi\n"
+
+        with patch("initrunner.examples._download_file", _fake_download):
+            written = copy_example("desk", tmp_path)
+
+        assert len(written) > 1
+        assert urls, "expected member files to be downloaded"
+        assert all("/examples/groups/roles/" in url for url in urls), urls

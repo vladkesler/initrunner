@@ -111,9 +111,8 @@ def _validate_universal_flags(
         raise typer.Exit(1)
 
     # -- Sense conflicts --
-    if role_file is not None and sense:
-        console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
-        raise typer.Exit(1)
+    # A role file plus --sense is only meaningful for a group, where sensing
+    # picks a member. That is checked once the target's kind is known.
     if sense and not prompt:
         console.print("[red]Error:[/red] --sense requires --prompt (-p).")
         raise typer.Exit(1)
@@ -167,6 +166,72 @@ def _validate_universal_flags(
         raise typer.Exit(1)
 
     return output_format
+
+
+# ---------------------------------------------------------------------------
+# Per-kind validation (runs once the target's kind is known)
+# ---------------------------------------------------------------------------
+
+# Flags that steer one agent's run. A team, flow or whole group has no single
+# run to steer, so these are rejected rather than quietly dropped.
+_SINGLE_AGENT_FLAGS = (
+    "--interactive",
+    "--autonomous",
+    "--max-iterations",
+    "--token-budget",
+    "--resume",
+    "--attach",
+    "--report",
+    "--report-template",
+    "--dev",
+    "--var",
+)
+
+# kind -> (denied flags, allowed run modes)
+_KIND_POLICY: dict[str, tuple[tuple[str, ...], frozenset[RunMode]]] = {
+    "Team": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD})),
+    "Flow": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD})),
+    "Group": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD, RunMode.SERVE, RunMode.DAEMON})),
+}
+
+
+def _validate_kind_flags(
+    kind: str,
+    mode: RunMode,
+    *,
+    active_flags: dict[str, bool],
+) -> None:
+    """Reject run flags the target cannot honour.
+
+    ``Agent`` targets accept everything, including a group member picked with
+    ``--agent``, which is rewritten to an Agent target before this runs.
+    """
+    policy = _KIND_POLICY.get(kind)
+    if policy is None:
+        return
+    denied_flags, allowed_modes = policy
+
+    invalid = [flag for flag in denied_flags if active_flags.get(flag)]
+    if invalid:
+        suffix = (
+            " Pick one member with --agent <name> to run it as a single agent."
+            if kind == "Group"
+            else ""
+        )
+        console.print(
+            f"[red]Error:[/red] {', '.join(invalid)} not supported for {kind} targets.{suffix}"
+        )
+        raise typer.Exit(1)
+
+    if mode not in allowed_modes:
+        flag = "--daemon/--autopilot" if mode is RunMode.DAEMON else f"--{mode.value}"
+        suffix = (
+            " Add --agent <name> to run one member that way."
+            if kind == "Group"
+            else " It is only supported for Agent targets."
+        )
+        console.print(f"[red]Error:[/red] {flag} is not supported for {kind} targets.{suffix}")
+        raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------

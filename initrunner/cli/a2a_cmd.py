@@ -21,6 +21,10 @@ def _default_advertise_url(host: str, port: int) -> str:
 @app.command("serve")
 def a2a_serve(
     role_file: Annotated[Path, typer.Argument(help="Agent directory or role YAML file")],
+    agent_member: Annotated[
+        str | None,
+        typer.Option("--agent", help="Which agent to serve, for a group of agents"),
+    ] = None,
     host: Annotated[str, typer.Option(help="Host to bind to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
     url: Annotated[
@@ -65,6 +69,33 @@ def a2a_serve(
             f"card URL ({advertised_url}). Pass --url with a reachable address."
         )
 
+    # A2A serves one agent card per URL, so a group needs the member named.
+    role_mutator = None
+    from initrunner.cli._helpers import detect_yaml_kind
+
+    if detect_yaml_kind(resolve_role_path(role_file)) == "Group":
+        from initrunner.cli.run_cmd._group import (
+            load_roster_or_exit,
+            member_overlay,
+            resolve_member_or_exit,
+        )
+
+        roster = load_roster_or_exit(resolve_role_path(role_file))
+        if agent_member is None:
+            console.print(
+                "[red]Error:[/red] an A2A server serves one agent card; pick a member "
+                f"with --agent. Available agents: {', '.join(roster.keys())}"
+            )
+            raise typer.Exit(1)
+        role_file = resolve_member_or_exit(roster, agent_member)
+        role_mutator = member_overlay(roster)
+    elif agent_member is not None:
+        console.print(
+            f"[red]Error:[/red] --agent picks one member of a group, and {role_file} is"
+            " not a group."
+        )
+        raise typer.Exit(1)
+
     extra_skill_dirs = resolve_skill_dirs(skill_dir)
     resolved_model = resolve_model_override(model)
     with command_context(
@@ -73,6 +104,7 @@ def a2a_serve(
         no_audit=no_audit,
         extra_skill_dirs=extra_skill_dirs,
         model_override=resolved_model,
+        role_mutator=role_mutator,
     ) as (role, agent, audit_logger, _memory_store, _sink_dispatcher):
         from initrunner.agent.skills import resolve_skills
 

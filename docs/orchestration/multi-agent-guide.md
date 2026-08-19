@@ -13,6 +13,12 @@ Do you need multiple agents?
   |     (todo_driven, plan_execute, reflexion)
   |     See: docs/core/reasoning.md
   |
+  Yes --> Do they work together, or just ship together?
+  |
+  |       Just ship together --> Group
+  |       (independent agents, one file, one process)
+  |       See: docs/orchestration/groups.md
+  |
   Yes --> Is it one-shot work with multiple perspectives?
             |
             Yes --> Team
@@ -34,17 +40,17 @@ Do you need multiple agents?
 
 ## Quick Comparison
 
-| | Single + Reasoning | Team | Flow | Spawn | Delegate |
-|--|-------------------|------|------|-------|----------|
-| **Kind** | Agent | Team | Flow | Agent (tool) | Agent (tool) |
-| **Config** | `reasoning` | `agents` | `agents` | `tools` | `tools` |
-| **Who decides** | You + LLM | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
-| **Execution** | Iterative loop | Sequential/parallel | Trigger-driven | Non-blocking | Blocking |
-| **Lifetime** | One run | One run | Daemon | Within parent run | Within parent run |
-| **Triggers** | No | No | Yes | No | No |
-| **Shared memory** | N/A | Yes | Yes | Optional | Optional |
-| **Typical agents** | 1 | 2-5 | 2-20 | 1-5 | 1-3 |
-| **Best for** | Planning, research, writing | Code review, analysis, ETL | Monitoring, bots | Parallel research | Conditional routing |
+| | Single + Reasoning | Group | Team | Flow | Spawn | Delegate |
+|--|-------------------|-------|------|------|-------|----------|
+| **Kind** | Agent | Group | Team | Flow | Agent (tool) | Agent (tool) |
+| **Config** | `reasoning` | `agents` (bare `use:`) | `agents` + `run` | `agents` + `then` | `tools` | `tools` |
+| **Who decides** | You + LLM | Nobody: they never interact | You (YAML) | You (YAML) | LLM (runtime) | LLM (runtime) |
+| **Execution** | Iterative loop | Independent | Sequential/parallel | Trigger-driven | Non-blocking | Blocking |
+| **Lifetime** | One run | One run each, or a service | One run | Daemon | Within parent run | Within parent run |
+| **Triggers** | No | Per member | No | Yes | No | No |
+| **Shared memory** | N/A | Optional | Yes | Yes | Optional | Optional |
+| **Typical agents** | 1 | 2-20 | 2-5 | 2-20 | 1-5 | 1-3 |
+| **Best for** | Planning, research, writing | Deploying a set of agents | Code review, analysis, ETL | Monitoring, bots | Parallel research | Conditional routing |
 
 ## When to Use Each
 

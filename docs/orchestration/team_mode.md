@@ -110,11 +110,30 @@ agents:
 
 You can mix simple and extended forms in the same team file. Simple strings are normalized to `{prompt: <string>}` internally.
 
+**Referencing an existing role file** -- point a member at a role file with `use:`:
+
+```yaml
+name: code-review
+run: sequential          # required: without it, a file of bare `use:` references
+                         # is a group of independent agents, not a team
+agents:
+  architect:
+    use: ./roles/architect.yaml
+  security:
+    use: ./roles/security.yaml
+    prompt: "find injection risks specifically"   # optional override
+```
+
+A referenced member runs its role file in full: skills, memory, ingest, output schema, autonomy, sinks, security, and resources all apply, not just the prompt, model, and tools. Its relative paths -- skill directories, custom tool modules, `.env`, ingest sources, output schema files, sandbox mounts -- resolve against the **referenced file's** directory, so a role works the same whether you run it directly or as a team member.
+
+Precedence when a member both references a file and sets its own fields: the member's `prompt`, `model`, and `tools` override the referenced role's. Tools merge as team tools, then role tools, then member tools (`tools_mode: replace` drops the earlier layers). Team-level `guardrails` and `observability` apply only where you set them explicitly; otherwise the referenced role keeps its own.
+
 **Agent fields:**
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `prompt` | `string` | *(required)* | Agent's role description. |
+| `prompt` | `string` | *(required unless `use` is set)* | Agent's role description. |
+| `use` | `string` | `null` | Path to an existing role file, relative to the team file. |
 | `model` | `ModelConfig` | `null` | Override the team's model. |
 | `tools` | `list[ToolConfig]` | `[]` | Additional tools for this agent. |
 | `tools_mode` | `"extend" \| "replace"` | `"extend"` | How agent tools interact with shared tools. |

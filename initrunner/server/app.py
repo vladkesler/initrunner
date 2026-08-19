@@ -9,6 +9,7 @@ import secrets
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 import uvicorn
@@ -23,6 +24,7 @@ from starlette.routing import Route
 from initrunner.agent.policies import validate_input
 from initrunner.agent.prompt import extract_text_from_prompt
 from initrunner.agent.schema.role import RoleDefinition
+from initrunner.agent.schema.security import SecurityPolicy
 from initrunner.audit.logger import AuditLogger
 from initrunner.server.conversations import ConversationStore
 from initrunner.server.convert import openai_messages_to_pydantic
@@ -41,6 +43,46 @@ from initrunner.server.models import (
 from initrunner.services.execution import execute_run_stream_sync, execute_run_sync
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ServedMember:
+    """One agent behind the API, addressed by ``key`` as an OpenAI model id."""
+
+    key: str
+    role: RoleDefinition
+    agent: Agent
+    role_path: Path | None = None
+
+
+def _conv_key(member_key: str, conv_id: str) -> str:
+    """Conversation history is per agent, even when clients reuse one id."""
+    return f"{member_key}:{conv_id}"
+
+
+def _member_for_run(
+    run_id: str,
+    audit_logger: AuditLogger | None,
+    members: dict[str, ServedMember],
+    single: ServedMember | None,
+) -> ServedMember | None:
+    """Find the agent that owns a paused run.
+
+    Pending approvals record the agent's name, so a resume lands back on the
+    agent that asked for it without the client having to say which.
+    """
+    if single is not None:
+        return single
+    if audit_logger is None:
+        return None
+    rows = audit_logger.load_pending_approvals(run_id)
+    if not rows:
+        return None
+    agent_name = rows[0].agent_name
+    for member in members.values():
+        if member.role.metadata.name == agent_name:
+            return member
+    return None
 
 
 def _error_response(status: int, error_type: str, message: str) -> JSONResponse:
@@ -169,12 +211,41 @@ def create_app(
     cors_origins: list[str] | None = None,
     role_path: Path | None = None,
 ) -> Starlette:
-    """Build and return the Starlette ASGI application."""
+    """Build and return the Starlette ASGI application for one agent."""
+    member = ServedMember(key=role.metadata.name, role=role, agent=agent, role_path=role_path)
+    return create_multi_app(
+        {member.key: member},
+        security=role.spec.security,
+        audit_logger=audit_logger,
+        api_key=api_key,
+        conversation_ttl=conversation_ttl,
+        cors_origins=cors_origins,
+    )
+
+
+def create_multi_app(
+    members: dict[str, ServedMember],
+    *,
+    security: SecurityPolicy,
+    audit_logger: AuditLogger | None = None,
+    api_key: str | None = None,
+    conversation_ttl: float | None = None,
+    cors_origins: list[str] | None = None,
+) -> Starlette:
+    """Build the ASGI app for one or more agents.
+
+    With a single agent the request's ``model`` is ignored, which is the
+    long-standing behaviour. With several, it selects the agent and is required:
+    guessing on the client's behalf would silently answer as the wrong agent.
+    """
     from initrunner.server.rate_limiter import TokenBucketRateLimiter
 
-    security = role.spec.security
+    if not members:
+        raise ValueError("a server needs at least one agent")
+
     server_cfg = security.server
     rate_cfg = security.rate_limit
+    single = next(iter(members.values())) if len(members) == 1 else None
 
     conversations = ConversationStore(
         ttl_seconds=conversation_ttl if conversation_ttl is not None else 3600,
@@ -184,7 +255,25 @@ def create_app(
         rate=rate_cfg.requests_per_minute / 60.0,
         burst=rate_cfg.burst_size,
     )
-    model_name = role.metadata.name
+
+    def _resolve_member(requested: str) -> ServedMember | None:
+        if single is not None:
+            return single
+        return members.get(requested)
+
+    def _unknown_model_error(requested: str) -> JSONResponse:
+        known = ", ".join(members)
+        if not requested:
+            return _error_response(
+                400,
+                "invalid_request_error",
+                f"this server hosts several agents; set 'model' to one of: {known}",
+            )
+        return _error_response(
+            400,
+            "invalid_request_error",
+            f"unknown model '{requested}'; this server hosts: {known}",
+        )
 
     # --- Handlers ---
 
@@ -193,7 +282,7 @@ def create_app(
 
     async def list_models(request: Request) -> JSONResponse:
         resp = ModelListResponse(
-            data=[ModelInfo(id=model_name, created=_now_ts())],
+            data=[ModelInfo(id=key, created=_now_ts()) for key in members],
         )
         return JSONResponse(resp.model_dump(exclude_none=True))
 
@@ -216,9 +305,15 @@ def create_app(
         except Exception as e:
             return _error_response(400, "invalid_request_error", str(e))
 
-        # Resolve conversation history
+        member = _resolve_member(req.model)
+        if member is None:
+            return _unknown_model_error(req.model)
+
+        # Resolve conversation history. The key includes the agent so that a
+        # client reusing one conversation id across agents does not hand one
+        # agent another's history.
         conv_id = request.headers.get("x-conversation-id") or secrets.token_urlsafe(24)
-        server_history = conversations.get(conv_id)
+        server_history = conversations.get(_conv_key(member.key, conv_id))
 
         try:
             if server_history is not None:
@@ -246,11 +341,9 @@ def create_app(
 
         if req.stream:
             return await _handle_stream(
-                agent,
-                role,
+                member,
                 prompt,
                 message_history,
-                model_name,
                 conv_id,
                 conversations,
                 audit_logger,
@@ -258,11 +351,9 @@ def create_app(
             )
 
         return await _handle_non_stream(
-            agent,
-            role,
+            member,
             prompt,
             message_history,
-            model_name,
             conv_id,
             conversations,
             audit_logger,
@@ -293,17 +384,23 @@ def create_app(
         approvals: dict[str, bool] = dict(body)
         resolved_by = request.headers.get("x-resolved-by")
 
+        member = _member_for_run(run_id, audit_logger, members, single)
+        if member is None:
+            return _error_response(
+                404, "invalid_request_error", f"no paused run '{run_id}' on this server"
+            )
+
         from initrunner.services.execution import resume_run_async
 
         try:
             result, new_messages = await resume_run_async(
-                agent,
-                role,
+                member.agent,
+                member.role,
                 run_id,
                 approvals,
                 audit_logger=audit_logger,
                 resolved_by=resolved_by,
-                role_path=role_path,
+                role_path=member.role_path,
             )
         except ValueError as e:
             return _error_response(404, "invalid_request_error", str(e))
@@ -316,20 +413,23 @@ def create_app(
             return _paused_json_response(
                 result,
                 new_messages,
-                role,
-                model_name,
+                member.role,
+                member.key,
                 conv_id,
                 audit_logger=audit_logger,
-                role_path=role_path,
+                role_path=member.role_path,
             )
         if not result.success:
             status, error_type, message = _classify_error(result.error or "")
             return _error_response(status, error_type, message)
-        conversations.save(conv_id, _trim_history(new_messages, _MAX_CONVERSATION_HISTORY))
+        conversations.save(
+            _conv_key(member.key, conv_id),
+            _trim_history(new_messages, _MAX_CONVERSATION_HISTORY),
+        )
         resp = ChatCompletionResponse(
             id=_make_id(),
             created=_now_ts(),
-            model=model_name,
+            model=member.key,
             choices=[Choice(message=ChatMessage(role="assistant", content=result.output))],
             usage=Usage(
                 prompt_tokens=result.tokens_in,
@@ -345,16 +445,15 @@ def create_app(
     # --- Non-streaming handler ---
 
     async def _handle_non_stream(
-        agent: Agent,
-        role: RoleDefinition,
+        member: ServedMember,
         prompt,
         message_history: list | None,
-        model_name: str,
         conv_id: str,
         conversations: ConversationStore,
         audit_logger: AuditLogger | None,
         request: Request | None = None,
     ) -> JSONResponse:
+        role = member.role
         content_policy = role.spec.security.content
         validation = validate_input(extract_text_from_prompt(prompt), content_policy)
         if not validation.valid:
@@ -363,7 +462,7 @@ def create_app(
         try:
             result, new_messages = await asyncio.to_thread(
                 execute_run_sync,
-                agent,
+                member.agent,
                 role,
                 prompt,
                 audit_logger=audit_logger,
@@ -382,18 +481,21 @@ def create_app(
                 result,
                 new_messages,
                 role,
-                model_name,
+                member.key,
                 conv_id,
                 audit_logger=audit_logger,
-                role_path=role_path,
+                role_path=member.role_path,
             )
 
-        conversations.save(conv_id, _trim_history(new_messages, _MAX_CONVERSATION_HISTORY))
+        conversations.save(
+            _conv_key(member.key, conv_id),
+            _trim_history(new_messages, _MAX_CONVERSATION_HISTORY),
+        )
 
         resp = ChatCompletionResponse(
             id=_make_id(),
             created=_now_ts(),
-            model=model_name,
+            model=member.key,
             choices=[Choice(message=ChatMessage(role="assistant", content=result.output))],
             usage=Usage(
                 prompt_tokens=result.tokens_in,
@@ -412,16 +514,16 @@ def create_app(
     _HEARTBEAT_INTERVAL = 100  # iterations (~10s at 0.1s poll)
 
     async def _handle_stream(
-        agent: Agent,
-        role: RoleDefinition,
+        member: ServedMember,
         prompt,
         message_history: list | None,
-        model_name: str,
         conv_id: str,
         conversations: ConversationStore,
         audit_logger: AuditLogger | None,
         request: Request | None = None,
     ) -> JSONResponse | StreamingResponse:
+        role = member.role
+        model_name = member.key
         # Pre-flight input validation — reject before streaming starts so the
         # client gets a proper HTTP 400, not a 200 SSE stream with an error.
         content_policy = role.spec.security.content
@@ -449,7 +551,7 @@ def create_app(
             # called from the thread pool.
             try:
                 return execute_run_stream_sync(
-                    agent,
+                    member.agent,
                     role,
                     prompt,
                     audit_logger=audit_logger,
@@ -518,7 +620,7 @@ def create_app(
                         role,
                         new_messages,
                         audit_logger=audit_logger,
-                        role_path=role_path,
+                        role_path=member.role_path,
                     )
                     pause_event = {
                         "event": "approval_required",
@@ -545,7 +647,7 @@ def create_app(
                     yield f"data: {finish.model_dump_json(exclude_none=True)}\n\n"
                 elif result.success:
                     conversations.save(
-                        conv_id,
+                        _conv_key(member.key, conv_id),
                         _trim_history(new_messages, _MAX_CONVERSATION_HISTORY),
                     )
 
@@ -721,5 +823,28 @@ def run_server(
         conversation_ttl=conversation_ttl,
         cors_origins=cors_origins,
         role_path=role_path,
+    )
+    uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+def run_multi_server(
+    members: dict[str, ServedMember],
+    *,
+    security: SecurityPolicy,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    audit_logger: AuditLogger | None = None,
+    api_key: str | None = None,
+    conversation_ttl: float | None = None,
+    cors_origins: list[str] | None = None,
+) -> None:
+    """Blocking entry point serving several agents from one process."""
+    app = create_multi_app(
+        members,
+        security=security,
+        audit_logger=audit_logger,
+        api_key=api_key,
+        conversation_ttl=conversation_ttl,
+        cors_origins=cors_origins,
     )
     uvicorn.run(app, host=host, port=port, log_level="info")

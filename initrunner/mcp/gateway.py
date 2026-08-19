@@ -12,6 +12,8 @@ from fastmcp.server import create_proxy
 from fastmcp.server.transforms import Visibility
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pydantic_ai import Agent
 
     from initrunner.agent.schema.role import RoleDefinition
@@ -57,14 +59,20 @@ def _make_tool_name(name: str, seen: set[str]) -> str:
 def _load_agents(
     role_paths: list[Path],
     extra_skill_dirs: list[Path] | None = None,
+    role_mutators: dict[Path, Callable[[RoleDefinition], RoleDefinition]] | None = None,
 ) -> list[_AgentEntry]:
     """Load and build agents for each role path. Fails fast on errors."""
     from initrunner.agent.loader import load_and_build
 
+    role_mutators = role_mutators or {}
     entries: list[_AgentEntry] = []
     for role_path in role_paths:
         try:
-            role, agent = load_and_build(role_path, extra_skill_dirs=extra_skill_dirs)
+            role, agent = load_and_build(
+                role_path,
+                extra_skill_dirs=extra_skill_dirs,
+                role_mutator=role_mutators.get(role_path),
+            )
         except Exception as e:
             raise RuntimeError(f"Failed to load {role_path}: {e}") from e
         entries.append(
@@ -160,12 +168,13 @@ def build_mcp_gateway(
     audit_logger: AuditLogger | None = None,
     pass_through: bool = False,
     extra_skill_dirs: list[Path] | None = None,
+    role_mutators: dict[Path, Callable[[RoleDefinition], RoleDefinition]] | None = None,
 ) -> FastMCP:
     """Build a FastMCP server that exposes InitRunner agents as MCP tools."""
     if not role_paths:
         raise ValueError("At least one role file required")
 
-    entries = _load_agents(role_paths, extra_skill_dirs)
+    entries = _load_agents(role_paths, extra_skill_dirs, role_mutators)
     mcp = FastMCP(server_name)
 
     seen: set[str] = set()

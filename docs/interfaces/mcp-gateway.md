@@ -433,6 +433,14 @@ initrunner mcp serve roles/researcher.yaml roles/writer.yaml roles/reviewer.yaml
 
 An MCP client (e.g., Claude Desktop) can then orchestrate all three agents as tools within a single conversation.
 
+If those agents already ship together as a [group](../orchestration/groups.md), pass the group file instead and every member becomes a tool:
+
+```bash
+initrunner mcp serve desk.yaml
+```
+
+Members keep their own directories for skills and custom tools, and pick up whatever the group shares.
+
 ## Error Handling
 
 - **Startup errors**: If any role file fails to load, the gateway exits immediately with a clear error message identifying the problematic file.

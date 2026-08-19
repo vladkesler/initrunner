@@ -42,6 +42,27 @@ _NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 _CHILD_NAME_RE = _NAME_RE
 RunPreset = Literal["sequential", "parallel", "debate", "ensemble"]
 
+# Fields a group of independent agents may set. Everything else configures how
+# an agent behaves, which belongs to the member's own role file.
+_GROUP_FIELDS = frozenset(
+    {
+        "name",
+        "description",
+        "tags",
+        "author",
+        "team",
+        "version",
+        "dependencies",
+        "bundle",
+        "spec_version",
+        "agents",
+        "shared_memory",
+        "shared_documents",
+        "observability",
+        "security",
+    }
+)
+
 
 class ThenConfig(BaseModel):
     """Graph edge. Mechanical rename of Flow ``DelegateSinkConfig`` (``target`` → ``to``)."""
@@ -206,6 +227,30 @@ class AgentDocument(BaseModel):
 
         return [NamedSpec.model_validate(item) for item in v]
 
+    def _grouped_agent_rules(self) -> None:
+        """Reject group-level fields that belong to a member's own role file.
+
+        A group is a deployment manifest: it says which agents run together and
+        what they share, not how any of them behaves. Anything that configures
+        behaviour is silently misleading here, so it is an error instead.
+        """
+        extra = sorted(self.model_fields_set - _GROUP_FIELDS)
+        if extra:
+            raise ValueError(
+                f"{extra} cannot be set on a group of agents. Group files support "
+                "metadata, shared_memory, shared_documents, observability and "
+                "security.server / security.rate_limit. Move these into the member's "
+                "role file, or add 'run:' to run the members as a team"
+            )
+        listener_only = self.security.model_fields_set - {"server", "rate_limit"}
+        if listener_only:
+            raise ValueError(
+                f"security.{sorted(listener_only)} cannot be set on a group of agents. "
+                "Group security covers only the shared listener ('server', "
+                "'rate_limit'); tool, sandbox and content policy stay in each "
+                "member's role file"
+            )
+
     @model_validator(mode="after")
     def _composition_rules(self) -> AgentDocument:
         composed = bool(self.agents)
@@ -241,10 +286,35 @@ class AgentDocument(BaseModel):
 
         has_then = any(child.then is not None for child in self.agents.values())
         has_after = any(child.after for child in self.agents.values())
-        if (has_then or has_after) and self.run is not None:
+        # Captured before the injection below, which would mark 'run' as set.
+        explicit_run = self.run is not None
+        if (has_then or has_after) and explicit_run:
             raise ValueError("pick 'run' (preset) or 'then'/'after' (graph), not both")
-        if not has_then and not has_after and self.run is None:
-            self.run = "sequential"
+        if not has_then and not has_after:
+            if explicit_run and len(self.agents) == 1:
+                raise ValueError(
+                    "'run' needs at least two agents; drop 'run', or add another agent"
+                )
+            if not explicit_run:
+                bare = {
+                    name for name, child in self.agents.items() if child.model_fields_set == {"use"}
+                }
+                if len(bare) == len(self.agents):
+                    # Grouped agents: every member is a bare reference to another
+                    # agent file, so there is nothing to orchestrate and no
+                    # strategy to inject.
+                    self._grouped_agent_rules()
+                    return self
+                if bare:
+                    raise ValueError(
+                        f"agents {sorted(bare)} are bare 'use:' references while "
+                        f"{sorted(set(self.agents) - bare)} are defined inline or add "
+                        "overrides, so this is neither a team nor a group. Add "
+                        "'run: sequential' (or parallel, debate, ensemble) to run them "
+                        "as a team, or move the inline definitions and overrides into "
+                        "role files to deploy them as independent agents"
+                    )
+                self.run = "sequential"
 
         if not has_then and not has_after and len(self.agents) > 1:
             for name, child in self.agents.items():

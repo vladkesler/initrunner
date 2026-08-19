@@ -27,6 +27,7 @@ from initrunner.cli.run_cmd._validate import (
     RunMode,
     _resolve_run_mode,
     _validate_ephemeral_flags,
+    _validate_kind_flags,
     _validate_role_only_flags,
     _validate_universal_flags,
 )
@@ -96,6 +97,10 @@ def run(
             "terminal, and enable /tool add for hot-attaching tools.",
         ),
     ] = False,
+    agent_member: Annotated[
+        str | None,
+        typer.Option("--agent", help="Which agent to run, for a group of agents"),
+    ] = None,
     sense: Annotated[
         bool, typer.Option("--sense", help="Sense the best role for the given prompt")
     ] = False,
@@ -142,7 +147,12 @@ def run(
     ] = 8000,
     api_key: Annotated[
         str | None,
-        typer.Option("--api-key", help="API key for auth", rich_help_panel="Serve Options"),
+        typer.Option(
+            "--api-key",
+            help="API key for auth",
+            envvar="INITRUNNER_API_KEY",
+            rich_help_panel="Serve Options",
+        ),
     ] = None,
     cors_origin: Annotated[
         list[str] | None,
@@ -330,8 +340,11 @@ def run(
         list_tools=list_tools,
     )
 
-    # --- Intent sensing ---
-    if sense:
+    # --- Intent sensing over the roles on disk ---
+    # With a target file, sensing instead picks among a group's members, which
+    # needs the target's kind; that happens after resolution below.
+    sense_over_members = sense and role_file is not None
+    if sense and not sense_over_members:
         role_file = _resolve_via_sensing(
             prompt,  # type: ignore[arg-type]  # guarded by _validate_flags
             role_dir=role_dir,
@@ -369,29 +382,70 @@ def run(
         )
         raise typer.Exit(1)
 
-    # --- Kind-specific flag validation ---
-    if kind == "Flow":
-        invalid = []
-        if interactive:
-            invalid.append("--interactive")
-        if autonomous:
-            invalid.append("--autonomous")
-        if resume:
-            invalid.append("--resume")
-        if attach:
-            invalid.append("--attach")
-        if report:
-            invalid.append("--report")
-        if sense:
-            invalid.append("--sense")
-        if mode != RunMode.STANDARD:
-            invalid.append(f"--{mode.value}" if mode != RunMode.DAEMON else "--daemon/--autopilot")
-        if invalid:
-            console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported for Flow targets.")
+    # --- Group targets: pick a member, or act on the group as a whole ---
+    role_mutator = None
+    if kind == "Group":
+        from initrunner.cli.run_cmd._group import (
+            load_roster_or_exit,
+            member_overlay,
+            print_members,
+            resolve_member_or_exit,
+            sense_member_or_exit,
+        )
+
+        if role_dir is not None:
+            console.print(
+                "[red]Error:[/red] --role-dir searches the filesystem;"
+                " a group senses over its own members."
+            )
             raise typer.Exit(1)
 
-    if kind not in ("Agent",) and mode != RunMode.STANDARD:
-        console.print(f"[red]Error:[/red] {mode.value} mode is only supported for Agent targets.")
+        roster = load_roster_or_exit(role_file)
+        if sense_over_members:
+            agent_member = sense_member_or_exit(
+                roster,
+                prompt,  # type: ignore[arg-type]  # guarded by _validate_universal_flags
+                confirm_role=confirm_role,
+                dry_run=dry_run,
+            )
+
+        if agent_member is not None:
+            # A selected member runs through every normal single-agent path;
+            # the overlay is what carries the group's shared stores into it.
+            role_file = resolve_member_or_exit(roster, agent_member)
+            role_mutator = member_overlay(roster)
+            kind = "Agent"
+    elif sense_over_members:
+        console.print("[red]Error:[/red] --sense and a role_file are mutually exclusive.")
+        raise typer.Exit(1)
+    elif agent_member is not None:
+        console.print(
+            f"[red]Error:[/red] --agent picks one member of a group, and {role_file} is not"
+            f" a group (kind: {kind})."
+        )
+        raise typer.Exit(1)
+
+    # --- Kind-specific flag validation ---
+    _validate_kind_flags(
+        kind,
+        mode,
+        active_flags={
+            "--interactive": interactive,
+            "--autonomous": autonomous,
+            "--max-iterations": max_iterations is not None,
+            "--token-budget": token_budget is not None,
+            "--resume": resume,
+            "--attach": bool(attach),
+            "--report": report is not None,
+            "--report-template": report_template != "default",
+            "--dev": dev,
+            "--var": bool(template_vars),
+        },
+    )
+
+    # A group has no single run of its own: name the agent you meant.
+    if kind == "Group" and mode == RunMode.STANDARD:
+        print_members(roster, role_file)
         raise typer.Exit(1)
 
     # --- Pre-flight YAML validation: catch syntax/schema errors before any
@@ -409,6 +463,38 @@ def run(
         _dispatch_flow(role_file, audit_db, no_audit, prompt=prompt)
         return
 
+    if kind == "Group":
+        # Every member in one process. Narrowing to one member rewrote the kind
+        # to Agent above, so only whole-group modes reach here.
+        from initrunner.cli.run_cmd._group_dispatch import (
+            dispatch_group_daemon,
+            dispatch_group_serve,
+        )
+
+        if mode == RunMode.SERVE:
+            dispatch_group_serve(
+                role_file,
+                host,
+                port,
+                api_key,
+                cors_origin,
+                audit_db,
+                no_audit,
+                skill_dir,
+                effective_model,
+            )
+        else:
+            dispatch_group_daemon(
+                role_file,
+                audit_db,
+                no_audit,
+                skill_dir,
+                effective_model,
+                autopilot=autopilot,
+                budget_timezone=budget_timezone,
+            )
+        return
+
     # --- Agent mode: flag-based dispatch ---
     if mode == RunMode.SERVE:
         _dispatch_serve(
@@ -421,6 +507,7 @@ def run(
             no_audit,
             skill_dir,
             effective_model,
+            role_mutator=role_mutator,
         )
         return
 
@@ -436,6 +523,7 @@ def run(
             skill_dir,
             effective_model,
             budget_timezone=budget_timezone,
+            role_mutator=role_mutator,
         )
         return
 
@@ -448,6 +536,7 @@ def run(
             effective_model,
             autopilot=autopilot,
             budget_timezone=budget_timezone,
+            role_mutator=role_mutator,
         )
         return
 
@@ -481,4 +570,5 @@ def run(
         model=effective_model,
         template_values=template_values or None,
         dev=dev,
+        role_mutator=role_mutator,
     )

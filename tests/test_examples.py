@@ -12,6 +12,7 @@ _ALL_YAMLS = sorted(EXAMPLES_DIR.rglob("*.yaml"))
 _ROLE_YAMLS = []
 _FLOW_YAMLS = []
 _TEAM_YAMLS = []
+_GROUP_YAMLS = []
 _SUITE_YAMLS = []
 
 for _p in _ALL_YAMLS:
@@ -44,6 +45,8 @@ for _p in _ALL_YAMLS:
                 _FLOW_YAMLS.append(_p)
             elif kind == "Team":
                 _TEAM_YAMLS.append(_p)
+            elif kind == "Group":
+                _GROUP_YAMLS.append(_p)
             else:
                 _ROLE_YAMLS.append(_p)
         else:
@@ -61,6 +64,17 @@ def test_role_yaml_validates(path: Path) -> None:
     role = load_role(path)
     assert role.metadata.name
     assert role.spec.role
+
+
+@pytest.mark.parametrize("path", _GROUP_YAMLS, ids=[_rel(p) for p in _GROUP_YAMLS])
+def test_group_yaml_validates(path: Path) -> None:
+    from initrunner.group.loader import load_group
+
+    roster = load_group(path)
+    assert roster.name
+    assert roster.members
+    for member in roster.members.values():
+        assert member.role.spec.role
 
 
 @pytest.mark.parametrize("path", _ROLE_YAMLS, ids=[_rel(p) for p in _ROLE_YAMLS])

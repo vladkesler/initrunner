@@ -139,7 +139,7 @@ def copy_example(name: str, output_dir: Path) -> list[Path]:
     written: list[Path] = []
 
     # Map from category to examples/ subdir
-    category_dirs = {"role": "roles", "flow": "flows", "skill": "skills"}
+    category_dirs = {"role": "roles", "group": "groups", "flow": "flows", "skill": "skills"}
     category_subdir = category_dirs.get(entry.category, entry.category)
 
     # Confine every write to output_dir. Catalog paths are trusted today, but a
