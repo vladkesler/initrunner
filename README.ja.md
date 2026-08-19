@@ -236,7 +236,9 @@ guardrails:
 
 ### メモリフットプリント
 
-素のエージェントプロセスの RSS は 150〜220 MB です。ほぼすべてが Python の AI スタック（プロバイダー SDK、PydanticAI、Pydantic）で、InitRunner 本体は約 7 MB、LanceDB は RAG やベクトルメモリを使うロールだけが読み込みます。コストはエージェントごとではなくプロセスごとです。`flow up` はマルチエージェント Flow を 1 プロセスで動かし、`--serve` / `--daemon` はタスクごとに起動コストを払わず 1 つの温かいプロセスを保ちます。内訳とコンテナサイズの目安は [Memory Footprint](docs/operations/memory-footprint.md) を参照。
+素のエージェントプロセスの RSS は 150〜220 MB です。ほぼすべてが Python の AI スタック（プロバイダー SDK、PydanticAI、Pydantic）で、InitRunner 本体は約 7 MB、LanceDB は RAG やベクトルメモリを使うロールだけが読み込みます。
+
+**このコストはエージェントごとではなくプロセスごとです。**スタックは既に読み込まれているため、動いているプロセスにエージェントを 1 つ追加しても約 1 MB しか増えません。5 エージェントの[グループ](docs/orchestration/groups.md)をまとめて配信した実測値は約 145 MB で、1 エージェントの約 142 MB とほぼ変わりません。10 エージェントでも 2 GB ではなく約 150 MB のプロセス 1 つです。`flow up` は Flow 全体を 1 プロセスで動かし、グループは互いに無関係なエージェントを 1 プロセスで動かし、`--serve` / `--daemon` はそのプロセスを保ったままタスクごとの起動コストを省きます。内訳とコンテナサイズの目安は [Memory Footprint](docs/operations/memory-footprint.md) を参照。
 
 ## マルチエージェントオーケストレーション
 
@@ -290,7 +292,9 @@ $ curl -s localhost:8000/v1/models | jq -c '.data[].id'
 "writer"
 ```
 
-`--daemon` は全メンバーのトリガーを 1 プロセスで実行し、`initrunner mcp serve desk.yaml` は各メンバーを MCP ツールとして公開します。Kubernetes や Argo CD では、グループファイルをロールファイルと一緒にマウントしてコンテナに渡すだけです。エージェントの追加は、新しいファイル 1 つと 1 行の設定で済みます。[エージェントのグループ化](docs/orchestration/groups.md) を参照。
+`--daemon` は全メンバーのトリガーを 1 プロセスで実行し、`initrunner mcp serve desk.yaml` は各メンバーを MCP ツールとして公開します。Kubernetes や Argo CD では、グループファイルをロールファイルと一緒にマウントしてコンテナに渡すだけです。エージェントの追加は、新しいファイル 1 つと 1 行の設定で済みます。
+
+**エージェントごとにランタイムを用意する必要はありません。**Python の AI スタックは一度だけ読み込まれ、全メンバーが共有するため、エージェント 1 つあたりの追加コストは約 1 MB です。実測では 1 エージェント単独が約 142 MB、5 エージェントで約 145 MB でした。10 エージェントでもコンテナ 10 個ではなく、約 150 MB のコンテナ 1 つで済みます。[エージェントのグループ化](docs/orchestration/groups.md) と [Memory Footprint](docs/operations/memory-footprint.md) を参照。
 
 ## MCP とインターフェース
 

@@ -49,9 +49,21 @@ a role actually uses:
 
 The ~110 MB import cost is per *process*, not per *agent*. Every agent added
 to an existing process costs only its own config, message history, and
-buffers, which is single-digit MB. If you are running a fleet, this is the
+buffers. Measured on one machine, serving a group of five agents:
+
+| Agents in the process | RSS |
+|---|---|
+| 1 | ~142 MB |
+| 5 | ~145 MB |
+
+That is about 1 MB per additional agent, against ~710 MB for the same five
+agents as five separate processes. If you are running a fleet, this is the
 number that matters for capacity planning:
 
+- **Groups**: `initrunner run desk.yaml --serve` hosts every member of a
+  [group](../orchestration/groups.md) in one process, each addressable as its
+  own OpenAI model ID. This is the cheapest way to run agents that have
+  nothing to do with each other. `--daemon` does the same for their triggers.
 - **Flows**: `initrunner flow up flow.yaml` runs every agent in the flow
   inside one process on a shared event loop. A five-agent flow is one
   ~200 MB process, not five.
