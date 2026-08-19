@@ -1,5 +1,7 @@
 # Changelog
 
+## [2026.8.6] - 2026-08-19
+
 ### Added
 - **Grouped agents: deploy several agents as one unit.** A file whose members are all bare `use:` references is now a group, not an orchestration. Members never hand off to each other; the file says which agents ship together and what they share. Run one with `initrunner run desk.yaml --agent intake`, pick one by prompt with `--sense`, or serve them all from one process with `--serve`, `--daemon`, or `initrunner mcp serve`. Group-wide `--serve` gives each member an OpenAI model ID and routes on the request's `model` field, so ordinary OpenAI clients pick an agent the way they pick a model. Groups may set `shared_memory`, `shared_documents`, `observability`, and the listener half of `security`; everything else belongs to a member's own role file and is rejected rather than ignored. See [Grouped agents](docs/orchestration/groups.md).
 - **`INITRUNNER_API_KEY`** is now read by `initrunner run --serve --api-key`, matching the MCP gateway and dashboard.
