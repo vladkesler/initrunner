@@ -58,7 +58,11 @@ def main(
     ] = None,
     verbose: Annotated[
         bool,
-        typer.Option("--verbose", help="Enable debug logging"),
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Enable debug logging (also settable via INITRUNNER_LOG_LEVEL)",
+        ),
     ] = False,
 ) -> None:
     """InitRunner — a lightweight AI agent runner."""
