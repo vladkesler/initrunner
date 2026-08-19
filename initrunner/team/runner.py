@@ -35,7 +35,9 @@ from initrunner.team.results import (
     accumulate_result,
 )
 from initrunner.team.roles import (
+    load_member_dotenvs,
     persona_to_role,
+    resolve_persona_role,
     team_report_role,
 )
 from initrunner.team.runtime import (
@@ -78,8 +80,10 @@ __all__ = [
     "build_debate_prompt",
     "build_parallel_prompt",
     "build_synthesis_prompt",
+    "load_member_dotenvs",
     "persona_env",
     "persona_to_role",
+    "resolve_persona_role",
     "resolve_shared_paths",
     "resolve_team_model",
     "run_pre_ingestion",
@@ -118,6 +122,7 @@ def run_team(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
+    load_member_dotenvs(team)
     resolve_team_model(team)
 
     shared_mem_path, shared_doc_path = resolve_shared_paths(team)
@@ -160,11 +165,11 @@ def run_team(
                     _logger.warning("Team timeout exceeded before persona '%s'", persona_name)
                     break
 
-            role = persona_to_role(persona_name, persona, team)
+            role, member_dir = resolve_persona_role(persona_name, persona, team)
             apply_shared_stores(role, team, shared_mem_path, shared_doc_path)
 
             with persona_env(persona.environment):
-                agent = build_agent(role, role_dir=team_dir)
+                agent = build_agent(role, role_dir=member_dir or team_dir)
 
                 prompt = build_agent_prompt(
                     task, persona_name, prior_outputs, team.spec.handoff_max_chars
@@ -235,6 +240,7 @@ def run_team_parallel(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
+    load_member_dotenvs(team)
     resolve_team_model(team)
 
     shared_mem_path, shared_doc_path = resolve_shared_paths(team)
@@ -250,10 +256,10 @@ def run_team_parallel(
         if on_persona_start is not None:
             on_persona_start(persona_name)
 
-        role = persona_to_role(persona_name, persona, team)
+        role, member_dir = resolve_persona_role(persona_name, persona, team)
         apply_shared_stores(role, team, shared_mem_path, shared_doc_path)
 
-        agent = build_agent(role, role_dir=team_dir)
+        agent = build_agent(role, role_dir=member_dir or team_dir)
         prompt = build_parallel_prompt(task, persona_name)
 
         trigger_metadata = {

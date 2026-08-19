@@ -5,8 +5,46 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.team.schema import PersonaConfig, TeamDefinition
+
+
+def resolve_persona_role(
+    name: str,
+    persona: PersonaConfig,
+    team: TeamDefinition,
+) -> tuple[RoleDefinition, Path | None]:
+    """Return the role to run for a persona plus the directory it came from.
+
+    Personas adapted from a ``use:`` reference run the full referenced role and
+    resolve relative paths against its own directory. Inline personas synthesize
+    a minimal role and have no directory of their own. The referenced role is
+    copied because callers patch shared stores onto it in place.
+    """
+    role, role_dir = team.member_provenance(name)
+    if role is not None:
+        return role.model_copy(deep=True), role_dir
+    return persona_to_role(name, persona, team), None
+
+
+def load_member_dotenvs(team: TeamDefinition) -> None:
+    """Load .env files for personas that reference their own role files.
+
+    Done once up front, in declared order, rather than per build: the parallel,
+    debate and ensemble strategies build personas from threads and ``load_dotenv``
+    mutates the process environment. ``override=False`` means the team's own .env
+    still wins, and earlier personas win over later ones.
+    """
+    from initrunner.agent.loader import _load_dotenv
+
+    seen: set[Path] = set()
+    for name in team.spec.personas:
+        _role, role_dir = team.member_provenance(name)
+        if role_dir is not None and role_dir not in seen:
+            seen.add(role_dir)
+            _load_dotenv(role_dir)
 
 
 def persona_to_role(

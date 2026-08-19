@@ -28,7 +28,7 @@ from initrunner.agent.tool_events import (
 )
 from initrunner.team.prompts import build_agent_prompt, build_parallel_prompt
 from initrunner.team.results import StepMetadata, TeamResult, accumulate_result
-from initrunner.team.roles import persona_to_role
+from initrunner.team.roles import load_member_dotenvs, resolve_persona_role
 from initrunner.team.runtime import persona_env, resolve_team_model, setup_team_tracing
 from initrunner.team.schema import PersonaConfig, TeamDefinition
 from initrunner.team.stores import apply_shared_stores, resolve_shared_paths, run_pre_ingestion
@@ -128,7 +128,7 @@ def _make_sequential_persona_step(persona_name: str, index: int):
                 return ""
 
         # Build role and agent
-        role = persona_to_role(persona_name, persona, team)
+        role, member_dir = resolve_persona_role(persona_name, persona, team)
         apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
         # Build prompt with prior outputs
@@ -151,7 +151,7 @@ def _make_sequential_persona_step(persona_name: str, index: int):
             cb_token = set_tool_event_callback(lambda event, _name=persona_name: _cb(_name, event))
         try:
             with persona_env(persona.environment):
-                agent = build_agent(role, role_dir=deps.team_dir)
+                agent = build_agent(role, role_dir=member_dir or deps.team_dir)
                 result, _ = await execute_run_async(
                     agent,
                     role,
@@ -246,7 +246,7 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
         if deps.on_persona_start:
             deps.on_persona_start(persona_name)
 
-        role = persona_to_role(persona_name, persona, team)
+        role, member_dir = resolve_persona_role(persona_name, persona, team)
         apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
         prompt = build_parallel_prompt(deps.task, persona_name)
@@ -264,7 +264,7 @@ def _make_parallel_persona_step(persona_name: str, declared_index: int):
             _cb = deps.on_tool_event
             cb_token = set_tool_event_callback(lambda event, _name=persona_name: _cb(_name, event))
         try:
-            agent = build_agent(role, role_dir=deps.team_dir)
+            agent = build_agent(role, role_dir=member_dir or deps.team_dir)
             result, _ = await execute_run_async(
                 agent,
                 role,
@@ -367,6 +367,7 @@ async def run_team_graph_async(
     result = TeamResult(team_run_id=team_run_id, team_name=team.metadata.name)
 
     _load_dotenv(team_dir)
+    load_member_dotenvs(team)
     resolve_team_model(team)
 
     shared_mem_path, shared_doc_path = resolve_shared_paths(team)
@@ -574,7 +575,7 @@ async def _run_debate_persona(
     if deps.on_persona_start:
         deps.on_persona_start(display_name)
 
-    role = persona_to_role(persona_name, persona, team)
+    role, member_dir = resolve_persona_role(persona_name, persona, team)
     apply_shared_stores(role, team, deps.shared_mem_path, deps.shared_doc_path)
 
     prompt = build_debate_prompt(
@@ -600,7 +601,7 @@ async def _run_debate_persona(
         _cb = deps.on_tool_event
         cb_token = set_tool_event_callback(lambda event, _name=display_name: _cb(_name, event))
     try:
-        agent = build_agent(role, role_dir=deps.team_dir)
+        agent = build_agent(role, role_dir=member_dir or deps.team_dir)
         run_result, _ = await execute_run_async(
             agent,
             role,

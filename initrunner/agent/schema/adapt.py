@@ -80,8 +80,15 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
         raise AdaptError("graph documents are not teams; use the flow adapter")
 
     personas: dict[str, PersonaConfig] = {}
+    member_roles: dict[str, RoleDefinition] = {}
+    member_dirs: dict[str, Path] = {}
     for name, child in document.agents.items():
         personas[name] = _child_to_persona(name, child, document, base_dir)
+        if child.use:
+            # _child_to_persona already rejected a missing base_dir.
+            assert base_dir is not None
+            member_roles[name] = _team_member_role(name, child, document, base_dir)
+            member_dirs[name] = (base_dir / child.use).resolve().parent
 
     g = document.guardrails
     spec = TeamSpec(
@@ -103,7 +110,7 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
         debate=document.debate,
         ensemble=document.ensemble,
     )
-    return TeamDefinition(
+    team = TeamDefinition(
         apiVersion=ApiVersion.V1,
         kind="Team",
         metadata=RoleMetadata(
@@ -118,6 +125,9 @@ def document_to_team(document: AgentDocument, *, base_dir: Path | None = None) -
         ),
         spec=spec,
     )
+    for name, role in member_roles.items():
+        team.set_member_provenance(name, role, member_dirs[name])
+    return team
 
 
 def document_to_flow(document: AgentDocument, *, base_dir: Path | None = None) -> FlowDefinition:
@@ -312,6 +322,33 @@ def _child_to_persona(
         tools_mode=child.tools_mode,
         environment=dict(child.environment),
     )
+
+
+def _team_member_role(
+    name: str,
+    child: AgentChild,
+    document: AgentDocument,
+    base_dir: Path,
+) -> RoleDefinition:
+    """Full referenced role backing a ``use:`` persona.
+
+    ``PersonaConfig`` only carries prompt/model/tools, so the referenced role's
+    skills, memory, ingest, output schema, security and the rest would be lost
+    if the runner rebuilt the persona from it. Team-level guardrails and
+    observability are overlaid only where the document set them explicitly, so
+    the referenced role's own settings otherwise stand.
+    """
+    role = _child_to_role(name, child, document, base_dir)
+    if "guardrails" in document.model_fields_set:
+        overlay = document.guardrails.model_dump(
+            exclude_unset=True,
+            exclude={"team_token_budget", "team_timeout_seconds"},
+        )
+        if overlay:
+            role.spec.guardrails = role.spec.guardrails.model_copy(update=overlay)
+    if document.observability is not None and role.spec.observability is None:
+        role.spec.observability = document.observability
+    return role
 
 
 def _resolved_child(
