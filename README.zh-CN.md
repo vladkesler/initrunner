@@ -398,4 +398,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.8.6</sub></p>
+<p align="center"><sub>v2026.8.7</sub></p>

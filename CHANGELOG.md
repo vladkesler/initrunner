@@ -1,5 +1,8 @@
 # Changelog
 
+### Docs
+- **Made it clear that the runtime cost is per process, not per agent.** The README said this already, but the sentence listed flows and `--serve` / `--daemon` without mentioning groups, and the groups section said nothing about memory, which is where the question actually comes up. Measured numbers replace the old "single-digit MB": one agent served alone is ~142 MB and five in a group are ~145 MB, so about 1 MB per additional agent against ~710 MB for five separate processes. Added to all three READMEs, plus a container-sizing section in [Grouped agents](docs/orchestration/groups.md) and a group example in [Memory footprint](docs/operations/memory-footprint.md).
+
 ## [2026.8.6] - 2026-08-19
 
 ### Added
