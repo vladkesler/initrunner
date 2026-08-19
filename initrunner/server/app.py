@@ -212,9 +212,7 @@ def create_app(
     role_path: Path | None = None,
 ) -> Starlette:
     """Build and return the Starlette ASGI application for one agent."""
-    member = ServedMember(
-        key=role.metadata.name, role=role, agent=agent, role_path=role_path
-    )
+    member = ServedMember(key=role.metadata.name, role=role, agent=agent, role_path=role_path)
     return create_multi_app(
         {member.key: member},
         security=role.spec.security,

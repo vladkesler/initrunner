@@ -263,6 +263,35 @@ initrunner flow up flow.yaml
 
 **チームモード** は、完全な Flow を構築するほどではないが、1つのタスクに複数の視点が必要な場合に使用。1つのファイルでペルソナを定義、3つの戦略：順次ハンドオフ、並列実行、またはディベート（多ラウンドの議論と統合）。[パターンガイド](docs/orchestration/patterns-guide.md) · [チームモード](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md) を参照。
 
+## 一緒にデプロイするが、連携はしないエージェント
+
+すべてのエージェントの集まりがパイプラインとは限りません。単に 3 つのエージェントがあり、それらを置く場所が 1 つ必要なだけのこともあります。列挙すればグループになります。ハンドオフも、コーディネーターも、実行順序もありません。
+
+```yaml
+name: desk
+agents:
+  intake:     { use: roles/intake.yaml }
+  researcher: { use: roles/researcher.yaml }
+  writer:     { use: roles/writer.yaml }
+```
+
+```bash
+initrunner run desk.yaml --agent intake -p "注文 #4412 が届きません"
+initrunner run desk.yaml --sense -p "顧客への返信を書いて"   # メンバーを自動選択
+initrunner run desk.yaml --serve                            # 3 エージェントを 1 プロセスで
+```
+
+`--agent` で選んだメンバーは、そのファイルを直接実行した場合とまったく同じように動作するため、REPL、自律モード、添付ファイル、レポートもそのまま使えます。`--serve` は各メンバーに OpenAI のモデル ID を割り当てるので、どの OpenAI クライアントからもモデルを選ぶ感覚でエージェントを選べます：
+
+```console
+$ curl -s localhost:8000/v1/models | jq -c '.data[].id'
+"intake"
+"researcher"
+"writer"
+```
+
+`--daemon` は全メンバーのトリガーを 1 プロセスで実行し、`initrunner mcp serve desk.yaml` は各メンバーを MCP ツールとして公開します。Kubernetes や Argo CD では、グループファイルをロールファイルと一緒にマウントしてコンテナに渡すだけです。エージェントの追加は、新しいファイル 1 つと 1 行の設定で済みます。[エージェントのグループ化](docs/orchestration/groups.md) を参照。
+
 ## MCP とインターフェース
 
 エージェントは任意の [MCP](https://modelcontextprotocol.io/) サーバーをツールソースとして利用可能（stdio、SSE、streamable-http）。逆方向も可能で、エージェントを MCP ツールとして公開し、Claude Code、Cursor、Windsurf から呼び出せます：
@@ -335,7 +364,7 @@ initrunner/
 | エージェントとツール | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
 | インテリジェンス | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | ナレッジとメモリ | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
+| オーケストレーション | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Grouped Agents](docs/orchestration/groups.md) · [Triggers](docs/core/triggers.md) |
 | インターフェース | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 配布 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | セキュリティ | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
@@ -365,4 +394,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.8.5</sub></p>
+<p align="center"><sub>v2026.8.6</sub></p>

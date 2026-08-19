@@ -147,7 +147,12 @@ def run(
     ] = 8000,
     api_key: Annotated[
         str | None,
-        typer.Option("--api-key", help="API key for auth", rich_help_panel="Serve Options"),
+        typer.Option(
+            "--api-key",
+            help="API key for auth",
+            envvar="INITRUNNER_API_KEY",
+            rich_help_panel="Serve Options",
+        ),
     ] = None,
     cors_origin: Annotated[
         list[str] | None,
@@ -456,6 +461,38 @@ def run(
 
     if kind == "Flow":
         _dispatch_flow(role_file, audit_db, no_audit, prompt=prompt)
+        return
+
+    if kind == "Group":
+        # Every member in one process. Narrowing to one member rewrote the kind
+        # to Agent above, so only whole-group modes reach here.
+        from initrunner.cli.run_cmd._group_dispatch import (
+            dispatch_group_daemon,
+            dispatch_group_serve,
+        )
+
+        if mode == RunMode.SERVE:
+            dispatch_group_serve(
+                role_file,
+                host,
+                port,
+                api_key,
+                cors_origin,
+                audit_db,
+                no_audit,
+                skill_dir,
+                effective_model,
+            )
+        else:
+            dispatch_group_daemon(
+                role_file,
+                audit_db,
+                no_audit,
+                skill_dir,
+                effective_model,
+                autopilot=autopilot,
+                budget_timezone=budget_timezone,
+            )
         return
 
     # --- Agent mode: flag-based dispatch ---

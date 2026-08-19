@@ -123,6 +123,26 @@
     "tools": []
   },
   {
+    "name": "desk",
+    "category": "group",
+    "description": "Support desk agents, deployed as one unit",
+    "tags": [],
+    "files": [
+      "desk.yaml",
+      "roles/intake.yaml",
+      "roles/researcher.yaml",
+      "roles/writer.yaml"
+    ],
+    "primary_file": "desk.yaml",
+    "primary_content": "# A group of independent agents deployed together.\n#\n# There is no orchestration here: members never hand off to each other. The file\n# says which agents ship as a unit and what they share. Run one with\n# `--agent <name>`, or serve them all from one process with `--serve`.\nname: desk\ndescription: Support desk agents, deployed as one unit\n\nagents:\n  intake:\n    use: roles/intake.yaml\n  researcher:\n    use: roles/researcher.yaml\n  writer:\n    use: roles/writer.yaml\n",
+    "multi_file": true,
+    "difficulty": "intermediate",
+    "features": [
+      "group"
+    ],
+    "tools": []
+  },
+  {
     "name": "a2a-coordinator",
     "category": "role",
     "description": "Coordinator that delegates research to a remote A2A agent",

@@ -34,36 +34,6 @@ Diagnose those three first. They are the whole blocker; the rest of the suite
 per-file, because a half-tightened schema is worse than either end state: it
 teaches users that typos are caught when they usually are not.
 
-## `flow validate` crashes on a single-member flow
-
-**Repro:**
-
-```yaml
-# flow.yaml
-name: test-flow
-agents:
-  worker:
-    use: roles/worker.yaml
-```
-
-```console
-$ initrunner flow validate flow.yaml
-AttributeError: 'AgentSpec' object has no attribute 'agents'
-```
-
-A composed document with exactly one child and no `run`, `then`, or `after`
-classifies as `flat-agent` and collapses into the child role. `flow_cmd.py:103`
-then iterates `flow.spec.agents`, which no longer exists, and the user gets a
-raw traceback.
-
-Two or more members work correctly, so this only bites the smallest possible
-flow. Pre-existing, not introduced by the 2026.8.5 flat-YAML doc sweep
-(confirmed by reproducing against a stashed tree).
-
-The fix is a decision, not just a guard: either the collapse is intentional and
-`flow_cmd` should detect it and print something useful, or single-member
-composed documents should stay composed. Pick one before writing code.
-
 ## Schema errors lost their per-field paths
 
 `initrunner validate` used to report a dotted path per issue. Since the flat

@@ -40,12 +40,14 @@ def test_overlay_points_members_at_the_shared_store(tmp_path: Path) -> None:
     roster = load_group(_make_group(tmp_path, "shared_memory:\n  enabled: true\n"))
     overlay = make_group_overlay(roster.group)
 
-    paths = {
-        key: overlay(member.role).spec.memory.store_path for key, member in roster.members.items()
-    }
+    paths = {}
+    for key, member in roster.members.items():
+        memory = overlay(member.role).spec.memory
+        assert memory is not None
+        paths[key] = memory.store_path
 
     assert paths["intake"] == paths["writer"]
-    assert paths["intake"].endswith("desk-shared.db")
+    assert str(paths["intake"]).endswith("desk-shared.db")
 
 
 def test_overlay_honours_an_explicit_store_path(tmp_path: Path) -> None:
@@ -56,6 +58,7 @@ def test_overlay_honours_an_explicit_store_path(tmp_path: Path) -> None:
 
     role = make_group_overlay(roster.group)(roster.members["intake"].role)
 
+    assert role.spec.memory is not None
     assert role.spec.memory.store_path == str(store)
 
 

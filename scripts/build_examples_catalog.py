@@ -35,6 +35,7 @@ SKIP_SUFFIXES = {".pyc", ".bak", ".orig", ".rej", ".swp"}
 # Categories map top-level dirs to catalog category names
 CATEGORIES = {
     "roles": "role",
+    "groups": "group",
     "flows": "flow",
     "skills": "skill",
 }
@@ -202,6 +203,43 @@ def _build_role_entry(path: Path, category_dir: Path) -> dict | None:
     return None
 
 
+def _build_group_entry(path: Path, category_dir: Path) -> dict | None:
+    """Build a catalog entry for a group of agents.
+
+    A group is one YAML listing member role files, so the entry carries the
+    group file plus every role it references.
+    """
+    if not (path.is_file() and path.suffix in (".yaml", ".yml")):
+        return None
+
+    content = path.read_text(encoding="utf-8")
+    data = _parse_yaml(content)
+    identity = _identity(data)
+    members = data.get("agents") or {}
+
+    files = [path.relative_to(category_dir).as_posix()]
+    for member in members.values():
+        if not isinstance(member, dict) or not member.get("use"):
+            continue
+        member_path = (path.parent / member["use"]).resolve()
+        if member_path.is_file():
+            files.append(member_path.relative_to(category_dir.resolve()).as_posix())
+
+    return {
+        "name": identity.get("name") or path.stem,
+        "category": "group",
+        "description": identity.get("description") or "",
+        "tags": identity.get("tags") or [],
+        "files": files,
+        "primary_file": path.relative_to(category_dir).as_posix(),
+        "primary_content": content,
+        "multi_file": True,
+        "difficulty": "intermediate",
+        "features": ["group"],
+        "tools": [],
+    }
+
+
 def _build_flow_entry(path: Path, category_dir: Path) -> dict | None:
     """Build a catalog entry for a flow example."""
     if path.is_file() and path.name in ("flow.yaml", "flow.yml"):
@@ -340,6 +378,13 @@ def build_catalog() -> list[dict]:
                     if entry and entry["name"] not in seen_names:
                         catalog.append(entry)
                         seen_names.add(entry["name"])
+
+        elif category == "group":
+            for f in sorted(category_dir.glob("*.yaml")):
+                entry = _build_group_entry(f, category_dir)
+                if entry and entry["name"] not in seen_names:
+                    catalog.append(entry)
+                    seen_names.add(entry["name"])
 
         elif category == "flow":
             # Top-level flow.yaml

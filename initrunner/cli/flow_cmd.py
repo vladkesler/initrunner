@@ -93,6 +93,16 @@ def flow_validate(
     if any(i.severity == "error" for i in issues) or flow is None:
         raise typer.Exit(1)
 
+    if kind != "Flow":
+        # Agents with no `then`/`after` between them are not a flow. Say which
+        # kind the file actually is instead of failing on a missing attribute.
+        console.print(
+            f"[red]Error:[/red] {flow_file} is a {kind}, not a flow. A flow needs "
+            "'then:' or 'after:' edges between its agents; without them the file "
+            f"is a {kind.lower()}. Validate it with [bold]initrunner validate[/bold]."
+        )
+        raise typer.Exit(1)
+
     table = Table(title=f"Flow: {flow.metadata.name}")
     table.add_column("Agent", style="cyan")
     table.add_column("Role")

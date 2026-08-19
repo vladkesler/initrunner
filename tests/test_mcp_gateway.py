@@ -459,3 +459,59 @@ class TestPassThroughTools:
         mock_transport.assert_not_called()
         tools = asyncio.run(parent.list_tools())
         assert len(tools) == 0
+
+
+class TestGroupExpansion:
+    """A group file exposes one MCP tool per member."""
+
+    @staticmethod
+    def _write_group(tmp_path: Path) -> Path:
+        roles = tmp_path / "roles"
+        roles.mkdir()
+        for name in ("intake", "writer"):
+            (roles / f"{name}.yaml").write_text(
+                f"name: {name}-agent\nprompt: do the thing\nmodel: openai:gpt-5-mini\n"
+            )
+        group = tmp_path / "desk.yaml"
+        group.write_text(
+            "name: desk\nshared_memory:\n  enabled: true\n"
+            "agents:\n  intake:\n    use: roles/intake.yaml\n"
+            "  writer:\n    use: roles/writer.yaml\n"
+        )
+        return group
+
+    def test_group_expands_to_member_paths(self, tmp_path: Path):
+        from initrunner.cli.mcp_cmd import _expand_groups
+
+        group = self._write_group(tmp_path)
+
+        paths, mutators = _expand_groups([group])
+
+        assert [p.name for p in paths] == ["intake.yaml", "writer.yaml"]
+        # Each member carries the group's shared stores into its build.
+        assert set(mutators) == set(paths)
+
+    def test_plain_roles_pass_through_untouched(self, tmp_path: Path):
+        from initrunner.cli.mcp_cmd import _expand_groups
+
+        role = tmp_path / "solo.yaml"
+        role.write_text("name: solo\nprompt: hi\n")
+
+        paths, mutators = _expand_groups([role])
+
+        assert paths == [role]
+        assert mutators == {}
+
+    @patch("initrunner.mcp.gateway.load_and_build", create=True)
+    def test_expanded_members_build_with_the_group_overlay(self, _mock, tmp_path: Path):
+        from initrunner.cli.mcp_cmd import _expand_groups
+
+        group = self._write_group(tmp_path)
+        paths, mutators = _expand_groups([group])
+
+        from initrunner.agent.loader import load_role
+
+        role = mutators[paths[0]](load_role(paths[0]))
+
+        assert role.spec.memory is not None
+        assert role.spec.memory.store_path.endswith("desk-shared.db")

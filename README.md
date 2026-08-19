@@ -318,6 +318,35 @@ Sense routing picks the right target per message using keyword scoring first (ze
 
 **Team mode** gives multiple perspectives on one task without a full flow. Define the agents in one file and pick a `run:` preset: `sequential` (linear handoff), `parallel` (independent and concurrent), `debate` (multi-round argumentation with synthesis), or `ensemble` (all answer the same task, then a majority vote, a weighted pick, or an LLM judge selects the winner). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
 
+## Agents that ship together but don't work together
+
+Not every set of agents is a pipeline. Sometimes you just have three agents and one place to put them. List them and you get a group: no handoffs, no coordinator, no run order.
+
+```yaml
+name: desk
+agents:
+  intake:     { use: roles/intake.yaml }
+  researcher: { use: roles/researcher.yaml }
+  writer:     { use: roles/writer.yaml }
+```
+
+```bash
+initrunner run desk.yaml --agent intake -p "order #4412 never arrived"
+initrunner run desk.yaml --sense -p "write the customer reply"   # picks a member
+initrunner run desk.yaml --serve                                 # all three, one process
+```
+
+A member picked with `--agent` runs exactly as its own file does, so REPL, autonomous mode, attachments, and reports all work unchanged. `--serve` gives each member an OpenAI model ID, so any OpenAI client picks the agent the way it picks a model:
+
+```console
+$ curl -s localhost:8000/v1/models | jq -c '.data[].id'
+"intake"
+"researcher"
+"writer"
+```
+
+`--daemon` runs every member's triggers in one process, and `initrunner mcp serve desk.yaml` turns each into an MCP tool. For Kubernetes or Argo CD, mount the group next to its role files and point the container at it: adding an agent is one new file plus one line. See [Grouped Agents](docs/orchestration/groups.md).
+
 ## MCP and interfaces
 
 Agents consume any [MCP](https://modelcontextprotocol.io/) server as a tool source (stdio, SSE, streamable-http). Going the other direction, expose your agents *as* MCP tools so Claude Code, Cursor, and Windsurf can call them:
@@ -394,7 +423,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Always-on Services](docs/agents/services.md) · [Providers](docs/configuration/providers.md) |
 | Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
+| Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Grouped Agents](docs/orchestration/groups.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | Distribution | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | Security | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
@@ -424,4 +453,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.8.5</sub></p>
+<p align="center"><sub>v2026.8.6</sub></p>

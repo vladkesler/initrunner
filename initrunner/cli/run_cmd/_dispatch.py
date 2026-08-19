@@ -79,8 +79,12 @@ def _dispatch_serve(
     role_mutator: RoleMutator = None,
 ) -> None:
     """Serve an agent as an OpenAI-compatible API."""
+    from initrunner.middleware import resolve_exposed_api_key
     from initrunner.server.app import run_server
 
+    # Fail closed: the completions endpoint drives the agent, so don't serve it
+    # off-host without auth.
+    api_key, generated_key = resolve_exposed_api_key(host, api_key)
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
@@ -94,7 +98,12 @@ def _dispatch_serve(
         console.print(f"  Model ID: {role.metadata.name}")
         console.print(f"  Health:   http://{host}:{port}/health")
         console.print(f"  Models:   http://{host}:{port}/v1/models")
-        if api_key:
+        if generated_key is not None:
+            console.print(
+                "  Auth:     [yellow]enabled[/yellow] -- generated key (no --api-key given):\n"
+                f"            [bold]{generated_key}[/bold]"
+            )
+        elif api_key:
             console.print("  Auth:     [yellow]enabled[/yellow] (Bearer token required)")
         if cors_origin:
             console.print(f"  CORS:     {', '.join(cors_origin)}")

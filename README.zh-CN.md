@@ -263,6 +263,35 @@ initrunner flow up flow.yaml
 
 **团队模式** 适用于需要多视角处理同一任务、但不需要完整 Flow 的场景。在一个文件中定义多个角色，三种策略：顺序交接、并行执行或辩论（多轮论证加综合）。查看 [模式指南](docs/orchestration/patterns-guide.md) · [团队模式](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md)。
 
+## 一起部署但互不协作的 Agent
+
+不是每一组 Agent 都是流水线。有时你只有三个 Agent，需要一个地方放它们。把它们列出来就得到一个组：没有交接，没有协调者，没有执行顺序。
+
+```yaml
+name: desk
+agents:
+  intake:     { use: roles/intake.yaml }
+  researcher: { use: roles/researcher.yaml }
+  writer:     { use: roles/writer.yaml }
+```
+
+```bash
+initrunner run desk.yaml --agent intake -p "订单 #4412 没有送达"
+initrunner run desk.yaml --sense -p "写一封回复客户的邮件"   # 自动选择成员
+initrunner run desk.yaml --serve                            # 三个 Agent，一个进程
+```
+
+用 `--agent` 选中的成员，行为与直接运行它自己的文件完全一致，因此 REPL、自主模式、附件和报告都照常可用。`--serve` 会给每个成员分配一个 OpenAI 模型 ID，任何 OpenAI 客户端都能像选模型一样选 Agent：
+
+```console
+$ curl -s localhost:8000/v1/models | jq -c '.data[].id'
+"intake"
+"researcher"
+"writer"
+```
+
+`--daemon` 在一个进程里运行所有成员的触发器，`initrunner mcp serve desk.yaml` 把每个成员变成一个 MCP 工具。用 Kubernetes 或 Argo CD 部署时，把组文件和角色文件挂载在一起，让容器指向它：新增一个 Agent 就是一个新文件加一行配置。查看 [Agent 分组](docs/orchestration/groups.md)。
+
 ## MCP 与界面
 
 Agent 可以使用任何 [MCP](https://modelcontextprotocol.io/) 服务器作为工具来源（stdio、SSE、streamable-http）。反过来，也可以把你的 Agent 暴露为 MCP 工具，让 Claude Code、Cursor 和 Windsurf 调用：
@@ -335,7 +364,7 @@ initrunner/
 | Agent 与工具 | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Providers](docs/configuration/providers.md) |
 | 智能 | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | 知识与记忆 | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
-| 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Triggers](docs/core/triggers.md) |
+| 编排 | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Grouped Agents](docs/orchestration/groups.md) · [Triggers](docs/core/triggers.md) |
 | 界面 | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
 | 分发 | [OCI Distribution](docs/core/oci-distribution.md) · [Shareable Templates](docs/getting-started/shareable-templates.md) |
 | 安全 | [Security Model](docs/security/security.md) · [Runtime Sandbox](docs/security/sandbox.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker Sandbox](docs/security/docker-sandbox.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Agent Policy](docs/security/agent-policy.md) · [Guardrails](docs/configuration/guardrails.md) |
@@ -365,4 +394,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.8.5</sub></p>
+<p align="center"><sub>v2026.8.6</sub></p>

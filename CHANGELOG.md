@@ -1,6 +1,24 @@
 # Changelog
 
-## Unreleased
+### Added
+- **Grouped agents: deploy several agents as one unit.** A file whose members are all bare `use:` references is now a group, not an orchestration. Members never hand off to each other; the file says which agents ship together and what they share. Run one with `initrunner run desk.yaml --agent intake`, pick one by prompt with `--sense`, or serve them all from one process with `--serve`, `--daemon`, or `initrunner mcp serve`. Group-wide `--serve` gives each member an OpenAI model ID and routes on the request's `model` field, so ordinary OpenAI clients pick an agent the way they pick a model. Groups may set `shared_memory`, `shared_documents`, `observability`, and the listener half of `security`; everything else belongs to a member's own role file and is rejected rather than ignored. See [Grouped agents](docs/orchestration/groups.md).
+- **`INITRUNNER_API_KEY`** is now read by `initrunner run --serve --api-key`, matching the MCP gateway and dashboard.
+
+### Fixed
+- **Teams flattened the roles they referenced.** A persona declared with `use:` kept only its prompt, model, and tools; its skills, memory, ingest, output schema, autonomy, sinks, security, and resources were dropped. Worse, every persona was built against the *team* file's directory, so a referenced role's skills, custom tool modules, `.env`, ingest sources, schema files, and sandbox mounts resolved against the wrong place. Referenced personas now run their role in full, from their own directory, the way flow members already did.
+- **`--serve` could expose an agent with no authentication.** Binding a non-loopback host without `--api-key` served `/v1/*` openly, unlike the dashboard, MCP gateway, and A2A server, which all fail closed. It now generates a key and prints it once.
+- **`flow validate` crashed on a file with no edges.** A single-member composed document raised `AttributeError: 'AgentSpec' object has no attribute 'agents'`. Such a file is a group, and the command now says so.
+
+### Changed
+- **Reference-only compositions are groups, not sequential teams.** Two or more bare `use:` members with no `run`, `then`, or `after` previously became a sequential team. Add `run: sequential` to keep that behaviour. The old path was undocumented, untested, and mangled the roles it referenced (see above).
+- **A single bare `use:` member is a group of one**, no longer collapsed into the referenced role, so growing a group from one agent to several does not change how the first one is addressed. A single *inline* member still collapses to a solo agent.
+- **`run:` with one agent is now an error** instead of being silently dropped, and mixing bare references with inline members without `run:` is an error naming both ways out.
+- **Team runs reject flags they cannot honour.** `initrunner run team.yaml -i` (and `--attach`, `--autonomous`, `--resume`, `--max-iterations`, `--token-budget`) silently ignored those flags; they now error, as they already did for flows.
+
+### Docs
+- New [Grouped agents](docs/orchestration/groups.md) page: the contract, the rules that decide group vs team vs flow, member selection, shared stores, and a Kubernetes/Argo CD deployment example. Linked from all three READMEs, the CLI, server, MCP, A2A, team-mode, and multi-agent guides.
+- `use:` inside a team is documented for the first time, including what a referenced member inherits and how its paths resolve.
+- [Known gaps](docs/operations/todo.md) drops the `flow validate` single-member entry, which asked for a decision that this release makes.
 
 ## [2026.8.5] - 2026-08-18
 
