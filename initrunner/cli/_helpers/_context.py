@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from initrunner.cli._helpers._console import console
+from initrunner.cli._helpers._console import console, print_error
 from initrunner.cli._helpers._display import ingest_status_color
 from initrunner.cli._helpers._resolve import resolve_role_path
 
@@ -161,6 +161,7 @@ def load_and_build_or_exit(
     role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> tuple[RoleDefinition, Agent]:
     role_file = resolve_role_path(role_file)
+    from initrunner._compat import MissingExtraError
     from initrunner.agent.loader import MissingApiKeyError, RoleLoadError
     from initrunner.agent.runtime_sandbox.base import SandboxUnavailableError
     from initrunner.services.execution import build_agent_sync
@@ -197,10 +198,15 @@ def load_and_build_or_exit(
             )
             raise typer.Exit(1) from None
         except RoleLoadError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            console.print(
-                f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
-            )
+            print_error(e)
+            # A role that only needs an uninstalled extra is valid YAML, so
+            # pointing at 'validate' would send the user somewhere that says
+            # everything is fine. The install command is the whole answer.
+            if not isinstance(e.__cause__, MissingExtraError):
+                console.print(
+                    f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold]"
+                    " for details."
+                )
             raise typer.Exit(1) from None
 
 

@@ -621,7 +621,6 @@ def _setup_embedder_and_check_model(
     )
     if db_path.exists():
         from initrunner.stores.base import EmbeddingModelChangedError
-        from initrunner.stores.lance_store import wipe_document_store
 
         saved_manifest_json: str | None = None
         with create_document_store(config.store_backend, db_path) as check_store:
@@ -646,6 +645,8 @@ def _setup_embedder_and_check_model(
                     stored_identity,
                     current_identity,
                 )
+                from initrunner.stores.lance_store import wipe_document_store
+
                 wipe_document_store(db_path)
                 if saved_manifest_json:
                     with create_document_store(config.store_backend, db_path) as fresh_store:

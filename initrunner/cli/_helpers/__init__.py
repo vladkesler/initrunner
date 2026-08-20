@@ -1,6 +1,6 @@
 """Shared CLI helpers: error handling, role loading, and context management."""
 
-from initrunner.cli._helpers._console import console
+from initrunner.cli._helpers._console import console, print_error
 from initrunner.cli._helpers._context import (
     _maybe_auto_ingest,
     _no_memory_role,
@@ -53,6 +53,7 @@ __all__ = [
     "load_role_or_exit",
     "preflight_validate_or_exit",
     "prepare_starter",
+    "print_error",
     "prompt_inline_api_key",
     "prompt_model_selection",
     "resolve_memory_path",

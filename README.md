@@ -360,6 +360,9 @@ initrunner mcp serve agent.yaml          # agent becomes an MCP tool
 initrunner mcp toolkit --tools search,sql  # expose raw tools, no LLM needed
 ```
 
+MCP lives in the `mcp` extra, which the default install includes. A core install
+(`--extras none`) skips it and about 25 MB of resident memory with it.
+
 See [MCP Gateway](docs/interfaces/mcp-gateway.md).
 
 <p align="center">

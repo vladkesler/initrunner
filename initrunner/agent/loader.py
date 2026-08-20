@@ -13,7 +13,7 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
 
-from initrunner._compat import require_provider
+from initrunner._compat import MissingExtraError, require_mcp, require_provider, require_vector
 from initrunner._yaml import load_raw_yaml
 from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
 from initrunner.agent.schema.execution import ExecutionConfig
@@ -120,7 +120,7 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
             )
 
 
-# Providers whose SDKs route through httpx and accept an injected client.
+# Providers whose SDKs accept an injected async client.
 # bedrock (boto3) and xai (gRPC) keep their SDKs' native retry handling and
 # are built as plain ``provider:name`` strings.
 _HTTPX_PROVIDERS = frozenset({"openai", "anthropic", "google", "groq", "mistral", "cohere"})
@@ -198,9 +198,9 @@ def _build_single_model(
     This is the single construction point for both the primary model and any
     FallbackModel entries.  API keys are resolved and injected into
     ``os.environ`` here, so every Model-like returned by this function is
-    immediately usable. Providers that route through httpx get an
-    ``AsyncTenacityTransport`` client (backoff + Retry-After on 429/5xx);
-    bedrock and xai keep their SDKs' native retry handling.
+    immediately usable. Providers that take an injected client get a retrying
+    one (backoff + Retry-After on 429/5xx); bedrock and xai keep their SDKs'
+    native retry handling.
     """
     from initrunner.agent.executor_retry import build_retrying_async_client
     from initrunner.credentials import get_resolver
@@ -234,7 +234,9 @@ def _build_single_model(
                 return _build_retrying_provider_model(
                     model_config,
                     build_retrying_async_client(
-                        attempts=http_retries, max_wait=http_retry_max_wait
+                        model_config.provider,
+                        attempts=http_retries,
+                        max_wait=http_retry_max_wait,
                     ),
                     resolved_key,
                 )
@@ -282,13 +284,13 @@ def _build_single_model(
                 base_url,
             )
 
-    # Custom OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter, ...) also
-    # route through httpx, so they get the same retrying transport.
+    # Custom OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter, ...) go
+    # through OpenAIProvider, so they get the same retrying transport it does.
     provider = OpenAIProvider(
         base_url=base_url,
         api_key=api_key,
         http_client=build_retrying_async_client(
-            attempts=http_retries, max_wait=http_retry_max_wait
+            "openai", attempts=http_retries, max_wait=http_retry_max_wait
         ),
     )
 
@@ -432,6 +434,17 @@ def _validate_provider(role: RoleDefinition) -> None:
             require_provider(prov)
         except RuntimeError as e:
             raise RoleLoadError(str(e)) from None
+
+
+def _require_role_extras(role: RoleDefinition) -> None:
+    """Check optional dependencies a role needs but only touches at run time.
+
+    Vector memory and ingestion open a LanceDB store long after the agent is
+    built (first tool call, or the runner opening a memory store), so without
+    this the missing extra would surface mid-run instead of at load.
+    """
+    if role.spec.memory is not None or role.spec.ingest is not None:
+        require_vector()
 
 
 def _validate_reasoning(role: RoleDefinition) -> None:
@@ -594,6 +607,13 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
     """Load PydanticAI capabilities, inject fallbacks, add input guard if configured."""
     capabilities = None
     if role.spec.capabilities:
+        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
+        if "MCP" in cap_names:
+            # PydanticAI keeps the MCP capability importable without fastmcp
+            # (MCPToolset degrades to Any), so check here rather than let it
+            # fail on the first tool call.
+            require_mcp()
+
         from pydantic_ai.agent.spec import (
             load_capability_from_nested_spec,  # type: ignore[import-not-found]
         )
@@ -607,7 +627,6 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
         _inject_local_fallbacks(caps)
         validate_capability_tool_conflicts(role)
 
-        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
         model = role.spec.model
         if "Thinking" in cap_names and getattr(model, "thinking", None) is not None:
             logger.warning(
@@ -769,9 +788,14 @@ def build_agent(
 
     from initrunner.agent.tools import build_toolsets
 
-    toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
-
-    capabilities = _build_capabilities(role)
+    # Optional dependencies are reported the same way a missing provider SDK
+    # is: as a role that cannot be loaded, with the install hint attached.
+    try:
+        _require_role_extras(role)
+        toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
+        capabilities = _build_capabilities(role)
+    except MissingExtraError as e:
+        raise RoleLoadError(str(e)) from e
 
     auto = _build_auto_tools(role, role_dir, explicit_paths, extra_skill_dirs)
     toolsets.extend(auto.extra_toolsets)

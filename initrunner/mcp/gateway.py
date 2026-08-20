@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastmcp import FastMCP
-from fastmcp.server import create_proxy
-from fastmcp.server.transforms import Visibility
+from fastmcp import FastMCP  # type: ignore[import-not-found]
+from fastmcp.server import create_proxy  # type: ignore[import-not-found]
+from fastmcp.server.transforms import Visibility  # type: ignore[import-not-found]
 
 if TYPE_CHECKING:
     from collections.abc import Callable

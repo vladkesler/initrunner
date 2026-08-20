@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner._compat import require_vector
 from initrunner.stores.base import (
     DocumentStore,
     MemoryStoreBase,
@@ -52,6 +53,7 @@ def create_document_store(
     dimensions: int | None = None,
 ) -> DocumentStore:
     """Create a DocumentStore for the given backend."""
+    require_vector()
     from initrunner.stores.lance_store import LanceDocumentStore
 
     return LanceDocumentStore(db_path, dimensions=dimensions)
@@ -69,6 +71,7 @@ def create_memory_store(
     incremented so that the caller's ``close()`` won't release the underlying
     tables.
     """
+    require_vector()
     key = str(db_path)
     with _registry_lock:
         existing = _active_memory_stores.get(key)

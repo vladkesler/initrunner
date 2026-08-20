@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from initrunner._async import run_sync
+from initrunner._compat import require_mcp
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.security import ToolSandboxConfig
@@ -147,6 +148,8 @@ def introspect_server_sync(
     sandbox: ToolSandboxConfig | None = None,
 ) -> list[McpToolInfo]:
     """List tools with full input schemas from an MCP server."""
+    require_mcp()
+
     from fastmcp import Client  # type: ignore[import-not-found]
 
     from initrunner.mcp._transport import build_transport

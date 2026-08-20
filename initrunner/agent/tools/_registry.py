@@ -124,10 +124,11 @@ def register_tool(
 # Auto-discovery
 # ---------------------------------------------------------------------------
 
-# Modules outside of initrunner.agent.tools that contain @register_tool
-_EXTERNAL_TOOL_MODULES: list[str] = [
-    "initrunner.mcp.server",
-]
+# Modules outside of initrunner.agent.tools that contain @register_tool.
+# Empty by design: a tool backed by an optional extra registers from a shim
+# in this package (see tools/mcp.py) and imports its dependency inside the
+# builder, so discovery never pays for an extra the role does not use.
+_EXTERNAL_TOOL_MODULES: list[str] = []
 
 _discovered_modules: set[str] = set()
 _all_discovered: bool = False

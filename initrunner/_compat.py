@@ -31,6 +31,8 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "keyring": ("vault-keyring", "keyring"),
     "pydantic_evals": ("observability", "pydantic-evals"),
     "fastembed": ("local-embeddings", "fastembed"),
+    "fastmcp": ("mcp", "fastmcp"),
+    "lancedb": ("vector", "lancedb"),
 }
 
 
@@ -139,6 +141,16 @@ def require_ingest(package: str) -> None:
 def require_a2a() -> None:
     """Check that a2a-sdk is importable, or raise with install hint."""
     require_extra("a2a", extra="a2a", pip_name="a2a-sdk")
+
+
+def require_mcp() -> None:
+    """Check that the MCP client stack is importable, or raise with install hint."""
+    require_extra("fastmcp", extra="mcp", pip_name="fastmcp")
+
+
+def require_vector() -> None:
+    """Check that lancedb is importable, or raise with install hint."""
+    require_extra("lancedb", extra="vector", pip_name="lancedb")
 
 
 def require_embeddings_local() -> None:

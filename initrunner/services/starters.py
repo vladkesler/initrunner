@@ -55,6 +55,10 @@ FEATURE_MAP: list[tuple[str, str]] = [
 _EXTRA_MARKERS: dict[str, tuple[str, str]] = {
     # key -> (extra name, marker module to try importing)
     "ingest": ("ingest", "pymupdf4llm"),
+    "vector": ("vector", "lancedb"),
+    "memory": ("vector", "lancedb"),
+    "web_scraper": ("vector", "lancedb"),
+    "mcp": ("mcp", "fastmcp"),
     "search": ("search", "ddgs"),
     "web_reader": ("search", "ddgs"),
     "telegram": ("telegram", "telegram"),
@@ -195,13 +199,16 @@ def _source_suffix(source: str) -> str:
 def _detect_requires_extras(data: dict) -> list[str]:
     """Detect required pip extras from tool types and ingest source formats.
 
-    A bare ``ingest:`` block does not require the ingest extra. Only sources
-    whose suffix needs pymupdf/docx/xlsx do.
+    A bare ``ingest:`` block does not require the ingest extra (only sources
+    whose suffix needs pymupdf/docx/xlsx do), but it does need the vector
+    store, as does any ``memory:`` block.
     """
     extras: set[str] = set()
     spec = document_body(data)
 
     ingest = spec.get("ingest") or {}
+    if ingest or spec.get("memory"):
+        extras.add("vector")
     for source in ingest.get("sources") or []:
         if isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES:
             extras.add("ingest")

@@ -6,14 +6,18 @@ import logging
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from fastmcp import FastMCP
 from pydantic import BaseModel
 
+from initrunner._compat import MissingExtraError, require_mcp
 from initrunner.agent._subprocess import SubprocessTimeout, run_subprocess_text
 from initrunner.agent._truncate import truncate_output
 from initrunner.agent._urls import check_domain_filter, validate_url_ssrf
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +127,10 @@ def _check_url(url: str, config: BrowserMCPConfig) -> str | None:
 
 def build_browser_mcp(config: BrowserMCPConfig | None = None) -> FastMCP:
     """Build a FastMCP server wrapping agent-browser CLI."""
+    require_mcp()
+
+    from fastmcp import FastMCP  # type: ignore[import-not-found]
+
     if config is None:
         config = BrowserMCPConfig()
 
@@ -349,5 +357,11 @@ def build_browser_mcp(config: BrowserMCPConfig | None = None) -> FastMCP:
 
 def main() -> None:
     """Entry point for ``initrunner-browser-mcp`` console script."""
-    mcp = build_browser_mcp()
+    import sys
+
+    try:
+        mcp = build_browser_mcp()
+    except MissingExtraError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     mcp.run(transport="stdio")

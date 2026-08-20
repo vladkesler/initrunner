@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
+from rich.markup import escape
 
-from initrunner.cli._helpers._console import console
+from initrunner.cli._helpers._console import console, print_error
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
@@ -142,14 +143,16 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
 
     errors, warnings = check_prerequisites(entry)
     if errors:
+        # These lines carry `pip install "initrunner[search]"`, and the bracket
+        # is markup to Rich; the indented ones are already formatted.
         for e in errors:
             if e.startswith(" "):
-                console.print(e)
+                console.print(e, markup=False)
             else:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(e)
         raise typer.Exit(1)
     for w in warnings:
-        console.print(f"[yellow]Note:[/yellow] {w}")
+        console.print(f"[yellow]Note:[/yellow] {escape(w)}")
 
     if model is not None:
         return model
@@ -245,7 +248,7 @@ def load_role_or_exit(role_file: Path) -> RoleDefinition:
     try:
         return load_role_sync(role_file)
     except RoleLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         console.print(
             f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold] for details."
         )

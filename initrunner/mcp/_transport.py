@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner._compat import require_mcp
 from initrunner.agent._env import resolve_env_vars
 from initrunner.agent._subprocess import scrub_env
 from initrunner.agent.schema.tools import McpToolConfig
@@ -32,6 +33,8 @@ def build_transport(
     Returns:
         A ``StdioTransport``, ``SSETransport``, or ``StreamableHttpTransport``.
     """
+    require_mcp()
+
     # Resolve headers once (used by SSE and streamable-http)
     resolved_headers = {k: resolve_env_vars(v) for k, v in config.headers.items()}
 

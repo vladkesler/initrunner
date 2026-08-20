@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from initrunner._async import run_sync
+from initrunner._compat import require_mcp
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,6 +35,8 @@ async def _execute(
     *,
     timeout_seconds: int = 30,
 ) -> PlaygroundResult:
+    require_mcp()
+
     from fastmcp import Client  # type: ignore[import-not-found]
 
     from initrunner.mcp._transport import build_transport

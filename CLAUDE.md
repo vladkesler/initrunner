@@ -44,7 +44,8 @@ deploy/                  # Docker entrypoint, fly.toml
 
 | Command | What it does |
 |---|---|
-| `uv sync` | install deps |
+| `uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector` | install deps (full suite baseline) |
+| `uv sync --dev` | install deps, core only (matches CI's `test-lean` job) |
 | `uv run pytest tests/ -v` | run tests |
 | `uv run ruff check .` | lint |
 | `uv run ruff format .` | format |

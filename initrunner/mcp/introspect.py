@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from initrunner._async import run_sync
+from initrunner._compat import require_mcp
 from initrunner.agent.schema.tools import McpToolConfig
 
 
@@ -41,7 +42,9 @@ def list_mcp_tools(
 
 def _list_tools_for_config(config: McpToolConfig, role_dir: Path) -> list[tuple[str, str]]:
     """Connect to an MCP server and list its tools. Returns (name, description) pairs."""
-    from fastmcp import Client
+    require_mcp()
+
+    from fastmcp import Client  # type: ignore[import-not-found]
 
     from initrunner.mcp._transport import build_transport
 

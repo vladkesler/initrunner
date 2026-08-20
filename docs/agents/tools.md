@@ -151,6 +151,10 @@ With `base_url: https://api.example.com`, calling `http_request("GET", "/users/1
 
 Connects to an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, making all of its tools available to the agent via PydanticAI's `MCPToolset` (the v2-ready replacement for the deprecated `FastMCPToolset`).
 
+Requires the `mcp` extra (`uv pip install "initrunner[mcp]"`), which is part of
+`[recommended]` and `[all]`. `type: mcp` validates in any install; building the
+agent is where a core install stops, with the install command in the message.
+
 ```yaml
 tools:
   # Stdio transport (local process)
@@ -832,6 +836,8 @@ tools:
 
 Fetches a web page, converts it to markdown, chunks the content, generates embeddings, and stores the result in the document store. Content stored by the scraper is immediately searchable via `search_documents`.
 
+Writes to the vector store, so it requires the `vector` extra (`uv pip install "initrunner[vector]"`).
+
 ```yaml
 tools:
   - web_scraper:
@@ -1429,6 +1435,7 @@ Browser automation via [agent-browser](https://github.com/vercel-labs/agent-brow
 
 **Prerequisites:**
 ```bash
+uv pip install "initrunner[mcp]"   # part of [recommended] and [all]
 npm i -g agent-browser
 agent-browser install
 ```

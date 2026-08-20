@@ -318,6 +318,10 @@ def get_reranker(reranker_type: str = "rrf", model: str = ""):
     (and ``torch``) backend; when that backend is missing this raises
     :class:`MissingExtraError` so callers can degrade explicitly.
     """
+    from initrunner._compat import require_vector
+
+    require_vector()
+
     from lancedb.rerankers import RRFReranker  # type: ignore[import-not-found]
 
     if reranker_type == "rrf":

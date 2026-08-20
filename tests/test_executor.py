@@ -78,51 +78,62 @@ def _attach_stream_mock(agent: MagicMock, *, text=None, output="Hello", messages
 
 
 class TestRetryingHttpClient:
-    """Transport-level retries via PydanticAI's AsyncTenacityTransport."""
+    """Transport-level retries via PydanticAI's AsyncHTTPX2TenacityTransport."""
 
     def test_client_has_tenacity_transport(self):
+        from pydantic_ai.retries import AsyncHTTPX2TenacityTransport
+
+        from initrunner.agent.executor_retry import build_retrying_async_client
+
+        client = build_retrying_async_client("openai")
+        assert isinstance(client._transport, AsyncHTTPX2TenacityTransport)
+
+    def test_a_provider_still_on_legacy_httpx_gets_a_legacy_client(self):
+        """groq's SDK rejects an httpx2 client, so it must be handed an httpx one."""
+        import httpx
         from pydantic_ai.retries import AsyncTenacityTransport
 
         from initrunner.agent.executor_retry import build_retrying_async_client
 
-        client = build_retrying_async_client()
+        client = build_retrying_async_client("groq")
+        assert isinstance(client, httpx.AsyncClient)
         assert isinstance(client._transport, AsyncTenacityTransport)
 
     def test_retryable_status_raises_for_retry(self):
         """The validate_response hook raises only for transient status codes."""
-        import httpx
+        import httpx2
 
         from initrunner.agent.executor_retry import _raise_for_retryable_status
 
         for code in (429, 500, 502, 503, 504):
-            resp = httpx.Response(code, request=httpx.Request("GET", "http://x"))
-            with pytest.raises(httpx.HTTPStatusError):
+            resp = httpx2.Response(code, request=httpx2.Request("GET", "http://x"))
+            with pytest.raises(httpx2.HTTPStatusError):
                 _raise_for_retryable_status(resp)
 
     def test_permanent_status_passes_through(self):
         """Permanent errors (401/403/404/422) must not trigger a retry."""
-        import httpx
+        import httpx2
 
         from initrunner.agent.executor_retry import _raise_for_retryable_status
 
         for code in (400, 401, 403, 404, 422):
-            resp = httpx.Response(code, request=httpx.Request("GET", "http://x"))
+            resp = httpx2.Response(code, request=httpx2.Request("GET", "http://x"))
             # Does not raise -> no retry; the SDK surfaces the error immediately.
             _raise_for_retryable_status(resp)
 
     def test_success_passes_through(self):
-        import httpx
+        import httpx2
 
         from initrunner.agent.executor_retry import _raise_for_retryable_status
 
-        resp = httpx.Response(200, request=httpx.Request("GET", "http://x"))
+        resp = httpx2.Response(200, request=httpx2.Request("GET", "http://x"))
         _raise_for_retryable_status(resp)
 
     def test_attempts_and_max_wait_are_configurable(self):
         from initrunner.agent.executor_retry import build_retrying_async_client
 
         # Smoke test: custom knobs build a valid client without error.
-        client = build_retrying_async_client(attempts=5, max_wait=30.0)
+        client = build_retrying_async_client("openai", attempts=5, max_wait=30.0)
         assert client is not None
 
 

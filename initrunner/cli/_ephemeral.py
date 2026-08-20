@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 
 from initrunner.agent.prompt import UserPrompt
-from initrunner.cli._helpers import console
+from initrunner.cli._helpers import console, print_error
 from initrunner.services.providers import (
     EPHEMERAL_TOOL_DEFAULTS,
     TOOL_PROFILES,
@@ -153,9 +153,7 @@ def verify_bot_sdk(platform: str) -> None:
     try:
         require_extra(platform)
     except MissingExtraError as e:
-        from rich.markup import escape
-
-        console.print(f"[red]Error:[/red] {escape(str(e))}")
+        print_error(e)
         raise typer.Exit(1) from None
 
 

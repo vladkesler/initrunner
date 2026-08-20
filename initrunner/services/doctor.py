@@ -232,8 +232,16 @@ def diagnose_role_extras(raw_data: dict) -> list[RoleExtrasGap]:
     # Check spec-level sections
     if spec.get("ingest"):
         feature_names.add("ingest")
+        feature_names.add("vector")
+    if spec.get("memory"):
+        feature_names.add("memory")
     if spec.get("observability"):
         feature_names.add("observability")
+    # PydanticAI's native MCP capability needs the same extra the 'mcp' tool
+    # does; build_agent gates on it, so doctor has to see it too.
+    for cap in spec.get("capabilities") or []:
+        if cap == "MCP" or (isinstance(cap, dict) and "MCP" in cap):
+            feature_names.add("mcp")
 
     for feature in feature_names:
         if feature not in markers:

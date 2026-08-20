@@ -27,18 +27,26 @@ Runs `pytest` across a Python version matrix:
 | 3.13   | `ubuntu-latest` |
 
 ```bash
-uv sync --dev --extra dashboard --extra a2a
+uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector
 uv run pytest tests/ -v
 ```
 
 All three versions must pass for the job to succeed.
+
+### `test-lean`
+
+A second job installs the core package only (`uv sync --dev`) and runs
+`tests/test_core_footprint.py` and `tests/test_lean_extras.py`. Those files assert
+that a plain install never imports the MCP stack or LanceDB, and that a role needing
+either fails at load with an install command. They pass trivially when the extras are
+present, so this job is the one that actually enforces them.
 
 ## Running Locally
 
 Run the same checks locally before pushing:
 
 ```bash
-uv sync --dev --extra dashboard --extra a2a
+uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector
 uv run ruff check .              # lint
 uv run ruff format --check .     # format check (or omit --check to auto-fix)
 uv run ty check initrunner/      # type check

@@ -96,13 +96,15 @@ if should_run "$FILTER" "default-recommended"; then
         "python:3.12-slim" \
         "--unmanaged" \
         "" \
-        "python3 -c 'import ddgs; import pymupdf4llm; import fastapi' && initrunner --version"
+        "python3 -c 'import ddgs, pymupdf4llm, fastapi, fastmcp, lancedb' && initrunner --version"
 fi
 
 if should_run "$FILTER" "extras-none"; then
     run_test "extras-none" \
         "python:3.12-slim" \
-        "--unmanaged --extras none"
+        "--unmanaged --extras none" \
+        "" \
+        "initrunner --version && python3 -c \"import starlette, uvicorn; import sys; from initrunner.agent.tools._registry import get_tool_types; assert 'mcp' in get_tool_types(); assert 'fastmcp' not in sys.modules\""
 fi
 
 if should_run "$FILTER" "uninstall"; then

@@ -45,10 +45,11 @@ COPY --from=dashboard /src/initrunner/dashboard/_static/ initrunner/dashboard/_s
 COPY README.md LICENSE-MIT LICENSE-APACHE ./
 RUN test -f initrunner/dashboard/_static/index.html
 
-# Build wheel and install into system Python
+# Build wheel and install into system Python. An empty EXTRAS means a core
+# install, so the bracket group is omitted entirely ("wheel[]" is not valid).
 RUN uv build --wheel --out-dir /build/dist && \
     WHEEL=$(ls /build/dist/initrunner-*.whl) && \
-    uv pip install --system "${WHEEL}[${EXTRAS}]" && \
+    uv pip install --system "${WHEEL}${EXTRAS:+[${EXTRAS}]}" && \
     python -c "from pathlib import Path; import initrunner.dashboard as d; \
 p = Path(d.__file__).parent / '_static' / 'index.html'; \
 assert p.is_file(), f'dashboard UI missing from wheel: {p}'"

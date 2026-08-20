@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastmcp import FastMCP
+from fastmcp import FastMCP  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 
 from initrunner.agent._env import resolve_env_vars

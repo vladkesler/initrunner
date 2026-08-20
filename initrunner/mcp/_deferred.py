@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable
 from typing import Any, Self
 
-from pydantic_ai.mcp import MCPToolset
+from pydantic_ai.mcp import MCPToolset  # type: ignore[import-not-found]
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.toolsets.abstract import AbstractToolset, ToolsetTool
 

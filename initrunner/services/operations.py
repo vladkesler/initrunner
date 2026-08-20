@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from initrunner._compat import require_mcp
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -290,6 +292,8 @@ def list_mcp_tools_sync(
     Returns ``(server_summary, tool_name, tool_description)`` tuples.
     Does not require valid LLM API keys.
     """
+    require_mcp()
+
     from initrunner.mcp.introspect import list_mcp_tools
 
     return list_mcp_tools(role_path, index=index)
@@ -309,6 +313,8 @@ def build_mcp_gateway_sync(
     extra_skill_dirs: list[Path] | None = None,
 ) -> object:
     """Build an MCP gateway server (sync). Returns a FastMCP instance."""
+    require_mcp()
+
     from initrunner.mcp.gateway import build_mcp_gateway
 
     return build_mcp_gateway(
@@ -332,6 +338,8 @@ def build_toolkit_sync(
     server_name: str | None = None,
 ) -> object:
     """Build an MCP toolkit server (sync). Returns a FastMCP instance."""
+    require_mcp()
+
     from initrunner.mcp.toolkit import ToolkitConfig, build_toolkit, load_toolkit_config
 
     config: ToolkitConfig | None = None

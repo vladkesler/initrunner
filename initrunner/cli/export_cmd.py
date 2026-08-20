@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from initrunner.cli._helpers import console
+from initrunner.cli._helpers import console, print_error
 
 app = typer.Typer(help="Export a role.yaml to other formats.")
 
@@ -41,7 +41,7 @@ def export_agent_spec(
     try:
         role = load_role(role_path)
     except RoleLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         raise typer.Exit(1) from None
 
     spec_dict, dropped = role_to_agent_spec(role)

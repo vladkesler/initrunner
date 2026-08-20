@@ -292,6 +292,7 @@ def app_entry() -> None:
     import time
 
     from initrunner import telemetry
+    from initrunner._compat import MissingExtraError
 
     global _invoked_command
     _invoked_command = None  # main() sets it; reset so a bypassed callback falls back to argv
@@ -309,6 +310,18 @@ def app_entry() -> None:
         exit_code = code if isinstance(code, int) else (0 if code is None else 1)
         status = "ok" if exit_code == 0 else "error"
         raise
+    except MissingExtraError as exc:
+        # An optional dependency is not installed. The message already carries
+        # the install command, so every command reports it the same way here
+        # rather than each one catching it separately. The message ends in
+        # ``initrunner[extra]``, which Rich would read as markup.
+        from rich.markup import escape
+
+        console.print(f"[red]Error:[/red] {escape(str(exc))}")
+        status = "error"
+        exit_code = 1
+        error_kind = type(exc).__name__
+        sys.exit(1)
     except BaseException as exc:
         status = "error"
         exit_code = 1

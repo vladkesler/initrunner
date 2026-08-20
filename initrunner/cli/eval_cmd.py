@@ -12,6 +12,7 @@ from initrunner.cli._helpers import (
     console,
     load_and_build_or_exit,
     load_role_or_exit,
+    print_error,
     resolve_model_override,
     resolve_role_path,
 )
@@ -170,7 +171,7 @@ def test(
                 pydantic_evals=use_pydantic_evals,
             )
     except MissingExtraError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         raise typer.Exit(1) from None
     _display_suite_result(suite_result, verbose=verbose)
 

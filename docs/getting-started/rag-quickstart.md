@@ -6,7 +6,8 @@ Get a document Q&A agent running with three commands. For the full reference, se
 
 ## Prerequisites
 
-- InitRunner installed (`pip install initrunner` or `uv tool install initrunner`)
+- InitRunner installed with the vector store: `uv pip install "initrunner[ingest]"`
+  (the default installer bundle already has it)
 - An API key for your provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) — or [Ollama](../configuration/ollama.md) for fully local RAG
 - Documents to index (Markdown, text, HTML, PDF, etc.)
 
