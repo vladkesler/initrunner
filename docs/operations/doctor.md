@@ -296,7 +296,7 @@ With `--fix`, doctor rewrites envelope Agent/Team/Flow YAML to flat documents, t
 | Deprecated fields in envelope role YAML (DEP001-DEP003) | Resolved by the rewrite. If the rewrite is refused (for example an existing `.bak` without `--force`), a surgical text patch fixes the field in place and preserves comments and formatting | Yes (`PATH` or `--role`) |
 | Provider SDK missing (key is set) | `install_extra()` installs the pip extra | No |
 | Missing API key | Prompts to enter and persist to `~/.initrunner/.env` | Interactive only (skipped with `--yes`) |
-| Role tools/triggers need uninstalled extras | Installs the matching extras (e.g. `initrunner[search]`) | Yes |
+| Role tools/triggers need uninstalled extras | Installs the matching extras (e.g. `initrunner[search]`, `initrunner[mcp]`, `initrunner[vector]`) | Yes |
 | `spec_version` behind current | Bumps and writes the YAML file | Yes |
 
 ### What `--fix` does NOT repair

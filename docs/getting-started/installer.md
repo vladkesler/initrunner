@@ -5,7 +5,7 @@ InitRunner ships a portable shell installer that works on Linux and macOS. A sin
 ## Quick Start
 
 ```bash
-# Install with recommended extras (search, ingestion, dashboard)
+# Install with recommended extras (search, ingestion, vector store, MCP, dashboard)
 curl -fsSL https://initrunner.ai/install.sh | sh
 
 # Install everything (all providers + all features)
@@ -38,7 +38,7 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 | Flag | Argument | Description |
 |------|----------|-------------|
 | `--method` | `uv`, `pipx`, or `pip` | Force a specific package installer instead of auto-detection. |
-| `--extras` | comma-separated list | Install optional extras. Default: `recommended`. Use `none` for bare install. |
+| `--extras` | comma-separated list | Install optional extras. Default: `recommended`. Use `none` for a core install (no MCP, no vector store). |
 | `--version` | version string | Pin to a specific PyPI version (e.g. `0.2.0`). Default: `latest`. |
 | `--unmanaged` | *(none)* | Skip all shell profile / PATH modifications. Implies `INITRUNNER_NO_MODIFY_PATH`. |
 | `--uninstall` | *(none)* | Remove initrunner and clean up PATH entries from shell profiles. |
@@ -232,8 +232,8 @@ The installer has a Docker-based test harness in `tests/installer/`. Each scenar
 | `method-pip` | `python:3.12-slim` | Explicit `--method pip` |
 | `method-pipx` | `python:3.12-slim` | Explicit `--method pipx` (pre-installs pipx) |
 | `extras` | `python:3.12-slim` | `--extras anthropic` installs optional dependencies |
-| `default-recommended` | `python:3.12-slim` | Default install includes recommended extras (search, ingest, dashboard) |
-| `extras-none` | `python:3.12-slim` | `--extras none` installs bare base only |
+| `default-recommended` | `python:3.12-slim` | Default install includes recommended extras (search, ingest, vector, mcp, dashboard) |
+| `extras-none` | `python:3.12-slim` | `--extras none` installs the core package only, and it still runs and serves |
 | `uninstall` | `python:3.12-slim` | Install then `--uninstall`, verifies binary is removed |
 | `e2e-hello` | `ubuntu:24.04` | Full end-to-end: installs, then runs a role with `initrunner run` |
 

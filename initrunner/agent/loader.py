@@ -13,7 +13,7 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
 
-from initrunner._compat import require_provider
+from initrunner._compat import MissingExtraError, require_mcp, require_provider, require_vector
 from initrunner._yaml import load_raw_yaml
 from initrunner.agent.schema.base import ModelConfig, PartialModelConfig
 from initrunner.agent.schema.execution import ExecutionConfig
@@ -434,6 +434,17 @@ def _validate_provider(role: RoleDefinition) -> None:
             raise RoleLoadError(str(e)) from None
 
 
+def _require_role_extras(role: RoleDefinition) -> None:
+    """Check optional dependencies a role needs but only touches at run time.
+
+    Vector memory and ingestion open a LanceDB store long after the agent is
+    built (first tool call, or the runner opening a memory store), so without
+    this the missing extra would surface mid-run instead of at load.
+    """
+    if role.spec.memory is not None or role.spec.ingest is not None:
+        require_vector()
+
+
 def _validate_reasoning(role: RoleDefinition) -> None:
     """Validate reasoning config against tool declarations."""
     config = role.spec.reasoning
@@ -594,6 +605,13 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
     """Load PydanticAI capabilities, inject fallbacks, add input guard if configured."""
     capabilities = None
     if role.spec.capabilities:
+        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
+        if "MCP" in cap_names:
+            # PydanticAI keeps the MCP capability importable without fastmcp
+            # (MCPToolset degrades to Any), so check here rather than let it
+            # fail on the first tool call.
+            require_mcp()
+
         from pydantic_ai.agent.spec import (
             load_capability_from_nested_spec,  # type: ignore[import-not-found]
         )
@@ -607,7 +625,6 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
         _inject_local_fallbacks(caps)
         validate_capability_tool_conflicts(role)
 
-        cap_names = {spec.name for spec in role.spec.capabilities if hasattr(spec, "name")}
         model = role.spec.model
         if "Thinking" in cap_names and getattr(model, "thinking", None) is not None:
             logger.warning(
@@ -769,9 +786,14 @@ def build_agent(
 
     from initrunner.agent.tools import build_toolsets
 
-    toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
-
-    capabilities = _build_capabilities(role)
+    # Optional dependencies are reported the same way a missing provider SDK
+    # is: as a role that cannot be loaded, with the install hint attached.
+    try:
+        _require_role_extras(role)
+        toolsets = build_toolsets(all_tools, role, role_dir=role_dir)
+        capabilities = _build_capabilities(role)
+    except MissingExtraError as e:
+        raise RoleLoadError(str(e)) from e
 
     auto = _build_auto_tools(role, role_dir, explicit_paths, extra_skill_dirs)
     toolsets.extend(auto.extra_toolsets)

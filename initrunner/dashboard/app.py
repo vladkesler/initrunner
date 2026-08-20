@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles  # type: ignore[import-not-found]
 from starlette.middleware.base import BaseHTTPMiddleware  # type: ignore[import-not-found]
 from starlette.responses import RedirectResponse
 
+from initrunner._compat import MissingExtraError
 from initrunner.dashboard.config import DashboardSettings
 from initrunner.dashboard.deps import (
     FlowCache,
@@ -235,6 +236,12 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         )
 
     # -- Error handler for clean JSON errors --------------------------------
+    @app.exception_handler(MissingExtraError)
+    async def _missing_extra(request: Request, exc: MissingExtraError):
+        # An optional dependency the running install does not have: the
+        # feature is unimplemented here, and the message carries the fix.
+        return JSONResponse({"detail": str(exc)}, status_code=501)
+
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):
         _logger.exception("Unhandled error on %s %s", request.method, request.url.path)

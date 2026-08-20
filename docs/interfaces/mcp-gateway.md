@@ -7,6 +7,9 @@ InitRunner offers two ways to expose capabilities via [MCP (Model Context Protoc
 | `initrunner mcp serve` | Agents (full LLM reasoning) | Yes — each tool call triggers an agent run | Expose specialized agents to MCP clients |
 | `initrunner mcp toolkit` | Raw tools (web search, CSV, SQL, etc.) | **No** — tools execute directly | Give AI coding assistants extra capabilities |
 
+Both need the `mcp` extra: `uv pip install "initrunner[mcp]"` (included in
+`[recommended]` and `[all]`). Without it these commands exit 1 and print that line.
+
 ---
 
 ## MCP Toolkit — Direct Tool Server

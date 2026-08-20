@@ -8,6 +8,10 @@ InitRunner's memory system gives agents three capabilities: **short-term session
 
 All memory types are backed by a single store per agent using a configurable store backend (default: `lancedb`, an in-process vector database). The store is dimension-agnostic — embedding dimensions are auto-detected on first use.
 
+The store ships in the `vector` extra (part of `[recommended]` and `[all]`). A core
+install validates a role with a `memory:` block but fails to build it, naming
+`uv pip install "initrunner[vector]"`.
+
 ## Quick Start
 
 ```yaml

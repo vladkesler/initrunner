@@ -67,9 +67,11 @@ Every builder receives a `ToolBuildContext` instance as its second argument:
 
 At first access, `_ensure_discovered()` imports every module under `initrunner/agent/tools/` via `pkgutil.iter_modules()`. Modules with `_`-prefixed names (like `_registry.py`) are skipped. Import errors are silently ignored so missing optional dependencies don't crash discovery.
 
-### External modules
+### Tools backed by an optional extra
 
-Tool modules that live outside the `tools/` package (e.g. `mcp/server.py`) are listed in `_EXTERNAL_TOOL_MODULES` in `_registry.py` and imported during discovery alongside the package modules.
+A tool whose dependency is an extra still has to register in a core install, or `type: <name>` would stop validating everywhere. The pattern is a thin module in `tools/` that registers the config class and does the heavy import inside the builder, after a `require_*()` check -- see `tools/mcp.py`, which is all of ten lines and keeps `mcp/server.py` (and fastmcp under it) unimported until a role actually configures an MCP server.
+
+`_EXTERNAL_TOOL_MODULES` in `_registry.py` can still list modules outside the `tools/` package for discovery. It is empty, and a new tool should not need it.
 
 ### Checklist
 

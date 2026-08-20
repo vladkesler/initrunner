@@ -8,7 +8,12 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from initrunner.cli._helpers import console, resolve_skill_dirs, suggest_next
+from initrunner.cli._helpers import (
+    console,
+    print_error,
+    resolve_skill_dirs,
+    suggest_next,
+)
 from initrunner.cli._options import SkillDirOption
 
 
@@ -239,7 +244,7 @@ def configure(
     try:
         role_def = load_role(role_path)
     except RoleLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         raise typer.Exit(1) from None
 
     # Determine if this is an installed role (registry-backed) or local file

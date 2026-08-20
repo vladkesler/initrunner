@@ -8,10 +8,21 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from initrunner.cli._helpers import console
+from initrunner.cli._helpers import console, print_error
 from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
 
 app = typer.Typer(help="MCP server introspection, gateway, and toolkit.")
+
+
+def _require_mcp_or_exit() -> None:
+    """Every command here needs the MCP stack; say so before doing anything."""
+    from initrunner._compat import MissingExtraError, require_mcp
+
+    try:
+        require_mcp()
+    except MissingExtraError as e:
+        print_error(e, stderr=True)
+        raise typer.Exit(1) from None
 
 
 @app.command("list-tools")
@@ -23,6 +34,8 @@ def list_tools(
     ] = None,
 ) -> None:
     """List tools available from MCP servers configured in a role."""
+    _require_mcp_or_exit()
+
     from rich.table import Table
 
     from initrunner.cli._helpers import resolve_role_path
@@ -111,6 +124,8 @@ def mcp_serve(
     skill_dir: SkillDirOption = None,
 ) -> None:
     """Expose InitRunner agents as an MCP server."""
+    _require_mcp_or_exit()
+
     from initrunner.cli._helpers import create_audit_logger, resolve_role_paths, resolve_skill_dirs
     from initrunner.mcp.gateway import build_mcp_gateway, run_mcp_gateway
 
@@ -201,6 +216,8 @@ def mcp_toolkit(
     ] = None,
 ) -> None:
     """Expose InitRunner tools directly as an MCP server (no agent/LLM required)."""
+    _require_mcp_or_exit()
+
     from initrunner.mcp.gateway import run_mcp_gateway
     from initrunner.mcp.toolkit import (
         ToolkitConfig,
@@ -296,6 +313,8 @@ def mcp_browser(
     ] = None,
 ) -> None:
     """Expose agent-browser as an MCP server for AI agent browser automation."""
+    _require_mcp_or_exit()
+
     from initrunner.mcp.browser import BrowserMCPConfig, build_browser_mcp
     from initrunner.mcp.gateway import run_mcp_gateway
 

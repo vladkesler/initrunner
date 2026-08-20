@@ -515,14 +515,16 @@ Embedding providers require credentials. InitRunner validates embedding keys at 
 
 You can override which env var is used for the embedding key by setting `embeddings.api_key_env` in your `ingest` or `memory` config.
 
-### `lancedb` not available
+### `'lancedb' is required`
 
-The vector store backend requires the `lancedb` package. Install it:
+The vector store ships in the `vector` extra, which `ingest` pulls in. A core
+install validates an `ingest:` role but refuses to build it:
 ```bash
-pip install lancedb
-# or with uv:
-uv pip install lancedb
+uv pip install "initrunner[ingest]"
+# or just the store, without the PDF/DOCX/XLSX parsers:
+uv pip install "initrunner[vector]"
 ```
+`initrunner doctor --fix --role <role.yaml>` installs whatever the role needs.
 
 ## Scaffold a RAG Role
 

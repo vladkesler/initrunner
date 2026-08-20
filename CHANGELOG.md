@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed (dependency layout)
+- **MCP and the vector store are extras now.** Importing `pydantic_ai` imports its MCP capability, which imports `pydantic_ai.mcp`, which imports `fastmcp` -- eagerly, whether or not a role uses MCP. Measured on CPython 3.12/Linux: a built agent is 109 MB resident with fastmcp installed and 81 MB without it, so a quarter of every InitRunner process was an MCP client nobody asked for. LanceDB is lazy already but costs ~300 MB on disk, 40% of the installed tree. Both moved out of the core dependencies into `mcp` and `vector`.
+  - **Nothing changes for `[recommended]` (the installer default), `[all]`, or the `:latest` Docker image** -- both extras are in all three. The change is visible only to `pip install initrunner` / `--extras none`, which is now genuinely minimal: OpenAI and Ollama models, every dependency-free built-in tool, triggers, flows, teams, groups, and the `--serve` API.
+  - To get them back: `uv pip install "initrunner[mcp,vector]"`, or re-run the installer, or `uv tool install --force "initrunner[recommended]"`.
+  - `starlette` and `uvicorn` are core dependencies now. They reached the tree only through the MCP SDK, while `server/app.py`, `triggers/webhook.py`, and `middleware.py` have always imported them at module level. `python-multipart` moved to the `dashboard` and `desktop` extras for the same reason: the login form and the upload route need it and FastAPI does not declare it.
+- **A role that needs an extra you do not have fails when you load it, not mid-run.** `type: mcp`, `memory:`, `ingest:`, `web_scraper`, and PydanticAI's native `MCP` capability are all checked while the agent is built, and the error carries the install command: `'lancedb' is required: uv pip install initrunner[vector]`. The YAML itself still validates everywhere, so `initrunner validate` and every editor, dashboard, and wizard surface behave the same in every install. `initrunner doctor --fix --role <file>` installs what the role asks for.
+
+### Added
+- **`scripts/measure_rss.py`** reproduces the numbers in [Memory footprint](docs/operations/memory-footprint.md): per-layer RSS, packed-agent RSS for 1/5/50 agents in one process, median of N runs, each scenario in a fresh interpreter. Linux only, not a CI gate.
+- **A CI job that installs the core package and nothing else** (`test-lean`), running two new test files that assert a plain install never imports fastmcp, `pydantic_ai.mcp`, `mcp`, `beartype`, `lancedb`, or `pyarrow` while still registering the `mcp` tool type. Module names rather than megabytes: allocators and platforms move RSS around, import graphs do not.
+
 ## [2026.8.8] - 2026-08-19
 
 ### Fixed

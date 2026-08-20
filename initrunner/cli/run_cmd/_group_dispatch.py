@@ -11,6 +11,7 @@ import typer
 from initrunner.cli._helpers import (
     console,
     create_audit_logger,
+    print_error,
     resolve_model_override,
     resolve_skill_dirs,
 )
@@ -70,7 +71,7 @@ def group_context(
             model_override=resolve_model_override(model),
         )
     except GroupPrepareError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         if audit_logger is not None:
             audit_logger.close()
         if provider is not None:

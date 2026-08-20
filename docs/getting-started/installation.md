@@ -2,7 +2,7 @@
 
 ## Quick install
 
-The install script auto-detects `uv`, `pipx`, or `pip` (and installs `uv` if none are found). It includes web search, document ingestion, and the dashboard by default:
+The install script auto-detects `uv`, `pipx`, or `pip` (and installs `uv` if none are found). It includes web search, document ingestion, MCP, the vector store, and the dashboard by default:
 
 ```bash
 curl -fsSL https://initrunner.ai/install.sh | sh
@@ -34,7 +34,14 @@ pip install "initrunner[recommended]"
 
 ## Minimal install
 
-If you only need the core agent runtime (OpenAI + Ollama, text ingestion, vector search):
+The core install is the agent runtime and nothing optional: OpenAI and Ollama models,
+every built-in tool that needs no extra dependency, triggers, the OpenAI-compatible
+`--serve` API, flows, teams and groups. It leaves out MCP servers and the vector store,
+which together are roughly a third of a running agent's memory, so this is the install
+to reach for when you are packing many agents onto one box.
+
+A role that uses `type: mcp`, `memory:`, `ingest:` or the `web_scraper` tool still
+validates here; it fails at load with the exact `uv pip install` line it needs.
 
 ```bash
 # shell installer
@@ -64,12 +71,12 @@ pip install "initrunner[all]"
 
 ## Available extras
 
-The `[recommended]` bundle includes `search`, `ingest`, and `dashboard`. The `[all]` bundle includes everything below.
+The `[recommended]` bundle includes `search`, `ingest`, `vector`, `mcp`, and `dashboard`. The `[all]` bundle includes everything below.
 
 | Extra | What it adds |
 |-------|--------------|
 | **Bundles** | |
-| `recommended` | Search + document ingestion + dashboard |
+| `recommended` | Search + document ingestion + vector store + MCP + dashboard |
 | `all` | Every extra below |
 | **LLM Providers** | |
 | `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
@@ -78,7 +85,9 @@ The `[recommended]` bundle includes `search`, `ingest`, and `dashboard`. The `[a
 | `groq` | Groq provider |
 | `mistral` | Mistral provider |
 | **Features** | |
-| `ingest` | PDF, DOCX, XLSX ingestion (base text ingestion is built-in) |
+| `ingest` | PDF, DOCX, XLSX ingestion, plus the vector store it writes to |
+| `vector` | LanceDB vector store: `memory:`, `ingest:`, retrieval, `web_scraper` |
+| `mcp` | MCP client and server: `type: mcp` tools, `initrunner mcp serve/toolkit/browser` |
 | `search` | Web search via DuckDuckGo (free, no API key) |
 | `audio` | YouTube transcript extraction |
 | `safety` | Profanity filter for content policy |
@@ -100,7 +109,9 @@ Combine specific extras with commas: `uv pip install "initrunner[ingest,search,a
 ```bash
 git clone https://github.com/vladkesler/initrunner.git
 cd initrunner
-uv sync
+# The full suite exercises every optional dependency; plain `uv sync --dev`
+# gives you the lean environment CI's test-lean job uses.
+uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector
 uv run pytest tests/ -v
 uv run ruff check .
 uv run initrunner --version

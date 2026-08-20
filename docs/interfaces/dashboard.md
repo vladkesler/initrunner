@@ -290,6 +290,10 @@ Queue + drawer for resolving paused runs that hit an `approval: required` tool (
 
 Visual management center for MCP servers configured across all agents. Four tabs:
 
+Listing servers and reading cached tool lists works in any install. Connecting to a
+server -- introspection, health checks, the Playground -- needs the `mcp` extra;
+without it those endpoints answer `501` with the `uv pip install` line.
+
 **Servers tab** -- aggregated view of every MCP server declared in any agent's `tools:` config.
 
 - Servers are deduplicated by connection identity (transport, command, args, url, cwd, headers, env keys). Two agents pointing at the same `npx @modelcontextprotocol/server-filesystem /tmp` show as one server entry with two agent refs.

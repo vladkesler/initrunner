@@ -1694,17 +1694,17 @@ dependencies = [
     { name = "anyio" },
     { name = "beautifulsoup4" },
     { name = "croniter" },
-    { name = "fastmcp" },
     { name = "initguard" },
     { name = "jinja2" },
-    { name = "lancedb" },
     { name = "markdownify" },
     { name = "pydantic" },
-    { name = "pydantic-ai-slim", extra = ["mcp", "openai", "retries"] },
+    { name = "pydantic-ai-slim", extra = ["openai", "retries"] },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "starlette" },
     { name = "typer" },
+    { name = "uvicorn" },
     { name = "watchfiles" },
 ]
 
@@ -1719,14 +1719,17 @@ all = [
     { name = "ddgs" },
     { name = "discord-py" },
     { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "lancedb" },
     { name = "openpyxl" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-sdk" },
-    { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"] },
+    { name = "pydantic-ai-slim", extra = ["anthropic", "bedrock", "cohere", "google", "groq", "mcp", "mistral", "xai"] },
     { name = "pydantic-evals" },
     { name = "pymupdf4llm" },
     { name = "python-docx" },
+    { name = "python-multipart" },
     { name = "python-telegram-bot" },
     { name = "slack-sdk" },
     { name = "uvicorn" },
@@ -1748,10 +1751,12 @@ channels = [
 ]
 dashboard = [
     { name = "fastapi" },
+    { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 desktop = [
     { name = "fastapi" },
+    { name = "python-multipart" },
     { name = "pywebview" },
     { name = "uvicorn" },
 ]
@@ -1765,12 +1770,17 @@ groq = [
     { name = "pydantic-ai-slim", extra = ["groq"] },
 ]
 ingest = [
+    { name = "lancedb" },
     { name = "openpyxl" },
     { name = "pymupdf4llm" },
     { name = "python-docx" },
 ]
 local-embeddings = [
     { name = "fastembed" },
+]
+mcp = [
+    { name = "fastmcp" },
+    { name = "pydantic-ai-slim", extra = ["mcp"] },
 ]
 mistral = [
     { name = "pydantic-ai-slim", extra = ["mistral"] },
@@ -1784,9 +1794,13 @@ observability = [
 recommended = [
     { name = "ddgs" },
     { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "lancedb" },
     { name = "openpyxl" },
+    { name = "pydantic-ai-slim", extra = ["mcp"] },
     { name = "pymupdf4llm" },
     { name = "python-docx" },
+    { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 safety = [
@@ -1807,6 +1821,9 @@ vault = [
 vault-keyring = [
     { name = "cryptography" },
     { name = "keyring" },
+]
+vector = [
+    { name = "lancedb" },
 ]
 
 [package.dev-dependencies]
@@ -1841,11 +1858,16 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'desktop'", specifier = ">=0.135.2" },
     { name = "fastapi", marker = "extra == 'recommended'", specifier = ">=0.135.2" },
     { name = "fastembed", marker = "extra == 'local-embeddings'", specifier = ">=0.7.4" },
-    { name = "fastmcp", specifier = ">=3.3,<4" },
+    { name = "fastmcp", marker = "extra == 'all'", specifier = ">=3.3,<4" },
+    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3.3,<4" },
+    { name = "fastmcp", marker = "extra == 'recommended'", specifier = ">=3.3,<4" },
     { name = "initguard", specifier = ">=2026.3.3" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "keyring", marker = "extra == 'vault-keyring'", specifier = ">=25" },
-    { name = "lancedb", specifier = ">=0.29.2" },
+    { name = "lancedb", marker = "extra == 'all'", specifier = ">=0.29.2" },
+    { name = "lancedb", marker = "extra == 'ingest'", specifier = ">=0.29.2" },
+    { name = "lancedb", marker = "extra == 'recommended'", specifier = ">=0.29.2" },
+    { name = "lancedb", marker = "extra == 'vector'", specifier = ">=0.29.2" },
     { name = "markdownify", specifier = ">=1.2.2" },
     { name = "openpyxl", marker = "extra == 'all'", specifier = ">=3.1.5" },
     { name = "openpyxl", marker = "extra == 'ingest'", specifier = ">=3.1.5" },
@@ -1862,8 +1884,11 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all-models'", specifier = ">=2.30.0" },
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = ">=2.30.0" },
     { name = "pydantic-ai-slim", extras = ["groq"], marker = "extra == 'groq'", specifier = ">=2.30.0" },
-    { name = "pydantic-ai-slim", extras = ["mcp", "openai", "retries"], specifier = ">=2.30.0" },
+    { name = "pydantic-ai-slim", extras = ["mcp"], marker = "extra == 'all'", specifier = ">=2.30.0" },
+    { name = "pydantic-ai-slim", extras = ["mcp"], marker = "extra == 'mcp'", specifier = ">=2.30.0" },
+    { name = "pydantic-ai-slim", extras = ["mcp"], marker = "extra == 'recommended'", specifier = ">=2.30.0" },
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=2.30.0" },
+    { name = "pydantic-ai-slim", extras = ["openai", "retries"], specifier = ">=2.30.0" },
     { name = "pydantic-evals", marker = "extra == 'all'", specifier = ">=2.30.0" },
     { name = "pydantic-evals", marker = "extra == 'observability'", specifier = ">=2.30.0" },
     { name = "pymupdf4llm", marker = "extra == 'all'", specifier = ">=0.2.9" },
@@ -1873,6 +1898,10 @@ requires-dist = [
     { name = "python-docx", marker = "extra == 'ingest'", specifier = ">=1.2.0" },
     { name = "python-docx", marker = "extra == 'recommended'", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-multipart", marker = "extra == 'all'", specifier = ">=0.0.20" },
+    { name = "python-multipart", marker = "extra == 'dashboard'", specifier = ">=0.0.20" },
+    { name = "python-multipart", marker = "extra == 'desktop'", specifier = ">=0.0.20" },
+    { name = "python-multipart", marker = "extra == 'recommended'", specifier = ">=0.0.20" },
     { name = "python-telegram-bot", marker = "extra == 'all'", specifier = ">=21.0" },
     { name = "python-telegram-bot", marker = "extra == 'channels'", specifier = ">=21.0" },
     { name = "python-telegram-bot", marker = "extra == 'telegram'", specifier = ">=21.0" },
@@ -1882,7 +1911,9 @@ requires-dist = [
     { name = "slack-sdk", marker = "extra == 'all'", specifier = ">=3.27" },
     { name = "slack-sdk", marker = "extra == 'channels'", specifier = ">=3.27" },
     { name = "slack-sdk", marker = "extra == 'slack'", specifier = ">=3.27" },
+    { name = "starlette", specifier = ">=0.46.2" },
     { name = "typer", specifier = ">=0.21.1" },
+    { name = "uvicorn", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'a2a'", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'dashboard'", specifier = ">=0.42.0" },
@@ -1892,7 +1923,7 @@ requires-dist = [
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring"]
+provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mcp", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring", "vector"]
 
 [package.metadata.requires-dev]
 dev = [

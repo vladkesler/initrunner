@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: uv sync --dev
+      - run: uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run ty check initrunner/
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --dev
+      - run: uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector
       - run: uv run pytest tests/ -v
 
   build:
@@ -148,6 +148,16 @@ jobs:
 
       - name: Smoke test - ingest extra
         run: python -c "import initrunner.ingestion; print('Ingest import OK')"
+
+      - name: Smoke test - mcp tool type without the mcp extra
+        run: |
+          python -c "
+          import sys
+          from initrunner.agent.tools._registry import get_tool_types
+          assert 'mcp' in get_tool_types(), 'mcp tool type is not registered'
+          assert 'fastmcp' not in sys.modules, 'fastmcp was imported without the extra'
+          print('MCP shim OK')
+          "
 
       - name: Smoke test - dashboard assets
         run: |

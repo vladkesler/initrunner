@@ -1,16 +1,19 @@
-"""MCPToolset wrapper for McpToolConfig."""
+"""MCPToolset wrapper for McpToolConfig.
+
+Registered from ``initrunner.agent.tools.mcp``, which keeps this module (and
+the ``mcp`` extra it needs) out of a core install until a role uses it.
+"""
 
 from __future__ import annotations
 
-from pydantic_ai.mcp import MCPToolset
+from pydantic_ai.mcp import MCPToolset  # type: ignore[import-not-found]
 from pydantic_ai.toolsets.abstract import AbstractToolset
 
 from initrunner.agent.schema.tools import McpToolConfig
-from initrunner.agent.tools._registry import ToolBuildContext, register_tool
+from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.mcp._transport import build_transport
 
 
-@register_tool("mcp", McpToolConfig)
 def build_mcp_toolset(
     config: McpToolConfig,
     ctx: ToolBuildContext,

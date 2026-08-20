@@ -10,7 +10,7 @@ import typer
 from rich.panel import Panel
 from rich.table import Table
 
-from initrunner.cli._helpers import console
+from initrunner.cli._helpers import console, print_error
 from initrunner.cli._options import SkillDirOption
 
 
@@ -220,7 +220,7 @@ def doctor(
             try:
                 group = load_group_definition(path)
             except GroupLoadError as e:
-                console.print(f"[red]Error:[/red] {e}")
+                print_error(e)
                 raise typer.Exit(1) from e
             console.print(
                 f"\n[yellow]{path} is a group of agents.[/yellow] "

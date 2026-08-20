@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 
 from pydantic_ai.toolsets.function import FunctionToolset
 
+from initrunner._compat import require_vector
 from initrunner.agent._urls import SSRFBlocked, check_domain_filter
 from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext, register_tool
@@ -82,6 +83,7 @@ def build_web_scraper_toolset(
     ctx: ToolBuildContext,
 ) -> FunctionToolset:
     """Build a FunctionToolset that scrapes a page and stores it in the document store."""
+    require_vector()  # every scrape writes to a LanceDB document store
     store_config = make_store_config(ctx.role)
     sandbox = ctx.role.spec.security.tools
 

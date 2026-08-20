@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
-from initrunner.cli._helpers import console
+from initrunner.cli._helpers import console, print_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +22,7 @@ def load_roster_or_exit(group_file: Path) -> Roster:
     try:
         return load_group(group_file)
     except GroupLoadError as e:
-        console.print(f"[red]Error:[/red] {e}")
+        print_error(e)
         raise typer.Exit(1) from e
 
 

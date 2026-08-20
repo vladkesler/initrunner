@@ -21,12 +21,11 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,mcp,retries]>=2.30.0",
+    "pydantic-ai-slim[openai,retries]>=2.30.0",
     "pydantic>=2.12",
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
     "rich>=14.3.2",
-    "lancedb>=0.29.2",
     "watchfiles>=1.1.1",
     "croniter>=6.0.0",
     "beautifulsoup4>=4.13.2",
@@ -34,12 +33,20 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "jinja2>=3.1",
     "initguard>=2026.3.3",
-    "fastmcp>=3.3,<4",
     "anyio>=4.13.0",
+    # Imported at module level by server/app.py, triggers/webhook.py and
+    # middleware.py. They used to arrive transitively via the MCP SDK.
+    "starlette>=0.46.2",
+    "uvicorn>=0.42.0",
 ]
 
 [project.optional-dependencies]
-ingest = ["pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
+# MCP client + server stack. Not in the core install: importing pydantic_ai
+# eagerly imports its MCP capability, which imports fastmcp, for ~26% of RSS.
+mcp = ["pydantic-ai-slim[mcp]>=2.30.0", "fastmcp>=3.3,<4"]
+# Vector store behind ingestion, vector memory and the web_scraper tool.
+vector = ["lancedb>=0.29.2"]
+ingest = ["initrunner[vector]", "pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
 local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
@@ -60,8 +67,8 @@ telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]
 slack = ["slack-sdk>=3.27"]
 channels = ["python-telegram-bot>=21.0", "discord.py>=2.3", "slack-sdk>=3.27"]
-dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0"]
-desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "pywebview>=6.1"]
+dashboard = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "python-multipart>=0.0.20"]
+desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "python-multipart>=0.0.20", "pywebview>=6.1"]
 a2a = ["a2a-sdk[http-server]>=1.1.2", "uvicorn>=0.42.0"]
 vault = ["cryptography>=48"]
 vault-keyring = ["cryptography>=48", "keyring>=25"]
@@ -69,9 +76,13 @@ recommended = [
     "initrunner[search]",
     "initrunner[ingest]",
     "initrunner[dashboard]",
+    "initrunner[mcp]",
+    "initrunner[vector]",
 ]
 all = [
     "initrunner[ingest]",
+    "initrunner[mcp]",
+    "initrunner[vector]",
     "initrunner[search]",
     "initrunner[audio]",
     "initrunner[safety]",
