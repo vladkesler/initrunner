@@ -50,6 +50,91 @@ class DiscoveredTeam:
 _SKIP_DIRS = SKIP_DIRS
 
 
+_INITRUNNER_API_VERSIONS = {"initrunner/v1"}
+_INITRUNNER_KINDS = {"Agent", "Team", "Flow"}
+
+
+def project_marker(directory: Path) -> Path | None:
+    """Return the directory's designated role file, when it has one.
+
+    ``agent.yaml`` or ``role.yaml`` names the one agent a directory is about,
+    and it wins over anything else in the directory.
+    """
+    for default_name in ("agent.yaml", "role.yaml"):
+        default = directory / default_name
+        if default.is_file():
+            return default
+    return None
+
+
+def _top_level_yaml(directory: Path) -> list[Path]:
+    """Every ``*.yaml`` / ``*.yml`` file directly inside *directory*, sorted."""
+    files = [f for ext in ("*.yaml", "*.yml") for f in directory.glob(ext) if f.is_file()]
+    return sorted(files)
+
+
+def top_level_documents(directory: Path) -> list[Path]:
+    """Return the InitRunner documents directly inside *directory*, sorted.
+
+    Deliberately not recursive. Nested directories hold the parts other
+    documents are built from -- a team's personas, a flow's steps -- and those
+    are not standalone agents someone meant to run.
+
+    Files that are not YAML mappings, or not recognisable InitRunner documents,
+    are skipped rather than reported: a directory is allowed to contain other
+    YAML. See :func:`unreadable_yaml_files` for the files this could not even
+    parse, which a caller treating the directory as a group should report.
+    """
+    import yaml
+
+    from initrunner.agent.schema.document import DocumentClass, classify_mapping
+
+    documents: list[Path] = []
+    for f in _top_level_yaml(directory):
+        try:
+            with open(f) as fh:
+                data = yaml.safe_load(fh)
+            if not isinstance(data, dict):
+                continue
+            classification = classify_mapping(data)
+            if classification.document_class in {
+                DocumentClass.FLAT_AGENT,
+                DocumentClass.ENVELOPE_AGENT,
+                DocumentClass.ENVELOPE_TEAM,
+                DocumentClass.ENVELOPE_FLOW,
+            }:
+                documents.append(f)
+            elif (
+                data.get("apiVersion") in _INITRUNNER_API_VERSIONS
+                and data.get("kind") in _INITRUNNER_KINDS
+            ):
+                documents.append(f)
+        except Exception:
+            continue
+
+    return documents
+
+
+def unreadable_yaml_files(directory: Path) -> list[tuple[Path, str]]:
+    """Top-level YAML files that could not be parsed at all, with the reason.
+
+    A file whose contents do not parse cannot be classified, so
+    :func:`top_level_documents` cannot see it. Somewhere that would silently
+    drop an agent -- serving a directory as a group -- the caller reports these
+    instead.
+    """
+    import yaml
+
+    broken: list[tuple[Path, str]] = []
+    for f in _top_level_yaml(directory):
+        try:
+            with open(f) as fh:
+                yaml.safe_load(fh)
+        except (yaml.YAMLError, OSError, UnicodeDecodeError) as e:
+            broken.append((f, str(e).replace("\n", " ")))
+    return broken
+
+
 def _scan_yaml_kind(dirs: list[Path], kind: str) -> Iterator[Path]:
     """Yield paths to YAML files matching ``apiVersion: initrunner/v1`` and the given kind.
 

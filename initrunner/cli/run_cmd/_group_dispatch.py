@@ -129,7 +129,11 @@ def dispatch_group_serve(
         }
         console.print(f"Serving group [cyan]{roster.name}[/cyan] at http://{host}:{port}")
         for key, member in prepared.items():
-            console.print(f"  Model ID: {key} [dim]({member.role.metadata.name})[/dim]")
+            # A directory group keys on the role's own name, so the parenthetical
+            # would just repeat it.
+            name = member.role.metadata.name
+            suffix = "" if name == key else f" [dim]({name})[/dim]"
+            console.print(f"  Model ID: {key}{suffix}")
         console.print(f"  Health:   http://{host}:{port}/health")
         console.print(f"  Models:   http://{host}:{port}/v1/models")
         if generated_key is not None:

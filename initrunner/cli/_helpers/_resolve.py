@@ -14,9 +14,6 @@ from initrunner.cli._helpers._console import console, print_error
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
 
-_INITRUNNER_API_VERSIONS = {"initrunner/v1"}
-_INITRUNNER_KINDS = {"Agent", "Team", "Flow"}
-
 
 def resolve_role_path(path: Path) -> Path:
     """Resolve a directory, file, or installed role name to its role YAML file.
@@ -32,45 +29,21 @@ def resolve_role_path(path: Path) -> Path:
 
     When *path* is neither a file nor a directory, try to resolve it as an
     installed role name via the registry.
+
+    ``initrunner run`` is the one caller that treats a directory of agents as a
+    group instead of an error; see :func:`resolve_run_target`.
     """
+    from initrunner.services.discovery import project_marker, top_level_documents
+
     if path.is_file():
         return path
 
     if path.is_dir():
-        for default_name in ("agent.yaml", "role.yaml"):
-            default = path / default_name
-            if default.is_file():
-                return default
+        marker = project_marker(path)
+        if marker is not None:
+            return marker
 
-        import yaml
-
-        from initrunner.agent.schema.document import DocumentClass, classify_mapping
-
-        candidates: list[Path] = []
-        for ext in ("*.yaml", "*.yml"):
-            for f in path.glob(ext):
-                if not f.is_file():
-                    continue
-                try:
-                    with open(f) as fh:
-                        data = yaml.safe_load(fh)
-                    if not isinstance(data, dict):
-                        continue
-                    classification = classify_mapping(data)
-                    if classification.document_class in {
-                        DocumentClass.FLAT_AGENT,
-                        DocumentClass.ENVELOPE_AGENT,
-                        DocumentClass.ENVELOPE_TEAM,
-                        DocumentClass.ENVELOPE_FLOW,
-                    }:
-                        candidates.append(f)
-                    elif (
-                        data.get("apiVersion") in _INITRUNNER_API_VERSIONS
-                        and data.get("kind") in _INITRUNNER_KINDS
-                    ):
-                        candidates.append(f)
-                except Exception:
-                    continue
+        candidates = top_level_documents(path)
 
         if len(candidates) == 1:
             return candidates[0]
@@ -231,10 +204,24 @@ def preflight_validate_or_exit(path: Path) -> None:
 def resolve_run_target(target: Path) -> tuple[Path, str]:
     """Resolve a run target to *(resolved_path, kind)*.
 
-    Explicit files may resolve to any kind (Agent, Team, Flow).
-    Directory and installed-name resolution stays Agent/Team-only via
-    :func:`resolve_role_path`.
+    Explicit files may resolve to any kind (Agent, Team, Flow, Group).
+
+    A directory of agents is a group: several agents sitting next to each
+    other, with no ``agent.yaml`` saying which one the directory is about, is
+    exactly what a group file describes, so ``run`` reads it as one instead of
+    refusing to choose. The directory itself is returned as the target.
+
+    A directory holding a team or a flow alongside an agent keeps the old
+    "pass one explicitly" error: those documents reference agents, and serving
+    a team's personas as standalone models is not what anyone meant.
     """
+    from initrunner.services.discovery import project_marker, top_level_documents
+
+    if target.is_dir() and project_marker(target) is None:
+        documents = top_level_documents(target)
+        if len(documents) > 1 and all(detect_yaml_kind(d) == "Agent" for d in documents):
+            return target, "Group"
+
     resolved = resolve_role_path(target)
     kind = detect_yaml_kind(resolved)
     return resolved, kind
