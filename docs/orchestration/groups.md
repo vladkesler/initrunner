@@ -18,6 +18,51 @@ There is no orchestration here. Members never hand off to each other, never see 
 
 Use it when you have several unrelated agents and one place to put them: a container image, a Kubernetes Deployment, a laptop. If instead the agents should work on a task together, you want [team mode](team_mode.md) (one shot, personas hand off) or [flows](flow.md) (long-running, explicit edges).
 
+## A directory of agents is already a group
+
+You do not need the file to get the packing. Point `run` at a directory holding
+several agent files and it serves all of them from one process:
+
+```bash
+$ ls agents/
+intake.yaml  researcher.yaml  writer.yaml
+
+$ initrunner run agents/ --serve
+Serving group agents at http://127.0.0.1:8000
+  Model ID: intake
+  Model ID: researcher
+  Model ID: writer
+```
+
+The rule: a directory with no `agent.yaml` or `role.yaml`, holding **two or more
+top-level agent documents and no team, flow or group document beside them**, is
+a group. Other files are ignored, YAML or not. `--serve`, `--daemon`,
+`--agent <name>` and `--sense` all work exactly as they do on a group file.
+
+- **Top-level only.** Nested directories are ignored, because that is where a
+  team's personas and a flow's steps live, and those are not agents anyone meant
+  to serve on their own.
+- **Members are keyed by the role's own `name:`**, which is the model ID a single
+  agent already gets from `--serve`. Moving an agent into a directory does not
+  change how clients address it. (A group *file* keys on the YAML key instead, so
+  it can name a member something other than the role's name.)
+- **One team or flow file in the directory and it stays an error** -- `pass one
+  explicitly` -- rather than serving that document's component agents.
+- **All or nothing.** One member that fails to load, or two roles sharing a
+  `name:`, fails the whole thing rather than quietly serving the rest. A
+  top-level YAML file that does not parse fails it too: nothing can tell
+  whether an agent was hiding in it. This is why a directory of unrelated
+  examples is not a deployable group -- `examples/roles` in this repository
+  holds roles that need extras and a specific container runtime, so serving
+  the whole directory fails on the first one that cannot load.
+- **A group file beside agents keeps the old error.** Two documents where one
+  is a group is ambiguous, so `initrunner run` asks you to pass one
+  explicitly rather than guessing which the directory is about.
+
+Write the file when you need something a directory cannot say: `shared_memory`,
+`shared_documents`, group-level `observability`, listener `security`, member keys
+that differ from role names, or members that live in different directories.
+
 ## How a file becomes a group
 
 The shape of the file decides, so there is no `kind:` to set:
@@ -128,7 +173,7 @@ $ initrunner validate desk.yaml
 
 ## Deploying with Kubernetes or Argo CD
 
-Bake or mount the group file next to its role files and point the container at the group. Nothing about the image is group-specific: it is the normal InitRunner image with a different argument.
+Bake or mount the group file next to its role files and point the container at the group. Nothing about the image is group-specific: it is the normal InitRunner image with a different argument. Without a group file, point it at the directory instead -- `args: ["run", "/agents", "--serve", "--host", "0.0.0.0"]` -- and adding an agent is one new file in the ConfigMap.
 
 ```yaml
 apiVersion: apps/v1
@@ -145,7 +190,7 @@ spec:
     spec:
       containers:
         - name: initrunner
-          image: ghcr.io/initrunner/initrunner:latest
+          image: ghcr.io/vladkesler/initrunner:latest
           args: ["run", "/agents/desk.yaml", "--serve", "--host", "0.0.0.0"]
           env:
             - name: INITRUNNER_API_KEY
@@ -158,6 +203,9 @@ spec:
             - containerPort: 8000
           readinessProbe:
             httpGet: {path: /health, port: 8000}
+          resources:
+            requests: {memory: 192Mi}
+            limits: {memory: 256Mi}
           volumeMounts:
             - name: agents
               mountPath: /agents

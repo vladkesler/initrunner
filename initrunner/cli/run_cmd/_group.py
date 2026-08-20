@@ -17,10 +17,11 @@ if TYPE_CHECKING:
 
 
 def load_roster_or_exit(group_file: Path) -> Roster:
-    from initrunner.group.loader import GroupLoadError, load_group
+    """Load a group file, or a directory of agent files."""
+    from initrunner.group.loader import GroupLoadError, load_roster
 
     try:
-        return load_group(group_file)
+        return load_roster(group_file)
     except GroupLoadError as e:
         print_error(e)
         raise typer.Exit(1) from e

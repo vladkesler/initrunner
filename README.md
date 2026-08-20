@@ -322,7 +322,7 @@ Sense routing picks the right target per message using keyword scoring first (ze
 
 ## Agents that ship together but don't work together
 
-Not every set of agents is a pipeline. Sometimes you just have three agents and one place to put them. List them and you get a group: no handoffs, no coordinator, no run order.
+Not every set of agents is a pipeline. Sometimes you just have three agents and one place to put them. Put them in a directory and `initrunner run agents/ --serve` runs all three in one process. Name them in a file when you want to say more than which agents ship together: no handoffs, no coordinator, no run order either way.
 
 ```yaml
 name: desk

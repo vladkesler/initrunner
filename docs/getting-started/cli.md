@@ -24,6 +24,10 @@ All commands that accept a role path also accept a **directory** or an **install
 
 This means `initrunner run .` works from inside an agent directory, and `initrunner run code-reviewer` works after `initrunner install alice/code-reviewer`.
 
+`run` adds one step at 2d: when *every* top-level match is an Agent, the directory
+is a [group](../orchestration/groups.md) and all of them run in one process. Every
+other command still wants a single file.
+
 ## The full surface area, when you need it
 
 | Command | Description |
@@ -125,7 +129,7 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | Flag | Description |
 |------|-------------|
 | `-p, --prompt TEXT` | Single prompt to send |
-| `--agent NAME` | Which agent to run, for a [group of agents](../orchestration/groups.md). Without it, a group lists its members and exits 1. |
+| `--agent NAME` | Which agent to run, for a [group of agents](../orchestration/groups.md) -- a group file or a directory of agent files. Without it, a group lists its members and exits 1. |
 | `-i, --interactive` | Interactive REPL mode |
 | `-a, --autonomous` | Autonomous agentic loop mode (requires `-p`) |
 | `--max-iterations N` | Override max iterations for autonomous mode |
@@ -195,12 +199,13 @@ Combine flags: `initrunner run role.yaml -p "Hello!" -i` sends a prompt then con
 
 ### Running one agent from a group
 
-A [group file](../orchestration/groups.md) lists agents that deploy together but run independently, so `run` needs to know which one you mean:
+A [group](../orchestration/groups.md) -- a group file, or a directory holding several agent files -- lists agents that deploy together but run independently, so `run` needs to know which one you mean:
 
 ```bash
 initrunner run desk.yaml                        # lists the members, exits 1
 initrunner run desk.yaml --agent intake -p "…"  # runs that member
 initrunner run desk.yaml --agent intake -i      # every single-agent flag works
+initrunner run agents/ --agent intake -p "…"    # same, for a directory of agents
 ```
 
 A member picked this way behaves exactly as if you had run its own file, plus whatever the group shares. Flags that steer a single run (`-i`, `-a`, `--attach`, `--report`, `--resume`, `--var`) need `--agent`.
