@@ -50,8 +50,14 @@ class GroupDefinition:
 
     @property
     def source_dir(self) -> Path:
-        """Directory the group file lives in; shared paths resolve against it."""
-        return self.source_path.parent if self.source_path else Path.cwd()
+        """Directory shared paths resolve against.
+
+        For a group file that is the directory holding it; a directory group's
+        ``source_path`` is the directory itself.
+        """
+        if self.source_path is None:
+            return Path.cwd()
+        return self.source_path if self.source_path.is_dir() else self.source_path.parent
 
 
 @dataclass(frozen=True)

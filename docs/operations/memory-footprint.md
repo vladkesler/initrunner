@@ -64,6 +64,8 @@ number that matters for capacity planning:
   [group](../orchestration/groups.md) in one process, each addressable as its
   own OpenAI model ID. This is the cheapest way to run agents that have
   nothing to do with each other. `--daemon` does the same for their triggers.
+  A directory of agent files is a group too, so `initrunner run agents/ --serve`
+  needs no manifest at all.
 - **Flows**: `initrunner flow up flow.yaml` runs every agent in the flow
   inside one process on a shared event loop. A five-agent flow is one
   ~200 MB process, not five.

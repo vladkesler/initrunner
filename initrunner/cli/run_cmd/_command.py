@@ -358,21 +358,32 @@ def run(
 
     resolved, kind = resolve_run_target(role_file)
     role_file = resolved
+    # A directory of agents is a group whose target is the directory itself.
+    # Everything below that reads one YAML document skips it; its members were
+    # each loaded and validated by the group loader, atomically.
     from initrunner.services.migrate import envelope_warning_for
 
-    warning = envelope_warning_for(role_file)
-    if warning:
-        console.print(f"[yellow]Warning:[/yellow] {warning}")
+    if not role_file.is_dir():
+        warning = envelope_warning_for(role_file)
+        if warning:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
 
     # --- --save: copy starter to local directory (no prerequisites needed) ---
     if save is not None:
+        if role_file.is_dir():
+            console.print(
+                f"[red]Error:[/red] --save copies one role file, and {role_file} is a"
+                " directory of agents. Pass the agent file you want."
+            )
+            raise typer.Exit(1)
         _handle_save(role_file, save)
         return
 
     # --- Starter: prerequisites + model auto-detect ---
     from initrunner.cli._helpers import prepare_starter
 
-    effective_model = prepare_starter(role_file, model) or model
+    starter_model = None if role_file.is_dir() else prepare_starter(role_file, model)
+    effective_model = starter_model or model
 
     # --- Removed kind rejection ---
     if kind == "Pipeline":
@@ -452,7 +463,8 @@ def run(
     #     skill resolution, model resolution, or API calls.  Covers all
     #     downstream dispatches (Agent/Team/Flow, serve/bot/daemon).  Runs
     #     after the cheap flag checks above so flag errors fire first.
-    preflight_validate_or_exit(role_file)
+    if not role_file.is_dir():
+        preflight_validate_or_exit(role_file)
 
     # --- Kind-based dispatch ---
     if kind == "Team":
