@@ -92,10 +92,10 @@ class TestLoadRole:
 
 class TestBuildModel:
     def test_standard_provider_returns_retrying_model(self, monkeypatch):
-        """openai builds an explicit OpenAIResponsesModel whose httpx client
+        """openai builds an explicit OpenAIResponsesModel whose httpx2 client
         carries the tenacity retry transport, preserving the model name."""
         from pydantic_ai.models.openai import OpenAIResponsesModel
-        from pydantic_ai.retries import AsyncTenacityTransport
+        from pydantic_ai.retries import AsyncHTTPX2TenacityTransport
 
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         mc = ModelConfig(provider="openai", name="gpt-5-mini")
@@ -104,7 +104,7 @@ class TestBuildModel:
         assert result.model_name == "gpt-5-mini"
         assert result.system == "openai"
         transport = result.client._client._transport
-        assert isinstance(transport, AsyncTenacityTransport)
+        assert isinstance(transport, AsyncHTTPX2TenacityTransport)
 
     def test_missing_sdk_falls_back_to_string(self, monkeypatch):
         """When a provider SDK is not installed, fall back to the plain
@@ -337,10 +337,11 @@ class TestHttpRetryConfig:
 
         real = executor_retry.build_retrying_async_client
 
-        def fake_builder(*, attempts, max_wait):
+        def fake_builder(provider, *, attempts, max_wait):
+            captured["provider"] = provider
             captured["attempts"] = attempts
             captured["max_wait"] = max_wait
-            return real(attempts=attempts, max_wait=max_wait)
+            return real(provider, attempts=attempts, max_wait=max_wait)
 
         monkeypatch.setattr(executor_retry, "build_retrying_async_client", fake_builder)
 
@@ -354,7 +355,7 @@ class TestHttpRetryConfig:
         self._patch_capture(monkeypatch, captured)
         mc = ModelConfig(provider="openai", name="gpt-5-mini")
         loader._build_model(mc, ExecutionConfig(http_retries=7, http_retry_max_wait=12.0))
-        assert captured == {"attempts": 7, "max_wait": 12.0}
+        assert captured == {"provider": "openai", "attempts": 7, "max_wait": 12.0}
 
     def test_default_retry_knobs_when_no_execution(self, monkeypatch):
         from initrunner.agent import loader
@@ -363,7 +364,7 @@ class TestHttpRetryConfig:
         captured = {}
         self._patch_capture(monkeypatch, captured)
         loader._build_model(ModelConfig(provider="openai", name="gpt-5-mini"))
-        assert captured == {"attempts": 3, "max_wait": 60.0}
+        assert captured == {"provider": "openai", "attempts": 3, "max_wait": 60.0}
 
 
 class TestOverridePreservesFallback:

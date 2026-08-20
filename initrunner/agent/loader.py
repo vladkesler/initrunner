@@ -120,7 +120,7 @@ def validate_capability_tool_conflicts(role: RoleDefinition) -> None:
             )
 
 
-# Providers whose SDKs route through httpx and accept an injected client.
+# Providers whose SDKs accept an injected async client.
 # bedrock (boto3) and xai (gRPC) keep their SDKs' native retry handling and
 # are built as plain ``provider:name`` strings.
 _HTTPX_PROVIDERS = frozenset({"openai", "anthropic", "google", "groq", "mistral", "cohere"})
@@ -198,9 +198,9 @@ def _build_single_model(
     This is the single construction point for both the primary model and any
     FallbackModel entries.  API keys are resolved and injected into
     ``os.environ`` here, so every Model-like returned by this function is
-    immediately usable. Providers that route through httpx get an
-    ``AsyncTenacityTransport`` client (backoff + Retry-After on 429/5xx);
-    bedrock and xai keep their SDKs' native retry handling.
+    immediately usable. Providers that take an injected client get a retrying
+    one (backoff + Retry-After on 429/5xx); bedrock and xai keep their SDKs'
+    native retry handling.
     """
     from initrunner.agent.executor_retry import build_retrying_async_client
     from initrunner.credentials import get_resolver
@@ -234,7 +234,9 @@ def _build_single_model(
                 return _build_retrying_provider_model(
                     model_config,
                     build_retrying_async_client(
-                        attempts=http_retries, max_wait=http_retry_max_wait
+                        model_config.provider,
+                        attempts=http_retries,
+                        max_wait=http_retry_max_wait,
                     ),
                     resolved_key,
                 )
@@ -282,13 +284,13 @@ def _build_single_model(
                 base_url,
             )
 
-    # Custom OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter, ...) also
-    # route through httpx, so they get the same retrying transport.
+    # Custom OpenAI-compatible endpoints (Ollama, vLLM, OpenRouter, ...) go
+    # through OpenAIProvider, so they get the same retrying transport it does.
     provider = OpenAIProvider(
         base_url=base_url,
         api_key=api_key,
         http_client=build_retrying_async_client(
-            attempts=http_retries, max_wait=http_retry_max_wait
+            "openai", attempts=http_retries, max_wait=http_retry_max_wait
         ),
     )
 

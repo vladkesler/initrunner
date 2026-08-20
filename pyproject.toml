@@ -21,7 +21,10 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,retries]>=2.30.0",
+    "pydantic-ai-slim[openai,retries]>=2.32.1",
+    # The provider SDKs moved to httpx2; executor_retry builds the retrying
+    # client the SDKs are handed, so it has to speak the same library.
+    "httpx2>=2.12.0",
     "pydantic>=2.12",
     "typer>=0.21.1",
     "pyyaml>=6.0.3",
@@ -43,7 +46,7 @@ dependencies = [
 [project.optional-dependencies]
 # MCP client + server stack. Not in the core install: importing pydantic_ai
 # eagerly imports its MCP capability, which imports fastmcp, for ~26% of RSS.
-mcp = ["pydantic-ai-slim[mcp]>=2.30.0", "fastmcp>=3.3,<4"]
+mcp = ["pydantic-ai-slim[mcp]>=2.32.1", "fastmcp>=3.3,<4"]
 # Vector store behind ingestion, vector memory and the web_scraper tool.
 vector = ["lancedb>=0.29.2"]
 ingest = ["initrunner[vector]", "pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
@@ -51,17 +54,17 @@ local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
 safety = ["better-profanity>=0.7.0"]
-anthropic = ["pydantic-ai-slim[anthropic]>=2.30.0"]
-google = ["pydantic-ai-slim[google]>=2.30.0"]
-groq = ["pydantic-ai-slim[groq]>=2.30.0"]
-mistral = ["pydantic-ai-slim[mistral]>=2.30.0"]
-all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.30.0"]
+anthropic = ["pydantic-ai-slim[anthropic]>=2.32.1"]
+google = ["pydantic-ai-slim[google]>=2.32.1"]
+groq = ["pydantic-ai-slim[groq]>=2.32.1"]
+mistral = ["pydantic-ai-slim[mistral]>=2.32.1"]
+all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.32.1"]
 # OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
-    "pydantic-evals>=2.30.0",
+    "pydantic-evals>=2.32.1",
 ]
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]
