@@ -1,7 +1,5 @@
 # Changelog
 
-## Unreleased
-
 ### Changed (dependency layout)
 - **MCP and the vector store are extras now.** Importing `pydantic_ai` imports its MCP capability, which imports `pydantic_ai.mcp`, which imports `fastmcp` -- eagerly, whether or not a role uses MCP. Measured on CPython 3.12/Linux: a built agent is 109 MB resident with fastmcp installed and 81 MB without it, so a quarter of every InitRunner process was an MCP client nobody asked for. LanceDB is lazy already but costs ~300 MB on disk, 40% of the installed tree. Both moved out of the core dependencies into `mcp` and `vector`.
   - **Nothing changes for `[recommended]` (the installer default), `[all]`, or the `:latest` Docker image** -- both extras are in all three. The change is visible only to `pip install initrunner` / `--extras none`, which is now genuinely minimal: OpenAI and Ollama models, every dependency-free built-in tool, triggers, flows, teams, groups, and the `--serve` API.
