@@ -207,7 +207,8 @@ def service_status(
     if view.unverifiable_message:
         console.print(f"  [yellow]warning:[/yellow] {view.unverifiable_message}")
     if s.process and view.observation is ProcessObservation.VERIFIED_RUNNING:
-        console.print(f"  daemon: running  pid={s.process.pid}")
+        rss = f"  rss={view.rss_mb} MB" if view.rss_mb is not None else ""
+        console.print(f"  daemon: running  pid={s.process.pid}{rss}")
     elif s.status.value == "running":
         console.print(f"  daemon: {view.observation.value}")
     else:

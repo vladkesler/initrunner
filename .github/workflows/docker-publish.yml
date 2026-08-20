@@ -11,6 +11,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      version-slim: ${{ steps.meta-slim.outputs.version }}
 
     steps:
       - name: Checkout
@@ -42,9 +45,13 @@ jobs:
           images: |
             ghcr.io/vladkesler/initrunner
             docker.io/vladkesler/initrunner
+          # Nothing implicit: latest=auto would also add `latest`, and it is
+          # declared below instead so both images follow the same rule.
+          flavor: |
+            latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev') }}
 
       - name: Build and push
         uses: docker/build-push-action@v7
@@ -57,27 +64,157 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # The core runtime plus the web UI: no MCP client stack, no vector store,
+      # which is most of the install size and about a quarter of the RSS.
+      - name: Extract metadata (slim)
+        id: meta-slim
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ghcr.io/vladkesler/initrunner
+            docker.io/vladkesler/initrunner
+          # latest=auto (the default) would add an unsuffixed `latest` here,
+          # because this workflow only runs on semver tags -- and the slim
+          # build runs second, so it would replace the [all] image on both
+          # registries with the dashboard-only one.
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},suffix=-slim
+            type=raw,value=slim,enable=${{ !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev') }}
+
+      - name: Build and push (slim)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            EXTRAS=dashboard
+          tags: ${{ steps.meta-slim.outputs.tags }}
+          labels: ${{ steps.meta-slim.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Every step below addresses the image by the immutable version tag this run
+  # just pushed, never by `latest`/`slim`. A moving tag would still resolve to
+  # the previous release if a push had failed, and the job would go green
+  # having tested an image this run did not build.
+  smoke:
+    name: Smoke test ${{ matrix.name }}
+    needs: docker
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: full
+            tag: ${{ needs.docker.outputs.version }}
+            port: 18080
+            # Present in [all], absent from the core+dashboard build. Asserting
+            # both directions is what actually proves the two images differ.
+            extras: present
+          - name: slim
+            tag: ${{ needs.docker.outputs.version-slim }}
+            port: 18081
+            extras: absent
+    steps:
+      - name: Pull the published image
+        run: docker pull "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}"
+
+      - name: CLI runs
+        run: docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" initrunner --version
+
+      - name: Allocator cap is set
+        run: |
+          docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+            sh -c 'test "$MALLOC_ARENA_MAX" = 2'
+
+      # Proves the serve stack and the seeded examples work in this build --
+      # the slim image has no MCP client stack and no vector store, so anything
+      # that quietly depended on them fails here rather than for a user.
+      - name: Serve a seeded example
+        run: |
+          docker run -d --name "smoke-${{ matrix.name }}" \
+            -e OPENAI_API_KEY=sk-test \
+            -p ${{ matrix.port }}:8000 \
+            "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+            initrunner run /opt/initrunner/example-roles/hello-world.yaml \
+              --serve --host 0.0.0.0 --api-key test
+
+          for attempt in $(seq 1 30); do
+            body=$(curl -fsS "http://127.0.0.1:${{ matrix.port }}/health" 2>/dev/null || true)
+            if [ "$body" = '{"status":"ok"}' ]; then
+              echo "healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::server never became healthy"
+          docker logs "smoke-${{ matrix.name }}"
+          exit 1
+
+      # The two tags are only worth publishing separately if they really
+      # carry different stacks. This also catches a tagging mistake that
+      # pushed one build over the other's tag.
+      - name: Extras match the tag
+        run: |
+          if [ "${{ matrix.extras }}" = "present" ]; then
+            docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+              python -c 'import fastmcp, lancedb'
+          else
+            if docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+                 python -c 'import fastmcp' 2>/dev/null; then
+              echo "::error::fastmcp is installed in :${{ matrix.tag }}"
+              exit 1
+            fi
+            if docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+                 python -c 'import lancedb' 2>/dev/null; then
+              echo "::error::lancedb is installed in :${{ matrix.tag }}"
+              exit 1
+            fi
+          fi
+
+      - name: Every seeded example validates
+        run: |
+          docker run --rm "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
+            sh -c 'for f in /opt/initrunner/example-roles/*.yaml; do
+                     initrunner validate "$f" || exit 1
+                   done'
+
+      - name: Stop the container
+        if: always()
+        run: docker rm -f "smoke-${{ matrix.name }}" || true
+
   scan:
-    name: Scan container image
+    name: Scan ${{ matrix.name }}
     needs: docker
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: full
+            tag: ${{ needs.docker.outputs.version }}
+          - name: slim
+            tag: ${{ needs.docker.outputs.version-slim }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Run Trivy on published image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: "ghcr.io/vladkesler/initrunner:latest"
+          image-ref: "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}"
           format: "sarif"
-          output: "trivy-image.sarif"
+          output: "trivy-image-${{ matrix.name }}.sarif"
           severity: "CRITICAL,HIGH"
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
-          sarif_file: "trivy-image.sarif"
-          category: "trivy-image"
+          sarif_file: "trivy-image-${{ matrix.name }}.sarif"
+          category: "trivy-image-${{ matrix.name }}"

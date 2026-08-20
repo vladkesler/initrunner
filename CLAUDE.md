@@ -52,6 +52,7 @@ deploy/                  # Docker entrypoint, fly.toml
 | `uv run ty check` | type check |
 | `scripts/release.sh <version>` | bump version, add CHANGELOG header, local commit + tag |
 | `scripts/build-dashboard.sh` | build the SvelteKit dashboard into the package |
+| `python scripts/measure_rss.py` | regenerate the RSS tables in `docs/operations/memory-footprint.md` (Linux) |
 
 The dashboard frontend (`dashboard/`) uses pnpm, never npm.
 </important>

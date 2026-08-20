@@ -40,7 +40,7 @@ initrunner service stop collector --purge
 | `service list` | Catalog + local status |
 | `service info <slug>` | Params, requires, defaults |
 | `service start <slug> [primary]` | Materialize + start daemon |
-| `service status <slug>` | State, process health, last run, cost |
+| `service status <slug>` | State, process health (with the daemon's RSS), last run, cost |
 | `service run <slug>` | One-shot tick (briefly stops daemon if running) |
 | `service stop [--purge]` | Stop daemon; `--purge` deletes instance dir |
 | `service logs <slug>` | Daemon log tail |

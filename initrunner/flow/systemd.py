@@ -49,6 +49,9 @@ RestartSec=10
 
 # Environment — shell env vars (e.g. from .bashrc) are NOT inherited.
 # Add secrets to the .env file or use --env-file during install.
+# Cap glibc's per-thread malloc arenas: a flow bridges sync and async with
+# worker threads, and uncapped arenas inflate RSS well past the live heap.
+Environment=MALLOC_ARENA_MAX=2
 EnvironmentFile=-{working_dir}/.env
 EnvironmentFile=-{home}/.initrunner/.env
 {extra_env_file}

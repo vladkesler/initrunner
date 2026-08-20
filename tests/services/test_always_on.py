@@ -368,6 +368,38 @@ def test_status_not_started(home: Path) -> None:
         status("nope")
 
 
+@pytest.mark.skipif(not os.path.exists("/proc/self/status"), reason="VmRSS is Linux-only")
+def test_status_reports_daemon_rss(catalog: Path, home: Path, fake_daemon) -> None:
+    """Sizing a fleet starts with knowing what one service actually costs."""
+    start_service("probe", params={"target": "z"}, extra_dirs=[catalog])
+
+    view = status("probe")
+
+    assert view.observation is ProcessObservation.VERIFIED_RUNNING
+    assert view.rss_mb is not None
+    assert view.rss_mb > 0
+
+    stop_service("probe", purge=True)
+
+
+def test_status_omits_rss_for_an_unverified_process(
+    catalog: Path, home: Path, fake_daemon, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unverified PID may be a recycled process; do not report its memory."""
+    start_service("probe", params={"target": "z"}, extra_dirs=[catalog])
+    monkeypatch.setattr(
+        "initrunner.services.always_on.observe_process",
+        lambda _p: ProcessObservation.UNVERIFIABLE,
+    )
+
+    view = status("probe")
+
+    assert view.rss_mb is None
+
+    monkeypatch.undo()
+    stop_service("probe", purge=True)
+
+
 def test_check_requires_search_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     entry = get_catalog_entry("collector")
     real_import = __import__

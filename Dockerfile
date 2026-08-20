@@ -74,6 +74,11 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Persistent state directory
 ENV INITRUNNER_HOME=/data
+# Sync and async execution are bridged with worker threads, and glibc gives each
+# thread its own malloc arena -- which inflates RSS well past the live heap in a
+# container that is billed on RSS. Two arenas is the standard cap at this thread
+# count; override with -e MALLOC_ARENA_MAX=... if you have measured otherwise.
+ENV MALLOC_ARENA_MAX=2
 RUN mkdir -p /data
 
 # OCI labels
@@ -84,12 +89,11 @@ LABEL org.opencontainers.image.title="InitRunner" \
 
 EXPOSE 8000 8100
 
-# Seed example roles for cloud/Docker first-boot
+# Seed example roles for cloud/Docker first-boot. Only roles that run on a core
+# install: the image is built with EXTRAS as an argument, and a seeded example
+# that needs search, vector or audio is a broken first impression in a slim build.
 COPY examples/roles/hello-world.yaml \
-     examples/roles/web-searcher.yaml \
-     examples/roles/memory-assistant.yaml \
      examples/roles/code-reviewer.yaml \
-     examples/roles/full-tools-assistant.yaml \
      /opt/initrunner/example-roles/
 
 COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

@@ -27,10 +27,17 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - INITRUNNER_DASHBOARD_API_KEY=${INITRUNNER_DASHBOARD_API_KEY:-}
+    # Sized for the default command below: the dashboard measures ~168 MiB
+    # here, so 256m leaves roughly a third free. Raise it to 512m for any role
+    # with `ingest:` or vector `memory:` -- LanceDB loads when the store opens
+    # and that alone measures ~212 MiB idle, which is too close to this cap to
+    # survive an ingestion run. See docs/operations/memory-footprint.md.
+    mem_limit: 256m
     restart: unless-stopped
     # Default CMD from image launches the dashboard.
-    # Override examples:
+    # Override examples (raise mem_limit to 512m for the RAG one):
     #   API server:    command: ["initrunner", "run", "/data/roles/my-agent.yaml", "--serve", "--host", "0.0.0.0"]
+    #   RAG agent:     command: ["initrunner", "run", "/data/roles/rag-agent.yaml", "--serve", "--host", "0.0.0.0"]
     #   Telegram bot:  command: ["initrunner", "run", "--bot", "telegram"]
     #   Interactive:   command: ["initrunner", "run", "-i"]
 

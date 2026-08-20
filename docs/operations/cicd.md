@@ -82,7 +82,16 @@ Runs `pnpm audit --prod` against the dashboard's frontend dependencies. This job
 
 ### Container Image Scan
 
-The Docker publish workflow (`.github/workflows/docker-publish.yml`) builds a multi-arch image (`linux/amd64`, `linux/arm64`) from the root `Dockerfile`. A Node stage compiles the SvelteKit dashboard on `$BUILDPLATFORM` (native to the runner) and the Python stage fails the build if `_static/index.html` is missing from the installed wheel. A post-publish Trivy scan of the container image detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image` category.
+The Docker publish workflow (`.github/workflows/docker-publish.yml`) runs on a `v*` tag and builds two multi-arch images (`linux/amd64`, `linux/arm64`) from the root `Dockerfile`: the full image (every extra) and `EXTRAS=dashboard` for the slim one. A Node stage compiles the SvelteKit dashboard on `$BUILDPLATFORM` (native to the runner) and the Python stage fails the build if `_static/index.html` is missing from the installed wheel.
+
+Tags are declared, never inferred (`latest=false` on both metadata steps). Each build gets an immutable version tag -- `2026.8.9` and `2026.8.9-slim` -- and the moving tags `latest` and `slim` are added only when the git tag is not an `rc` or `dev` pre-release.
+
+Two consequences worth knowing:
+
+- **A pre-release tag is a full rehearsal.** Pushing `v2026.8.9rc1` exercises the whole workflow -- both builds, both registries, smoke, and scan -- while leaving `latest` and `slim` pointing at the current release. It is the only way to exercise this workflow, which never runs on a branch push.
+- **Smoke and scan address the version tag, not `latest`.** A moving tag would still resolve to the previous release if a push had failed, and the job would pass having tested an image the run did not build.
+
+Smoke starts each image, checks the CLI, asserts `MALLOC_ARENA_MAX=2`, serves a seeded example until `/health` answers, validates every seeded example, and asserts that `fastmcp` and `lancedb` import in the full image and are absent from the slim one -- the contract that separates the two. A post-publish Trivy scan of each image detects OS-level CVEs in the `python:3.13-slim` base image and installed system packages. Results appear in the Security tab under the `trivy-image-full` and `trivy-image-slim` categories.
 
 ## Audit Chain Verification
 
