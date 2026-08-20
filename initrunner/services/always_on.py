@@ -740,6 +740,10 @@ def start_daemon(slug: str, role_path: Path) -> ProcessIdentity:
     log_path = _log_path(slug)
     env = os.environ.copy()
     env.setdefault("INITRUNNER_NO_TELEMETRY_PROMPT", "1")
+    # A long-lived agent process bridges sync and async with worker threads, and
+    # glibc gives each thread its own malloc arena. Capping arenas keeps RSS near
+    # the live heap; `MALLOC_ARENA_MAX=... initrunner service start` still wins.
+    env.setdefault("MALLOC_ARENA_MAX", "2")
 
     pid = _daemon_launcher(role_path, log_path, instance_dir(slug), env)
     time.sleep(0.3)
@@ -1132,6 +1136,7 @@ class ServiceStatusView:
     last_run_ok: bool | None = None
     cost_today_usd: float | None = None
     unverifiable_message: str | None = None
+    rss_mb: int | None = None
 
 
 def status(slug: str) -> ServiceStatusView:
@@ -1160,6 +1165,14 @@ def status(slug: str) -> ServiceStatusView:
 
     last_run_at, last_run_ok, cost = _audit_snapshot(runtime_agent_name(slug))
 
+    # Only once the PID is confirmed to be this service's daemon: reading
+    # /proc for an unverified PID would report a recycled process's memory.
+    rss_mb = None
+    if state.process and obs is ProcessObservation.VERIFIED_RUNNING:
+        from initrunner._proc import process_rss_mb
+
+        rss_mb = process_rss_mb(state.process.pid)
+
     return ServiceStatusView(
         state=state,
         observation=obs,
@@ -1169,6 +1182,7 @@ def status(slug: str) -> ServiceStatusView:
         last_run_ok=last_run_ok,
         cost_today_usd=cost,
         unverifiable_message=unverifiable_message,
+        rss_mb=rss_mb,
     )
 
 

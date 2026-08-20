@@ -222,12 +222,16 @@ Check what came up with `GET /v1/models`; it lists one entry per member.
 
 One container, not one per agent. The Python AI stack (provider SDK, PydanticAI, Pydantic) loads once and every member shares it, so members are nearly free after the first:
 
-| Agents in the process | RSS |
-|---|---|
-| 1 | ~142 MB |
-| 5 | ~145 MB |
+| Agents in the process | RSS (core install) | RSS (with the `mcp` extra) |
+|---|---|---|
+| 1 | 112 MB | 137 MB |
+| 5 | 115 MB | 140 MB |
+| 50 | 151 MB | 176 MB |
 
-About 1 MB per extra agent, so ten agents fit in the same ~150 MB as one. Size the limit from a real measurement of your own roles with roughly 30% headroom; a group of plain agents is comfortable at 256 MB, and one that uses RAG or vector memory needs 512 MB because LanceDB adds ~102 MB when it loads. See [Memory Footprint](../operations/memory-footprint.md).
+Under 1 MB per extra agent, so fifty agents fit in one 256 Mi container instead
+of fifty. (Those rows measure one process building N agents; a live `--serve`
+reads a few MB higher, and a container a few more again -- the slim image
+serving a three-agent directory measures 141 MiB.) Size the limit from a real measurement of your own roles with roughly 30% headroom; a group of plain agents is comfortable at 256 Mi, and one that uses RAG or vector memory needs 512 Mi because LanceDB adds ~77 MB when it loads. See [Memory Footprint](../operations/memory-footprint.md).
 
 ## Limits
 
