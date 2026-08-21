@@ -173,7 +173,7 @@ $ initrunner validate desk.yaml
 
 ## Deploying with Kubernetes or Argo CD
 
-Bake or mount the group file next to its role files and point the container at the group. Nothing about the image is group-specific: it is the normal InitRunner image with a different argument. Without a group file, point it at the directory instead -- `args: ["run", "/agents", "--serve", "--host", "0.0.0.0"]` -- and adding an agent is one new file in the ConfigMap.
+Bake or mount the group file next to its role files and point the container at the group. Nothing about the image is group-specific: it is the normal InitRunner image with a different argument. Without a group file, point it at the directory instead -- `args: ["initrunner", "run", "/agents", "--serve", "--host", "0.0.0.0"]` -- and adding an agent is one new file in the ConfigMap.
 
 ```yaml
 apiVersion: apps/v1
@@ -191,7 +191,7 @@ spec:
       containers:
         - name: initrunner
           image: ghcr.io/vladkesler/initrunner:latest
-          args: ["run", "/agents/desk.yaml", "--serve", "--host", "0.0.0.0"]
+          args: ["initrunner", "run", "/agents/desk.yaml", "--serve", "--host", "0.0.0.0"]
           env:
             - name: INITRUNNER_API_KEY
               valueFrom:

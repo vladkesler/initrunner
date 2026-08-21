@@ -106,7 +106,7 @@ Browse community agents at [InitHub](https://hub.initrunner.ai/): `initrunner se
 **Docker:**
 
 ```bash
-docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -i
+docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest initrunner run -i
 ```
 
 ## One file, four modes

@@ -12,6 +12,26 @@ memory or ingestion. It also runs ~38 MB lighter, because the MCP client stack
 loads whether or not a role uses it. A role that needs a missing extra fails at
 load with the `uv pip install` line, so switching tags never fails silently.
 
+One catch on `slim`: ephemeral mode (`initrunner run` with no role file) turns
+on persistent memory by default, and that needs the vector extra. Pass
+`--no-memory` to run it on `slim`, or use `latest`. Examples in this page that
+name a role file are unaffected.
+
+## Naming the command
+
+The image's default command is `initrunner dashboard --expose --no-open`, and
+its entrypoint runs whatever command it is given. Docker replaces the *whole*
+default command when you pass your own, so every example below spells out
+`initrunner` before the subcommand:
+
+```bash
+docker run ... ghcr.io/vladkesler/initrunner:latest run -i              # exec: run: not found
+docker run ... ghcr.io/vladkesler/initrunner:latest initrunner run -i   # correct
+```
+
+The same applies to `command:` in Compose and to `command:`/`args:` in a
+Kubernetes pod spec.
+
 ## API keys
 
 The container needs API keys to reach your LLM provider. Three ways to pass them:
@@ -37,16 +57,16 @@ All examples below use `-e OPENAI_API_KEY` for brevity. Replace with `--env-file
 ```bash
 # Interactive chat with memory
 docker run --rm -it -e OPENAI_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest initrunner run -i
 
 # Chat with cherry-picked tools
 docker run --rm -it -e OPENAI_API_KEY \
     -v initrunner-data:/data -v .:/workspace \
     ghcr.io/vladkesler/initrunner:latest \
-    run -i --tools git --tools filesystem
+    initrunner run -i --tools git --tools filesystem
 
 # Enable all built-in tools at once
-#   run -i --tool-profile all
+#   initrunner run -i --tool-profile all
 ```
 
 ## RAG (document chat)
@@ -55,15 +75,15 @@ docker run --rm -it -e OPENAI_API_KEY \
 # Chat with your documents (instant RAG)
 docker run --rm -it -e OPENAI_API_KEY \
     -v initrunner-data:/data -v ./docs:/docs \
-    ghcr.io/vladkesler/initrunner:latest run -i --ingest /docs
+    ghcr.io/vladkesler/initrunner:latest initrunner run -i --ingest /docs
 
 # Ingest documents for a role, then query
 docker run --rm -e OPENAI_API_KEY \
     -v ./roles:/roles -v ./docs:/docs -v initrunner-data:/data \
-    ghcr.io/vladkesler/initrunner:latest ingest /roles/rag-agent.yaml
+    ghcr.io/vladkesler/initrunner:latest initrunner ingest /roles/rag-agent.yaml
 docker run --rm -it -e OPENAI_API_KEY \
     -v ./roles:/roles -v initrunner-data:/data \
-    ghcr.io/vladkesler/initrunner:latest run /roles/rag-agent.yaml -i
+    ghcr.io/vladkesler/initrunner:latest initrunner run /roles/rag-agent.yaml -i
 ```
 
 ## Telegram bot
@@ -71,7 +91,7 @@ docker run --rm -it -e OPENAI_API_KEY \
 ```bash
 docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
     -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest \
-    run --bot telegram
+    initrunner run --bot telegram
 ```
 
 ## API server
@@ -80,7 +100,7 @@ docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
 # OpenAI-compatible API server on port 8000
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles \
     -p 8000:8000 ghcr.io/vladkesler/initrunner:latest \
-    run /roles/my-agent.yaml --serve --host 0.0.0.0
+    initrunner run /roles/my-agent.yaml --serve --host 0.0.0.0
 ```
 
 ## Web dashboard
@@ -91,7 +111,7 @@ This is the image default (`CMD`). `--expose` binds `0.0.0.0` and generates an A
 # Web dashboard at http://localhost:8100
 docker run -d -e OPENAI_API_KEY -v ./roles:/roles -v initrunner-data:/data \
     -p 8100:8100 ghcr.io/vladkesler/initrunner:latest \
-    dashboard --expose --no-open --roles-dir /roles
+    initrunner dashboard --expose --no-open --roles-dir /roles
 ```
 
 ## Using a different provider or model
@@ -103,7 +123,7 @@ docker run --rm -it \
     -e OPENAI_API_KEY=sk-or-your-openrouter-key \
     -e OPENAI_BASE_URL=https://openrouter.ai/api/v1 \
     -e INITRUNNER_MODEL=openai:google/gemini-3-flash-preview \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest initrunner run -i
 ```
 
 Or use any supported provider directly:
@@ -111,11 +131,11 @@ Or use any supported provider directly:
 ```bash
 # Anthropic
 docker run --rm -it -e ANTHROPIC_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest initrunner run -i
 
 # Google
 docker run --rm -it -e GOOGLE_API_KEY \
-    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest run -i
+    -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest initrunner run -i
 ```
 
 ## Docker Compose
@@ -238,7 +258,7 @@ docker run --rm -it \
     -v ./roles:/roles \
     -v initrunner-data:/data \
     ghcr.io/vladkesler/initrunner:latest \
-    run /roles/my-sandboxed-agent.yaml -p "compute 2**100"
+    initrunner run /roles/my-sandboxed-agent.yaml -p "compute 2**100"
 ```
 
 Or in `docker-compose.yml`, uncomment the socket volume:

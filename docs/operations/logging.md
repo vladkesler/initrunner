@@ -96,7 +96,7 @@ INITRUNNER_LOG_LEVEL=DEBUG initrunner run role.yaml -p "ping"
 services:
   agent:
     image: ghcr.io/vladkesler/initrunner:latest
-    command: ["a2a", "serve", "/app/role.yaml"]
+    command: ["initrunner", "a2a", "serve", "/app/role.yaml"]
     environment:
       INITRUNNER_LOG_LEVEL: DEBUG
 ```

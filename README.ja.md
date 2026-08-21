@@ -82,7 +82,7 @@ initrunner run --ingest ./docs/    # YAML をスキップして、ドキュメ�
 **Docker:**
 
 ```bash
-docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -i
+docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest initrunner run -i
 ```
 
 ## 1つのファイル、4つのモード
