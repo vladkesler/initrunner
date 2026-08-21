@@ -157,6 +157,31 @@ def verify_bot_sdk(platform: str) -> None:
         raise typer.Exit(1) from None
 
 
+def build_agent_or_exit(role):
+    """Build the agent, reporting a missing extra the way the role-file path does.
+
+    ``build_agent`` wraps ``MissingExtraError`` in ``RoleLoadError`` so the
+    install hint surfaces at load rather than mid-run. ``load_and_build_or_exit``
+    catches it for role files; this is the ephemeral twin. Nothing an ephemeral
+    role can carry needs the vector extra except memory and ingest, and memory
+    is on by default, so when ingest is not in play the hint names the flag
+    that turns memory off.
+    """
+    from initrunner._compat import MissingExtraError
+    from initrunner.agent.loader import RoleLoadError, build_agent
+
+    try:
+        return build_agent(role)
+    except RoleLoadError as e:
+        print_error(e)
+        if isinstance(e.__cause__, MissingExtraError) and role.spec.ingest is None:
+            console.print(
+                "[dim]Hint:[/dim] Persistent memory is what needs it."
+                " Add [bold]--no-memory[/bold] to run without it."
+            )
+        raise typer.Exit(1) from None
+
+
 # ---------------------------------------------------------------------------
 # Ingestion
 # ---------------------------------------------------------------------------
@@ -230,7 +255,6 @@ def dispatch_ephemeral_repl(
     api_key_env: str | None = None,
 ) -> None:
     """Build ephemeral role and run as REPL or one-shot."""
-    from initrunner.agent.loader import build_agent
     from initrunner.cli._helpers import ephemeral_context
     from initrunner.runner import run_interactive, run_single
     from initrunner.services.providers import build_quick_chat_role_sync
@@ -275,7 +299,7 @@ def dispatch_ephemeral_repl(
     else:
         ingest_config = None
 
-    agent = build_agent(role)
+    agent = build_agent_or_exit(role)
 
     console.print(f"[dim]Using {prov}:{mod}[/dim]")
     one_shot = bool(prompt) and not interactive
@@ -432,13 +456,12 @@ def dispatch_ephemeral_bot(
 
     role = build_ephemeral_role(prov, mod, **build_kwargs)
 
-    from initrunner.agent.loader import build_agent
     from initrunner.cli._helpers import create_audit_logger
     from initrunner.runner import run_daemon
     from initrunner.stores.factory import managed_memory_store
 
+    agent = build_agent_or_exit(role)
     audit_logger = create_audit_logger(audit_db, no_audit)
-    agent = build_agent(role)
 
     if ingest_config is not None:
         run_ephemeral_ingest(role, prov)

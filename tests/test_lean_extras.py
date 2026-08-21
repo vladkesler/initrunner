@@ -9,6 +9,7 @@ identically whether or not the extras are installed.
 from __future__ import annotations
 
 import sys
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -209,3 +210,73 @@ class TestMissingExtraIsReportedOnce:
             cli_main.app_entry()
         assert exc.value.code == 1
         assert "initrunner[vector]" in capsys.readouterr().out
+
+
+class TestEphemeralModeReportsAMissingExtra:
+    """``initrunner run`` with no role file turns persistent memory on, which
+    needs the vector extra. It fails at load like the role-file path does, and
+    names the flag that runs without memory."""
+
+    @pytest.fixture(autouse=True)
+    def _env(self, monkeypatch, tmp_path):
+        # Detection prefers Anthropic, and that SDK is an extra; pin the
+        # provider to the one in core so the vector gate is what fires.
+        for var in (
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "GROQ_API_KEY",
+            "MISTRAL_API_KEY",
+            "CO_API_KEY",
+            "XAI_API_KEY",
+            "INITRUNNER_MODEL",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        # Keep the developer's real ~/.initrunner/run.yaml and .env out of it.
+        monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path / "home"))
+
+    def test_one_shot_names_the_extra_and_the_flag(self, no_lancedb):
+        from initrunner.cli.main import app
+
+        result = CliRunner().invoke(app, ["run", "-p", "hi", "--no-audit"])
+
+        flat = " ".join(result.output.split())
+        assert result.exit_code == 1
+        assert "initrunner[vector]" in flat
+        assert "--no-memory" in flat
+
+    def test_bot_path_reports_the_same_way(self, no_lancedb, monkeypatch):
+        """The SDK gate fires first on a lean install; step past it."""
+        from initrunner.cli.main import app
+
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
+        with patch("initrunner.cli._ephemeral.verify_bot_sdk"):
+            result = CliRunner().invoke(app, ["run", "--bot", "telegram", "--no-audit"])
+
+        flat = " ".join(result.output.split())
+        assert result.exit_code == 1
+        assert "initrunner[vector]" in flat
+        assert "--no-memory" in flat
+
+    def test_ingest_needs_the_extra_whatever_memory_does(self, no_lancedb, tmp_path):
+        """Turning memory off would not help, so the flag is not offered."""
+        from initrunner.cli.main import app
+
+        result = CliRunner().invoke(
+            app, ["run", "-p", "hi", "--ingest", str(tmp_path / "docs"), "--no-audit"]
+        )
+
+        flat = " ".join(result.output.split())
+        assert result.exit_code == 1
+        assert "initrunner[vector]" in flat
+        assert "--no-memory" not in flat
+
+    def test_no_memory_runs_on_a_core_install(self, no_lancedb):
+        """The escape hatch the hint advertises has to work."""
+        from initrunner.cli.main import app
+
+        with patch("initrunner.runner.run_single") as run_single:
+            result = CliRunner().invoke(app, ["run", "-p", "hi", "--no-memory", "--no-audit"])
+
+        assert result.exit_code == 0, result.output
+        run_single.assert_called_once()
