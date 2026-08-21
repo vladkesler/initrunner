@@ -82,7 +82,7 @@ initrunner run --ingest ./docs/    # 跳过 YAML，直接和你的文档聊天
 **Docker:**
 
 ```bash
-docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest run -i
+docker run --rm -it -e OPENAI_API_KEY ghcr.io/vladkesler/initrunner:latest initrunner run -i
 ```
 
 ## 一个文件，四种模式
