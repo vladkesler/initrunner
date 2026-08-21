@@ -13,9 +13,9 @@ loads whether or not a role uses it. A role that needs a missing extra fails at
 load with the `uv pip install` line, so switching tags never fails silently.
 
 One catch on `slim`: ephemeral mode (`initrunner run` with no role file) turns
-on persistent memory by default, and that needs the vector extra. Pass
-`--no-memory` to run it on `slim`, or use `latest`. Examples in this page that
-name a role file are unaffected.
+on persistent memory by default, and that needs the vector extra. It stops at
+load and tells you: add `--no-memory` to run without memory, or use `latest`.
+Examples in this page that name a role file are unaffected.
 
 ## Naming the command
 

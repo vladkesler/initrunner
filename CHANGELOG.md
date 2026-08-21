@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
-
 ### Fixed
 - **Ephemeral mode crashed instead of naming the missing extra.** `initrunner run -p "hi"` with no role file turns persistent memory on by default, which needs the vector extra. On a core install or the `slim` image that ended in a Rich traceback, where `initrunner run role.yaml` with the same `memory:` block prints one clean line. The loader wraps `MissingExtraError` in `RoleLoadError` so the hint surfaces at load rather than mid-run, and the role-file path catches it in `load_and_build_or_exit`; the REPL/one-shot and `--bot` paths called `build_agent` bare. Both now go through one helper that prints the install line and, when memory is the only thing asking for the extra, adds `Add --no-memory to run without it`, because the user never wrote `memory:` and may be in a container where `pip install` is not an option. `--ingest` still needs the extra and says so without the flag hint. The `--bot` path also no longer opens the audit log before the agent is known to build.
+
+### Docs
+- **Every container example names `initrunner` before the subcommand.** The image entrypoint runs whatever command it is given, and the default command is `initrunner dashboard --expose --no-open`, so `docker run ... initrunner:latest run -i` execs `run` and dies with `exec: run: not found`. The Docker page, all three READMEs, the Compose snippet in the logging page, and the Kubernetes `args:` in the groups page had this shape. A short "Naming the command" section on the Docker page explains the override rule so the examples do not get shortened back.
 
 ## [2026.8.9] - 2026-08-21
 

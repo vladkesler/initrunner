@@ -398,4 +398,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.8.9</sub></p>
+<p align="center"><sub>v2026.8.10</sub></p>
