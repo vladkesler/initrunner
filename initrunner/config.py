@@ -30,6 +30,16 @@ def get_home_dir() -> Path:
 
 
 def get_audit_db_path() -> Path:
+    """Return the audit database path.
+
+    ``INITRUNNER_AUDIT_DB`` overrides it, so every reader (CLI, dashboard,
+    daemon) resolves the same database without each one plumbing a path.
+    Not cached: the env var is read per call so tests and subprocesses can
+    change it.
+    """
+    env = os.environ.get("INITRUNNER_AUDIT_DB")
+    if env:
+        return Path(env)
     return get_home_dir() / "audit.db"
 
 

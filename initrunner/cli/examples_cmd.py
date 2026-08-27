@@ -89,6 +89,36 @@ def examples_show(
         )
 
 
+def _copy_starter_or_exit(name: str, output: Path) -> None:
+    """Copy a bundled starter and print its next steps, or exit non-zero."""
+    from initrunner.services.starters import copy_starter
+
+    try:
+        written = copy_starter(name, output)
+    except FileExistsError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        console.print(
+            "[dim]Remove existing files first or choose a different output directory.[/dim]"
+        )
+        raise typer.Exit(1) from None
+
+    # Name the source: a few slugs (helpdesk, scout) exist both as a bundled
+    # starter and as a catalog example, and the starter is what wins.
+    console.print(f"[green]Copied {len(written)} file(s)[/green] from the bundled starter:")
+    for path in written:
+        console.print(f"  {path}")
+
+    # Hints name the copied file, not the starter slug, so they work from any
+    # cwd. A composite starter may be a flow rather than a role.
+    primary = next((output / n for n in ("role.yaml", "flow.yaml") if (output / n).is_file()), None)
+    if primary is not None:
+        console.print("\n[dim]Next steps:[/dim]")
+        # soft_wrap keeps a long absolute path on one line so the command stays
+        # copy-pasteable in a narrow terminal.
+        console.print(f"  [bold]initrunner validate {primary}[/bold]", soft_wrap=True)
+        console.print(f"  [bold]initrunner run {primary}[/bold]", soft_wrap=True)
+
+
 @app.command("copy")
 def examples_copy(
     name: Annotated[str, typer.Argument(help="Name of the example to copy")],
@@ -97,13 +127,20 @@ def examples_copy(
         typer.Option("--output", "-o", help="Output directory (default: current dir)"),
     ] = Path("."),
 ) -> None:
-    """Copy example files to a directory."""
+    """Copy example or starter files to a directory."""
     from initrunner.examples import (
         ExampleDownloadError,
         ExampleNotFoundError,
         copy_example,
         get_example,
     )
+    from initrunner.services.starters import get_starter
+
+    # Bundled starters are checked first and copied offline; the catalog is the
+    # fallback and may reach GitHub for multi-file examples.
+    if get_starter(name) is not None:
+        _copy_starter_or_exit(name, output)
+        return
 
     try:
         written = copy_example(name, output)
