@@ -181,12 +181,8 @@ security:
       - "https://staging.example.com"
 ```
 
-The `--cors-origin` CLI flag (repeatable) **adds** origins on top of YAML -- it supplements, it doesn't replace:
-
-```bash
-# These two origins are added on top of any cors_origins in role YAML
-initrunner run role.yaml --serve --cors-origin https://dev.example.com --cors-origin http://localhost:3000
-```
+CORS origins come from the role YAML only, so what a deployment exposes is
+reviewable in the same file as the rest of its policy.
 
 #### HTTPS Enforcement
 

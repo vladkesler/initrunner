@@ -356,7 +356,7 @@ initrunner run team.yaml -p "review the auth module"
 initrunner run team.yaml -p "review the auth module" --dry-run
 
 # With audit logging
-initrunner run team.yaml -p "review the auth module" --audit-db ./audit.db
+INITRUNNER_AUDIT_DB=./audit.db initrunner run team.yaml -p "review the auth module"
 
 # Export report
 initrunner run team.yaml -p "review this PR" --report ./team-report.md

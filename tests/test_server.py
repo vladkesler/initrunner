@@ -861,22 +861,28 @@ class TestCORSCLIOverride:
         assert "access-control-allow-origin" not in resp.headers
 
 
-class TestServeCLICorsFlag:
-    def test_cors_origin_flag_accepted(self):
-        """CLI parser recognizes the --cors-origin flag on run --serve."""
+class TestServeCorsFromRole:
+    def test_cors_origins_come_from_the_role(self, tmp_path):
+        """security.server.cors_origins is the only source of allowed origins."""
+        from initrunner.agent.loader import load_role
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: cors-agent\n"
+            "spec:\n  role: test\n"
+            "  model:\n    provider: openai\n    name: gpt-5-mini\n"
+            "  security:\n    server:\n      cors_origins: ['https://example.com']\n"
+        )
+        role = load_role(role_file)
+        assert role.spec.security.server.cors_origins == ["https://example.com"]
+
+    def test_serve_host_and_port_are_accepted(self):
+        """--host/--port stay on run --serve as deployment inputs."""
         result = cli_runner.invoke(
             cli_app,
-            [
-                "run",
-                "/nonexistent/role.yaml",
-                "--serve",
-                "--cors-origin",
-                "https://example.com",
-            ],
+            ["run", "/nonexistent/role.yaml", "--serve", "--host", "0.0.0.0", "--port", "9001"],
         )
-        # Will fail because role file doesn't exist, but the flag itself is parsed
         assert result.exit_code == 1
-        # Should NOT fail with "no such option" error
         assert "No such option" not in (result.output or "")
 
 

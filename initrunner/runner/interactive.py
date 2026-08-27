@@ -106,7 +106,7 @@ def run_interactive(
     role_path: Path | None = None,
     extra_skill_dirs: list[Path] | None = None,
     load_model_override: str | None = None,
-    tool_dev: bool = False,
+    show_thinking: bool = True,
 ) -> None:
     """Run an interactive REPL with multi-turn conversation history."""
     agent_name = role.metadata.name
@@ -260,7 +260,7 @@ def run_interactive(
             message_history=message_history,
             sink_dispatcher=sink_dispatcher,
             model_override=model_override,
-            show_thinking=not tool_dev,
+            show_thinking=show_thinking,
         )
 
         while result.status == "paused":

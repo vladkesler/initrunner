@@ -101,7 +101,7 @@ class TestExportReportCLI:
         assert "# Agent Run Report" in content
 
     def test_export_report_with_template(self, tmp_path: Path):
-        """--report-template pr-review uses the pr-review template."""
+        """--report pr-review:PATH uses the pr-review template."""
         report_file = tmp_path / "review.md"
         result_obj = _successful_run_result()
 
@@ -121,9 +121,7 @@ class TestExportReportCLI:
                         "Hello",
                         "--dry-run",
                         "--report",
-                        str(report_file),
-                        "--report-template",
-                        "pr-review",
+                        f"pr-review:{report_file}",
                         "--format",
                         "rich",
                     ],
@@ -134,52 +132,27 @@ class TestExportReportCLI:
         content = report_file.read_text()
         assert "# PR Review Report" in content
 
-    def test_export_report_invalid_template(self, tmp_path: Path):
-        """Unknown --report-template errors before execution."""
-        report_file = tmp_path / "report.md"
+    def test_unknown_template_prefix_is_treated_as_a_path(self, tmp_path: Path):
+        """Only a built-in name is a template prefix; anything else is the path."""
+        from initrunner.report import parse_report_spec
+
+        assert parse_report_spec("nonexistent:out.md") == (
+            "default",
+            Path("nonexistent:out.md"),
+        )
+
+    def test_missing_path_after_template_errors(self):
         with (
             patch("initrunner.cli.run_cmd._command.resolve_run_target", _passthrough_run_target),
             patch("initrunner.cli.run_cmd._command.preflight_validate_or_exit", lambda _p: None),
             patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
         ):
             result = runner.invoke(
-                app,
-                [
-                    "run",
-                    "fake-role.yaml",
-                    "-p",
-                    "Hello",
-                    "--report",
-                    str(report_file),
-                    "--report-template",
-                    "nonexistent",
-                ],
+                app, ["run", "fake-role.yaml", "-p", "Hello", "--report", "pr-review:"]
             )
 
         assert result.exit_code == 1
-        assert "Unknown template" in result.output
-
-    def test_report_template_without_report_errors(self):
-        """--report-template without --report must error."""
-        with (
-            patch("initrunner.cli.run_cmd._command.resolve_run_target", _passthrough_run_target),
-            patch("initrunner.cli.run_cmd._command.preflight_validate_or_exit", lambda _p: None),
-            patch("initrunner.cli._run_agent.command_context", _mock_command_context()),
-        ):
-            result = runner.invoke(
-                app,
-                [
-                    "run",
-                    "fake-role.yaml",
-                    "-p",
-                    "Hello",
-                    "--report-template",
-                    "pr-review",
-                ],
-            )
-
-        assert result.exit_code == 1
-        assert "--report-template requires --report" in result.output
+        assert "missing PATH" in result.output
 
     def test_export_report_failed_run(self, tmp_path: Path):
         """Report is still written when the run fails."""
@@ -213,3 +186,37 @@ class TestExportReportCLI:
         content = report_file.read_text()
         assert "Failed" in content
         assert "Model API error: 500" in content
+
+
+class TestParseReportSpec:
+    """--report takes PATH or TEMPLATE:PATH."""
+
+    def test_bare_path_uses_default_template(self):
+        from initrunner.report import parse_report_spec
+
+        assert parse_report_spec("out.md") == ("default", Path("out.md"))
+
+    def test_template_prefix_is_split(self):
+        from initrunner.report import parse_report_spec
+
+        assert parse_report_spec("changelog:/tmp/x.md") == ("changelog", Path("/tmp/x.md"))
+
+    def test_windows_drive_letter_stays_a_path(self):
+        from initrunner.report import parse_report_spec
+
+        template, path = parse_report_spec(r"C:\reports\out.md")
+        assert template == "default"
+        assert str(path) == r"C:\reports\out.md"
+
+    def test_colon_in_a_relative_path_stays_a_path(self):
+        from initrunner.report import parse_report_spec
+
+        assert parse_report_spec("a:b/out.md") == ("default", Path("a:b/out.md"))
+
+    def test_empty_path_after_template_raises(self):
+        import pytest
+
+        from initrunner.report import parse_report_spec
+
+        with pytest.raises(ValueError, match="missing PATH"):
+            parse_report_spec("pr-review:")

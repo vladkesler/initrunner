@@ -7,7 +7,6 @@ from pathlib import Path
 import typer
 
 from initrunner.cli._helpers import console, create_audit_logger
-from initrunner.cli._run_agent import _maybe_export_report
 
 
 def _display_team_result(team_result: object) -> None:
@@ -47,10 +46,7 @@ def _run_team(
     team_file: Path,
     prompt: str | None,
     dry_run: bool,
-    audit_db: Path | None,
     no_audit: bool,
-    report: Path | None,
-    report_template: str,
 ) -> None:
     """Run a team YAML file."""
     if not prompt:
@@ -58,7 +54,6 @@ def _run_team(
         raise typer.Exit(1)
 
     from initrunner.team.loader import TeamLoadError, load_team
-    from initrunner.team.roles import team_report_role
     from initrunner.team.runner import run_team_dispatch
 
     try:
@@ -67,7 +62,7 @@ def _run_team(
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None
 
-    audit_logger = create_audit_logger(audit_db, no_audit)
+    audit_logger = create_audit_logger(None, no_audit)
 
     dry_run_model = None
     if dry_run:
@@ -108,32 +103,6 @@ def _run_team(
         )
 
     _display_team_result(result)
-
-    if report is not None and result.agent_results:
-        # Synthesize a RunResult for report export
-        from initrunner.agent.executor import RunResult as _RunResult
-
-        synthetic = _RunResult(
-            run_id=result.team_run_id,
-            output=result.final_output,
-            tokens_in=result.total_tokens_in,
-            tokens_out=result.total_tokens_out,
-            total_tokens=result.total_tokens,
-            tool_calls=result.total_tool_calls,
-            duration_ms=result.total_duration_ms,
-            success=result.success,
-            error=result.error,
-        )
-        # Build a synthetic role for the report
-        synthetic_role = team_report_role(team)
-        _maybe_export_report(
-            synthetic_role,
-            synthetic,
-            prompt,
-            report,
-            report_template,
-            dry_run,
-        )
 
     if audit_logger is not None:
         audit_logger.close()

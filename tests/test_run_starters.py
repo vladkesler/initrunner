@@ -119,32 +119,3 @@ class TestRunList:
     def test_list_shows_usage_hint(self):
         result = runner.invoke(app, ["run", "--list"])
         assert "initrunner run <name>" in result.output
-
-
-class TestRunSave:
-    """Test the --save flag."""
-
-    def test_save_copies_single_file_starter(self, tmp_path: Path):
-        save_dir = tmp_path / "my-agent"
-        result = runner.invoke(app, ["run", "memory", "--save", str(save_dir)])
-        assert result.exit_code == 0
-        assert (save_dir / "role.yaml").is_file()
-
-    def test_save_copies_composite_starter(self, tmp_path: Path):
-        save_dir = tmp_path / "my-pipeline"
-        result = runner.invoke(app, ["run", "pipeline", "--save", str(save_dir)])
-        assert result.exit_code == 0
-        assert (save_dir / "flow.yaml").is_file()
-        assert (save_dir / "roles").is_dir()
-
-    def test_save_non_starter_fails(self, tmp_path: Path):
-        role_file = tmp_path / "role.yaml"
-        role_file.write_text(
-            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: test-agent\n"
-            "spec:\n  role: You are a helpful assistant.\n"
-            "  model:\n    provider: openai\n    name: gpt-5-mini\n"
-        )
-        save_dir = tmp_path / "out"
-        result = runner.invoke(app, ["run", str(role_file), "--save", str(save_dir)])
-        assert result.exit_code == 1
-        assert "only works with bundled starters" in result.output

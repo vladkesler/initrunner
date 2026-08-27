@@ -11,7 +11,7 @@ Audit logging is enabled by default. Every `run`, `daemon`, and `serve` command 
 initrunner run role.yaml -p "Hello!"
 
 # Custom audit database path
-initrunner run role.yaml -p "Hello!" --audit-db ./my-audit.db
+INITRUNNER_AUDIT_DB=./my-audit.db initrunner run role.yaml -p "Hello!"
 
 # Disable audit logging
 initrunner run role.yaml -p "Hello!" --no-audit

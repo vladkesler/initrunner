@@ -1,9 +1,13 @@
-"""Flag validation for the run command."""
+"""Flag validation for the run command.
+
+Every flag `run` accepts is either consumed by the target it is given to, or
+rejected here. Nothing is silently dropped: a flag the target cannot honour is
+an error, not a no-op, so a run never quietly ignores what was asked for.
+"""
 
 from __future__ import annotations
 
 import enum
-from pathlib import Path
 
 import typer
 
@@ -19,31 +23,24 @@ class RunMode(enum.Enum):
     STANDARD = "standard"
     DAEMON = "daemon"
     SERVE = "serve"
-    BOT = "bot"
 
 
 def _resolve_run_mode(
     *,
     daemon_mode: bool,
-    autopilot: bool,
     serve_mode: bool,
-    bot: str | None,
     autonomous: bool,
 ) -> RunMode:
     """Resolve mutually exclusive mode flags into a single RunMode.
 
-    ``--autopilot`` subsumes ``--daemon`` (both map to DAEMON).
-    ``--autonomous`` is a STANDARD-mode modifier, mutually exclusive with
-    the long-running modes.
+    ``--autonomous`` is a STANDARD-mode modifier, mutually exclusive with the
+    long-running modes.
     """
     active: list[tuple[str, RunMode]] = []
-    if daemon_mode or autopilot:
-        flag = "--autopilot" if autopilot else "--daemon"
-        active.append((flag, RunMode.DAEMON))
+    if daemon_mode:
+        active.append(("--daemon", RunMode.DAEMON))
     if serve_mode:
         active.append(("--serve", RunMode.SERVE))
-    if bot:
-        active.append(("--bot", RunMode.BOT))
     if autonomous:
         active.append(("--autonomous", RunMode.STANDARD))
 
@@ -61,46 +58,27 @@ def _resolve_run_mode(
 # Universal validation (runs before ephemeral / role branching)
 # ---------------------------------------------------------------------------
 
+_VALID_FORMATS = ("auto", "json", "text", "rich")
+
 
 def _validate_universal_flags(
     *,
     mode: RunMode,
-    bot: str | None,
     output_format: str,
-    no_stream: bool,
     interactive: bool,
     autonomous: bool,
     sense: bool,
-    confirm_role: bool,
-    role_dir: Path | None,
-    role_file: Path | None,
     prompt: str | None,
-    api_key: str | None,
-    cors_origin: list[str] | None,
-    allowed_users: list[str] | None,
-    allowed_user_ids: list[str] | None,
-    budget_timezone: str | None,
-) -> str:
-    """Validate flags that apply regardless of ephemeral vs role-file mode.
-
-    Returns effective *output_format* (handles ``--no-stream`` deprecation).
-    """
-    # -- Bot platform --
-    if bot and bot not in ("telegram", "discord"):
-        console.print(f"[red]Error:[/red] --bot must be 'telegram' or 'discord', got '{bot}'.")
-        raise typer.Exit(1)
-
+    host: str | None,
+    port: int | None,
+) -> None:
+    """Validate flags whose meaning depends only on the run mode."""
     # -- Format --
-    if output_format not in ("auto", "json", "text", "rich"):
+    if output_format not in _VALID_FORMATS:
         console.print(
-            f"[red]Error:[/red] Unknown format '{output_format}'. Use: auto, json, text, rich"
+            f"[red]Error:[/red] Unknown format '{output_format}'. Use: {', '.join(_VALID_FORMATS)}"
         )
         raise typer.Exit(1)
-
-    if no_stream:
-        typer.echo("Warning: --no-stream is deprecated; use --format rich", err=True)
-        if output_format == "auto":
-            output_format = "rich"
 
     if output_format in ("json", "text") and interactive:
         console.print("[red]Error:[/red] --format json|text is not supported with -i.")
@@ -110,66 +88,38 @@ def _validate_universal_flags(
         console.print("[red]Error:[/red] --format json|text is not supported with -a.")
         raise typer.Exit(1)
 
-    # -- Sense conflicts --
-    # A role file plus --sense is only meaningful for a group, where sensing
-    # picks a member. That is checked once the target's kind is known.
-    if sense and not prompt:
-        console.print("[red]Error:[/red] --sense requires --prompt (-p).")
-        raise typer.Exit(1)
-    if sense and mode in (RunMode.DAEMON, RunMode.SERVE, RunMode.BOT):
-        console.print(f"[red]Error:[/red] --sense is not supported with {mode.value} mode.")
-        raise typer.Exit(1)
-
-    # -- Sense-dependent flags --
-    if confirm_role and not sense:
-        console.print(
-            "[red]Error:[/red] --confirm-role requires --sense."
-            " It confirms the auto-selected role before running."
-        )
-        raise typer.Exit(1)
-    if role_dir is not None and not sense:
-        console.print(
-            "[red]Error:[/red] --role-dir requires --sense."
-            " It sets the directory to search when sensing."
-        )
-        raise typer.Exit(1)
-
-    # -- Serve-only flags --
-    if mode != RunMode.SERVE:
-        serve_only = [f for f, v in [("--api-key", api_key), ("--cors-origin", cors_origin)] if v]
-        if serve_only:
+    # -- Mode-only flags --
+    # A long-running mode has no single run to format or prompt.
+    if mode is not RunMode.STANDARD:
+        if output_format != "auto":
             console.print(
-                f"[red]Error:[/red] {', '.join(serve_only)} only applies to --serve mode."
+                f"[red]Error:[/red] --format only applies to a standard run, not --{mode.value}."
+            )
+            raise typer.Exit(1)
+        if prompt:
+            console.print(
+                f"[red]Error:[/red] --prompt only applies to a standard run,"
+                f" not --{mode.value}. Triggers supply the prompt in daemon mode."
             )
             raise typer.Exit(1)
 
-    # -- Bot-only flags --
-    if mode != RunMode.BOT:
-        bot_only = [
-            f
-            for f, v in [
-                ("--allowed-users", allowed_users),
-                ("--allowed-user-ids", allowed_user_ids),
-            ]
-            if v
-        ]
-        if bot_only:
-            console.print(f"[red]Error:[/red] {', '.join(bot_only)} only applies to --bot mode.")
+    if mode is not RunMode.SERVE:
+        bound = [f for f, v in (("--host", host), ("--port", port)) if v is not None]
+        if bound:
+            console.print(f"[red]Error:[/red] {', '.join(bound)} only applies to --serve mode.")
             raise typer.Exit(1)
 
-    # -- Budget timezone --
-    if budget_timezone and mode not in (RunMode.DAEMON, RunMode.BOT):
-        console.print(
-            "[red]Error:[/red] --budget-timezone only applies to"
-            " --daemon, --autopilot, or --bot mode."
-        )
+    # -- Sense --
+    if sense and not prompt:
+        console.print("[red]Error:[/red] --sense requires --prompt (-p).")
         raise typer.Exit(1)
-
-    return output_format
+    if sense and mode is not RunMode.STANDARD:
+        console.print(f"[red]Error:[/red] --sense is not supported with {mode.value} mode.")
+        raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------
-# Per-kind validation (runs once the target's kind is known)
+# Per-target validation
 # ---------------------------------------------------------------------------
 
 # Flags that steer one agent's run. A team, flow or whole group has no single
@@ -177,21 +127,35 @@ def _validate_universal_flags(
 _SINGLE_AGENT_FLAGS = (
     "--interactive",
     "--autonomous",
-    "--max-iterations",
-    "--token-budget",
     "--resume",
     "--attach",
     "--report",
-    "--report-template",
-    "--dev",
     "--var",
+    "--format",
 )
+
+# Ephemeral mode is keyed like a target kind so one table covers every context.
+EPHEMERAL_KIND = "Ephemeral"
 
 # kind -> (denied flags, allowed run modes)
 _KIND_POLICY: dict[str, tuple[tuple[str, ...], frozenset[RunMode]]] = {
-    "Team": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD})),
-    "Flow": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD})),
-    "Group": (_SINGLE_AGENT_FLAGS, frozenset({RunMode.STANDARD, RunMode.SERVE, RunMode.DAEMON})),
+    # No role file: no target to attach a report, template var, or member to.
+    EPHEMERAL_KIND: (
+        ("--autonomous", "--dry-run", "--report", "--var", "--agent", "--format"),
+        frozenset({RunMode.STANDARD}),
+    ),
+    # Team and Flow build their own agents, so a single agent's model and run
+    # flags have nowhere to land.
+    "Team": ((*_SINGLE_AGENT_FLAGS, "--model"), frozenset({RunMode.STANDARD})),
+    "Flow": ((*_SINGLE_AGENT_FLAGS, "--model", "--dry-run"), frozenset({RunMode.STANDARD})),
+    "Group": (
+        (*_SINGLE_AGENT_FLAGS, "--dry-run"),
+        frozenset({RunMode.STANDARD, RunMode.SERVE, RunMode.DAEMON}),
+    ),
+}
+
+_SUFFIX_BY_KIND = {
+    "Group": " Pick one member with --agent <name> to run it as a single agent.",
 }
 
 
@@ -213,98 +177,45 @@ def _validate_kind_flags(
 
     invalid = [flag for flag in denied_flags if active_flags.get(flag)]
     if invalid:
-        suffix = (
-            " Pick one member with --agent <name> to run it as a single agent."
-            if kind == "Group"
-            else ""
-        )
+        target = "without a role file" if kind == EPHEMERAL_KIND else f"for {kind} targets"
         console.print(
-            f"[red]Error:[/red] {', '.join(invalid)} not supported for {kind} targets.{suffix}"
+            f"[red]Error:[/red] {', '.join(invalid)} not supported {target}."
+            f"{_SUFFIX_BY_KIND.get(kind, '')}"
         )
         raise typer.Exit(1)
 
     if mode not in allowed_modes:
-        flag = "--daemon/--autopilot" if mode is RunMode.DAEMON else f"--{mode.value}"
+        if kind == EPHEMERAL_KIND:
+            console.print(
+                f"[red]Error:[/red] {mode.value} mode is not supported without a role file."
+            )
+            raise typer.Exit(1)
         suffix = (
             " Add --agent <name> to run one member that way."
             if kind == "Group"
             else " It is only supported for Agent targets."
         )
-        console.print(f"[red]Error:[/red] {flag} is not supported for {kind} targets.{suffix}")
+        console.print(
+            f"[red]Error:[/red] --{mode.value} is not supported for {kind} targets.{suffix}"
+        )
         raise typer.Exit(1)
-
-
-# ---------------------------------------------------------------------------
-# Ephemeral-only validation
-# ---------------------------------------------------------------------------
-
-
-def _validate_ephemeral_flags(
-    *,
-    mode: RunMode,
-    autonomous: bool,
-    dry_run: bool,
-    save: Path | None,
-    skill_dir: Path | None,
-    report: Path | None,
-    report_template: str,
-    resume: bool,
-    prompt: str | None,
-    interactive: bool,
-) -> None:
-    """Reject flags that don't apply to ephemeral mode (no role file)."""
-    if mode not in (RunMode.STANDARD, RunMode.BOT):
-        console.print(f"[red]Error:[/red] {mode.value} mode is not supported without a role file.")
-        raise typer.Exit(1)
-
-    invalid = []
-    if autonomous:
-        invalid.append("--autonomous")
-    if dry_run:
-        invalid.append("--dry-run")
-    if save is not None:
-        invalid.append("--save")
-    if skill_dir is not None:
-        invalid.append("--skill-dir")
-    if report is not None:
-        invalid.append("--report")
-    if report_template != "default":
-        invalid.append("--report-template")
-    if invalid:
-        console.print(f"[red]Error:[/red] {', '.join(invalid)} not supported without a role file.")
-        raise typer.Exit(1)
-
-    # --resume only valid for REPL (no -p, or -p with -i)
-    if resume and prompt and not interactive:
-        console.print("[red]Error:[/red] --resume requires -i when used with -p.")
-        raise typer.Exit(1)
-
-
-# ---------------------------------------------------------------------------
-# Role-file-only validation
-# ---------------------------------------------------------------------------
 
 
 def _validate_role_only_flags(
     *,
-    tool_profile: str | None,
-    extra_tools: list[str] | None,
-    provider: str | None,
+    tools: list[str] | None,
+    memory: bool | None,
     ingest: list[str] | None,
-    list_tools: bool,
 ) -> None:
     """Reject ephemeral-only flags when a role file is provided."""
     invalid = []
-    if tool_profile is not None:
-        invalid.append("--tool-profile")
-    if extra_tools:
+    if tools:
         invalid.append("--tools")
-    if provider is not None:
-        invalid.append("--provider")
+    # bool | None: --no-memory is False, which is still an explicit choice.
+    if memory is not None:
+        invalid.append("--memory/--no-memory")
     if ingest:
         invalid.append("--ingest")
-    if list_tools:
-        invalid.append("--list-tools")
     if invalid:
         console.print(
             f"[red]Error:[/red] {', '.join(invalid)} not supported with a role file"

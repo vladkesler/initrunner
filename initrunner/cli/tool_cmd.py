@@ -117,6 +117,6 @@ def tool_new(
     console.print(f"  1. Review {scaffold.module_name}.py (it runs as plain Python).")
     console.print("  2. Add the snippet above to your role's tools.")
     console.print(
-        "  3. Iterate live: [bold]initrunner run role.yaml --dev[/bold], then "
+        "  3. Iterate live: [bold]initrunner run role.yaml -i --format rich[/bold], then "
         f"[bold]/tool add {scaffold.module_name}[/bold]."
     )

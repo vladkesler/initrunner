@@ -51,7 +51,7 @@ def run_single(
     """Execute a single prompt and display the result.
 
     ``show_thinking=False`` suppresses the Rich ``Live`` spinner so a
-    ``breakpoint()`` in a tool owns the terminal (used by ``run --dev``).
+    ``breakpoint()`` in a tool owns the terminal (used by ``run -i --format rich``).
     """
     import contextlib
 

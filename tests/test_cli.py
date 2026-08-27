@@ -186,7 +186,7 @@ class TestRun:
             app, ["run", "--sense", "-p", "test task", "--format", "rich", "--no-audit"]
         )
         assert result.exit_code == 0
-        mock_select.assert_called_once_with("test task", role_dir=None, allow_llm=True)
+        mock_select.assert_called_once_with("test task", allow_llm=True)
         mock_run_single.assert_called_once()
 
     @patch("initrunner.services.role_selector.select_role_sync")
@@ -197,7 +197,7 @@ class TestRun:
         mock_select.side_effect = NoRolesFoundError("no roles")
         result = runner.invoke(app, ["run", "--sense", "--dry-run", "-p", "task"])
         assert result.exit_code == 1
-        mock_select.assert_called_once_with("task", role_dir=None, allow_llm=False)
+        mock_select.assert_called_once_with("task", allow_llm=False)
 
     @patch("initrunner.runner.run_single")
     @patch("initrunner.agent.loader.load_and_build")
@@ -205,7 +205,7 @@ class TestRun:
     def test_auto_confirm_role_interactive_yes(
         self, mock_select, mock_load, mock_run_single, tmp_path
     ):
-        """--confirm-role with 'y' on a TTY-like stdin proceeds."""
+        """Sensing on a TTY-like stdin confirms, and 'y' proceeds."""
         import io
 
         from initrunner.agent.executor import RunResult
@@ -242,14 +242,19 @@ class TestRun:
         # Use --format rich to force buffered panel path (CliRunner is non-TTY)
         result = runner.invoke(
             app,
-            ["run", "--sense", "--confirm-role", "-p", "task", "--format", "rich", "--no-audit"],
+            ["run", "--sense", "-p", "task", "--format", "rich", "--no-audit"],
             input=_FakeTTY(b"y\n"),
         )
         assert result.exit_code == 0
 
+    @patch("initrunner.runner.run_single")
+    @patch("initrunner.agent.loader.load_and_build")
     @patch("initrunner.services.role_selector.select_role_sync")
-    def test_auto_confirm_role_non_tty_errors(self, mock_select, tmp_path):
-        """--confirm-role in a non-TTY environment (CliRunner default) should error."""
+    def test_auto_sense_non_tty_proceeds_without_prompting(
+        self, mock_select, mock_load, mock_run_single, tmp_path
+    ):
+        """Piped and scripted runs are never blocked on a confirmation prompt."""
+        from initrunner.agent.executor import RunResult
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
 
         role_file = tmp_path / "role.yaml"
@@ -263,17 +268,25 @@ class TestRun:
         )
         mock_select.return_value = SelectionResult(candidate=cand, method="keyword")
 
-        # No stdin patch: CliRunner provides a BytesIO stdin with isatty()=False
+        role = MagicMock()
+        role.spec.memory = None
+        role.spec.sinks = []
+        role.spec.observability = None
+        role.spec.guardrails.run_token_budget = None
+        mock_load.return_value = (role, MagicMock())
+        mock_run_single.return_value = (RunResult(run_id="x", output="ok", success=True), [])
+
+        # CliRunner's stdin reports isatty()=False.
         result = runner.invoke(
-            app,
-            ["run", "--sense", "--confirm-role", "-p", "task"],
+            app, ["run", "--sense", "-p", "task", "--format", "rich", "--no-audit"]
         )
-        assert result.exit_code == 1
-        assert "interactive terminal" in result.output
+        assert result.exit_code == 0
+        assert "Use this role?" not in result.output
+        mock_run_single.assert_called_once()
 
     @patch("initrunner.services.role_selector.select_role_sync")
     def test_auto_confirm_role_interactive_no(self, mock_select, tmp_path):
-        """--confirm-role with 'n' on a TTY-like stdin cancels the run (exit 0)."""
+        """Sensing on a TTY-like stdin cancels the run on 'n' (exit 0)."""
         import io
 
         from initrunner.services.role_selector import RoleCandidate, SelectionResult
@@ -295,7 +308,7 @@ class TestRun:
 
         result = runner.invoke(
             app,
-            ["run", "--sense", "--confirm-role", "-p", "task"],
+            ["run", "--sense", "-p", "task"],
             input=_FakeTTY(b"n\n"),
         )
         # typer.Exit() without code = 0
@@ -374,7 +387,7 @@ class TestRunStreaming:
     @patch("initrunner.runner.run_single")
     @patch("initrunner.agent.loader.load_and_build")
     def test_no_stream_forces_buffered(self, mock_load, mock_run_single, mock_run_stream, tmp_path):
-        """--no-stream on TTY should use run_single (buffered)."""
+        """--format rich on a TTY uses run_single (buffered), not the stream."""
         from initrunner.agent.executor import RunResult
         from initrunner.agent.schema.output import OutputConfig
 
@@ -396,7 +409,7 @@ class TestRunStreaming:
         with patch("initrunner.cli._run_agent.sys") as mock_sys:
             mock_sys.stdout.isatty.return_value = True
             result = runner.invoke(
-                app, ["run", str(role_file), "-p", "hello", "--no-stream", "--no-audit"]
+                app, ["run", str(role_file), "-p", "hello", "--format", "rich", "--no-audit"]
             )
 
         assert result.exit_code == 0
@@ -652,33 +665,6 @@ class TestRunOutputFormat:
         )
         assert result.exit_code == 1
         assert "Unknown format" in result.output
-
-    def test_no_stream_deprecation_warning(self, tmp_path):
-        """--no-stream should emit a deprecation warning."""
-        from initrunner.agent.executor import RunResult
-
-        role = self._mock_role()
-
-        role_file = tmp_path / "role.yaml"
-        role_file.write_text(_DUMMY_VALID_ROLE_YAML)
-
-        with (
-            patch("initrunner.agent.loader.load_and_build", return_value=(role, MagicMock())),
-            patch(
-                "initrunner.runner.run_single",
-                return_value=(RunResult(run_id="t", output="ok", success=True), []),
-            ),
-            patch("initrunner.cli._run_agent.sys") as mock_sys,
-        ):
-            mock_sys.stdout.isatty.return_value = True
-            result = runner.invoke(
-                app, ["run", str(role_file), "-p", "hello", "--no-stream", "--no-audit"]
-            )
-
-        assert result.exit_code == 0
-        # Deprecation warning goes to stderr (captured by typer.echo(err=True))
-        # CliRunner merges stdout+stderr in output by default
-        assert "deprecated" in result.output.lower()
 
 
 class TestDisplayResultPlain:
@@ -1637,11 +1623,11 @@ class TestErrorHints:
         assert "initrunner new" in result.output
 
     def test_unknown_tool_type_hint(self):
-        """Unknown --tools value should suggest --list-tools."""
+        """An unknown --tools value lists the profiles and tools that work."""
         result = runner.invoke(app, ["run", "-p", "hi", "--tools", "nonexistent_xyz", "--no-audit"])
         assert result.exit_code == 1
-        assert "Hint" in result.output
-        assert "--list-tools" in result.output
+        assert "Profiles:" in result.output
+        assert "Tools:" in result.output
 
     def test_no_provider_hint(self, monkeypatch):
         """No usable provider should suggest initrunner setup and env vars."""

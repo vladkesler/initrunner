@@ -38,11 +38,9 @@ if TYPE_CHECKING:
 def group_context(
     group_file: Path,
     *,
-    audit_db: Path | None,
     no_audit: bool,
     with_memory: bool = False,
     with_sinks: bool = False,
-    skill_dir: Path | None = None,
     model: str | None = None,
 ) -> Iterator[GroupRuntime]:
     """Build every member of a group and own their resources for the process.
@@ -58,7 +56,7 @@ def group_context(
     from initrunner.stores.factory import managed_memory_store
 
     roster = load_roster_or_exit(group_file)
-    audit_logger = create_audit_logger(audit_db, no_audit)
+    audit_logger = create_audit_logger(None, no_audit)
 
     provider = None
     if roster.group.observability is not None:
@@ -67,7 +65,7 @@ def group_context(
     try:
         prepared = prepare_group(
             roster,
-            extra_skill_dirs=resolve_skill_dirs(skill_dir),
+            extra_skill_dirs=resolve_skill_dirs(None),
             model_override=resolve_model_override(model),
         )
     except GroupPrepareError as e:
@@ -101,26 +99,27 @@ def group_context(
 
 def dispatch_group_serve(
     group_file: Path,
-    host: str,
-    port: int,
-    api_key: str | None,
-    cors_origin: list[str] | None,
-    audit_db: Path | None,
+    host: str | None,
+    port: int | None,
     no_audit: bool,
-    skill_dir: Path | None,
     model: str | None,
 ) -> None:
     """Serve every member of a group from one OpenAI-compatible API."""
+    import os
+
     from initrunner.middleware import resolve_exposed_api_key
     from initrunner.server.app import ServedMember, run_multi_server
 
+    host = host or "127.0.0.1"
+    port = port or 8000
+
     # Fail closed: never serve agents off-host without authentication.
-    resolved_key, generated_key = resolve_exposed_api_key(host, api_key)
+    resolved_key, generated_key = resolve_exposed_api_key(
+        host, os.environ.get("INITRUNNER_API_KEY")
+    )
     with group_context(
         group_file,
-        audit_db=audit_db,
         no_audit=no_audit,
-        skill_dir=skill_dir,
         model=model,
     ) as (roster, prepared, audit_logger, _stores, _sinks):
         members = {
@@ -138,13 +137,12 @@ def dispatch_group_serve(
         console.print(f"  Models:   http://{host}:{port}/v1/models")
         if generated_key is not None:
             console.print(
-                "  Auth:     [yellow]enabled[/yellow] -- generated key (no --api-key given):\n"
+                "  Auth:     [yellow]enabled[/yellow] -- generated key"
+                " (INITRUNNER_API_KEY not set):\n"
                 f"            [bold]{generated_key}[/bold]"
             )
         elif resolved_key:
             console.print("  Auth:     [yellow]enabled[/yellow] (Bearer token required)")
-        if cors_origin:
-            console.print(f"  CORS:     {', '.join(cors_origin)}")
 
         run_multi_server(
             members,
@@ -153,41 +151,29 @@ def dispatch_group_serve(
             port=port,
             audit_logger=audit_logger,
             api_key=resolved_key,
-            cors_origins=cors_origin,
         )
 
 
 def dispatch_group_daemon(
     group_file: Path,
-    audit_db: Path | None,
     no_audit: bool,
-    skill_dir: Path | None,
     model: str | None,
-    *,
-    autopilot: bool = False,
-    budget_timezone: str | None = None,
 ) -> None:
     """Run every trigger-driven member of a group in one process."""
     from initrunner.group.daemon import run_group_daemon
 
     with group_context(
         group_file,
-        audit_db=audit_db,
         no_audit=no_audit,
         with_memory=True,
         with_sinks=True,
-        skill_dir=skill_dir,
         model=model,
     ) as (roster, prepared, audit_logger, memory_stores, sinks):
-        if budget_timezone is not None:
-            for member in prepared.values():
-                member.role.spec.guardrails.budget_timezone = budget_timezone
         run_group_daemon(
             roster,
             prepared,
             audit_logger=audit_logger,
             memory_stores=memory_stores,
             sink_dispatchers=sinks,
-            extra_skill_dirs=resolve_skill_dirs(skill_dir),
-            autopilot=autopilot,
+            extra_skill_dirs=resolve_skill_dirs(None),
         )

@@ -148,13 +148,9 @@ triggers:
 
 七种触发器类型：cron、webhook、file_watch、heartbeat、telegram、discord、slack。守护进程热重载角色变更无需重启，最多同时运行四个触发器。查看 [触发器](docs/core/triggers.md)。
 
-### 自动驾驶
+### 自主触发器
 
-`--autopilot` 就是 `--daemon` 加上每个触发器的自主循环。Telegram 消息 "帮我找从纽约到伦敦下周的航班" 在守护进程模式下只有一次 LLM 轮次。在自动驾驶模式下，Agent 搜索航班、比较选项、核对日期，然后回复一份候选列表。
-
-```bash
-initrunner run role.yaml --autopilot
-```
+设置了 `autonomous: true` 的触发器会运行自主循环，而不是单次响应。Telegram 消息 "帮我找从纽约到伦敦下周的航班" 默认只有一次 LLM 轮次；开启自主模式后，Agent 搜索航班、比较选项、核对日期，然后回复一份候选列表。
 
 也可以有选择地启用。在单个触发器上设置 `autonomous: true`，其余保持单次响应：
 

@@ -73,7 +73,7 @@ These fields in the `guardrails:` block control autonomous execution limits:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `max_iterations` | `int` | `10` | Maximum number of loop iterations before the run stops. Can be overridden with `--max-iterations` on the CLI. |
+| `max_iterations` | `int` | `10` | Maximum number of loop iterations before the run stops. |
 | `autonomous_token_budget` | `int \| null` | `null` (unlimited) | Total token budget across all iterations. The loop stops when this budget is exhausted. The current consumption is shown to the agent in the continuation prompt BUDGET block. |
 | `autonomous_timeout_seconds` | `int \| null` | `null` (unlimited) | Wall-clock timeout for the entire autonomous run. Elapsed time is shown to the agent in the continuation prompt BUDGET block. |
 
@@ -156,7 +156,7 @@ schedule_followup_at(prompt: str, iso_datetime: str) -> str
 initrunner run role.yaml -p "Research quantum computing advances" -a
 
 # Override max iterations
-initrunner run role.yaml -p "Research quantum computing advances" -a --max-iterations 20
+initrunner run role.yaml -p "Research quantum computing advances" -a
 
 # Dry run (no API calls, uses TestModel)
 initrunner run role.yaml -p "Test the agentic loop" -a --dry-run
@@ -167,18 +167,17 @@ Flags:
 | Flag | Description |
 |---|---|
 | `-a`, `--autonomous` | Enable autonomous agentic loop mode |
-| `--max-iterations N` | Override `guardrails.max_iterations` for this run |
 | `--dry-run` | Use `TestModel` instead of making real API calls |
 
 Note: `--autonomous` requires `--prompt` (`-p`) and is mutually exclusive with `--interactive` (`-i`).
 
 ## Daemon Mode
 
-In daemon mode, triggers can opt into autonomous execution per trigger fire. Use `--autopilot` to force all triggers into autonomous mode without per-trigger config:
+In daemon mode, triggers opt into autonomous execution per trigger. Set `autonomous: true` on each trigger you want looping, and declare an `autonomy:` block so the role has loop settings:
 
 ```bash
 initrunner run role.yaml --daemon      # triggers use autonomous: true/false per config
-initrunner run role.yaml --autopilot   # all triggers use autonomous loop
+initrunner run role.yaml --daemon   # triggers marked autonomous use the loop
 ```
 
 Set `autonomous: true` on any trigger config:

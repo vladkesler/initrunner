@@ -262,11 +262,13 @@ class TestRunADirectory:
         assert result.exit_code == 1
         assert "--interactive" in _flat(result.output)
 
-    def test_save_is_rejected(self, desk: Path, tmp_path: Path) -> None:
-        result = runner.invoke(app, ["run", str(desk), "--save", str(tmp_path / "out.yaml")])
+    def test_report_is_rejected_for_the_whole_group(self, desk: Path, tmp_path: Path) -> None:
+        """A group has no single run to report on; name a member instead."""
+        result = runner.invoke(app, ["run", str(desk), "--report", str(tmp_path / "out.md")])
 
         assert result.exit_code == 1
-        assert "directory of agents" in _flat(result.output)
+        assert "--report" in _flat(result.output)
+        assert "--agent" in _flat(result.output)
 
     def test_a_broken_member_stops_the_whole_group(self, desk: Path) -> None:
         (desk / "reply.yaml").write_text("name: reply\nmodel: 42\n")

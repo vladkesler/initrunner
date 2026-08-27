@@ -9,7 +9,7 @@ The `initrunner run <role> --serve` command exposes any agent as an OpenAI-compa
 initrunner run role.yaml --serve
 
 # With authentication
-initrunner run role.yaml --serve --api-key my-secret-key
+INITRUNNER_API_KEY=my-secret-key initrunner run role.yaml --serve
 
 # Custom host/port
 initrunner run role.yaml --serve --host 0.0.0.0 --port 3000
@@ -24,10 +24,10 @@ Use `initrunner run <role> --serve` with the following flags:
 | `role_file` | `Path` | *(required)* | Path to the role YAML file, or a [group file](../orchestration/groups.md) to serve several agents from one process. |
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
-| `--api-key` | `str` | `None` | API key for Bearer token authentication. When set, all `/v1/*` endpoints require `Authorization: Bearer <key>`. Env: `INITRUNNER_API_KEY`. Binding off-host without one generates a key rather than serving unauthenticated. |
+| `INITRUNNER_API_KEY` (env) | `str` | `None` | API key for Bearer token authentication. When set, all `/v1/*` endpoints require `Authorization: Bearer <key>`. Binding off-host without one generates a key rather than serving unauthenticated. Environment-only: a key on the command line shows up in `ps`. |
 | `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
-| `--cors-origin` | `str` | `None` | Allowed CORS origin. Can be repeated. Merged with `security.server.cors_origins` from role YAML. |
+| `security.server.cors_origins` (role YAML) | `list[str]` | `[]` | Allowed CORS origins. |
 | `--skill-dir` | `Path` | `None` | Extra skill search directory. |
 
 ## Endpoints
@@ -40,7 +40,7 @@ Health check endpoint. Always returns `200 OK`.
 {"status": "ok"}
 ```
 
-Not protected by authentication even when `--api-key` is set.
+Not protected by authentication even when `INITRUNNER_API_KEY` is set.
 
 ### `GET /v1/models`
 
@@ -230,7 +230,7 @@ Things worth knowing:
 
 ## Authentication
 
-When `--api-key` is set, all `/v1/*` endpoints require a Bearer token:
+When `INITRUNNER_API_KEY` is set, all `/v1/*` endpoints require a Bearer token:
 
 ```
 Authorization: Bearer <api-key>
@@ -246,16 +246,10 @@ Invalid or missing tokens return:
 
 ## CORS
 
-By default, the server sends **no CORS headers** (secure default). CORS origins are configured via the role YAML (`security.server.cors_origins`) and/or the `--cors-origin` CLI flag.
+By default, the server sends **no CORS headers** (secure default). CORS origins are configured in the role YAML (`security.server.cors_origins`).
 
-- Origins from both sources are **merged** (CLI supplements YAML, does not replace).
 - When at least one origin is configured, the server adds CORS middleware with `allow_methods: ["*"]` and `allow_headers: ["*"]` for those origins.
 - If no origins are configured, no CORS middleware is added.
-
-```bash
-# Add origins via CLI (repeatable flag)
-initrunner run role.yaml --serve --cors-origin https://myapp.com --cors-origin https://staging.com
-```
 
 ## Error Handling
 
@@ -326,7 +320,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://127.0.0.1:8000/v1",
-    api_key="my-secret-key",  # or "unused" if no --api-key set
+    api_key="my-secret-key",  # or "unused" if INITRUNNER_API_KEY is not set
 )
 
 response = client.chat.completions.create(
@@ -431,5 +425,5 @@ docker volume rm open-webui
 
 ### Notes
 
-- If you start the server with `--api-key`, set `OPENAI_API_KEY` to the same value in the `docker run` command.
+- If you start the server with `INITRUNNER_API_KEY`, set `OPENAI_API_KEY` to the same value in the `docker run` command.
 - For production deployments, consider running both services behind a reverse proxy with TLS.

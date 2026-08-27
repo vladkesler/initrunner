@@ -156,11 +156,12 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
     whoami,
 )
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
-from initrunner.cli.run_cmd import run  # noqa: E402
+from initrunner.cli.run_cmd import RunCommand, run  # noqa: E402
 from initrunner.cli.vault_cmd import app as vault_app  # noqa: E402
 
 # --- Getting Started ---
-app.command(rich_help_panel="Getting Started")(run)
+# RunCommand turns a removed flag into a pointer at its replacement.
+app.command(rich_help_panel="Getting Started", cls=RunCommand)(run)
 app.command(rich_help_panel="Getting Started")(new)
 app.command(rich_help_panel="Getting Started")(setup)
 app.command(rich_help_panel="Getting Started")(doctor)

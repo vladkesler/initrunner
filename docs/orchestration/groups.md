@@ -91,7 +91,7 @@ Add `run: sequential` to make it a team, or move `writer` into its own role file
 
 ## What a group file may contain
 
-Members carry `use:` and nothing else. A member with overrides is a persona, which is a team; keeping groups reference-only is what lets each member's skills, custom tools, `.env`, ingest sources and output schemas keep resolving against its own directory, and keeps `--dev` hot reload working.
+Members carry `use:` and nothing else. A member with overrides is a persona, which is a team; keeping groups reference-only is what lets each member's skills, custom tools, `.env`, ingest sources and output schemas keep resolving against its own directory, and keeps `/tool add` hot-attach working.
 
 At the top level a group may set:
 
@@ -115,7 +115,7 @@ initrunner run desk.yaml --agent researcher -i          # REPL
 initrunner run desk.yaml --agent writer -a -p "draft the reply"
 ```
 
-A selected member behaves exactly like `initrunner run roles/intake.yaml`: attachments, reports, autonomous mode, `--serve`, `--daemon` and `--bot` all work as usual, plus whatever the group shares.
+A selected member behaves exactly like `initrunner run roles/intake.yaml`: attachments, reports, autonomous mode, `--serve` and `--daemon` all work as usual, plus whatever the group shares.
 
 Running a group without naming an agent lists the members and exits non-zero. It never picks one for you and never fans out to all of them:
 
@@ -134,7 +134,7 @@ To let the prompt choose, use `--sense`. It scores the group's own members -- ne
 
 ```bash
 initrunner run desk.yaml --sense -p "write the customer reply"
-initrunner run desk.yaml --sense --confirm-role -p "..."   # ask before running
+initrunner run desk.yaml --sense -p "..."                  # confirms on a terminal
 ```
 
 `--dry-run` keeps sensing to keyword scoring, with no model call for the tiebreak.

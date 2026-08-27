@@ -245,13 +245,11 @@ class TestEphemeralModeReportsAMissingExtra:
         assert "initrunner[vector]" in flat
         assert "--no-memory" in flat
 
-    def test_bot_path_reports_the_same_way(self, no_lancedb, monkeypatch):
-        """The SDK gate fires first on a lean install; step past it."""
+    def test_interactive_path_reports_the_same_way(self, no_lancedb):
+        """The REPL path reports a missing extra like the one-shot path does."""
         from initrunner.cli.main import app
 
-        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x")
-        with patch("initrunner.cli._ephemeral.verify_bot_sdk"):
-            result = CliRunner().invoke(app, ["run", "--bot", "telegram", "--no-audit"])
+        result = CliRunner().invoke(app, ["run", "-i", "--no-audit"])
 
         flat = " ".join(result.output.split())
         assert result.exit_code == 1

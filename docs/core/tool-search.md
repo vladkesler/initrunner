@@ -53,7 +53,7 @@ In ephemeral mode (`initrunner run` without a role file) the CLI configures tool
 
 ### How it works
 
-Only the tools you actually select are attached, the `--tool-profile` you pick plus any `--tools` extras, never the full catalog. When that set is just `datetime` and `web_reader` (or empty), there is nothing worth hiding, so tool search stays off and no `search_tools` function is registered. As soon as anything else is attached, tool search turns on: the attached datetime and web_reader functions are pinned as `always_available`, and every other attached tool is discoverable via `search_tools()`.
+Only the tools you actually select are attached, the profile and tool types you name with `--tools`, never the full catalog. When that set is just `datetime` and `web_reader` (or empty), there is nothing worth hiding, so tool search stays off and no `search_tools` function is registered. As soon as anything else is attached, tool search turns on: the attached datetime and web_reader functions are pinned as `always_available`, and every other attached tool is discoverable via `search_tools()`.
 
 | Profile | Tool search | Always visible | Discoverable via search |
 |---------|-------------|----------------|------------------------|
@@ -66,14 +66,14 @@ Only the tools you actually select are attached, the `--tool-profile` you pick p
 ### Example
 
 ```bash
-initrunner run --tool-profile all
+initrunner run --tools all
 ```
 
 The agent sees `current_time`, `parse_date`, `fetch_page`, and `search_tools`. When the user asks "search the web for Python 3.13 release notes", the agent calls `search_tools("web search")`, discovers `web_search`, and then calls it — all in the same turn.
 
-Tools added with `--tools` are not pinned. An extra that goes beyond the `minimal` set switches tool search on and lands behind it. For example, `--tool-profile minimal --tools git` keeps `current_time`, `parse_date`, and `fetch_page` always visible, and makes `git_log`, `git_diff`, and the rest of the git functions discoverable through `search_tools`. An extra that is already in the minimal profile (`--tools datetime`, `--tools web_reader`) changes nothing and leaves tool search off.
+Tools added with `--tools` are not pinned. An extra that goes beyond the `minimal` set switches tool search on and lands behind it. For example, `--tools minimal,git` keeps `current_time`, `parse_date`, and `fetch_page` always visible, and makes `git_log`, `git_diff`, and the rest of the git functions discoverable through `search_tools`. An extra that is already in the minimal profile (`--tools datetime`, `--tools web_reader`) changes nothing and leaves tool search off.
 
-### Relationship to `--tool-profile all`
+### Relationship to `--tools all`
 
 The `all` profile attaches every built-in extra (`datetime`, `web_reader`, `search`, `python`, `filesystem`, `slack`, `git`, `shell`), and that is what turns tool search on. The three datetime and web_reader functions stay visible, and the remaining functions are reached through `search_tools`, so context stays bounded even with the full catalog attached. The default `minimal` profile attaches only `datetime` and `web_reader`, which is below the threshold, so tool search stays off and both tools' functions are simply visible.
 

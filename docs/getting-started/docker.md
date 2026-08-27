@@ -66,7 +66,7 @@ docker run --rm -it -e OPENAI_API_KEY \
     initrunner run -i --tools git --tools filesystem
 
 # Enable all built-in tools at once
-#   initrunner run -i --tool-profile all
+#   initrunner run -i --tools all
 ```
 
 ## RAG (document chat)
@@ -91,7 +91,7 @@ docker run --rm -it -e OPENAI_API_KEY \
 ```bash
 docker run -d -e OPENAI_API_KEY -e TELEGRAM_BOT_TOKEN \
     -v initrunner-data:/data ghcr.io/vladkesler/initrunner:latest \
-    initrunner run --bot telegram
+    initrunner run telegram --daemon
 ```
 
 ## API server

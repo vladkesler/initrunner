@@ -38,7 +38,7 @@ services:
     # Override examples (raise mem_limit to 512m for the RAG one):
     #   API server:    command: ["initrunner", "run", "/data/roles/my-agent.yaml", "--serve", "--host", "0.0.0.0"]
     #   RAG agent:     command: ["initrunner", "run", "/data/roles/rag-agent.yaml", "--serve", "--host", "0.0.0.0"]
-    #   Telegram bot:  command: ["initrunner", "run", "--bot", "telegram"]
+    #   Telegram bot:  command: ["initrunner", "run", "telegram", "--daemon"]
     #   Interactive:   command: ["initrunner", "run", "-i"]
 
 volumes:

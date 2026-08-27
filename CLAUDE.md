@@ -131,7 +131,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | PydanticAI Agent Spec import/export | `docs/getting-started/agent-spec-import.md` |
 | Tool configuration reference (all built-in types) | `docs/agents/tools.md` |
 | Tool examples cookbook | `docs/agents/example_tools.md` |
-| Creating, scaffolding (`tool new`) & hot-attaching (`--dev`) tools | `docs/agents/tool_creation.md` |
+| Creating, scaffolding (`tool new`) & hot-attaching (`/tool add`) tools | `docs/agents/tool_creation.md` |
 | Tool registry internals | `docs/agents/registry.md` |
 | Skills (SKILL.md bundles) | `docs/agents/skills_feature.md` |
 | Always-on services (start/status/stop) | `docs/agents/services.md` |

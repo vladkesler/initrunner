@@ -126,10 +126,10 @@ guardrails:
 Or override from the CLI:
 
 ```bash
-initrunner run role.yaml --daemon --budget-timezone America/New_York
+initrunner run role.yaml --daemon
 ```
 
-The `--budget-timezone` flag is valid with `--daemon`, `--autopilot`, and `--bot`.
+Set `guardrails.budget_timezone` in the role; it applies to every daemon run.
 
 ### Startup Validation
 

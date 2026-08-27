@@ -109,13 +109,15 @@ The generated functions are plain Python with type hints and docstrings, so the 
 In an interactive session you can add a tool without restarting:
 
 ```
-initrunner run role.yaml --dev
+initrunner run role.yaml -i
 > /tool add fetch_pr_diff
 ```
 
+Add `--format rich` when you plan to hit a `breakpoint()`.
+
 `/tool add <module>` appends a `type: custom` entry, rebuilds the agent, and preserves the conversation history, so the agent can call the new tool on the next turn. Re-running it after editing the module reloads the source. `/reload` does the same after you edit `role.yaml` itself.
 
-Because custom tools are plain Python running in-process, you can drop a `breakpoint()` into a function and step through the agent's real tool call with `pdb`. The `--dev` flag turns off streaming and the status spinner so the debugger owns the terminal. Reliable stepping needs an `async def` tool (it runs on the main loop thread; synchronous tools run on a worker thread), and a `breakpoint()` cannot reach inside an out-of-process sandbox (`bwrap`/`docker`/`ssh`), so use the `none` backend or in-process audit hooks while debugging.
+Because custom tools are plain Python running in-process, you can drop a `breakpoint()` into a function and step through the agent's real tool call with `pdb`. `--format rich` turns off streaming and the status spinner so the debugger owns the terminal. Reliable stepping needs an `async def` tool (it runs on the main loop thread; synchronous tools run on a worker thread), and a `breakpoint()` cannot reach inside an out-of-process sandbox (`bwrap`/`docker`/`ssh`), so use the `none` backend or in-process audit hooks while debugging.
 
 ### Single Function vs. Module Discovery
 

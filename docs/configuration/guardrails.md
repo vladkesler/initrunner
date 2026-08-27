@@ -44,7 +44,7 @@ guardrails:
 | `cost_limit` | float | *null* | Best-effort USD cap for one logical run (`UsageLimits.cost_limit`). Unpriced models do not enforce it. |
 | `total_tokens_limit` | int | *null* | Cumulative input+output tokens for one logical run |
 | `session_token_budget` | int | *null* | Cumulative token budget for REPL session (warns at 80%) |
-| `run_token_budget` | int | *null* | Cumulative token budget for a single one-shot CLI run; counts the parent run plus completed inline-delegated sub-runs. Override per-invocation with `--token-budget N`. |
+| `run_token_budget` | int | *null* | Cumulative token budget for a single one-shot CLI run; counts the parent run plus completed inline-delegated sub-runs. |
 | `daemon_token_budget` | int | *null* | Lifetime token budget for daemon process |
 | `daemon_daily_token_budget` | int | *null* | Daily token budget for daemon (resets at UTC midnight) |
 | `daemon_daily_cost_budget` | float | *null* | Daily USD cost budget for daemon (resets at UTC midnight) |
@@ -127,7 +127,7 @@ See [Autonomous Execution](../orchestration/autonomy.md) for the full loop lifec
 Token usage is tracked per-run in the audit log and displayed in the CLI.
 
 - **Per-call limits** (`max_tokens_per_run`, `total_tokens_limit`, `input_tokens_limit`, `per_request_input_tokens_limit`, `cost_limit`, `max_request_limit`) map to PydanticAI's `UsageLimits`. Cumulative fields apply to one logical InitRunner run, including approval resume. They do not see tokens spent inside delegated sub-agents.
-- **Per-run cumulative budget** (`run_token_budget`) caps one one-shot CLI invocation across the parent run *and* completed inline-delegated sub-runs. Use this when a coordinator role can spin up a chain of `delegate` tool calls and you want a hard ceiling on total spend per invocation. Override per-invocation with `--token-budget N`.
+- **Per-run cumulative budget** (`run_token_budget`) caps one one-shot CLI invocation across the parent run *and* completed inline-delegated sub-runs. Use this when a coordinator role can spin up a chain of `delegate` tool calls and you want a hard ceiling on total spend per invocation.
 - **Session budgets** (`session_token_budget`) track cumulative usage across REPL turns and warn at 80% consumption.
 - **Daemon budgets** (`daemon_token_budget`, `daemon_daily_token_budget`) protect long-running daemons from unbounded spend. The daily budget resets at UTC midnight.
 - **Cost budgets** (`daemon_daily_cost_budget`, `daemon_weekly_cost_budget`) enforce USD spend limits. They prefer the live `RunUsage.cost` and fall back to a token-based `genai-prices` estimate. Requires a supported model/provider.
