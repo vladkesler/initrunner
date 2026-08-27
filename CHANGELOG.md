@@ -32,7 +32,7 @@
 
 - **Ephemeral `--bot` is gone with it.** There was nowhere without a role file to put an allowlist or a budget. Use the bundled starter and copy it to customise. Two behaviour notes: the starter has no allowlist, exactly like the ephemeral bot, so add `allowed_user_ids` before sharing the bot's handle; and it runs one agent turn per message, where `run --bot` forced the autonomous loop.
 
-- **Flags are now refused rather than ignored.** Several combinations used to be accepted and silently dropped: `--no-memory` with a role file, `--var` and `--format` in ephemeral mode, `--model` on Team and Flow targets, `--dry-run` on a Flow, `--host`/`--port` without `--serve`, and `-p` with `--daemon`/`--serve`. Each is an error naming the flag. `tests/test_run_flag_matrix.py` walks every retained flag across every kind of target and asserts it is either received by the dispatcher or refused, so this cannot rot.
+- **Flags are now refused rather than ignored.** Several combinations used to be accepted and silently dropped: `--no-memory` with a role file, `--var` and `--format` in ephemeral mode, `--model` on Team and Flow targets, `--dry-run` on a Flow, `--host`/`--port` without `--serve`, `-p` with `--daemon`/`--serve`, and the flags that steer one run (`-i`, `--resume`, `--attach`, `--report`, `--var`, `--format`, `--dry-run`) under `--daemon`/`--serve`. That last one had teeth: `--dry-run --daemon` started the daemon and called the real model. Each is an error naming the flag. `tests/test_run_flag_matrix.py` walks every retained flag across every kind of target and asserts it is either received by the dispatcher or refused, so this cannot rot.
 
 - **`-i --format rich` no longer shows the "Thinking..." spinner.** That is what makes it a complete replacement for `--dev`, which existed to keep Rich off the terminal so a `breakpoint()` in a tool could own it. Streaming REPLs are unchanged.
 
@@ -44,7 +44,7 @@
 - `initrunner.runner.bot` and `run_bot`, `--autopilot` plumbing through `DaemonRunner`/`run_daemon`/`run_group_daemon`, the `cors_origins` arguments on the server entry points, `max_iterations_override` (its only caller was the CLI; `execute_autonomous_sync` had no callers at all), and `tool_dev` on `run_interactive`. `_run_team` also lost report parameters that could never fire, because `--report` has always been refused for Team targets.
 
 ### Added (daemon)
-- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint at startup naming the missing block. This is the case `--autopilot` used to paper over by waiving the requirement.
+- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint naming the missing block, at startup and again after a hot reload, so a live edit that adds the trigger without the block is not silent either. This is the case `--autopilot` used to paper over by waiving the requirement.
 
 ## [2026.8.10] - 2026-08-21
 

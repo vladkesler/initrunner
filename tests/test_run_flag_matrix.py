@@ -130,6 +130,27 @@ class TestModeRefusals:
     def test_refused_outside_its_mode(self, agent_file, argv, flag):
         _refused(["run", str(agent_file), *argv], flag)
 
+    # An Agent under --daemon/--serve is the one target with no denial table of
+    # its own, so it is where a single-run flag would slip through and be
+    # dropped by the dispatcher. Cross every one of them against both modes.
+    @pytest.mark.parametrize("mode", ["--daemon", "--serve"])
+    @pytest.mark.parametrize(
+        ("argv", "flag"),
+        [
+            (["--dry-run"], "--dry-run"),
+            (["-i"], "--interactive"),
+            (["--resume"], "--resume"),
+            (["--attach", "x.png"], "--attach"),
+            (["--report", "out.md"], "--report"),
+            (["--var", "K=V"], "--var"),
+            (["--format", "json"], "--format"),
+        ],
+    )
+    def test_agent_refuses_single_run_flags_in_long_running_modes(
+        self, agent_file, mode, argv, flag
+    ):
+        _refused(["run", str(agent_file), mode, *argv], flag)
+
 
 class TestTeamRefusals:
     @pytest.mark.parametrize(

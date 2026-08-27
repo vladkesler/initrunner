@@ -60,17 +60,31 @@ def _resolve_run_mode(
 
 _VALID_FORMATS = ("auto", "json", "text", "rich")
 
+# Flags that steer one single run: they shape its output, feed it input, or
+# stop it before it happens. ``--daemon`` and ``--serve`` have no single run for
+# them to land on, so they are rejected rather than accepted and dropped.
+# ``--autonomous`` is absent on purpose: mode resolution already refuses it
+# alongside a long-running mode, with a better message.
+_SINGLE_RUN_FLAGS = (
+    "--interactive",
+    "--resume",
+    "--attach",
+    "--report",
+    "--var",
+    "--format",
+    "--dry-run",
+)
+
 
 def _validate_universal_flags(
     *,
     mode: RunMode,
     output_format: str,
-    interactive: bool,
-    autonomous: bool,
     sense: bool,
     prompt: str | None,
     host: str | None,
     port: int | None,
+    active_flags: dict[str, bool],
 ) -> None:
     """Validate flags whose meaning depends only on the run mode."""
     # -- Format --
@@ -80,20 +94,22 @@ def _validate_universal_flags(
         )
         raise typer.Exit(1)
 
-    if output_format in ("json", "text") and interactive:
+    if output_format in ("json", "text") and active_flags.get("--interactive"):
         console.print("[red]Error:[/red] --format json|text is not supported with -i.")
         raise typer.Exit(1)
 
-    if output_format in ("json", "text") and autonomous:
+    if output_format in ("json", "text") and active_flags.get("--autonomous"):
         console.print("[red]Error:[/red] --format json|text is not supported with -a.")
         raise typer.Exit(1)
 
     # -- Mode-only flags --
-    # A long-running mode has no single run to format or prompt.
+    # A long-running mode has no single run to steer, format or prompt.
     if mode is not RunMode.STANDARD:
-        if output_format != "auto":
+        stray = [flag for flag in _SINGLE_RUN_FLAGS if active_flags.get(flag)]
+        if stray:
             console.print(
-                f"[red]Error:[/red] --format only applies to a standard run, not --{mode.value}."
+                f"[red]Error:[/red] {', '.join(stray)} only applies to a standard run,"
+                f" not --{mode.value}."
             )
             raise typer.Exit(1)
         if prompt:

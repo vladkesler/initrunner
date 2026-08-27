@@ -298,7 +298,7 @@ initrunner run role.yaml --daemon --no-audit
 |--------|------|---------|-------------|
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
 | `--daemon` | `bool` | `false` | Run in daemon mode with triggers. |
-| `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
+| `INITRUNNER_AUDIT_DB` (env) | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 
 ### Lifecycle

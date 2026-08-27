@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.schema.base import ApiVersion, Kind, ModelConfig, RoleMetadata
 from initrunner.agent.schema.role import AgentSpec, DaemonConfig, RoleDefinition
 from initrunner.agent.schema.triggers import CronTriggerConfig
@@ -25,6 +26,7 @@ def _make_role(
     triggers=None,
     hot_reload: bool = True,
     reload_debounce: float = 0.2,
+    autonomy=None,
 ) -> RoleDefinition:
     return RoleDefinition(
         apiVersion=ApiVersion.V1,
@@ -34,6 +36,7 @@ def _make_role(
             role="You are a test agent.",
             model=ModelConfig(provider="openai", name="gpt-5-mini"),
             triggers=triggers or [],
+            autonomy=autonomy,
             daemon=DaemonConfig(
                 hot_reload=hot_reload,
                 reload_debounce_seconds=reload_debounce,
@@ -297,6 +300,48 @@ class TestDaemonRunnerReload:
             runner._apply_reload(role_file)
 
         assert "cron" in runner._autonomous_trigger_types
+
+    def test_reload_hints_when_autonomy_block_is_missing(self, tmp_path, capsys):
+        """A live edit that adds an autonomous trigger but no autonomy: block."""
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("placeholder")
+
+        old_role = _make_role(triggers=[CronTriggerConfig(schedule="* * * * *", prompt="t")])
+        new_role = _make_role(
+            triggers=[CronTriggerConfig(schedule="* * * * *", prompt="t", autonomous=True)]
+        )
+
+        runner = DaemonRunner(MagicMock(), old_role, role_path=role_file)
+        runner._dispatcher = MagicMock()
+
+        with patch(
+            "initrunner.agent.loader.load_and_build",
+            return_value=(new_role, MagicMock()),
+        ):
+            runner._apply_reload(role_file)
+
+        assert "add 'autonomy: {}'" in capsys.readouterr().out
+
+    def test_reload_stays_quiet_when_autonomy_is_configured(self, tmp_path, capsys):
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text("placeholder")
+
+        old_role = _make_role(triggers=[CronTriggerConfig(schedule="* * * * *", prompt="t")])
+        new_role = _make_role(
+            triggers=[CronTriggerConfig(schedule="* * * * *", prompt="t", autonomous=True)],
+            autonomy=AutonomyConfig(),
+        )
+
+        runner = DaemonRunner(MagicMock(), old_role, role_path=role_file)
+        runner._dispatcher = MagicMock()
+
+        with patch(
+            "initrunner.agent.loader.load_and_build",
+            return_value=(new_role, MagicMock()),
+        ):
+            runner._apply_reload(role_file)
+
+        assert "autonomy: {}" not in capsys.readouterr().out
 
     def test_in_flight_uses_old_refs(self, tmp_path):
         """In-flight trigger runs use snapshot of old agent/role."""

@@ -165,18 +165,7 @@ class DaemonRunner:
 
         self._setup_scheduling()
 
-        # Check which triggers want autonomous mode
-        for tc in self._role.spec.triggers:
-            if getattr(tc, "autonomous", False):
-                self._autonomous_trigger_types.add(tc.type)
-
-        # A trigger marked autonomous still needs loop settings to loop; without
-        # them it quietly runs single-shot, which reads as the flag not working.
-        if self._autonomous_trigger_types and self._role.spec.autonomy is None:
-            console.print(
-                "[dim]Hint: add 'autonomy: {}' to run autonomous triggers as an"
-                " agentic loop; without it they run one turn each.[/dim]"
-            )
+        self._refresh_autonomous_triggers(self._role)
 
         self._dispatcher = TriggerDispatcher(self._role.spec.triggers, self._on_trigger)
 
@@ -210,6 +199,23 @@ class DaemonRunner:
             self._reloader.stop()
 
         console.print("Daemon stopped.")
+
+    def _refresh_autonomous_triggers(self, role: RoleDefinition) -> None:
+        """Recompute which trigger types run the autonomous loop.
+
+        A trigger marked ``autonomous: true`` still needs an ``autonomy:`` block
+        to loop; without one it quietly runs a single turn, which reads as the
+        setting not working. Say so on startup and again after every reload, so
+        a live edit that adds the trigger but not the block is not silent.
+        """
+        self._autonomous_trigger_types = {
+            tc.type for tc in role.spec.triggers if getattr(tc, "autonomous", False)
+        }
+        if self._autonomous_trigger_types and role.spec.autonomy is None:
+            console.print(
+                "[dim]Hint: add 'autonomy: {}' to run autonomous triggers as an"
+                " agentic loop; without it they run one turn each.[/dim]"
+            )
 
     def _setup_scheduling(self) -> None:
         """Initialize scheduling tools if autonomy is configured."""
@@ -739,12 +745,7 @@ class DaemonRunner:
                 timezone=new_g.budget_timezone,
             )
 
-        # Recompute autonomous trigger types
-        new_auto_types: set[str] = set()
-        for tc in new_role.spec.triggers:
-            if getattr(tc, "autonomous", False):
-                new_auto_types.add(tc.type)
-        self._autonomous_trigger_types = new_auto_types
+        self._refresh_autonomous_triggers(new_role)
 
         # Rebuild scheduling if autonomy config changed
         self._setup_scheduling()

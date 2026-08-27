@@ -25,10 +25,10 @@ Use `initrunner run <role> --serve` with the following flags:
 | `--host` | `str` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to expose on all interfaces. |
 | `--port` | `int` | `8000` | Port to listen on. |
 | `INITRUNNER_API_KEY` (env) | `str` | `None` | API key for Bearer token authentication. When set, all `/v1/*` endpoints require `Authorization: Bearer <key>`. Binding off-host without one generates a key rather than serving unauthenticated. Environment-only: a key on the command line shows up in `ps`. |
-| `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
+| `INITRUNNER_AUDIT_DB` (env) | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 | `security.server.cors_origins` (role YAML) | `list[str]` | `[]` | Allowed CORS origins. |
-| `--skill-dir` | `Path` | `None` | Extra skill search directory. |
+| `INITRUNNER_SKILL_DIR` (env) | `Path` | `None` | Extra skill search directory. |
 
 ## Endpoints
 

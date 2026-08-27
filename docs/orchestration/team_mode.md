@@ -357,9 +357,6 @@ initrunner run team.yaml -p "review the auth module" --dry-run
 
 # With audit logging
 INITRUNNER_AUDIT_DB=./audit.db initrunner run team.yaml -p "review the auth module"
-
-# Export report
-initrunner run team.yaml -p "review this PR" --report ./team-report.md
 ```
 
 The CLI header shows strategy, shared memory, and shared documents status:

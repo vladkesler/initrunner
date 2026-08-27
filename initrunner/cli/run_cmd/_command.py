@@ -151,19 +151,8 @@ def run(
         serve_mode=serve_mode,
         autonomous=autonomous,
     )
-    _validate_universal_flags(
-        mode=mode,
-        output_format=output_format,
-        interactive=interactive,
-        autonomous=autonomous,
-        sense=sense,
-        prompt=prompt,
-        host=host,
-        port=port,
-    )
-
-    # Flags whose support depends on what is being run. Built once and checked
-    # against the target's kind, so nothing is accepted and then ignored.
+    # Every flag whose support depends on the run mode or on what is being run.
+    # Built once and checked against both, so nothing is accepted then ignored.
     active_flags = {
         "--interactive": interactive,
         "--autonomous": autonomous,
@@ -176,6 +165,16 @@ def run(
         "--model": model is not None,
         "--agent": agent_member is not None,
     }
+
+    _validate_universal_flags(
+        mode=mode,
+        output_format=output_format,
+        sense=sense,
+        prompt=prompt,
+        host=host,
+        port=port,
+        active_flags=active_flags,
+    )
 
     # --- No role file + no --sense: ephemeral mode ---
     if role_file is None and not sense:

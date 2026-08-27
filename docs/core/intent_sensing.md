@@ -86,10 +86,10 @@ After sensing, the result panel shows one of four methods:
 
 Intent Sensing scans every `*.yaml` / `*.yml` file (recursively, at any depth, skipping `node_modules`, `.venv`, `__pycache__`, `.git` and similar) and keeps the ones that load as agent documents. The directories are searched in this order:
 
-2. Current working directory (`.`)
-3. `./examples/roles/` — if the directory exists
-4. Global roles directory (`~/.initrunner/roles/`, or `$INITRUNNER_HOME/roles/` or `$XDG_DATA_HOME/initrunner/roles/` when those variables are set)
-5. Bundled starter examples shipped with the package
+1. Current working directory (`.`)
+2. `./examples/roles/` — if the directory exists
+3. Global roles directory (`~/.initrunner/roles/`, or `$INITRUNNER_HOME/roles/` or `$XDG_DATA_HOME/initrunner/roles/` when those variables are set)
+4. Bundled starter examples shipped with the package
 
 Roles with parse errors are skipped silently. Only successfully loaded roles enter the scoring pool.
 

@@ -51,6 +51,6 @@ def _show_starter_listing() -> None:
     console.print()
     console.print("[dim]Usage:[/dim]")
     console.print("  initrunner run <name>              Run interactively")
-    console.print('  initrunner run <name> -p "..."      Single-shot with prompt')
+    console.print('  initrunner run <name> -p "..."     Single-shot with prompt')
     console.print("  initrunner examples copy <name>    Copy to a directory to customize")
     console.print()

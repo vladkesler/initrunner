@@ -33,11 +33,11 @@ The directory is created automatically if it doesn't exist.
 
 ## CLI Options
 
-The `--audit-db` and `--no-audit` flags are available on `run`, `daemon`, and `serve` commands:
+`run` takes `--no-audit`; the database path comes from the environment, so every reader (CLI, daemon, dashboard) resolves the same file:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--audit-db` | `Path` | `~/.initrunner/audit.db` | Custom path to the audit database. |
+| `INITRUNNER_AUDIT_DB` (env) | `Path` | `~/.initrunner/audit.db` | Custom path to the audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging entirely. |
 
 ## Audit Export
