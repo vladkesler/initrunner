@@ -43,6 +43,9 @@
 ### Removed (internal)
 - `initrunner.runner.bot` and `run_bot`, `--autopilot` plumbing through `DaemonRunner`/`run_daemon`/`run_group_daemon`, the `cors_origins` arguments on the server entry points, `max_iterations_override` (its only caller was the CLI; `execute_autonomous_sync` had no callers at all), and `tool_dev` on `run_interactive`. `_run_team` also lost report parameters that could never fire, because `--report` has always been refused for Team targets.
 
+### Added (daemon)
+- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint at startup naming the missing block. This is the case `--autopilot` used to paper over by waiving the requirement.
+
 ## [2026.8.10] - 2026-08-21
 
 ### Fixed

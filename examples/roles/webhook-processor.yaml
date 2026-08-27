@@ -45,6 +45,7 @@ tools:
     username: Webhook Bot
     icon_emoji: ':incoming_envelope:'
 - datetime
+autonomy: {}
 triggers:
 - type: webhook
   rate_limit_rpm: 30

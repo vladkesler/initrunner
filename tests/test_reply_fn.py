@@ -293,22 +293,21 @@ class TestReplyFnInDaemon:
 
         reply_fn.assert_not_called()
 
+    @patch("initrunner.runner.daemon.execute_run")
     @patch("initrunner.runner.daemon.run_autonomous")
-    def test_autopilot_forces_all_triggers_autonomous(self, mock_autonomous):
-        """Autopilot mode forces every trigger type into autonomous execution."""
+    def test_autonomous_trigger_without_autonomy_block_runs_single_shot(
+        self, mock_autonomous, mock_execute
+    ):
+        """An autonomous trigger still needs an autonomy block to loop."""
+        from initrunner.agent.executor import RunResult
         from initrunner.runner.daemon import DaemonRunner
 
-        mock_auto_result = MagicMock()
-        mock_auto_result.final_output = "Done"
-        mock_auto_result.final_messages = None
-        mock_auto_result.iterations = [MagicMock(output="Done")]
-        mock_auto_result.total_tokens = 100
-        mock_autonomous.return_value = mock_auto_result
-
-        event = TriggerEvent(
-            trigger_type="cron",
-            prompt="Do cron work",
+        mock_execute.return_value = (
+            RunResult(run_id="r", output="ok", success=True),
+            [],
         )
+
+        event = TriggerEvent(trigger_type="cron", prompt="Do cron work")
 
         agent = MagicMock()
         role = MagicMock()
@@ -318,16 +317,15 @@ class TestReplyFnInDaemon:
         role.spec.guardrails.daemon_weekly_cost_budget = None
         role.spec.guardrails.budget_timezone = "UTC"
         role.spec.triggers = []
-        role.spec.autonomy = None  # No autonomy config
+        role.spec.autonomy = None  # no loop settings
         role.spec.memory = None
 
-        runner = DaemonRunner(agent, role, autopilot=True)
-        # autopilot=True but no triggers registered yet; trigger_types populated in run()
-        # Manually add to simulate what run() does
+        runner = DaemonRunner(agent, role)
         runner._autonomous_trigger_types = {"cron"}
         runner._on_trigger_inner(event)
 
-        mock_autonomous.assert_called_once()
+        mock_autonomous.assert_not_called()
+        mock_execute.assert_called_once()
 
     @patch("initrunner.runner.daemon.run_autonomous")
     def test_non_conversational_autonomous_still_uses_autonomous(self, mock_autonomous):

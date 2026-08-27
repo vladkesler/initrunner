@@ -80,7 +80,6 @@ def execute_autonomous_sync(
     *,
     audit_logger: AuditLogger | None = None,
     memory_store: MemoryStoreBase | None = None,
-    max_iterations_override: int | None = None,
     principal_id: str | None = None,
 ) -> AutonomousResult:
     """Execute an autonomous agentic loop (sync)."""
@@ -92,7 +91,6 @@ def execute_autonomous_sync(
         prompt,
         audit_logger=audit_logger,
         memory_store=memory_store,
-        max_iterations_override=max_iterations_override,
     )
 
 

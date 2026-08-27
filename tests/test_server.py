@@ -797,13 +797,13 @@ class TestStreamingEndpoint:
         assert second_call_kwargs.kwargs["message_history"] is not None
 
 
-class TestCORSCLIOverride:
-    def test_cors_origins_from_cli(self):
+class TestCORSFromRole:
+    def test_cors_origins_from_the_role(self):
         from initrunner.server.app import create_app
 
-        role = _make_role()
+        role = _make_security_role(server=ServerConfig(cors_origins=["https://myapp.com"]))
         agent = MagicMock()
-        app = create_app(agent, role, cors_origins=["https://myapp.com"])
+        app = create_app(agent, role)
         client = TestClient(app)
 
         resp = client.options(
@@ -815,35 +815,24 @@ class TestCORSCLIOverride:
         )
         assert resp.headers.get("access-control-allow-origin") == "https://myapp.com"
 
-    def test_cors_cli_merged_with_role_config(self):
+    def test_several_role_origins_all_allowed(self):
         from initrunner.server.app import create_app
 
-        role = _make_security_role(server=ServerConfig(cors_origins=["https://role-origin.com"]))
+        role = _make_security_role(
+            server=ServerConfig(cors_origins=["https://one.com", "https://two.com"])
+        )
         agent = MagicMock()
-        app = create_app(agent, role, cors_origins=["https://cli-origin.com"])
+        app = create_app(agent, role)
         client = TestClient(app)
 
-        # Role origin should work
-        resp1 = client.options(
-            "/v1/chat/completions",
-            headers={
-                "Origin": "https://role-origin.com",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-        assert resp1.headers.get("access-control-allow-origin") == "https://role-origin.com"
+        for origin in ("https://one.com", "https://two.com"):
+            resp = client.options(
+                "/v1/chat/completions",
+                headers={"Origin": origin, "Access-Control-Request-Method": "POST"},
+            )
+            assert resp.headers.get("access-control-allow-origin") == origin
 
-        # CLI origin should also work
-        resp2 = client.options(
-            "/v1/chat/completions",
-            headers={
-                "Origin": "https://cli-origin.com",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-        assert resp2.headers.get("access-control-allow-origin") == "https://cli-origin.com"
-
-    def test_cors_no_cli_no_role_means_no_headers(self):
+    def test_no_origins_means_no_headers(self):
         from initrunner.server.app import create_app
 
         role = _make_role()

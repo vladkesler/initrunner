@@ -176,13 +176,16 @@ Note: `--autonomous` requires `--prompt` (`-p`) and is mutually exclusive with `
 In daemon mode, triggers opt into autonomous execution per trigger. Set `autonomous: true` on each trigger you want looping, and declare an `autonomy:` block so the role has loop settings:
 
 ```bash
-initrunner run role.yaml --daemon      # triggers use autonomous: true/false per config
 initrunner run role.yaml --daemon   # triggers marked autonomous use the loop
 ```
 
-Set `autonomous: true` on any trigger config:
+Both parts are required. A trigger with `autonomous: true` in a role with no
+`autonomy:` block runs one turn per fire, not a loop; the daemon prints a hint
+at startup when it sees that combination.
 
 ```yaml
+autonomy: {}                        # loop settings; defaults are fine
+
 triggers:
   - type: cron
     schedule: "0 */6 * * *"

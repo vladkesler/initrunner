@@ -208,7 +208,6 @@ def create_app(
     audit_logger: AuditLogger | None = None,
     api_key: str | None = None,
     conversation_ttl: float | None = None,
-    cors_origins: list[str] | None = None,
     role_path: Path | None = None,
 ) -> Starlette:
     """Build and return the Starlette ASGI application for one agent."""
@@ -219,7 +218,6 @@ def create_app(
         audit_logger=audit_logger,
         api_key=api_key,
         conversation_ttl=conversation_ttl,
-        cors_origins=cors_origins,
     )
 
 
@@ -230,7 +228,6 @@ def create_multi_app(
     audit_logger: AuditLogger | None = None,
     api_key: str | None = None,
     conversation_ttl: float | None = None,
-    cors_origins: list[str] | None = None,
 ) -> Starlette:
     """Build the ASGI app for one or more agents.
 
@@ -719,11 +716,9 @@ def create_multi_app(
 
     middleware: list[Middleware] = []
 
-    # CORS: merge CLI origins with role YAML origins (supplement, not replace)
-    all_origins: list[str] = list(server_cfg.cors_origins or [])
-    for origin in cors_origins or []:
-        if origin not in all_origins:
-            all_origins.append(origin)
+    # CORS origins come from the role only, so what a deployment exposes is
+    # reviewable in the same file as the rest of its policy.
+    all_origins: list[str] = list(server_cfg.cors_origins)
 
     if all_origins:
         middleware.append(
@@ -811,7 +806,6 @@ def run_server(
     audit_logger: AuditLogger | None = None,
     api_key: str | None = None,
     conversation_ttl: float | None = None,
-    cors_origins: list[str] | None = None,
     role_path: Path | None = None,
 ) -> None:
     """Blocking entry point -- starts uvicorn with the OpenAI-compatible app."""
@@ -821,7 +815,6 @@ def run_server(
         audit_logger=audit_logger,
         api_key=api_key,
         conversation_ttl=conversation_ttl,
-        cors_origins=cors_origins,
         role_path=role_path,
     )
     uvicorn.run(app, host=host, port=port, log_level="info")
@@ -836,7 +829,6 @@ def run_multi_server(
     audit_logger: AuditLogger | None = None,
     api_key: str | None = None,
     conversation_ttl: float | None = None,
-    cors_origins: list[str] | None = None,
 ) -> None:
     """Blocking entry point serving several agents from one process."""
     app = create_multi_app(
@@ -845,6 +837,5 @@ def run_multi_server(
         audit_logger=audit_logger,
         api_key=api_key,
         conversation_ttl=conversation_ttl,
-        cors_origins=cors_origins,
     )
     uvicorn.run(app, host=host, port=port, log_level="info")
