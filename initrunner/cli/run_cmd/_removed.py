@@ -10,6 +10,8 @@ cover it one release after the removal.
 
 from __future__ import annotations
 
+import sys
+
 import click
 import typer
 from typer.core import TyperCommand
@@ -58,12 +60,24 @@ class RunCommand(TyperCommand):
     def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
         try:
             return super().parse_args(ctx, args)
-        except click.NoSuchOption as e:
-            hint = REMOVED_RUN_FLAGS.get(e.option_name)
+        except Exception as e:
+            # Not `except click.NoSuchOption`. Typer 0.27 vendors its own copy of
+            # Click, so the error it raises is typer._click.exceptions.NoSuchOption,
+            # which is not an instance of click.NoSuchOption. Catching the class
+            # meant the pointer worked against the pinned dev environment and
+            # nowhere else: a fresh `pip install initrunner` resolves the newer
+            # pair and every user saw Click's "No such option" instead. The
+            # attribute is the part both versions agree on.
+            option_name = getattr(e, "option_name", None)
+            hint = REMOVED_RUN_FLAGS.get(option_name) if isinstance(option_name, str) else None
             if hint is None:
                 raise
             typer.echo(
-                f"Error: {e.option_name} was removed from 'initrunner run'; {hint}.",
+                f"Error: {option_name} was removed from 'initrunner run'; {hint}.",
                 err=True,
             )
-            raise click.exceptions.Exit(2) from None
+            # sys.exit, not click.exceptions.Exit, for the same reason: the Exit
+            # class Typer's runtime recognises is whichever Click it vendored,
+            # and raising the wrong one surfaces as a traceback. SystemExit is
+            # the one exception both versions let through untouched.
+            sys.exit(2)
