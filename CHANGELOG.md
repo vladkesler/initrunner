@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2026.8.12] - 2026-08-28
 
 ### Fixed
 - **The pointer for a removed `run` flag only worked against the lockfile.** Typer 0.27 vendors its own copy of Click, so it raises `typer._click.exceptions.NoSuchOption`, which is not an instance of `click.NoSuchOption`. The shim caught that class, so it worked in this repo's pinned dev environment and nowhere else: a fresh `pip install initrunner` resolves the newer pair, and every user got Click's bare "No such option: --api-key" instead of the line naming the replacement. It now keys off the `option_name` attribute, which both versions carry, and exits through `sys.exit` rather than a `click.exceptions.Exit` that the vendored runtime does not recognise and prints as a traceback. The 21 existing cases all passed throughout, because the suite only ever runs against the lockfile; the new test fakes the vendored exception so the contract is the attribute, not the class.
