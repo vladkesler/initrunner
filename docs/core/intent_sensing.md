@@ -18,13 +18,13 @@ The result is displayed in a panel before the agent runs, showing which role was
 initrunner run --sense -p "analyze this CSV and summarize trends"
 
 # Search a specific directory
-initrunner run --sense --role-dir ./roles/ -p "search the web for AI news"
+initrunner run --sense -p "search the web for AI news"
 
 # Preview selection without running (no API calls at all)
 initrunner run --sense --dry-run -p "review my Python code for bugs"
 
 # Confirm before committing
-initrunner run --sense --confirm-role -p "deploy my app to production"
+initrunner run --sense -p "deploy my app to production"
 ```
 
 ## How It Works
@@ -86,11 +86,10 @@ After sensing, the result panel shows one of four methods:
 
 Intent Sensing scans every `*.yaml` / `*.yml` file (recursively, at any depth, skipping `node_modules`, `.venv`, `__pycache__`, `.git` and similar) and keeps the ones that load as agent documents. The directories are searched in this order:
 
-1. `--role-dir PATH` (if provided): searched first, **in addition to** the directories below
-2. Current working directory (`.`)
-3. `./examples/roles/` — if the directory exists
-4. Global roles directory (`~/.initrunner/roles/`, or `$INITRUNNER_HOME/roles/` or `$XDG_DATA_HOME/initrunner/roles/` when those variables are set)
-5. Bundled starter examples shipped with the package
+1. Current working directory (`.`)
+2. `./examples/roles/` — if the directory exists
+3. Global roles directory (`~/.initrunner/roles/`, or `$INITRUNNER_HOME/roles/` or `$XDG_DATA_HOME/initrunner/roles/` when those variables are set)
+4. Bundled starter examples shipped with the package
 
 Roles with parse errors are skipped silently. Only successfully loaded roles enter the scoring pool.
 
@@ -99,8 +98,7 @@ Roles with parse errors are skipped silently. Only successfully loaded roles ent
 | Flag | Description |
 |------|-------------|
 | `--sense` | Enable intent sensing (replaces the `role.yaml` argument) |
-| `--role-dir PATH` | Extra directory searched first, in addition to the default directories |
-| `--confirm-role` | Show the sensed role and ask for confirmation before running (requires a TTY) |
+| (none) | Sensing shows the selected role and asks for confirmation whenever stdin is a terminal. Piped and scripted runs proceed with the selection. |
 | `--dry-run` | Score roles with keyword matching only — no LLM calls, no agent execution |
 
 `--sense` and a positional `role.yaml` argument are mutually exclusive. `--sense` requires `--prompt` (`-p`).
@@ -189,7 +187,7 @@ The panel shows the selected role, its score, and the gap to the runner-up — u
 ### Confirm before executing
 
 ```bash
-initrunner run --sense --confirm-role -p "delete old log files"
+initrunner run --sense -p "delete old log files"
 ```
 
 The panel is displayed, then:
@@ -220,7 +218,7 @@ The panel shows the method (`keyword match` or `LLM selection`), score, and gap.
 
 Intent Sensing searched all default directories and found nothing loadable. Fix options:
 
-- Point at a specific directory: `--role-dir ./my-roles/`
+- Put the role where sensing looks: the current directory, `./examples/roles`, or `~/.initrunner/roles`
 - Create a role: `initrunner new --blank`
 - Check that existing role files parse correctly: `initrunner validate role.yaml`
 

@@ -35,7 +35,6 @@ def run_group_daemon(
     memory_stores: dict[str, MemoryStoreBase] | None = None,
     sink_dispatchers: dict[str, SinkDispatcher] | None = None,
     extra_skill_dirs: list[Path] | None = None,
-    autopilot: bool = False,
 ) -> None:
     """Start every member that has triggers and block until stopped."""
     from initrunner._signal import install_shutdown_handler
@@ -69,7 +68,6 @@ def run_group_daemon(
             memory_store=memory_stores.get(key),
             role_path=member.path,
             extra_skill_dirs=extra_skill_dirs,
-            autopilot=autopilot,
             stop_event=stop,
             install_signal_handler=False,
             rebuild=_make_rebuild(roster, member, extra_skill_dirs),

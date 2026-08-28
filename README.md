@@ -201,15 +201,11 @@ initrunner service stop collector              # --purge deletes local instance 
 
 Shipped first: **`collector`** (scheduled monitoring for a company, domain, or topic). Instance state lives under `~/.initrunner/services/`. See [Always-on Services](docs/agents/services.md).
 
-### Autopilot
+### Autonomous triggers
 
-`--autopilot` is `--daemon` plus the autonomous loop on every trigger. A Telegram message like "find me flights from NYC to London next week" in daemon mode gets one LLM turn. In autopilot, the agent searches flights, compares options, checks dates, and replies with a shortlist.
+A trigger marked `autonomous: true` runs the agentic loop instead of a single turn. A Telegram message like "find me flights from NYC to London next week" gets one LLM turn by default; autonomous, the agent searches flights, compares options, checks dates, and replies with a shortlist.
 
-```bash
-initrunner run role.yaml --autopilot
-```
-
-Or go selective: set `autonomous: true` on individual triggers, leave the rest single-shot.
+Set it per trigger, and leave the rest single-shot:
 
 ```yaml
 triggers:
@@ -383,7 +379,7 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 |---------|-----------------|------|
 | **Always-on services** (curated start/stop/status; no YAML) | `initrunner service start collector acme.com` | [Services](docs/agents/services.md) |
 | **Skills** (reusable tool + prompt bundles) | `skills: [../skills/web-researcher]` | [Skills](docs/agents/skills_feature.md) |
-| **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `--dev`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
+| **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `/tool add`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
 | **Plan** (static dry-run: reachable tools, policies, sandbox, cost; no model call) | `initrunner plan role.yaml` | [Plan](docs/operations/plan.md) |
 | **API server** (OpenAI-compatible endpoint) | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A server** (agent-to-agent protocol) | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |

@@ -12,21 +12,20 @@ from initrunner.cli._helpers import (
     preflight_validate_or_exit,
     resolve_run_target,
 )
-from initrunner.cli._options import AuditDbOption, ModelOption, NoAuditOption, SkillDirOption
+from initrunner.cli._options import ModelOption, NoAuditOption
 from initrunner.cli._run_agent import _run_agent
 from initrunner.cli._run_team import _run_team
 from initrunner.cli.run_cmd._dispatch import (
-    _dispatch_bot,
     _dispatch_daemon,
     _dispatch_flow,
     _dispatch_serve,
 )
 from initrunner.cli.run_cmd._sensing import _resolve_via_sensing
-from initrunner.cli.run_cmd._starters import _handle_save, _show_starter_listing
+from initrunner.cli.run_cmd._starters import _show_starter_listing
 from initrunner.cli.run_cmd._validate import (
+    EPHEMERAL_KIND,
     RunMode,
     _resolve_run_mode,
-    _validate_ephemeral_flags,
     _validate_kind_flags,
     _validate_role_only_flags,
     _validate_universal_flags,
@@ -45,24 +44,11 @@ def run(
     autonomous: Annotated[
         bool, typer.Option("-a", "--autonomous", help="Autonomous agentic loop mode")
     ] = False,
-    max_iterations: Annotated[
-        int | None,
-        typer.Option("--max-iterations", help="Override max iterations for autonomous mode"),
-    ] = None,
-    token_budget: Annotated[
-        int | None,
-        typer.Option(
-            "--token-budget",
-            help="Cumulative token budget across the run, including delegations",
-        ),
-    ] = None,
     resume: Annotated[bool, typer.Option("--resume", help="Resume previous REPL session")] = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Simulate with TestModel (no API calls)")
     ] = False,
-    audit_db: AuditDbOption = None,
     no_audit: NoAuditOption = False,
-    skill_dir: SkillDirOption = None,
     attach: Annotated[
         list[str] | None,
         typer.Option(
@@ -72,31 +58,17 @@ def run(
         ),
     ] = None,
     report: Annotated[
-        Path | None,
-        typer.Option("--report", help="Export markdown report to PATH after run"),
-    ] = None,
-    report_template: Annotated[
-        str,
+        str | None,
         typer.Option(
-            "--report-template",
-            help="Report template: default, pr-review, changelog, ci-fix",
+            "--report",
+            help="Export a markdown report to PATH, or TEMPLATE:PATH to pick a template"
+            " (default, pr-review, changelog, ci-fix)",
         ),
-    ] = "default",
+    ] = None,
     output_format: Annotated[
         str,
         typer.Option("-f", "--format", help="Output format: auto, json, text, rich"),
     ] = "auto",
-    no_stream: Annotated[
-        bool, typer.Option("--no-stream", hidden=True, help="Deprecated: use --format rich")
-    ] = False,
-    dev: Annotated[
-        bool,
-        typer.Option(
-            "--dev",
-            help="Developer REPL: disable streaming so breakpoint() in a tool owns the "
-            "terminal, and enable /tool add for hot-attaching tools.",
-        ),
-    ] = False,
     agent_member: Annotated[
         str | None,
         typer.Option("--agent", help="Which agent to run, for a group of agents"),
@@ -104,19 +76,7 @@ def run(
     sense: Annotated[
         bool, typer.Option("--sense", help="Sense the best role for the given prompt")
     ] = False,
-    role_dir: Annotated[
-        Path | None,
-        typer.Option("--role-dir", help="Directory to search for roles (used with --sense)"),
-    ] = None,
-    confirm_role: Annotated[
-        bool,
-        typer.Option("--confirm-role", help="Confirm auto-selected role before running"),
-    ] = False,
     model: ModelOption = None,
-    save: Annotated[
-        Path | None,
-        typer.Option("--save", help="Copy starter to local directory for customization"),
-    ] = None,
     # --- Mode flags ---
     daemon_mode: Annotated[
         bool, typer.Option("--daemon", help="Run in daemon mode with triggers")
@@ -124,99 +84,29 @@ def run(
     serve_mode: Annotated[
         bool, typer.Option("--serve", help="Serve as OpenAI-compatible API")
     ] = False,
-    bot: Annotated[
-        str | None, typer.Option("--bot", help="Launch as bot (telegram or discord)")
-    ] = None,
-    autopilot: Annotated[
-        bool, typer.Option("--autopilot", help="Daemon mode with all triggers autonomous")
-    ] = False,
-    budget_timezone: Annotated[
-        str | None,
-        typer.Option(
-            "--budget-timezone",
-            help="IANA timezone for daily budget reset (e.g. America/New_York)",
-            rich_help_panel="Daemon Options",
-        ),
-    ] = None,
     # --- Serve options ---
+    # Deployment inputs, not agent behaviour: the same role binds to loopback on
+    # a laptop and to 0.0.0.0 in a container. Default None so "not given" is
+    # distinguishable from the value.
     host: Annotated[
-        str, typer.Option(help="Host to bind to", rich_help_panel="Serve Options")
-    ] = "127.0.0.1",
-    port: Annotated[
-        int, typer.Option(help="Port to listen on", rich_help_panel="Serve Options")
-    ] = 8000,
-    api_key: Annotated[
         str | None,
-        typer.Option(
-            "--api-key",
-            help="API key for auth",
-            envvar="INITRUNNER_API_KEY",
-            rich_help_panel="Serve Options",
-        ),
+        typer.Option(help="Host to bind to (default: 127.0.0.1)", rich_help_panel="Serve Options"),
     ] = None,
-    cors_origin: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--cors-origin", help="CORS origin (repeatable)", rich_help_panel="Serve Options"
-        ),
-    ] = None,
-    # --- Bot options ---
-    allowed_users: Annotated[
-        list[str] | None,
-        typer.Option("--allowed-users", help="Bot username filter", rich_help_panel="Bot Options"),
-    ] = None,
-    allowed_user_ids: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--allowed-user-ids",
-            help="Bot user ID filter (repeatable)",
-            rich_help_panel="Bot Options",
-        ),
+    port: Annotated[
+        int | None,
+        typer.Option(help="Port to listen on (default: 8000)", rich_help_panel="Serve Options"),
     ] = None,
     # --- Ephemeral mode options ---
-    provider: Annotated[
-        str | None,
-        typer.Option(
-            "--provider",
-            help="Model provider (ephemeral mode)",
-            rich_help_panel="Ephemeral Mode",
-        ),
-    ] = None,
-    tool_profile: Annotated[
-        str | None,
-        typer.Option(
-            "--tool-profile",
-            help=(
-                "Tool profile: none, minimal (datetime, web_reader),"
-                " all (+ search, python, filesystem, git, shell, slack)"
-            ),
-            rich_help_panel="Ephemeral Mode",
-        ),
-    ] = None,
-    extra_tools: Annotated[
+    tools: Annotated[
         list[str] | None,
         typer.Option(
             "--tools",
-            help="Extra tool types (repeatable)",
+            help="Tools for ephemeral mode: a profile (none, minimal, all) and/or tool types"
+            " (datetime, web_reader, search, python, filesystem, git, shell, slack)."
+            " Repeatable or comma-separated. Default: minimal.",
             rich_help_panel="Ephemeral Mode",
         ),
     ] = None,
-    list_tools: Annotated[
-        bool,
-        typer.Option(
-            "--list-tools",
-            help="List available extra tool types and exit",
-            rich_help_panel="Ephemeral Mode",
-        ),
-    ] = False,
-    explain_profiles: Annotated[
-        bool,
-        typer.Option(
-            "--explain-profiles",
-            help="Show tools in each tool profile and exit",
-            rich_help_panel="Ephemeral Mode",
-        ),
-    ] = False,
     memory: Annotated[
         bool | None,
         typer.Option(
@@ -255,90 +145,73 @@ def run(
         _show_starter_listing()
         raise typer.Exit(0)
 
-    # --- --list-tools: show ephemeral tool types ---
-    if list_tools:
-        from initrunner.cli._ephemeral import print_list_tools
-
-        print_list_tools()
-        raise typer.Exit(0)
-
-    # --- --explain-profiles: show tool profile breakdown ---
-    if explain_profiles:
-        from initrunner.cli._ephemeral import print_explain_profiles
-
-        print_explain_profiles()
-        raise typer.Exit(0)
-
     # --- Universal validation (before ephemeral / role branching) ---
     mode = _resolve_run_mode(
         daemon_mode=daemon_mode,
-        autopilot=autopilot,
         serve_mode=serve_mode,
-        bot=bot,
         autonomous=autonomous,
     )
-    output_format = _validate_universal_flags(
+    # Every flag whose support depends on the run mode or on what is being run.
+    # Built once and checked against both, so nothing is accepted then ignored.
+    active_flags = {
+        "--interactive": interactive,
+        "--autonomous": autonomous,
+        "--resume": resume,
+        "--attach": bool(attach),
+        "--report": report is not None,
+        "--var": bool(template_vars),
+        "--format": output_format != "auto",
+        "--dry-run": dry_run,
+        "--model": model is not None,
+        "--agent": agent_member is not None,
+    }
+
+    _validate_universal_flags(
         mode=mode,
-        bot=bot,
         output_format=output_format,
-        no_stream=no_stream,
-        interactive=interactive,
-        autonomous=autonomous,
         sense=sense,
-        confirm_role=confirm_role,
-        role_dir=role_dir,
-        role_file=role_file,
         prompt=prompt,
-        api_key=api_key,
-        cors_origin=cors_origin,
-        allowed_users=allowed_users,
-        allowed_user_ids=allowed_user_ids,
-        budget_timezone=budget_timezone,
+        host=host,
+        port=port,
+        active_flags=active_flags,
     )
 
     # --- No role file + no --sense: ephemeral mode ---
     if role_file is None and not sense:
-        _validate_ephemeral_flags(
-            mode=mode,
-            autonomous=autonomous,
-            dry_run=dry_run,
-            save=save,
-            skill_dir=skill_dir,
-            report=report,
-            report_template=report_template,
-            resume=resume,
-            prompt=prompt,
-            interactive=interactive,
-        )
+        _validate_kind_flags(EPHEMERAL_KIND, mode, active_flags=active_flags)
+        # --resume only valid for a REPL (no -p, or -p with -i)
+        if resume and prompt and not interactive:
+            console.print("[red]Error:[/red] --resume requires -i when used with -p.")
+            raise typer.Exit(1)
+
         from initrunner.cli._ephemeral import dispatch_ephemeral
 
         dispatch_ephemeral(
-            provider=provider,
             model=model,
             prompt=prompt,
             interactive=interactive,
-            tool_profile=tool_profile,
-            extra_tools=extra_tools,
+            tools=tools,
             memory=memory,
             resume=resume,
             ingest=ingest,
-            bot=bot,
             attach=attach,
-            allowed_users=allowed_users,
-            allowed_user_ids=allowed_user_ids,
-            audit_db=audit_db,
             no_audit=no_audit,
         )
         return
 
     # --- Role-incompatible flags ---
-    _validate_role_only_flags(
-        tool_profile=tool_profile,
-        extra_tools=extra_tools,
-        provider=provider,
-        ingest=ingest,
-        list_tools=list_tools,
-    )
+    _validate_role_only_flags(tools=tools, memory=memory, ingest=ingest)
+
+    # --- Report target: TEMPLATE:PATH or PATH ---
+    report_spec = None
+    if report is not None:
+        from initrunner.report import parse_report_spec
+
+        try:
+            report_spec = parse_report_spec(report)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from None
 
     # --- Intent sensing over the roles on disk ---
     # With a target file, sensing instead picks among a group's members, which
@@ -346,9 +219,7 @@ def run(
     sense_over_members = sense and role_file is not None
     if sense and not sense_over_members:
         role_file = _resolve_via_sensing(
-            prompt,  # type: ignore[arg-type]  # guarded by _validate_flags
-            role_dir=role_dir,
-            confirm_role=confirm_role,
+            prompt,  # type: ignore[arg-type]  # guarded by _validate_universal_flags
             dry_run=dry_run,
         )
 
@@ -367,17 +238,6 @@ def run(
         warning = envelope_warning_for(role_file)
         if warning:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
-
-    # --- --save: copy starter to local directory (no prerequisites needed) ---
-    if save is not None:
-        if role_file.is_dir():
-            console.print(
-                f"[red]Error:[/red] --save copies one role file, and {role_file} is a"
-                " directory of agents. Pass the agent file you want."
-            )
-            raise typer.Exit(1)
-        _handle_save(role_file, save)
-        return
 
     # --- Starter: prerequisites + model auto-detect ---
     from initrunner.cli._helpers import prepare_starter
@@ -404,21 +264,14 @@ def run(
             sense_member_or_exit,
         )
 
-        if role_dir is not None:
-            console.print(
-                "[red]Error:[/red] --role-dir searches the filesystem;"
-                " a group senses over its own members."
-            )
-            raise typer.Exit(1)
-
         roster = load_roster_or_exit(role_file)
         if sense_over_members:
             agent_member = sense_member_or_exit(
                 roster,
                 prompt,  # type: ignore[arg-type]  # guarded by _validate_universal_flags
-                confirm_role=confirm_role,
                 dry_run=dry_run,
             )
+            active_flags["--agent"] = True
 
         if agent_member is not None:
             # A selected member runs through every normal single-agent path;
@@ -437,22 +290,7 @@ def run(
         raise typer.Exit(1)
 
     # --- Kind-specific flag validation ---
-    _validate_kind_flags(
-        kind,
-        mode,
-        active_flags={
-            "--interactive": interactive,
-            "--autonomous": autonomous,
-            "--max-iterations": max_iterations is not None,
-            "--token-budget": token_budget is not None,
-            "--resume": resume,
-            "--attach": bool(attach),
-            "--report": report is not None,
-            "--report-template": report_template != "default",
-            "--dev": dev,
-            "--var": bool(template_vars),
-        },
-    )
+    _validate_kind_flags(kind, mode, active_flags=active_flags)
 
     # A group has no single run of its own: name the agent you meant.
     if kind == "Group" and mode == RunMode.STANDARD:
@@ -461,18 +299,18 @@ def run(
 
     # --- Pre-flight YAML validation: catch syntax/schema errors before any
     #     skill resolution, model resolution, or API calls.  Covers all
-    #     downstream dispatches (Agent/Team/Flow, serve/bot/daemon).  Runs
+    #     downstream dispatches (Agent/Team/Flow, serve/daemon).  Runs
     #     after the cheap flag checks above so flag errors fire first.
     if not role_file.is_dir():
         preflight_validate_or_exit(role_file)
 
     # --- Kind-based dispatch ---
     if kind == "Team":
-        _run_team(role_file, prompt, dry_run, audit_db, no_audit, report, report_template)
+        _run_team(role_file, prompt, dry_run, no_audit)
         return
 
     if kind == "Flow":
-        _dispatch_flow(role_file, audit_db, no_audit, prompt=prompt)
+        _dispatch_flow(role_file, no_audit, prompt=prompt)
         return
 
     if kind == "Group":
@@ -484,27 +322,9 @@ def run(
         )
 
         if mode == RunMode.SERVE:
-            dispatch_group_serve(
-                role_file,
-                host,
-                port,
-                api_key,
-                cors_origin,
-                audit_db,
-                no_audit,
-                skill_dir,
-                effective_model,
-            )
+            dispatch_group_serve(role_file, host, port, no_audit, effective_model)
         else:
-            dispatch_group_daemon(
-                role_file,
-                audit_db,
-                no_audit,
-                skill_dir,
-                effective_model,
-                autopilot=autopilot,
-                budget_timezone=budget_timezone,
-            )
+            dispatch_group_daemon(role_file, no_audit, effective_model)
         return
 
     # --- Agent mode: flag-based dispatch ---
@@ -513,28 +333,8 @@ def run(
             role_file,
             host,
             port,
-            api_key,
-            cors_origin,
-            audit_db,
             no_audit,
-            skill_dir,
             effective_model,
-            role_mutator=role_mutator,
-        )
-        return
-
-    if mode == RunMode.BOT:
-        assert bot is not None  # guaranteed by RunMode validation
-        _dispatch_bot(
-            role_file,
-            bot,
-            allowed_users,
-            allowed_user_ids,
-            audit_db,
-            no_audit,
-            skill_dir,
-            effective_model,
-            budget_timezone=budget_timezone,
             role_mutator=role_mutator,
         )
         return
@@ -542,12 +342,8 @@ def run(
     if mode == RunMode.DAEMON:
         _dispatch_daemon(
             role_file,
-            audit_db,
             no_audit,
-            skill_dir,
             effective_model,
-            autopilot=autopilot,
-            budget_timezone=budget_timezone,
             role_mutator=role_mutator,
         )
         return
@@ -567,20 +363,13 @@ def run(
         prompt=prompt,
         interactive=interactive,
         autonomous=autonomous,
-        max_iterations=max_iterations,
-        token_budget=token_budget,
         resume=resume,
         dry_run=dry_run,
-        audit_db=audit_db,
         no_audit=no_audit,
-        skill_dir=skill_dir,
         attach=attach,
-        report=report,
-        report_template=report_template,
+        report_spec=report_spec,
         output_format=output_format,
-        no_stream=no_stream,
         model=effective_model,
         template_values=template_values or None,
-        dev=dev,
         role_mutator=role_mutator,
     )

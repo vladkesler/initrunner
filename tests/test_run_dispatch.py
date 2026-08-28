@@ -65,24 +65,11 @@ class TestMutualExclusivity:
         assert "Cannot combine" in result.output
         assert "--daemon" in result.output and "--autonomous" in result.output
 
-    def test_serve_and_bot_exclusive(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--serve", "--bot", "telegram"])
+    def test_serve_and_autonomous_exclusive(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--serve", "-a", "-p", "hi"])
         assert result.exit_code == 1
         assert "Cannot combine" in result.output
-        assert "--serve" in result.output and "--bot" in result.output
-
-    def test_bot_and_autonomous_exclusive(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "telegram", "-a", "-p", "hi"])
-        assert result.exit_code == 1
-        assert "Cannot combine" in result.output
-        assert "--bot" in result.output and "--autonomous" in result.output
-
-
-class TestBotValidation:
-    def test_bot_invalid_platform(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "whatsapp"])
-        assert result.exit_code == 1
-        assert "telegram" in result.output and "discord" in result.output
+        assert "--serve" in result.output and "--autonomous" in result.output
 
 
 class TestKindFlagValidation:
@@ -144,51 +131,6 @@ class TestDaemonFlag:
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once()
-        # autopilot=False when using plain --daemon
-        assert mock_dispatch.call_args[1].get("autopilot") is False
-
-
-class TestAutopilotFlag:
-    def test_autopilot_dispatches_to_daemon(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._command._dispatch_daemon") as mock_dispatch:
-            result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot"])
-
-        assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
-        assert mock_dispatch.call_args[1]["autopilot"] is True
-
-    def test_autopilot_and_serve_exclusive(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--serve"])
-        assert result.exit_code == 1
-        assert "Cannot combine" in result.output
-        assert "--autopilot" in result.output and "--serve" in result.output
-
-    def test_autopilot_and_bot_exclusive(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--bot", "telegram"])
-        assert result.exit_code == 1
-        assert "Cannot combine" in result.output
-        assert "--autopilot" in result.output and "--bot" in result.output
-
-    def test_autopilot_and_autonomous_exclusive(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "-a", "-p", "hi"])
-        assert result.exit_code == 1
-        assert "Cannot combine" in result.output
-        assert "--autopilot" in result.output and "--autonomous" in result.output
-
-    def test_autopilot_with_daemon_is_redundant_safe(self, agent_yaml):
-        """--autopilot --daemon should not error (redundant but valid)."""
-        with patch("initrunner.cli.run_cmd._command._dispatch_daemon") as mock_dispatch:
-            result = runner.invoke(app, ["run", str(agent_yaml), "--autopilot", "--daemon"])
-
-        assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
-        assert mock_dispatch.call_args[1]["autopilot"] is True
-
-    def test_autopilot_rejected_in_ephemeral_mode(self):
-        result = runner.invoke(app, ["run", "--autopilot"])
-        assert result.exit_code == 1
-        assert "daemon" in result.output
-        assert "not supported without a role file" in result.output
 
 
 class TestServeFlag:
@@ -198,17 +140,6 @@ class TestServeFlag:
 
         assert result.exit_code == 0
         mock_dispatch.assert_called_once()
-
-
-class TestBotFlag:
-    def test_bot_flag_dispatches(self, agent_yaml):
-        with patch("initrunner.cli.run_cmd._command._dispatch_bot") as mock_dispatch:
-            result = runner.invoke(app, ["run", str(agent_yaml), "--bot", "telegram"])
-
-        assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
-        args = mock_dispatch.call_args
-        assert args[0][1] == "telegram"
 
 
 class TestTriggerHint:
@@ -317,56 +248,6 @@ class TestInlineApiKeyPrompt:
         assert "sk-test-inline" in env_file.read_text()
 
 
-class TestModeSpecificFlagValidation:
-    """Serve-only and bot-only flags should error outside their modes."""
-
-    def test_api_key_without_serve_rejected(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--api-key", "secret", "-p", "hi"])
-        assert result.exit_code == 1
-        assert "--api-key" in result.output
-        assert "--serve" in result.output
-
-    def test_cors_origin_without_serve_rejected(self, agent_yaml):
-        result = runner.invoke(
-            app, ["run", str(agent_yaml), "--cors-origin", "http://localhost", "-p", "hi"]
-        )
-        assert result.exit_code == 1
-        assert "--cors-origin" in result.output
-        assert "--serve" in result.output
-
-    def test_allowed_users_without_bot_rejected(self, agent_yaml):
-        result = runner.invoke(
-            app, ["run", str(agent_yaml), "--allowed-users", "alice", "-p", "hi"]
-        )
-        assert result.exit_code == 1
-        assert "--allowed-users" in result.output
-        assert "--bot" in result.output
-
-    def test_allowed_user_ids_without_bot_rejected(self, agent_yaml):
-        result = runner.invoke(
-            app, ["run", str(agent_yaml), "--allowed-user-ids", "123", "-p", "hi"]
-        )
-        assert result.exit_code == 1
-        assert "--allowed-user-ids" in result.output
-        assert "--bot" in result.output
-
-
-class TestSenseOnlyFlagValidation:
-    """--confirm-role and --role-dir should error without --sense."""
-
-    def test_confirm_role_without_sense_rejected(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--confirm-role", "-p", "hi"])
-        assert result.exit_code == 1
-        assert "--confirm-role" in result.output
-        assert "--sense" in result.output
-
-    def test_role_dir_without_sense_rejected(self, agent_yaml):
-        result = runner.invoke(app, ["run", str(agent_yaml), "--role-dir", "/tmp", "-p", "hi"])
-        assert result.exit_code == 1
-        assert "--role-dir" in result.output
-        assert "--sense" in result.output
-
-
 class TestOldCommandsRemoved:
     def test_daemon_command_gone(self):
         result = runner.invoke(app, ["daemon", "some-role.yaml"])
@@ -379,3 +260,66 @@ class TestOldCommandsRemoved:
     def test_pipeline_command_gone(self):
         result = runner.invoke(app, ["pipeline", "some-pipeline.yaml"])
         assert result.exit_code == 2
+
+
+class TestRemovedFlags:
+    """Removed flags name their replacement instead of "No such option".
+
+    Delete alongside `initrunner/cli/run_cmd/_removed.py` one release on.
+    """
+
+    @pytest.mark.parametrize(
+        ("argv", "expected"),
+        [
+            (["--max-iterations", "5"], "guardrails.max_iterations"),
+            (["--token-budget", "100"], "guardrails.run_token_budget"),
+            (["--budget-timezone", "UTC"], "guardrails.budget_timezone"),
+            (["--allowed-users", "alice"], "allowed_users"),
+            (["--allowed-user-ids", "1"], "allowed_user_ids"),
+            (["--cors-origin", "https://x"], "security.server.cors_origins"),
+            (["--api-key", "k"], "INITRUNNER_API_KEY"),
+            (["--autopilot"], "autonomy: {}"),
+            (["--provider", "openai"], "--model provider:model"),
+            (["--tool-profile", "all"], "--tools none|minimal|all"),
+            (["--list-tools"], "--tools"),
+            (["--explain-profiles"], "--tools"),
+            (["--role-dir", "."], "--sense already searches"),
+            (["--confirm-role"], "--sense already confirms"),
+            (["--report-template", "pr-review"], "--report TEMPLATE:PATH"),
+            (["--save", "out"], "examples copy"),
+            (["--no-stream"], "--format rich"),
+            (["--dev"], "--format rich"),
+            (["--audit-db", "a.db"], "INITRUNNER_AUDIT_DB"),
+            (["--skill-dir", "s"], "INITRUNNER_SKILL_DIR"),
+            (["--bot", "telegram"], "--daemon"),
+        ],
+    )
+    def test_removed_flag_names_its_replacement(self, agent_yaml, argv, expected):
+        result = runner.invoke(app, ["run", str(agent_yaml), *argv])
+        assert result.exit_code == 2
+        assert "was removed" in result.output
+        assert expected in result.output
+
+    def test_equals_form_is_recognised(self, agent_yaml):
+        """Click splits --flag=value before matching, so both forms hit."""
+        result = runner.invoke(app, ["run", str(agent_yaml), "--max-iterations=5"])
+        assert result.exit_code == 2
+        assert "guardrails.max_iterations" in result.output
+
+    def test_removed_flag_without_a_role_file(self):
+        result = runner.invoke(app, ["run", "--tool-profile", "all"])
+        assert result.exit_code == 2
+        assert "--tools" in result.output
+
+    def test_unrelated_unknown_flag_keeps_click_message(self, agent_yaml):
+        result = runner.invoke(app, ["run", str(agent_yaml), "--not-a-real-flag"])
+        assert result.exit_code == 2
+        assert "was removed" not in result.output
+        assert "No such option" in result.output
+
+    def test_help_is_unaffected(self):
+        result = runner.invoke(app, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "was removed" not in result.output
+        for gone in ("--autopilot", "--bot", "--tool-profile", "--save", "--dev"):
+            assert gone not in result.output

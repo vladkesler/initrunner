@@ -11,7 +11,7 @@ Audit logging is enabled by default. Every `run`, `daemon`, and `serve` command 
 initrunner run role.yaml -p "Hello!"
 
 # Custom audit database path
-initrunner run role.yaml -p "Hello!" --audit-db ./my-audit.db
+INITRUNNER_AUDIT_DB=./my-audit.db initrunner run role.yaml -p "Hello!"
 
 # Disable audit logging
 initrunner run role.yaml -p "Hello!" --no-audit
@@ -33,11 +33,11 @@ The directory is created automatically if it doesn't exist.
 
 ## CLI Options
 
-The `--audit-db` and `--no-audit` flags are available on `run`, `daemon`, and `serve` commands:
+`run` takes `--no-audit`; the database path comes from the environment, so every reader (CLI, daemon, dashboard) resolves the same file:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--audit-db` | `Path` | `~/.initrunner/audit.db` | Custom path to the audit database. |
+| `INITRUNNER_AUDIT_DB` (env) | `Path` | `~/.initrunner/audit.db` | Custom path to the audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging entirely. |
 
 ## Audit Export

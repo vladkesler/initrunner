@@ -87,7 +87,6 @@ def run_autonomous(
     sink_dispatcher: SinkDispatcher | None = None,
     memory_store: MemoryStoreBase | None = None,
     model_override: Model | str | None = None,
-    max_iterations_override: int | None = None,
     extra_toolsets: list | None = None,
     trigger_type: str | None = None,
     trigger_metadata: dict[str, str] | None = None,
@@ -105,7 +104,7 @@ def run_autonomous(
     autonomous_run_id = generate_id()
     autonomy_config = role.spec.autonomy or AutonomyConfig()
     guardrails = role.spec.guardrails
-    max_iterations = max_iterations_override or guardrails.max_iterations
+    max_iterations = guardrails.max_iterations
     token_budget = guardrails.autonomous_token_budget
 
     # Unified state + strategy

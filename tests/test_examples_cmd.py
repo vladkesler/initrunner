@@ -344,3 +344,65 @@ class TestGroupExamples:
         assert len(written) > 1
         assert urls, "expected member files to be downloaded"
         assert all("/examples/groups/roles/" in url for url in urls), urls
+
+
+class TestCopyBundledStarters:
+    """`examples copy` serves bundled starters offline, before the catalog.
+
+    This is the replacement for the removed `run <starter> --save`.
+    """
+
+    def _run(self, *args: str):
+        from typer.testing import CliRunner
+
+        from initrunner.cli.main import app
+
+        return CliRunner().invoke(app, ["examples", "copy", *args])
+
+    def test_copies_single_file_starter_as_role_yaml(self, tmp_path: Path):
+        result = self._run("memory", "--output", str(tmp_path))
+        assert result.exit_code == 0
+        assert (tmp_path / "role.yaml").is_file()
+        assert "bundled starter" in result.output
+
+    def test_copies_composite_starter_tree(self, tmp_path: Path):
+        result = self._run("pipeline", "--output", str(tmp_path))
+        assert result.exit_code == 0
+        assert (tmp_path / "flow.yaml").is_file()
+        assert (tmp_path / "roles").is_dir()
+
+    def test_next_steps_point_at_the_copied_file(self, tmp_path: Path):
+        result = self._run("memory", "--output", str(tmp_path))
+        assert result.exit_code == 0
+        # The hint must name the output path, not the starter slug, so it works
+        # from any working directory.
+        assert f"initrunner run {tmp_path / 'role.yaml'}" in result.output
+
+    def test_next_steps_name_flow_for_a_flow_starter(self, tmp_path: Path):
+        result = self._run("pipeline", "--output", str(tmp_path))
+        assert result.exit_code == 0
+        assert f"initrunner validate {tmp_path / 'flow.yaml'}" in result.output
+
+    def test_refuses_to_clobber_and_writes_nothing(self, tmp_path: Path):
+        (tmp_path / "roles").mkdir()
+        (tmp_path / "roles" / "notifier.yaml").write_text("mine")
+
+        result = self._run("pipeline", "--output", str(tmp_path))
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+        # Preflight runs before any write: the rest of the tree must be absent
+        # and the pre-existing file untouched.
+        assert not (tmp_path / "flow.yaml").exists()
+        assert (tmp_path / "roles" / "notifier.yaml").read_text() == "mine"
+
+    def test_starter_wins_over_a_same_named_catalog_example(self, tmp_path: Path):
+        """`helpdesk` exists in both; the offline starter is what is copied."""
+        from initrunner.services.starters import get_starter
+
+        assert get_starter("helpdesk") is not None
+        result = self._run("helpdesk", "--output", str(tmp_path))
+        assert result.exit_code == 0
+        assert "bundled starter" in result.output
+        # The catalog copy nests under a helpdesk/ directory; the starter does not.
+        assert (tmp_path / "role.yaml").is_file()
+        assert not (tmp_path / "helpdesk").exists()

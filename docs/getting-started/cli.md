@@ -34,7 +34,7 @@ other command still wants a single file.
 |---------|-------------|
 | `initrunner run` | Run an agent (ephemeral or from role file), team, flow, or pipeline |
 | `initrunner run <PATH>` | Run an agent from a role file, team, flow, or pipeline (auto-detected from YAML kind) |
-| `initrunner run <PATH> --dev` | Interactive REPL with `/tool add` hot-attach and `breakpoint()`-friendly output (no streaming/spinner) |
+| `initrunner run <PATH> -i --format rich` | Interactive REPL with buffered output, so a `breakpoint()` in a tool owns the terminal |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
 | `initrunner plan <PATH>` | Static dry-run: reachable tools, would-fire policies, guardrails, sandbox, triggers, heuristic cost (no model call) |
@@ -50,6 +50,9 @@ other command still wants a single file.
 | `initrunner update [name]` | Update installed role(s) to latest version |
 | `initrunner doctor` | Check provider configuration, API keys, and connectivity |
 | `initrunner plugins` | List discovered tool plugins |
+| `initrunner examples list` | Browse bundled examples and starters |
+| `initrunner examples show <NAME>` | Print an example's primary file |
+| `initrunner examples copy <NAME>` | Copy an example or bundled starter into a directory to customize |
 | `initrunner audit prune` | Prune old audit records |
 | `initrunner audit export` | Export audit records as JSON or CSV |
 | `initrunner cost report` | Cost breakdown by agent (filters: `--agent`, `--since`, `--until`) |
@@ -111,7 +114,7 @@ Running `initrunner` with no subcommand in a TTY shows an action menu:
 What would you like to do? [1/2/3/4] (1):
 ```
 
-- **Chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`. It attaches the `minimal` tool profile (`datetime`, `web_reader`) unless you pass `--tool-profile all`, `--tool-profile none`, or `--tools`. Enter selects Chat.
+- **Chat** starts an ephemeral REPL using the provider from `~/.initrunner/run.yaml`. It attaches the `minimal` tool profile (`datetime`, `web_reader`) unless you pass `--tools all`, `--tools none`, or specific tool types. Enter selects Chat.
 - **Try a starter** lists Agent starters that are ready with your current extras and env (no Team/Flow until you pass `-p`).
 - **Create an agent** enters the interactive agent builder (`initrunner new`).
 - **Dashboard** launches the web UI at `http://localhost:8100`. Last in the list, never the default.
@@ -132,39 +135,54 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 | `--agent NAME` | Which agent to run, for a [group of agents](../orchestration/groups.md) -- a group file or a directory of agent files. Without it, a group lists its members and exits 1. |
 | `-i, --interactive` | Interactive REPL mode |
 | `-a, --autonomous` | Autonomous agentic loop mode (requires `-p`) |
-| `--max-iterations N` | Override max iterations for autonomous mode |
-| `--token-budget N` | Cumulative token budget across the run, including inline-delegated sub-agents. Overrides `guardrails.run_token_budget` for this invocation. |
 | `--resume` | Resume the previous REPL session (requires `memory:` config) |
 | `--dry-run` | Simulate with TestModel (no API calls) |
 | `--daemon` | Run in trigger-driven daemon mode |
-| `--autopilot` | Daemon mode with all triggers autonomous |
 | `--serve` | Serve agent as an OpenAI-compatible API |
-| `--bot TEXT` | Launch as a bot (`telegram` or `discord`) |
 | `--var TEXT` | Template variable in `key=value` format (repeatable) for `{{var}}` placeholders in `prompt`. Requires `deps_schema`. See [Agent Spec Import](agent-spec-import.md). |
-| `--host TEXT` | Host to bind to (default: `127.0.0.1`). Used with `--serve`. |
-| `--port INT` | Port to listen on (default: `8000`). Used with `--serve`. |
-| `--api-key TEXT` | API key for Bearer token authentication. Used with `--serve`. |
-| `--cors-origin TEXT` | Allowed CORS origin (repeatable). Used with `--serve`. |
-| `--allowed-users TEXT` | Restrict bot to these usernames (repeatable). Used with `--bot`. |
-| `--allowed-user-ids TEXT` | Restrict bot to these user IDs (repeatable). Used with `--bot`. |
-| `--audit-db PATH` | Custom audit database path |
+| `--host TEXT` | Host to bind to (default: `127.0.0.1`). Only with `--serve`. |
+| `--port INT` | Port to listen on (default: `8000`). Only with `--serve`. |
 | `--no-audit` | Disable audit logging |
-| `--skill-dir PATH` | Extra skill search directory |
 | `-A, --attach PATH_OR_URL` | Attach file or URL (repeatable). Supports images, audio, video, and documents. Requires `-p`. See [Multimodal Input](../core/multimodal.md). |
-| `--report PATH` | Export a markdown report to PATH after the run. See [Report Export](../core/reports.md). |
-| `--report-template TEXT` | Report template: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
-| `--sense` | Sense the best role for the given prompt (replaces the path argument, or picks a member when the path is a group). |
-| `--role-dir PATH` | Directory to search for roles when using `--sense`. Not used with a group, which senses over its own members. |
+| `--report PATH` or `TEMPLATE:PATH` | Export a markdown report after the run. Prefix a built-in template name to pick one: `--report pr-review:review.md`. Templates: `default`, `pr-review`, `changelog`, `ci-fix`. See [Report Export](../core/reports.md). |
+| `--sense` | Sense the best role for the given prompt (replaces the path argument, or picks a member when the path is a group). Confirms the choice whenever there is a terminal. |
 | `-f, --format TEXT` | Output format: `auto` (default), `json`, `text`, `rich`. See [Output Formats](#output-formats). |
-| `--no-stream` | **Deprecated.** Use `--format rich`. Hidden from `--help`. |
-| `--confirm-role` | Prompt to confirm the auto-selected role before running (requires a TTY). |
-| `--provider TEXT` | Model provider (overrides auto-detection or role config) |
 | `--model TEXT` | Model alias or provider:model (overrides auto-detection or role config). Env: `INITRUNNER_MODEL`. See [Model Aliases](../configuration/model-aliases.md). |
-| `--tool-profile TEXT` | Tool profile: `none` (no tools), `minimal` (default: `datetime` + `web_reader`), `all` (full ephemeral catalog, including `python`/`shell`) |
-| `--tools TEXT` | Extra tool types to enable (repeatable). Merged onto the selected profile. |
+| `--tools TEXT` | Ephemeral tools: a profile (`none`, `minimal` (default), `all`) and/or tool types (`datetime`, `web_reader`, `search`, `python`, `filesystem`, `git`, `shell`, `slack`). Repeatable or comma-separated: `--tools all,git`. |
 | `--memory / --no-memory` | Enable or disable persistent memory (default: enabled for ephemeral) |
 | `--ingest PATH` | Paths or globs to ingest for document Q&A (repeatable) |
-| `--list-tools` | List available extra tool types and exit |
+| `--list` | List available starter agents |
+
+Every flag is either used by the target it is given to or refused. `--tools`,
+`--memory`, and `--ingest` configure ephemeral mode and are refused with a role
+file, where the YAML owns those settings; `--host`/`--port` are refused without
+`--serve`; `--format`, `--report`, and `--var` are refused for Team, Flow, and
+whole-group runs, which have no single agent run to steer.
+
+### Settings that moved into the role
+
+These `run` flags were removed. Each duplicated a field the role YAML already
+had, so the role is now the single place the setting lives. For one release,
+passing the old flag prints the replacement and exits 2.
+
+| Removed flag | Use instead |
+|------|-------------|
+| `--max-iterations` | `guardrails.max_iterations` |
+| `--token-budget` | `guardrails.run_token_budget` |
+| `--budget-timezone` | `guardrails.budget_timezone` |
+| `--autopilot` | `autonomous: true` on each trigger plus `autonomy: {}`, then `--daemon` |
+| `--bot telegram\|discord` | a `telegram`/`discord` trigger in the role, then `--daemon` |
+| `--allowed-users`, `--allowed-user-ids` | the matching fields on the trigger |
+| `--cors-origin` | `security.server.cors_origins` |
+| `--api-key` | `INITRUNNER_API_KEY` |
+| `--audit-db` | `INITRUNNER_AUDIT_DB` |
+| `--skill-dir` | `INITRUNNER_SKILL_DIR` |
+| `--report-template pr-review` | `--report pr-review:PATH` |
+| `--tool-profile all`, `--list-tools`, `--explain-profiles` | `--tools all`; `--help` lists the values |
+| `--provider` | `--model provider:model`, or `provider:` in `~/.initrunner/run.yaml` |
+| `--role-dir`, `--confirm-role` | nothing: `--sense` searches the default directories and confirms on a terminal |
+| `--save` | `initrunner examples copy <starter>` |
+| `--dev`, `--no-stream` | `--format rich` |
 
 ### Intent Sensing examples
 
@@ -172,11 +190,13 @@ The path argument is optional when `--sense` is used. The `run` command auto-det
 # Let initrunner pick the best role for your task
 initrunner run --sense -p "analyze this CSV and summarize"
 
-# Search a specific directory for roles
-initrunner run --sense --role-dir ./roles/ -p "search the web for AI news"
+# Sensing searches the current directory, ./examples/roles,
+# ~/.initrunner/roles, and the bundled starters
+initrunner run --sense -p "search the web for AI news"
 
-# Review the sensed role before running
-initrunner run --sense --confirm-role -p "review my code for bugs"
+# On a terminal, the sensed role is shown and confirmed before running;
+# piped or scripted runs proceed with the selection
+initrunner run --sense -p "review my code for bugs"
 
 # Dry-run: discover + score roles without any LLM calls
 initrunner run --sense --dry-run -p "task description"
@@ -219,7 +239,7 @@ The `--format` flag controls how `initrunner run` presents output. The default (
 | `auto` | **TTY:** stream tokens live. **Non-TTY (piped):** plain text to stdout, stats to stderr. |
 | `json` | JSON envelope to stdout with `output`, `success`, `error`, token counts, and timing. |
 | `text` | Plain text to stdout (agent output only), stats to stderr. |
-| `rich` | Buffered Rich panel with Markdown rendering (the old `--no-stream` behavior). |
+| `rich` | Buffered Rich panel with Markdown rendering. No live stream and no spinner, so a `breakpoint()` in a tool owns the terminal. |
 
 In `auto` (streaming), `rich`, and autonomous modes, tool call completions are shown as dimmed status lines so you can distinguish tool issues from model issues:
 
@@ -501,7 +521,7 @@ Only the Agent-Spec overlap is exported. Triggers, ingest, memory, skills, sinks
 
 ## Serve options
 
-The `--serve` flag on `initrunner run` starts an OpenAI-compatible API server. Server-specific flags (`--host`, `--port`, `--api-key`, `--cors-origin`) are listed in the [Run options](#run-options) table above.
+The `--serve` flag on `initrunner run` starts an OpenAI-compatible API server. `--host` and `--port` are listed in the [Run options](#run-options) table above. Set `INITRUNNER_API_KEY` for Bearer-token auth, and `security.server.cors_origins` in the role for CORS. Binding off-loopback without a key generates one and prints it, so the server is never reachable unauthenticated.
 
 See [server.md](../interfaces/server.md) for endpoint details, streaming, multi-turn conversations, and usage examples.
 
@@ -632,6 +652,6 @@ initrunner hub info owner/package-name
 
 | Variable | Effect |
 |----------|--------|
-| `INITRUNNER_AUDIT_DB` | Default audit database path (overridden by `--audit-db`) |
+| `INITRUNNER_AUDIT_DB` | Audit database path, honored by every reader (CLI, daemon, dashboard). `--audit-db` takes precedence on the commands that accept it |
 | `INITRUNNER_LOG_LEVEL` | Log level: `ERROR`, `WARNING` (default), `INFO`, `DEBUG` (overridden by `--verbose`). See [Logging](../operations/logging.md) |
 | `INITRUNNER_SKILL_DIR` | Extra skill search directory (CLI `--skill-dir` takes precedence, but env dir is also searched) |

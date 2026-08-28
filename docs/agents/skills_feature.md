@@ -166,12 +166,12 @@ A bare name (e.g. `web-researcher`) is searched across multiple directories. At 
 |----------|----------|-------------|
 | 1 | `{role_dir}/skills/{name}/SKILL.md` | Skills directory next to the role file |
 | 1 | `{role_dir}/skills/{name}.md` | Flat format next to the role file |
-| 2 | `{extra_dirs}/{name}/SKILL.md` | Extra search directories (`--skill-dir` / `INITRUNNER_SKILL_DIR`) |
+| 2 | `{extra_dirs}/{name}/SKILL.md` | Extra search directories (`INITRUNNER_SKILL_DIR`, or `--skill-dir` on the commands that take it) |
 | 2 | `{extra_dirs}/{name}.md` | Flat format in extra directories |
 | 3 | `~/.initrunner/skills/{name}/SKILL.md` | Global skills directory |
 | 3 | `~/.initrunner/skills/{name}.md` | Flat format in global directory |
 
-The `--skill-dir` CLI option takes precedence over `INITRUNNER_SKILL_DIR`. Both are checked before the global `~/.initrunner/skills/` directory.
+Where both are present, the `--skill-dir` CLI option takes precedence over `INITRUNNER_SKILL_DIR`. Both are checked before the global `~/.initrunner/skills/` directory.
 
 ### Deduplication
 
@@ -269,7 +269,7 @@ Paths are resolved relative to `role_dir` (the role file's parent directory):
 |----------|------|-------|
 | 1 | `{role_dir}/skills/` | Role-local |
 | 2 | `{role_dir}/.agents/skills/` | Project-level (agentskills.io) |
-| 3 | `--skill-dir` / `INITRUNNER_SKILL_DIR` | Extra dirs |
+| 3 | `INITRUNNER_SKILL_DIR` / `--skill-dir` | Extra dirs |
 | 4 | `~/.agents/skills/` | User-level (agentskills.io) |
 | 5 | `~/.initrunner/skills/` | User-level (existing) |
 
@@ -374,19 +374,19 @@ initrunner skill new web-researcher
 
 Creates `web-researcher/SKILL.md` with template frontmatter and prompt. Refuses to overwrite an existing directory.
 
-### `--skill-dir` Option
+### Extra skill directories
 
-The `--skill-dir` option is available on `validate` and `run` commands. It adds an extra directory to the skill search path.
+`run` reads `INITRUNNER_SKILL_DIR`. The `--skill-dir` option is available on `validate`, `plan`, `doctor`, `skill list`, `a2a serve`, and `mcp serve`.
 
 ```bash
-initrunner run role.yaml -i --skill-dir ./shared-skills
-initrunner run role.yaml --daemon --skill-dir /opt/skills
-initrunner run role.yaml --serve --skill-dir ./shared-skills
+INITRUNNER_SKILL_DIR=./shared-skills initrunner run role.yaml -i
+INITRUNNER_SKILL_DIR=/opt/skills initrunner run role.yaml --daemon
+initrunner validate role.yaml --skill-dir ./shared-skills
 ```
 
 ### `INITRUNNER_SKILL_DIR` Environment Variable
 
-Set `INITRUNNER_SKILL_DIR` to permanently add an extra skill search directory. It has lower precedence than `--skill-dir` but higher precedence than `~/.initrunner/skills/`.
+Set `INITRUNNER_SKILL_DIR` to permanently add an extra skill search directory. It is how `run` picks up extra skills, and it has higher precedence than `~/.initrunner/skills/`.
 
 ```bash
 export INITRUNNER_SKILL_DIR=/opt/shared-skills

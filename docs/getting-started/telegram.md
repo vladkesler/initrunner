@@ -59,32 +59,38 @@ You should see `Telegram bot started polling` in the logs.
 
 ### Quick Alternative
 
-To test without creating a role file:
+To try one without writing a role file, run the bundled starter:
 
 ```bash
-initrunner run --bot telegram
+initrunner run telegram --daemon
 ```
 
-Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
+It auto-detects your provider and ships with search, web reading, audio
+transcription, and persistent memory.
+
+> **It answers anyone who messages it.** The starter has no allowlist, so add
+> `allowed_user_ids` before you share the bot's handle. Each message is one
+> agent run, not an autonomous loop.
+
+To change its tools, budgets, or access control, copy it and edit the YAML:
 
 ```bash
-# Enable every available tool
-SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner run --bot telegram --tool-profile all
-
-# Or add specific extras
-initrunner run --bot telegram --tools git --tools shell
-
-# Restrict to specific users by ID (recommended) or username
-initrunner run --bot telegram --allowed-user-ids 123456789
-initrunner run --bot telegram --allowed-users alice --allowed-users bob
-
-# Disable memory if not needed
-initrunner run --bot telegram --no-memory
+initrunner examples copy telegram --output ./my-bot
+initrunner run ./my-bot/role.yaml --daemon
 ```
 
-Run `initrunner run --list-tools` to see all available tool types.
+Access control, tools, and budgets all live in that file:
 
-For production, use the `role.yaml` approach with `initrunner run role.yaml --bot telegram` or `--daemon` for access control and budgets.
+```yaml
+triggers:
+  - type: telegram
+    # By ID (recommended) or username
+    allowed_user_ids: [123456789]
+    allowed_users: [alice, bob]
+```
+
+Run `initrunner run --help` to see the tool types available to ephemeral mode
+(`--tools`), which is separate from what a role file can use.
 
 ## Testing
 

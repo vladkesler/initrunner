@@ -160,7 +160,7 @@ def _resolve_skill_path(
         f"Skill '{name}' not found. Searched:\n"
         + "\n".join(f"  - {s}" for s in searched)
         + f"\n\nHint: use a relative path (e.g. ../skills/{name})"
-        " or pass --skill-dir to add a search directory."
+        " or set INITRUNNER_SKILL_DIR to add a search directory."
     )
 
 

@@ -44,7 +44,7 @@ guardrails:
 
 When a field is `null` (or omitted), no limit is enforced for that dimension.
 
-Budget counters are persisted to the audit database after each run, so they survive daemon/bot restarts. The `--budget-timezone` CLI flag overrides the YAML value.
+Budget counters are persisted to the audit database after each run, so they survive daemon restarts.
 
 ## Per-Run Limits
 

@@ -797,13 +797,13 @@ class TestStreamingEndpoint:
         assert second_call_kwargs.kwargs["message_history"] is not None
 
 
-class TestCORSCLIOverride:
-    def test_cors_origins_from_cli(self):
+class TestCORSFromRole:
+    def test_cors_origins_from_the_role(self):
         from initrunner.server.app import create_app
 
-        role = _make_role()
+        role = _make_security_role(server=ServerConfig(cors_origins=["https://myapp.com"]))
         agent = MagicMock()
-        app = create_app(agent, role, cors_origins=["https://myapp.com"])
+        app = create_app(agent, role)
         client = TestClient(app)
 
         resp = client.options(
@@ -815,35 +815,24 @@ class TestCORSCLIOverride:
         )
         assert resp.headers.get("access-control-allow-origin") == "https://myapp.com"
 
-    def test_cors_cli_merged_with_role_config(self):
+    def test_several_role_origins_all_allowed(self):
         from initrunner.server.app import create_app
 
-        role = _make_security_role(server=ServerConfig(cors_origins=["https://role-origin.com"]))
+        role = _make_security_role(
+            server=ServerConfig(cors_origins=["https://one.com", "https://two.com"])
+        )
         agent = MagicMock()
-        app = create_app(agent, role, cors_origins=["https://cli-origin.com"])
+        app = create_app(agent, role)
         client = TestClient(app)
 
-        # Role origin should work
-        resp1 = client.options(
-            "/v1/chat/completions",
-            headers={
-                "Origin": "https://role-origin.com",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-        assert resp1.headers.get("access-control-allow-origin") == "https://role-origin.com"
+        for origin in ("https://one.com", "https://two.com"):
+            resp = client.options(
+                "/v1/chat/completions",
+                headers={"Origin": origin, "Access-Control-Request-Method": "POST"},
+            )
+            assert resp.headers.get("access-control-allow-origin") == origin
 
-        # CLI origin should also work
-        resp2 = client.options(
-            "/v1/chat/completions",
-            headers={
-                "Origin": "https://cli-origin.com",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-        assert resp2.headers.get("access-control-allow-origin") == "https://cli-origin.com"
-
-    def test_cors_no_cli_no_role_means_no_headers(self):
+    def test_no_origins_means_no_headers(self):
         from initrunner.server.app import create_app
 
         role = _make_role()
@@ -861,22 +850,28 @@ class TestCORSCLIOverride:
         assert "access-control-allow-origin" not in resp.headers
 
 
-class TestServeCLICorsFlag:
-    def test_cors_origin_flag_accepted(self):
-        """CLI parser recognizes the --cors-origin flag on run --serve."""
+class TestServeCorsFromRole:
+    def test_cors_origins_come_from_the_role(self, tmp_path):
+        """security.server.cors_origins is the only source of allowed origins."""
+        from initrunner.agent.loader import load_role
+
+        role_file = tmp_path / "role.yaml"
+        role_file.write_text(
+            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: cors-agent\n"
+            "spec:\n  role: test\n"
+            "  model:\n    provider: openai\n    name: gpt-5-mini\n"
+            "  security:\n    server:\n      cors_origins: ['https://example.com']\n"
+        )
+        role = load_role(role_file)
+        assert role.spec.security.server.cors_origins == ["https://example.com"]
+
+    def test_serve_host_and_port_are_accepted(self):
+        """--host/--port stay on run --serve as deployment inputs."""
         result = cli_runner.invoke(
             cli_app,
-            [
-                "run",
-                "/nonexistent/role.yaml",
-                "--serve",
-                "--cors-origin",
-                "https://example.com",
-            ],
+            ["run", "/nonexistent/role.yaml", "--serve", "--host", "0.0.0.0", "--port", "9001"],
         )
-        # Will fail because role file doesn't exist, but the flag itself is parsed
         assert result.exit_code == 1
-        # Should NOT fail with "no such option" error
         assert "No such option" not in (result.output or "")
 
 

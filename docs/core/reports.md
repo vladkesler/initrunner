@@ -9,7 +9,7 @@ InitRunner can export a structured markdown report after any `run` command. Repo
 initrunner run role.yaml -p "Review this PR" --report ./report.md
 
 # Use a purpose-built template
-initrunner run role.yaml -p "Review this PR" --report ./review.md --report-template pr-review
+initrunner run role.yaml -p "Review this PR" --report pr-review:./review.md
 
 # Combine with --dry-run for testing
 initrunner run role.yaml -p "Hello" --dry-run --report ./report.md
@@ -23,8 +23,8 @@ These flags are available on the `run` command:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `--report PATH` | `Path` | — | Export a markdown report to PATH after the run. |
-| `--report-template` | `str` | `default` | Report template to use: `default`, `pr-review`, `changelog`, `ci-fix`. Requires `--report`. |
+| `--report PATH` | `str` | — | Export a markdown report to PATH after the run. |
+| `--report TEMPLATE:PATH` | `str` | — | Same, with a named template: `default`, `pr-review`, `changelog`, `ci-fix`. A prefix is only read as a template when it is one of those names, so a plain path containing a colon still works. |
 
 ## Templates
 
@@ -44,7 +44,7 @@ Compact layout with a "PR Review Report" header. The agent output is presented a
 
 ```bash
 initrunner run role.yaml -p "Review the changes in this diff" \
-  --report ./review.md --report-template pr-review
+  --report pr-review:./review.md
 ```
 
 ### `changelog`
@@ -53,7 +53,7 @@ initrunner run role.yaml -p "Review the changes in this diff" \
 
 ```bash
 initrunner run role.yaml -p "Generate a changelog from these commits" \
-  --report ./changelog.md --report-template changelog
+  --report changelog:./changelog.md
 ```
 
 ### `ci-fix`
@@ -62,7 +62,7 @@ initrunner run role.yaml -p "Generate a changelog from these commits" \
 
 ```bash
 initrunner run role.yaml -p "Fix the failing CI tests" \
-  -a --report ./ci-analysis.md --report-template ci-fix
+  -a --report ci-fix:./ci-analysis.md
 ```
 
 ## Report Contents
@@ -100,8 +100,7 @@ For autonomous runs (`-a`), the `default` and `ci-fix` templates also include pe
 initrunner run code-reviewer.yaml \
   -p "Review the diff in review.patch" \
   -A review.patch \
-  --report ./pr-review-report.md \
-  --report-template pr-review
+  --report pr-review:./pr-review-report.md
 ```
 
 ### CI fix with autonomous mode
@@ -109,9 +108,8 @@ initrunner run code-reviewer.yaml \
 ```bash
 initrunner run ci-fixer.yaml \
   -p "The build is failing on test_auth. Fix it." \
-  -a --max-iterations 5 \
-  --report /tmp/ci-analysis.md \
-  --report-template ci-fix
+  -a \
+  --report ci-fix:/tmp/ci-analysis.md
 ```
 
 ### Dry-run report for testing

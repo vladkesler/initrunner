@@ -59,7 +59,7 @@ def resolve_exposed_api_key(host: str | None, api_key: str | None) -> tuple[str 
     generated = secrets.token_urlsafe(32)
     _logger.warning(
         "Server bound to non-loopback host %r without an API key; generated one to "
-        "avoid serving unauthenticated. Set --api-key (or the env var) to choose your own.",
+        "avoid serving unauthenticated. Set INITRUNNER_API_KEY to choose your own.",
         host,
     )
     return generated, generated

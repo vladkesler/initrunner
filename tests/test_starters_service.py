@@ -6,9 +6,13 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from initrunner.services.starters import (
     STARTERS_DIR,
+    StarterNotFoundError,
     check_prerequisites,
+    copy_starter,
     derive_features,
     get_starter,
     list_starters,
@@ -308,3 +312,46 @@ class TestStartersDir:
     def test_starters_dir_has_yaml_files(self):
         yaml_files = list(STARTERS_DIR.glob("*.yaml"))
         assert len(yaml_files) >= 5
+
+
+class TestCopyStarter:
+    """copy_starter is the offline starter copy behind `examples copy`."""
+
+    def test_single_file_starter_lands_as_role_yaml(self, tmp_path: Path):
+        written = copy_starter("memory", tmp_path)
+        assert written == [tmp_path / "role.yaml"]
+        assert (tmp_path / "role.yaml").read_text().strip()
+
+    def test_composite_starter_keeps_its_tree(self, tmp_path: Path):
+        written = copy_starter("pipeline", tmp_path)
+        rel = {p.relative_to(tmp_path).as_posix() for p in written}
+        assert "flow.yaml" in rel
+        assert any(r.startswith("roles/") for r in rel)
+
+    def test_creates_missing_output_directory(self, tmp_path: Path):
+        target = tmp_path / "nested" / "deeper"
+        copy_starter("memory", target)
+        assert (target / "role.yaml").is_file()
+
+    def test_unknown_slug_raises_and_writes_nothing(self, tmp_path: Path):
+        with pytest.raises(StarterNotFoundError):
+            copy_starter("no-such-starter", tmp_path)
+        assert list(tmp_path.iterdir()) == []
+
+    def test_collision_raises_before_writing_anything(self, tmp_path: Path):
+        (tmp_path / "roles").mkdir()
+        (tmp_path / "roles" / "notifier.yaml").write_text("mine")
+
+        with pytest.raises(FileExistsError):
+            copy_starter("pipeline", tmp_path)
+
+        assert not (tmp_path / "flow.yaml").exists()
+        assert (tmp_path / "roles" / "notifier.yaml").read_text() == "mine"
+
+    def test_copied_role_is_a_valid_role(self, tmp_path: Path):
+        """A copied starter must load, not just land on disk."""
+        from initrunner.agent.loader import load_role
+
+        copy_starter("memory", tmp_path)
+        role = load_role(tmp_path / "role.yaml")
+        assert role.metadata.name

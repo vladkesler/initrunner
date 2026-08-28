@@ -170,11 +170,9 @@ def _display_daemon_header(
     guardrails: object,
     autonomous_trigger_types: set[str],
     dispatcher: object,
-    *,
-    autopilot: bool = False,
 ) -> None:
     """Print the header for daemon mode."""
-    mode_label = "Autopilot mode" if autopilot else "Daemon mode"
+    mode_label = "Daemon mode"
     console.print(f"[bold]{mode_label}[/bold] -- agent: [cyan]{role.metadata.name}[/cyan]")
     if guardrails.daemon_token_budget is not None:  # type: ignore[union-attr]
         console.print(f"  Lifetime token budget: [cyan]{guardrails.daemon_token_budget:,}[/cyan]")  # type: ignore[union-attr]

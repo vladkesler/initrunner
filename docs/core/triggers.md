@@ -288,7 +288,7 @@ The `initrunner run <role> --daemon` command starts all configured triggers and 
 
 ```bash
 initrunner run role.yaml --daemon
-initrunner run role.yaml --daemon --audit-db ./custom-audit.db
+INITRUNNER_AUDIT_DB=./custom-audit.db initrunner run role.yaml --daemon
 initrunner run role.yaml --daemon --no-audit
 ```
 
@@ -298,8 +298,7 @@ initrunner run role.yaml --daemon --no-audit
 |--------|------|---------|-------------|
 | `role_file` | `Path` | *(required)* | Path to the role YAML file. |
 | `--daemon` | `bool` | `false` | Run in daemon mode with triggers. |
-| `--autopilot` | `bool` | `false` | Daemon mode with all triggers autonomous. |
-| `--audit-db` | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
+| `INITRUNNER_AUDIT_DB` (env) | `Path` | `~/.initrunner/audit.db` | Path to audit database. |
 | `--no-audit` | `bool` | `false` | Disable audit logging. |
 
 ### Lifecycle
@@ -307,9 +306,9 @@ initrunner run role.yaml --daemon --no-audit
 1. The role is loaded and the agent is built.
 2. All triggers are started in daemon threads via `TriggerDispatcher`.
 3. When a trigger fires, the prompt is sent to the agent.
-4. **All trigger types** (cron, file watch, webhook, Telegram, Discord, heartbeat) use the autonomous loop when `autonomous: true` is set on the trigger config. The `--autopilot` flag forces all triggers into autonomous mode regardless of per-trigger config.
+4. **All trigger types** (cron, file watch, webhook, Telegram, Discord, heartbeat) use the autonomous loop when `autonomous: true` is set on the trigger config and the role declares an `autonomy:` block.
 5. For **messaging triggers** (Telegram, Discord), the final output of the autonomous run is sent back to the originating channel. For **other triggers**, the result is displayed and dispatched to sinks.
-6. Triggers without `autonomous: true` (and not in `--autopilot` mode) use direct single-shot execution.
+6. Triggers without `autonomous: true` use direct single-shot execution.
 7. The daemon continues until interrupted.
 
 ### Hot-Reload

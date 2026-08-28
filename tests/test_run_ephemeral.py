@@ -36,10 +36,21 @@ class TestEphemeralFlagValidation:
         assert result.exit_code == 1
         assert "--dry-run" in result.output
 
-    def test_save_rejected(self):
-        result = runner.invoke(app, ["run", "--save", "/tmp/x", "-p", "hello"])
+    def test_format_rejected(self):
+        """--format has no effect without a role file, so it is refused."""
+        result = runner.invoke(app, ["run", "--format", "json", "-p", "hello"])
         assert result.exit_code == 1
-        assert "--save" in result.output
+        assert "--format" in result.output
+
+    def test_var_rejected(self):
+        result = runner.invoke(app, ["run", "--var", "K=V", "-p", "hello"])
+        assert result.exit_code == 1
+        assert "--var" in result.output
+
+    def test_report_rejected(self):
+        result = runner.invoke(app, ["run", "--report", "out.md", "-p", "hello"])
+        assert result.exit_code == 1
+        assert "--report" in result.output
 
     def test_resume_rejected_for_one_shot(self):
         """--resume with -p (no -i) should error."""
@@ -66,49 +77,50 @@ class TestEphemeralDispatch:
         assert kwargs["prompt"] == "hello"
 
     @patch("initrunner.cli._ephemeral.dispatch_ephemeral")
-    def test_bot_flag_dispatches_ephemeral(self, mock_dispatch):
-        result = runner.invoke(app, ["run", "--bot", "telegram"])
+    def test_tools_passed_through(self, mock_dispatch):
+        result = runner.invoke(app, ["run", "--tools", "all"])
         assert result.exit_code == 0
-        mock_dispatch.assert_called_once()
-        kwargs = mock_dispatch.call_args[1]
-        assert kwargs["bot"] == "telegram"
+        assert mock_dispatch.call_args[1]["tools"] == ["all"]
 
     @patch("initrunner.cli._ephemeral.dispatch_ephemeral")
-    def test_tool_profile_passed(self, mock_dispatch):
-        result = runner.invoke(app, ["run", "--tool-profile", "all"])
+    def test_tools_repeatable(self, mock_dispatch):
+        result = runner.invoke(app, ["run", "--tools", "minimal", "--tools", "git"])
         assert result.exit_code == 0
-        kwargs = mock_dispatch.call_args[1]
-        assert kwargs["tool_profile"] == "all"
-
-    @patch("initrunner.cli._ephemeral.dispatch_ephemeral")
-    def test_tool_profile_none_passed(self, mock_dispatch):
-        result = runner.invoke(app, ["run", "--tool-profile", "none"])
-        assert result.exit_code == 0
-        assert mock_dispatch.call_args[1]["tool_profile"] == "none"
+        assert mock_dispatch.call_args[1]["tools"] == ["minimal", "git"]
 
 
 class TestRoleIncompatibleFlags:
     """Ephemeral-only flags should error when a role file is given."""
 
-    def test_tool_profile_rejected_with_role(self, tmp_path):
+    @staticmethod
+    def _role(tmp_path):
         role = tmp_path / "role.yaml"
         role.write_text(
             "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: t\n"
             "spec:\n  role: test\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
         )
-        result = runner.invoke(app, ["run", str(role), "--tool-profile", "all"])
-        assert result.exit_code == 1
-        assert "--tool-profile" in result.output
+        return role
 
-    def test_provider_rejected_with_role(self, tmp_path):
-        role = tmp_path / "role.yaml"
-        role.write_text(
-            "apiVersion: initrunner/v1\nkind: Agent\nmetadata:\n  name: t\n"
-            "spec:\n  role: test\n  model:\n    provider: openai\n    name: gpt-5-mini\n"
-        )
-        result = runner.invoke(app, ["run", str(role), "--provider", "anthropic"])
+    def test_tools_rejected_with_role(self, tmp_path):
+        result = runner.invoke(app, ["run", str(self._role(tmp_path)), "--tools", "all"])
         assert result.exit_code == 1
-        assert "--provider" in result.output
+        assert "--tools" in result.output
+
+    def test_no_memory_rejected_with_role(self, tmp_path):
+        """--no-memory is False, not None: an explicit choice, not a default."""
+        result = runner.invoke(app, ["run", str(self._role(tmp_path)), "--no-memory", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--memory/--no-memory" in result.output
+
+    def test_memory_rejected_with_role(self, tmp_path):
+        result = runner.invoke(app, ["run", str(self._role(tmp_path)), "--memory", "-p", "hi"])
+        assert result.exit_code == 1
+        assert "--memory/--no-memory" in result.output
+
+    def test_ingest_rejected_with_role(self, tmp_path):
+        result = runner.invoke(app, ["run", str(self._role(tmp_path)), "--ingest", "docs/"])
+        assert result.exit_code == 1
+        assert "--ingest" in result.output
 
 
 class TestSenseValidation:
@@ -122,74 +134,55 @@ class TestSenseValidation:
         result = runner.invoke(app, ["run", "--sense", "-p", "hello", "--serve"])
         assert result.exit_code == 1
 
-    def test_sense_rejects_bot(self):
-        result = runner.invoke(app, ["run", "--sense", "-p", "hello", "--bot", "telegram"])
-        assert result.exit_code == 1
-
 
 class TestListFlags:
-    """Test --list and --list-tools."""
+    """--list still lists starters; the tool listings moved into --help."""
 
     def test_list_shows_starters(self):
         result = runner.invoke(app, ["run", "--list"])
         assert result.exit_code == 0
         assert "Starter Agents" in result.output
 
-    def test_list_tools_shows_tools(self):
-        result = runner.invoke(app, ["run", "--list-tools"])
-        assert result.exit_code == 0
-        assert "Available extra tools" in result.output
 
+class TestParseToolsFlag:
+    """--tools carries a profile and/or tool types in one flag."""
 
-class TestExplainProfiles:
-    """--explain-profiles should show profile breakdown."""
+    def test_profile_only(self):
+        from initrunner.cli._ephemeral import parse_tools_flag
 
-    def test_explain_profiles_shows_all_profiles(self):
-        result = runner.invoke(app, ["run", "--explain-profiles"])
-        assert result.exit_code == 0
-        assert "none" in result.output
-        assert "minimal" in result.output
-        assert "all" in result.output
-        assert "datetime" in result.output
-        assert "web_reader" in result.output
+        assert parse_tools_flag(["all"]) == ("all", [])
 
-    def test_explain_profiles_exits_cleanly_with_other_flags(self):
-        """--explain-profiles should exit before validation runs."""
-        result = runner.invoke(app, ["run", "--explain-profiles", "--daemon"])
-        assert result.exit_code == 0
-        assert "Tool profiles" in result.output
+    def test_types_only(self):
+        from initrunner.cli._ephemeral import parse_tools_flag
 
+        assert parse_tools_flag(["git", "shell"]) == (None, ["git", "shell"])
 
-class TestEphemeralSenseOnlyFlags:
-    """--confirm-role and --role-dir should error without --sense in ephemeral mode."""
+    def test_comma_separated(self):
+        from initrunner.cli._ephemeral import parse_tools_flag
 
-    def test_confirm_role_without_sense_rejected(self):
-        result = runner.invoke(app, ["run", "--confirm-role", "-p", "hi"])
+        assert parse_tools_flag(["all,git"]) == ("all", ["git"])
+
+    def test_whitespace_and_duplicates_ignored(self):
+        from initrunner.cli._ephemeral import parse_tools_flag
+
+        assert parse_tools_flag([" all , git ", "git"]) == ("all", ["git"])
+
+    def test_two_profiles_rejected(self):
+        result = runner.invoke(app, ["run", "--tools", "all", "--tools", "minimal", "-p", "hi"])
         assert result.exit_code == 1
-        assert "--confirm-role" in result.output
-        assert "--sense" in result.output
+        assert "more than one profile" in result.output
 
-    def test_role_dir_without_sense_rejected(self):
-        result = runner.invoke(app, ["run", "--role-dir", "/tmp", "-p", "hi"])
+    def test_unknown_token_lists_valid_values(self):
+        result = runner.invoke(app, ["run", "--tools", "bogus", "-p", "hi"])
         assert result.exit_code == 1
-        assert "--role-dir" in result.output
-        assert "--sense" in result.output
+        assert "Profiles:" in result.output
+        assert "Tools:" in result.output
 
-
-class TestEphemeralModeSpecificFlags:
-    """Serve-only and bot-only flags should error in ephemeral mode without their parent."""
-
-    def test_api_key_without_serve_rejected(self):
-        result = runner.invoke(app, ["run", "--api-key", "secret"])
+    def test_registry_only_tool_points_at_role_yaml(self):
+        """A real tool that ephemeral mode cannot attach says why."""
+        result = runner.invoke(app, ["run", "--tools", "clarify", "-p", "hi"])
         assert result.exit_code == 1
-        assert "--api-key" in result.output
-        assert "--serve" in result.output
-
-    def test_allowed_users_without_bot_rejected(self):
-        result = runner.invoke(app, ["run", "--allowed-users", "alice"])
-        assert result.exit_code == 1
-        assert "--allowed-users" in result.output
-        assert "--bot" in result.output
+        assert "initrunner new" in result.output
 
 
 class TestChatRemoved:
@@ -227,7 +220,7 @@ class TestAttachedToolsHonorProfile:
         mock_cfg.return_value = RunConfig(provider="openai", model="gpt-5-mini")
         from initrunner.cli._ephemeral import dispatch_ephemeral
 
-        dispatch_ephemeral(prompt="hello", tool_profile="none")
+        dispatch_ephemeral(prompt="hello", tools=["none"])
         assert mock_repl.call_args[1]["attached_tools"] == []
 
     @patch("initrunner.cli._ephemeral.dispatch_ephemeral_repl")
@@ -238,7 +231,7 @@ class TestAttachedToolsHonorProfile:
         mock_cfg.return_value = RunConfig(provider="openai", model="gpt-5-mini")
         from initrunner.cli._ephemeral import dispatch_ephemeral
 
-        dispatch_ephemeral(prompt="hello", tool_profile="all")
+        dispatch_ephemeral(prompt="hello", tools=["all"])
         types = set(_attached_types(mock_repl.call_args[1]))
         assert {"python", "shell", "datetime", "web_reader"} <= types
 
@@ -250,7 +243,7 @@ class TestAttachedToolsHonorProfile:
         mock_cfg.return_value = RunConfig(provider="openai", model="gpt-5-mini")
         from initrunner.cli._ephemeral import dispatch_ephemeral
 
-        dispatch_ephemeral(prompt="hello", extra_tools=["python"])
+        dispatch_ephemeral(prompt="hello", tools=["python"])
         assert _attached_types(mock_repl.call_args[1]) == [
             "datetime",
             "web_reader",
@@ -277,16 +270,30 @@ class TestAttachedToolsHonorProfile:
             "git",
         ]
 
-    @patch("initrunner.cli._ephemeral.dispatch_ephemeral_bot")
+    @patch("initrunner.cli._ephemeral.dispatch_ephemeral_repl")
     @patch("initrunner.run_config.load_run_config")
-    def test_bot_gets_attached_profile(self, mock_cfg, mock_bot):
+    def test_comma_separated_profile_and_type(self, mock_cfg, mock_repl):
         from initrunner.run_config import RunConfig
 
         mock_cfg.return_value = RunConfig(provider="openai", model="gpt-5-mini")
         from initrunner.cli._ephemeral import dispatch_ephemeral
 
-        dispatch_ephemeral(bot="telegram", tool_profile="none")
-        assert mock_bot.call_args[1]["attached_tools"] == []
+        dispatch_ephemeral(prompt="hello", tools=["none,git"])
+        assert _attached_types(mock_repl.call_args[1]) == ["git"]
+
+    @patch("initrunner.cli._ephemeral.dispatch_ephemeral_repl")
+    @patch("initrunner.run_config.load_run_config")
+    def test_flag_types_replace_run_yaml_tools(self, mock_cfg, mock_repl):
+        """An explicit --tools list replaces run.yaml's, it does not merge."""
+        from initrunner.run_config import RunConfig
+
+        mock_cfg.return_value = RunConfig(
+            provider="openai", model="gpt-5-mini", tool_profile="minimal", tools=["git"]
+        )
+        from initrunner.cli._ephemeral import dispatch_ephemeral
+
+        dispatch_ephemeral(prompt="hello", tools=["python"])
+        assert _attached_types(mock_repl.call_args[1]) == ["datetime", "web_reader", "python"]
 
 
 class TestCheckProfileEnvsSelectedOnly:

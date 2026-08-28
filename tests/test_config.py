@@ -22,6 +22,7 @@ def _clear_cache(monkeypatch):
     # Remove env vars that could interfere
     monkeypatch.delenv("INITRUNNER_HOME", raising=False)
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.delenv("INITRUNNER_AUDIT_DB", raising=False)
     yield
     get_home_dir.cache_clear()
 
@@ -59,6 +60,27 @@ class TestGetHomeDir:
 class TestDerivedPaths:
     def test_audit_db_path(self, monkeypatch):
         monkeypatch.setenv("INITRUNNER_HOME", "/tmp/ir")
+        get_home_dir.cache_clear()
+        assert get_audit_db_path() == Path("/tmp/ir/audit.db")
+
+    def test_audit_db_env_overrides_home(self, monkeypatch):
+        """INITRUNNER_AUDIT_DB wins over the home-derived default."""
+        monkeypatch.setenv("INITRUNNER_HOME", "/tmp/ir")
+        monkeypatch.setenv("INITRUNNER_AUDIT_DB", "/tmp/elsewhere/custom.db")
+        get_home_dir.cache_clear()
+        assert get_audit_db_path() == Path("/tmp/elsewhere/custom.db")
+
+    def test_audit_db_env_read_per_call(self, monkeypatch):
+        """Not cached: a changed env var takes effect without a cache_clear."""
+        monkeypatch.setenv("INITRUNNER_AUDIT_DB", "/tmp/first.db")
+        assert get_audit_db_path() == Path("/tmp/first.db")
+        monkeypatch.setenv("INITRUNNER_AUDIT_DB", "/tmp/second.db")
+        assert get_audit_db_path() == Path("/tmp/second.db")
+
+    def test_audit_db_empty_env_falls_back(self, monkeypatch):
+        """An empty value is not a path; fall back to the home default."""
+        monkeypatch.setenv("INITRUNNER_HOME", "/tmp/ir")
+        monkeypatch.setenv("INITRUNNER_AUDIT_DB", "")
         get_home_dir.cache_clear()
         assert get_audit_db_path() == Path("/tmp/ir/audit.db")
 

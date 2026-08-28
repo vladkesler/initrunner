@@ -294,7 +294,7 @@ class TestRunAutonomous:
     @patch("initrunner.runner.autonomous.execute_run")
     def test_completes_when_reflection_signals_done(self, mock_execute):
         """Agent calls finish_task → loop should stop."""
-        role = _make_role(max_iterations=5)
+        role = _make_role(max_iterations=2)
 
         call_count = 0
 
@@ -320,7 +320,7 @@ class TestRunAutonomous:
         mock_execute.side_effect = _side_effect
 
         agent = MagicMock()
-        auto_result = run_autonomous(agent, role, "Do something", max_iterations_override=2)
+        auto_result = run_autonomous(agent, role, "Do something")
 
         assert auto_result.iteration_count == 2
         assert auto_result.final_status == "max_iterations"

@@ -399,7 +399,7 @@ initrunner run --ingest "./docs/**/*.md"
 initrunner run --ingest ./notes/ --ingest ./data/*.csv
 
 # Combine with tools
-initrunner run --ingest ./docs/ --tool-profile all
+initrunner run --ingest ./docs/ --tools all
 ```
 
 The `--ingest` flag:

@@ -40,17 +40,13 @@ def get_run_budget_tracker() -> DaemonTokenTracker | None:
     return _run_budget.get()
 
 
-def make_single_shot_tracker(
-    role: RoleDefinition,
-    override: int | None,
-) -> DaemonTokenTracker | None:
+def make_single_shot_tracker(role: RoleDefinition) -> DaemonTokenTracker | None:
     """Build a lifetime-only tracker if a per-run budget is configured.
 
-    *override* (e.g. from ``--token-budget``) takes precedence over the
-    role's ``guardrails.run_token_budget``. Returns ``None`` when neither
-    is set, so callers can no-op cleanly.
+    Reads ``guardrails.run_token_budget``. Returns ``None`` when it is unset,
+    so callers can no-op cleanly.
     """
-    budget = override if override is not None else role.spec.guardrails.run_token_budget
+    budget = role.spec.guardrails.run_token_budget
     if budget is None:
         return None
 

@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+### Changed (`run` flags)
+- **`initrunner run` went from 43 flags to 22, and the role YAML is now the one place a setting lives.** `_validate.py` was 313 lines whose only job was policing which flags could be combined with which; that code existed because the flags overlapped each other and the schema. Twenty-one flags are gone. Each had a YAML field, an environment variable, or another flag that already did the job:
+
+  | Removed | Use instead |
+  |---|---|
+  | `--max-iterations` | `guardrails.max_iterations` |
+  | `--token-budget` | `guardrails.run_token_budget` |
+  | `--budget-timezone` | `guardrails.budget_timezone` |
+  | `--autopilot` | `autonomous: true` on each trigger **plus** an `autonomy: {}` block, then `--daemon` |
+  | `--bot telegram\|discord` | a `telegram`/`discord` trigger in the role, then `--daemon` |
+  | `--allowed-users`, `--allowed-user-ids` | the matching fields on that trigger |
+  | `--cors-origin` | `security.server.cors_origins` |
+  | `--api-key` | `INITRUNNER_API_KEY` |
+  | `--audit-db` | `INITRUNNER_AUDIT_DB` |
+  | `--skill-dir` | `INITRUNNER_SKILL_DIR` |
+  | `--report-template pr-review` | `--report pr-review:PATH` |
+  | `--tool-profile`, `--list-tools`, `--explain-profiles` | `--tools` (it takes profiles and tool types) |
+  | `--provider` | `--model provider:model`, or `provider:` in `~/.initrunner/run.yaml` |
+  | `--role-dir`, `--confirm-role` | nothing: `--sense` searches the default directories and confirms on a terminal |
+  | `--save` | `initrunner examples copy <starter>` |
+  | `--dev`, `--no-stream` | `--format rich` |
+
+  For this release, passing a removed flag prints the replacement and exits 2 rather than Click's "No such option". That shim goes away next release.
+
+- **`--host` and `--port` stayed.** They are deployment inputs, not agent behaviour: the same role binds to loopback on a laptop and `0.0.0.0` in a container, and moving `host` into the role would have meant per-environment copies of otherwise identical YAML.
+
+- **`--bot` is gone because it was worse than redundant.** `run_bot` never read `role.spec.triggers`; it synthesised a trigger from CLI arguments, silently discarding `token_env`, `allow_all`, `channel_ids`, `allowed_roles`, and (on Discord) `--allowed-users`. With no allowlist flags the synthesised config had empty allowlists and `allow_all: false`, which the Telegram adapter reads as no check at all, so the bot answered everyone. `--daemon` builds the same triggers from YAML and adds hot reload, retry, circuit breaking, and Slack. `initrunner run telegram --daemon` runs the bundled starter.
+
+- **Ephemeral `--bot` is gone with it.** There was nowhere without a role file to put an allowlist or a budget. Use the bundled starter and copy it to customise. Two behaviour notes: the starter has no allowlist, exactly like the ephemeral bot, so add `allowed_user_ids` before sharing the bot's handle; and it runs one agent turn per message, where `run --bot` forced the autonomous loop.
+
+- **Flags are now refused rather than ignored.** Several combinations used to be accepted and silently dropped: `--no-memory` with a role file, `--var` and `--format` in ephemeral mode, `--model` on Team and Flow targets, `--dry-run` on a Flow, `--host`/`--port` without `--serve`, `-p` with `--daemon`/`--serve`, and the flags that steer one run (`-i`, `--resume`, `--attach`, `--report`, `--var`, `--format`, `--dry-run`) under `--daemon`/`--serve`. That last one had teeth: `--dry-run --daemon` started the daemon and called the real model. Each is an error naming the flag. `tests/test_run_flag_matrix.py` walks every retained flag across every kind of target and asserts it is either received by the dispatcher or refused, so this cannot rot.
+
+- **`-i --format rich` no longer shows the "Thinking..." spinner.** That is what makes it a complete replacement for `--dev`, which existed to keep Rich off the terminal so a `breakpoint()` in a tool could own it. Streaming REPLs are unchanged.
+
+### Added
+- **`INITRUNNER_AUDIT_DB` is honored by every reader.** It was previously wired only to Typer's `envvar=` on `--audit-db`, so the dashboard and daemon stayed on the home default no matter what the environment said. `get_audit_db_path()` reads it now, which covers the CLI, the daemon, and all fourteen dashboard call sites.
+- **`initrunner examples copy <starter>` copies bundled starters offline.** `examples copy` only knew the GitHub-backed catalog, so `examples copy telegram` failed outright and starters were reachable only through `run --save`. Destinations are checked before anything is written, so a collision leaves the directory untouched. Where a name exists as both a starter and a catalog example (`helpdesk`, `scout`), the starter wins, matching how `initrunner run helpdesk` already resolves; the output names the source.
+
+### Removed (internal)
+- `initrunner.runner.bot` and `run_bot`, `--autopilot` plumbing through `DaemonRunner`/`run_daemon`/`run_group_daemon`, the `cors_origins` arguments on the server entry points, `max_iterations_override` (its only caller was the CLI; `execute_autonomous_sync` had no callers at all), and `tool_dev` on `run_interactive`. `_run_team` also lost report parameters that could never fire, because `--report` has always been refused for Team targets.
+
+### Added (daemon)
+- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint naming the missing block, at startup and again after a hot reload, so a live edit that adds the trigger without the block is not silent either. This is the case `--autopilot` used to paper over by waiving the requirement.
+
 ## [2026.8.10] - 2026-08-21
 
 ### Fixed

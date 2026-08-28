@@ -80,31 +80,37 @@ You should see `Discord bot connected` in the logs.
 
 ### Quick Alternative
 
-To test without creating a role file:
+To try one without writing a role file, run the bundled starter:
 
 ```bash
-initrunner run --bot discord
+initrunner run discord --daemon
 ```
 
-Auto-detects your provider, launches an ephemeral bot with minimal tools and persistent memory enabled by default. Use `--tool-profile all` for everything, or add individual tools with `--tools`:
+It auto-detects your provider and ships with search, web reading, and
+persistent memory.
+
+> **It answers anyone who messages it.** The starter has no allowlist, so add
+> `allowed_user_ids` before you invite the bot anywhere public. Each message is
+> one agent run, not an autonomous loop.
+
+To change its tools, budgets, or access control, copy it and edit the YAML:
 
 ```bash
-# Enable every available tool
-SLACK_WEBHOOK_URL="https://hooks.slack.com/..." initrunner run --bot discord --tool-profile all
-
-# Or add specific extras
-initrunner run --bot discord --tools git --tools shell
-
-# Restrict to specific users by ID (works in DMs and guild channels)
-initrunner run --bot discord --allowed-user-ids 111222333444555666
-
-# Disable memory if not needed
-initrunner run --bot discord --no-memory
+initrunner examples copy discord --output ./my-bot
+initrunner run ./my-bot/role.yaml --daemon
 ```
 
-Run `initrunner run --list-tools` to see all available tool types.
+Access control, tools, and budgets all live in that file:
 
-For production, use the `role.yaml` approach with `initrunner run role.yaml --bot discord` or `--daemon` for access control and budgets.
+```yaml
+triggers:
+  - type: discord
+    # Works in DMs and guild channels
+    allowed_user_ids: ["111222333444555666"]
+```
+
+Run `initrunner run --help` to see the tool types available to ephemeral mode
+(`--tools`), which is separate from what a role file can use.
 
 ## Testing
 

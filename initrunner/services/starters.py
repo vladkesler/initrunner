@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger(__name__)
 
+
+class StarterNotFoundError(Exception):
+    """Raised when a starter slug does not resolve to a bundled starter."""
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -563,6 +568,45 @@ def apply_starter_content_root(role: RoleDefinition, role_file: Path) -> RoleDef
         return role
     new_spec = role.spec.model_copy(update={"tools": new_tools})
     return role.model_copy(update={"spec": new_spec})
+
+
+def copy_starter(slug: str, output_dir: Path) -> list[Path]:
+    """Copy a bundled starter into *output_dir*. Returns the written paths.
+
+    A single-file starter lands as ``role.yaml``; a composite starter keeps its
+    tree. Every destination is checked before anything is written, so a
+    collision leaves *output_dir* exactly as it was -- the same contract as
+    ``initrunner.examples.copy_example``.
+    """
+    import shutil
+
+    source = resolve_starter_path(slug)
+    if source is None:
+        raise StarterNotFoundError(f"Unknown starter: {slug}")
+
+    starter_dir = source.parent
+    if starter_dir.resolve() == STARTERS_DIR.resolve():
+        pairs = [(source, Path("role.yaml"))]
+    else:
+        pairs = [(src, src.relative_to(starter_dir)) for src in _files_under(starter_dir)]
+
+    # Preflight: confine every write to output_dir and refuse to clobber, before
+    # the first byte is written.
+    out_root = output_dir.resolve()
+    for _src, rel in pairs:
+        dest = output_dir / rel
+        if not dest.resolve().is_relative_to(out_root):
+            raise ValueError(f"Unsafe starter file path: {rel}")
+        if dest.exists():
+            raise FileExistsError(f"File already exists: {dest}")
+
+    written: list[Path] = []
+    for src, rel in pairs:
+        dest = output_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        written.append(dest)
+    return written
 
 
 def copy_starter_samples(entry: StarterEntry, dest_parent: Path) -> list[Path]:

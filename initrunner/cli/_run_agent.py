@@ -54,7 +54,6 @@ def _maybe_export_report(
 def _resolve_output_format(
     output_format: str,
     *,
-    no_stream: bool,
     autonomous: bool,
     output_type: str,
 ) -> str:
@@ -72,9 +71,6 @@ def _resolve_output_format(
             effective = "rich"
         else:
             effective = "stream"
-
-    if no_stream and effective == "stream":
-        effective = "rich"
 
     return effective
 
@@ -143,21 +139,14 @@ def _run_agent(
     prompt: str | None,
     interactive: bool,
     autonomous: bool,
-    max_iterations: int | None,
-    token_budget: int | None,
     resume: bool,
     dry_run: bool,
-    audit_db: Path | None,
     no_audit: bool,
-    skill_dir: Path | None,
     attach: list[str] | None,
-    report: Path | None,
-    report_template: str,
+    report_spec: tuple[str, Path] | None,
     output_format: str,
-    no_stream: bool,
     model: str | None,
     template_values: dict[str, str] | None = None,
-    dev: bool = False,
     role_mutator: Callable[[RoleDefinition], RoleDefinition] | None = None,
 ) -> None:
     """Standard agent execution: single-shot, REPL, or autonomous."""
@@ -168,19 +157,7 @@ def _run_agent(
         console.print("[red]Error:[/red] --autonomous and --interactive are mutually exclusive.")
         raise typer.Exit(1)
 
-    if report_template != "default" and report is None:
-        console.print("[red]Error:[/red] --report-template requires --report PATH.")
-        raise typer.Exit(1)
-
-    if report_template != "default":
-        from initrunner.report import BUILT_IN_TEMPLATES
-
-        if report_template not in BUILT_IN_TEMPLATES:
-            console.print(
-                f"[red]Error:[/red] Unknown template '{report_template}'. "
-                f"Available: {', '.join(BUILT_IN_TEMPLATES)}"
-            )
-            raise typer.Exit(1)
+    report_template, report = report_spec if report_spec is not None else ("default", None)
 
     if attach and not prompt and not interactive and sys.stdin.isatty():
         console.print("[red]Error:[/red] use --prompt with --attach or pipe stdin.")
@@ -201,11 +178,11 @@ def _run_agent(
     resolved_model = resolve_model_override(model)
     with command_context(
         role_file,
-        audit_db=audit_db,
+        audit_db=None,
         no_audit=no_audit,
         with_memory=True,
         with_sinks=True,
-        extra_skill_dirs=resolve_skill_dirs(skill_dir),
+        extra_skill_dirs=resolve_skill_dirs(None),
         model_override=resolved_model,
         dry_run=dry_run,
         role_mutator=role_mutator,
@@ -224,13 +201,12 @@ def _run_agent(
 
         effective = _resolve_output_format(
             output_format,
-            no_stream=no_stream,
             autonomous=autonomous,
             output_type=role.spec.output.type,
         )
-        # Developer REPL disables streaming so a breakpoint() in a tool owns the
-        # terminal (Rich Live would otherwise fight pdb for it).
-        use_stream = effective == "stream" and not dev
+        # A buffered REPL (--format rich) runs neither Rich Live nor the status
+        # spinner, so a breakpoint() in a tool owns the terminal.
+        use_stream = effective == "stream"
         _run_single = run_single_stream if use_stream else run_single
 
         run_result = None
@@ -247,7 +223,6 @@ def _run_agent(
                 sink_dispatcher=sink_dispatcher,
                 memory_store=memory_store,
                 model_override=model_override,
-                max_iterations_override=max_iterations,
             )
         elif user_prompt and not interactive:
             from initrunner.runner.run_budget import (
@@ -256,7 +231,7 @@ def _run_agent(
                 set_run_budget_tracker,
             )
 
-            tracker = make_single_shot_tracker(role, token_budget)
+            tracker = make_single_shot_tracker(role)
             if tracker is not None:
                 allowed, reason = tracker.check_before_run()
                 if not allowed:
@@ -337,10 +312,10 @@ def _run_agent(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
                 stream=use_stream,
+                show_thinking=use_stream,
                 role_path=role_file,
-                extra_skill_dirs=resolve_skill_dirs(skill_dir),
+                extra_skill_dirs=resolve_skill_dirs(None),
                 load_model_override=resolved_model,
-                tool_dev=dev,
             )
             suggest_next("run_repl_exit", role, role_file)
         else:
@@ -353,10 +328,10 @@ def _run_agent(
                 sink_dispatcher=sink_dispatcher,
                 model_override=model_override,
                 stream=use_stream,
+                show_thinking=use_stream,
                 role_path=role_file,
-                extra_skill_dirs=resolve_skill_dirs(skill_dir),
+                extra_skill_dirs=resolve_skill_dirs(None),
                 load_model_override=resolved_model,
-                tool_dev=dev,
             )
             suggest_next("run_repl_exit", role, role_file)
 

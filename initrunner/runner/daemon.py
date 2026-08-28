@@ -74,7 +74,6 @@ class DaemonRunner:
         memory_store: MemoryStoreBase | None = None,
         role_path: Path | None = None,
         extra_skill_dirs: list[Path] | None = None,
-        autopilot: bool = False,
         stop_event: threading.Event | None = None,
         install_signal_handler: bool = True,
         rebuild: Callable[[Path], tuple[RoleDefinition, Agent]] | None = None,
@@ -82,7 +81,6 @@ class DaemonRunner:
     ) -> None:
         self._agent = agent
         self._role = role
-        self._autopilot = autopilot
         self._agent_role_lock = threading.RLock()
         self._audit_logger = audit_logger
         self._sink_dispatcher = sink_dispatcher
@@ -167,10 +165,7 @@ class DaemonRunner:
 
         self._setup_scheduling()
 
-        # Check which triggers want autonomous mode
-        for tc in self._role.spec.triggers:
-            if self._autopilot or getattr(tc, "autonomous", False):
-                self._autonomous_trigger_types.add(tc.type)
+        self._refresh_autonomous_triggers(self._role)
 
         self._dispatcher = TriggerDispatcher(self._role.spec.triggers, self._on_trigger)
 
@@ -179,7 +174,6 @@ class DaemonRunner:
             self._role.spec.guardrails,
             self._autonomous_trigger_types,
             self._dispatcher,
-            autopilot=self._autopilot,
         )
 
         with self._dispatcher:
@@ -205,6 +199,23 @@ class DaemonRunner:
             self._reloader.stop()
 
         console.print("Daemon stopped.")
+
+    def _refresh_autonomous_triggers(self, role: RoleDefinition) -> None:
+        """Recompute which trigger types run the autonomous loop.
+
+        A trigger marked ``autonomous: true`` still needs an ``autonomy:`` block
+        to loop; without one it quietly runs a single turn, which reads as the
+        setting not working. Say so on startup and again after every reload, so
+        a live edit that adds the trigger but not the block is not silent.
+        """
+        self._autonomous_trigger_types = {
+            tc.type for tc in role.spec.triggers if getattr(tc, "autonomous", False)
+        }
+        if self._autonomous_trigger_types and role.spec.autonomy is None:
+            console.print(
+                "[dim]Hint: add 'autonomy: {}' to run autonomous triggers as an"
+                " agentic loop; without it they run one turn each.[/dim]"
+            )
 
     def _setup_scheduling(self) -> None:
         """Initialize scheduling tools if autonomy is configured."""
@@ -298,9 +309,7 @@ class DaemonRunner:
             event.trigger_type in self._autonomous_trigger_types
             or event.trigger_type == "scheduled"
         )
-        use_autonomous = trigger_wants_autonomous and (
-            role.spec.autonomy is not None or self._autopilot
-        )
+        use_autonomous = trigger_wants_autonomous and role.spec.autonomy is not None
 
         # Retrieve prior conversation history for messaging triggers
         conv_key = event.conversation_key
@@ -736,12 +745,7 @@ class DaemonRunner:
                 timezone=new_g.budget_timezone,
             )
 
-        # Recompute autonomous trigger types
-        new_auto_types: set[str] = set()
-        for tc in new_role.spec.triggers:
-            if self._autopilot or getattr(tc, "autonomous", False):
-                new_auto_types.add(tc.type)
-        self._autonomous_trigger_types = new_auto_types
+        self._refresh_autonomous_triggers(new_role)
 
         # Rebuild scheduling if autonomy config changed
         self._setup_scheduling()
@@ -822,7 +826,6 @@ def run_daemon(
     memory_store: MemoryStoreBase | None = None,
     role_path: Path | None = None,
     extra_skill_dirs: list[Path] | None = None,
-    autopilot: bool = False,
 ) -> None:
     """Run in daemon mode: triggers fire → agent responds → result logged."""
     runner = DaemonRunner(
@@ -833,6 +836,5 @@ def run_daemon(
         memory_store=memory_store,
         role_path=role_path,
         extra_skill_dirs=extra_skill_dirs,
-        autopilot=autopilot,
     )
     runner.run()

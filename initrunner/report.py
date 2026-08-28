@@ -18,6 +18,25 @@ if TYPE_CHECKING:
 BUILT_IN_TEMPLATES = ("default", "pr-review", "changelog", "ci-fix")
 
 
+def parse_report_spec(value: str) -> tuple[str, Path]:
+    """Split a ``--report`` value into (template name, output path).
+
+    ``TEMPLATE:PATH`` selects a built-in template; anything else is the path
+    with the default template. Only a known template name counts as a prefix,
+    so a Windows drive letter (``C:\\out.md``) and a relative path containing
+    a colon are still read as paths.
+    """
+    template, sep, rest = value.partition(":")
+    if sep and template in BUILT_IN_TEMPLATES:
+        if not rest:
+            raise ValueError(
+                f"--report {value!r}: missing PATH after '{template}:'."
+                f" Use {template}:path/to/report.md"
+            )
+        return template, Path(rest)
+    return "default", Path(value)
+
+
 @dataclass
 class ReportContext:
     agent_name: str

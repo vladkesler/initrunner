@@ -71,26 +71,14 @@ class TestSchemaField:
 class TestMakeSingleShotTracker:
     def test_returns_none_when_unset(self):
         role = _make_role(run_token_budget=None)
-        assert make_single_shot_tracker(role, override=None) is None
+        assert make_single_shot_tracker(role) is None
 
     def test_returns_tracker_from_role_field(self):
         role = _make_role(run_token_budget=5000)
-        tracker = make_single_shot_tracker(role, override=None)
+        tracker = make_single_shot_tracker(role)
         assert tracker is not None
         assert tracker.lifetime_budget == 5000
         assert tracker.daily_budget is None
-
-    def test_override_takes_precedence_over_field(self):
-        role = _make_role(run_token_budget=5000)
-        tracker = make_single_shot_tracker(role, override=100)
-        assert tracker is not None
-        assert tracker.lifetime_budget == 100
-
-    def test_override_with_no_field_set(self):
-        role = _make_role(run_token_budget=None)
-        tracker = make_single_shot_tracker(role, override=2500)
-        assert tracker is not None
-        assert tracker.lifetime_budget == 2500
 
 
 # ---------------------------------------------------------------------------

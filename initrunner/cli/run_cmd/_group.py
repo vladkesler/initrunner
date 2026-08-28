@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,13 +46,7 @@ def resolve_member_or_exit(roster: Roster, key: str) -> Path:
     return member.path
 
 
-def sense_member_or_exit(
-    roster: Roster,
-    prompt: str,
-    *,
-    confirm_role: bool,
-    dry_run: bool,
-) -> str:
+def sense_member_or_exit(roster: Roster, prompt: str, *, dry_run: bool) -> str:
     """Pick the member that best matches *prompt*.
 
     Uses the same scoring as sensing over a role directory, but the candidates
@@ -80,7 +75,9 @@ def sense_member_or_exit(
         )
         raise typer.Exit(1)
 
-    if confirm_role and not typer.confirm(f"Use agent '{key}'?", default=True):
+    # Same rule as sensing over a role directory: confirm whenever there is a
+    # terminal to ask, proceed when piped.
+    if sys.stdin.isatty() and not typer.confirm(f"Use agent '{key}'?", default=True):
         console.print("Cancelled.")
         raise typer.Exit(1)
     return key
