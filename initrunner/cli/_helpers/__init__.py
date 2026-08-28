@@ -20,6 +20,7 @@ from initrunner.cli._helpers._display import (
     prompt_model_selection,
     suggest_next,
 )
+from initrunner.cli._helpers._extras import offer_install
 from initrunner.cli._helpers._resolve import (
     _apply_model_override,
     detect_yaml_kind,
@@ -51,6 +52,7 @@ __all__ = [
     "install_extras",
     "load_and_build_or_exit",
     "load_role_or_exit",
+    "offer_install",
     "preflight_validate_or_exit",
     "prepare_starter",
     "print_error",

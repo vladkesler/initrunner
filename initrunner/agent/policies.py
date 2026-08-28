@@ -176,14 +176,14 @@ def redact_text(text: str, policy: ContentPolicy) -> str:
 
 def _check_profanity(text: str) -> ValidationResult:
     """Check for profanity using better-profanity library."""
-    from initrunner._compat import is_extra_available
+    from initrunner._compat import MissingExtraError, require_extra
 
-    if not is_extra_available("better_profanity"):
-        return ValidationResult(
-            valid=False,
-            reason=("'better-profanity' is required: uv pip install initrunner[safety]"),
-            validator="profanity",
-        )
+    try:
+        require_extra("better_profanity")
+    except MissingExtraError as e:
+        # A guardrail cannot prompt or exit: a run in flight fails the check
+        # and reports why. The message is _compat's, so it stays in step.
+        return ValidationResult(valid=False, reason=str(e), validator="profanity")
     from better_profanity import profanity  # type: ignore[import-not-found]
 
     if profanity.contains_profanity(text):

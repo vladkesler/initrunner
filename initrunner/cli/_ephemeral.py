@@ -172,12 +172,19 @@ def build_agent_or_exit(role):
     try:
         return build_agent(role)
     except RoleLoadError as e:
+        cause = e.__cause__
+        if isinstance(cause, MissingExtraError) and cause.extra:
+            if role.spec.ingest is None:
+                # Print the way out before the prompt, so declining still
+                # leaves the user with something to do.
+                console.print(
+                    "[dim]Hint:[/dim] Persistent memory is what needs it."
+                    " Add [bold]--no-memory[/bold] to run without it."
+                )
+            from initrunner.cli._helpers._extras import offer_install
+
+            offer_install([cause.extra], needed_by="this run")
         print_error(e)
-        if isinstance(e.__cause__, MissingExtraError) and role.spec.ingest is None:
-            console.print(
-                "[dim]Hint:[/dim] Persistent memory is what needs it."
-                " Add [bold]--no-memory[/bold] to run without it."
-            )
         raise typer.Exit(1) from None
 
 

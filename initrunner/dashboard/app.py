@@ -240,7 +240,14 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     async def _missing_extra(request: Request, exc: MissingExtraError):
         # An optional dependency the running install does not have: the
         # feature is unimplemented here, and the message carries the fix.
-        return JSONResponse({"detail": str(exc)}, status_code=501)
+        # The dashboard cannot prompt, so it hands over the exact command for
+        # the server's own install method.
+        body: dict[str, str] = {"detail": str(exc)}
+        if exc.extra:
+            from initrunner._install import manual_hint
+
+            body["install"] = manual_hint([exc.extra])
+        return JSONResponse(body, status_code=501)
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):

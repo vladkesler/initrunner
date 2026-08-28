@@ -11,9 +11,7 @@
 		Globe,
 		Import,
 		Loader2,
-		ExternalLink,
-		Copy,
-		Check
+		ExternalLink
 	} from 'lucide-svelte';
 
 	type Mode = 'description' | 'template' | 'blank' | 'hub' | 'import';
@@ -85,8 +83,6 @@
 		onSelectMode: (m: Mode) => void;
 	} = $props();
 
-	let setupCopied = $state(false);
-
 	const templateSetup = $derived(
 		(selectedTemplate && options?.template_setups?.[selectedTemplate]) || null
 	);
@@ -99,11 +95,6 @@
 		{ id: 'import', label: 'Import', desc: 'From existing code', icon: Import }
 	];
 
-	async function copySetupCommand(text: string) {
-		await navigator.clipboard.writeText(text);
-		setupCopied = true;
-		setTimeout(() => (setupCopied = false), 2000);
-	}
 </script>
 
 <!-- Provider warning -->
@@ -209,23 +200,11 @@
 
 				{#if templateSetup.extras.length > 0}
 					<div class="mt-3">
-						<span class="section-label">
-							Install dependency
-						</span>
-						<div class="mt-1.5 flex items-center justify-between border border-edge bg-surface-1 px-3 py-2">
-							<code class="font-mono text-[13px] text-fg-muted">uv sync --extra {templateSetup.extras[0]}</code>
-							<button
-								class="ml-3 shrink-0 text-fg-faint transition-[color] duration-150 hover:text-fg-muted"
-								onclick={() => copySetupCommand(`uv sync --extra ${templateSetup?.extras[0]}`)}
-								aria-label="Copy install command"
-							>
-								{#if setupCopied}
-									<Check size={14} class="text-ok" />
-								{:else}
-									<Copy size={14} />
-								{/if}
-							</button>
-						</div>
+						<span class="section-label">Dependency</span>
+						<p class="mt-1.5 text-[13px] text-fg-muted">
+							InitRunner installs <code class="font-mono">initrunner[{templateSetup.extras[0]}]</code>
+							the first time you run this agent.
+						</p>
 					</div>
 				{/if}
 

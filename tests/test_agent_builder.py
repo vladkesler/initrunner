@@ -327,7 +327,8 @@ class TestBuildNextSteps:
         assert role is not None
         steps = build_next_steps(role, Path("role.yaml"))
         assert any("DISCORD_BOT_TOKEN" in s for s in steps)
-        assert any("--extra discord" in s for s in steps)
+        # No install step: the first run offers to install the extra.
+        assert not any("--extra" in s for s in steps)
         assert any("--daemon" in s for s in steps)
 
     def test_telegram_trigger_hints(self):
@@ -335,7 +336,7 @@ class TestBuildNextSteps:
         assert role is not None
         steps = build_next_steps(role, Path("role.yaml"))
         assert any("TELEGRAM_BOT_TOKEN" in s for s in steps)
-        assert any("--extra telegram" in s for s in steps)
+        assert not any("--extra" in s for s in steps)
         assert any("--daemon" in s for s in steps)
 
 

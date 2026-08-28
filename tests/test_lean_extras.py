@@ -278,3 +278,244 @@ class TestEphemeralModeReportsAMissingExtra:
 
         assert result.exit_code == 0, result.output
         run_single.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Offering to install what is missing
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def no_ddgs(monkeypatch):
+    """Make ``import ddgs`` fail, extra installed or not."""
+    monkeypatch.setitem(sys.modules, "ddgs", None)
+
+
+@pytest.fixture
+def no_webview(monkeypatch):
+    monkeypatch.setitem(sys.modules, "webview", None)
+
+
+@pytest.fixture
+def installable(monkeypatch, tmp_path):
+    """A uv-tool install whose receipt this machine knows how to rebuild."""
+    (tmp_path / "uv-receipt.toml").write_text(
+        '[tool]\nrequirements = [{ name = "initrunner", extras = ["recommended"] }]\n'
+    )
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+    monkeypatch.setattr("initrunner._install._in_container", lambda: False)
+    monkeypatch.setattr("initrunner._install._is_editable", lambda: False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr("initrunner._install._reexeced", False)
+    return tmp_path
+
+
+def _run_entry(argv):
+    """Run the real CLI entry point, returning its exit code."""
+    from initrunner.cli.main import app_entry
+
+    with patch.object(sys, "argv", ["initrunner", *argv]):
+        try:
+            app_entry()
+        except SystemExit as exc:
+            return exc.code if isinstance(exc.code, int) else 1
+    return 0
+
+
+class TestOfferInstall:
+    """The prompt, end to end through app_entry, not just the helper."""
+
+    def test_accepting_installs_then_reruns_the_command(self, installable, no_webview, capsys):
+        with (
+            patch("initrunner.cli._helpers._extras._is_interactive", return_value=True),
+            patch("typer.confirm", return_value=True),
+            patch("subprocess.run") as run,
+            patch("os.execv", side_effect=SystemExit(0)) as execv,
+        ):
+            _run_entry(["desktop"])
+
+        assert run.call_args[0][0] == [
+            "uv",
+            "tool",
+            "install",
+            "initrunner[desktop,recommended]",
+        ]
+        exe, argv = execv.call_args[0]
+        assert exe == sys.executable
+        assert argv == [sys.executable, "-m", "initrunner", "desktop"]
+
+    def test_the_rerun_is_marked_so_it_cannot_loop(self, installable, no_webview):
+        import os
+
+        seen = {}
+        with (
+            patch("initrunner.cli._helpers._extras._is_interactive", return_value=True),
+            patch("typer.confirm", return_value=True),
+            patch("subprocess.run"),
+            patch(
+                "os.execv",
+                side_effect=lambda *a: (
+                    seen.update(os.environ) or (_ for _ in ()).throw(SystemExit(0))
+                ),
+            ),
+        ):
+            _run_entry(["desktop"])
+
+        from initrunner._install import REEXEC_ENV_VAR
+
+        assert seen[REEXEC_ENV_VAR] == "1"
+
+    def test_declining_prints_the_command_and_exits(self, installable, no_webview, capsys):
+        with (
+            patch("initrunner.cli._helpers._extras._is_interactive", return_value=True),
+            patch("typer.confirm", return_value=False),
+            patch("subprocess.run") as run,
+            patch("os.execv") as execv,
+        ):
+            code = _run_entry(["desktop"])
+
+        out = " ".join(capsys.readouterr().out.split())
+        assert code == 1
+        assert "uv tool install 'initrunner[desktop,recommended]'" in out
+        run.assert_not_called()
+        execv.assert_not_called()
+
+    def test_a_failed_install_does_not_rerun(self, installable, no_webview):
+        import subprocess
+
+        with (
+            patch("initrunner.cli._helpers._extras._is_interactive", return_value=True),
+            patch("typer.confirm", return_value=True),
+            patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, ["uv"])),
+            patch("os.execv") as execv,
+        ):
+            code = _run_entry(["desktop"])
+
+        assert code == 1
+        execv.assert_not_called()
+
+    def test_non_interactive_never_prompts(self, installable, no_webview, capsys):
+        with (
+            patch("sys.stdin.isatty", return_value=False),
+            patch("typer.confirm") as confirm,
+            patch("subprocess.run") as run,
+        ):
+            code = _run_entry(["desktop"])
+
+        out = " ".join(capsys.readouterr().out.split())
+        assert code == 1
+        confirm.assert_not_called()
+        run.assert_not_called()
+        assert "uv tool install" in out
+
+    def test_ci_never_prompts(self, installable, no_webview, monkeypatch):
+        monkeypatch.setenv("CI", "true")
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdout.isatty", return_value=True),
+            patch("typer.confirm") as confirm,
+        ):
+            code = _run_entry(["desktop"])
+
+        assert code == 1
+        confirm.assert_not_called()
+
+    def test_a_rerun_that_still_fails_does_not_ask_again(
+        self, installable, no_webview, monkeypatch
+    ):
+        """Otherwise a broken install loops between prompt and re-exec."""
+        monkeypatch.setenv("INITRUNNER_REEXEC", "1")
+        with (
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdout.isatty", return_value=True),
+            patch("typer.confirm") as confirm,
+        ):
+            code = _run_entry(["desktop"])
+
+        assert code == 1
+        confirm.assert_not_called()
+
+    def test_the_loop_guard_is_not_inherited_by_children(
+        self, installable, no_webview, monkeypatch
+    ):
+        """Daemons and service ticks would otherwise never offer to install."""
+        import os
+
+        monkeypatch.setenv("INITRUNNER_REEXEC", "1")
+        with patch("sys.stdin.isatty", return_value=False):
+            _run_entry(["desktop"])
+        assert "INITRUNNER_REEXEC" not in os.environ
+
+    def test_an_install_that_cannot_be_rebuilt_only_prints(self, no_webview, monkeypatch, capsys):
+        """A checkout gets uv sync, never an unattended reinstall."""
+        monkeypatch.setattr("initrunner._install.install_method", lambda: "editable")
+        monkeypatch.setattr("initrunner._install._reexeced", False)
+        with (
+            patch("initrunner.cli._helpers._extras._is_interactive", return_value=True),
+            patch("typer.confirm") as confirm,
+            patch("subprocess.run") as run,
+        ):
+            code = _run_entry(["desktop"])
+
+        out = " ".join(capsys.readouterr().out.split())
+        assert code == 1
+        confirm.assert_not_called()
+        run.assert_not_called()
+        assert "uv sync --extra desktop" in out
+
+
+class TestEveryGapCarriesItsExtra:
+    """The prompt can only fire when the exception names the extra."""
+
+    def test_search_fails_at_build_not_on_the_first_search(self, no_ddgs):
+        from initrunner.agent.schema.tools import SearchToolConfig
+
+        role = make_role(tools=[SearchToolConfig(type="search")])
+        with pytest.raises(RoleLoadError) as exc:
+            build_agent(role)
+
+        assert "initrunner[search]" in str(exc.value)
+        assert isinstance(exc.value.__cause__, MissingExtraError)
+        assert exc.value.__cause__.extra == "search"
+
+    def test_a_non_duckduckgo_provider_needs_no_extra(self, no_ddgs):
+        """Brave and friends run on core httpx."""
+        from initrunner.agent.schema.tools import SearchToolConfig
+
+        role = make_role(tools=[SearchToolConfig(type="search", provider="brave", api_key="k")])
+        build_agent(role)
+
+    def test_missing_provider_sdk_keeps_its_cause(self):
+        """`from None` here would hide the extra from the prompt."""
+        role = make_role(provider="anthropic", model_name="claude-sonnet-4-6")
+        with patch("initrunner._compat.importlib.import_module", side_effect=ImportError):
+            with pytest.raises(RoleLoadError) as exc:
+                build_agent(role)
+
+        assert isinstance(exc.value.__cause__, MissingExtraError)
+        assert exc.value.__cause__.extra == "anthropic"
+
+    def test_vector_gap_carries_its_extra(self, no_lancedb):
+        role = make_role(memory=MemoryConfig())
+        with pytest.raises(RoleLoadError) as exc:
+            build_agent(role)
+
+        cause = exc.value.__cause__
+        assert isinstance(cause, MissingExtraError)
+        assert cause.extra == "vector"
+
+
+class TestMcpKeepsStdoutClean:
+    """`mcp serve` speaks the protocol on stdout; a hint there is a parse error."""
+
+    def test_nothing_reaches_stdout(self, no_fastmcp, installable, tmp_path, capsys):
+        role = tmp_path / "agent.yaml"
+        role.write_text("name: a\nprompt: p\nmodel:\n  provider: openai\n  name: gpt-5-mini\n")
+        with patch("sys.stdin.isatty", return_value=False):
+            code = _run_entry(["mcp", "serve", str(role)])
+
+        captured = capsys.readouterr()
+        assert code == 1
+        assert captured.out == ""
+        assert "initrunner[mcp]" in " ".join(captured.err.split())

@@ -100,6 +100,24 @@ _YT_MODULES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _transcript_api_importable(monkeypatch):
+    """Let the builder's extras gate pass whether or not the extra is installed.
+
+    ``build_audio_toolset`` checks for youtube-transcript-api so a role that
+    cannot fetch transcripts fails at load rather than on the first call. The
+    tests below cover the behaviour behind that gate, and patch these same two
+    modules again where they need particular transcripts or errors.
+    """
+    import sys
+
+    if "youtube_transcript_api" in sys.modules:
+        return
+    mock_yt, mock_errors = _make_yt_mock()
+    monkeypatch.setitem(sys.modules, "youtube_transcript_api", mock_yt)
+    monkeypatch.setitem(sys.modules, "youtube_transcript_api._errors", mock_errors)
+
+
 # ---------------------------------------------------------------------------
 # Schema / config tests
 # ---------------------------------------------------------------------------
@@ -240,9 +258,19 @@ class TestGetYoutubeTranscript:
             result = self._fn()(url="https://youtu.be/dQw4w9WgXcQ")
         assert "Error" in result
 
-    def test_missing_package(self):
+    def test_builder_names_the_extra(self):
+        """The gate moved to build time: a role that cannot fetch fails at load."""
+        from initrunner._compat import MissingExtraError
+
         with patch.dict("sys.modules", {"youtube_transcript_api": None}):
-            result = self._fn()(url="https://youtu.be/dQw4w9WgXcQ")
+            with pytest.raises(MissingExtraError, match=r"initrunner\[audio\]"):
+                self._fn()
+
+    def test_missing_package_at_call_time(self):
+        """The call-time guard still covers a toolset built before the loss."""
+        fn = self._fn()
+        with patch.dict("sys.modules", {"youtube_transcript_api": None}):
+            result = fn(url="https://youtu.be/dQw4w9WgXcQ")
         assert "initrunner[audio]" in result
 
     def test_bad_url(self):

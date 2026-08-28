@@ -60,6 +60,13 @@ def _mock_webview_modules():
 
 
 def test_missing_pywebview():
+    """The error carries the extra so the CLI can offer to install it.
+
+    The command used to catch this and exit; it now propagates to app_entry,
+    which names the extra and, on a terminal, offers to install it.
+    """
+    from initrunner._compat import MissingExtraError
+
     real_import = builtins.__import__
 
     def _block_webview(name, *args, **kwargs):
@@ -70,8 +77,10 @@ def test_missing_pywebview():
     with mock.patch("builtins.__import__", side_effect=_block_webview):
         from initrunner.cli.desktop_cmd import desktop
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(MissingExtraError) as exc:
             desktop(port=8100)
+
+    assert exc.value.extra == "desktop"
 
 
 def test_reuse_existing_backend():
