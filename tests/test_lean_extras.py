@@ -307,6 +307,10 @@ def installable(monkeypatch, tmp_path):
     monkeypatch.setattr("initrunner._install._is_editable", lambda: False)
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("CI", raising=False)
+    # These tests make stdin/stdout look like a terminal, which is also what the
+    # telemetry consent prompt waits for. On a machine that has never answered
+    # it, that prompt fires first and the install prompt never gets asked.
+    monkeypatch.setenv("DO_NOT_TRACK", "1")
     monkeypatch.setattr("initrunner._install._reexeced", False)
     return tmp_path
 
@@ -479,10 +483,14 @@ class TestEveryGapCarriesItsExtra:
         assert isinstance(exc.value.__cause__, MissingExtraError)
         assert exc.value.__cause__.extra == "search"
 
-    def test_a_non_duckduckgo_provider_needs_no_extra(self, no_ddgs):
+    def test_a_non_duckduckgo_provider_needs_no_extra(self, no_ddgs, monkeypatch, tmp_path):
         """Brave and friends run on core httpx."""
         from initrunner.agent.schema.tools import SearchToolConfig
 
+        # Building the agent resolves the model's API key, which would otherwise
+        # come from whatever the machine running the tests happens to have.
+        monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path))
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         role = make_role(tools=[SearchToolConfig(type="search", provider="brave", api_key="k")])
         build_agent(role)
 
