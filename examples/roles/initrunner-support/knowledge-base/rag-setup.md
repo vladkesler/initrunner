@@ -98,7 +98,7 @@ chunking:
 - `.csv`, `.json` -- structured data
 - `.html`, `.htm` -- converted to Markdown
 
-**Requires `initrunner[ingest]` extra:**
+**Requires the `ingest` extra, which InitRunner offers to install on first use:**
 - `.pdf` -- via pymupdf4llm
 - `.docx` -- via python-docx
 - `.xlsx` -- via openpyxl

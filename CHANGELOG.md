@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Changed (`run` flags)
+### Changed
 - **`initrunner run` went from 43 flags to 22, and the role YAML is now the one place a setting lives.** `_validate.py` was 313 lines whose only job was policing which flags could be combined with which; that code existed because the flags overlapped each other and the schema. Twenty-one flags are gone. Each had a YAML field, an environment variable, or another flag that already did the job:
 
   | Removed | Use instead |
@@ -36,15 +36,23 @@
 
 - **`-i --format rich` no longer shows the "Thinking..." spinner.** That is what makes it a complete replacement for `--dev`, which existed to keep Rich off the terminal so a `breakpoint()` in a tool could own it. Streaming REPLs are unchanged.
 
+- **The docs describe four installs instead of twenty-four.** `initrunner`, `initrunner[recommended]`, `initrunner[all]`, and the provider names. The fine-grained extras stay in `pyproject.toml` for packagers and for `doctor --fix`; they are no longer something a reader has to learn, because nothing needs installing by hand any more. The old table had drifted anyway: it omitted four real extras, described `channels` as Telegram and Discord when it also carries Slack, called `all` "every extra below" when it excluded four, and said local embeddings were unimplemented when they have worked for months. `[all]` now also carries the credential vault, and a test keeps the table and `pyproject.toml` in step.
+
 ### Added
+- **A missing extra offers to install itself.** `initrunner run scout` on a core install used to print `uv pip install initrunner[search]` and stop, which is the wrong command about as often as it is the right one: `uv pip install` without `--python` resolves `./.venv` rather than the interpreter that is running, and the shell installer's default path is `uv tool install`. Now the command names what it needs and asks `Install now? [Y/n]`, runs the installer that put InitRunner there, and reruns itself. Starters, role files, ephemeral runs, provider SDKs, `dashboard`, `desktop`, `eval`, `mcp` and the vault all go through the one prompt. It only runs unattended where the result is predictable: a uv tool install whose receipt describes a plain registry install, `uv pip` into the running interpreter, and `pip`. pipx, containers, `uv sync` checkouts, `uvx`, Windows, scripts, CI and anything the receipt does not fully describe get the exact command printed instead. `mcp serve` writes all of it to stderr, since the protocol owns stdout.
 - **`INITRUNNER_AUDIT_DB` is honored by every reader.** It was previously wired only to Typer's `envvar=` on `--audit-db`, so the dashboard and daemon stayed on the home default no matter what the environment said. `get_audit_db_path()` reads it now, which covers the CLI, the daemon, and all fourteen dashboard call sites.
 - **`initrunner examples copy <starter>` copies bundled starters offline.** `examples copy` only knew the GitHub-backed catalog, so `examples copy telegram` failed outright and starters were reachable only through `run --save`. Destinations are checked before anything is written, so a collision leaves the directory untouched. Where a name exists as both a starter and a catalog example (`helpdesk`, `scout`), the starter wins, matching how `initrunner run helpdesk` already resolves; the output names the source.
+- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint naming the missing block, at startup and again after a hot reload, so a live edit that adds the trigger without the block is not silent either. This is the case `--autopilot` used to paper over by waiving the requirement.
+
+### Fixed
+- **Installing one extra no longer removes the others.** `doctor --fix` and `setup` ran `uv tool install --force "initrunner[anthropic]"`, and uv resolves a tool environment to exactly the spec it is handed, so a user who installed `[recommended]` and accepted the offer to add Anthropic silently lost search, ingestion, the vector store, MCP and the dashboard. The extras already installed now come from the tool's own receipt (or pipx's metadata) and are passed along with the new one. `--force` is gone with them: uv replaces the environment when the requirement changes, and `--force` additionally recreates it. A version pin the user chose is preserved, and no new one is added, because a pin in the receipt is what `uv tool upgrade` respects afterwards.
+- **`google` and `xai` roles failed with an SDK that was installed.** The Google gate imported `google.generativeai`, a package `pydantic-ai-slim[google]` has not shipped since it moved to `google-genai`, so `require_provider("google")` raised for anyone who had it. `xai` was waved through as "uses the openai SDK", but a `xai:` model reaches PydanticAI as a plain string and builds `XaiModel` on the `xai-sdk` gRPC client, so a missing SDK surfaced deep inside model construction instead of at load. Both now check what actually gets imported, and `xai`, `cohere` and `bedrock` have extras of their own, so `initrunner[<provider>]` works for all seven.
+- **A role with `web_reader` was told it needed web search.** The tool runs on core httpx and beautifulsoup4; the starters table had mapped it to the `search` extra, so `initrunner run --list` and `doctor` both reported an install that was never needed.
+- **`initrunner dashboard` on a core install printed a traceback** instead of naming the `dashboard` extra. `doctor` also advertised `initrunner[triggers]`, an extra that has never existed, for a `croniter` import that cannot fail: croniter is a core dependency.
+- **A missing search or transcript dependency surfaced mid-run.** The `search` and `audio` tools checked for their package on the first call, so a role would start, spend a model turn and then fail. Both check when the agent is built, which is what every other extra already did.
 
 ### Removed (internal)
 - `initrunner.runner.bot` and `run_bot`, `--autopilot` plumbing through `DaemonRunner`/`run_daemon`/`run_group_daemon`, the `cors_origins` arguments on the server entry points, `max_iterations_override` (its only caller was the CLI; `execute_autonomous_sync` had no callers at all), and `tool_dev` on `run_interactive`. `_run_team` also lost report parameters that could never fire, because `--report` has always been refused for Team targets.
-
-### Added (daemon)
-- **The daemon says when an autonomous trigger cannot loop.** `autonomous: true` on a trigger only takes effect if the role also declares an `autonomy:` block; without one the trigger quietly ran single-shot. It now prints a one-line hint naming the missing block, at startup and again after a hot reload, so a live edit that adds the trigger without the block is not silent either. This is the case `--autopilot` used to paper over by waiving the requirement.
 
 ## [2026.8.10] - 2026-08-21
 

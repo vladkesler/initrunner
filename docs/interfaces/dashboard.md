@@ -5,7 +5,7 @@ The dashboard provides a local web interface for managing agents, running prompt
 ## Quick Start
 
 ```bash
-pip install "initrunner[dashboard]"   # or: uv add "initrunner[dashboard]"
+# In [recommended] and [all]; a core install offers to add it.
 initrunner dashboard                  # opens http://localhost:8100
 ```
 
@@ -461,7 +461,8 @@ Open the dashboard in a native window instead of the browser. Uses the OS WebVie
 ### Install
 
 ```bash
-pip install "initrunner[desktop]"   # or: uv add "initrunner[desktop]"
+# Not in [all]: pywebview needs a system GUI toolkit. Run the command below
+# and InitRunner offers to install it.
 ```
 
 ### Usage

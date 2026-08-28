@@ -44,9 +44,9 @@ initrunner setup --skip-test
 | `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-3.7-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-4-scout-17b-16e` |
 | `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
-| `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-a` |
-| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-6-v1:0` |
-| `xai` | `XAI_API_KEY` | *(uses openai SDK)* | `grok-4` |
+| `cohere` | `CO_API_KEY` | `initrunner[cohere]` | `command-a` |
+| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[bedrock]` | `us.anthropic.claude-sonnet-4-6-v1:0` |
+| `xai` | `XAI_API_KEY` | `initrunner[xai]` | `grok-4` |
 | `ollama` | *(none)* | *(included in core)* | `llama3.2` |
 
 Default Model is the entry the wizard preselects. It shows a curated list per provider and also accepts any custom model name you type. For `ollama`, `llama3.2` is the default only when no local models are detected; if the Ollama server responds, the wizard lists the models you have installed and defaults to the first one.

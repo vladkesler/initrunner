@@ -6,10 +6,10 @@ InitRunner speaks **A2A 1.0 only**. There is no 0.3 compatibility mode. Clients 
 
 ## Quick Start
 
-```bash
-# Install the A2A extra
-uv pip install initrunner[a2a]
+The A2A server ships in `[all]`. On a smaller install the command below names
+the `a2a` extra and offers to install it.
 
+```bash
 # Start the server
 initrunner a2a serve role.yaml
 

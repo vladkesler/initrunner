@@ -8,8 +8,9 @@ The SQLite audit trail remains the lightweight default. Observability adds a sec
 
 See traces in under a minute — no Docker, no external services:
 
+Not part of `[recommended]`. InitRunner installs this the first time a role needs it, or get it up front with `initrunner[all]`.
+
 ```bash
-pip install initrunner[observability]
 initrunner run examples/roles/traced-agent.yaml -p "What time is it?" --no-audit
 ```
 
@@ -79,11 +80,11 @@ Spans appear in completion order (leaf spans first, root span last). All spans s
 
 ## Installation
 
-```bash
-pip install initrunner[observability]
-```
+Tracing lives in the `observability` extra, which `[all]` includes. On a smaller
+install, a role with an `observability:` block names it at load and offers to
+install it; `initrunner doctor --fix --role agent.yaml --yes` does it up front.
 
-This installs `opentelemetry-sdk`, `opentelemetry-exporter-otlp`, and `opentelemetry-instrumentation-logging`.
+It brings `opentelemetry-sdk`, `opentelemetry-exporter-otlp`, `opentelemetry-instrumentation-logging`, and `pydantic-evals`.
 
 For the Logfire backend, install separately:
 
@@ -243,7 +244,7 @@ Both systems record agent activity, but they serve different purposes:
 |---|---|---|
 | **Purpose** | Compliance, history, debugging | Distributed tracing, performance analysis |
 | **Backend** | Local SQLite (built-in) | Any OTel collector (Jaeger, Tempo, Datadog, etc.) |
-| **Dependencies** | None (included) | `pip install initrunner[observability]` |
+| **Dependencies** | None (included) | The `observability` extra, installed on demand |
 | **Default** | Enabled | Opt-in |
 | **Granularity** | One record per agent run | Nested spans (run → LLM call → tool call) |
 | **Multi-agent** | Independent per-run records | Distributed traces across delegation chains |
@@ -274,10 +275,11 @@ When `observability` is not set:
 ### Missing SDK
 
 ```
-RuntimeError: OpenTelemetry observability requires: pip install initrunner[observability]
+Error: initrunner run needs initrunner[observability]
+Install now? [Y/n]
 ```
 
-Install the optional dependency group: `pip install initrunner[observability]`
+Answer yes, or run the command it prints when there is no terminal to ask.
 
 ### No traces appearing
 

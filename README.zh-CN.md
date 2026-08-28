@@ -297,7 +297,6 @@ initrunner mcp toolkit --tools search,sql  # 暴露原始工具，无需 LLM
 </p>
 
 ```bash
-pip install "initrunner[dashboard]"
 initrunner dashboard                  # 打开 http://localhost:8100
 ```
 

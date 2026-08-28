@@ -41,7 +41,7 @@ which together are roughly a third of a running agent's memory, so this is the i
 to reach for when you are packing many agents onto one box.
 
 A role that uses `type: mcp`, `memory:`, `ingest:` or the `web_scraper` tool still
-validates here; it fails at load with the exact `uv pip install` line it needs.
+validates here; it fails at load naming what it needs, and offers to install it.
 
 ```bash
 # shell installer
@@ -56,7 +56,7 @@ pip install initrunner
 
 ## Install everything
 
-Install all providers, features, and interfaces:
+Install every provider, feature, and interface:
 
 ```bash
 # shell installer
@@ -69,40 +69,42 @@ uv pip install "initrunner[all]"
 pip install "initrunner[all]"
 ```
 
-## Available extras
+## What to install
 
-The `[recommended]` bundle includes `search`, `ingest`, `vector`, `mcp`, and `dashboard`. The `[all]` bundle includes everything below.
+Four names cover it. Everything else in `pyproject.toml` is there for packagers.
 
-| Extra | What it adds |
-|-------|--------------|
-| **Bundles** | |
-| `recommended` | Search + document ingestion + vector store + MCP + dashboard |
-| `all` | Every extra below |
-| **LLM Providers** | |
-| `all-models` | All LLM providers (Anthropic, Google, Groq, Mistral, Cohere, Bedrock, xAI) |
-| `anthropic` | Anthropic provider (Claude) |
-| `google` | Google provider (Gemini) |
-| `groq` | Groq provider |
-| `mistral` | Mistral provider |
-| **Features** | |
-| `ingest` | PDF, DOCX, XLSX ingestion, plus the vector store it writes to |
-| `vector` | LanceDB vector store: `memory:`, `ingest:`, retrieval, `web_scraper` |
-| `mcp` | MCP client and server: `type: mcp` tools, `initrunner mcp serve/toolkit/browser` |
-| `search` | Web search via DuckDuckGo (free, no API key) |
-| `audio` | YouTube transcript extraction |
-| `safety` | Profanity filter for content policy |
-| `observability` | OpenTelemetry tracing and metrics export |
-| **Messaging Triggers** | |
-| `telegram` | Telegram bot trigger |
-| `discord` | Discord bot trigger |
-| `channels` | Both Telegram and Discord |
-| **Interfaces** | |
-| `dashboard` | Web UI (FastAPI + Uvicorn) |
-| `desktop` | Desktop app (dashboard + PyWebView) |
+| Install | Gets you |
+|---------|----------|
+| `initrunner` | The core runtime: OpenAI and Ollama models, every tool that needs no extra dependency, triggers, flows, teams, groups, and the OpenAI-compatible `--serve` API. |
+| `initrunner[recommended]` | Core plus web search, document ingestion, the vector store behind `memory:` and `ingest:`, MCP, and the dashboard. This is what the install script gives you. |
+| `initrunner[all]` | Everything above plus every provider SDK, YouTube transcripts, the profanity filter, OpenTelemetry, the Telegram/Discord/Slack triggers, the A2A server, and the credential vault. |
+| `initrunner[anthropic]` and friends | One provider SDK. Also `google`, `groq`, `mistral`, `cohere`, `bedrock`, `xai`, or `all-models` for all seven. |
 
-Combine specific extras with commas: `uv pip install "initrunner[ingest,search,anthropic]"`.
+Two things are deliberately outside `[all]`, because both are large and neither
+is worth carrying by default: the desktop app (`desktop`, which needs a system
+GUI toolkit) and local fastembed embeddings (`local-embeddings`, which pulls in
+the ONNX runtime). Both install on demand, like everything else below.
 
-> **Note:** `local-embeddings` (fastembed) is defined but **not yet implemented**. Use [Ollama](../configuration/ollama.md) for local embeddings instead.
+## Missing something?
+
+Nothing is a dead end. A role or command that needs something this install does
+not have says so by name and offers to fix it:
+
+```
+$ initrunner run scout -p "state of the RISC-V ecosystem"
+Error: the scout starter needs initrunner[search]
+Install now? [Y/n]
+```
+
+Answer yes and InitRunner runs the installer that put it there in the first
+place, keeping the extras you already have, then reruns your command.
+
+Where that is not safe or not possible, it prints the exact command for your
+install instead of guessing. That covers pipx (which rebuilds the whole
+environment), containers, a `uv sync` checkout, `uvx`, Windows, and any script
+or CI job with no terminal attached. To get ahead of it, `initrunner doctor
+--fix --role agent.yaml --yes` installs whatever a role asks for without
+prompting.
 
 ## Development setup
 

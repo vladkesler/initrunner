@@ -403,7 +403,7 @@ Responds to Telegram messages using long-polling via [python-telegram-bot](https
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
 2. Set the token as an environment variable: `export TELEGRAM_BOT_TOKEN=your-token`.
-3. Install the optional dependency: `pip install initrunner[telegram]`.
+3. Run the agent; InitRunner offers to install the Telegram dependency.
 
 ```yaml
 triggers:
@@ -449,7 +449,7 @@ Responds to Discord DMs and @mentions via WebSocket client using [discord.py](ht
 2. Enable the **Message Content Intent** under Bot settings.
 3. Invite the bot to your server with the `bot` scope and `Send Messages` + `Read Message History` permissions.
 4. Set the token: `export DISCORD_BOT_TOKEN=your-token`.
-5. Install the optional dependency: `pip install initrunner[discord]`.
+5. Run the agent; InitRunner offers to install the Discord dependency.
 
 ```yaml
 triggers:
@@ -513,7 +513,7 @@ Slack Socket Mode requires **two** tokens: an app-level token to open the WebSoc
    export SLACK_BOT_TOKEN=xoxb-...
    ```
 7. Invite the bot to any channels you want it to listen in: `/invite @your-bot`.
-8. Install the optional dependency: `pip install initrunner[slack]`.
+8. Run the agent; InitRunner offers to install the Slack dependency.
 
 ```yaml
 triggers:

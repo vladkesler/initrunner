@@ -120,3 +120,20 @@ A working implementation is not in the repo; it was written as a throwaway
 during the 2026.8.5 sweep. It is about 60 lines: extract fenced blocks, skip an
 allowlist of four non-agent examples, call `classify_mapping` then
 `normalize_mapping`. Reuse the logic in `tests/test_docs_yaml.py`.
+
+## Two role-extra detectors that disagree
+
+`starters._detect_requires_extras` and `doctor.diagnose_role_extras` both scan a
+role for the extras it needs, and they answer differently. Starters look at
+ingest source suffixes, so a Markdown-only `ingest:` block needs `vector` and
+not `ingest` (`initrunner/services/starters.py`, `_INGEST_EXTRA_SUFFIXES`).
+Doctor flags `ingest` for any `ingest:` block at all
+(`initrunner/services/doctor.py`, `diagnose_role_extras`). Doctor is the wrong
+one: it offers to install PDF, DOCX and XLSX parsers for a role that only reads
+`.md` files.
+
+Neither notices `embeddings.provider: local`, which needs `local-embeddings`.
+
+The fix is one detector taking a raw role dict and returning extra names, used
+by both, plus a `FEATURE_EXTRAS` entry for local embeddings. It was left out of
+the self-healing-extras change to keep that diff to the install path.

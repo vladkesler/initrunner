@@ -297,7 +297,6 @@ initrunner mcp toolkit --tools search,sql  # LLM 不要で生ツールを公開
 </p>
 
 ```bash
-pip install "initrunner[dashboard]"
 initrunner dashboard                  # http://localhost:8100 を開く
 ```
 
