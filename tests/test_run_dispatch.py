@@ -311,6 +311,33 @@ class TestRemovedFlags:
         assert result.exit_code == 2
         assert "--tools" in result.output
 
+    def test_a_vendored_click_error_is_still_recognised(self, agent_yaml):
+        """Typer 0.27 vendors Click, so the error is not click.NoSuchOption.
+
+        The shim used to catch that class, which made it work against the
+        locked dev environment and nowhere else: a fresh `pip install` resolves
+        typer>=0.27 and every user got Click's bare "No such option" instead of
+        the replacement. The suite never noticed, because it only ever runs
+        against the lockfile. This fakes the vendored exception so the contract
+        is the attribute, not the class.
+        """
+        from initrunner.cli.run_cmd._removed import RunCommand
+
+        class VendoredNoSuchOption(Exception):
+            """What typer._click raises: same shape, unrelated class."""
+
+            option_name = "--api-key"
+
+        def boom(self, ctx, args):
+            raise VendoredNoSuchOption("No such option: --api-key")
+
+        with patch.object(RunCommand.__bases__[0], "parse_args", boom):
+            result = runner.invoke(app, ["run", str(agent_yaml), "--api-key", "k"])
+
+        assert result.exit_code == 2
+        assert "was removed" in result.output
+        assert "INITRUNNER_API_KEY" in result.output
+
     def test_unrelated_unknown_flag_keeps_click_message(self, agent_yaml):
         result = runner.invoke(app, ["run", str(agent_yaml), "--not-a-real-flag"])
         assert result.exit_code == 2

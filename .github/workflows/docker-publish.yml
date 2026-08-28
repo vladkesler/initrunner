@@ -137,10 +137,11 @@ jobs:
         run: |
           docker run -d --name "smoke-${{ matrix.name }}" \
             -e OPENAI_API_KEY=sk-test \
+            -e INITRUNNER_API_KEY=test \
             -p ${{ matrix.port }}:8000 \
             "ghcr.io/vladkesler/initrunner:${{ matrix.tag }}" \
             initrunner run /opt/initrunner/example-roles/hello-world.yaml \
-              --serve --host 0.0.0.0 --api-key test
+              --serve --host 0.0.0.0
 
           for attempt in $(seq 1 30); do
             body=$(curl -fsS "http://127.0.0.1:${{ matrix.port }}/health" 2>/dev/null || true)
