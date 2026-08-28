@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from initrunner._compat import _PROVIDER_EXTRAS, require_provider
-from initrunner.cli._helpers import check_ollama_running, console, handle_api_key, install_extra
+from initrunner.cli._helpers import check_ollama_running, console, handle_api_key, install_extras
 from initrunner.config import get_global_env_path
 from initrunner.services.setup import (
     ALL_PROVIDERS,
@@ -33,7 +33,7 @@ def _install_provider_sdk(provider: str) -> bool:
     extra = _PROVIDER_EXTRAS.get(provider)
     if extra is None:
         return True
-    return install_extra(extra)
+    return install_extras([extra])
 
 
 # ---------------------------------------------------------------------------

@@ -310,6 +310,13 @@ def build_search_toolset(
     ctx: ToolBuildContext,
 ) -> FunctionToolset:
     """Build a FunctionToolset for web and news search."""
+    if config.provider == "duckduckgo":
+        # Fail here rather than on the first search: a role that cannot search
+        # should say so at load, the way every other missing extra does. The
+        # call-time guard stays for the MCP toolkit, which skips this builder.
+        from initrunner._compat import require_extra
+
+        require_extra("ddgs")
     api_key = resolve_env_vars(config.api_key)
     provider_fn = _PROVIDERS[config.provider]
 

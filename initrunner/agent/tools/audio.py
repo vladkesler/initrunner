@@ -112,6 +112,11 @@ def _do_get_youtube_transcript(
 @register_tool("audio", AudioToolConfig)
 def build_audio_toolset(config: AudioToolConfig, ctx: ToolBuildContext) -> FunctionToolset:
     """Build a FunctionToolset for audio operations."""
+    from initrunner._compat import require_extra
+
+    # At build time so a role naming this tool fails at load, not mid-run.
+    require_extra("youtube_transcript_api")
+
     toolset = FunctionToolset()
 
     @toolset.tool_plain

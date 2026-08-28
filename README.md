@@ -42,7 +42,7 @@ New to InitRunner? Start with [the five commands you'll actually use](docs/getti
 
 ### Starters
 
-Browse the catalog with `initrunner run --list`. The model is auto-detected from your API key. Start with `memory` (API key only). `helpdesk` expects docs in `./knowledge-base/`. `scout` needs `initrunner[search]`.
+Browse the catalog with `initrunner run --list`. The model is auto-detected from your API key. Start with `memory` (API key only). `helpdesk` expects docs in `./knowledge-base/`. `scout` installs web search the first time you run it.
 
 | Starter | What it does |
 |---------|-------------|
@@ -51,7 +51,7 @@ Browse the catalog with `initrunner run --list`. The model is auto-detected from
 | `scholar` | Three-agent research team: planner, web researcher, synthesizer, with shared memory |
 | `reviewer` | Multi-perspective code review: architect, security, maintainer |
 | `reader` | Index a codebase, chat about architecture, remember patterns across sessions |
-| `scout` | Web research with structured briefings and sourced citations (`initrunner[search]`) |
+| `scout` | Web research with structured briefings and sourced citations |
 | `writer` | Topic-to-article pipeline: researcher, writer, editor/fact-checker, driven by webhook or cron |
 | `mail` | Monitors inbox, triages, drafts replies, alerts Slack on urgent mail |
 | `librarian` | Knowledge-base Q&A agent with document ingestion |
@@ -181,7 +181,7 @@ When you want a **productized always-on outcome** without authoring YAML, use se
 
 ```bash
 initrunner service list
-initrunner service start collector acme.com    # Linux; needs initrunner[search]
+initrunner service start collector acme.com    # Linux; installs web search if missing
 initrunner service status collector
 initrunner service run collector               # one tick now (no waiting on cron)
 initrunner service stop collector              # --purge deletes local instance data
@@ -345,7 +345,8 @@ initrunner mcp toolkit --tools search,sql  # expose raw tools, no LLM needed
 ```
 
 MCP lives in the `mcp` extra, which the default install includes. A core install
-(`--extras none`) skips it and about 25 MB of resident memory with it.
+(`--extras none`) skips it and about 25 MB of resident memory with it; the first
+command that needs it offers to install it.
 
 See [MCP Gateway](docs/interfaces/mcp-gateway.md).
 
@@ -355,7 +356,6 @@ See [MCP Gateway](docs/interfaces/mcp-gateway.md).
 </p>
 
 ```bash
-pip install "initrunner[dashboard]"
 initrunner dashboard                  # opens http://localhost:8100
 ```
 

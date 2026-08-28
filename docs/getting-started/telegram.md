@@ -6,7 +6,7 @@ Get a Telegram bot agent running in three steps. For the full trigger reference,
 
 - InitRunner installed (`pip install initrunner` or `uv tool install initrunner`)
 - An API key for your provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
-- The Telegram optional dependency: `uv sync --extra telegram` (or `pip install initrunner[telegram]`)
+- The Telegram dependency, which InitRunner offers to install on the first run
 
 ## Step 1: Create a Bot with BotFather
 
@@ -134,15 +134,12 @@ By default the bot responds to **anyone** who messages it, and logs a loud start
 
 ## Troubleshooting
 
-### `ModuleNotFoundError: No module named 'telegram'`
+### `needs initrunner[telegram]`
 
-The optional dependency is not installed. Run:
-
-```bash
-uv sync --extra telegram
-# or
-pip install initrunner[telegram]
-```
+The Telegram library is not installed. On a terminal InitRunner offers to install
+it and reruns your command; answer yes. In a script, a container or CI it prints
+the command for your install instead, because installing there would either be
+thrown away or hide a gap in your image.
 
 ### `Env var TELEGRAM_BOT_TOKEN not set`
 

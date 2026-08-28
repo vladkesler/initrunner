@@ -28,11 +28,12 @@ model: anthropic:claude-sonnet-4-6
 | `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-3.7-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
 | `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
-| `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-r-plus` |
-| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-6-v1:0` |
-| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-4` |
+| `cohere` | `CO_API_KEY` | `initrunner[cohere]` | `command-r-plus` |
+| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[bedrock]` | `us.anthropic.claude-sonnet-4-6-v1:0` |
+| `xai` | `XAI_API_KEY` | `initrunner[xai]` | `grok-4` |
 
-Install all provider extras at once with `pip install initrunner[all-models]`.
+Install every provider at once with `pip install "initrunner[all-models]"`. Either way,
+a role naming a provider whose SDK is missing says so at load and offers to install it.
 
 > **Dashboard setup:** API keys can also be configured from the dashboard. Run `initrunner dashboard` and use the inline key form on the launchpad, or navigate to the System page for full provider management. Keys are saved to `~/.initrunner/.env`.
 
@@ -63,17 +64,17 @@ model: groq:llama-3.3-70b-versatile
 model: mistral:mistral-large-latest
 ```
 
-**Cohere** (`pip install initrunner[all-models]`):
+**Cohere** (`pip install "initrunner[cohere]"`):
 ```yaml
 model: cohere:command-r-plus
 ```
 
-**Bedrock** (`pip install initrunner[all-models]`):
+**Bedrock** (`pip install "initrunner[bedrock]"`):
 ```yaml
 model: bedrock:us.anthropic.claude-sonnet-4-6-v1:0
 ```
 
-**xAI** (`pip install initrunner[all-models]`):
+**xAI** (`pip install "initrunner[xai]"`):
 ```yaml
 model: xai:grok-4
 ```
@@ -380,7 +381,7 @@ The embedding model is determined by the agent's model provider unless overridde
 | `anthropic` | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
 | `google` | `google:text-embedding-004` | `GOOGLE_API_KEY` |
 | `ollama` | `ollama:nomic-embed-text` | Ollama running locally |
-| `local` | `local:BAAI/bge-small-en-v1.5` | `initrunner[local-embeddings]` |
+| `local` | `local:BAAI/bge-small-en-v1.5` | `local-embeddings`, installed on demand |
 | All others | `openai:text-embedding-3-small` | `OPENAI_API_KEY` |
 
 > **`local` is not `ollama`.** The `local` provider runs the embedding model in-process via [fastembed](https://github.com/qdrant/fastembed) with no HTTP hop, no API key, and no separate server. The `ollama` provider routes through an OpenAI-compatible HTTP client and needs a running Ollama endpoint. Pick `local` when you want zero external dependencies; pick `ollama` when you already run Ollama and want to share its model cache.
@@ -406,13 +407,12 @@ ingest:
 
 The `local` provider embeds text on the same machine that runs the agent, with no
 HTTP request and no API key. It uses [fastembed](https://github.com/qdrant/fastembed),
-which ships quantized ONNX models and does not pull in PyTorch. Install the extra:
+which ships quantized ONNX models and does not pull in PyTorch.
 
-```bash
-uv pip install "initrunner[local-embeddings]"
-```
-
-Then set `provider: local` in your `ingest` or `memory` embeddings config:
+It is not in `[all]`, because the ONNX runtime is a large download for something
+most agents never use. Set `provider: local` in your `ingest` or `memory`
+embeddings config and run the role: InitRunner names the extra it needs and
+offers to install it.
 
 ```yaml
 ingest:

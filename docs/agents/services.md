@@ -6,7 +6,7 @@ Services are **curated always-on agents**: start once, they run on a schedule, r
 
 - Linux (process supervision is Linux-only in v1)
 - A configured model provider (`initrunner setup` or env keys)
-- For `collector`: `pip install "initrunner[search]"`
+- For `collector`: web search, which InitRunner offers to install on the first run
 
 ## Quick start
 
@@ -14,7 +14,7 @@ Services are **curated always-on agents**: start once, they run on a schedule, r
 # See what's available
 initrunner service list
 
-# Start collector (needs initrunner[search] + a provider)
+# Start collector (needs web search + a provider)
 initrunner service start collector acme.com
 
 # Or with explicit schedule / sink
@@ -67,7 +67,7 @@ Continuous monitoring for one target. Searches and reads public sources, diffs a
 | `target` | yes | — | Company, person, domain, topic (primary) |
 | `alert_severity` | no | `medium` | `low` / `medium` / `high` |
 
-Default schedule: `daily` (06:00 UTC). Requires: `initrunner[search]`.
+Default schedule: `daily` (06:00 UTC). Requires web search.
 
 Runtime agent name is `service-collector` (isolates audit, memory, and budgets from any role also named `collector`).
 

@@ -433,7 +433,9 @@ def _validate_provider(role: RoleDefinition) -> None:
         try:
             require_provider(prov)
         except RuntimeError as e:
-            raise RoleLoadError(str(e)) from None
+            # Keep the cause: a MissingExtraError here carries the extra name,
+            # which is what lets the caller offer to install it.
+            raise RoleLoadError(str(e)) from e
 
 
 def _require_role_extras(role: RoleDefinition) -> None:

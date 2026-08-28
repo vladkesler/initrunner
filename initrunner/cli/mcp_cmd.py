@@ -8,21 +8,26 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from initrunner.cli._helpers import console, print_error
+from initrunner.cli._helpers import console
 from initrunner.cli._options import AuditDbOption, NoAuditOption, SkillDirOption
 
 app = typer.Typer(help="MCP server introspection, gateway, and toolkit.")
 
 
 def _require_mcp_or_exit() -> None:
-    """Every command here needs the MCP stack; say so before doing anything."""
+    """Every command here needs the MCP stack; say so before doing anything.
+
+    Everything goes to stderr: ``mcp serve`` speaks the protocol on stdout, and
+    a stray line there is a parse error for the client.
+    """
     from initrunner._compat import MissingExtraError, require_mcp
 
     try:
         require_mcp()
-    except MissingExtraError as e:
-        print_error(e, stderr=True)
-        raise typer.Exit(1) from None
+    except MissingExtraError:
+        from initrunner.cli._helpers._extras import offer_install
+
+        offer_install(["mcp"], needed_by="initrunner mcp", stderr=True)
 
 
 @app.command("list-tools")

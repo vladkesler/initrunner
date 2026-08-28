@@ -44,6 +44,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Three of these are for humans: `recommended` (the installer default), `all`,
+# and the provider names. The fine-grained ones below are kept for packagers and
+# for `initrunner doctor --fix`; the docs point at the bundles instead, and a
+# command that needs one of these offers to install it.
 # MCP client + server stack. Not in the core install: importing pydantic_ai
 # eagerly imports its MCP capability, which imports fastmcp, for ~26% of RSS.
 mcp = ["pydantic-ai-slim[mcp]>=2.32.1", "fastmcp>=3.3,<4"]
@@ -58,6 +62,9 @@ anthropic = ["pydantic-ai-slim[anthropic]>=2.32.1"]
 google = ["pydantic-ai-slim[google]>=2.32.1"]
 groq = ["pydantic-ai-slim[groq]>=2.32.1"]
 mistral = ["pydantic-ai-slim[mistral]>=2.32.1"]
+cohere = ["pydantic-ai-slim[cohere]>=2.32.1"]
+bedrock = ["pydantic-ai-slim[bedrock]>=2.32.1"]
+xai = ["pydantic-ai-slim[xai]>=2.32.1"]
 all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.32.1"]
 # OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
@@ -94,6 +101,7 @@ all = [
     "initrunner[channels]",
     "initrunner[dashboard]",
     "initrunner[a2a]",
+    "initrunner[vault-keyring]",
 ]
 
 [project.scripts]

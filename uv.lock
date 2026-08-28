@@ -1727,10 +1727,12 @@ a2a = [
 all = [
     { name = "a2a-sdk", extra = ["http-server"] },
     { name = "better-profanity" },
+    { name = "cryptography" },
     { name = "ddgs" },
     { name = "discord-py" },
     { name = "fastapi" },
     { name = "fastmcp" },
+    { name = "keyring" },
     { name = "lancedb" },
     { name = "openpyxl" },
     { name = "opentelemetry-exporter-otlp" },
@@ -1755,10 +1757,16 @@ anthropic = [
 audio = [
     { name = "youtube-transcript-api" },
 ]
+bedrock = [
+    { name = "pydantic-ai-slim", extra = ["bedrock"] },
+]
 channels = [
     { name = "discord-py" },
     { name = "python-telegram-bot" },
     { name = "slack-sdk" },
+]
+cohere = [
+    { name = "pydantic-ai-slim", extra = ["cohere"] },
 ]
 dashboard = [
     { name = "fastapi" },
@@ -1836,6 +1844,9 @@ vault-keyring = [
 vector = [
     { name = "lancedb" },
 ]
+xai = [
+    { name = "pydantic-ai-slim", extra = ["xai"] },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1856,6 +1867,7 @@ requires-dist = [
     { name = "better-profanity", marker = "extra == 'all'", specifier = ">=0.7.0" },
     { name = "better-profanity", marker = "extra == 'safety'", specifier = ">=0.7.0" },
     { name = "croniter", specifier = ">=6.0.0" },
+    { name = "cryptography", marker = "extra == 'all'", specifier = ">=48" },
     { name = "cryptography", marker = "extra == 'vault'", specifier = ">=48" },
     { name = "cryptography", marker = "extra == 'vault-keyring'", specifier = ">=48" },
     { name = "ddgs", marker = "extra == 'all'", specifier = ">=9.10.0" },
@@ -1875,6 +1887,7 @@ requires-dist = [
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "initguard", specifier = ">=2026.3.3" },
     { name = "jinja2", specifier = ">=3.1" },
+    { name = "keyring", marker = "extra == 'all'", specifier = ">=25" },
     { name = "keyring", marker = "extra == 'vault-keyring'", specifier = ">=25" },
     { name = "lancedb", marker = "extra == 'all'", specifier = ">=0.29.2" },
     { name = "lancedb", marker = "extra == 'ingest'", specifier = ">=0.29.2" },
@@ -1894,6 +1907,8 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["anthropic"], marker = "extra == 'anthropic'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "bedrock", "cohere", "google", "groq", "mistral", "xai"], marker = "extra == 'all-models'", specifier = ">=2.32.1" },
+    { name = "pydantic-ai-slim", extras = ["bedrock"], marker = "extra == 'bedrock'", specifier = ">=2.32.1" },
+    { name = "pydantic-ai-slim", extras = ["cohere"], marker = "extra == 'cohere'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["groq"], marker = "extra == 'groq'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["mcp"], marker = "extra == 'all'", specifier = ">=2.32.1" },
@@ -1901,6 +1916,7 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["mcp"], marker = "extra == 'recommended'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["mistral"], marker = "extra == 'mistral'", specifier = ">=2.32.1" },
     { name = "pydantic-ai-slim", extras = ["openai", "retries"], specifier = ">=2.32.1" },
+    { name = "pydantic-ai-slim", extras = ["xai"], marker = "extra == 'xai'", specifier = ">=2.32.1" },
     { name = "pydantic-evals", marker = "extra == 'all'", specifier = ">=2.32.1" },
     { name = "pydantic-evals", marker = "extra == 'observability'", specifier = ">=2.32.1" },
     { name = "pymupdf4llm", marker = "extra == 'all'", specifier = ">=0.2.9" },
@@ -1935,7 +1951,7 @@ requires-dist = [
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "channels", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mcp", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring", "vector"]
+provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "bedrock", "channels", "cohere", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mcp", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring", "vector", "xai"]
 
 [package.metadata.requires-dev]
 dev = [

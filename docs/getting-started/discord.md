@@ -6,7 +6,7 @@ Get a Discord bot agent running in five steps. For the full trigger reference, s
 
 - InitRunner installed (`pip install initrunner` or `uv tool install initrunner`)
 - An API key for your provider (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
-- The Discord optional dependency: `uv sync --extra discord` (or `pip install initrunner[discord]`)
+- The Discord dependency, which InitRunner offers to install on the first run
 
 ## Step 1: Create a Discord Application
 
@@ -160,15 +160,12 @@ By default the bot responds to **anyone** who can DM it or @mention it in a shar
 
 The **Message Content Intent** is not enabled. Go to the Developer Portal > Bot > Privileged Gateway Intents and enable it (see Step 2).
 
-### `ModuleNotFoundError: No module named 'discord'`
+### `needs initrunner[discord]`
 
-The optional dependency is not installed. Run:
-
-```bash
-uv sync --extra discord
-# or
-pip install initrunner[discord]
-```
+The Discord library is not installed. On a terminal InitRunner offers to install
+it and reruns your command; answer yes. In a script, a container or CI it prints
+the command for your install instead, because installing there would either be
+thrown away or hide a gap in your image.
 
 ### `Env var DISCORD_BOT_TOKEN not set`
 

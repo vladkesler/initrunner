@@ -19,6 +19,12 @@ def launch_dashboard(
     extra_role_dirs: list[Path] | None = None,
 ) -> None:
     """Start the dashboard server (blocking)."""
+    from initrunner._compat import require_extra
+
+    # Before the imports below: without this a core install gets a bare
+    # ModuleNotFoundError traceback instead of the name of the extra.
+    require_extra("fastapi")
+
     from initrunner.dashboard.app import create_app  # type: ignore[import-not-found]
     from initrunner.dashboard.config import DashboardSettings  # type: ignore[import-not-found]
     from initrunner.middleware import resolve_exposed_api_key

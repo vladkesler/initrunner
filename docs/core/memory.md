@@ -10,7 +10,7 @@ All memory types are backed by a single store per agent using a configurable sto
 
 The store ships in the `vector` extra (part of `[recommended]` and `[all]`). A core
 install validates a role with a `memory:` block but fails to build it, naming
-`uv pip install "initrunner[vector]"`.
+the vector extra and offering to install it.
 
 ## Quick Start
 

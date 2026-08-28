@@ -10,7 +10,12 @@ InitRunner is available on [GHCR](https://ghcr.io/vladkesler/initrunner) and [Do
 Use `slim` when you know what your roles need and none of it is MCP, vector
 memory or ingestion. It also runs ~38 MB lighter, because the MCP client stack
 loads whether or not a role uses it. A role that needs a missing extra fails at
-load with the `uv pip install` line, so switching tags never fails silently.
+load and names it, so switching tags never fails silently.
+
+In a container InitRunner never installs anything for you, even on a terminal:
+an install inside a running container is gone at the next `docker run`. It
+prints what is missing and leaves the fix to your image. Rebuild with
+`--build-arg EXTRAS=search,vector`, or use `latest`, which has everything.
 
 One catch on `slim`: ephemeral mode (`initrunner run` with no role file) turns
 on persistent memory by default, and that needs the vector extra. It stops at

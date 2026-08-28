@@ -324,11 +324,11 @@ def cache(
 
     _require_existing_vault()
     if not keyring_cache.is_available():
-        typer.echo(
-            "no keyring backend available. "
-            "Install extras: uv pip install initrunner[vault-keyring]",
-            err=True,
-        )
+        # Names the extra and offers to install it, like every other gap.
+        from initrunner._compat import require_extra
+
+        require_extra("keyring")
+        typer.echo("no keyring backend available.", err=True)
         raise typer.Exit(code=2)
 
     interactive = _is_interactive(no_prompt)

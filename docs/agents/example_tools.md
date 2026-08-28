@@ -323,7 +323,7 @@ tools:
   - datetime
 ```
 
-> The `search` tool registers two functions: `web_search` for general queries and `news_search` for recent events. Pair it with `datetime` so the agent can reason about time when filtering news. DuckDuckGo requires the `search` extra (`pip install initrunner[search]`); paid providers (SerpAPI, Brave, Tavily) need an `api_key` but use `httpx` which is already bundled.
+> The `search` tool registers two functions: `web_search` for general queries and `news_search` for recent events. Pair it with `datetime` so the agent can reason about time when filtering news. DuckDuckGo requires the `search` extra, offered on first use; paid providers (SerpAPI, Brave, Tavily) need an `api_key` but use `httpx` which is already bundled.
 
 - Full example: [`examples/roles/web-searcher.yaml`](../examples/roles/web-searcher.yaml)
 - Reference: [tools.md — Search Tool](tools.md#search-tool)

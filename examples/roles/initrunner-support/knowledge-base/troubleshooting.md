@@ -88,6 +88,9 @@ pip install initrunner[groq]          # for Groq
 pip install initrunner[mistral]       # for Mistral
 pip install initrunner[all-models]    # all providers
 pip install initrunner[ingest]        # PDF, DOCX, XLSX support
+
+# Or just run the agent: InitRunner names what is missing and offers to
+# install it, keeping the extras already present.
 ```
 
 

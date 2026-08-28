@@ -401,6 +401,8 @@ class TestSandboxWarningsFollowAttachedTools:
 
     def test_all_role_warns_for_exec_tools(self, caplog, monkeypatch):
         import logging
+        import sys
+        from unittest.mock import MagicMock
 
         from initrunner.agent.loader import build_agent
         from initrunner.services.providers import (
@@ -408,6 +410,10 @@ class TestSandboxWarningsFollowAttachedTools:
             build_quick_chat_role_sync,
         )
 
+        # The "all" profile includes search, which checks for ddgs at build
+        # time. This test is about the sandbox warnings behind that gate.
+        if "ddgs" not in sys.modules:
+            monkeypatch.setitem(sys.modules, "ddgs", MagicMock())
         monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
         caplog.set_level(logging.WARNING, logger="initrunner")
 

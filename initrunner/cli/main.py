@@ -298,6 +298,10 @@ def app_entry() -> None:
     global _invoked_command
     _invoked_command = None  # main() sets it; reset so a bypassed callback falls back to argv
 
+    from initrunner._install import consume_reexec_flag
+
+    consume_reexec_flag()
+
     start = time.monotonic()
     _maybe_prompt_telemetry_consent()
 
@@ -312,16 +316,25 @@ def app_entry() -> None:
         status = "ok" if exit_code == 0 else "error"
         raise
     except MissingExtraError as exc:
-        # An optional dependency is not installed. The message already carries
-        # the install command, so every command reports it the same way here
-        # rather than each one catching it separately. The message ends in
-        # ``initrunner[extra]``, which Rich would read as markup.
+        # An optional dependency is not installed. Every command reports it the
+        # same way here rather than each one catching it separately: name what
+        # is missing, and on a terminal offer to install it and rerun.
         from rich.markup import escape
 
-        console.print(f"[red]Error:[/red] {escape(str(exc))}")
         status = "error"
         exit_code = 1
         error_kind = type(exc).__name__
+        if exc.extra:
+            from initrunner.cli._helpers import offer_install
+
+            command = _invoked_command or "initrunner"
+            try:
+                # Raises typer.Exit, or never returns (it re-execs the command).
+                offer_install([exc.extra], needed_by=f"initrunner {command}")
+            except typer.Exit as e:
+                sys.exit(e.exit_code)
+        # No extra name on the exception: the message is all there is.
+        console.print(f"[red]Error:[/red] {escape(str(exc))}")
         sys.exit(1)
     except BaseException as exc:
         status = "error"

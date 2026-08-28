@@ -198,11 +198,16 @@ def load_and_build_or_exit(
             )
             raise typer.Exit(1) from None
         except RoleLoadError as e:
-            print_error(e)
             # A role that only needs an uninstalled extra is valid YAML, so
             # pointing at 'validate' would send the user somewhere that says
-            # everything is fine. The install command is the whole answer.
-            if not isinstance(e.__cause__, MissingExtraError):
+            # everything is fine. Offer to install it instead.
+            cause = e.__cause__
+            if isinstance(cause, MissingExtraError) and cause.extra:
+                from initrunner.cli._helpers._extras import offer_install
+
+                offer_install([cause.extra], needed_by=role_file.name)
+            print_error(e)
+            if not isinstance(cause, MissingExtraError):
                 console.print(
                     f"[dim]Hint:[/dim] Run [bold]initrunner validate {role_file}[/bold]"
                     " for details."

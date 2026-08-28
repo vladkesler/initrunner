@@ -12,7 +12,7 @@ This guide covers practical patterns for using InitRunner's retrieval-augmented 
   - `GOOGLE_API_KEY` set (for Google provider)
   - Ollama running with an embedding model (`ollama pull nomic-embed-text`)
 - [ ] Documents ready (Markdown, text, HTML, PDF, DOCX, XLSX)
-- [ ] Optional extras installed if needed: `initrunner[ingest]` for PDF/DOCX/XLSX support
+- [ ] PDF/DOCX/XLSX support: the `ingest` extra, offered on first use
 
 > **Note:** The `local-embeddings` extra (`fastembed`) is available for in-process embeddings with no API key. See [Providers: Local in-process embeddings](../configuration/providers.md#local-in-process-embeddings-fastembed) for setup.
 
@@ -123,7 +123,8 @@ ingest:
 
 ### Multi-format knowledge base
 
-Mix HTML, Markdown, and PDF sources. Install `initrunner[ingest]` for PDF support:
+Mix HTML, Markdown, and PDF sources. PDFs need the `ingest` extra, which InitRunner
+offers to install the first time it meets one:
 
 ```yaml
 ingest:

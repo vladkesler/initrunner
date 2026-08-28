@@ -422,7 +422,7 @@ class TestDiagnoseRoleExtras:
         from initrunner.services.doctor import diagnose_role_extras
 
         raw = {"spec": {"tools": [{"type": "search"}]}}
-        with patch("initrunner.services.doctor._is_module_available", return_value=False):
+        with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
             gaps = diagnose_role_extras(raw)
 
         assert any(g.extras_name == "search" for g in gaps)
@@ -432,7 +432,7 @@ class TestDiagnoseRoleExtras:
         from initrunner.services.doctor import diagnose_role_extras
 
         raw = {"spec": {"triggers": [{"type": "telegram"}]}}
-        with patch("initrunner.services.doctor._is_module_available", return_value=False):
+        with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
             gaps = diagnose_role_extras(raw)
 
         assert any(g.extras_name == "telegram" for g in gaps)
@@ -442,7 +442,7 @@ class TestDiagnoseRoleExtras:
         from initrunner.services.doctor import diagnose_role_extras
 
         raw = {"spec": {"observability": {"backend": "console"}}}
-        with patch("initrunner.services.doctor._is_module_available", return_value=False):
+        with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
             gaps = diagnose_role_extras(raw)
 
         assert any(g.extras_name == "observability" for g in gaps)
@@ -460,7 +460,7 @@ class TestDiagnoseRoleExtras:
         from initrunner.services.doctor import diagnose_role_extras
 
         raw = {"spec": {"tools": [{"type": "search"}, {"type": "web_reader"}]}}
-        with patch("initrunner.services.doctor._is_module_available", return_value=False):
+        with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
             gaps = diagnose_role_extras(raw)
 
         search_gaps = [g for g in gaps if g.extras_name == "search"]
@@ -780,11 +780,11 @@ class TestDoctorFixSDK:
 
         with _PATCH_DOTENV, _PATCH_OLLAMA:
             with patch("initrunner.services.doctor.diagnose_providers", return_value=[mock_diag]):
-                with patch("initrunner.cli._helpers.install_extra", return_value=True) as m:
+                with patch("initrunner.cli._helpers.install_extras", return_value=True) as m:
                     result = runner.invoke(app, ["doctor", "--fix", "--yes"])
 
         assert result.exit_code == 0
-        m.assert_called_once_with("anthropic")
+        m.assert_called_once_with(["anthropic"])
         assert "Installed" in result.output
 
     def test_fix_no_action_when_sdk_present(self, monkeypatch):
@@ -801,7 +801,7 @@ class TestDoctorFixSDK:
 
         with _PATCH_DOTENV, _PATCH_OLLAMA:
             with patch("initrunner.services.doctor.diagnose_providers", return_value=[mock_diag]):
-                with patch("initrunner.cli._helpers.install_extra") as m:
+                with patch("initrunner.cli._helpers.install_extras") as m:
                     result = runner.invoke(app, ["doctor", "--fix", "--yes"])
 
         assert result.exit_code == 0
@@ -903,12 +903,12 @@ class TestDoctorFixRole:
 
         with _PATCH_DOTENV, _PATCH_OLLAMA:
             with patch("initrunner.services.doctor.diagnose_providers", return_value=[]):
-                with patch("initrunner.services.doctor._is_module_available", return_value=False):
-                    with patch("initrunner.cli._helpers.install_extra", return_value=True) as m:
+                with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
+                    with patch("initrunner.cli._helpers.install_extras", return_value=True) as m:
                         result = runner.invoke(app, ["doctor", "--fix", "--yes", "--role", str(p)])
 
         assert result.exit_code == 0
-        m.assert_called_with("search")
+        m.assert_called_with(["search"])
         assert "Installed" in result.output
 
     def test_fix_bumps_spec_version(self, monkeypatch, tmp_path):

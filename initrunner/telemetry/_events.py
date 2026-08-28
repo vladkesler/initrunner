@@ -90,16 +90,15 @@ def _is_ci() -> bool:
 
 
 def install_method() -> str:
-    """Best-effort install method. Never raises."""
+    """Best-effort install method. Never raises.
+
+    Shares the detector the install prompt uses, so what telemetry reports and
+    what the CLI would actually run cannot drift apart.
+    """
     try:
-        if os.path.exists("/.dockerenv") or os.environ.get("INITRUNNER_IN_DOCKER"):
-            return "docker"
-        exe = (sys.argv[0] or "").lower()
-        if "pipx" in exe or os.environ.get("PIPX_HOME"):
-            return "pipx"
-        if "uv" in os.environ.get("UV", "") or "/uv/" in exe:
-            return "uv"
-        return "pip"
+        from initrunner._install import install_method as _detect
+
+        return _detect()
     except Exception:
         return "unknown"
 

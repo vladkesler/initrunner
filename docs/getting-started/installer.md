@@ -38,7 +38,7 @@ curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 | Flag | Argument | Description |
 |------|----------|-------------|
 | `--method` | `uv`, `pipx`, or `pip` | Force a specific package installer instead of auto-detection. |
-| `--extras` | comma-separated list | Install optional extras. Default: `recommended`. Use `none` for a core install (no MCP, no vector store). |
+| `--extras` | `recommended`, `all`, `none`, or provider names | Extras to install. Default: `recommended`. `none` gives a core install (no MCP, no vector store); anything a role needs later is offered at run time. |
 | `--version` | version string | Pin to a specific PyPI version (e.g. `0.2.0`). Default: `latest`. |
 | `--unmanaged` | *(none)* | Skip all shell profile / PATH modifications. Implies `INITRUNNER_NO_MODIFY_PATH`. |
 | `--uninstall` | *(none)* | Remove initrunner and clean up PATH entries from shell profiles. |

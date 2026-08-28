@@ -9,7 +9,11 @@ def _show_starter_listing() -> None:
     """Render a Rich table of available starter agents."""
     from rich.table import Table
 
-    from initrunner.services.starters import check_prerequisites, list_starters
+    from initrunner.services.starters import (
+        check_prerequisites,
+        list_starters,
+        missing_extras,
+    )
 
     starters = list_starters()
     if not starters:
@@ -27,8 +31,11 @@ def _show_starter_listing() -> None:
 
     for entry in starters:
         errors, _warnings = check_prerequisites(entry)
+        missing = missing_extras(entry)
         if errors:
             status = f"[yellow]{errors[0]}[/yellow]"
+        elif missing:
+            status = f"[yellow]Installs initrunner\\[{','.join(missing)}] on first run[/yellow]"
         elif starter_content(entry).kind == "bundled":
             status = "[green]Ready (samples)[/green]"
         else:

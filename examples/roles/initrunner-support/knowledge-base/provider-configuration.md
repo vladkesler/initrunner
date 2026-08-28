@@ -12,9 +12,9 @@ InitRunner supports multiple LLM providers. Each provider requires its own API k
 | `google` | `GOOGLE_API_KEY` | `initrunner[google]` | `gemini-2.0-flash` |
 | `groq` | `GROQ_API_KEY` | `initrunner[groq]` | `llama-3.3-70b-versatile` |
 | `mistral` | `MISTRAL_API_KEY` | `initrunner[mistral]` | `mistral-large-latest` |
-| `cohere` | `CO_API_KEY` | `initrunner[all-models]` | `command-r-plus` |
-| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[all-models]` | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
-| `xai` | `XAI_API_KEY` | `initrunner[all-models]` | `grok-3` |
+| `cohere` | `CO_API_KEY` | `initrunner[cohere]` | `command-r-plus` |
+| `bedrock` | `AWS_ACCESS_KEY_ID` | `initrunner[bedrock]` | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
+| `xai` | `XAI_API_KEY` | `initrunner[xai]` | `grok-3` |
 | `ollama` | *(none)* | *(included)* | `llama3.2` |
 
 

@@ -151,7 +151,7 @@ With `base_url: https://api.example.com`, calling `http_request("GET", "/users/1
 
 Connects to an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server, making all of its tools available to the agent via PydanticAI's `MCPToolset` (the v2-ready replacement for the deprecated `FastMCPToolset`).
 
-Requires the `mcp` extra (`uv pip install "initrunner[mcp]"`), which is part of
+Requires the `mcp` extra, offered on first use and part of
 `[recommended]` and `[all]`. `type: mcp` validates in any install; building the
 agent is where a core install stops, with the install command in the message.
 
@@ -836,7 +836,7 @@ tools:
 
 Fetches a web page, converts it to markdown, chunks the content, generates embeddings, and stores the result in the document store. Content stored by the scraper is immediately searchable via `search_documents`.
 
-Writes to the vector store, so it requires the `vector` extra (`uv pip install "initrunner[vector]"`).
+Writes to the vector store, so it requires the `vector` extra, in `[recommended]` and `[all]`.
 
 ```yaml
 tools:
@@ -917,18 +917,15 @@ tools:
 
 | Provider | Free? | API Key | Notes |
 |----------|-------|---------|-------|
-| `duckduckgo` | Yes | Not required | Uses `duckduckgo-search` library. Install with `pip install initrunner[search]`. |
+| `duckduckgo` | Yes | Not required | Uses the `ddgs` library, in the `search` extra. |
 | `serpapi` | No | Required (`SERPAPI_API_KEY`) | Google results via SerpAPI. Uses `httpx` (bundled). |
 | `brave` | No | Required (`BRAVE_API_KEY`) | Brave Search API. Uses `httpx` (bundled). |
 | `tavily` | No | Required (`TAVILY_API_KEY`) | Tavily search API. Uses `httpx` (bundled). |
 
 ### Install
 
-DuckDuckGo requires the optional `search` extra:
-
-```bash
-pip install initrunner[search]
-```
+DuckDuckGo requires the `search` extra, which `[recommended]` and `[all]` include.
+On a core install, a role naming this tool says so at load and offers to install it.
 
 Paid providers use `httpx`, which is already bundled with InitRunner — no extra install needed.
 
@@ -982,13 +979,8 @@ tools:
 
 ### Install
 
-The YouTube transcript feature requires the optional `audio` extra:
-
-```bash
-pip install initrunner[audio]
-# or with uv:
-uv sync --extra audio
-```
+The YouTube transcript feature requires the `audio` extra, which `[all]` includes.
+On a smaller install, a role naming this tool offers to add it at load.
 
 If the package is not installed, `get_youtube_transcript` returns an error message directing the user to install the extra. The `transcribe_audio` function does not require additional packages — it uses PydanticAI's built-in multimodal support.
 
@@ -1341,7 +1333,7 @@ tools:
 
 Extract text and metadata from PDF files inline during a conversation. Unlike the ingestion pipeline (which is a bulk ETL step), this tool gives agents on-demand access to PDF content.
 
-Requires the `ingest` extra: `pip install initrunner[ingest]`
+Requires the `ingest` extra, offered on first use and part of `[recommended]`
 
 ```yaml
 tools:
@@ -1435,7 +1427,7 @@ Browser automation via [agent-browser](https://github.com/vercel-labs/agent-brow
 
 **Prerequisites:**
 ```bash
-uv pip install "initrunner[mcp]"   # part of [recommended] and [all]
+# Part of [recommended] and [all]; a core install offers to add it.
 npm i -g agent-browser
 agent-browser install
 ```

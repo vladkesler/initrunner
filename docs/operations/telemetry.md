@@ -36,7 +36,7 @@ which is the source of truth. Two events are sent:
 
 | Property | Example | Notes |
 |---|---|---|
-| `install_method` | `pip`, `pipx`, `uv`, `docker`, `unknown` | Best-effort. |
+| `install_method` | `uv-tool`, `pipx`, `uv-pip`, `pip`, `uvx`, `editable`, `docker`, `unknown` | Best-effort. Read from the install's own records, the same way the install prompt reads them. |
 
 ### On every event
 

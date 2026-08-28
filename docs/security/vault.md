@@ -7,9 +7,9 @@ A local encrypted vault for your API keys and bot tokens. Drop-in: everything th
 ## Install
 
 ```bash
-uv pip install 'initrunner[vault]'
-# optional: cache the passphrase in the OS keyring
-uv pip install 'initrunner[vault-keyring]'
+# The vault ships in [all]. On a smaller install the vault commands name what
+# they need and offer to install it, keyring included.
+uv pip install 'initrunner[all]'
 ```
 
 The vault is opt-in. InitRunner without the `vault` extra keeps reading from `os.environ` and `~/.initrunner/.env` exactly as before.

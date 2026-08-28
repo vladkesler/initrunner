@@ -48,6 +48,20 @@ def _make_ddgs_mock():
     return MagicMock()
 
 
+@pytest.fixture(autouse=True)
+def _ddgs_importable(monkeypatch):
+    """Let the builder's extras gate pass whether or not ddgs is installed.
+
+    ``build_search_toolset`` checks for ddgs so a role that cannot search fails
+    at load. These tests are about the search behaviour behind that gate, and
+    most of them replace the provider function anyway.
+    """
+    import sys
+
+    if "ddgs" not in sys.modules:
+        monkeypatch.setitem(sys.modules, "ddgs", MagicMock())
+
+
 # ---------------------------------------------------------------------------
 # Schema / config validation tests
 # ---------------------------------------------------------------------------

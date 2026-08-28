@@ -28,15 +28,10 @@ def desktop(
     ] = None,
 ) -> None:
     """Launch the dashboard in a native desktop window."""
-    from initrunner._compat import MissingExtraError, require_extra
+    from initrunner._compat import require_extra
 
-    try:
-        require_extra("webview")
-    except MissingExtraError as e:
-        from rich.markup import escape
-
-        console.print(f"[red]{escape(str(e))}[/red]")
-        raise SystemExit(1) from None
+    # Uncaught on purpose: app_entry names the extra and offers to install it.
+    require_extra("webview")
     import webview  # type: ignore[import-not-found]
 
     _ensure_gi()

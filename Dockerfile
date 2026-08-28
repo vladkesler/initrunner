@@ -74,6 +74,10 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Persistent state directory
 ENV INITRUNNER_HOME=/data
+# Tells InitRunner it is in a container, so it prints the command to change
+# the image rather than installing an extra that the next run would lose.
+# /.dockerenv covers Docker; podman and friends do not write it.
+ENV INITRUNNER_IN_DOCKER=1
 # Sync and async execution are bridged with worker threads, and glibc gives each
 # thread its own malloc arena -- which inflates RSS well past the live heap in a
 # container that is billed on RSS. Two arenas is the standard cap at this thread

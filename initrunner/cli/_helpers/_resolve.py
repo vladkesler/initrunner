@@ -108,22 +108,35 @@ def prepare_starter(role_file: Path, model: str | None) -> str | None:
     Prints warnings for missing user data.
     Raises ``typer.Exit(1)`` on hard prerequisite failures.
     """
-    from initrunner.services.starters import check_prerequisites, get_starter_for_path
+    from initrunner.services.starters import (
+        check_prerequisites,
+        get_starter_for_path,
+        missing_extras,
+    )
 
     entry = get_starter_for_path(role_file)
     if entry is None:
         return None
 
+    # Missing tokens and missing docs come first: there is no point installing
+    # a Telegram SDK for a starter that cannot run without a token anyway.
     errors, warnings = check_prerequisites(entry)
     if errors:
-        # These lines carry `pip install "initrunner[search]"`, and the bracket
-        # is markup to Rich; the indented ones are already formatted.
+        # Indented lines are already formatted; the rest may carry brackets
+        # that Rich would read as markup.
         for e in errors:
             if e.startswith(" "):
                 console.print(e, markup=False)
             else:
                 print_error(e)
         raise typer.Exit(1)
+
+    missing = missing_extras(entry)
+    if missing:
+        from initrunner.cli._helpers._extras import offer_install
+
+        offer_install(missing, needed_by=f"the {entry.slug} starter")
+
     for w in warnings:
         console.print(f"[yellow]Note:[/yellow] {escape(w)}")
 

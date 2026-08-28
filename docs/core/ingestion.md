@@ -201,7 +201,7 @@ These are starting points — adjust based on your retrieval quality. Smaller ch
 | `.json` | Pretty-printed JSON (2-space indent) |
 | `.html`, `.htm` | HTML → Markdown conversion (scripts/styles removed) |
 
-### Optional Formats (`pip install initrunner[ingest]`)
+### Optional Formats (the `ingest` extra)
 
 | Extension | Extractor | Library |
 |-----------|-----------|---------|
@@ -209,7 +209,7 @@ These are starting points — adjust based on your retrieval quality. Smaller ch
 | `.docx` | Paragraphs joined with double newlines | `python-docx` |
 | `.xlsx` | Sheets as CSV with sheet title headers | `openpyxl` |
 
-Attempting to ingest an optional format without the extra installed raises a helpful error message directing the user to install `initrunner[ingest]`.
+Attempting to ingest an optional format without the extra installed names it and offers to install it.
 
 Unsupported file types raise a `ValueError` and are skipped during ingestion (the pipeline continues with remaining files).
 
@@ -496,11 +496,12 @@ The embedding model produces vectors with a different dimension than what the st
 
 ### Optional format errors (PDF, DOCX, XLSX)
 
-If you see an error like `"Install initrunner[ingest] for PDF support"`, install the extra:
+If ingestion reports that it needs the `ingest` extra, answer yes when it offers to
+install it, or do it up front:
 ```bash
-pip install initrunner[ingest]
+pip install "initrunner[ingest]"
 # or with uv:
-uv pip install initrunner[ingest]
+uv pip install "initrunner[ingest]"
 ```
 
 ### API key not set
@@ -518,7 +519,8 @@ You can override which env var is used for the embedding key by setting `embeddi
 ### `'lancedb' is required`
 
 The vector store ships in the `vector` extra, which `ingest` pulls in. A core
-install validates an `ingest:` role but refuses to build it:
+install validates an `ingest:` role but refuses to build it, naming the extra
+and offering to install it. To do it yourself:
 ```bash
 uv pip install "initrunner[ingest]"
 # or just the store, without the PDF/DOCX/XLSX parsers:

@@ -12,7 +12,6 @@ from initrunner.cli._helpers import (
     console,
     load_and_build_or_exit,
     load_role_or_exit,
-    print_error,
     resolve_model_override,
     resolve_role_path,
 )
@@ -108,7 +107,6 @@ def test(
     """Run a test suite against an agent role."""
     role_file = resolve_role_path(role_file)
 
-    from initrunner._compat import MissingExtraError
     from initrunner.eval.runner import SuiteLoadError, load_suite
     from initrunner.services.eval import (
         run_suite_report_sync,
@@ -147,32 +145,30 @@ def test(
     )
 
     native_report = None
-    try:
-        if want_report:
-            pe_result = run_suite_report_sync(
-                agent,
-                role,
-                test_suite,
-                dry_run=dry_run,
-                concurrency=concurrency,
-                tag_filter=tag,
-            )
-            suite_result = pe_result.suite_result
-            native_report = pe_result.report
-        else:
-            suite_result = run_suite_sync(
-                agent,
-                role,
-                test_suite,
-                dry_run=dry_run,
-                concurrency=concurrency,
-                tag_filter=tag,
-                role_file=role_file,
-                pydantic_evals=use_pydantic_evals,
-            )
-    except MissingExtraError as e:
-        print_error(e)
-        raise typer.Exit(1) from None
+    # A missing observability extra propagates: app_entry names it and offers
+    # to install it, the same as every other command.
+    if want_report:
+        pe_result = run_suite_report_sync(
+            agent,
+            role,
+            test_suite,
+            dry_run=dry_run,
+            concurrency=concurrency,
+            tag_filter=tag,
+        )
+        suite_result = pe_result.suite_result
+        native_report = pe_result.report
+    else:
+        suite_result = run_suite_sync(
+            agent,
+            role,
+            test_suite,
+            dry_run=dry_run,
+            concurrency=concurrency,
+            tag_filter=tag,
+            role_file=role_file,
+            pydantic_evals=use_pydantic_evals,
+        )
     _display_suite_result(suite_result, verbose=verbose)
 
     if report and native_report is not None:

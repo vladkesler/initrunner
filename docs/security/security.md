@@ -102,7 +102,7 @@ Controls input validation, output filtering, and audit redaction.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `profanity_filter` | `bool` | `false` | Block profane input. Requires `initrunner[safety]`. |
+| `profanity_filter` | `bool` | `false` | Block profane input. Needs the `safety` extra, in `[all]`. |
 | `blocked_input_patterns` | `list[str]` | `[]` | Regex patterns that reject matching prompts. |
 | `blocked_output_patterns` | `list[str]` | `[]` | Regex patterns applied to agent output. |
 | `output_action` | `"strip" \| "block"` | `"strip"` | `strip` replaces matches with `[FILTERED]`; `block` rejects the entire output. |
@@ -131,9 +131,8 @@ On rejection, `execute_run()` returns `RunResult(success=False, error=<reason>)`
 
 #### Profanity Filter Setup
 
-```bash
-pip install initrunner[safety]
-```
+The filter needs the `safety` extra, which `[all]` includes. Without it the
+guardrail fails closed: input is rejected and the run says what is missing.
 
 ```yaml
 security:
