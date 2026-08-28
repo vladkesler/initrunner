@@ -27,18 +27,6 @@
 
 Define an agent in one YAML file. Chat with it. When it works, let it run autonomously. When you trust it, deploy it as a daemon that reacts to cron schedules, file changes, webhooks, and Telegram messages. Same file the whole way. No rewrite between prototyping and production. Prefer a curated outcome without YAML? Use [always-on services](#always-on-services).
 
-## Agent files are simpler now
-
-You used to wrap every agent in `apiVersion`, `kind`, `metadata`, and `spec`. The file is the agent now: a name, a prompt, the tools.
-
-Nothing you already have breaks. Convert a file or folder when you want:
-
-```bash
-initrunner doctor --fix PATH --yes
-```
-
-That keeps a `.bak` copy. [How the rewrite works](docs/getting-started/envelope-migration.md).
-
 ## Quickstart
 
 ```bash
