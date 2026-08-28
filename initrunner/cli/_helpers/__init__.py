@@ -16,7 +16,7 @@ from initrunner.cli._helpers._display import (
     _NextContext,
     display_sense_result,
     ingest_status_color,
-    install_extra,
+    install_extras,
     prompt_model_selection,
     suggest_next,
 )
@@ -48,7 +48,7 @@ __all__ = [
     "ephemeral_context",
     "handle_api_key",
     "ingest_status_color",
-    "install_extra",
+    "install_extras",
     "load_and_build_or_exit",
     "load_role_or_exit",
     "preflight_validate_or_exit",

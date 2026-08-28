@@ -160,16 +160,17 @@ class FlowDiagnostics:
 
 
 # ---------------------------------------------------------------------------
-# Feature-to-extras mapping (extends starters._EXTRA_MARKERS)
+# Feature-to-extras mapping (extends starters.FEATURE_EXTRAS)
 # ---------------------------------------------------------------------------
 
 
-def _build_extra_markers() -> dict[str, tuple[str, str]]:
-    from initrunner.services.starters import _EXTRA_MARKERS
+def _build_extra_markers() -> dict[str, str]:
+    """Feature name to the extra it needs, for roles as well as starters."""
+    from initrunner.services.starters import FEATURE_EXTRAS
 
-    markers = dict(_EXTRA_MARKERS)
-    markers.setdefault("observability", ("observability", "opentelemetry.sdk"))
-    markers.setdefault("pdf_extract", ("ingest", "pymupdf4llm"))
+    markers = dict(FEATURE_EXTRAS)
+    markers.setdefault("observability", "observability")
+    markers.setdefault("pdf_extract", "ingest")
     return markers
 
 
@@ -244,13 +245,11 @@ def diagnose_role_extras(raw_data: dict) -> list[RoleExtrasGap]:
             feature_names.add("mcp")
 
     for feature in feature_names:
-        if feature not in markers:
-            continue
-        extras_name, marker_module = markers[feature]
-        if extras_name in seen:
+        extras_name = markers.get(feature)
+        if extras_name is None or extras_name in seen:
             continue
         seen.add(extras_name)
-        if not _is_module_available(marker_module):
+        if not _is_extra_installed(extras_name):
             gaps.append(RoleExtrasGap(feature=feature, extras_name=extras_name))
 
     return gaps
@@ -891,13 +890,11 @@ def diagnose_triggers(role: object) -> list[TriggerDiagnosis]:
 
         try:
             if isinstance(trigger, CronTriggerConfig):
-                try:
-                    from croniter import croniter  # type: ignore[import-not-found]
+                # croniter is a core dependency; there is no extra to name.
+                from croniter import croniter  # type: ignore[import-not-found]
 
-                    if not croniter.is_valid(trigger.schedule):
-                        issues.append(f"Invalid cron expression: {trigger.schedule}")
-                except ImportError:
-                    issues.append("croniter not installed (pip install initrunner[triggers])")
+                if not croniter.is_valid(trigger.schedule):
+                    issues.append(f"Invalid cron expression: {trigger.schedule}")
 
                 try:
                     from zoneinfo import ZoneInfo
@@ -1188,7 +1185,12 @@ def role_diagnostics_to_checks(diag: RoleDiagnostics) -> list:
 # ---------------------------------------------------------------------------
 
 
-def _is_module_available(module_name: str) -> bool:
-    from initrunner._compat import is_extra_available
+def _is_extra_installed(extra: str) -> bool:
+    """Whether *extra* is installed here.
 
-    return is_extra_available(module_name)
+    A named seam rather than a direct call so tests can pretend an extra is
+    missing without unloading the module that stands for it.
+    """
+    from initrunner._compat import is_extra_installed
+
+    return is_extra_installed(extra)

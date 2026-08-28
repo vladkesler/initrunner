@@ -267,72 +267,68 @@ class TestSdkInstall:
             )
         assert result.exit_code == 0
 
-    def test_uv_tool_env_uses_uv_tool_install(self, clean_env):
-        """When sys.executable is in a uv tool env and uv is on PATH, use uv tool install."""
+    def test_uv_tool_env_keeps_the_extras_it_already_had(self, clean_env, tmp_path):
+        """The receipt names them; installing one extra must not drop the rest."""
+        (tmp_path / "uv-receipt.toml").write_text(
+            '[tool]\nrequirements = [{ name = "initrunner", extras = ["recommended"] }]\n'
+        )
         with (
-            patch("sys.executable", "/home/user/.local/share/uv/tools/initrunner/bin/python"),
-            patch("shutil.which", return_value="/usr/bin/uv"),
+            patch("sys.prefix", str(tmp_path)),
+            patch("initrunner._install._in_container", return_value=False),
+            patch("initrunner._install._is_editable", return_value=False),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = MagicMock(returncode=0)
-            from initrunner.cli._helpers import install_extra
+            from initrunner.cli._helpers import install_extras
 
-            install_extra("anthropic")
+            install_extras(["anthropic"])
             cmd = mock_run.call_args[0][0]
-            assert cmd == ["uv", "tool", "install", "--force", "initrunner[anthropic]"]
+            assert cmd == ["uv", "tool", "install", "initrunner[anthropic,recommended]"]
 
-    def test_pipx_env_uses_pipx_install(self, clean_env):
-        """When sys.executable is in a pipx venv and pipx is on PATH, use pipx install --force."""
+    def test_pipx_env_prints_instead_of_rebuilding(self, clean_env, tmp_path):
+        """pipx reinstalls everything and drops the venv on failure; not unattended."""
+        import json
+        from io import StringIO
 
-        def which_side_effect(name):
-            return "/usr/bin/pipx" if name == "pipx" else None
+        from rich.console import Console
 
+        (tmp_path / "pipx_metadata.json").write_text(
+            json.dumps({"main_package": {"package_or_url": "initrunner[recommended]"}})
+        )
+        buf = StringIO()
         with (
-            patch(
-                "sys.executable",
-                "/home/user/.local/share/pipx/venvs/initrunner/bin/python",
-            ),
-            patch("shutil.which", side_effect=which_side_effect),
+            patch("sys.prefix", str(tmp_path)),
+            patch("initrunner._install._in_container", return_value=False),
+            patch("initrunner._install._is_editable", return_value=False),
+            patch("initrunner.cli._helpers._display.console", Console(file=buf, no_color=True)),
             patch("subprocess.run") as mock_run,
         ):
-            mock_run.return_value = MagicMock(returncode=0)
-            from initrunner.cli._helpers import install_extra
+            from initrunner.cli._helpers import install_extras
 
-            install_extra("anthropic")
-            cmd = mock_run.call_args[0][0]
-            assert cmd == ["pipx", "install", "--force", "initrunner[anthropic]"]
+            assert install_extras(["anthropic"]) is False
+        mock_run.assert_not_called()
+        assert "initrunner[anthropic,recommended]" in buf.getvalue()
 
-    def test_pipx_env_without_pipx_falls_back_to_interpreter_pip(self, clean_env):
-        """When sys.executable is in a pipx venv but pipx not on PATH, use sys.executable -m pip."""
-        fake_exe = "/home/user/.local/share/pipx/venvs/initrunner/bin/python"
-        with (
-            patch("sys.executable", fake_exe),
-            patch("shutil.which", return_value=None),
-            patch("subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = MagicMock(returncode=0)
-            from initrunner.cli._helpers import install_extra
-
-            install_extra("anthropic")
-            cmd = mock_run.call_args[0][0]
-            assert cmd[0] == fake_exe
-            assert cmd[1:] == ["-m", "pip", "install", "initrunner[anthropic]"]
-
-    def test_uv_preferred_over_pip(self, clean_env):
+    def test_uv_preferred_over_pip(self, clean_env, tmp_path):
         """When uv is on PATH (non-tool env), should use uv pip install."""
         with (
+            patch("sys.prefix", str(tmp_path)),
+            patch("initrunner._install._in_container", return_value=False),
+            patch("initrunner._install._is_editable", return_value=False),
             patch("shutil.which", return_value="/usr/bin/uv"),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = MagicMock(returncode=0)
-            from initrunner.cli._helpers import install_extra
+            from initrunner.cli._helpers import install_extras
 
-            install_extra("anthropic")
+            install_extras(["anthropic"])
             cmd = mock_run.call_args[0][0]
             assert cmd[0] == "uv"
             assert "pip" in cmd
+            # Without --python this would resolve ./.venv, not the running one.
+            assert cmd[cmd.index("--python") + 1] == sys.executable
 
-    def test_failure_output_escapes_extras_brackets(self, clean_env):
+    def test_failure_output_escapes_extras_brackets(self, clean_env, tmp_path):
         """When install fails, [extra] brackets must appear literally in the warning."""
         import subprocess
         from io import StringIO
@@ -343,31 +339,39 @@ class TestSdkInstall:
         recorded_console = Console(file=buf, no_color=True)
 
         with (
+            patch("sys.prefix", str(tmp_path)),
+            patch("initrunner._install._in_container", return_value=False),
+            patch("initrunner._install._is_editable", return_value=False),
             patch("initrunner.cli._helpers._display.console", recorded_console),
             patch("shutil.which", return_value=None),
+            patch("importlib.util.find_spec", return_value=object()),
             patch(
                 "subprocess.run",
                 side_effect=subprocess.CalledProcessError(1, ["pip"]),
             ),
         ):
-            from initrunner.cli._helpers import install_extra
+            from initrunner.cli._helpers import install_extras
 
-            result = install_extra("anthropic")
+            result = install_extras(["anthropic"])
             output = buf.getvalue()
 
         assert result is False
         assert "[anthropic]" in output
 
-    def test_pip_fallback(self, clean_env):
+    def test_pip_fallback(self, clean_env, tmp_path):
         """When uv is not on PATH, should use pip."""
         with (
+            patch("sys.prefix", str(tmp_path)),
+            patch("initrunner._install._in_container", return_value=False),
+            patch("initrunner._install._is_editable", return_value=False),
             patch("shutil.which", return_value=None),
+            patch("importlib.util.find_spec", return_value=object()),
             patch("subprocess.run") as mock_run,
         ):
             mock_run.return_value = MagicMock(returncode=0)
-            from initrunner.cli._helpers import install_extra
+            from initrunner.cli._helpers import install_extras
 
-            install_extra("anthropic")
+            install_extras(["anthropic"])
             cmd = mock_run.call_args[0][0]
             assert cmd[0] == sys.executable
             assert "-m" in cmd

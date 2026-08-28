@@ -342,7 +342,7 @@ def doctor(
 
 def _fix_providers(role_file: Path | None, yes: bool) -> list[str]:
     """Offer to install missing SDKs and set a targeted API key. Returns fix descriptions."""
-    from initrunner.cli._helpers import handle_api_key, install_extra
+    from initrunner.cli._helpers import handle_api_key, install_extras
     from initrunner.config import get_global_env_path
     from initrunner.services.doctor import derive_role_provider, diagnose_providers
 
@@ -354,7 +354,7 @@ def _fix_providers(role_file: Path | None, yes: bool) -> list[str]:
         if not d.fixable_sdk:
             continue
         if yes or typer.confirm(f"Install SDK for {d.provider}?", default=True):
-            if install_extra(d.extras_name):  # type: ignore[arg-type]
+            if install_extras([d.extras_name]):  # type: ignore[list-item]
                 fixed.append(f"Installed initrunner[{d.extras_name}]")
 
     # --- Targeted API key ---
@@ -568,7 +568,7 @@ def _check_flat_role_health(
 ) -> tuple[bool, list[str]]:
     """Health-check a flat agent file. Envelope deprecation patches do not apply."""
     from initrunner.agent.loader import load_role
-    from initrunner.cli._helpers import install_extra, resolve_skill_dirs
+    from initrunner.cli._helpers import install_extras, resolve_skill_dirs
     from initrunner.services.doctor import (
         diagnose_role_deep,
         diagnose_role_extras,
@@ -596,7 +596,7 @@ def _check_flat_role_health(
                 f"Install initrunner[{gap.extras_name}] (needed by {gap.feature})?",
                 default=True,
             ):
-                if install_extra(gap.extras_name):
+                if install_extras([gap.extras_name]):
                     fixed.append(f"Installed initrunner[{gap.extras_name}]")
     return False, fixed
 
@@ -605,7 +605,7 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
     """Apply role-level fixes: missing extras, deprecation patches, and spec_version bump."""
     import yaml
 
-    from initrunner.cli._helpers import install_extra
+    from initrunner.cli._helpers import install_extras
     from initrunner.services.doctor import (
         build_role_fix_plan,
         bump_spec_version_text,
@@ -620,7 +620,7 @@ def _fix_role(path: Path, raw: dict, yes: bool) -> list[str]:
         if yes or typer.confirm(
             f"Install initrunner[{gap.extras_name}] (needed by {gap.feature})?", default=True
         ):
-            if install_extra(gap.extras_name):
+            if install_extras([gap.extras_name]):
                 fixed.append(f"Installed initrunner[{gap.extras_name}]")
 
     # --- Fixable deprecations (surgical text edit, preserves formatting) ---

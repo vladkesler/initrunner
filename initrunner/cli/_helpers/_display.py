@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -11,6 +12,8 @@ from rich.markup import escape
 from initrunner.cli._helpers._console import console
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from initrunner.agent.schema.role import RoleDefinition
     from initrunner.services.role_selector import SelectionResult
 
@@ -68,39 +71,41 @@ def display_sense_result(result: SelectionResult) -> None:
     console.print(Panel(table, title="[bold]Intent Sensing[/bold]", border_style="dim"))
 
 
-def install_extra(extra: str) -> bool:
-    """Best-effort install of an initrunner extra. Returns True on success."""
-    import shutil
+def install_extras(extras: Iterable[str]) -> bool:
+    """Best-effort install of one or more initrunner extras.
+
+    Returns ``True`` when the installer ran and succeeded.  When this install
+    cannot be rebuilt safely without the user watching (a pipx venv, a checkout,
+    a container, Windows) nothing is run: the command to run by hand is printed
+    and this returns ``False``.
+    """
     import subprocess
-    import sys
 
-    pkg = f"initrunner[{extra}]"
-    pkg_display = escape(pkg)
+    from initrunner._install import install_command, manual_hint
 
-    exe = sys.executable.replace("\\", "/")
-    if "/uv/tools/" in exe and shutil.which("uv"):
-        cmd = ["uv", "tool", "install", "--force", pkg]
-    elif "/pipx/venvs/" in exe:
-        if shutil.which("pipx"):
-            cmd = ["pipx", "install", "--force", pkg]
-        else:
-            cmd = [sys.executable, "-m", "pip", "install", pkg]
-    elif shutil.which("uv"):
-        cmd = ["uv", "pip", "install", pkg]
-    else:
-        cmd = [sys.executable, "-m", "pip", "install", pkg]
+    wanted = sorted({e for e in extras if e})
+    pkg_display = escape(f"initrunner[{','.join(wanted)}]")
+    cmd = install_command(wanted)
+    if cmd is None:
+        console.print(
+            f"[yellow]Warning:[/yellow] Cannot install {pkg_display} automatically here.\n"
+            f"Install manually: [bold]{escape(manual_hint(wanted))}[/bold]"
+        )
+        return False
 
+    # Inherited stdio: lancedb and pymupdf can take minutes to build, and the
+    # installer's own progress is the only sign that anything is happening.
+    console.print(f"Installing {pkg_display}...")
     try:
-        with console.status(f"Installing {pkg_display}..."):
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-        console.print(f"[green]Installed {pkg_display}[/green]")
-        return True
+        subprocess.run(cmd, check=True)
     except (subprocess.CalledProcessError, OSError) as exc:
         console.print(
             f"[yellow]Warning:[/yellow] Could not install {pkg_display}: {escape(str(exc))}\n"
-            f"Install manually: [bold]{escape(' '.join(cmd))}[/bold]"
+            f"Install manually: [bold]{escape(shlex.join(cmd))}[/bold]"
         )
         return False
+    console.print(f"[green]Installed {pkg_display}[/green]")
+    return True
 
 
 def prompt_model_selection(

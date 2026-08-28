@@ -528,28 +528,16 @@ def check_requires(definition: ServiceDefinition) -> list[str]:
             missing.append(f"env:{var}")
     for extra in definition.spec.requires.extras:
         if not _extra_available(extra):
-            missing.append(f'extra:{extra} (pip install "initrunner[{extra}]")')
+            from initrunner._install import manual_hint
+
+            missing.append(f"extra:{extra} ({manual_hint([extra])})")
     return missing
 
 
 def _extra_available(extra: str) -> bool:
-    markers = {
-        "search": "ddgs",
-        "ingest": "pymupdf4llm",
-        "telegram": "telegram",
-        "discord": "discord",
-        "slack": "slack_sdk",
-        "audio": "youtube_transcript_api",
-        "dashboard": "fastapi",
-    }
-    mod = markers.get(extra)
-    if mod is None:
-        return True
-    try:
-        __import__(mod)
-        return True
-    except ImportError:
-        return False
+    from initrunner._compat import is_extra_installed
+
+    return is_extra_installed(extra)
 
 
 # ---------------------------------------------------------------------------

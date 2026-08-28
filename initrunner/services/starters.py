@@ -56,20 +56,20 @@ FEATURE_MAP: list[tuple[str, str]] = [
     ("triggers", "Triggers"),
 ]
 
-# Maps spec sections / tool types to the pip extra required.
-_EXTRA_MARKERS: dict[str, tuple[str, str]] = {
-    # key -> (extra name, marker module to try importing)
-    "ingest": ("ingest", "pymupdf4llm"),
-    "vector": ("vector", "lancedb"),
-    "memory": ("vector", "lancedb"),
-    "web_scraper": ("vector", "lancedb"),
-    "mcp": ("mcp", "fastmcp"),
-    "search": ("search", "ddgs"),
-    "web_reader": ("search", "ddgs"),
-    "telegram": ("telegram", "telegram"),
-    "discord": ("discord", "discord"),
-    "slack": ("slack", "slack_sdk"),
-    "audio": ("audio", "youtube_transcript_api"),
+# Maps spec sections / tool types to the pip extra required. Whether that extra
+# is installed is _compat's business; this only says which one a feature needs.
+# web_reader is deliberately absent: it runs on core httpx and beautifulsoup4.
+FEATURE_EXTRAS: dict[str, str] = {
+    "ingest": "ingest",
+    "vector": "vector",
+    "memory": "vector",
+    "web_scraper": "vector",
+    "mcp": "mcp",
+    "search": "search",
+    "telegram": "telegram",
+    "discord": "discord",
+    "slack": "slack",
+    "audio": "audio",
 }
 
 
@@ -228,8 +228,9 @@ def _detect_requires_extras(data: dict) -> list[str]:
             tool_types.add(trigger["type"])
 
     for tool_type in tool_types:
-        if tool_type in _EXTRA_MARKERS:
-            extras.add(_EXTRA_MARKERS[tool_type][0])
+        extra = FEATURE_EXTRAS.get(tool_type)
+        if extra is not None:
+            extras.add(extra)
 
     return sorted(extras)
 
@@ -389,15 +390,11 @@ def resolve_starter_path(name: str) -> Path | None:
 # ---------------------------------------------------------------------------
 
 
-def _is_extra_installed(extra: str) -> bool:
-    """Check if a pip extra's marker package is importable."""
-    from initrunner._compat import is_extra_available
+def missing_extras(entry: StarterEntry) -> list[str]:
+    """Extras this starter needs that are not installed here."""
+    from initrunner._compat import is_extra_installed
 
-    marker = _EXTRA_MARKERS.get(extra)
-    if marker is None:
-        return True
-    _, module_name = marker
-    return is_extra_available(module_name)
+    return [e for e in entry.requires_extras if not is_extra_installed(e)]
 
 
 def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
@@ -440,13 +437,6 @@ def check_prerequisites(entry: StarterEntry) -> tuple[list[str], list[str]]:
                     errors.append("  Or add it to ~/.initrunner/.env")
                 if setup.get("docs_url"):
                     errors.append(f"  Docs: {setup['docs_url']}")
-
-    # Missing extras
-    missing_extras = [e for e in entry.requires_extras if not _is_extra_installed(e)]
-    if missing_extras:
-        extras_str = ",".join(missing_extras)
-        errors.append(f'Missing dependencies: uv pip install "initrunner\\[{extras_str}]"')
-        errors.append(f"  Or: initrunner doctor --fix --role {entry.path}")
 
     content = starter_content(entry)
     if entry.requires_user_data and content.kind == "missing":

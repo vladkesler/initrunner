@@ -10,7 +10,23 @@ import importlib
 
 
 class MissingExtraError(RuntimeError):
-    """Raised when an optional dependency is not installed."""
+    """Raised when an optional dependency is not installed.
+
+    ``extra`` and ``pip_name`` carry what the message already says in prose, so
+    a caller can offer to install it instead of only printing the line.  They
+    default to ``None`` for the few sites that raise this with a hand-built
+    message.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        extra: str | None = None,
+        pip_name: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.extra = extra
+        self.pip_name = pip_name
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +49,25 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "fastembed": ("local-embeddings", "fastembed"),
     "fastmcp": ("mcp", "fastmcp"),
     "lancedb": ("vector", "lancedb"),
+    "pymupdf4llm": ("ingest", "pymupdf4llm"),
+    "fastapi": ("dashboard", "fastapi"),
+    "opentelemetry.sdk": ("observability", "opentelemetry-sdk"),
 }
+
+# extra -> the module whose presence stands for it.  Where an extra ships more
+# than one package, the marker is the one its ``require_*`` gate imports, so
+# "installed" here means the same thing it means at the point of use.
+_MARKER_OVERRIDES: dict[str, str] = {"observability": "opentelemetry.sdk"}
+
+
+def _build_marker_modules() -> dict[str, str]:
+    markers = dict(_MARKER_OVERRIDES)
+    for module, (extra, _pip_name) in _EXTRA_PACKAGES.items():
+        markers.setdefault(extra, module)
+    return markers
+
+
+_EXTRA_MARKER_MODULES: dict[str, str] = _build_marker_modules()
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +98,7 @@ def require_extra(
             msg = f"'{pip_name or module}' is required: uv pip install initrunner[{extra}]"
         else:
             msg = f"'{pip_name or module}' is required: uv pip install {pip_name or module}"
-        raise MissingExtraError(msg) from None
+        raise MissingExtraError(msg, extra=extra, pip_name=pip_name or module) from None
 
 
 def is_extra_available(module: str) -> bool:
@@ -76,18 +110,37 @@ def is_extra_available(module: str) -> bool:
     return True
 
 
+def is_extra_installed(extra: str) -> bool:
+    """Return ``True`` when *extra*'s marker module is importable.
+
+    Deliberately the same test the ``require_*`` gates use rather than a
+    metadata check: a partially installed extra whose feature works today keeps
+    reporting as installed.  Unknown extras are treated as present so a name
+    this map has not caught up with never blocks a run.
+    """
+    module = _EXTRA_MARKER_MODULES.get(extra)
+    if module is None:
+        return True
+    return is_extra_available(module)
+
+
 # ---------------------------------------------------------------------------
-# Provider checks (special-cased: openai/ollama/xai skip logic)
+# Provider checks (special-cased: openai/ollama skip logic)
 # ---------------------------------------------------------------------------
 
 _PROVIDER_PACKAGES: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
-    "google": "google.generativeai",
+    # pydantic-ai-slim[google] installs google-genai, not the retired
+    # google-generativeai package.
+    "google": "google.genai",
     "groq": "groq",
     "mistral": "mistralai",
     "cohere": "cohere",
     "bedrock": "boto3",
+    # xai reaches PydanticAI as a plain "xai:name" string, which builds
+    # XaiModel on top of the xai-sdk gRPC client rather than the openai SDK.
+    "xai": "xai_sdk",
 }
 
 _PROVIDER_EXTRAS: dict[str, str] = {
@@ -95,15 +148,16 @@ _PROVIDER_EXTRAS: dict[str, str] = {
     "google": "google",
     "groq": "groq",
     "mistral": "mistral",
-    "cohere": "all-models",
-    "bedrock": "all-models",
+    "cohere": "cohere",
+    "bedrock": "bedrock",
+    "xai": "xai",
 }
 
 
 def require_provider(provider: str) -> None:
     """Check that the SDK for *provider* is importable, or raise with install hint."""
-    if provider in ("openai", "ollama", "xai"):
-        return  # openai SDK always available with core install; ollama and xai use it
+    if provider in ("openai", "ollama"):
+        return  # openai SDK always available with core install; ollama uses it
     module = _PROVIDER_PACKAGES.get(provider)
     if module is None:
         raise RuntimeError(f"Unknown provider '{provider}'")
@@ -111,8 +165,10 @@ def require_provider(provider: str) -> None:
         importlib.import_module(module)
     except ImportError:
         extra = _PROVIDER_EXTRAS.get(provider, "all-models")
-        raise RuntimeError(
-            f"Provider '{provider}' requires: uv pip install initrunner[{extra}]"
+        raise MissingExtraError(
+            f"Provider '{provider}' requires: uv pip install initrunner[{extra}]",
+            extra=extra,
+            pip_name=module,
         ) from None
 
 

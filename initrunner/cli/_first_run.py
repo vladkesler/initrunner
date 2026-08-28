@@ -55,10 +55,13 @@ def prompt_job_menu(
 
 
 def list_menu_starters() -> list:
-    """First-hour starters that are Ready on this machine.
+    """First-hour starters that can run on this machine.
 
     Preference order from ``FIRST_HOUR_STARTERS``. Team entries are
-    included only in a git checkout (they launch with ``-p``).
+    included only in a git checkout (they launch with ``-p``). A starter whose
+    only gap is an uninstalled extra stays on the menu: picking it offers to
+    install what it needs, which is a better first hour than a short list with
+    no explanation.
     """
     from initrunner.services.starters import (
         FIRST_HOUR_STARTERS,
