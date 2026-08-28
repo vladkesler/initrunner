@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2026.8.11] - 2026-08-28
 
 ### Changed
 - **`initrunner run` went from 43 flags to 22, and the role YAML is now the one place a setting lives.** `_validate.py` was 313 lines whose only job was policing which flags could be combined with which; that code existed because the flags overlapped each other and the schema. Twenty-one flags are gone. Each had a YAML field, an environment variable, or another flag that already did the job:
