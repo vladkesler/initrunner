@@ -6,6 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from mcp.types import Tool
 from pydantic_ai.tools import ToolDefinition
 
 from initrunner.mcp._deferred import DeferredMcpToolset
@@ -24,16 +25,17 @@ def _make_tool_def(name: str = "read_file", desc: str = "Read a file") -> ToolDe
     )
 
 
-def _make_mcp_tool(name: str = "read_file", desc: str = "Read a file"):
-    """Mimics a tool returned by ``client.list_tools()``."""
-    tool = MagicMock()
-    tool.name = name
-    tool.description = desc
-    tool.inputSchema = {"type": "object", "properties": {"path": {"type": "string"}}}
-    tool.meta = None
-    tool.annotations = None
-    tool.outputSchema = None
-    return tool
+def _make_mcp_tool(name: str = "read_file", desc: str = "Read a file") -> Tool:
+    """A real MCP ``Tool`` as returned by ``client.list_tools()``.
+
+    A real model rather than a mock, so a renamed SDK field (mcp 2.0 turned
+    ``inputSchema`` into ``input_schema``) fails here instead of in production.
+    """
+    return Tool(
+        name=name,
+        description=desc,
+        input_schema={"type": "object", "properties": {"path": {"type": "string"}}},
+    )
 
 
 def _make_live_toolset(tools: list | None = None):

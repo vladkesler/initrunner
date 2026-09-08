@@ -125,11 +125,11 @@ class DeferredMcpToolset(AbstractToolset[Any]):
                 CachedTool(
                     name=t.name,
                     description=t.description or "",
-                    parameters_json_schema=t.inputSchema,
+                    parameters_json_schema=t.input_schema,
                     metadata={
                         "meta": t.meta,
                         "annotations": (t.annotations.model_dump() if t.annotations else None),
-                        "output_schema": t.outputSchema or None,
+                        "output_schema": t.output_schema or None,
                     },
                 )
                 for t in mcp_tools

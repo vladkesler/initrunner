@@ -138,7 +138,7 @@ def find_server(server_id: str, role_cache: RoleCache) -> McpServerEntry | None:
 
 
 # ---------------------------------------------------------------------------
-# Introspection (extends introspect.py with inputSchema)
+# Introspection (extends introspect.py with input_schema)
 # ---------------------------------------------------------------------------
 
 
@@ -163,7 +163,7 @@ def introspect_server_sync(
                 McpToolInfo(
                     name=t.name,
                     description=t.description or "",
-                    input_schema=t.inputSchema if hasattr(t, "inputSchema") else {},
+                    input_schema=t.input_schema,
                 )
                 for t in mcp_tools
             ]
