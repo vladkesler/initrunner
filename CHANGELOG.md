@@ -1,5 +1,7 @@
 # Changelog
 
+## [2026.9.1] - 2026-09-08
+
 ### Fixed
 - **`scrape_page` embedded every chunk in its own concurrent request.** The web scraper tool created one embedding coroutine per chunk and handed the whole set to `asyncio.gather()`, so the number of in-flight provider calls was the chunk count: a long page against a hosted embedding API became a burst of several hundred simultaneous requests, and rate-limit failures scaled with page size (#248). Each of those calls also built a fresh embedder, which for `embeddings.provider: local` meant constructing the fastembed model once per chunk. The tool now creates one embedder and sends the chunks through the provider's batch endpoint in sequential batches of 500, the same way `initrunner ingest` has always done it. A 512-chunk page is two requests, one after the other.
 - **`initrunner plan` on a Group broke member paths across lines.** It points at the member roles to plan instead, and Rich wrapped each path at the terminal width, splitting it mid-name, so a long path could not be copied from the output. The lines now soft-wrap and the terminal folds them visually.
