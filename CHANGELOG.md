@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
-
 ### Fixed
 - **`scrape_page` embedded every chunk in its own concurrent request.** The web scraper tool created one embedding coroutine per chunk and handed the whole set to `asyncio.gather()`, so the number of in-flight provider calls was the chunk count: a long page against a hosted embedding API became a burst of several hundred simultaneous requests, and rate-limit failures scaled with page size (#248). Each of those calls also built a fresh embedder, which for `embeddings.provider: local` meant constructing the fastembed model once per chunk. The tool now creates one embedder and sends the chunks through the provider's batch endpoint in sequential batches of 500, the same way `initrunner ingest` has always done it. A 512-chunk page is two requests, one after the other.
+- **`initrunner plan` on a Group broke member paths across lines.** It points at the member roles to plan instead, and Rich wrapped each path at the terminal width, splitting it mid-name, so a long path could not be copied from the output. The lines now soft-wrap and the terminal folds them visually.
+
+### Changed
+- **fastmcp 3.4.7 to 4.0.3, and the `mcp` extra now requires fastmcp 4.** Dependabot proposed widening the range to `<5` (#250); the lockfile moved with it rather than leaving `pip install initrunner[mcp]` on a different major from the one the suite runs against. fastmcp 4 brings mcp 2.0, which renamed `Tool.inputSchema` and `Tool.outputSchema` to `input_schema` and `output_schema`, and two places read the old names: the deferred MCP toolset raised `AttributeError` the first time it connected to a live server, and hub introspection fell back to an empty schema for every tool without failing. Both read the new names now, and the test fixture for a listed tool is a real `mcp.types.Tool` rather than a mock that answered to any attribute. The floor is 4 because the code speaks one naming scheme and fastmcp 3 pulls in mcp 1.x with the old one. Transitively: `mcp` 1.28.1 to 2.2.0, `mcp-types` 2.2.0 added, `uncalled-for` 0.2.0 to 0.4.0, `httpx-sse` dropped.
+
+### Security
+- **Bumped `fflate` to 0.4.9 in the dashboard (GHSA-px8p-9vwx-vf98, medium).** `unzipSync` could enter an infinite loop on a malformed ZIP64 archive. It arrives transitively through `posthog-js`, whose `^0.4.8` range already permitted the patched release, so a targeted lockfile update was enough and no `pnpm.overrides` pin was needed.
+
+### Dependencies
+- **Bumped dashboard frontend dependencies:** `svelte` to 5.57.0 (#249); `js-yaml` to 5.4.1 (#251); `@xyflow/svelte` to 1.6.6 (#252); `posthog-js` to 1.428.4 (Dependabot #253 asked for 1.426.2; the `^1.426.2` range resolved 1.428.4). `svelte` and `js-yaml` are build-time; `@xyflow/svelte` (flow editor) and `posthog-js` (opt-in telemetry) ship in the compiled dashboard.
 
 ## [2026.8.12] - 2026-08-28
 
