@@ -61,7 +61,8 @@ def plan(
                 raise typer.Exit(1) from None
             console.print("Plan one of its agents:")
             for ref in group.members.values():
-                console.print(f"  [bold]initrunner plan {ref.path}[/bold]")
+                # soft_wrap keeps a long path on one line, so it can be copied intact
+                console.print(f"  [bold]initrunner plan {ref.path}[/bold]", soft_wrap=True)
         raise typer.Exit(1)
 
     try:

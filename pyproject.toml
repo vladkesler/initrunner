@@ -50,7 +50,7 @@ dependencies = [
 # command that needs one of these offers to install it.
 # MCP client + server stack. Not in the core install: importing pydantic_ai
 # eagerly imports its MCP capability, which imports fastmcp, for ~26% of RSS.
-mcp = ["pydantic-ai-slim[mcp]>=2.32.1", "fastmcp>=3.3,<4"]
+mcp = ["pydantic-ai-slim[mcp]>=2.32.1", "fastmcp>=4,<5"]
 # Vector store behind ingestion, vector memory and the web_scraper tool.
 vector = ["lancedb>=0.29.2"]
 ingest = ["initrunner[vector]", "pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
