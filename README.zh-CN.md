@@ -381,4 +381,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.8.12</sub></p>
+<p align="center"><sub>v2026.9.1</sub></p>
