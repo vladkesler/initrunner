@@ -1,5 +1,6 @@
-"""Tests for the embeddings module: api_key_env and compute_model_identity."""
+"""Tests for the embeddings module: api_key_env, compute_model_identity, batching."""
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +9,7 @@ from initrunner.ingestion.embeddings import (
     _PROVIDER_EMBEDDING_KEY_DEFAULTS,
     _default_embedding_key_env,
     compute_model_identity,
+    embed_texts_batched,
 )
 
 
@@ -317,3 +319,34 @@ class TestGetReranker:
 
         reranker = get_reranker("cross_encoder")
         assert isinstance(reranker, CrossEncoderReranker)
+
+
+class TestEmbedTextsBatched:
+    """embed_texts_batched issues sequential provider calls of at most batch_size."""
+
+    def _run(self, texts, **kwargs):
+        calls: list[int] = []
+
+        async def fake_embed(_embedder, batch, **_kw):
+            calls.append(len(batch))
+            return [[float(t)] for t in batch]
+
+        with patch("initrunner.ingestion.embeddings.embed_texts", new=fake_embed):
+            vectors = asyncio.run(embed_texts_batched(MagicMock(), texts, **kwargs))
+        return calls, vectors
+
+    def test_empty_input_makes_no_calls(self):
+        calls, vectors = self._run([])
+        assert calls == []
+        assert vectors == []
+
+    def test_default_batch_size_splits_at_500(self):
+        texts = [str(i) for i in range(1200)]
+        calls, vectors = self._run(texts)
+        assert calls == [500, 500, 200]
+        assert vectors == [[float(i)] for i in range(1200)]
+
+    def test_batch_size_one_is_one_call_per_text(self):
+        calls, vectors = self._run(["0", "1", "2"], batch_size=1)
+        assert calls == [1, 1, 1]
+        assert vectors == [[0.0], [1.0], [2.0]]

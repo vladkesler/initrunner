@@ -35,6 +35,8 @@ _PROVIDER_EMBEDDING_KEY_DEFAULTS: dict[str, str] = {
     "google": "GOOGLE_API_KEY",
 }
 
+EMBED_BATCH_SIZE = 500
+
 
 def _default_embedding_key_env(provider: str) -> str:
     """Return the default environment variable name for embedding API keys."""
@@ -294,19 +296,23 @@ async def embed_texts(
     return [list(v) for v in result.embeddings]
 
 
-async def embed_single_async(
-    provider: str,
-    model: str,
-    text: str,
+async def embed_texts_batched(
+    embedder: Embedder,
+    texts: list[str],
     *,
-    base_url: str = "",
-    api_key_env: str = "",
-    input_type: Literal["query", "document"] = "query",
-) -> list[float]:
-    """Async variant of ``embed_single`` — directly awaits ``embed_texts``."""
-    embedder = create_embedder(provider, model, base_url=base_url, api_key_env=api_key_env)
-    vectors = await embed_texts(embedder, [text], input_type=input_type)
-    return vectors[0]
+    input_type: Literal["query", "document"] = "document",
+    batch_size: int = EMBED_BATCH_SIZE,
+) -> list[list[float]]:
+    """Embed *texts* in sequential batches of at most *batch_size*.
+
+    One provider request per batch, issued one after another, so the number of
+    in-flight calls never depends on how many texts there are.
+    """
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start : start + batch_size]
+        vectors.extend(await embed_texts(embedder, batch, input_type=input_type))
+    return vectors
 
 
 def get_reranker(reranker_type: str = "rrf", model: str = ""):
