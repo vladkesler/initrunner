@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 from datetime import UTC, datetime
 
@@ -108,23 +107,17 @@ def build_web_scraper_toolset(
             return result
         chunk_texts, markdown = result
 
-        from initrunner.ingestion.embeddings import embed_single_async
+        from initrunner.ingestion.embeddings import create_embedder, embed_texts_batched
 
-        embeddings = await asyncio.gather(
-            *(
-                embed_single_async(
-                    store_config.embed_provider,
-                    store_config.embed_model,
-                    ct,
-                    base_url=store_config.embed_base_url,
-                    api_key_env=store_config.embed_api_key_env,
-                    input_type="document",
-                )
-                for ct in chunk_texts
-            )
+        embedder = create_embedder(
+            store_config.embed_provider,
+            store_config.embed_model,
+            base_url=store_config.embed_base_url,
+            api_key_env=store_config.embed_api_key_env,
         )
+        embeddings = await embed_texts_batched(embedder, chunk_texts, input_type="document")
 
-        stored = _store_chunks(store_config, url, chunk_texts, list(embeddings))
+        stored = _store_chunks(store_config, url, chunk_texts, embeddings)
         return f"{stored} ({len(markdown):,} chars)"
 
     return toolset

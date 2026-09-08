@@ -1,12 +1,18 @@
 """Tests for the web_scraper tool."""
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.agent.schema.tools import WebScraperToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.agent.tools.web_scraper import build_web_scraper_toolset
+from initrunner.ingestion.chunker import Chunk
+
+
+async def _fake_embed(_embedder, texts, **_kwargs):
+    """Return deterministic 4-dim vectors, one per text."""
+    return [[1.0, 0.0, 0.0, 0.0]] * len(texts)
 
 
 def _get_tool_func(toolset, name: str):
@@ -73,10 +79,8 @@ class TestWebScraperToolset:
                 "initrunner._html.fetch_url_as_markdown_async",
                 AsyncMock(return_value="Good content"),
             ),
-            patch(
-                "initrunner.ingestion.embeddings.embed_single_async",
-                AsyncMock(return_value=[1.0, 0.0, 0.0, 0.0]),
-            ),
+            patch("initrunner.ingestion.embeddings.create_embedder", return_value=MagicMock()),
+            patch("initrunner.ingestion.embeddings.embed_texts", new=_fake_embed),
         ):
             result = asyncio.run(func(url="https://good.com/page"))
 
@@ -94,10 +98,8 @@ class TestWebScraperToolset:
                 "initrunner._html.fetch_url_as_markdown_async",
                 AsyncMock(return_value="Test content for web scraper tool that is long enough"),
             ),
-            patch(
-                "initrunner.ingestion.embeddings.embed_single_async",
-                AsyncMock(return_value=[1.0, 0.0, 0.0, 0.0]),
-            ),
+            patch("initrunner.ingestion.embeddings.create_embedder", return_value=MagicMock()),
+            patch("initrunner.ingestion.embeddings.embed_texts", new=_fake_embed),
         ):
             ts = build_web_scraper_toolset(config, ctx)
             func = _get_tool_func(ts, "scrape_page")
@@ -106,6 +108,46 @@ class TestWebScraperToolset:
         assert "Stored" in result
         assert "chunk" in result
         assert "example.com" in result
+
+    def test_scrape_embeds_in_sequential_batches(self):
+        """Regression for #248: one embedder, batched requests, never one call per chunk."""
+        url = "https://example.com/big-page"
+        chunks = [Chunk(text=f"chunk-{i}", source=url, index=i) for i in range(1200)]
+        batch_sizes: list[int] = []
+        active = 0
+        max_active = 0
+        stored: dict = {}
+
+        async def tracking_embed(_embedder, texts, **_kwargs):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            batch_sizes.append(len(texts))
+            await asyncio.sleep(0)
+            active -= 1
+            return [[float(t.split("-")[1]), 0.0, 0.0, 0.0] for t in texts]
+
+        def capture_store(_store_config, _url, chunk_texts, embeddings):
+            stored["embeddings"] = embeddings
+            return f"Stored {len(chunk_texts)} chunks from {url}"
+
+        create_embedder = MagicMock(return_value=MagicMock())
+        with (
+            patch("initrunner._html.fetch_url_as_markdown_async", AsyncMock(return_value="page")),
+            patch("initrunner.agent.tools.web_scraper.chunk_text", return_value=chunks),
+            patch("initrunner.ingestion.embeddings.create_embedder", create_embedder),
+            patch("initrunner.ingestion.embeddings.embed_texts", new=tracking_embed),
+            patch("initrunner.agent.tools.web_scraper._store_chunks", capture_store),
+        ):
+            ts = build_web_scraper_toolset(WebScraperToolConfig(), _make_ctx())
+            func = _get_tool_func(ts, "scrape_page")
+            result = asyncio.run(func(url=url))
+
+        assert "Stored 1200 chunks" in result
+        assert create_embedder.call_count == 1
+        assert batch_sizes == [500, 500, 200]
+        assert max_active == 1
+        assert [v[0] for v in stored["embeddings"]] == [float(i) for i in range(1200)]
 
     def test_fetch_error_returns_message(self):
         config = WebScraperToolConfig()

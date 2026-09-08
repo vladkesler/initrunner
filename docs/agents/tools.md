@@ -859,7 +859,7 @@ tools:
 
 ### Registered Functions
 
-- **`scrape_page(url: str) -> str`** — Fetch the URL, convert HTML to markdown, chunk the text, embed each chunk, and store the results in the document store. Returns a confirmation with chunk count and content size. Stored content becomes searchable via the `search_documents` tool.
+- **`scrape_page(url: str) -> str`** — Fetch the URL, convert HTML to markdown, chunk the text, embed the chunks, and store the results in the document store. Embedding uses one embedder and the provider's batch endpoint, 500 chunks per request and one request at a time, so a large page is a handful of calls rather than one per chunk. Returns a confirmation with chunk count and content size. Stored content becomes searchable via the `search_documents` tool.
 
 ### Security
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **`scrape_page` embedded every chunk in its own concurrent request.** The web scraper tool created one embedding coroutine per chunk and handed the whole set to `asyncio.gather()`, so the number of in-flight provider calls was the chunk count: a long page against a hosted embedding API became a burst of several hundred simultaneous requests, and rate-limit failures scaled with page size (#248). Each of those calls also built a fresh embedder, which for `embeddings.provider: local` meant constructing the fastembed model once per chunk. The tool now creates one embedder and sends the chunks through the provider's batch endpoint in sequential batches of 500, the same way `initrunner ingest` has always done it. A 512-chunk page is two requests, one after the other.
+
 ## [2026.8.12] - 2026-08-28
 
 ### Fixed
