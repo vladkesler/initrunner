@@ -6,10 +6,11 @@ import secrets
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 
 class CronTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["cron"] = "cron"
     schedule: str
     prompt: str
@@ -21,6 +22,7 @@ class CronTriggerConfig(BaseModel):
 
 
 class FileWatchTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["file_watch"] = "file_watch"
     paths: list[str]
     extensions: list[str] = []
@@ -34,6 +36,7 @@ class FileWatchTriggerConfig(BaseModel):
 
 
 class WebhookTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["webhook"] = "webhook"
     path: str = "/webhook"
     port: int = 8080
@@ -62,6 +65,7 @@ class WebhookTriggerConfig(BaseModel):
 
 
 class TelegramTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["telegram"] = "telegram"
     token_env: str = "TELEGRAM_BOT_TOKEN"
     allowed_users: list[str] = []
@@ -80,6 +84,7 @@ class TelegramTriggerConfig(BaseModel):
 
 
 class DiscordTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["discord"] = "discord"
     token_env: str = "DISCORD_BOT_TOKEN"
     channel_ids: list[str] = []
@@ -101,6 +106,7 @@ class DiscordTriggerConfig(BaseModel):
 
 
 class SlackTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["slack"] = "slack"
     app_token_env: str = "SLACK_APP_TOKEN"
     bot_token_env: str = "SLACK_BOT_TOKEN"
@@ -121,6 +127,7 @@ class SlackTriggerConfig(BaseModel):
 
 
 class HeartbeatTriggerConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["heartbeat"] = "heartbeat"
     file: str
     interval_seconds: int = Field(default=3600, gt=0)

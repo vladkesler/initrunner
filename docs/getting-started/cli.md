@@ -284,13 +284,15 @@ get a stack trace, and no API requests are sent.
 $ initrunner run role.yaml -p "hello"
 ╭─────────────────── Invalid agent.yaml -- role.yaml ───────────────────────╮
 │                                                                            │
-│  1 error                                                                   │
+│  2 errors                                                                  │
 │                                                                            │
-│  [ERROR] document                                                          │
-│    1 validation error for AgentDocument                                    │
-│  model.provider                                                            │
-│    Input should be a valid string [type=string_type, input_value=123,      │
-│  input_type=int]                                                           │
+│  [ERROR] tools.1.allowd_commands                                           │
+│    Extra inputs are not permitted                                          │
+│    Fix: unknown field; check for typos against the schema                  │
+│                                                                            │
+│  [ERROR] memory.retenion_days                                              │
+│    Extra inputs are not permitted                                          │
+│    Fix: unknown field; check for typos against the schema                  │
 │                                                                            │
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -298,10 +300,12 @@ $ initrunner run role.yaml -p "hello"
 The panel shows one row per issue with:
 
 - **Severity label** (`[ERROR]`, `[WARN]`, `[INFO]`).
-- **Field path** -- dotted path into the YAML (e.g. `name`, `tools`). Schema
-  errors report `document` and carry the exact path (`model.provider`) in the
-  message body. For YAML syntax errors, the path also includes 1-based line and
-  column (e.g. `yaml (line 14, col 3)`).
+- **Field path** -- dotted path into the YAML (e.g. `model.provider`,
+  `tools.1.allowd_commands`, where `1` is the tool's position in the list).
+  Every error in the file is listed, not just the first. Issues from a role
+  that a flow or group references carry that member's prefix
+  (`agents.worker.memory.retenion_days`). For YAML syntax errors, the path
+  also includes 1-based line and column (e.g. `yaml (line 14, col 3)`).
 - **Message** -- the underlying Pydantic or YAML parser message.
 - **Fix hint** -- a short suggestion derived from Pydantic's error type
   (`string_type`, `missing`, `union_tag_invalid`, etc.) or from the

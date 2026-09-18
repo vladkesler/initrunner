@@ -213,8 +213,7 @@ class TestADirectoryGroupReportsAMissingExtra:
 
         monkeypatch.setitem(sys.modules, "lancedb", None)
         (desk / "notes.yaml").write_text(
-            "name: notes\ndescription: d\nprompt: p\nmodel: openai:gpt-5-mini\n"
-            "memory:\n  enabled: true\n"
+            "name: notes\ndescription: d\nprompt: p\nmodel: openai:gpt-5-mini\nmemory: {}\n"
         )
 
         result = runner.invoke(app, ["run", str(desk), "--serve", "--no-audit"])

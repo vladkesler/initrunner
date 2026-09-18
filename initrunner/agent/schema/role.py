@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic_core import InitErrorDetails
 
 from initrunner.agent.schema.autonomy import AutonomyConfig
 from initrunner.agent.schema.base import (
@@ -30,7 +31,10 @@ from initrunner.agent.schema.triggers import TriggerConfig
 def parse_tool_list(v: Any) -> list:
     """Parse a list of tool config dicts into typed ToolConfig instances.
 
-    Shared by AgentSpec and SkillFrontmatter validators.
+    Shared by the agent, team and skill validators. Every invalid entry is
+    reported, each at its list index: raised from a field validator, the
+    ``ValidationError`` keeps those locations, so the user sees
+    ``tools.1.allowed_commands`` rather than one flattened message.
     """
     if not isinstance(v, list):
         return v
@@ -40,24 +44,46 @@ def parse_tool_list(v: Any) -> list:
 
     builtin_types = get_tool_types()
     result = []
-    for item in v:
+    line_errors: list[InitErrorDetails] = []
+    for index, item in enumerate(cast(list[Any], v)):
         if not isinstance(item, dict):
             result.append(item)
             continue
         tool_type = item.get("type")
-        if tool_type in builtin_types:
-            try:
+        try:
+            if tool_type in builtin_types:
                 result.append(builtin_types[tool_type].model_validate(item))
-            except ValidationError as exc:
-                raise ValueError(f"Invalid config for tool '{tool_type}': {exc}") from exc
-        else:
-            config = {k: val for k, val in item.items() if k != "type"}
-            result.append(PluginToolConfig(type=tool_type, config=config))
+            else:
+                config = {k: val for k, val in item.items() if k != "type"}
+                result.append(
+                    PluginToolConfig.model_validate({"type": tool_type, "config": config})
+                )
+        except ValidationError as exc:
+            line_errors.extend(_errors_at(index, exc))
+    if line_errors:
+        raise ValidationError.from_exception_data("tools", line_errors)
     return result
+
+
+def _errors_at(index: int, exc: ValidationError) -> list[InitErrorDetails]:
+    """Re-root one tool's validation errors under its position in the list."""
+    details: list[InitErrorDetails] = []
+    for err in exc.errors():
+        detail: InitErrorDetails = {
+            "type": err["type"],
+            "loc": (index, *err["loc"]),
+            "input": err["input"],
+        }
+        if "ctx" in err:
+            detail["ctx"] = err["ctx"]
+        details.append(detail)
+    return details
 
 
 class AutoSkillsConfig(BaseModel):
     """Configuration for auto-discovered skills (agentskills.io progressive disclosure)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = True
     max_skills: int = Field(default=50, ge=1, le=200)
@@ -65,6 +91,8 @@ class AutoSkillsConfig(BaseModel):
 
 class ToolSearchConfig(BaseModel):
     """Configuration for the tool search meta-tool."""
+
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
     always_available: list[str] = Field(default_factory=list)
@@ -74,6 +102,8 @@ class ToolSearchConfig(BaseModel):
 
 class DaemonConfig(BaseModel):
     """Configuration for daemon mode behaviour."""
+
+    model_config = ConfigDict(extra="forbid")
 
     hot_reload: bool = True
     reload_debounce_seconds: float = Field(default=1.0, ge=0.0, le=30.0)

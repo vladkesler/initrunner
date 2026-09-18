@@ -300,6 +300,101 @@ class TestValidateYamlFile:
         assert errors[0].field == "file"
 
 
+_FLAT_TWO_TYPOS_YAML = textwrap.dedent("""\
+    name: typos
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+    memory:
+      retenion_days: 30
+    tools:
+      - think
+      - shell:
+          allowd_commands: [ls]
+""")
+
+
+_FLAT_VALID_ROLE_YAML = textwrap.dedent("""\
+    name: fine
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+""")
+
+
+_FLAT_MEMBER_TYPO_YAML = textwrap.dedent("""\
+    name: member
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+    memory:
+      retenion_days: 30
+""")
+
+
+class TestFlatDocumentFieldPaths:
+    """Flat files report one issue per field, not one ``document`` blob."""
+
+    def test_each_typo_is_its_own_issue_with_a_fix(self, tmp_path):
+        f = tmp_path / "agent.yaml"
+        f.write_text(_FLAT_TWO_TYPOS_YAML)
+        defn, kind, issues = validate_yaml_file(f)
+        assert defn is None
+        assert kind == "Agent"
+        errors = {i.field: i for i in issues if i.severity == "error"}
+        assert set(errors) == {"memory.retenion_days", "tools.1.allowd_commands"}
+        assert all(i.suggestion for i in errors.values())
+
+    def test_flow_member_issues_keep_their_prefix(self, tmp_path):
+        (tmp_path / "worker.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        flow = tmp_path / "flow.yaml"
+        flow.write_text(
+            textwrap.dedent("""\
+                name: pipe
+                model: openai:gpt-5-mini
+                agents:
+                  worker:
+                    use: worker.yaml
+                    then: {to: sink}
+                  sink:
+                    prompt: Collect the results.
+            """)
+        )
+        _defn, kind, issues = validate_yaml_file(flow)
+        assert kind == "Flow"
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert "agents.worker.memory.retenion_days" in fields
+
+    def test_group_member_issues_keep_their_prefix(self, tmp_path):
+        (tmp_path / "a.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        (tmp_path / "b.yaml").write_text(_FLAT_VALID_ROLE_YAML)
+        group = tmp_path / "group.yaml"
+        group.write_text("name: desk\nagents:\n  a:\n    use: a.yaml\n  b:\n    use: b.yaml\n")
+        _defn, kind, issues = validate_yaml_file(group)
+        assert kind == "Group"
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.a.memory.retenion_days"]
+
+    def test_referenced_role_error_is_not_reported_as_the_parents(self, tmp_path):
+        """A broken ``use:`` target loads inside the adapter; its paths are that file's."""
+        (tmp_path / "bad.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        team = tmp_path / "team.yaml"
+        team.write_text(
+            textwrap.dedent("""\
+                name: crew
+                model: openai:gpt-5-mini
+                run: sequential
+                agents:
+                  a:
+                    use: bad.yaml
+                    prompt: Override the prompt.
+                  b: Review the work.
+            """)
+        )
+        defn, _kind, issues = validate_yaml_file(team)
+        assert defn is None
+        [error] = [i for i in issues if i.severity == "error"]
+        assert error.field == "document"
+        assert "bad.yaml" in error.message
+
+
 # ---------------------------------------------------------------------------
 # preflight_validate_or_exit: run-path policy
 # ---------------------------------------------------------------------------

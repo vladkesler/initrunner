@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from initrunner.agent.schema.ingestion import EmbeddingConfig
 from initrunner.agent.schema.triggers import TriggerConfig
@@ -24,6 +24,8 @@ class EnsembleConfig(BaseModel):
     - ``judge``: an LLM judge (``eval/judge.py``) scores each answer against
       ``judge_criteria`` and the highest-scoring answer wins.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     mode: Literal["majority", "weighted", "judge"] = "majority"
     judge_model: str = "openai:gpt-4o-mini"
@@ -63,6 +65,8 @@ class LoopBackConfig(BaseModel):
       ``==`` -- exit when the first number parsed from the output satisfies the
       comparison (e.g. ``">0.8"`` for a self-reported confidence score).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["loop-back"] = "loop-back"
     target: str
@@ -163,6 +167,7 @@ class RestartPolicy(BaseModel):
 
 
 class SharedMemoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     store_path: str | None = None
     store_backend: StoreBackend = StoreBackend.LANCEDB
@@ -199,6 +204,8 @@ class DurabilityConfig(BaseModel):
     journaling, so single-shot and REPL runs are unaffected. ``journal`` is
     the self-contained, audit-native durable ledger.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
     backend: Literal["none", "journal"] = "none"

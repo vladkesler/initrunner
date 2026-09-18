@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from initrunner.agent.schema.tools._base import ToolConfigBase
 
@@ -44,6 +44,7 @@ class McpToolConfig(ToolConfigBase):
 
 
 class ApiParameter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str  # must be valid Python identifier
     type: Literal["string", "integer", "number", "boolean"]  # JSON Schema types
     required: bool = False
@@ -59,6 +60,7 @@ class ApiParameter(BaseModel):
 
 
 class ApiEndpoint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str  # becomes the tool function name
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "GET"
     path: str  # supports {param} placeholders
@@ -97,6 +99,7 @@ class CustomToolConfig(ToolConfigBase):
 
 
 class DelegateAgentRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     role_file: str | None = None
     url: str | None = None
@@ -106,6 +109,8 @@ class DelegateAgentRef(BaseModel):
 
 class DelegateSharedMemory(BaseModel):
     """Shared memory config for delegate sub-agents."""
+
+    model_config = ConfigDict(extra="forbid")
 
     store_path: str
     max_memories: int = 1000
@@ -134,6 +139,7 @@ class DelegateToolConfig(ToolConfigBase):
 
 
 class SpawnAgentRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     role_file: str | None = None
     url: str | None = None

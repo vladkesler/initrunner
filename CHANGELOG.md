@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Unknown keys in an agent file are now errors, at every depth.** Only the top level of a flat document, a tool's own keys in a flat document, composed `agents:` children, and the `security` and `observability` sections rejected keys they didn't define; everywhere else a misspelled setting validated clean and was dropped, so `memory: {max_sesions: 3}` ran with the default of 10 and nothing said why. Every model an agent file can reach now uses `extra="forbid"`: model, tools (including `permissions`, script parameters and API endpoints), triggers, sinks, ingest, memory, autonomy, reasoning, guardrails, execution, and the team and flow settings. Envelope files get the same check on those sections, and so do tool entries in a skill's frontmatter. Free-form mappings stay open (plugin tool options, MCP `headers` and `env`, `model.extra_headers` and `extra_body`, `output.schema`, `deps_schema`), and a skill's own top-level frontmatter keys are still ignored for agentskills.io compatibility. **A file that loaded before can fail now**; the key it names was never doing anything, so fix the spelling or delete it. The three `memory import` tests that had kept this change out since 2026.8.5 were using `memory: {enabled: true}`, a key `MemoryConfig` never had.
+
+### Fixed
+- **`validate` and the run pre-flight reported a flat file's schema errors as one `document` blob.** Since the flat migration, any Pydantic failure collapsed into a single issue with the real path buried in the message. Each error is its own row again, with its path and fix hint, and every error in the file is listed rather than the first. Tool errors were flattened even earlier, into one "Invalid config for tool" message per list: they now point at the entry and the field (`tools.1.allowd_commands`), and every bad tool is reported, in flat files, envelopes, teams, skills and the dashboard builder alike. An error from a role that a team references by `use:` still arrives as one issue naming that file, because its field paths belong to the file, not the one being validated.
+
 ## [2026.9.1] - 2026-09-08
 
 ### Fixed

@@ -10,15 +10,17 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConcurrencyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     max_running: Annotated[int, Field(ge=1)]
     max_queued: Annotated[int, Field(ge=0)] | None = None
 
 
 class ExecutionConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     retries: Annotated[int, Field(ge=0, le=10)] = 1
     output_retries: Annotated[int, Field(ge=0, le=10)] | None = None
     end_strategy: Literal["early", "graceful", "exhaustive"] = "graceful"

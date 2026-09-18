@@ -295,6 +295,26 @@ def test_validate_invalid_yaml(builder_client):
     assert data["issues"][0]["severity"] == "error"
 
 
+def test_validate_reports_nested_typos_by_path(builder_client):
+    yaml_text = """\
+name: typos
+prompt: You are a careful assistant.
+model: openai:gpt-5-mini
+memory:
+  retenion_days: 30
+tools:
+  - think
+  - shell:
+      allowd_commands: [ls]
+"""
+    resp = builder_client.post("/api/builder/validate", json={"yaml_text": yaml_text})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is False
+    fields = {i["field"] for i in data["issues"] if i["severity"] == "error"}
+    assert fields == {"memory.retenion_days", "tools.1.allowd_commands"}
+
+
 def test_validate_missing_fields(builder_client):
     resp = builder_client.post(
         "/api/builder/validate",

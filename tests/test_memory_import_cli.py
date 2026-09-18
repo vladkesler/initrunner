@@ -21,8 +21,7 @@ _ROLE_YAML = textwrap.dedent("""\
       model:
         provider: openai
         name: gpt-5-mini
-      memory:
-        enabled: true
+      memory: {}
 """)
 
 _ROLE_NO_MEMORY_YAML = textwrap.dedent("""\

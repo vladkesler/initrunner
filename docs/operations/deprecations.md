@@ -35,6 +35,37 @@ When you save or generate a role through InitRunner (builder, templates, `initru
 
 All current rules are error-severity with automatic migration. Run `initrunner doctor --fix PATH --yes` to rewrite envelopes and auto-patch deprecated fields. Use `--yes` to skip prompts.
 
+## Unknown keys are errors
+
+Every section of an agent file rejects keys it doesn't define, at any depth.
+A misspelled setting used to validate clean and then do nothing, which is the
+worst way for a config to fail: `memory: {max_sesions: 3}` looked fine and
+the agent kept the default of 10. Now it stops the run:
+
+```
+[ERROR] memory.max_sesions
+  Extra inputs are not permitted
+  Fix: unknown field; check for typos against the schema
+```
+
+This covers the flat document and everything nested in it: model, tools
+(including `permissions`, script parameters and API endpoints), triggers,
+sinks, ingest, memory, autonomy, reasoning, guardrails, execution, and the
+team and flow settings (`then`, `debate`, `ensemble`, `shared_memory`,
+`shared_documents`, `durability`). Envelope files get the same check on those
+nested sections. Tool entries in a skill's `SKILL.md` frontmatter are checked
+too; the frontmatter's own top-level keys are still ignored, because
+agentskills.io files written for other tools carry fields InitRunner doesn't
+use.
+
+Places that are free-form by design stay open: a plugin tool's options,
+`headers` and `env` on MCP tools, `model.extra_headers` and
+`model.extra_body`, `output.schema`, and `deps_schema`.
+
+If a file that used to load now fails, the key it names was never doing
+anything. Fix the spelling or delete the line. Nothing removes unknown keys
+for you, and there is no switch to turn the check off.
+
 ## Checking Your Role
 
 Three commands surface schema and deprecation problems, each tuned to a different workflow:
@@ -45,10 +76,10 @@ Three commands surface schema and deprecation problems, each tuned to a differen
 | `initrunner validate <PATH>` | Same as the run pre-flight, plus warnings and info-level recommendations. On a clean role, also shows the configuration table | Auditing a role you just edited |
 | `initrunner doctor --role <PATH>` | Deprecation rules table, spec version drift, and (with `--fix`) automatic migration | Upgrading roles between InitRunner releases |
 
-Schema errors from the run pre-flight and `validate` show per-field paths
-(e.g. `spec.model.provider`) thanks to the shared `unwrap_pydantic_error`
-helper that follows Pydantic's `ValidationError` through the deprecation
-wrapper. Deprecation rule failures (DEP001..DEP005) appear with `field:
+Schema errors from the run pre-flight and `validate` show one issue per
+field, with its path: `model.provider` in a flat file, `spec.model.provider`
+in an envelope (where the shared `unwrap_pydantic_error` helper follows
+Pydantic's `ValidationError` through the deprecation wrapper). Deprecation rule failures (DEP001..DEP005) appear with `field:
 deprecation`.
 
 Run `doctor --role` for the deprecation table view:

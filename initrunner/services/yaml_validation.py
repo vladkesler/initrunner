@@ -18,7 +18,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from initrunner.services._yaml_validation import ValidationIssue
+from initrunner.services._yaml_validation import ValidationIssue, extract_pydantic_errors
 
 
 class InvalidComposeKindError(Exception):
@@ -117,14 +117,19 @@ def _validate_flat_document(
     text: str, path: Path, kind: str
 ) -> tuple[Any | None, list[ValidationIssue]]:
     import yaml
+    from pydantic import ValidationError
 
-    from initrunner.agent.schema.adapt import AdaptError, adapt_mapping
-    from initrunner.agent.schema.normalize import NormalizeError
+    from initrunner.agent.schema.adapt import adapt_mapping
 
     try:
         data = yaml.safe_load(text)
         _legacy, defn, _ir = adapt_mapping(data, base_dir=path.parent, source_path=path.resolve())
-    except (AdaptError, NormalizeError, Exception) as exc:
+    except ValidationError as exc:
+        # Raised directly, the error is this document's own: one issue per
+        # field. A referenced role's failure arrives wrapped in RoleLoadError
+        # instead, and its paths belong to that file, so it stays whole below.
+        return None, extract_pydantic_errors(exc)
+    except Exception as exc:
         return (
             None,
             [
