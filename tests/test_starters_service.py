@@ -399,6 +399,17 @@ _EXTRA_CASES = [
         {"shared_documents": {"enabled": True, "embeddings": {"provider": "local", "model": "m"}}},
         [("local-embeddings", "shared_documents.embeddings"), ("vector", "shared_documents")],
     ),
+    (
+        "shared-documents-pdf",
+        {
+            "shared_documents": {
+                "enabled": True,
+                "sources": ["./handbook/*.md", "./contracts/**/*.pdf"],
+                "embeddings": {"provider": "openai", "model": "text-embedding-3-small"},
+            }
+        },
+        [("ingest", "shared_documents"), ("vector", "shared_documents")],
+    ),
     ("shared-memory-enabled", {"shared_memory": {"enabled": True}}, [("vector", "shared_memory")]),
     ("shared-memory-disabled", {"shared_memory": {"enabled": False}}, []),
     (
@@ -467,3 +478,15 @@ class TestDetectExtraRequirements:
 
     def test_inline_child_search_is_seen(self):
         assert "search" in get_starter("scholar").requires_extras
+
+    @pytest.mark.parametrize("slug", ["scholar", "writer"])
+    def test_shared_memory_starters_need_vector(self, slug):
+        assert "vector" in get_starter(slug).requires_extras
+
+    def test_child_trigger_token_is_a_required_env(self):
+        from initrunner.services.starters import _detect_requires_env
+
+        data = _as_flat(
+            {"prompt": None, "agents": {"bot": {"prompt": "p", "triggers": [{"type": "telegram"}]}}}
+        )
+        assert _detect_requires_env("", data) == ["TELEGRAM_BOT_TOKEN"]

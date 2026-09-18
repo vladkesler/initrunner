@@ -171,8 +171,10 @@ def _detect_requires_env(raw_yaml: str, data: dict) -> list[str]:
         "telegram": "TELEGRAM_BOT_TOKEN",
         "discord": "DISCORD_BOT_TOKEN",
     }
-    # Trigger *_token_env fields (token_env, app_token_env, bot_token_env)
-    for trigger in document_body(data).get("triggers") or []:
+    # Trigger *_token_env fields (token_env, app_token_env, bot_token_env), on
+    # the document and on each inline child, the same places the extras come from.
+    triggers = [t for m in _members(document_body(data)) for t in m.get("triggers") or []]
+    for trigger in triggers:
         if isinstance(trigger, str):
             if trigger in _default_token_env:
                 env_vars.add(_default_token_env[trigger])
@@ -223,9 +225,8 @@ def detect_extra_requirements(data: dict) -> list[ExtraRequirement]:
     body = document_body(data)
     found: list[ExtraRequirement] = []
 
-    ingest = _section(body, "ingest")
     stores = [
-        ("ingest", ingest),
+        ("ingest", _section(body, "ingest")),
         ("memory", _section(body, "memory")),
         ("shared_memory", _enabled_section(body, "shared_memory")),
         ("shared_documents", _enabled_section(body, "shared_documents")),
@@ -237,13 +238,14 @@ def detect_extra_requirements(data: dict) -> list[ExtraRequirement]:
         embeddings = section.get("embeddings")
         if isinstance(embeddings, dict) and embeddings.get("provider") == "local":
             found.append(ExtraRequirement("local-embeddings", f"{name}.embeddings"))
-    # Markdown, text and HTML sources are read by core; only these parsers
-    # come from the ingest extra.
-    if ingest is not None and any(
-        isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES
-        for source in ingest.get("sources") or []
-    ):
-        found.append(ExtraRequirement("ingest", "ingest"))
+        # ingest and shared_documents read their sources through the same
+        # extractors. Markdown, text and HTML are core; these parsers come
+        # from the ingest extra.
+        if any(
+            isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES
+            for source in section.get("sources") or []
+        ):
+            found.append(ExtraRequirement("ingest", name))
     if _section(body, "observability") is not None:
         found.append(ExtraRequirement("observability", "observability"))
 

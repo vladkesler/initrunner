@@ -309,7 +309,7 @@ installs on first run, so the two always agree.
 |---|---|
 | An `ingest:` or `memory:` block, even `memory: {}` | `vector` |
 | `shared_memory` or `shared_documents` with `enabled: true` | `vector` |
-| Ingest sources ending in `.pdf`, `.docx` or `.xlsx`, or the `pdf_extract` tool | `ingest` |
+| `.pdf`, `.docx` or `.xlsx` sources under `ingest` or an enabled `shared_documents`, or the `pdf_extract` tool | `ingest` |
 | `embeddings.provider: local` under `ingest`, `memory` or `shared_documents` | `local-embeddings` |
 | An `observability:` block | `observability` |
 | The `mcp` tool, or `capabilities: [MCP]` | `mcp` |
