@@ -571,6 +571,17 @@ class TestCliIntegration:
         assert result.exit_code == 0
         assert "Valid" in result.output
 
+    def test_validate_command_team_without_a_model(self, tmp_path):
+        """The model is auto-detected at run time; the summary must not assume one."""
+        f = tmp_path / "team.yaml"
+        f.write_text(
+            "name: crew\nrun: parallel\nagents:\n  architect: Review the design.\n"
+            "  tester: Review the tests.\n"
+        )
+        result = runner.invoke(app, ["validate", str(f)])
+        assert result.exit_code == 0, result.output
+        assert "auto-detect at runtime" in result.output
+
     def test_validate_command_warning_only_renders_panel_and_succeeds(self, tmp_path):
         f = tmp_path / "role.yaml"
         f.write_text(_SHORT_PROMPT_ROLE_YAML)

@@ -421,7 +421,9 @@ def _validate_team(team_file: Path) -> None:
     table.add_row("Name", team.metadata.name)
     table.add_row("Description", team.metadata.description or "(none)")
     table.add_row("Tags", ", ".join(team.metadata.tags) if team.metadata.tags else "(none)")
-    table.add_row("Model", team.spec.model.to_model_string())
+    # A team without a model picks one at run time, like a solo agent.
+    model = team.spec.model if team.spec.model and team.spec.model.name else None
+    table.add_row("Model", model.to_model_string() if model else "(auto-detect at runtime)")
     table.add_row("Agents", str(len(team.spec.personas)))
     agent_parts = []
     for pname, pcfg in team.spec.personas.items():
@@ -472,13 +474,16 @@ def _validate_team(team_file: Path) -> None:
         table.add_row("Team Timeout", f"{team.spec.guardrails.team_timeout_seconds}s")
     table.add_row("Handoff Max Chars", str(team.spec.handoff_max_chars))
 
-    try:
-        from initrunner._compat import require_provider
+    if model:
+        try:
+            from initrunner._compat import require_provider
 
-        require_provider(team.spec.model.provider)
-        table.add_row("Provider Status", "[green]available[/green]")
-    except RuntimeError as e:
-        table.add_row("Provider Status", f"[yellow]{e}[/yellow]")
+            require_provider(model.provider)
+            table.add_row("Provider Status", "[green]available[/green]")
+        except RuntimeError as e:
+            table.add_row("Provider Status", f"[yellow]{e}[/yellow]")
+    else:
+        table.add_row("Provider Status", "[dim]auto-detect at runtime[/dim]")
 
     console.print(table)
     console.print("[green]Valid[/green]")
