@@ -52,9 +52,10 @@ This covers the flat document and everything nested in it: model, tools
 (including `permissions`, script parameters and API endpoints), triggers,
 sinks, ingest, memory, autonomy, reasoning, guardrails, execution, and the
 team and flow settings (`then`, `debate`, `ensemble`, `shared_memory`,
-`shared_documents`, `durability`). Envelope files get the same check on those
-nested sections. Tool entries in a skill's `SKILL.md` frontmatter are checked
-too; the frontmatter's own top-level keys are still ignored, because
+`shared_documents`, `durability`). Envelope files are checked at every level
+too, from `metadata` and `spec` down to team personas and flow agents. Tool
+entries in a skill's `SKILL.md` frontmatter are checked
+too, and so is its `requires` block; the frontmatter's own top-level keys are still ignored, because
 agentskills.io files written for other tools carry fields InitRunner doesn't
 use.
 

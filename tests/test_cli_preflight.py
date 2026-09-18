@@ -372,8 +372,8 @@ class TestFlatDocumentFieldPaths:
         fields = [i.field for i in issues if i.severity == "error"]
         assert fields == ["agents.a.memory.retenion_days"]
 
-    def test_referenced_role_error_is_not_reported_as_the_parents(self, tmp_path):
-        """A broken ``use:`` target loads inside the adapter; its paths are that file's."""
+    def test_referenced_role_errors_carry_the_member_prefix(self, tmp_path):
+        """A ``use:`` target with overrides is loaded while composing; check it first."""
         (tmp_path / "bad.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
         team = tmp_path / "team.yaml"
         team.write_text(
@@ -390,9 +390,60 @@ class TestFlatDocumentFieldPaths:
         )
         defn, _kind, issues = validate_yaml_file(team)
         assert defn is None
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.a.memory.retenion_days"]
+
+    def test_flow_member_with_overrides_keeps_its_prefix(self, tmp_path):
+        (tmp_path / "worker.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        flow = tmp_path / "flow.yaml"
+        flow.write_text(
+            textwrap.dedent("""\
+                name: pipe
+                model: openai:gpt-5-mini
+                agents:
+                  worker:
+                    use: worker.yaml
+                    prompt: Override the prompt.
+                    then: {to: sink}
+                  sink:
+                    prompt: Collect the results.
+            """)
+        )
+        _defn, _kind, issues = validate_yaml_file(flow)
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.worker.memory.retenion_days"]
+
+    def test_document_rule_is_reported_as_document(self, tmp_path):
+        """Model-level rules have no field path; they must not render as a blank row."""
+        f = tmp_path / "agent.yaml"
+        f.write_text("name: noprompt\nmodel: openai:gpt-5-mini\n")
+        defn, _kind, issues = validate_yaml_file(f)
+        assert defn is None
         [error] = [i for i in issues if i.severity == "error"]
         assert error.field == "document"
-        assert "bad.yaml" in error.message
+        assert "require 'prompt'" in error.message
+
+    def test_a_file_that_references_itself_is_an_error_not_a_crash(self, tmp_path):
+        group = tmp_path / "group.yaml"
+        group.write_text(
+            "name: desk\nagents:\n  a:\n    use: group.yaml\n  b:\n    use: group.yaml\n"
+        )
+        defn, _kind, issues = validate_yaml_file(group)
+        assert defn is None
+        fields = {i.field for i in issues if i.severity == "error"}
+        assert fields == {"agents.a.use", "agents.b.use"}
+
+    def test_a_member_that_is_not_an_agent_is_an_error(self, tmp_path):
+        (tmp_path / "b.yaml").write_text(_FLAT_VALID_ROLE_YAML)
+        (tmp_path / "inner.yaml").write_text(
+            "name: inner\nagents:\n  x:\n    use: b.yaml\n  y:\n    use: b.yaml\n"
+        )
+        group = tmp_path / "group.yaml"
+        group.write_text("name: desk\nagents:\n  a:\n    use: inner.yaml\n  b:\n    use: b.yaml\n")
+        _defn, _kind, issues = validate_yaml_file(group)
+        errors = [i for i in issues if i.severity == "error"]
+        assert [i.field for i in errors] == ["agents.a.use"]
+        assert "inner.yaml is a Group" in errors[0].message
 
 
 # ---------------------------------------------------------------------------

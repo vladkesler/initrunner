@@ -44,6 +44,7 @@ class BundleConfig(BaseModel):
 
 
 class Metadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")]
     description: str = ""
     tags: list[str] = []

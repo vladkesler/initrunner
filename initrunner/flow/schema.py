@@ -114,6 +114,7 @@ def _parse_until_condition(
 
 
 class DelegateSinkConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["delegate"] = "delegate"
     target: str | list[str]
     strategy: Literal["all", "keyword", "sense", "ensemble"] = "all"
@@ -155,12 +156,14 @@ class DelegateSinkConfig(BaseModel):
 
 
 class HealthCheckConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     interval_seconds: int = 30
     timeout_seconds: int = 10
     retries: int = 3
 
 
 class RestartPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     condition: Literal["none", "on-failure", "always"] = "none"
     max_retries: int = 3
     delay_seconds: int = 5
@@ -175,6 +178,7 @@ class SharedMemoryConfig(BaseModel):
 
 
 class SharedDocumentsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     store_path: str | None = None
     store_backend: StoreBackend = StoreBackend.LANCEDB
@@ -227,6 +231,7 @@ class DurabilityConfig(BaseModel):
 
 
 class FlowAgentConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     role: str = ""
     inline_role: object | None = None  # RoleDefinition; set by the v3 adapter only
     trigger: TriggerConfig | None = None
@@ -244,6 +249,7 @@ class FlowAgentConfig(BaseModel):
 
 
 class FlowSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     agents: dict[str, FlowAgentConfig] = Field(min_length=1)
     shared_memory: SharedMemoryConfig = SharedMemoryConfig()
     shared_documents: SharedDocumentsConfig = SharedDocumentsConfig()
@@ -350,11 +356,13 @@ class FlowSpec(BaseModel):
 
 
 class FlowMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     description: str = ""
 
 
 class FlowDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     apiVersion: str
     kind: Literal["Flow"]
     metadata: FlowMetadata

@@ -16,14 +16,17 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from initrunner.agent.schema.normalize import normalize_mapping
-from initrunner.agent.schema.role import SkillFrontmatter
+from initrunner.agent.schema.role import RequiresConfig, RoleDefinition, SkillFrontmatter
 from initrunner.agent.schema.tools import PluginToolConfig
 from initrunner.agent.schema.v3 import AgentDocument
 from initrunner.agent.tools._registry import get_tool_types
+from initrunner.flow.schema import FlowDefinition
+from initrunner.team.schema import TeamDefinition
 
 
 def _reachable_models() -> set[type[BaseModel]]:
-    """Models an agent file can configure: the document tree plus every tool."""
+    """Models an agent file can configure: flat and envelope trees, every tool,
+    and a skill's ``requires`` block."""
     seen: set[type[BaseModel]] = set()
 
     def walk(annotation: Any) -> None:
@@ -39,7 +42,8 @@ def _reachable_models() -> set[type[BaseModel]]:
         for field in annotation.model_fields.values():
             walk(field.annotation)
 
-    walk(AgentDocument)
+    for root in (AgentDocument, RoleDefinition, TeamDefinition, FlowDefinition, RequiresConfig):
+        walk(root)
     for config_class in get_tool_types().values():
         walk(config_class)
     return seen
@@ -52,7 +56,7 @@ def test_every_reachable_model_forbids_extra_keys() -> None:
         for m in models
         if m.model_config.get("extra") != "forbid"
     )
-    assert len(models) > 90  # the walk really covered the tree
+    assert len(models) > 110  # the walk really covered both trees
     assert open_models == []
 
 
@@ -125,6 +129,48 @@ def test_composition_typo_fails_at_its_path() -> None:
         }
     )
     assert ("agents.a.then.ensemble.quorum", "extra_forbidden") in errors
+
+
+@pytest.mark.parametrize(
+    ("document", "model", "loc"),
+    [
+        (
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Agent",
+                "metadata": {"name": "env"},
+                "spec": {"role": "You help.", "memroy": {}},
+            },
+            RoleDefinition,
+            ("spec", "memroy"),
+        ),
+        (
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Team",
+                "metadata": {"name": "crew"},
+                "spec": {"personas": {"a": {"role": "p", "tols": []}, "b": "q"}},
+            },
+            TeamDefinition,
+            ("spec", "personas", "a", "tols"),
+        ),
+        (
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "Flow",
+                "metadata": {"name": "pipe", "tags": ["x"]},
+                "spec": {"agents": {"a": {"role": "a.yaml"}}},
+            },
+            FlowDefinition,
+            ("metadata", "tags"),
+        ),
+    ],
+    ids=["role-spec", "team-persona", "flow-metadata"],
+)
+def test_envelope_typo_fails_at_its_path(document, model, loc) -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        model.model_validate(document)
+    assert (loc, "extra_forbidden") in [(e["loc"], e["type"]) for e in excinfo.value.errors()]
 
 
 def test_every_bad_tool_is_reported() -> None:

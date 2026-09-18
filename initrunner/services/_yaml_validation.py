@@ -84,14 +84,16 @@ def extract_pydantic_errors(exc: Exception) -> list[ValidationIssue]:
 
     Falls back to a generic issue if *exc* is not a ``ValidationError``.
     Populates ``suggestion`` from ``err["type"]`` for known Pydantic error
-    types -- this is a stable API, not message string matching.
+    types -- this is a stable API, not message string matching. A rule on the
+    whole document (a model validator, such as a solo agent with no
+    ``prompt``) has an empty location and is reported as ``document``.
     """
     from pydantic import ValidationError
 
     if isinstance(exc, ValidationError):
         return [
             ValidationIssue(
-                field=".".join(str(loc) for loc in err["loc"]),
+                field=".".join(str(loc) for loc in err["loc"]) or "document",
                 message=err["msg"],
                 severity="error",
                 suggestion=_PYDANTIC_TYPE_SUGGESTIONS.get(err.get("type", "")),

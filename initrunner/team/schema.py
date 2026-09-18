@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 class PersonaConfig(BaseModel):
     """Extended persona definition with optional overrides."""
 
+    model_config = ConfigDict(extra="forbid")
+
     role: str
     model: PartialModelConfig | None = None
     tools: list[ToolConfig] = []
@@ -58,6 +60,8 @@ class TeamDocumentsConfig(BaseModel):
 
 class TeamGuardrails(BaseModel):
     """Per-persona guardrails plus cumulative team-level budgets."""
+
+    model_config = ConfigDict(extra="forbid")
 
     # Per-persona (passed to each execute_run via Guardrails)
     max_tokens_per_run: Annotated[int, Field(gt=0)] = 50000
@@ -104,6 +108,7 @@ class TeamEnsembleConfig(BaseModel):
 
 
 class TeamSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     model: PartialModelConfig | None = None
     personas: dict[str, PersonaConfig] = Field(min_length=2)
     tools: list[ToolConfig] = []
@@ -172,6 +177,7 @@ class TeamSpec(BaseModel):
 
 
 class TeamDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     apiVersion: ApiVersion
     kind: Literal["Team"]
     metadata: Metadata

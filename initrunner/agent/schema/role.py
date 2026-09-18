@@ -110,6 +110,7 @@ class DaemonConfig(BaseModel):
 
 
 class AgentSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     role: str
     model: PartialModelConfig | None = None
     output: OutputConfig = OutputConfig()
@@ -178,6 +179,8 @@ class AgentSpec(BaseModel):
 class RequiresConfig(BaseModel):
     """External dependencies a skill needs (validated at load time)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     env: list[str] = []
     bins: list[str] = []
 
@@ -217,6 +220,7 @@ class SkillDefinition(BaseModel):
 
 
 class RoleDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     apiVersion: ApiVersion
     kind: Kind
     metadata: RoleMetadata

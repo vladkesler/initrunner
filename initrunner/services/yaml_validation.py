@@ -68,10 +68,17 @@ def validate_yaml_file(
 ) -> tuple[Any | None, str, list[ValidationIssue]]:
     """Detect kind, validate, return ``(definition, kind, issues)``.
 
-    For Flow files, recurses into each referenced role file and prefixes
-    nested issue field paths with ``agents.<name>.`` so the user can tell
-    which referenced file is broken.
+    Every agent file a document references (``use:`` in a flat file, ``role:``
+    in an envelope flow) is validated too, and its issues come back with an
+    ``agents.<name>.`` prefix so the user can tell which file is broken.
     """
+    return _validate_file(path, frozenset())
+
+
+def _validate_file(
+    path: Path, visiting: frozenset[Path]
+) -> tuple[Any | None, str, list[ValidationIssue]]:
+    """``validate_yaml_file`` with the chain of files that led here, to stop cycles."""
     kind = detect_yaml_kind(path)
 
     try:
@@ -91,8 +98,9 @@ def validate_yaml_file(
 
     from initrunner.agent.schema.document import DocumentClass, classify_yaml_text
 
+    visiting = visiting | {path.resolve()}
     if classify_yaml_text(text).document_class is DocumentClass.FLAT_AGENT:
-        defn, issues = _validate_flat_document(text, path, kind)
+        defn, issues = _validate_flat_document(text, path, visiting)
         return defn, kind, issues
 
     if kind == "Team":
@@ -104,7 +112,10 @@ def validate_yaml_file(
 
         defn, issues = _validate_flow_text(text)
         if defn is not None:
-            issues.extend(_flow_role_issues(defn, path.parent))
+            references = {
+                name: cfg.role for name, cfg in defn.spec.agents.items() if cfg.inline_role is None
+            }
+            issues.extend(_reference_issues(references, path.parent, visiting))
     else:
         from initrunner.services.agent_builder import _validate_yaml as _validate_role_text
 
@@ -114,87 +125,89 @@ def validate_yaml_file(
 
 
 def _validate_flat_document(
-    text: str, path: Path, kind: str
+    text: str, path: Path, visiting: frozenset[Path]
 ) -> tuple[Any | None, list[ValidationIssue]]:
+    """Check the document, then each file it references, then compose them.
+
+    The composing step (``adapt_mapping``) loads referenced files and stops at
+    the first bad one with a single message, so the document's own schema and
+    every ``use:`` file are checked first: each problem gets its own issue,
+    with a path into the file it is in.
+    """
     import yaml
     from pydantic import ValidationError
 
     from initrunner.agent.schema.adapt import adapt_mapping
+    from initrunner.agent.schema.normalize import normalize_mapping
+
+    data = yaml.safe_load(text)
+    issues: list[ValidationIssue] = []
+    try:
+        normalize_mapping(data)
+    except ValidationError as exc:
+        issues.extend(extract_pydantic_errors(exc))
+    except Exception as exc:
+        issues.append(ValidationIssue(field="document", message=str(exc), severity="error"))
+
+    agents = data.get("agents")
+    if isinstance(agents, dict):
+        references = {
+            name: child["use"]
+            for name, child in agents.items()
+            if isinstance(child, dict) and isinstance(child.get("use"), str)
+        }
+        issues.extend(_reference_issues(references, path.parent, visiting))
+
+    if any(issue.severity == "error" for issue in issues):
+        return None, issues
 
     try:
-        data = yaml.safe_load(text)
         _legacy, defn, _ir = adapt_mapping(data, base_dir=path.parent, source_path=path.resolve())
-    except ValidationError as exc:
-        # Raised directly, the error is this document's own: one issue per
-        # field. A referenced role's failure arrives wrapped in RoleLoadError
-        # instead, and its paths belong to that file, so it stays whole below.
-        return None, extract_pydantic_errors(exc)
     except Exception as exc:
-        return (
-            None,
-            [
-                ValidationIssue(
-                    field="document",
-                    message=str(exc),
-                    severity="error",
-                )
-            ],
-        )
-    issues: list[ValidationIssue] = []
-    if defn is not None:
-        if kind == "Flow":
-            issues.extend(_flow_role_issues(defn, path.parent))
-        elif kind == "Group":
-            issues.extend(_group_member_issues(defn))
+        issues.append(ValidationIssue(field="document", message=str(exc), severity="error"))
+        return None, issues
     return defn, issues
 
 
-def _group_member_issues(defn: Any) -> list[ValidationIssue]:
-    """Validate every role a group references, prefixing each member's issues."""
+def _reference_issues(
+    references: dict[str, str], base_dir: Path, visiting: frozenset[Path]
+) -> list[ValidationIssue]:
+    """Validate each referenced agent file, prefixing its issues with ``agents.<name>.``."""
     issues: list[ValidationIssue] = []
-    for name, ref in defn.members.items():
-        if not ref.path.exists():
+    for name, use in references.items():
+        field = f"agents.{name}.use"
+        ref = (base_dir / use).resolve()
+        if ref in visiting:
             issues.append(
                 ValidationIssue(
-                    field=f"agents.{name}.use",
-                    message=f"Role file not found: {ref.path}",
+                    field=field,
+                    message=f"{use} leads back to a file that references it",
                     severity="error",
-                    suggestion="check the path is relative to the group file directory",
+                    suggestion="point this at an agent file, not at the file that uses it",
                 )
             )
             continue
-        _, member_kind, sub_issues = validate_yaml_file(ref.path)
+        if not ref.exists():
+            issues.append(
+                ValidationIssue(
+                    field=field,
+                    message=f"Role file not found: {ref}",
+                    severity="error",
+                    suggestion="check the path is relative to this file's directory",
+                )
+            )
+            continue
+        _, member_kind, sub_issues = _validate_file(ref, visiting)
         if member_kind != "Agent":
             issues.append(
                 ValidationIssue(
-                    field=f"agents.{name}.use",
-                    message=f"{ref.use} is a {member_kind}, and a group's members are agents",
+                    field=field,
+                    message=f"{use} is a {member_kind}, not a single agent",
                     severity="error",
-                    suggestion="point this member at a single agent file",
+                    suggestion="point this at a single agent file",
                 )
             )
         issues.extend(_prefix_issues(sub_issues, f"agents.{name}."))
-    return issues
-
-
-def _flow_role_issues(defn: Any, base_dir: Path) -> list[ValidationIssue]:
-    issues: list[ValidationIssue] = []
-    for agent_name, cfg in defn.spec.agents.items():
-        if cfg.inline_role is not None:
-            continue
-        role_path = base_dir / cfg.role
-        if not role_path.exists():
-            issues.append(
-                ValidationIssue(
-                    field=f"agents.{agent_name}.use",
-                    message=f"Role file not found: {role_path}",
-                    severity="error",
-                    suggestion="check the path is relative to the flow file directory",
-                )
-            )
-            continue
-        _, _, sub_issues = validate_yaml_file(role_path)
-        issues.extend(_prefix_issues(sub_issues, f"agents.{agent_name}."))
     return issues
 
 
