@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: unit-runner
 description: Runs unit tests on modules identified by the change detector and reports
   results

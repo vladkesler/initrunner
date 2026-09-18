@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: kube-advisor
 description: |
   Tell it what's broken in your cluster and it runs kubectl to diagnose the issue, identifies the root cause, and gives you exact commands to fix it. Handles CrashLoopBackOff, OOMKilled, pending pods, service connectivity, DNS, storage, stuck rollouts, and more.

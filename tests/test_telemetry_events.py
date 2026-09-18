@@ -58,6 +58,19 @@ def test_unknown_command_maps_to_other():
     assert _events.normalize_command(None) == "other"
 
 
+def test_every_registered_command_is_known():
+    """A new command must be added to the allowlist, or it reports as "other"."""
+    import typer.main
+    from typer.core import TyperGroup
+
+    from initrunner.cli.main import app
+
+    group = typer.main.get_command(app)
+    assert isinstance(group, TyperGroup)
+    registered = set(group.commands)
+    assert registered - _events._KNOWN_COMMANDS == set()
+
+
 def test_error_kind_allowlist():
     assert _events.normalize_error_kind("FileNotFoundError") == "FileNotFoundError"
     assert _events.normalize_error_kind("SomeThirdPartyLibError") == "OtherError"

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: full-tools-assistant
 description: General-purpose assistant with all zero-config tools enabled
 spec_version: 3

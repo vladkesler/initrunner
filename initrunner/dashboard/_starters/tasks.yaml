@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: tasks
 description: Autonomous planner that breaks tasks into structured todo lists with
   self-critique

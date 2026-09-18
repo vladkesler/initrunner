@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: changelog-slack
 description: Generates a changelog formatted in Slack mrkdwn, ready to paste into
   a channel

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: docker-sandbox-hardened
 description: Code execution agent with a hardened Docker runtime (gVisor by default).
   See docs/security/sandbox-comparison.md.

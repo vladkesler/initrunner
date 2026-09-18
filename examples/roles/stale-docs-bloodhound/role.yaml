@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: stale-docs-bloodhound
 description: |
   Watches source code for changes, searches documentation for stale references using ripgrep and RAG, and files GitHub issues when documentation is confidently out of date.

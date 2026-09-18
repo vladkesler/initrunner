@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: postman
 description: |
   Autonomous email assistant that monitors your inbox, triages messages, drafts replies, and alerts Slack on urgent mail. Learns your contacts, communication style, and priorities over time.

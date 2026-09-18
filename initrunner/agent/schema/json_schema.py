@@ -18,6 +18,7 @@ import json
 import re
 from typing import Any
 
+from pydantic import create_model
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic_core import core_schema
 
@@ -59,12 +60,14 @@ class _AgentSchemaGenerator(GenerateJsonSchema):
             {"allOf": [refs[name]], "properties": {"type": {"const": name}}, "required": ["type"]}
             for name in names
         ]
+        # In {name: {...}} the key supplies 'type', so the body must not need it.
+        bodies = {name: self._single_key_body(name, tool_types[name], refs[name]) for name in names}
         single_key = {
             "type": "object",
             "minProperties": 1,
             "maxProperties": 1,
             "not": {"required": ["type"]},
-            "properties": {name: {"anyOf": [refs[name], {"type": "null"}]} for name in names},
+            "properties": {name: {"anyOf": [bodies[name], {"type": "null"}]} for name in names},
             "additionalProperties": {"type": ["object", "null"]},
         }
         plugin = {
@@ -81,6 +84,20 @@ class _AgentSchemaGenerator(GenerateJsonSchema):
             ),
             "anyOf": [{"type": "string"}, *typed, single_key, plugin],
         }
+
+    def _single_key_body(
+        self, name: str, config_class: type[ToolConfigBase], ref: JsonSchemaValue
+    ) -> JsonSchemaValue:
+        """The ``{name: body}`` value: the tool's own schema, with ``type`` from the key.
+
+        Most tools default ``type`` to their name, so their schema already
+        fits. The ``plugin`` tool's ``type`` is any string and required, so it
+        gets a copy of its model where the key's name is the default.
+        """
+        if not config_class.model_fields["type"].is_required():
+            return ref
+        body = create_model(f"{config_class.__name__}Body", __base__=config_class, type=(str, name))
+        return self.generate_inner(body.__pydantic_core_schema__)
 
 
 def build_agent_schema() -> dict[str, Any]:

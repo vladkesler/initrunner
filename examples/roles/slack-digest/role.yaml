@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: slack-digest
 description: |
   An autonomous daily briefing agent that curates relevant news and posts a digest to your Slack channel. Learns what matters to your team and avoids repeating stories.

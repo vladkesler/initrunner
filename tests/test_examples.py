@@ -173,3 +173,21 @@ def test_policy_yaml_validates(policy_dir: Path) -> None:
 
     policy_set = load_policies(str(policy_dir))
     assert policy_set is not None
+
+
+def test_examples_catalog_is_current():
+    """``initrunner examples`` ships this file; regenerate after editing examples/.
+
+    python scripts/build_examples_catalog.py
+    """
+    import importlib.util
+    import json
+
+    script = Path(__file__).resolve().parent.parent / "scripts" / "build_examples_catalog.py"
+    spec = importlib.util.spec_from_file_location("build_examples_catalog", script)
+    assert spec is not None and spec.loader is not None
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+
+    committed = builder.OUTPUT_FILE.read_text(encoding="utf-8")
+    assert committed == json.dumps(builder.build_catalog(), indent=2, ensure_ascii=False) + "\n"

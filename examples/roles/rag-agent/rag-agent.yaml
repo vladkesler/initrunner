@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: rag-agent
 description: Knowledge base Q&A agent with document ingestion
 spec_version: 3

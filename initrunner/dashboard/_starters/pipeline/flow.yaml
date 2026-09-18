@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: pipeline
 description: |
   CI event processing pipeline. A webhook receiver accepts CI webhooks, a build analyzer diagnoses failures, and a notifier sends Slack alerts and updates GitHub commit status.

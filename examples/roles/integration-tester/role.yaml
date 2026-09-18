@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: integration-tester
 description: |
   Runs integration test suites, diagnoses failures by checking service health, database connectivity, and environment configuration. Learns flaky test patterns and environment quirks across runs via memory.

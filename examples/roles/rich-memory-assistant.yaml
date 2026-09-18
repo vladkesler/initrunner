@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: rich-memory-assistant
 description: Assistant with episodic, semantic, and procedural memory plus consolidation
 spec_version: 3

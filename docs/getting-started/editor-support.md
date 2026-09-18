@@ -26,7 +26,9 @@ prompt: You are a helpful assistant.
 ```
 
 That comment is the whole setup for any editor that runs the YAML language
-server. For older files, paste the same line at the top.
+server. The bundled examples and starters carry it too, so a copy from
+`initrunner examples copy` works the same way. For older files, paste the same
+line at the top.
 
 ## VS Code
 

@@ -7,6 +7,9 @@ it, and the typos the runtime rejects are rejected here too.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +21,7 @@ from jsonschema.protocols import Validator
 from initrunner import __version__
 from initrunner.agent.schema.document import DocumentClass, classify_mapping
 from initrunner.agent.schema.json_schema import (
+    SCHEMA_DIRECTIVE,
     SCHEMA_URL,
     build_agent_schema,
     render_agent_schema,
@@ -54,6 +58,29 @@ def test_schema_does_not_change_between_releases() -> None:
     assert __version__ not in render_agent_schema()
 
 
+def test_schema_does_not_depend_on_hash_order() -> None:
+    """A default built from a set iterates in hash order, which differs per process.
+
+    Seeds 1 and 2 order a two-item frozenset differently, which is how
+    ``security.tools.env_allowlist`` once made this file flip between runs.
+    """
+    script = (
+        "import sys; from initrunner.agent.schema.json_schema import render_agent_schema; "
+        "sys.stdout.write(render_agent_schema())"
+    )
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", script],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for seed in ("1", "2")
+    }
+    assert len(outputs) == 1
+
+
 def test_schema_is_valid_draft_2020_12() -> None:
     schema = build_agent_schema()
     jsonschema.Draft202012Validator.check_schema(schema)
@@ -78,6 +105,12 @@ def test_every_shipped_agent_file_validates(validator, path: Path) -> None:
     assert errors == []
 
 
+@pytest.mark.parametrize("path", _shipped_flat_agents(), ids=lambda p: p.name)
+def test_every_shipped_agent_file_points_at_the_schema(path: Path) -> None:
+    """Examples and starters get copied into projects; the copy should light up in editors."""
+    assert path.read_text(encoding="utf-8").splitlines()[0] == SCHEMA_DIRECTIVE
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -89,6 +122,7 @@ def test_every_shipped_agent_file_validates(validator, path: Path) -> None:
         {"tools": [{"type": "filesystem", "root_path": "."}]},
         {"tools": ["my_plugin", {"my_plugin": {"x": 1}}, {"type": "my_plugin", "y": 2}]},
         {"tools": [{"type": "plugin", "config": {"anything": True}}]},
+        {"tools": [{"plugin": {"config": {"anything": True}}}, {"plugin": None}]},
         {"prompt": None, "agents": {"a": "Research the topic.", "b": {"prompt": "Write it up."}}},
         {"output": {"type": "json_schema", "schema": {"type": "object", "x-anything": 1}}},
     ],
@@ -101,6 +135,7 @@ def test_every_shipped_agent_file_validates(validator, path: Path) -> None:
         "tool-typed",
         "plugin-forms",
         "plugin-builtin",
+        "plugin-builtin-single-key",
         "inline-child-string",
         "output-schema-open",
     ],
@@ -119,6 +154,7 @@ def test_shorthand_validates(validator, body: dict[str, Any]) -> None:
         ({"tools": ["think", {"shell": {"allowd_commands": ["ls"]}}]}, "tools/1"),
         # The plugin fallback must not swallow a misconfigured built-in tool.
         ({"tools": [{"type": "shell", "config": {}}]}, "tools/0"),
+        ({"tools": [{"plugin": {"confg": {}}}]}, "tools/0"),
         ({"model": {"name": "gpt-5-mini", "temprature": 0.2}}, "model"),
     ],
     ids=[
@@ -128,6 +164,7 @@ def test_shorthand_validates(validator, body: dict[str, Any]) -> None:
         "tool-typed",
         "tool-single-key",
         "builtin-as-plugin",
+        "plugin-single-key",
         "model",
     ],
 )

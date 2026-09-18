@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: context-aware-scraper
 description: Autonomous scraper with context budget guard for large page content
 spec_version: 3

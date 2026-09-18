@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: content-editor
 description: Fact-checks and polishes articles before publication
 spec_version: 3

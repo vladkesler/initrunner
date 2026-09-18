@@ -23,11 +23,11 @@ _LIB = "initrunner-cli"
 _KNOWN_COMMANDS = frozenset(
     {
         "run", "new", "setup", "doctor", "examples", "export",
-        "test", "ingest", "validate", "configure",
-        "dashboard", "desktop", "a2a", "flow", "mcp",
+        "test", "ingest", "validate", "schema", "plan", "configure",
+        "dashboard", "desktop", "a2a", "flow", "mcp", "service",
         "install", "uninstall", "list", "update", "search", "info",
         "publish", "pull", "login", "logout", "whoami",
-        "plugins", "skill", "memory", "audit", "cost", "vault",
+        "plugins", "tool", "skill", "memory", "audit", "cost", "vault",
         "approve", "pending", "hub", "telemetry",
         "help", "version",
     }

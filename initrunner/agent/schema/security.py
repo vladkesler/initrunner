@@ -230,7 +230,8 @@ class ToolSandboxConfig(BaseModel):
     sensitive_env_suffixes: list[str] = Field(
         default_factory=lambda: list(DEFAULT_SENSITIVE_ENV_SUFFIXES)
     )
-    env_allowlist: list[str] = Field(default_factory=lambda: list(DEFAULT_ENV_ALLOWLIST))
+    # Sorted: the frozenset iterates in hash order, which changes per process.
+    env_allowlist: list[str] = Field(default_factory=lambda: sorted(DEFAULT_ENV_ALLOWLIST))
     restrict_db_paths: bool = True
     # PEP 578 audit hook sandbox (opt-in)
     audit_hooks_enabled: bool = False

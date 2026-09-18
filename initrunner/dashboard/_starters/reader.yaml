@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: reader
 description: |
   Ingests your codebase, remembers architectural patterns across sessions, and answers code questions with file-level citations. File-watch trigger keeps understanding current as code changes.

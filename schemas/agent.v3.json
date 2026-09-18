@@ -3214,6 +3214,44 @@
       "title": "PluginToolConfig",
       "type": "object"
     },
+    "PluginToolConfigBody": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "plugin",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Config",
+          "type": "object"
+        }
+      },
+      "title": "PluginToolConfigBody",
+      "type": "object"
+    },
     "ProceduralMemoryConfig": {
       "additionalProperties": false,
       "properties": {
@@ -4097,8 +4135,8 @@
               "_KEY_BASE"
             ],
             "env_allowlist": [
-              "SSH_AGENT_PID",
-              "GPG_AGENT_INFO"
+              "GPG_AGENT_INFO",
+              "SSH_AGENT_PID"
             ],
             "restrict_db_paths": true,
             "audit_hooks_enabled": false,
@@ -5560,7 +5598,7 @@
             "plugin": {
               "anyOf": [
                 {
-                  "$ref": "#/$defs/PluginToolConfig"
+                  "$ref": "#/$defs/PluginToolConfigBody"
                 },
                 {
                   "type": "null"
