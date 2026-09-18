@@ -6,6 +6,7 @@ import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -1744,3 +1745,46 @@ class TestDiagnoseModelName:
         assert len(model_checks) == 1
         assert model_checks[0]["status"] == "warn"
         assert "Did you mean" in model_checks[0]["message"]
+
+
+class TestDiagnoseRoleExtrasSharesDetection:
+    """Doctor reports exactly the detector's requirements that are not installed."""
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            {"name": "rag", "prompt": "p", "ingest": {"sources": ["./docs/**/*.md"]}},
+            {"name": "mem", "prompt": "p", "memory": {}, "tools": ["search", {"pdf_extract": {}}]},
+            {"spec": {"capabilities": ["MCP"], "observability": {"backend": "console"}}},
+            {
+                "name": "local",
+                "prompt": "p",
+                "memory": {"embeddings": {"provider": "local"}},
+                "agents": {"a": {"prompt": "p", "tools": ["search"]}},
+            },
+        ],
+        ids=["markdown-rag", "memory-and-tools", "envelope-mcp-observability", "local-and-child"],
+    )
+    def test_gaps_are_the_uninstalled_requirements(self, raw):
+        from initrunner.services.doctor import diagnose_role_extras
+        from initrunner.services.starters import detect_extra_requirements
+
+        installed = {"vector"}
+        with patch(
+            "initrunner.services.doctor._is_extra_installed", side_effect=lambda e: e in installed
+        ):
+            gaps = diagnose_role_extras(raw)
+
+        expected = [
+            (r.feature, r.extra) for r in detect_extra_requirements(raw) if r.extra not in installed
+        ]
+        assert [(g.feature, g.extras_name) for g in gaps] == expected
+
+    def test_markdown_only_rag_does_not_offer_ingest(self):
+        from initrunner.services.doctor import diagnose_role_extras
+
+        raw = {"name": "rag", "prompt": "p", "ingest": {"sources": ["./docs/**/*.md"]}}
+        with patch("initrunner.services.doctor._is_extra_installed", return_value=False):
+            gaps = diagnose_role_extras(raw)
+
+        assert [g.extras_name for g in gaps] == ["vector"]
