@@ -115,6 +115,7 @@ Issues = "https://github.com/vladkesler/initrunner/issues"
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.26.0",
     "pre-commit>=4.0.0",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",

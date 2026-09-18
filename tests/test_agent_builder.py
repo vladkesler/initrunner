@@ -623,6 +623,61 @@ class TestBuilderSessionSave:
         assert result.omitted_assets == ["config.json", "skills/SKILL.md"]
 
 
+_FLAT_YAML = textwrap.dedent("""\
+    name: test-agent
+    description: A test agent
+    prompt: You are a helpful assistant.
+    model: openai:gpt-5-mini
+""")
+
+
+class TestBuilderSaveSchemaDirective:
+    """New flat files point editors at the published schema; nothing else changes."""
+
+    def _save(self, tmp_path, text, *, existing=None):
+        session = BuilderSession()
+        session._yaml_text = text
+        out = tmp_path / "agent.yaml"
+        if existing is not None:
+            out.write_text(existing)
+        result = session.save(out, force=existing is not None)
+        return out.read_text(), result
+
+    def test_new_flat_file_gets_the_directive_once(self, tmp_path):
+        from initrunner.agent.schema.json_schema import SCHEMA_DIRECTIVE
+
+        saved, result = self._save(tmp_path, _FLAT_YAML)
+        assert result.valid is True
+        assert saved.splitlines()[0] == SCHEMA_DIRECTIVE
+        assert saved.count("yaml-language-server") == 1
+        assert saved.endswith(_FLAT_YAML)
+
+    def test_an_existing_directive_is_kept(self, tmp_path):
+        own = "# yaml-language-server: $schema=./agent.schema.json\n" + _FLAT_YAML
+        saved, _ = self._save(tmp_path, own)
+        assert saved == own
+
+    def test_overwriting_a_file_leaves_its_header_alone(self, tmp_path):
+        saved, result = self._save(tmp_path, _FLAT_YAML, existing="name: old\n")
+        assert result.valid is True
+        assert saved == _FLAT_YAML
+
+    def test_an_invalid_new_draft_still_gets_it(self, tmp_path):
+        from initrunner.agent.schema.json_schema import SCHEMA_DIRECTIVE
+
+        draft = _FLAT_YAML + "memory:\n  retenion_days: 30\n"
+        saved, result = self._save(tmp_path, draft)
+        assert result.valid is False
+        assert saved == f"{SCHEMA_DIRECTIVE}\n{draft}"
+
+    @pytest.mark.parametrize(
+        "text", [_VALID_YAML, "not: valid: yaml: for: role"], ids=["envelope", "unparseable"]
+    )
+    def test_other_text_gets_none(self, tmp_path, text):
+        saved, _ = self._save(tmp_path, text)
+        assert "yaml-language-server" not in saved
+
+
 # ---------------------------------------------------------------------------
 # generate_role() one-shot wrapper
 # ---------------------------------------------------------------------------

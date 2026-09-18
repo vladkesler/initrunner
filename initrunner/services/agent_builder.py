@@ -1047,13 +1047,15 @@ class BuilderSession:
 
     def save(self, path: Path, *, force: bool = False) -> PostCreateResult:
         """Validate and write the current YAML to disk."""
+        from initrunner.agent.schema.json_schema import with_schema_directive
         from initrunner.services.roles import save_role_yaml_sync
 
         issue_strings: list[str] = []
         valid = True
         generated_paths: list[str] = []
 
-        if path.exists() and not force:
+        created = not path.exists()
+        if not created and not force:
             raise FileExistsError(f"{path} already exists. Use --force to overwrite.")
 
         # Resolve sidecar module name from output YAML stem
@@ -1067,12 +1069,16 @@ class BuilderSession:
             self._role_cache = None
             self._issues_cache = None
 
+        # A new file points editors at the published schema. An existing file
+        # is the user's, so a save leaves its header as it was.
+        text = with_schema_directive(self._yaml_text) if created else self._yaml_text
+
         try:
-            role = save_role_yaml_sync(path, self._yaml_text)
+            role = save_role_yaml_sync(path, text)
         except (ValueError, Exception) as e:
             # Write anyway but note the issue
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(self._yaml_text)
+            path.write_text(text)
             issue_strings.append(str(e))
             valid = False
             role = self.role

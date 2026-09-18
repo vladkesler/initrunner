@@ -1,0 +1,6482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json",
+  "title": "InitRunner agent",
+  "description": "An InitRunner agent file (spec_version 3). Checks that span fields run in `initrunner validate`.",
+  "$defs": {
+    "AgentChild": {
+      "additionalProperties": false,
+      "description": "One composed child: inline prompt, file ref, or both (use + overrides).",
+      "properties": {
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "use": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Use"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/PartialModelConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tools": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ToolConfigBase"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "tools_mode": {
+          "default": "extend",
+          "enum": [
+            "extend",
+            "replace"
+          ],
+          "title": "Tools Mode",
+          "type": "string"
+        },
+        "environment": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Environment",
+          "type": "object"
+        },
+        "triggers": {
+          "default": [],
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "cron": "#/$defs/CronTriggerConfig",
+                "discord": "#/$defs/DiscordTriggerConfig",
+                "file_watch": "#/$defs/FileWatchTriggerConfig",
+                "heartbeat": "#/$defs/HeartbeatTriggerConfig",
+                "slack": "#/$defs/SlackTriggerConfig",
+                "telegram": "#/$defs/TelegramTriggerConfig",
+                "webhook": "#/$defs/WebhookTriggerConfig"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CronTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/FileWatchTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/WebhookTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/TelegramTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/DiscordTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/SlackTriggerConfig"
+              },
+              {
+                "$ref": "#/$defs/HeartbeatTriggerConfig"
+              }
+            ]
+          },
+          "title": "Triggers",
+          "type": "array"
+        },
+        "then": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThenConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "after": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "After",
+          "type": "array"
+        },
+        "guardrails": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentGuardrails"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "AgentChild",
+      "type": "object"
+    },
+    "AgentGuardrails": {
+      "additionalProperties": false,
+      "description": "Solo guardrails plus optional composed budgets.",
+      "properties": {
+        "max_tokens_per_run": {
+          "default": 50000,
+          "exclusiveMinimum": 0,
+          "title": "Max Tokens Per Run",
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "default": 20,
+          "minimum": 0,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_request_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Request Limit"
+        },
+        "input_tokens_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Tokens Limit"
+        },
+        "total_tokens_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Tokens Limit"
+        },
+        "per_request_input_tokens_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Per Request Input Tokens Limit"
+        },
+        "cost_limit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Limit"
+        },
+        "session_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Token Budget"
+        },
+        "run_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Token Budget"
+        },
+        "daemon_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daemon Token Budget"
+        },
+        "daemon_daily_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daemon Daily Token Budget"
+        },
+        "daemon_daily_cost_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daemon Daily Cost Budget"
+        },
+        "daemon_weekly_cost_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Daemon Weekly Cost Budget"
+        },
+        "budget_timezone": {
+          "default": "UTC",
+          "title": "Budget Timezone",
+          "type": "string"
+        },
+        "max_iterations": {
+          "default": 10,
+          "exclusiveMinimum": 0,
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "autonomous_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Autonomous Token Budget"
+        },
+        "autonomous_timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Autonomous Timeout Seconds"
+        },
+        "retry_policy": {
+          "$ref": "#/$defs/RetryPolicy",
+          "default": {
+            "max_attempts": 1,
+            "backoff_base_seconds": 2.0,
+            "backoff_max_seconds": 30.0
+          }
+        },
+        "circuit_breaker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CircuitBreakerConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "team_token_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team Token Budget"
+        },
+        "team_timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Team Timeout Seconds"
+        }
+      },
+      "title": "AgentGuardrails",
+      "type": "object"
+    },
+    "ApiEndpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "method": {
+          "default": "GET",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ApiParameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        },
+        "body_template": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Body Template"
+        },
+        "query_params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Query Params",
+          "type": "object"
+        },
+        "response_extract": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Extract"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "path"
+      ],
+      "title": "ApiEndpoint",
+      "type": "object"
+    },
+    "ApiParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "default": {
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "ApiParameter",
+      "type": "object"
+    },
+    "ApiToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "api",
+          "default": "api",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        },
+        "auth": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Auth",
+          "type": "object"
+        },
+        "endpoints": {
+          "items": {
+            "$ref": "#/$defs/ApiEndpoint"
+          },
+          "title": "Endpoints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "base_url",
+        "endpoints"
+      ],
+      "title": "ApiToolConfig",
+      "type": "object"
+    },
+    "AudioToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "audio",
+          "default": "audio",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "youtube_languages": {
+          "default": [
+            "en"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Youtube Languages",
+          "type": "array"
+        },
+        "include_timestamps": {
+          "default": false,
+          "title": "Include Timestamps",
+          "type": "boolean"
+        },
+        "transcription_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transcription Model"
+        },
+        "max_audio_mb": {
+          "default": 20.0,
+          "title": "Max Audio Mb",
+          "type": "number"
+        },
+        "max_transcript_chars": {
+          "default": 50000,
+          "title": "Max Transcript Chars",
+          "type": "integer"
+        }
+      },
+      "title": "AudioToolConfig",
+      "type": "object"
+    },
+    "AuditConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "max_records": {
+          "default": 100000,
+          "title": "Max Records",
+          "type": "integer"
+        },
+        "retention_days": {
+          "default": 90,
+          "title": "Retention Days",
+          "type": "integer"
+        }
+      },
+      "title": "AuditConfig",
+      "type": "object"
+    },
+    "AutoSkillsConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for auto-discovered skills (agentskills.io progressive disclosure).",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_skills": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Max Skills",
+          "type": "integer"
+        }
+      },
+      "title": "AutoSkillsConfig",
+      "type": "object"
+    },
+    "AutonomyConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for autonomous agent execution.",
+      "properties": {
+        "continuation_prompt": {
+          "default": "Continue working on the task. Review your progress so far and decide your next step. If you have completed the task, call the finish_task tool with a summary.",
+          "title": "Continuation Prompt",
+          "type": "string"
+        },
+        "max_history_messages": {
+          "default": 40,
+          "title": "Max History Messages",
+          "type": "integer"
+        },
+        "max_plan_steps": {
+          "default": 20,
+          "title": "Max Plan Steps",
+          "type": "integer"
+        },
+        "iteration_delay_seconds": {
+          "default": 0,
+          "title": "Iteration Delay Seconds",
+          "type": "number"
+        },
+        "max_no_tool_call_iterations": {
+          "default": 2,
+          "title": "Max No Tool Call Iterations",
+          "type": "integer"
+        },
+        "max_scheduled_per_run": {
+          "default": 3,
+          "title": "Max Scheduled Per Run",
+          "type": "integer"
+        },
+        "max_scheduled_total": {
+          "default": 50,
+          "title": "Max Scheduled Total",
+          "type": "integer"
+        },
+        "max_schedule_delay_seconds": {
+          "default": 86400,
+          "title": "Max Schedule Delay Seconds",
+          "type": "integer"
+        },
+        "compaction": {
+          "$ref": "#/$defs/CompactionConfig",
+          "default": {
+            "enabled": false,
+            "threshold": 30,
+            "tail_messages": 6,
+            "model_override": null,
+            "summary_prefix": "[CONVERSATION HISTORY SUMMARY]\n"
+          }
+        }
+      },
+      "title": "AutonomyConfig",
+      "type": "object"
+    },
+    "BindMount": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "title": "BindMount",
+      "type": "object"
+    },
+    "BlackboardToolConfig": {
+      "additionalProperties": false,
+      "description": "Shared-state coordination for agents inside one flow run.\n\nA flow agent declares ``type: blackboard`` to post, read, and claim\nstructured entries on a per-run blackboard. The board lives in the flow\ngraph state, so an upstream agent can post a value that a downstream\nagent (or a fan-in join) reads without threading it through prompt text.\nThe tool is only active inside a flow; a standalone single-shot run has\nno blackboard and the tool is never built.",
+      "properties": {
+        "type": {
+          "const": "blackboard",
+          "default": "blackboard",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "max_entries": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Entries",
+          "type": "integer"
+        },
+        "max_value_chars": {
+          "default": 10000,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Max Value Chars",
+          "type": "integer"
+        }
+      },
+      "title": "BlackboardToolConfig",
+      "type": "object"
+    },
+    "BundleConfig": {
+      "additionalProperties": false,
+      "description": "Extra files to include in OCI bundles (glob patterns relative to role dir).",
+      "properties": {
+        "include": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Include",
+          "type": "array"
+        }
+      },
+      "title": "BundleConfig",
+      "type": "object"
+    },
+    "CalculatorToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "calculator",
+          "default": "calculator",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "max_expression_length": {
+          "default": 1000,
+          "title": "Max Expression Length",
+          "type": "integer"
+        }
+      },
+      "title": "CalculatorToolConfig",
+      "type": "object"
+    },
+    "ChunkingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "default": "fixed",
+          "enum": [
+            "fixed",
+            "paragraph"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "chunk_size": {
+          "default": 512,
+          "title": "Chunk Size",
+          "type": "integer"
+        },
+        "chunk_overlap": {
+          "default": 50,
+          "title": "Chunk Overlap",
+          "type": "integer"
+        }
+      },
+      "title": "ChunkingConfig",
+      "type": "object"
+    },
+    "CircuitBreakerConfig": {
+      "additionalProperties": false,
+      "description": "Per-daemon circuit breaker to stop wasting triggers against a broken provider.",
+      "properties": {
+        "failure_threshold": {
+          "default": 5,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Failure Threshold",
+          "type": "integer"
+        },
+        "reset_timeout_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 10,
+          "title": "Reset Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "CircuitBreakerConfig",
+      "type": "object"
+    },
+    "ClarifyToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "clarify",
+          "default": "clarify",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "max_clarifications": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Clarifications",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "ClarifyToolConfig",
+      "type": "object"
+    },
+    "CompactionConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for LLM-driven conversation history compaction.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "threshold": {
+          "default": 30,
+          "minimum": 1,
+          "title": "Threshold",
+          "type": "integer"
+        },
+        "tail_messages": {
+          "default": 6,
+          "minimum": 1,
+          "title": "Tail Messages",
+          "type": "integer"
+        },
+        "model_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Override"
+        },
+        "summary_prefix": {
+          "default": "[CONVERSATION HISTORY SUMMARY]\n",
+          "title": "Summary Prefix",
+          "type": "string"
+        }
+      },
+      "title": "CompactionConfig",
+      "type": "object"
+    },
+    "ConcurrencyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "max_running": {
+          "minimum": 1,
+          "title": "Max Running",
+          "type": "integer"
+        },
+        "max_queued": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Queued"
+        }
+      },
+      "required": [
+        "max_running"
+      ],
+      "title": "ConcurrencyConfig",
+      "type": "object"
+    },
+    "ConsolidationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "interval": {
+          "default": "after_session",
+          "enum": [
+            "after_session",
+            "after_autonomous",
+            "manual"
+          ],
+          "title": "Interval",
+          "type": "string"
+        },
+        "max_episodes_per_run": {
+          "default": 20,
+          "title": "Max Episodes Per Run",
+          "type": "integer"
+        },
+        "model_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Override"
+        }
+      },
+      "title": "ConsolidationConfig",
+      "type": "object"
+    },
+    "ContentPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "profanity_filter": {
+          "default": false,
+          "title": "Profanity Filter",
+          "type": "boolean"
+        },
+        "blocked_input_patterns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Input Patterns",
+          "type": "array"
+        },
+        "blocked_output_patterns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Output Patterns",
+          "type": "array"
+        },
+        "output_action": {
+          "default": "strip",
+          "enum": [
+            "strip",
+            "block"
+          ],
+          "title": "Output Action",
+          "type": "string"
+        },
+        "llm_classifier_enabled": {
+          "default": false,
+          "title": "Llm Classifier Enabled",
+          "type": "boolean"
+        },
+        "allowed_topics_prompt": {
+          "default": "",
+          "title": "Allowed Topics Prompt",
+          "type": "string"
+        },
+        "max_prompt_length": {
+          "default": 50000,
+          "exclusiveMinimum": 0,
+          "title": "Max Prompt Length",
+          "type": "integer"
+        },
+        "max_output_length": {
+          "default": 100000,
+          "exclusiveMinimum": 0,
+          "title": "Max Output Length",
+          "type": "integer"
+        },
+        "redact_patterns": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Redact Patterns",
+          "type": "array"
+        },
+        "pii_redaction": {
+          "default": false,
+          "title": "Pii Redaction",
+          "type": "boolean"
+        }
+      },
+      "title": "ContentPolicy",
+      "type": "object"
+    },
+    "CronTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "cron",
+          "default": "cron",
+          "title": "Type",
+          "type": "string"
+        },
+        "schedule": {
+          "title": "Schedule",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schedule",
+        "prompt"
+      ],
+      "title": "CronTriggerConfig",
+      "type": "object"
+    },
+    "CsvAnalysisToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "csv_analysis",
+          "default": "csv_analysis",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "root_path": {
+          "default": ".",
+          "title": "Root Path",
+          "type": "string"
+        },
+        "max_rows": {
+          "default": 1000,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "max_file_size_mb": {
+          "default": 10.0,
+          "title": "Max File Size Mb",
+          "type": "number"
+        },
+        "delimiter": {
+          "default": ",",
+          "title": "Delimiter",
+          "type": "string"
+        }
+      },
+      "title": "CsvAnalysisToolConfig",
+      "type": "object"
+    },
+    "CustomSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "custom",
+          "default": "custom",
+          "title": "Type",
+          "type": "string"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "function": {
+          "title": "Function",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module",
+        "function"
+      ],
+      "title": "CustomSinkConfig",
+      "type": "object"
+    },
+    "CustomToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "custom",
+          "default": "custom",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "function": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Function"
+        },
+        "config": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Config",
+          "type": "object"
+        }
+      },
+      "required": [
+        "module"
+      ],
+      "title": "CustomToolConfig",
+      "type": "object"
+    },
+    "DaemonConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for daemon mode behaviour.",
+      "properties": {
+        "hot_reload": {
+          "default": true,
+          "title": "Hot Reload",
+          "type": "boolean"
+        },
+        "reload_debounce_seconds": {
+          "default": 1.0,
+          "maximum": 30.0,
+          "minimum": 0.0,
+          "title": "Reload Debounce Seconds",
+          "type": "number"
+        }
+      },
+      "title": "DaemonConfig",
+      "type": "object"
+    },
+    "DateTimeToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "datetime",
+          "default": "datetime",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "default_timezone": {
+          "default": "UTC",
+          "title": "Default Timezone",
+          "type": "string"
+        }
+      },
+      "title": "DateTimeToolConfig",
+      "type": "object"
+    },
+    "DebateConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for the debate strategy.",
+      "properties": {
+        "max_rounds": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 2,
+          "title": "Max Rounds",
+          "type": "integer"
+        },
+        "synthesize": {
+          "default": true,
+          "title": "Synthesize",
+          "type": "boolean"
+        }
+      },
+      "title": "DebateConfig",
+      "type": "object"
+    },
+    "DelegateAgentRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role File"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "headers_env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers Env",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DelegateAgentRef",
+      "type": "object"
+    },
+    "DelegateSharedMemory": {
+      "additionalProperties": false,
+      "description": "Shared memory config for delegate sub-agents.",
+      "properties": {
+        "store_path": {
+          "title": "Store Path",
+          "type": "string"
+        },
+        "max_memories": {
+          "default": 1000,
+          "title": "Max Memories",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "store_path"
+      ],
+      "title": "DelegateSharedMemory",
+      "type": "object"
+    },
+    "DelegateToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "delegate",
+          "default": "delegate",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/DelegateAgentRef"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "mode": {
+          "default": "inline",
+          "enum": [
+            "inline",
+            "mcp",
+            "a2a"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "max_depth": {
+          "default": 3,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "shared_memory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DelegateSharedMemory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "agents"
+      ],
+      "title": "DelegateToolConfig",
+      "type": "object"
+    },
+    "DiscordTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "discord",
+          "default": "discord",
+          "title": "Type",
+          "type": "string"
+        },
+        "token_env": {
+          "default": "DISCORD_BOT_TOKEN",
+          "title": "Token Env",
+          "type": "string"
+        },
+        "channel_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Channel Ids",
+          "type": "array"
+        },
+        "allowed_roles": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Roles",
+          "type": "array"
+        },
+        "allowed_user_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed User Ids",
+          "type": "array"
+        },
+        "allow_all": {
+          "default": false,
+          "title": "Allow All",
+          "type": "boolean"
+        },
+        "prompt_template": {
+          "default": "{message}",
+          "title": "Prompt Template",
+          "type": "string"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "title": "DiscordTriggerConfig",
+      "type": "object"
+    },
+    "DockerBackendConfig": {
+      "additionalProperties": false,
+      "description": "Docker-specific settings nested under sandbox.docker.",
+      "properties": {
+        "image": {
+          "default": "python:3.12-slim",
+          "title": "Image",
+          "type": "string"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "const": "auto",
+              "type": "string"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "auto",
+          "title": "User"
+        },
+        "extra_args": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra Args",
+          "type": "array"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "enum": [
+                "runc",
+                "runsc",
+                "kata-runtime",
+                "kata-qemu",
+                "kata-fc",
+                "kata-clh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime"
+        }
+      },
+      "title": "DockerBackendConfig",
+      "type": "object"
+    },
+    "DurabilityConfig": {
+      "additionalProperties": false,
+      "description": "Audit-backed checkpoint/resume journal for a flow.\n\nWhen ``enabled`` is True with ``backend: journal``, each completed\nsub-agent delegation is recorded as a signed row in the append-only\naudit store, keyed by ``flow_run_id``. A crashed or interrupted flow\ncan then be resumed with ``initrunner flow run --resume <flow_run_id>``:\nservices that already produced a successful checkpoint are replayed from\nthe journal instead of being re-run.\n\n``backend`` only accepts working values. ``none`` (the default) means no\njournaling, so single-shot and REPL runs are unaffected. ``journal`` is\nthe self-contained, audit-native durable ledger.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "backend": {
+          "default": "none",
+          "enum": [
+            "none",
+            "journal"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "retry_policy": {
+          "default": "exponential",
+          "enum": [
+            "exponential",
+            "linear",
+            "none"
+          ],
+          "title": "Retry Policy",
+          "type": "string"
+        },
+        "max_retries": {
+          "default": 3,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "retry_delay_seconds": {
+          "default": 1,
+          "title": "Retry Delay Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "DurabilityConfig",
+      "type": "object"
+    },
+    "EmailToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "email",
+          "default": "email",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "imap_host": {
+          "title": "Imap Host",
+          "type": "string"
+        },
+        "smtp_host": {
+          "default": "",
+          "title": "Smtp Host",
+          "type": "string"
+        },
+        "imap_port": {
+          "default": 993,
+          "title": "Imap Port",
+          "type": "integer"
+        },
+        "smtp_port": {
+          "default": 587,
+          "title": "Smtp Port",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        },
+        "use_ssl": {
+          "default": true,
+          "title": "Use Ssl",
+          "type": "boolean"
+        },
+        "default_folder": {
+          "default": "INBOX",
+          "title": "Default Folder",
+          "type": "string"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "max_results": {
+          "default": 20,
+          "title": "Max Results",
+          "type": "integer"
+        },
+        "max_body_chars": {
+          "default": 50000,
+          "title": "Max Body Chars",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "imap_host",
+        "username",
+        "password"
+      ],
+      "title": "EmailToolConfig",
+      "type": "object"
+    },
+    "EmbeddingConfig": {
+      "additionalProperties": false,
+      "description": "Which embedding model produces the vectors for a store.\n\n``provider`` selects the backend. ``local`` runs an in-process fastembed\nmodel with no HTTP hop (offline-friendly, no API key, requires the\n``local-embeddings`` extra). It is distinct from ``ollama``, which routes\nthrough an OpenAI-compatible HTTP client and needs a running endpoint.\n\nDimension consistency: a store is fixed to the dimension of the model that\nfirst wrote to it. Changing ``provider`` or ``model`` to one with a\ndifferent dimension (for example ``BAAI/bge-small-en-v1.5`` at 384 to\n``BAAI/bge-base-en-v1.5`` at 768) requires a fresh ``store_path``.",
+      "properties": {
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "base_url": {
+          "default": "",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "api_key_env": {
+          "default": "",
+          "title": "Api Key Env",
+          "type": "string"
+        }
+      },
+      "title": "EmbeddingConfig",
+      "type": "object"
+    },
+    "EnsembleConfig": {
+      "additionalProperties": false,
+      "description": "Voting configuration for the ``ensemble`` delegate strategy.\n\nAn ensemble sink broadcasts the same prompt to every target, then a\nreducer picks a single winning answer instead of concatenating them:\n\n- ``majority``: normalized vote on identical answers; ties break on the\n  lowest topology index (deterministic).\n- ``weighted``: each target carries a YAML ``weights`` value; the answer\n  from the highest-weight target wins.\n- ``judge``: an LLM judge (``eval/judge.py``) scores each answer against\n  ``judge_criteria`` and the highest-scoring answer wins.",
+      "properties": {
+        "mode": {
+          "default": "majority",
+          "enum": [
+            "majority",
+            "weighted",
+            "judge"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "judge_model": {
+          "default": "openai:gpt-4o-mini",
+          "title": "Judge Model",
+          "type": "string"
+        },
+        "judge_criteria": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Judge Criteria",
+          "type": "array"
+        },
+        "weights": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weights"
+        }
+      },
+      "title": "EnsembleConfig",
+      "type": "object"
+    },
+    "EpisodicMemoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_episodes": {
+          "default": 500,
+          "title": "Max Episodes",
+          "type": "integer"
+        }
+      },
+      "title": "EpisodicMemoryConfig",
+      "type": "object"
+    },
+    "ExecutionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "retries": {
+          "default": 1,
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Retries",
+          "type": "integer"
+        },
+        "output_retries": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Retries"
+        },
+        "end_strategy": {
+          "default": "graceful",
+          "enum": [
+            "early",
+            "graceful",
+            "exhaustive"
+          ],
+          "title": "End Strategy",
+          "type": "string"
+        },
+        "tool_timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Timeout Seconds"
+        },
+        "max_concurrency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConcurrencyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "http_retries": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Http Retries",
+          "type": "integer"
+        },
+        "http_retry_max_wait": {
+          "default": 60.0,
+          "exclusiveMinimum": 0,
+          "maximum": 600,
+          "title": "Http Retry Max Wait",
+          "type": "number"
+        }
+      },
+      "title": "ExecutionConfig",
+      "type": "object"
+    },
+    "FileSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "file",
+          "default": "file",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "format": {
+          "default": "json",
+          "enum": [
+            "json",
+            "text"
+          ],
+          "title": "Format",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "FileSinkConfig",
+      "type": "object"
+    },
+    "FileSystemToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "filesystem",
+          "default": "filesystem",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "root_path": {
+          "default": ".",
+          "title": "Root Path",
+          "type": "string"
+        },
+        "allowed_extensions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Extensions",
+          "type": "array"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        }
+      },
+      "title": "FileSystemToolConfig",
+      "type": "object"
+    },
+    "FileWatchTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "file_watch",
+          "default": "file_watch",
+          "title": "Type",
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Paths",
+          "type": "array"
+        },
+        "extensions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Extensions",
+          "type": "array"
+        },
+        "prompt_template": {
+          "default": "File changed: {path}",
+          "title": "Prompt Template",
+          "type": "string"
+        },
+        "debounce_seconds": {
+          "default": 1.0,
+          "title": "Debounce Seconds",
+          "type": "number"
+        },
+        "process_existing": {
+          "default": false,
+          "title": "Process Existing",
+          "type": "boolean"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "paths"
+      ],
+      "title": "FileWatchTriggerConfig",
+      "type": "object"
+    },
+    "GitToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "git",
+          "default": "git",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "repo_path": {
+          "default": ".",
+          "title": "Repo Path",
+          "type": "string"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 102400,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "GitToolConfig",
+      "type": "object"
+    },
+    "HeartbeatTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "heartbeat",
+          "default": "heartbeat",
+          "title": "Type",
+          "type": "string"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "interval_seconds": {
+          "default": 3600,
+          "exclusiveMinimum": 0,
+          "title": "Interval Seconds",
+          "type": "integer"
+        },
+        "prompt_prefix": {
+          "default": "You are processing a periodic task checklist. Review all items below and work through any that are not yet complete. Use your tools as needed. Report what you did for each item.",
+          "title": "Prompt Prefix",
+          "type": "string"
+        },
+        "active_hours": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Active Hours"
+        },
+        "timezone": {
+          "default": "UTC",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "title": "HeartbeatTriggerConfig",
+      "type": "object"
+    },
+    "HttpToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "http",
+          "default": "http",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "allowed_methods": {
+          "default": [
+            "GET"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Methods",
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        }
+      },
+      "required": [
+        "base_url"
+      ],
+      "title": "HttpToolConfig",
+      "type": "object"
+    },
+    "ImageGenToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image_gen",
+          "default": "image_gen",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "provider": {
+          "default": "openai",
+          "enum": [
+            "openai",
+            "stability"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "api_key_env": {
+          "default": "",
+          "title": "Api Key Env",
+          "type": "string"
+        },
+        "default_size": {
+          "default": "1024x1024",
+          "title": "Default Size",
+          "type": "string"
+        },
+        "default_quality": {
+          "default": "standard",
+          "title": "Default Quality",
+          "type": "string"
+        },
+        "default_style": {
+          "default": "natural",
+          "title": "Default Style",
+          "type": "string"
+        },
+        "output_dir": {
+          "default": "",
+          "title": "Output Dir",
+          "type": "string"
+        },
+        "input_root": {
+          "default": "",
+          "title": "Input Root",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "ImageGenToolConfig",
+      "type": "object"
+    },
+    "IngestConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "auto": {
+          "default": true,
+          "title": "Auto",
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "watch": {
+          "default": false,
+          "title": "Watch",
+          "type": "boolean"
+        },
+        "chunking": {
+          "$ref": "#/$defs/ChunkingConfig",
+          "default": {
+            "strategy": "fixed",
+            "chunk_size": 512,
+            "chunk_overlap": 50
+          }
+        },
+        "embeddings": {
+          "$ref": "#/$defs/EmbeddingConfig",
+          "default": {
+            "provider": "",
+            "model": "",
+            "base_url": "",
+            "api_key_env": ""
+          }
+        },
+        "retriever": {
+          "$ref": "#/$defs/RetrieverConfig",
+          "default": {
+            "strategy": "vector",
+            "rrf_k": 60,
+            "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2"
+          }
+        },
+        "store_backend": {
+          "$ref": "#/$defs/StoreBackend",
+          "default": "lancedb"
+        },
+        "store_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Path"
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "title": "IngestConfig",
+      "type": "object"
+    },
+    "LoopBackConfig": {
+      "additionalProperties": false,
+      "description": "A bounded loop-back edge for critic/refine supervisor patterns.\n\nWhen set on a delegate sink, the sink's downstream output is routed back to\n``target`` (an upstream agent already on the path) so the pair can iterate.\nThe loop is bounded two ways: it always stops after ``max_iterations``\nrounds, and it stops early when the ``until`` predicate matches the latest\noutput. An immutable per-edge envelope carries the iteration counter, and\nthe flow depth cap still applies, so a loop cannot run unbounded.\n\n``until`` is a small predicate map keyed by the field to inspect on the\noutput envelope. Only ``output`` (the latest agent text) is supported, and\neach condition is one of:\n\n- ``contains:<text>`` -- exit when the output contains ``<text>``\n  (case-insensitive).\n- ``<op><number>`` where ``<op>`` is one of ``>``, ``>=``, ``<``, ``<=``,\n  ``==`` -- exit when the first number parsed from the output satisfies the\n  comparison (e.g. ``\">0.8\"`` for a self-reported confidence score).",
+      "properties": {
+        "type": {
+          "const": "loop-back",
+          "default": "loop-back",
+          "title": "Type",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "max_iterations": {
+          "default": 3,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Max Iterations",
+          "type": "integer"
+        },
+        "until": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Until"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "LoopBackConfig",
+      "type": "object"
+    },
+    "McpToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "mcp",
+          "default": "mcp",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "transport": {
+          "default": "stdio",
+          "enum": [
+            "stdio",
+            "sse",
+            "streamable-http"
+          ],
+          "title": "Transport",
+          "type": "string"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "args": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Args",
+          "type": "array"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "tool_filter": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Filter",
+          "type": "array"
+        },
+        "tool_exclude": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tool Exclude",
+          "type": "array"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Env",
+          "type": "object"
+        },
+        "cwd": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cwd"
+        },
+        "tool_prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Prefix"
+        },
+        "max_retries": {
+          "default": 1,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        },
+        "defer": {
+          "default": false,
+          "title": "Defer",
+          "type": "boolean"
+        }
+      },
+      "title": "McpToolConfig",
+      "type": "object"
+    },
+    "MemoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "store_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Path"
+        },
+        "store_backend": {
+          "$ref": "#/$defs/StoreBackend",
+          "default": "lancedb"
+        },
+        "max_sessions": {
+          "default": 10,
+          "title": "Max Sessions",
+          "type": "integer"
+        },
+        "max_resume_messages": {
+          "default": 20,
+          "title": "Max Resume Messages",
+          "type": "integer"
+        },
+        "embeddings": {
+          "$ref": "#/$defs/EmbeddingConfig",
+          "default": {
+            "provider": "",
+            "model": "",
+            "base_url": "",
+            "api_key_env": ""
+          }
+        },
+        "episodic": {
+          "$ref": "#/$defs/EpisodicMemoryConfig",
+          "default": {
+            "enabled": true,
+            "max_episodes": 500
+          }
+        },
+        "semantic": {
+          "$ref": "#/$defs/SemanticMemoryConfig",
+          "default": {
+            "enabled": true,
+            "max_memories": 1000
+          }
+        },
+        "procedural": {
+          "$ref": "#/$defs/ProceduralMemoryConfig",
+          "default": {
+            "enabled": true,
+            "max_procedures": 100
+          }
+        },
+        "consolidation": {
+          "$ref": "#/$defs/ConsolidationConfig",
+          "default": {
+            "enabled": true,
+            "interval": "after_session",
+            "max_episodes_per_run": 20,
+            "model_override": null
+          }
+        }
+      },
+      "title": "MemoryConfig",
+      "type": "object"
+    },
+    "ModelConcurrencyConfig": {
+      "additionalProperties": false,
+      "description": "Cap concurrent model requests, optionally sharing the cap across agents.\n\nMaps to PydanticAI's ``ConcurrencyLimitedModel`` + ``ConcurrencyLimiter``.\nDistinct from ``execution.max_concurrency``, which bounds an agent's\nparallel *tool* execution. This bounds in-flight *model requests* -- useful\nwhen several agents in one process (compose services, team personas, flow\nnodes) share a provider rate-limit budget.",
+      "properties": {
+        "max_running": {
+          "minimum": 1,
+          "title": "Max Running",
+          "type": "integer"
+        },
+        "max_queued": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Queued"
+        },
+        "share": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Share"
+        }
+      },
+      "required": [
+        "max_running"
+      ],
+      "title": "ModelConcurrencyConfig",
+      "type": "object"
+    },
+    "ObservabilityConfig": {
+      "additionalProperties": false,
+      "description": "OpenTelemetry observability configuration.",
+      "properties": {
+        "backend": {
+          "default": "otlp",
+          "enum": [
+            "otlp",
+            "logfire",
+            "console"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "endpoint": {
+          "default": "http://localhost:4317",
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "service_name": {
+          "default": "",
+          "title": "Service Name",
+          "type": "string"
+        },
+        "trace_tool_calls": {
+          "default": true,
+          "title": "Trace Tool Calls",
+          "type": "boolean"
+        },
+        "trace_token_usage": {
+          "default": true,
+          "title": "Trace Token Usage",
+          "type": "boolean"
+        },
+        "sample_rate": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Sample Rate",
+          "type": "number"
+        },
+        "include_content": {
+          "default": false,
+          "title": "Include Content",
+          "type": "boolean"
+        }
+      },
+      "title": "ObservabilityConfig",
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "text",
+          "enum": [
+            "text",
+            "json_schema"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema"
+        },
+        "schema_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema File"
+        },
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "tool",
+            "native",
+            "prompted",
+            "text"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "OutputConfig",
+      "type": "object"
+    },
+    "PartialModelConfig": {
+      "additionalProperties": false,
+      "description": "YAML-facing model config. Provider and name may be omitted for auto-detection.",
+      "properties": {
+        "provider": {
+          "default": "",
+          "title": "Provider",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base Url"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Key Env"
+        },
+        "temperature": {
+          "default": 0.1,
+          "maximum": 2.0,
+          "minimum": 0.0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "max_tokens": {
+          "default": 4096,
+          "maximum": 128000,
+          "minimum": 1,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "context_window": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context Window"
+        },
+        "concurrency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelConcurrencyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fallback": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Fallback",
+          "type": "array"
+        },
+        "fallback_on": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Fallback On",
+          "type": "array"
+        },
+        "prompt_cache": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/PromptCacheConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top P"
+        },
+        "top_k": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top K"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "stop_sequences": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Sequences"
+        },
+        "parallel_tool_calls": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parallel Tool Calls"
+        },
+        "presence_penalty": {
+          "anyOf": [
+            {
+              "maximum": 2.0,
+              "minimum": -2.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Presence Penalty"
+        },
+        "frequency_penalty": {
+          "anyOf": [
+            {
+              "maximum": 2.0,
+              "minimum": -2.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency Penalty"
+        },
+        "logit_bias": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logit Bias"
+        },
+        "extra_headers": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extra Headers"
+        },
+        "extra_body": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extra Body"
+        },
+        "tool_choice": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "none"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Choice"
+        },
+        "thinking": {
+          "anyOf": [
+            {
+              "enum": [
+                false,
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thinking"
+        }
+      },
+      "title": "PartialModelConfig",
+      "type": "object"
+    },
+    "PdfExtractToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "pdf_extract",
+          "default": "pdf_extract",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "root_path": {
+          "default": ".",
+          "title": "Root Path",
+          "type": "string"
+        },
+        "max_pages": {
+          "default": 100,
+          "minimum": 1,
+          "title": "Max Pages",
+          "type": "integer"
+        },
+        "max_content_bytes": {
+          "default": 512000,
+          "title": "Max Content Bytes",
+          "type": "integer"
+        },
+        "max_file_size_mb": {
+          "default": 50.0,
+          "title": "Max File Size Mb",
+          "type": "number"
+        }
+      },
+      "title": "PdfExtractToolConfig",
+      "type": "object"
+    },
+    "PluginToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Config",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "PluginToolConfig",
+      "type": "object"
+    },
+    "ProceduralMemoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_procedures": {
+          "default": 100,
+          "title": "Max Procedures",
+          "type": "integer"
+        }
+      },
+      "title": "ProceduralMemoryConfig",
+      "type": "object"
+    },
+    "PromptCacheConfig": {
+      "additionalProperties": false,
+      "description": "Provider-native prompt caching for the static prefix of a request.\n\nMaps to Anthropic's ``anthropic_cache_*`` and Bedrock's ``bedrock_cache_*``\nmodel settings. Caching the system instructions and tool definitions lets\nrepeated runs of a role (daemons, triggers, REPLs) reuse the cached prefix,\ncutting input-token cost. Only ``anthropic`` and ``bedrock`` support it.",
+      "properties": {
+        "instructions": {
+          "default": true,
+          "title": "Instructions",
+          "type": "boolean"
+        },
+        "tools": {
+          "default": true,
+          "title": "Tools",
+          "type": "boolean"
+        },
+        "ttl": {
+          "default": "5m",
+          "enum": [
+            "5m",
+            "1h"
+          ],
+          "title": "Ttl",
+          "type": "string"
+        }
+      },
+      "title": "PromptCacheConfig",
+      "type": "object"
+    },
+    "PythonToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "python",
+          "default": "python",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 102400,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        },
+        "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Working Dir"
+        },
+        "require_confirmation": {
+          "default": true,
+          "title": "Require Confirmation",
+          "type": "boolean"
+        },
+        "network_disabled": {
+          "default": true,
+          "title": "Network Disabled",
+          "type": "boolean"
+        }
+      },
+      "title": "PythonToolConfig",
+      "type": "object"
+    },
+    "RateLimitConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "requests_per_minute": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "Requests Per Minute",
+          "type": "integer"
+        },
+        "burst_size": {
+          "default": 10,
+          "exclusiveMinimum": 0,
+          "title": "Burst Size",
+          "type": "integer"
+        }
+      },
+      "title": "RateLimitConfig",
+      "type": "object"
+    },
+    "ReasoningConfig": {
+      "additionalProperties": false,
+      "description": "Controls how the execution layer orchestrates agent reasoning.",
+      "properties": {
+        "pattern": {
+          "default": "react",
+          "enum": [
+            "react",
+            "todo_driven",
+            "plan_execute",
+            "reflexion"
+          ],
+          "title": "Pattern",
+          "type": "string"
+        },
+        "auto_plan": {
+          "default": false,
+          "title": "Auto Plan",
+          "type": "boolean"
+        },
+        "reflection_rounds": {
+          "default": 0,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Reflection Rounds",
+          "type": "integer"
+        },
+        "reflection_dimensions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ReflexionDimension"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reflection Dimensions"
+        },
+        "success_criteria": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Success Criteria"
+        },
+        "auto_detect": {
+          "default": true,
+          "title": "Auto Detect",
+          "type": "boolean"
+        }
+      },
+      "title": "ReasoningConfig",
+      "type": "object"
+    },
+    "ReflexionDimension": {
+      "additionalProperties": false,
+      "description": "A single evaluation dimension for a reflexion round.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "prompt"
+      ],
+      "title": "ReflexionDimension",
+      "type": "object"
+    },
+    "ResourceConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "memory": {
+          "default": "512Mi",
+          "title": "Memory",
+          "type": "string"
+        },
+        "cpu": {
+          "default": 0.5,
+          "title": "Cpu",
+          "type": "number"
+        }
+      },
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "ResourceLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_file_size_mb": {
+          "default": 50.0,
+          "exclusiveMinimum": 0,
+          "title": "Max File Size Mb",
+          "type": "number"
+        },
+        "max_total_ingest_mb": {
+          "default": 500.0,
+          "exclusiveMinimum": 0,
+          "title": "Max Total Ingest Mb",
+          "type": "number"
+        }
+      },
+      "title": "ResourceLimits",
+      "type": "object"
+    },
+    "RetrieverConfig": {
+      "additionalProperties": false,
+      "description": "How ingested documents are searched at query time.\n\n``vector`` is dense cosine search only (the default, unchanged behaviour).\n``hybrid`` fuses dense vector search with BM25 full-text search using\nreciprocal rank fusion (RRF). ``hybrid_rerank`` runs the hybrid stage and\nthen reorders the fused candidates with a cross-encoder model. The\ncross-encoder backend is optional: when ``sentence-transformers`` is not\ninstalled, ``hybrid_rerank`` degrades to plain ``hybrid`` scoring.",
+      "properties": {
+        "strategy": {
+          "default": "vector",
+          "enum": [
+            "vector",
+            "hybrid",
+            "hybrid_rerank"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "rrf_k": {
+          "default": 60,
+          "title": "Rrf K",
+          "type": "integer"
+        },
+        "reranker_model": {
+          "default": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "title": "Reranker Model",
+          "type": "string"
+        }
+      },
+      "title": "RetrieverConfig",
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "description": "Daemon-level retry policy for failed runs.",
+      "properties": {
+        "max_attempts": {
+          "default": 1,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "backoff_base_seconds": {
+          "default": 2.0,
+          "maximum": 30.0,
+          "minimum": 0.5,
+          "title": "Backoff Base Seconds",
+          "type": "number"
+        },
+        "backoff_max_seconds": {
+          "default": 30.0,
+          "maximum": 300.0,
+          "minimum": 1.0,
+          "title": "Backoff Max Seconds",
+          "type": "number"
+        }
+      },
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "SSHBackendConfig": {
+      "additionalProperties": false,
+      "description": "SSH-specific settings nested under sandbox.ssh.\n\nSSH is *remote execution*, not a kernel sandbox. The host is resolved via\nthe user's ``~/.ssh/config`` and ``ssh-agent``; this struct only carries\na couple of explicit overrides.",
+      "properties": {
+        "host": {
+          "minLength": 1,
+          "title": "Host",
+          "type": "string"
+        },
+        "config_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Config File"
+        },
+        "identity_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identity File"
+        },
+        "remote_cwd": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remote Cwd"
+        },
+        "connect_timeout": {
+          "default": 10,
+          "exclusiveMinimum": 0,
+          "title": "Connect Timeout",
+          "type": "integer"
+        },
+        "control_persist": {
+          "default": "60s",
+          "title": "Control Persist",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "title": "SSHBackendConfig",
+      "type": "object"
+    },
+    "SandboxConfig": {
+      "additionalProperties": false,
+      "description": "Backend-agnostic runtime sandbox configuration.",
+      "properties": {
+        "backend": {
+          "default": "none",
+          "enum": [
+            "auto",
+            "bwrap",
+            "docker",
+            "ssh",
+            "none"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "network": {
+          "default": "none",
+          "enum": [
+            "none",
+            "bridge",
+            "host"
+          ],
+          "title": "Network",
+          "type": "string"
+        },
+        "allowed_read_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Read Paths",
+          "type": "array"
+        },
+        "allowed_write_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Write Paths",
+          "type": "array"
+        },
+        "memory_limit": {
+          "default": "256m",
+          "title": "Memory Limit",
+          "type": "string"
+        },
+        "cpu_limit": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Cpu Limit",
+          "type": "number"
+        },
+        "read_only_rootfs": {
+          "default": true,
+          "title": "Read Only Rootfs",
+          "type": "boolean"
+        },
+        "bind_mounts": {
+          "items": {
+            "$ref": "#/$defs/BindMount"
+          },
+          "title": "Bind Mounts",
+          "type": "array"
+        },
+        "env_passthrough": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Env Passthrough",
+          "type": "array"
+        },
+        "docker": {
+          "$ref": "#/$defs/DockerBackendConfig",
+          "default": {
+            "image": "python:3.12-slim",
+            "user": "auto",
+            "extra_args": [],
+            "runtime": null
+          }
+        },
+        "ssh": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHBackendConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "SandboxConfig",
+      "type": "object"
+    },
+    "ScriptDefinition": {
+      "additionalProperties": false,
+      "description": "A single inline script that becomes a tool function.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "interpreter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interpreter"
+        },
+        "parameters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ScriptParameter"
+          },
+          "title": "Parameters",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        },
+        "allowed_commands": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Commands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "body"
+      ],
+      "title": "ScriptDefinition",
+      "type": "object"
+    },
+    "ScriptParameter": {
+      "additionalProperties": false,
+      "description": "A parameter for a script tool, injected as an uppercase env var.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string",
+          "default": "",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ScriptParameter",
+      "type": "object"
+    },
+    "ScriptToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "script",
+          "default": "script",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "scripts": {
+          "items": {
+            "$ref": "#/$defs/ScriptDefinition"
+          },
+          "title": "Scripts",
+          "type": "array"
+        },
+        "interpreter": {
+          "default": "/bin/sh",
+          "title": "Interpreter",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 102400,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        },
+        "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Working Dir"
+        }
+      },
+      "required": [
+        "scripts"
+      ],
+      "title": "ScriptToolConfig",
+      "type": "object"
+    },
+    "SearchToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "search",
+          "default": "search",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "provider": {
+          "default": "duckduckgo",
+          "enum": [
+            "duckduckgo",
+            "serpapi",
+            "brave",
+            "tavily"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "api_key": {
+          "default": "",
+          "title": "Api Key",
+          "type": "string"
+        },
+        "max_results": {
+          "default": 10,
+          "title": "Max Results",
+          "type": "integer"
+        },
+        "safe_search": {
+          "default": true,
+          "title": "Safe Search",
+          "type": "boolean"
+        },
+        "timeout_seconds": {
+          "default": 15,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "SearchToolConfig",
+      "type": "object"
+    },
+    "SecurityPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "anyOf": [
+            {
+              "enum": [
+                "public",
+                "internal",
+                "sandbox",
+                "development"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preset"
+        },
+        "content": {
+          "$ref": "#/$defs/ContentPolicy",
+          "default": {
+            "profanity_filter": false,
+            "blocked_input_patterns": [],
+            "blocked_output_patterns": [],
+            "output_action": "strip",
+            "llm_classifier_enabled": false,
+            "allowed_topics_prompt": "",
+            "max_prompt_length": 50000,
+            "max_output_length": 100000,
+            "redact_patterns": [],
+            "pii_redaction": false
+          }
+        },
+        "server": {
+          "$ref": "#/$defs/ServerConfig",
+          "default": {
+            "cors_origins": [],
+            "require_https": false,
+            "max_request_body_bytes": 1048576,
+            "max_conversations": 1000
+          }
+        },
+        "rate_limit": {
+          "$ref": "#/$defs/RateLimitConfig",
+          "default": {
+            "requests_per_minute": 60,
+            "burst_size": 10
+          }
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceLimits",
+          "default": {
+            "max_file_size_mb": 50.0,
+            "max_total_ingest_mb": 500.0
+          }
+        },
+        "tools": {
+          "$ref": "#/$defs/ToolSandboxConfig",
+          "default": {
+            "allowed_custom_modules": [],
+            "blocked_custom_modules": [
+              "os",
+              "subprocess",
+              "shutil",
+              "sys",
+              "importlib",
+              "ctypes",
+              "socket",
+              "http.server",
+              "pickle",
+              "shelve",
+              "marshal",
+              "code",
+              "codeop",
+              "threading",
+              "_thread"
+            ],
+            "mcp_command_allowlist": [],
+            "sensitive_env_prefixes": [
+              "OPENAI_",
+              "ANTHROPIC_",
+              "GOOGLE_API_KEY",
+              "GEMINI_",
+              "HF_",
+              "HUGGING_FACE",
+              "COHERE_",
+              "REPLICATE_",
+              "MISTRAL_",
+              "GROQ_",
+              "TOGETHER_",
+              "FIREWORKS_",
+              "DEEPSEEK_",
+              "PERPLEXITY_",
+              "XAI_",
+              "OPENROUTER_",
+              "VOYAGE_",
+              "AWS_",
+              "GCP_",
+              "GCLOUD_",
+              "GOOGLE_APPLICATION_CREDENTIALS",
+              "GOOGLE_CLOUD_",
+              "AZURE_",
+              "DIGITALOCEAN_",
+              "DO_API",
+              "LINODE_",
+              "VULTR_",
+              "HETZNER_",
+              "CLOUDFLARE_",
+              "FASTLY_",
+              "NETLIFY_",
+              "VERCEL_",
+              "HEROKU_",
+              "RENDER_",
+              "RAILWAY_",
+              "FLY_API",
+              "SUPABASE_",
+              "FIREBASE_",
+              "ALICLOUD_",
+              "ALIBABA_CLOUD_",
+              "TENCENTCLOUD_",
+              "OCI_",
+              "IBMCLOUD_",
+              "GITHUB_TOKEN",
+              "GITHUB_PAT",
+              "GH_TOKEN",
+              "GHP_",
+              "GITLAB_TOKEN",
+              "BITBUCKET_TOKEN",
+              "CODECOV_TOKEN",
+              "NPM_TOKEN",
+              "PYPI_",
+              "TWINE_",
+              "JFROG_",
+              "ARTIFACTORY_",
+              "NUGET_",
+              "SLACK_",
+              "TELEGRAM_BOT_TOKEN",
+              "DISCORD_BOT_TOKEN",
+              "TWILIO_",
+              "SENDGRID_",
+              "MAILGUN_",
+              "STRIPE_",
+              "DATABASE_URL",
+              "REDIS_URL",
+              "MONGO_URI",
+              "MONGODB_URI",
+              "POSTGRES_PASSWORD",
+              "MYSQL_PASSWORD",
+              "SSH_AUTH_SOCK",
+              "SSH_PRIVATE_KEY",
+              "SECRET_KEY",
+              "SESSION_SECRET",
+              "DJANGO_SECRET",
+              "RAILS_MASTER_KEY",
+              "JWT_SECRET",
+              "DOCKER_PASSWORD",
+              "DOCKER_TOKEN",
+              "VAULT_TOKEN",
+              "SENTRY_",
+              "DATADOG_",
+              "DD_API_KEY",
+              "DD_APP_KEY",
+              "NEW_RELIC_",
+              "SNYK_",
+              "SONAR_"
+            ],
+            "sensitive_env_suffixes": [
+              "_KEY",
+              "_SECRET",
+              "_TOKEN",
+              "_PASSWORD",
+              "_PASSPHRASE",
+              "_CREDENTIAL",
+              "_CREDENTIALS",
+              "_API_KEY",
+              "_ACCESS_KEY",
+              "_PRIVATE_KEY",
+              "_PAT",
+              "_DSN",
+              "_APIKEY",
+              "_APITOKEN",
+              "_CONNECTION_STRING",
+              "_KEY_BASE"
+            ],
+            "env_allowlist": [
+              "SSH_AGENT_PID",
+              "GPG_AGENT_INFO"
+            ],
+            "restrict_db_paths": true,
+            "audit_hooks_enabled": false,
+            "allowed_write_paths": [],
+            "allowed_network_hosts": [],
+            "block_private_ips": true,
+            "allow_subprocess": false,
+            "allow_eval_exec": false,
+            "sandbox_violation_action": "raise"
+          }
+        },
+        "sandbox": {
+          "$ref": "#/$defs/SandboxConfig",
+          "default": {
+            "backend": "none",
+            "network": "none",
+            "allowed_read_paths": [],
+            "allowed_write_paths": [],
+            "memory_limit": "256m",
+            "cpu_limit": 1.0,
+            "read_only_rootfs": true,
+            "bind_mounts": [],
+            "env_passthrough": [],
+            "docker": {
+              "extra_args": [],
+              "image": "python:3.12-slim",
+              "runtime": null,
+              "user": "auto"
+            },
+            "ssh": null
+          }
+        },
+        "audit": {
+          "$ref": "#/$defs/AuditConfig",
+          "default": {
+            "max_records": 100000,
+            "retention_days": 90
+          }
+        }
+      },
+      "title": "SecurityPolicy",
+      "type": "object"
+    },
+    "SemanticMemoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_memories": {
+          "default": 1000,
+          "title": "Max Memories",
+          "type": "integer"
+        }
+      },
+      "title": "SemanticMemoryConfig",
+      "type": "object"
+    },
+    "ServerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cors_origins": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Cors Origins",
+          "type": "array"
+        },
+        "require_https": {
+          "default": false,
+          "title": "Require Https",
+          "type": "boolean"
+        },
+        "max_request_body_bytes": {
+          "default": 1048576,
+          "exclusiveMinimum": 0,
+          "title": "Max Request Body Bytes",
+          "type": "integer"
+        },
+        "max_conversations": {
+          "default": 1000,
+          "title": "Max Conversations",
+          "type": "integer"
+        }
+      },
+      "title": "ServerConfig",
+      "type": "object"
+    },
+    "SharedMemoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "store_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Path"
+        },
+        "store_backend": {
+          "$ref": "#/$defs/StoreBackend",
+          "default": "lancedb"
+        },
+        "max_memories": {
+          "default": 1000,
+          "title": "Max Memories",
+          "type": "integer"
+        }
+      },
+      "title": "SharedMemoryConfig",
+      "type": "object"
+    },
+    "ShellToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "shell",
+          "default": "shell",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "allowed_commands": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Commands",
+          "type": "array"
+        },
+        "blocked_commands": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Commands",
+          "type": "array"
+        },
+        "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Working Dir"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 102400,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        },
+        "require_confirmation": {
+          "default": true,
+          "title": "Require Confirmation",
+          "type": "boolean"
+        }
+      },
+      "title": "ShellToolConfig",
+      "type": "object"
+    },
+    "SlackToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "slack",
+          "default": "slack",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "webhook_url": {
+          "title": "Webhook Url",
+          "type": "string"
+        },
+        "default_channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Channel"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Username"
+        },
+        "icon_emoji": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon Emoji"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_response_bytes": {
+          "default": 1024,
+          "title": "Max Response Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "webhook_url"
+      ],
+      "title": "SlackToolConfig",
+      "type": "object"
+    },
+    "SlackTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "slack",
+          "default": "slack",
+          "title": "Type",
+          "type": "string"
+        },
+        "app_token_env": {
+          "default": "SLACK_APP_TOKEN",
+          "title": "App Token Env",
+          "type": "string"
+        },
+        "bot_token_env": {
+          "default": "SLACK_BOT_TOKEN",
+          "title": "Bot Token Env",
+          "type": "string"
+        },
+        "channel_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Channel Ids",
+          "type": "array"
+        },
+        "allowed_user_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed User Ids",
+          "type": "array"
+        },
+        "allow_all": {
+          "default": false,
+          "title": "Allow All",
+          "type": "boolean"
+        },
+        "respond_in_thread": {
+          "default": true,
+          "title": "Respond In Thread",
+          "type": "boolean"
+        },
+        "prompt_template": {
+          "default": "{message}",
+          "title": "Prompt Template",
+          "type": "string"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "title": "SlackTriggerConfig",
+      "type": "object"
+    },
+    "SpawnAgentRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role File"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "SpawnAgentRef",
+      "type": "object"
+    },
+    "SpawnToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "spawn",
+          "default": "spawn",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "agents": {
+          "items": {
+            "$ref": "#/$defs/SpawnAgentRef"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "max_concurrent": {
+          "default": 4,
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Max Concurrent",
+          "type": "integer"
+        },
+        "max_depth": {
+          "default": 3,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "shared_memory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DelegateSharedMemory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "agents"
+      ],
+      "title": "SpawnToolConfig",
+      "type": "object"
+    },
+    "SqlToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "sql",
+          "default": "sql",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "database": {
+          "title": "Database",
+          "type": "string"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "max_rows": {
+          "default": 100,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "max_result_bytes": {
+          "default": 102400,
+          "title": "Max Result Bytes",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 10,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "title": "SqlToolConfig",
+      "type": "object"
+    },
+    "StoreBackend": {
+      "enum": [
+        "lancedb"
+      ],
+      "title": "StoreBackend",
+      "type": "string"
+    },
+    "TeamDocumentsConfig": {
+      "additionalProperties": false,
+      "description": "Team-level shared document/RAG configuration with ingest sources.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "store_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Store Path"
+        },
+        "store_backend": {
+          "$ref": "#/$defs/StoreBackend",
+          "default": "lancedb"
+        },
+        "embeddings": {
+          "$ref": "#/$defs/EmbeddingConfig",
+          "default": {
+            "provider": "",
+            "model": "",
+            "base_url": "",
+            "api_key_env": ""
+          }
+        },
+        "chunking": {
+          "$ref": "#/$defs/ChunkingConfig",
+          "default": {
+            "strategy": "fixed",
+            "chunk_size": 512,
+            "chunk_overlap": 50
+          }
+        }
+      },
+      "title": "TeamDocumentsConfig",
+      "type": "object"
+    },
+    "TeamEnsembleConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for the ``ensemble`` team strategy.\n\nEvery persona answers the same task in parallel; a reducer then picks one\nwinning answer instead of concatenating them. ``majority`` votes on\nidentical answers, ``weighted`` favours the highest-weight persona, and\n``judge`` scores each answer with an LLM judge (``eval/judge.py``).",
+      "properties": {
+        "mode": {
+          "default": "majority",
+          "enum": [
+            "majority",
+            "weighted",
+            "judge"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "judge_model": {
+          "default": "openai:gpt-4o-mini",
+          "title": "Judge Model",
+          "type": "string"
+        },
+        "judge_criteria": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Judge Criteria",
+          "type": "array"
+        },
+        "weights": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weights"
+        }
+      },
+      "title": "TeamEnsembleConfig",
+      "type": "object"
+    },
+    "TelegramTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "telegram",
+          "default": "telegram",
+          "title": "Type",
+          "type": "string"
+        },
+        "token_env": {
+          "default": "TELEGRAM_BOT_TOKEN",
+          "title": "Token Env",
+          "type": "string"
+        },
+        "allowed_users": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Users",
+          "type": "array"
+        },
+        "allowed_user_ids": {
+          "default": [],
+          "items": {
+            "type": "integer"
+          },
+          "title": "Allowed User Ids",
+          "type": "array"
+        },
+        "allow_all": {
+          "default": false,
+          "title": "Allow All",
+          "type": "boolean"
+        },
+        "prompt_template": {
+          "default": "{message}",
+          "title": "Prompt Template",
+          "type": "string"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "title": "TelegramTriggerConfig",
+      "type": "object"
+    },
+    "ThenConfig": {
+      "additionalProperties": false,
+      "description": "Graph edge. Mechanical rename of Flow ``DelegateSinkConfig`` (``target`` → ``to``).",
+      "properties": {
+        "to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "To"
+        },
+        "strategy": {
+          "default": "all",
+          "enum": [
+            "all",
+            "keyword",
+            "sense",
+            "ensemble"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "ensemble": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EnsembleConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "loop_back": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoopBackConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "keep_existing_sinks": {
+          "default": false,
+          "title": "Keep Existing Sinks",
+          "type": "boolean"
+        },
+        "queue_size": {
+          "default": 100,
+          "title": "Queue Size",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 60,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "circuit_breaker_threshold": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Circuit Breaker Threshold"
+        },
+        "circuit_breaker_reset_seconds": {
+          "default": 60,
+          "title": "Circuit Breaker Reset Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "to"
+      ],
+      "title": "ThenConfig",
+      "type": "object"
+    },
+    "ThinkToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "think",
+          "default": "think",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "critique": {
+          "default": false,
+          "title": "Critique",
+          "type": "boolean"
+        },
+        "max_thoughts": {
+          "default": 50,
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Max Thoughts",
+          "type": "integer"
+        }
+      },
+      "title": "ThinkToolConfig",
+      "type": "object"
+    },
+    "TodoToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "todo",
+          "default": "todo",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "max_items": {
+          "default": 30,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Items",
+          "type": "integer"
+        },
+        "shared": {
+          "default": false,
+          "title": "Shared",
+          "type": "boolean"
+        },
+        "shared_path": {
+          "default": "",
+          "title": "Shared Path",
+          "type": "string"
+        }
+      },
+      "title": "TodoToolConfig",
+      "type": "object"
+    },
+    "ToolConfigBase": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ApiToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "api"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AudioToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "audio"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/BlackboardToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "blackboard"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/CalculatorToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "calculator"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ClarifyToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "clarify"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/CsvAnalysisToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "csv_analysis"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/CustomToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "custom"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/DateTimeToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "datetime"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/DelegateToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "delegate"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/EmailToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "email"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/FileSystemToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "filesystem"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/GitToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "git"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/HttpToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "http"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ImageGenToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "image_gen"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/McpToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "mcp"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/PdfExtractToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "pdf_extract"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/PluginToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "plugin"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/PythonToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "python"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ScriptToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "script"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SearchToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "search"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ShellToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "shell"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SlackToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "slack"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SpawnToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "spawn"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SqlToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "sql"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ThinkToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "think"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/TodoToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "todo"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/WebReaderToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "web_reader"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/WebScraperToolConfig"
+            }
+          ],
+          "properties": {
+            "type": {
+              "const": "web_scraper"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "additionalProperties": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "maxProperties": 1,
+          "minProperties": 1,
+          "not": {
+            "required": [
+              "type"
+            ]
+          },
+          "properties": {
+            "api": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ApiToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "audio": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AudioToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "blackboard": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BlackboardToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "calculator": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CalculatorToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "clarify": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ClarifyToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "csv_analysis": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CsvAnalysisToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "custom": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CustomToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "datetime": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DateTimeToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delegate": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DelegateToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "email": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/EmailToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "filesystem": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FileSystemToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "git": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GitToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "http": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/HttpToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "image_gen": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ImageGenToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "mcp": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/McpToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pdf_extract": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PdfExtractToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "plugin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "python": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PythonToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "script": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ScriptToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "search": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SearchToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "shell": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ShellToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slack": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SlackToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spawn": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SpawnToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sql": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SqlToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "think": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ThinkToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "todo": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TodoToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "web_reader": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WebReaderToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "web_scraper": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WebScraperToolConfig"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "not": {
+                "enum": [
+                  "api",
+                  "audio",
+                  "blackboard",
+                  "calculator",
+                  "clarify",
+                  "csv_analysis",
+                  "custom",
+                  "datetime",
+                  "delegate",
+                  "email",
+                  "filesystem",
+                  "git",
+                  "http",
+                  "image_gen",
+                  "mcp",
+                  "pdf_extract",
+                  "plugin",
+                  "python",
+                  "script",
+                  "search",
+                  "shell",
+                  "slack",
+                  "spawn",
+                  "sql",
+                  "think",
+                  "todo",
+                  "web_reader",
+                  "web_scraper"
+                ]
+              },
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "A tool name ('think'), a single-key mapping ({shell: {...}}), or a mapping with 'type'. Names that are not built in are plugin tools, and their other keys are passed to the plugin.",
+      "title": "Tool"
+    },
+    "ToolPermissions": {
+      "additionalProperties": false,
+      "description": "Declarative allow/deny permission rules for tool arguments.\n\nPattern format: ``arg_name=glob_pattern`` — *arg_name* matches a tool\nfunction parameter, *glob_pattern* uses :func:`fnmatch.fnmatch` syntax.\nA bare pattern (no ``=``) matches against all string argument values.\n\nEvaluation order: deny rules first (deny wins) → allow rules → default.",
+      "properties": {
+        "default": {
+          "enum": [
+            "allow",
+            "deny"
+          ],
+          "type": "string",
+          "default": "allow",
+          "title": "Default"
+        },
+        "allow": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allow",
+          "type": "array"
+        },
+        "deny": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Deny",
+          "type": "array"
+        }
+      },
+      "title": "ToolPermissions",
+      "type": "object"
+    },
+    "ToolSandboxConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_custom_modules": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Custom Modules",
+          "type": "array"
+        },
+        "blocked_custom_modules": {
+          "default": [
+            "os",
+            "subprocess",
+            "shutil",
+            "sys",
+            "importlib",
+            "ctypes",
+            "socket",
+            "http.server",
+            "pickle",
+            "shelve",
+            "marshal",
+            "code",
+            "codeop",
+            "threading",
+            "_thread"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Custom Modules",
+          "type": "array"
+        },
+        "mcp_command_allowlist": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Mcp Command Allowlist",
+          "type": "array"
+        },
+        "sensitive_env_prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sensitive Env Prefixes",
+          "type": "array"
+        },
+        "sensitive_env_suffixes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sensitive Env Suffixes",
+          "type": "array"
+        },
+        "env_allowlist": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Env Allowlist",
+          "type": "array"
+        },
+        "restrict_db_paths": {
+          "default": true,
+          "title": "Restrict Db Paths",
+          "type": "boolean"
+        },
+        "audit_hooks_enabled": {
+          "default": false,
+          "title": "Audit Hooks Enabled",
+          "type": "boolean"
+        },
+        "allowed_write_paths": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Write Paths",
+          "type": "array"
+        },
+        "allowed_network_hosts": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Network Hosts",
+          "type": "array"
+        },
+        "block_private_ips": {
+          "default": true,
+          "title": "Block Private Ips",
+          "type": "boolean"
+        },
+        "allow_subprocess": {
+          "default": false,
+          "title": "Allow Subprocess",
+          "type": "boolean"
+        },
+        "allow_eval_exec": {
+          "default": false,
+          "title": "Allow Eval Exec",
+          "type": "boolean"
+        },
+        "sandbox_violation_action": {
+          "default": "raise",
+          "enum": [
+            "raise",
+            "log"
+          ],
+          "title": "Sandbox Violation Action",
+          "type": "string"
+        }
+      },
+      "title": "ToolSandboxConfig",
+      "type": "object"
+    },
+    "ToolSearchConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for the tool search meta-tool.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "always_available": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Always Available",
+          "type": "array"
+        },
+        "max_results": {
+          "default": 5,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Max Results",
+          "type": "integer"
+        },
+        "threshold": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "title": "ToolSearchConfig",
+      "type": "object"
+    },
+    "WebReaderToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "web_reader",
+          "default": "web_reader",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "allowed_domains": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Domains",
+          "type": "array"
+        },
+        "blocked_domains": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Domains",
+          "type": "array"
+        },
+        "max_content_bytes": {
+          "default": 512000,
+          "title": "Max Content Bytes",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 15,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "user_agent": {
+          "title": "User Agent",
+          "type": "string"
+        }
+      },
+      "title": "WebReaderToolConfig",
+      "type": "object"
+    },
+    "WebScraperToolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "web_scraper",
+          "default": "web_scraper",
+          "title": "Type",
+          "type": "string"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolPermissions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "approval": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "required"
+          ],
+          "title": "Approval",
+          "type": "string"
+        },
+        "allowed_domains": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Domains",
+          "type": "array"
+        },
+        "blocked_domains": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocked Domains",
+          "type": "array"
+        },
+        "max_content_bytes": {
+          "default": 512000,
+          "title": "Max Content Bytes",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 15,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "user_agent": {
+          "title": "User Agent",
+          "type": "string"
+        }
+      },
+      "title": "WebScraperToolConfig",
+      "type": "object"
+    },
+    "WebhookSinkConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "webhook",
+          "default": "webhook",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "method": {
+          "default": "POST",
+          "title": "Method",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "retry_count": {
+          "default": 0,
+          "title": "Retry Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "WebhookSinkConfig",
+      "type": "object"
+    },
+    "WebhookTriggerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "webhook",
+          "default": "webhook",
+          "title": "Type",
+          "type": "string"
+        },
+        "path": {
+          "default": "/webhook",
+          "title": "Path",
+          "type": "string"
+        },
+        "port": {
+          "default": 8080,
+          "title": "Port",
+          "type": "integer"
+        },
+        "method": {
+          "default": "POST",
+          "title": "Method",
+          "type": "string"
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secret"
+        },
+        "rate_limit_rpm": {
+          "default": 60,
+          "title": "Rate Limit Rpm",
+          "type": "integer"
+        },
+        "autonomous": {
+          "default": false,
+          "title": "Autonomous",
+          "type": "boolean"
+        }
+      },
+      "title": "WebhookTriggerConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "author": {
+      "default": "",
+      "title": "Author",
+      "type": "string"
+    },
+    "team": {
+      "default": "",
+      "title": "Team",
+      "type": "string"
+    },
+    "version": {
+      "default": "",
+      "title": "Version",
+      "type": "string"
+    },
+    "dependencies": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "bundle": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BundleConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "spec_version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Spec Version"
+    },
+    "prompt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/PartialModelConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "tools": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ToolConfigBase"
+      },
+      "title": "Tools",
+      "type": "array"
+    },
+    "skills": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "capabilities": {
+      "default": [],
+      "items": {},
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "deps_schema": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deps Schema"
+    },
+    "triggers": {
+      "default": [],
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "cron": "#/$defs/CronTriggerConfig",
+            "discord": "#/$defs/DiscordTriggerConfig",
+            "file_watch": "#/$defs/FileWatchTriggerConfig",
+            "heartbeat": "#/$defs/HeartbeatTriggerConfig",
+            "slack": "#/$defs/SlackTriggerConfig",
+            "telegram": "#/$defs/TelegramTriggerConfig",
+            "webhook": "#/$defs/WebhookTriggerConfig"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/CronTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/FileWatchTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/WebhookTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/TelegramTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/DiscordTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/SlackTriggerConfig"
+          },
+          {
+            "$ref": "#/$defs/HeartbeatTriggerConfig"
+          }
+        ]
+      },
+      "title": "Triggers",
+      "type": "array"
+    },
+    "sinks": {
+      "default": [],
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "custom": "#/$defs/CustomSinkConfig",
+            "file": "#/$defs/FileSinkConfig",
+            "webhook": "#/$defs/WebhookSinkConfig"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/WebhookSinkConfig"
+          },
+          {
+            "$ref": "#/$defs/FileSinkConfig"
+          },
+          {
+            "$ref": "#/$defs/CustomSinkConfig"
+          }
+        ]
+      },
+      "title": "Sinks",
+      "type": "array"
+    },
+    "ingest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IngestConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "memory": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MemoryConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "autonomy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AutonomyConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "reasoning": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReasoningConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "guardrails": {
+      "$ref": "#/$defs/AgentGuardrails"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionConfig"
+    },
+    "resources": {
+      "$ref": "#/$defs/ResourceConfig"
+    },
+    "security": {
+      "$ref": "#/$defs/SecurityPolicy"
+    },
+    "observability": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ObservabilityConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "auto_skills": {
+      "$ref": "#/$defs/AutoSkillsConfig"
+    },
+    "tool_search": {
+      "$ref": "#/$defs/ToolSearchConfig"
+    },
+    "daemon": {
+      "$ref": "#/$defs/DaemonConfig"
+    },
+    "agents": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/AgentChild"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agents"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "enum": [
+            "sequential",
+            "parallel",
+            "debate",
+            "ensemble"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run"
+    },
+    "debate": {
+      "$ref": "#/$defs/DebateConfig"
+    },
+    "ensemble": {
+      "$ref": "#/$defs/TeamEnsembleConfig"
+    },
+    "handoff_max_chars": {
+      "default": 4000,
+      "exclusiveMinimum": 0,
+      "title": "Handoff Max Chars",
+      "type": "integer"
+    },
+    "shared_memory": {
+      "$ref": "#/$defs/SharedMemoryConfig"
+    },
+    "shared_documents": {
+      "$ref": "#/$defs/TeamDocumentsConfig"
+    },
+    "durability": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DurabilityConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "type": "object"
+}
