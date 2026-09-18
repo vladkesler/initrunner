@@ -17,6 +17,14 @@
 - **Opt-in telemetry reported `plan`, `service` and `tool` as `other`.** The allowlist of command names had fallen behind the CLI. It lists every registered command now (including the new `schema`), and a test fails when a command is added without it.
 - **`initrunner examples show webhook-processor` printed an outdated file.** The bundled catalog is generated from `examples/` and had not been rebuilt since `autonomy: {}` was added to that example in 2026.8.11. It is current again, and a test now fails when the catalog and `examples/` disagree.
 
+### Security
+- **Bumped `anyio` to 4.15.1 (GHSA-82r6-8w77-94w6, GHSA-5p39-cfhj-2xmp).** The first let a hijacked connection to an internationalized (non-ASCII) domain pass the TLS hostname check with a certificate issued for the domain's IDNA 2003 spelling. The second is a process-pool worker that blocks once it writes enough to stderr, because nothing drains that pipe; InitRunner does not use AnyIO's process pool. `anyio` sits under httpx, every provider SDK and the flow and team runners. No Dependabot alert existed for these yet; the `pip-audit` job flagged them while this release was being prepared. `typing-extensions` moved to 4.16.0 with it.
+- **Bumped `soupsieve` to 2.9.2 (GHSA-gjv8-xp57-g29c, GHSA-j934-xhv5-fg8f, medium).** Two polynomial-time ReDoS bugs in CSS selector parsing. It arrives through `beautifulsoup4`, and InitRunner's own code never calls BeautifulSoup's CSS `select()`, where those patterns run. Supersedes Dependabot #261.
+- **Bumped `devalue` to 5.9.2 in the dashboard (GHSA-9rgm-9g3h-6x36, medium).** Malformed input could tie up its parser. It comes through `@sveltejs/kit` and `svelte`, whose `^5.8.1` ranges already allowed the fix, so a lockfile-only update was enough and no `pnpm.overrides` pin was needed.
+
+### Dependencies
+- **Bumped dashboard frontend dependencies:** `bits-ui` to 2.19.2 (#257); `vite` to 8.3.0 (#258); `posthog-js` to 1.434.0 (Dependabot #259 asked for 1.429.5; the `^1.429.5` range resolved 1.434.0). `vite` is build-time; `bits-ui` (UI components) and `posthog-js` (opt-in telemetry) ship in the compiled dashboard.
+
 ## [2026.9.1] - 2026-09-08
 
 ### Fixed
