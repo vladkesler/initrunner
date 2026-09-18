@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: research-coordinator
 description: Orchestrator that delegates research and writing tasks to sub-agents
 spec_version: 3

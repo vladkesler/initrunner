@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: scholar
 description: |
   Multi-agent research team. A planner breaks your question into targeted sub-queries, a researcher searches the web and stores verified facts in shared memory, and a synthesizer produces a structured report with citations. Flagship demo of Team mode + shared memory.

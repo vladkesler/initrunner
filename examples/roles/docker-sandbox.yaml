@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: docker-sandbox
 description: Code execution agent with Docker container isolation — no network, read-only
   rootfs, memory limits

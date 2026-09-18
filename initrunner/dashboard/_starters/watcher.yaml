@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: watcher
 description: |
   Heartbeat-driven monitoring daemon that runs health checks from a markdown checklist, learns normal baselines via procedural memory, and detects anomalies by comparing against learned patterns. Gets smarter over time.

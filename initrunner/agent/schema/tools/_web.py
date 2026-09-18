@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import model_validator
 
-from initrunner.agent.schema.base import _USER_AGENT
+from initrunner.agent.schema.base import _USER_AGENT, UserAgent
 from initrunner.agent.schema.tools._base import ToolConfigBase
 
 
@@ -26,7 +26,7 @@ class WebReaderToolConfig(ToolConfigBase):
     blocked_domains: list[str] = []
     max_content_bytes: int = 512_000
     timeout_seconds: int = 15
-    user_agent: str = _USER_AGENT
+    user_agent: UserAgent = _USER_AGENT
 
     def summary(self) -> str:
         if self.allowed_domains:
@@ -40,7 +40,7 @@ class WebScraperToolConfig(ToolConfigBase):
     blocked_domains: list[str] = []
     max_content_bytes: int = 512_000
     timeout_seconds: int = 15
-    user_agent: str = _USER_AGENT
+    user_agent: UserAgent = _USER_AGENT
 
     def summary(self) -> str:
         if self.allowed_domains:

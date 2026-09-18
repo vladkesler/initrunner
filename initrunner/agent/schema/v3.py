@@ -121,7 +121,7 @@ class AgentChild(BaseModel):
     after: list[str] = []
     guardrails: AgentGuardrails | None = None
 
-    @field_validator("model", mode="before")
+    @field_validator("model", mode="before", json_schema_input_type=str | PartialModelConfig | None)
     @classmethod
     def _coerce_model(cls, v: Any) -> Any:
         return coerce_model_shorthand(v)
@@ -193,7 +193,7 @@ class AgentDocument(BaseModel):
             f"flat documents use spec_version {FLAT_SCHEMA_VERSION} (or omit it), not {v}"
         )
 
-    @field_validator("model", mode="before")
+    @field_validator("model", mode="before", json_schema_input_type=str | PartialModelConfig | None)
     @classmethod
     def _coerce_model(cls, v: Any) -> Any:
         return coerce_model_shorthand(v)
@@ -203,7 +203,9 @@ class AgentDocument(BaseModel):
     def _parse_tools(cls, v: Any) -> list:
         return parse_v3_tool_list(v)
 
-    @field_validator("agents", mode="before")
+    @field_validator(
+        "agents", mode="before", json_schema_input_type=dict[str, str | AgentChild] | None
+    )
     @classmethod
     def _normalize_agents(cls, v: Any) -> Any:
         if not isinstance(v, dict):

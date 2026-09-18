@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: math-assistant
 description: |
   Computation assistant that evaluates mathematical expressions step-by-step using an exact calculator. Handles arithmetic, trigonometry, logarithms, financial formulas, and statistics. Shows full working for every answer.

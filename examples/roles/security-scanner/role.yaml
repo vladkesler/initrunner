@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: security-scanner
 description: |
   Runs static analysis scanners, triages findings with LLM intelligence, and reports only high-confidence vulnerabilities. Auto-discovers language-specific scanning skills based on your project.
@@ -90,7 +91,7 @@ prompt: |
     should always be skipped (e.g. "bandit B101 in test files")
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       findings:

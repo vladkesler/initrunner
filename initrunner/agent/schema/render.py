@@ -260,7 +260,9 @@ def _capabilities_value(caps: list[Any]) -> list[Any]:
 
 
 def _dump_section(obj: Any) -> dict[str, Any]:
-    return obj.model_dump(mode="json", exclude_defaults=True, exclude_none=True)
+    # by_alias: YAML uses the public key (output.schema), not the Python
+    # attribute (schema_) that the alias exists to avoid.
+    return obj.model_dump(mode="json", by_alias=True, exclude_defaults=True, exclude_none=True)
 
 
 def _put_if_dumped(out: dict[str, Any], key: str, obj: Any) -> None:

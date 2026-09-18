@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from initrunner import __version__
 
 _USER_AGENT = f"initrunner/{__version__}"
+
+
+def _omit_default(schema: dict[str, Any]) -> None:
+    """Leave a field's default out of the published JSON Schema."""
+    schema.pop("default", None)
+
+
+UserAgent = Annotated[str, Field(json_schema_extra=_omit_default)]
+"""HTTP ``User-Agent`` string. Its default carries the installed version, which
+must not leak into ``schemas/agent.v3.json`` or the file would change every
+release."""
 
 ThinkingEffort = Literal[False, "minimal", "low", "medium", "high", "xhigh"]
 """Extended-thinking effort levels accepted by ``ModelSettings['thinking']``.
@@ -182,17 +193,17 @@ class PartialModelConfig(BaseModel):
             )
         return data
 
-    @model_validator(mode="before")
+    @field_validator(
+        "prompt_cache", mode="before", json_schema_input_type=bool | PromptCacheConfig | None
+    )
     @classmethod
-    def _coerce_prompt_cache_shorthand(cls, data: dict) -> dict:  # type: ignore[type-arg]
+    def _coerce_prompt_cache_shorthand(cls, v: Any) -> Any:
         """Allow ``prompt_cache: true`` as shorthand for the default config."""
-        if isinstance(data, dict):
-            value = data.get("prompt_cache")
-            if value is True:
-                data = {**data, "prompt_cache": {}}
-            elif value is False:
-                data = {**data, "prompt_cache": None}
-        return data
+        if v is True:
+            return {}
+        if v is False:
+            return None
+        return v
 
     def is_resolved(self) -> bool:
         """Return True when both provider and name are set."""

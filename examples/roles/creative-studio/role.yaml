@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: creative-studio
 description: |
   AI image generation assistant that crafts detailed DALL-E prompts from natural language descriptions, generates images, iterates on style and composition, and edits existing images. Learns your visual preferences over time.

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: local-rag
 description: Fully local RAG agent using Ollama (no API keys needed)
 spec_version: 3

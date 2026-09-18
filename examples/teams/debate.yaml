@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: architecture-debate
 description: Multi-round debate on technical decisions
 spec_version: 3

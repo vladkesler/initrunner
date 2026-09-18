@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 # A group of independent agents deployed together.
 #
 # There is no orchestration here: members never hand off to each other. The file

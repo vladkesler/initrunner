@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: content-pipeline
 description: |
   Multi-agent content creation pipeline. A file watcher monitors ./drafts/ for new markdown or text files, extracts the topic, and delegates to a researcher. The researcher fans out to a writer (polished output) and a reviewer (QA checks). Memory is enabled for researcher and writer so they build up knowledge across runs.

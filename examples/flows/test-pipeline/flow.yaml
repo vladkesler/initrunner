@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: test-pipeline
 description: |
   Multi-agent test pipeline. A file watcher detects repository changes, analyzes git diff to determine affected modules, and delegates to unit and integration test runners. Each runner posts its own results directly to Slack.

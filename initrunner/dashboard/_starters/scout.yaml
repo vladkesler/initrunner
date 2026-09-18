@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: scout
 description: |
   Research assistant that searches the web, reads pages, and delivers structured briefings with sources. Give it a topic and get a report.

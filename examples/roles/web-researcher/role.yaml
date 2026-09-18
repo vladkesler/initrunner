@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: scout
 description: |
   Autonomous web research agent that navigates websites with a headless browser, extracts structured data, takes screenshots, fills search forms, and compares information across multiple pages. Remembers site structures and extraction patterns.

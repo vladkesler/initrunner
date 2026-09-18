@@ -37,6 +37,7 @@ other command still wants a single file.
 | `initrunner run <PATH> -i --format rich` | Interactive REPL with buffered output, so a `breakpoint()` in a tool owns the terminal |
 | `initrunner validate <PATH>` | Validate a role definition |
 | `initrunner validate <PATH> --explain` | Validate and explain what each section does in plain language |
+| `initrunner schema` | Print the JSON Schema for agent files, for editor completion and typo checks |
 | `initrunner plan <PATH>` | Static dry-run: reachable tools, would-fire policies, guardrails, sandbox, triggers, heuristic cost (no model call) |
 | `initrunner new [description]` | Create a new agent via conversational builder |
 | `initrunner setup` | Guided setup wizard (provider selection + test) |
@@ -418,6 +419,23 @@ Valid
 
 For deeper checks (deprecation rules, spec version status), run `initrunner
 doctor --role <PATH>` -- see [Deprecations](../operations/deprecations.md).
+
+## Schema
+
+Synopsis: `initrunner schema`
+
+Prints the JSON Schema for agent YAML files to stdout, the same file that is
+published as `schemas/agent.v3.json`. It is generated from the installed
+version's models, so redirect it to a file when you want a schema that matches
+what you run rather than what is on `main`:
+
+```bash
+initrunner schema > agent.schema.json
+```
+
+No credentials, network access or extras are needed. See
+[Editor support](editor-support.md) for wiring it into VS Code, JetBrains or
+Neovim.
 
 ## Ingest options
 

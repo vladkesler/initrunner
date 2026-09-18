@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: api-monitor
 description: |
   Monitors API endpoints on a heartbeat, detects degradation trends using long-term memory, and alerts Slack when things go wrong. Auto-discovers analysis skills for latency trends, SSL certificates, and response validation.
@@ -94,7 +95,7 @@ prompt: |
     back to normal.
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       checks:

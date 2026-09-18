@@ -157,6 +157,7 @@ from initrunner.cli.registry_cmd import (  # noqa: E402
 )
 from initrunner.cli.role_cmd import configure, setup, validate  # noqa: E402
 from initrunner.cli.run_cmd import RunCommand, run  # noqa: E402
+from initrunner.cli.schema_cmd import schema  # noqa: E402
 from initrunner.cli.vault_cmd import app as vault_app  # noqa: E402
 
 # --- Getting Started ---
@@ -172,6 +173,7 @@ app.add_typer(export_app, name="export", rich_help_panel="Getting Started")
 app.command(rich_help_panel="Run & Test")(test)
 app.command(rich_help_panel="Run & Test")(ingest)
 app.command(rich_help_panel="Run & Test")(validate)
+app.command(rich_help_panel="Run & Test")(schema)
 app.command(rich_help_panel="Run & Test")(plan)
 app.command(rich_help_panel="Run & Test")(configure)
 

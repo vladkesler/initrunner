@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: summarizer
 description: Synthesizes research findings into structured summaries
 spec_version: 3

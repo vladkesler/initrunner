@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: writer
 description: |
   Topic researcher, content writer, and editor/fact-checker pipeline. Submit topics via webhook or let the daily cron pick from a topic queue. Outputs polished markdown articles with verified citations.

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: csv-analyst
 description: Analyze and summarize CSV files in a local directory
 spec_version: 3

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: inbox-watcher
 description: Monitors inbox and forwards new messages
 spec_version: 3

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: pdf-analyst
 description: |
   Analyze, compare, and summarize PDF documents. Extracts text and metadata directly from PDFs, answers questions about content, compares documents side-by-side, and builds structured summaries with page references.

@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: unit-tester
 description: |
   Detects your test framework, reads source code, generates test files, runs the suite, and iterates until tests pass. Learns your project's testing conventions via memory and auto-discovered skills.
@@ -87,7 +88,7 @@ prompt: |
     in this project")
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       tests_generated:

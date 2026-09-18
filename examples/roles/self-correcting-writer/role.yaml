@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
 name: self-correcting-writer
 description: Writer that produces content then self-critiques and improves it via
   reflexion

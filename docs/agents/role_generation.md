@@ -193,6 +193,20 @@ Next steps:
   initrunner validate role.yaml
 ```
 
+### Editor schema header
+
+A file the builder creates starts with one comment line:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
+```
+
+Editors with a YAML language server read it and give you completion and typo
+checks for the rest of the file. It is written only when the file is new:
+saving over an existing file (the dashboard editor, `initrunner new --force`)
+leaves that file's header as it was, and a file that already names a schema
+keeps its own. See [Editor support](../getting-started/editor-support.md).
+
 ### Run it now?
 
 For runnable one-shot agents (no triggers, no `ingest` block, valid YAML), `initrunner new` then asks whether to execute the agent immediately:
