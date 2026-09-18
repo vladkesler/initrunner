@@ -369,6 +369,7 @@ Also available as a native desktop window (`initrunner desktop`). See [Dashboard
 | **Skills** (reusable tool + prompt bundles) | `skills: [../skills/web-researcher]` | [Skills](docs/agents/skills_feature.md) |
 | **Tool scaffolding** (LLM-write a tool, hot-attach in the REPL with `/tool add`) | `initrunner tool new "fetch a PR diff"` | [Tools](docs/agents/tool_creation.md) |
 | **Plan** (static dry-run: reachable tools, policies, sandbox, cost; no model call) | `initrunner plan role.yaml` | [Plan](docs/operations/plan.md) |
+| **Editor support** (completion and typo checks from a JSON Schema; files from `initrunner new` come wired up) | `initrunner schema > agent.schema.json` | [Editor support](docs/getting-started/editor-support.md) |
 | **API server** (OpenAI-compatible endpoint) | `initrunner run agent.yaml --serve --port 3000` | [Server](docs/interfaces/server.md) |
 | **A2A server** (agent-to-agent protocol) | `initrunner a2a serve agent.yaml` | [A2A](docs/interfaces/a2a.md) |
 | **Multimodal** (images, audio, video, docs) | `initrunner run role.yaml -p "Describe" -A photo.png` | [Multimodal](docs/core/multimodal.md) |
@@ -431,6 +432,8 @@ initrunner examples copy code-reviewer # copy to current directory
 
 Run `initrunner doctor --role role.yaml` to check any role file for deprecated fields, schema errors, and spec version issues. Add `--fix` to auto-repair. Use `--flow flow.yaml` to validate an entire flow and its referenced roles. See [Deprecations](docs/operations/deprecations.md).
 
+Since 2026.9.2, a key InitRunner doesn't recognize is an error at any depth instead of being silently dropped. If a file that used to load now fails, `initrunner validate` names each key with its path (`memory.max_sesions`): fix the spelling or delete the line.
+
 ## Community
 
 - [Discord](https://discord.gg/HhnG8JcdJD): chat, ask questions, share roles
@@ -444,4 +447,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.9.1</sub></p>
+<p align="center"><sub>v2026.9.2</sub></p>

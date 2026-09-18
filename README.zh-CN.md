@@ -368,6 +368,8 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 运行 `initrunner doctor --role role.yaml` 检查角色文件的废弃字段、Schema 错误和规范版本问题。添加 `--fix` 自动修复。用 `--flow flow.yaml` 验证整个 Flow 及其引用的角色。查看 [废弃说明](docs/operations/deprecations.md)。
 
+从 2026.9.2 起，InitRunner 不认识的键在任何层级都会报错，不再被静默丢弃。如果以前能加载的文件现在报错，`initrunner validate` 会逐个列出这些键及其路径（如 `memory.max_sesions`）：修正拼写或删除该行即可。
+
 ## 社区
 
 - [Discord](https://discord.gg/HhnG8JcdJD): 聊天、提问、分享角色
@@ -381,4 +383,4 @@ initrunner examples copy code-reviewer # 复制到当前目录
 
 ---
 
-<p align="center"><sub>v2026.9.1</sub></p>
+<p align="center"><sub>v2026.9.2</sub></p>
