@@ -185,3 +185,19 @@ def test_non_kebab_flow_name_is_rejected() -> None:
                 "spec": {"agents": {"intake": {"role": "roles/intake.yaml"}}},
             }
         )
+
+
+def test_rendered_output_schema_uses_the_public_key() -> None:
+    """``schema_`` is the Python attribute; the YAML key is ``schema``."""
+    from initrunner.agent.schema.render import render_document
+    from initrunner.agent.schema.v3 import AgentDocument
+
+    document = AgentDocument.model_validate(
+        {
+            "name": "structured",
+            "prompt": "Reply in JSON.",
+            "output": {"type": "json_schema", "schema": {"type": "object"}},
+        }
+    )
+    rendered = yaml.safe_load(render_document(document))
+    assert rendered["output"] == {"type": "json_schema", "schema": {"type": "object"}}
