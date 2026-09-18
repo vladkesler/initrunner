@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class WebhookSinkConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["webhook"] = "webhook"
     url: str
     method: str = "POST"
@@ -20,6 +21,7 @@ class WebhookSinkConfig(BaseModel):
 
 
 class FileSinkConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["file"] = "file"
     path: str
     format: Literal["json", "text"] = "json"
@@ -29,6 +31,7 @@ class FileSinkConfig(BaseModel):
 
 
 class CustomSinkConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     type: Literal["custom"] = "custom"
     module: str
     function: str

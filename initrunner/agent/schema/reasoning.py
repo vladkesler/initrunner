@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ReflexionDimension(BaseModel):
     """A single evaluation dimension for a reflexion round."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
     prompt: str = Field(min_length=1)
@@ -45,6 +47,8 @@ DEFAULT_REFLEXION_DIMENSIONS: list[ReflexionDimension] = [
 
 class ReasoningConfig(BaseModel):
     """Controls how the execution layer orchestrates agent reasoning."""
+
+    model_config = ConfigDict(extra="forbid")
 
     pattern: Literal["react", "todo_driven", "plan_execute", "reflexion"] = "react"
     auto_plan: bool = False

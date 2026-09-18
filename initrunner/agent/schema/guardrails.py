@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class RetryPolicy(BaseModel):
     """Daemon-level retry policy for failed runs."""
+
+    model_config = ConfigDict(extra="forbid")
 
     max_attempts: Annotated[int, Field(ge=1, le=5)] = 1
     backoff_base_seconds: Annotated[float, Field(ge=0.5, le=30.0)] = 2.0
@@ -19,11 +21,14 @@ class RetryPolicy(BaseModel):
 class CircuitBreakerConfig(BaseModel):
     """Per-daemon circuit breaker to stop wasting triggers against a broken provider."""
 
+    model_config = ConfigDict(extra="forbid")
+
     failure_threshold: Annotated[int, Field(ge=1, le=100)] = 5
     reset_timeout_seconds: Annotated[int, Field(ge=10, le=3600)] = 60
 
 
 class Guardrails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     max_tokens_per_run: Annotated[int, Field(gt=0)] = 50000
     max_tool_calls: Annotated[int, Field(ge=0)] = 20
     timeout_seconds: Annotated[int, Field(gt=0)] = 300

@@ -73,7 +73,7 @@ A SKILL.md file has two parts: YAML frontmatter (delimited by `---`) and a Markd
 | `tools` | `list[ToolConfig]` | `[]` | Tool configurations contributed by the skill. Same format as `tools` in a role. |
 | `requires` | `RequiresConfig` | `{}` | External dependencies to check at load time. |
 
-Unknown frontmatter fields are silently ignored (`extra="ignore"`) to maintain compatibility with community SKILL.md files that may include additional fields.
+Unknown frontmatter fields are silently ignored (`extra="ignore"`) to maintain compatibility with community SKILL.md files that may include additional fields. The entries under `tools:` are InitRunner config, though, and get the same check as a role's tools: a misspelled key in a tool entry is an error that names the entry, for example `tools.0.allowd_commands`.
 
 ### Markdown Body
 

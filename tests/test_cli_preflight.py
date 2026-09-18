@@ -300,6 +300,152 @@ class TestValidateYamlFile:
         assert errors[0].field == "file"
 
 
+_FLAT_TWO_TYPOS_YAML = textwrap.dedent("""\
+    name: typos
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+    memory:
+      retenion_days: 30
+    tools:
+      - think
+      - shell:
+          allowd_commands: [ls]
+""")
+
+
+_FLAT_VALID_ROLE_YAML = textwrap.dedent("""\
+    name: fine
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+""")
+
+
+_FLAT_MEMBER_TYPO_YAML = textwrap.dedent("""\
+    name: member
+    prompt: You are a careful assistant.
+    model: openai:gpt-5-mini
+    memory:
+      retenion_days: 30
+""")
+
+
+class TestFlatDocumentFieldPaths:
+    """Flat files report one issue per field, not one ``document`` blob."""
+
+    def test_each_typo_is_its_own_issue_with_a_fix(self, tmp_path):
+        f = tmp_path / "agent.yaml"
+        f.write_text(_FLAT_TWO_TYPOS_YAML)
+        defn, kind, issues = validate_yaml_file(f)
+        assert defn is None
+        assert kind == "Agent"
+        errors = {i.field: i for i in issues if i.severity == "error"}
+        assert set(errors) == {"memory.retenion_days", "tools.1.allowd_commands"}
+        assert all(i.suggestion for i in errors.values())
+
+    def test_flow_member_issues_keep_their_prefix(self, tmp_path):
+        (tmp_path / "worker.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        flow = tmp_path / "flow.yaml"
+        flow.write_text(
+            textwrap.dedent("""\
+                name: pipe
+                model: openai:gpt-5-mini
+                agents:
+                  worker:
+                    use: worker.yaml
+                    then: {to: sink}
+                  sink:
+                    prompt: Collect the results.
+            """)
+        )
+        _defn, kind, issues = validate_yaml_file(flow)
+        assert kind == "Flow"
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert "agents.worker.memory.retenion_days" in fields
+
+    def test_group_member_issues_keep_their_prefix(self, tmp_path):
+        (tmp_path / "a.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        (tmp_path / "b.yaml").write_text(_FLAT_VALID_ROLE_YAML)
+        group = tmp_path / "group.yaml"
+        group.write_text("name: desk\nagents:\n  a:\n    use: a.yaml\n  b:\n    use: b.yaml\n")
+        _defn, kind, issues = validate_yaml_file(group)
+        assert kind == "Group"
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.a.memory.retenion_days"]
+
+    def test_referenced_role_errors_carry_the_member_prefix(self, tmp_path):
+        """A ``use:`` target with overrides is loaded while composing; check it first."""
+        (tmp_path / "bad.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        team = tmp_path / "team.yaml"
+        team.write_text(
+            textwrap.dedent("""\
+                name: crew
+                model: openai:gpt-5-mini
+                run: sequential
+                agents:
+                  a:
+                    use: bad.yaml
+                    prompt: Override the prompt.
+                  b: Review the work.
+            """)
+        )
+        defn, _kind, issues = validate_yaml_file(team)
+        assert defn is None
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.a.memory.retenion_days"]
+
+    def test_flow_member_with_overrides_keeps_its_prefix(self, tmp_path):
+        (tmp_path / "worker.yaml").write_text(_FLAT_MEMBER_TYPO_YAML)
+        flow = tmp_path / "flow.yaml"
+        flow.write_text(
+            textwrap.dedent("""\
+                name: pipe
+                model: openai:gpt-5-mini
+                agents:
+                  worker:
+                    use: worker.yaml
+                    prompt: Override the prompt.
+                    then: {to: sink}
+                  sink:
+                    prompt: Collect the results.
+            """)
+        )
+        _defn, _kind, issues = validate_yaml_file(flow)
+        fields = [i.field for i in issues if i.severity == "error"]
+        assert fields == ["agents.worker.memory.retenion_days"]
+
+    def test_document_rule_is_reported_as_document(self, tmp_path):
+        """Model-level rules have no field path; they must not render as a blank row."""
+        f = tmp_path / "agent.yaml"
+        f.write_text("name: noprompt\nmodel: openai:gpt-5-mini\n")
+        defn, _kind, issues = validate_yaml_file(f)
+        assert defn is None
+        [error] = [i for i in issues if i.severity == "error"]
+        assert error.field == "document"
+        assert "require 'prompt'" in error.message
+
+    def test_a_file_that_references_itself_is_an_error_not_a_crash(self, tmp_path):
+        group = tmp_path / "group.yaml"
+        group.write_text(
+            "name: desk\nagents:\n  a:\n    use: group.yaml\n  b:\n    use: group.yaml\n"
+        )
+        defn, _kind, issues = validate_yaml_file(group)
+        assert defn is None
+        fields = {i.field for i in issues if i.severity == "error"}
+        assert fields == {"agents.a.use", "agents.b.use"}
+
+    def test_a_member_that_is_not_an_agent_is_an_error(self, tmp_path):
+        (tmp_path / "b.yaml").write_text(_FLAT_VALID_ROLE_YAML)
+        (tmp_path / "inner.yaml").write_text(
+            "name: inner\nagents:\n  x:\n    use: b.yaml\n  y:\n    use: b.yaml\n"
+        )
+        group = tmp_path / "group.yaml"
+        group.write_text("name: desk\nagents:\n  a:\n    use: inner.yaml\n  b:\n    use: b.yaml\n")
+        _defn, _kind, issues = validate_yaml_file(group)
+        errors = [i for i in issues if i.severity == "error"]
+        assert [i.field for i in errors] == ["agents.a.use"]
+        assert "inner.yaml is a Group" in errors[0].message
+
+
 # ---------------------------------------------------------------------------
 # preflight_validate_or_exit: run-path policy
 # ---------------------------------------------------------------------------
@@ -424,6 +570,17 @@ class TestCliIntegration:
         result = runner.invoke(app, ["validate", str(f)])
         assert result.exit_code == 0
         assert "Valid" in result.output
+
+    def test_validate_command_team_without_a_model(self, tmp_path):
+        """The model is auto-detected at run time; the summary must not assume one."""
+        f = tmp_path / "team.yaml"
+        f.write_text(
+            "name: crew\nrun: parallel\nagents:\n  architect: Review the design.\n"
+            "  tester: Review the tests.\n"
+        )
+        result = runner.invoke(app, ["validate", str(f)])
+        assert result.exit_code == 0, result.output
+        assert "auto-detect at runtime" in result.output
 
     def test_validate_command_warning_only_renders_panel_and_succeeds(self, tmp_path):
         f = tmp_path / "role.yaml"

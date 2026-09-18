@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 from initrunner.agent.schema.base import ApiVersion, Metadata, PartialModelConfig
 from initrunner.agent.schema.ingestion import ChunkingConfig, EmbeddingConfig
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 class PersonaConfig(BaseModel):
     """Extended persona definition with optional overrides."""
 
+    model_config = ConfigDict(extra="forbid")
+
     role: str
     model: PartialModelConfig | None = None
     tools: list[ToolConfig] = []
@@ -36,6 +38,8 @@ class PersonaConfig(BaseModel):
 
 class TeamDocumentsConfig(BaseModel):
     """Team-level shared document/RAG configuration with ingest sources."""
+
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
     sources: list[str] = []
@@ -57,6 +61,8 @@ class TeamDocumentsConfig(BaseModel):
 class TeamGuardrails(BaseModel):
     """Per-persona guardrails plus cumulative team-level budgets."""
 
+    model_config = ConfigDict(extra="forbid")
+
     # Per-persona (passed to each execute_run via Guardrails)
     max_tokens_per_run: Annotated[int, Field(gt=0)] = 50000
     max_tool_calls: Annotated[int, Field(ge=0)] = 20
@@ -70,6 +76,8 @@ class TeamGuardrails(BaseModel):
 class DebateConfig(BaseModel):
     """Configuration for the debate strategy."""
 
+    model_config = ConfigDict(extra="forbid")
+
     max_rounds: Annotated[int, Field(ge=2, le=10)] = 3
     synthesize: bool = True
 
@@ -82,6 +90,8 @@ class TeamEnsembleConfig(BaseModel):
     identical answers, ``weighted`` favours the highest-weight persona, and
     ``judge`` scores each answer with an LLM judge (``eval/judge.py``).
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     mode: Literal["majority", "weighted", "judge"] = "majority"
     judge_model: str = "openai:gpt-4o-mini"
@@ -98,6 +108,7 @@ class TeamEnsembleConfig(BaseModel):
 
 
 class TeamSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     model: PartialModelConfig | None = None
     personas: dict[str, PersonaConfig] = Field(min_length=2)
     tools: list[ToolConfig] = []
@@ -166,6 +177,7 @@ class TeamSpec(BaseModel):
 
 
 class TeamDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     apiVersion: ApiVersion
     kind: Literal["Team"]
     metadata: Metadata

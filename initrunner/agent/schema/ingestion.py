@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from initrunner.stores.base import StoreBackend
 
 
 class ChunkingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     strategy: Literal["fixed", "paragraph"] = "fixed"
     chunk_size: int = 512
     chunk_overlap: int = 50
@@ -38,6 +39,8 @@ class EmbeddingConfig(BaseModel):
     ``BAAI/bge-base-en-v1.5`` at 768) requires a fresh ``store_path``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     # empty provider = derive from spec.model.provider; 'local' = fastembed in-process
     provider: str = ""
     # empty model = provider default (e.g. text-embedding-3-small, or bge-small for local)
@@ -58,12 +61,15 @@ class RetrieverConfig(BaseModel):
     installed, ``hybrid_rerank`` degrades to plain ``hybrid`` scoring.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     strategy: Literal["vector", "hybrid", "hybrid_rerank"] = "vector"
     rrf_k: int = 60  # RRF smoothing constant; lancedb default
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 class IngestConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     auto: bool = True
     sources: list[str]
     watch: bool = False

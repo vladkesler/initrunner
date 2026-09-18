@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from initrunner import __version__
 
@@ -38,10 +38,13 @@ class Kind(StrEnum):
 class BundleConfig(BaseModel):
     """Extra files to include in OCI bundles (glob patterns relative to role dir)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     include: list[str] = []
 
 
 class Metadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")]
     description: str = ""
     tags: list[str] = []
@@ -85,6 +88,8 @@ class ModelConcurrencyConfig(BaseModel):
     nodes) share a provider rate-limit budget.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     max_running: Annotated[int, Field(ge=1)]
     """Maximum concurrent in-flight model requests."""
     max_queued: Annotated[int, Field(ge=0)] | None = None
@@ -104,6 +109,8 @@ class PromptCacheConfig(BaseModel):
     cutting input-token cost. Only ``anthropic`` and ``bedrock`` support it.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     instructions: bool = True
     """Cache the system instructions (role prompt + skill prompts)."""
     tools: bool = True
@@ -114,6 +121,8 @@ class PromptCacheConfig(BaseModel):
 
 class PartialModelConfig(BaseModel):
     """YAML-facing model config. Provider and name may be omitted for auto-detection."""
+
+    model_config = ConfigDict(extra="forbid")
 
     provider: str = ""
     name: str = ""

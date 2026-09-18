@@ -28,7 +28,7 @@ class OutputConfig(BaseModel):
     schema_file: str | None = None
     mode: OutputMode = "auto"
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     @model_validator(mode="after")
     def _validate_output(self) -> OutputConfig:

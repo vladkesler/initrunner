@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompactionConfig(BaseModel):
     """Configuration for LLM-driven conversation history compaction."""
+
+    model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
     threshold: int = Field(default=30, ge=1)
@@ -17,6 +19,8 @@ class CompactionConfig(BaseModel):
 
 class AutonomyConfig(BaseModel):
     """Configuration for autonomous agent execution."""
+
+    model_config = ConfigDict(extra="forbid")
 
     continuation_prompt: str = (
         "Continue working on the task. Review your progress so far and "

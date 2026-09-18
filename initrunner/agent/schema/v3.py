@@ -101,8 +101,6 @@ class ThenConfig(BaseModel):
 class AgentGuardrails(Guardrails):
     """Solo guardrails plus optional composed budgets."""
 
-    model_config = ConfigDict(extra="forbid")
-
     team_token_budget: Annotated[int, Field(gt=0)] | None = None
     team_timeout_seconds: Annotated[int, Field(gt=0)] | None = None
 
@@ -405,22 +403,9 @@ def expand_tool_shorthand(v: Any) -> Any:
 
 
 def parse_v3_tool_list(v: Any) -> list:
-    """Expand shorthand, parse builtin tools, reject unknown keys on builtins."""
-    expanded = expand_tool_shorthand(v)
-    parsed = parse_tool_list(expanded)
-    if not isinstance(expanded, list):
-        return parsed
-    from initrunner.agent.tools._registry import get_tool_types
+    """Expand shorthand, then parse builtin and plugin tools.
 
-    builtin_types = get_tool_types()
-    for raw, model in zip(expanded, parsed, strict=False):
-        if not isinstance(raw, dict):
-            continue
-        tool_type = raw.get("type")
-        if tool_type not in builtin_types:
-            continue
-        allowed = set(type(model).model_fields)
-        extra = set(raw) - allowed
-        if extra:
-            raise ValueError(f"Unknown keys for tool '{tool_type}': {sorted(extra)}")
-    return parsed
+    Builtin tool models forbid unknown keys, so a typo fails at its list
+    index; plugin tools keep every other key as their ``config``.
+    """
+    return parse_tool_list(expand_tool_shorthand(v))

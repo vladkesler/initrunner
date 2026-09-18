@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ToolPermissions(BaseModel):
@@ -16,6 +16,8 @@ class ToolPermissions(BaseModel):
 
     Evaluation order: deny rules first (deny wins) → allow rules → default.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     default: Literal["allow", "deny"] = "allow"
     allow: list[str] = []
@@ -36,6 +38,8 @@ class ToolPermissions(BaseModel):
 
 class ToolConfigBase(BaseModel):
     """Base class for all tool configurations."""
+
+    model_config = ConfigDict(extra="forbid")
 
     type: str
     permissions: ToolPermissions | None = None

@@ -50,8 +50,11 @@ def test_tool_shorthand_and_unknown_key() -> None:
     assert tools[1].type == "filesystem"
     assert tools[1].root_path == "."
 
-    with pytest.raises(ValueError, match="Unknown keys"):
-        parse_v3_tool_list([{"filesystem": {"root": ".", "read_only": True}}])
+    with pytest.raises(ValidationError) as excinfo:
+        parse_v3_tool_list(["search", {"filesystem": {"root": ".", "read_only": True}}])
+    [error] = excinfo.value.errors()
+    assert error["loc"] == (1, "root")
+    assert error["type"] == "extra_forbidden"
 
 
 def test_preset_team_defaults_sequential() -> None:

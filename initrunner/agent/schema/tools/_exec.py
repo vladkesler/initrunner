@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from initrunner.agent.schema.tools._base import ToolConfigBase
 
@@ -61,6 +61,8 @@ class ShellToolConfig(ToolConfigBase):
 class ScriptParameter(BaseModel):
     """A parameter for a script tool, injected as an uppercase env var."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: str = ""
     required: bool = False
@@ -76,6 +78,8 @@ class ScriptParameter(BaseModel):
 
 class ScriptDefinition(BaseModel):
     """A single inline script that becomes a tool function."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     description: str = ""

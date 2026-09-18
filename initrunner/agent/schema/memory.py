@@ -4,28 +4,32 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from initrunner.agent.schema.ingestion import EmbeddingConfig
 from initrunner.stores.base import StoreBackend
 
 
 class EpisodicMemoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = True
     max_episodes: int = 500
 
 
 class SemanticMemoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = True
     max_memories: int = 1000
 
 
 class ProceduralMemoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = True
     max_procedures: int = 100
 
 
 class ConsolidationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = True
     interval: Literal["after_session", "after_autonomous", "manual"] = "after_session"
     max_episodes_per_run: int = 20
@@ -33,6 +37,7 @@ class ConsolidationConfig(BaseModel):
 
 
 class MemoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     store_path: str | None = None  # default: ~/.initrunner/memory/{agent-name}.db
     store_backend: StoreBackend = StoreBackend.LANCEDB
     max_sessions: int = 10

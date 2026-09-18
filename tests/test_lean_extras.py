@@ -184,8 +184,7 @@ class TestTheHintSurvivesRichMarkup:
 
         role = tmp_path / "notes.yaml"
         role.write_text(
-            "name: notes\ndescription: d\nprompt: p\nmodel: openai:gpt-5-mini\n"
-            "memory:\n  enabled: true\n"
+            "name: notes\ndescription: d\nprompt: p\nmodel: openai:gpt-5-mini\nmemory: {}\n"
         )
 
         result = CliRunner().invoke(app, ["run", str(role), "-p", "hi", "--no-audit"])
