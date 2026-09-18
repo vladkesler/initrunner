@@ -368,6 +368,8 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 `initrunner doctor --role role.yaml` でロールファイルの非推奨フィールド、スキーマエラー、仕様バージョンの問題をチェック。`--fix` で自動修復。`--flow flow.yaml` で Flow 全体とその参照先ロールを検証。[非推奨事項](docs/operations/deprecations.md) を参照。
 
+2026.9.2 以降、InitRunner が認識しないキーはどの階層でも黙って捨てられず、エラーになります。以前は読み込めたファイルが失敗する場合は、`initrunner validate` が各キーをパス付き（例: `memory.max_sesions`）で表示するので、綴りを直すかその行を削除してください。
+
 ## コミュニティ
 
 - [Discord](https://discord.gg/HhnG8JcdJD): チャット、質問、ロール共有
@@ -381,4 +383,4 @@ initrunner examples copy code-reviewer # カレントディレクトリにコピ
 
 ---
 
-<p align="center"><sub>v2026.9.1</sub></p>
+<p align="center"><sub>v2026.9.2</sub></p>

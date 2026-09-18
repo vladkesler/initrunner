@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2026.9.2] - 2026-09-18
 
 ### Added
 - **A JSON Schema for agent files, so editors catch typos as you type.** `schemas/agent.v3.json` is generated from the same Pydantic models the loader uses, and `initrunner schema` prints it (no API keys or extras needed; redirect it to a file to match the version you run). Files that `initrunner new` and the dashboard's new-agent page create start with a `# yaml-language-server: $schema=...` line, which is all VS Code's YAML extension or Neovim's yamlls needs for completion, hover text and red underlines. Existing files are never touched, and a file that already names a schema keeps it. The bundled examples and starters carry the same line, so a copy from `initrunner examples copy` lights up too. The schema knows the shorthand the loader accepts (`model: openai:gpt-5-mini`, `tools: [think]`, `- shell: {...}`, a child agent written as a plain prompt, `prompt_cache: true`) and the full config of every built-in tool, and treats other tool names as plugins without letting a misconfigured built-in slip through as one. Every flat agent file in `examples/` and the starters validates against it; that is a test, along with one that fails if the committed file drifts from the models. Rules that span fields stay in `initrunner validate`. See `docs/getting-started/editor-support.md`.
