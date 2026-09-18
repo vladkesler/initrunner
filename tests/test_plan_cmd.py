@@ -73,3 +73,12 @@ def test_plan_rejects_non_agent_kind(tmp_path):
     result = runner.invoke(app, ["plan", str(tmp_path / "team.yaml")])
     assert result.exit_code == 1
     assert "Agent roles" in result.output
+
+
+def test_plan_header_without_a_model(tmp_path):
+    role = tmp_path / "agent.yaml"
+    role.write_text("name: no-model\nprompt: You help.\nsecurity:\n  sandbox:\n    backend: none\n")
+    result = runner.invoke(app, ["plan", str(role), "--no-sandbox-probe"])
+    assert result.exit_code == 0, result.output
+    assert "(auto-detect at runtime)" in result.output
+    assert "((" not in result.output

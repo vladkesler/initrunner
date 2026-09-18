@@ -513,7 +513,7 @@ def plan_role(
     model_label = (
         f"{model.provider}:{model.name}"
         if model is not None and getattr(model, "name", None)
-        else "(auto-detect at runtime)"
+        else "auto-detect at runtime"
     )
 
     return AgentPlan(
