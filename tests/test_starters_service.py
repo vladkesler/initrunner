@@ -355,3 +355,138 @@ class TestCopyStarter:
         copy_starter("memory", tmp_path)
         role = load_role(tmp_path / "role.yaml")
         assert role.metadata.name
+
+
+_MCP = {"mcp": {"transport": "sse", "url": "https://mcp.example"}}
+
+# (case id, document body, expected (extra, feature) pairs). Each body is checked
+# as a flat document and inside an envelope ``spec``.
+_EXTRA_CASES = [
+    (
+        "markdown-text-html-ingest",
+        {"ingest": {"sources": ["./docs/**/*.md", "./notes/*.txt", "./site/*.html"]}},
+        [("vector", "ingest")],
+    ),
+    (
+        "pdf-ingest",
+        {"ingest": {"sources": ["./docs/**/*.pdf"]}},
+        [("ingest", "ingest"), ("vector", "ingest")],
+    ),
+    (
+        "docx-upper",
+        {"ingest": {"sources": ["./in/*.DOCX"]}},
+        [("ingest", "ingest"), ("vector", "ingest")],
+    ),
+    (
+        "xlsx-ingest",
+        {"ingest": {"sources": ["./sheets/q3.xlsx"]}},
+        [("ingest", "ingest"), ("vector", "ingest")],
+    ),
+    ("empty-memory", {"memory": {}}, [("vector", "memory")]),
+    ("null-memory", {"memory": None}, []),
+    (
+        "ingest-local-embeddings",
+        {"ingest": {"sources": ["*.md"], "embeddings": {"provider": "local"}}},
+        [("local-embeddings", "ingest.embeddings"), ("vector", "ingest")],
+    ),
+    (
+        "memory-local-embeddings",
+        {"memory": {"embeddings": {"provider": "local"}}},
+        [("local-embeddings", "memory.embeddings"), ("vector", "memory")],
+    ),
+    (
+        "shared-documents-local-embeddings",
+        {"shared_documents": {"enabled": True, "embeddings": {"provider": "local", "model": "m"}}},
+        [("local-embeddings", "shared_documents.embeddings"), ("vector", "shared_documents")],
+    ),
+    (
+        "shared-documents-pdf",
+        {
+            "shared_documents": {
+                "enabled": True,
+                "sources": ["./handbook/*.md", "./contracts/**/*.pdf"],
+                "embeddings": {"provider": "openai", "model": "text-embedding-3-small"},
+            }
+        },
+        [("ingest", "shared_documents"), ("vector", "shared_documents")],
+    ),
+    ("shared-memory-enabled", {"shared_memory": {"enabled": True}}, [("vector", "shared_memory")]),
+    ("shared-memory-disabled", {"shared_memory": {"enabled": False}}, []),
+    (
+        "inline-child-tools",
+        {"agents": {"a": {"prompt": "p", "tools": ["search", _MCP]}, "b": "prompt only"}},
+        [("mcp", "mcp"), ("search", "search")],
+    ),
+    (
+        "envelope-team-personas",
+        {"personas": {"a": {"role": "p", "tools": [{"type": "search"}]}, "b": "p"}},
+        [("search", "search")],
+    ),
+    ("empty-observability", {"observability": {}}, [("observability", "observability")]),
+    ("pdf-extract-tool", {"tools": [{"pdf_extract": {}}]}, [("ingest", "pdf_extract")]),
+    ("mcp-capability", {"capabilities": ["MCP"]}, [("mcp", "MCP capability")]),
+    (
+        "mcp-capability-mapping",
+        {"capabilities": [{"MCP": {"url": "https://mcp.example"}}]},
+        [("mcp", "MCP capability")],
+    ),
+    ("trigger", {"triggers": [{"type": "telegram"}]}, [("telegram", "telegram")]),
+    (
+        "one-entry-per-extra-sorted",
+        {"tools": ["web_scraper", "search", "web_reader"], "memory": {}},
+        [("search", "search"), ("vector", "memory")],
+    ),
+    ("nothing", {"tools": ["think", "web_reader"]}, []),
+]
+
+
+def _as_flat(body: dict) -> dict:
+    return {"name": "probe", "prompt": "p", **body}
+
+
+def _as_envelope(body: dict) -> dict:
+    return {
+        "apiVersion": "initrunner/v1",
+        "kind": "Agent",
+        "metadata": {"name": "probe"},
+        "spec": body,
+    }
+
+
+class TestDetectExtraRequirements:
+    @pytest.mark.parametrize("wrap", [_as_flat, _as_envelope], ids=["flat", "envelope"])
+    @pytest.mark.parametrize(
+        ("body", "expected"), [c[1:] for c in _EXTRA_CASES], ids=[c[0] for c in _EXTRA_CASES]
+    )
+    def test_case(self, wrap, body, expected):
+        from initrunner.services.starters import detect_extra_requirements
+
+        found = [(r.extra, r.feature) for r in detect_extra_requirements(wrap(body))]
+        assert found == expected
+
+    def test_starter_wrapper_lists_extra_names(self):
+        from initrunner.services.starters import _detect_requires_extras
+
+        assert _detect_requires_extras(_as_flat({"memory": {}, "tools": ["search"]})) == [
+            "search",
+            "vector",
+        ]
+
+    def test_empty_memory_starters_need_vector(self):
+        for slug in ("memory", "telegram"):
+            assert "vector" in get_starter(slug).requires_extras, slug
+
+    def test_inline_child_search_is_seen(self):
+        assert "search" in get_starter("scholar").requires_extras
+
+    @pytest.mark.parametrize("slug", ["scholar", "writer"])
+    def test_shared_memory_starters_need_vector(self, slug):
+        assert "vector" in get_starter(slug).requires_extras
+
+    def test_child_trigger_token_is_a_required_env(self):
+        from initrunner.services.starters import _detect_requires_env
+
+        data = _as_flat(
+            {"prompt": None, "agents": {"bot": {"prompt": "p", "triggers": [{"type": "telegram"}]}}}
+        )
+        assert _detect_requires_env("", data) == ["TELEGRAM_BOT_TOKEN"]

@@ -296,8 +296,29 @@ With `--fix`, doctor rewrites envelope Agent/Team/Flow YAML to flat documents, t
 | Deprecated fields in envelope role YAML (DEP001-DEP003) | Resolved by the rewrite. If the rewrite is refused (for example an existing `.bak` without `--force`), a surgical text patch fixes the field in place and preserves comments and formatting | Yes (`PATH` or `--role`) |
 | Provider SDK missing (key is set) | `install_extra()` installs the pip extra | No |
 | Missing API key | Prompts to enter and persist to `~/.initrunner/.env` | Interactive only (skipped with `--yes`) |
-| Role tools/triggers need uninstalled extras | Installs them, keeping the extras already present | Yes |
+| Role needs uninstalled extras (see below) | Installs them, keeping the extras already present | Yes |
 | `spec_version` behind current | Bumps and writes the YAML file | Yes |
+
+### Which extras a role needs
+
+Doctor reads the role file, not the installed runtime, and asks for an extra
+only when something in the file uses it. The same check decides what a starter
+installs on first run, so the two always agree.
+
+| In the file | Extra |
+|---|---|
+| An `ingest:` or `memory:` block, even `memory: {}` | `vector` |
+| `shared_memory` or `shared_documents` with `enabled: true` | `vector` |
+| `.pdf`, `.docx` or `.xlsx` sources under `ingest` or an enabled `shared_documents`, or the `pdf_extract` tool | `ingest` |
+| `embeddings.provider: local` under `ingest`, `memory` or `shared_documents` | `local-embeddings` |
+| An `observability:` block | `observability` |
+| The `mcp` tool, or `capabilities: [MCP]` | `mcp` |
+| The `search`, `audio` or `web_scraper` tool; a `telegram`, `discord` or `slack` trigger | the extra of the same name (`web_scraper` needs `vector`) |
+
+A Markdown, text or HTML knowledge base needs `vector` and nothing else; the
+PDF, Word and Excel parsers stay uninstalled until a source needs them. Tools
+and triggers on inline `agents:` children count. A child that points at
+another file with `use:` does not: run doctor on that file too.
 
 ### What `--fix` does NOT repair
 

@@ -56,14 +56,14 @@ FEATURE_MAP: list[tuple[str, str]] = [
     ("triggers", "Triggers"),
 ]
 
-# Maps spec sections / tool types to the pip extra required. Whether that extra
-# is installed is _compat's business; this only says which one a feature needs.
-# web_reader is deliberately absent: it runs on core httpx and beautifulsoup4.
+# Maps tool and trigger types to the pip extra they need. Sections (ingest,
+# memory, observability, shared stores) are read by detect_extra_requirements.
+# Whether an extra is installed is _compat's business; this only says which one
+# a feature needs. web_reader is deliberately absent: it runs on core httpx and
+# beautifulsoup4.
 FEATURE_EXTRAS: dict[str, str] = {
-    "ingest": "ingest",
-    "vector": "vector",
-    "memory": "vector",
     "web_scraper": "vector",
+    "pdf_extract": "ingest",
     "mcp": "mcp",
     "search": "search",
     "telegram": "telegram",
@@ -171,8 +171,10 @@ def _detect_requires_env(raw_yaml: str, data: dict) -> list[str]:
         "telegram": "TELEGRAM_BOT_TOKEN",
         "discord": "DISCORD_BOT_TOKEN",
     }
-    # Trigger *_token_env fields (token_env, app_token_env, bot_token_env)
-    for trigger in document_body(data).get("triggers") or []:
+    # Trigger *_token_env fields (token_env, app_token_env, bot_token_env), on
+    # the document and on each inline child, the same places the extras come from.
+    triggers = [t for m in _members(document_body(data)) for t in m.get("triggers") or []]
+    for trigger in triggers:
         if isinstance(trigger, str):
             if trigger in _default_token_env:
                 env_vars.add(_default_token_env[trigger])
@@ -201,38 +203,108 @@ def _source_suffix(source: str) -> str:
     return "." + last.rsplit(".", 1)[-1].lower()
 
 
-def _detect_requires_extras(data: dict) -> list[str]:
-    """Detect required pip extras from tool types and ingest source formats.
+@dataclass(frozen=True)
+class ExtraRequirement:
+    """A pip extra a document needs, and the feature that needs it."""
 
-    A bare ``ingest:`` block does not require the ingest extra (only sources
-    whose suffix needs pymupdf/docx/xlsx do), but it does need the vector
-    store, as does any ``memory:`` block.
+    extra: str
+    feature: str
+
+
+def detect_extra_requirements(data: dict) -> list[ExtraRequirement]:
+    """Pip extras a flat or envelope document needs: one entry per extra, sorted.
+
+    A section counts when its key is present and not null. ``memory: {}`` is
+    memory with every default, which the loader backs with the vector store,
+    so it needs ``vector`` like any other memory block. Tools and triggers are
+    read from the document, each inline ``agents:`` child and each envelope
+    team persona; a ``use:`` reference is another file and is not read here.
+    When several features need one extra, the first found names it: sections,
+    then capabilities, then tools and triggers.
     """
-    extras: set[str] = set()
-    spec = document_body(data)
+    body = document_body(data)
+    found: list[ExtraRequirement] = []
 
-    ingest = spec.get("ingest") or {}
-    if ingest or spec.get("memory"):
-        extras.add("vector")
-    for source in ingest.get("sources") or []:
-        if isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES:
-            extras.add("ingest")
-            break
+    stores = [
+        ("ingest", _section(body, "ingest")),
+        ("memory", _section(body, "memory")),
+        ("shared_memory", _enabled_section(body, "shared_memory")),
+        ("shared_documents", _enabled_section(body, "shared_documents")),
+    ]
+    for name, section in stores:
+        if section is None:
+            continue
+        found.append(ExtraRequirement("vector", name))
+        embeddings = section.get("embeddings")
+        if isinstance(embeddings, dict) and embeddings.get("provider") == "local":
+            found.append(ExtraRequirement("local-embeddings", f"{name}.embeddings"))
+        # ingest and shared_documents read their sources through the same
+        # extractors. Markdown, text and HTML are core; these parsers come
+        # from the ingest extra.
+        if any(
+            isinstance(source, str) and _source_suffix(source) in _INGEST_EXTRA_SUFFIXES
+            for source in section.get("sources") or []
+        ):
+            found.append(ExtraRequirement("ingest", name))
+    if _section(body, "observability") is not None:
+        found.append(ExtraRequirement("observability", "observability"))
 
-    tool_types = tool_types_from(spec.get("tools") or [])
+    # PydanticAI's native MCP capability needs the same extra the 'mcp' tool
+    # does; build_agent gates on it.
+    for capability in body.get("capabilities") or []:
+        if capability == "MCP" or (isinstance(capability, dict) and "MCP" in capability):
+            found.append(ExtraRequirement("mcp", "MCP capability"))
 
-    for trigger in spec.get("triggers") or []:
+    for member in _members(body):
+        types = tool_types_from(member.get("tools") or [])
+        types |= _trigger_types(member.get("triggers") or [])
+        for name in sorted(types):
+            extra = FEATURE_EXTRAS.get(name)
+            if extra is not None:
+                found.append(ExtraRequirement(extra, name))
+
+    first: dict[str, ExtraRequirement] = {}
+    for requirement in found:
+        first.setdefault(requirement.extra, requirement)
+    return [first[extra] for extra in sorted(first)]
+
+
+def _detect_requires_extras(data: dict) -> list[str]:
+    """Names of the pip extras a starter needs, sorted."""
+    return [r.extra for r in detect_extra_requirements(data)]
+
+
+def _section(body: dict, key: str) -> dict | None:
+    """The mapping under *key*, or None when the key is absent or null."""
+    value = body.get(key)
+    return value if isinstance(value, dict) else None
+
+
+def _enabled_section(body: dict, key: str) -> dict | None:
+    """A shared store section, only when it sets ``enabled: true``."""
+    section = _section(body, key)
+    return section if section is not None and section.get("enabled") else None
+
+
+def _members(body: dict) -> list[dict]:
+    """The document, then every inline child or persona that can carry tools."""
+    members = [body]
+    for key in ("agents", "personas"):
+        children = body.get(key)
+        if isinstance(children, dict):
+            members.extend(child for child in children.values() if isinstance(child, dict))
+    return members
+
+
+def _trigger_types(triggers: list) -> set[str]:
+    """Type names of trigger entries."""
+    types: set[str] = set()
+    for trigger in triggers:
         if isinstance(trigger, str):
-            tool_types.add(trigger)
+            types.add(trigger)
         elif isinstance(trigger, dict) and trigger.get("type"):
-            tool_types.add(trigger["type"])
-
-    for tool_type in tool_types:
-        extra = FEATURE_EXTRAS.get(tool_type)
-        if extra is not None:
-            extras.add(extra)
-
-    return sorted(extras)
+            types.add(str(trigger["type"]))
+    return types
 
 
 def _detect_requires_user_data(data: dict) -> list[str]:

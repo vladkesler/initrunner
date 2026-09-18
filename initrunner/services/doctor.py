@@ -160,21 +160,6 @@ class FlowDiagnostics:
 
 
 # ---------------------------------------------------------------------------
-# Feature-to-extras mapping (extends starters.FEATURE_EXTRAS)
-# ---------------------------------------------------------------------------
-
-
-def _build_extra_markers() -> dict[str, str]:
-    """Feature name to the extra it needs, for roles as well as starters."""
-    from initrunner.services.starters import FEATURE_EXTRAS
-
-    markers = dict(FEATURE_EXTRAS)
-    markers.setdefault("observability", "observability")
-    markers.setdefault("pdf_extract", "ingest")
-    return markers
-
-
-# ---------------------------------------------------------------------------
 # Provider diagnosis
 # ---------------------------------------------------------------------------
 
@@ -214,45 +199,18 @@ def diagnose_providers() -> list[ProviderDiagnosis]:
 
 
 def diagnose_role_extras(raw_data: dict) -> list[RoleExtrasGap]:
-    """Scan a raw role dict for tools/triggers/features needing missing extras."""
-    markers = _build_extra_markers()
-    from initrunner.services.starters import document_body, tool_types_from
+    """Extras a raw role dict needs that are not installed here.
 
-    spec = document_body(raw_data)
-    seen: set[str] = set()
-    gaps: list[RoleExtrasGap] = []
+    Detection is shared with starters (``detect_extra_requirements``), so
+    doctor and the starter listing never disagree about what a role needs.
+    """
+    from initrunner.services.starters import detect_extra_requirements
 
-    # Collect tool and trigger type names
-    feature_names: set[str] = tool_types_from(spec.get("tools") or [])
-    for trigger in spec.get("triggers") or []:
-        if isinstance(trigger, str):
-            feature_names.add(trigger)
-        elif isinstance(trigger, dict) and trigger.get("type"):
-            feature_names.add(trigger["type"])
-
-    # Check spec-level sections
-    if spec.get("ingest"):
-        feature_names.add("ingest")
-        feature_names.add("vector")
-    if spec.get("memory"):
-        feature_names.add("memory")
-    if spec.get("observability"):
-        feature_names.add("observability")
-    # PydanticAI's native MCP capability needs the same extra the 'mcp' tool
-    # does; build_agent gates on it, so doctor has to see it too.
-    for cap in spec.get("capabilities") or []:
-        if cap == "MCP" or (isinstance(cap, dict) and "MCP" in cap):
-            feature_names.add("mcp")
-
-    for feature in feature_names:
-        extras_name = markers.get(feature)
-        if extras_name is None or extras_name in seen:
-            continue
-        seen.add(extras_name)
-        if not _is_extra_installed(extras_name):
-            gaps.append(RoleExtrasGap(feature=feature, extras_name=extras_name))
-
-    return gaps
+    return [
+        RoleExtrasGap(feature=requirement.feature, extras_name=requirement.extra)
+        for requirement in detect_extra_requirements(raw_data)
+        if not _is_extra_installed(requirement.extra)
+    ]
 
 
 def build_role_fix_plan(raw_data: dict) -> RoleFixPlan:
