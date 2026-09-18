@@ -87,7 +87,7 @@ prompt: |
     in this project")
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       tests_generated:

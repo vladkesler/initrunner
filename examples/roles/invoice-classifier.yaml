@@ -17,7 +17,7 @@ prompt: |
   unless something looks suspicious.
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       status:

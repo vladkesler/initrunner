@@ -94,7 +94,7 @@ prompt: |
     back to normal.
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       checks:

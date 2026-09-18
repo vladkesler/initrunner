@@ -90,7 +90,7 @@ prompt: |
     should always be skipped (e.g. "bandit B101 in test files")
 output:
   type: json_schema
-  schema_:
+  schema:
     type: object
     properties:
       findings:
