@@ -18,7 +18,7 @@
     "js-yaml": "^5.4.1",
     "lucide-svelte": "^1.0.1",
     "svelte": "^5.57.0",
-    "tailwind-merge": "^3.6.0",
+    "tailwind-merge": "^3.7.0",
     "tailwind-variants": "^3.3.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
