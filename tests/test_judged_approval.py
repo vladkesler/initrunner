@@ -35,6 +35,7 @@ def _verdict(decision: str, reason: str = "because") -> ApprovalVerdict:
         blast_radius=0.0,
         blast_confidence=1.0,
         requested=0.9,
+        related=0.9,
         exfil=0.0,
     )
 

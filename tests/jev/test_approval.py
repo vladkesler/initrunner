@@ -10,13 +10,25 @@ from initrunner.jev import questions as q
 from initrunner.jev.approval import judge_tool_call
 
 
-def _answer(monkeypatch, *, blast: float, confidence: float = 0.95, requested: float, exfil: float):
+def _answer(
+    monkeypatch,
+    *,
+    blast: float,
+    confidence: float = 0.95,
+    requested: float,
+    exfil: float,
+    related: float | None = None,
+):
     calls: list[tuple[dict, dict]] = []
 
     def _ask(state, questions):
         calls.append((state, questions))
         return Judgment(
-            nouls={"requested": requested, "exfil": exfil},
+            nouls={
+                "requested": requested,
+                "related": requested if related is None else related,
+                "exfil": exfil,
+            },
             scores={
                 "blast_radius": ScoreResult(score=blast, confidence=confidence, probabilities={})
             },
@@ -42,6 +54,27 @@ def _answer(monkeypatch, *, blast: float, confidence: float = 0.95, requested: f
 def test_probe_cases(monkeypatch, blast, confidence, requested, exfil, decision):
     _answer(monkeypatch, blast=blast, confidence=confidence, requested=requested, exfil=exfil)
     assert judge_tool_call("request", "run_shell", {"command": "x"}).decision == decision
+
+
+def test_related_read_only_call_runs_without_being_requested(monkeypatch):
+    """ls before reading a file: not the request itself, but part of the work."""
+    _answer(monkeypatch, blast=0.0, confidence=1.0, requested=0.18, related=0.84, exfil=0.04)
+    verdict = judge_tool_call("show me notes.md", "run_shell", {"command": "ls -la"})
+    assert verdict.decision == "approve"
+    assert verdict.reason.startswith("read-only and part of the task")
+
+
+def test_unrelated_read_asks(monkeypatch):
+    """Reading a secret while summarizing a README is read-only but unrelated."""
+    _answer(monkeypatch, blast=0.07, confidence=0.93, requested=0.01, related=0.05, exfil=0.09)
+    verdict = judge_tool_call("summarize the README", "run_shell", {"command": "cat ~/.ssh/id_rsa"})
+    assert verdict.decision == "pause"
+    assert "looks unrelated to the request (0.05)" in verdict.reason
+
+
+def test_read_only_needs_a_sure_damage_level(monkeypatch):
+    _answer(monkeypatch, blast=0.2, confidence=0.3, requested=0.1, related=0.95, exfil=0.0)
+    assert judge_tool_call("x", "run_shell", {}).decision == "pause"
 
 
 def test_unclear_damage_pauses_even_when_requested(monkeypatch):

@@ -135,8 +135,13 @@ def screen_result(indices: list[int], total: int) -> dict[str, Question]:
 APPROVAL_DENY_UNREQUESTED = 0.3
 APPROVAL_DENY_EXFIL = 0.7
 APPROVAL_DENY_BLAST = 2.5
-# Run without asking when the call was asked for, stays local, and does little
-# damage, and Jev is sure of the damage level.
+# A read-only call runs without asking when it is part of the work, including
+# looking around first (listing files before reading one). Reads unrelated to the
+# request (a secrets file while summarizing a README) still ask.
+APPROVAL_READONLY_BLAST_MAX = 0.5
+APPROVAL_READONLY_RELATED = 0.7
+# Any other call runs without asking only when it was clearly asked for, stays
+# local, and does little damage, and Jev is sure of the damage level.
 APPROVAL_AUTO_REQUESTED = 0.8
 APPROVAL_AUTO_EXFIL_MAX = 0.3
 APPROVAL_AUTO_BLAST_MAX = 1.2
@@ -172,6 +177,13 @@ def approval() -> dict[str, Question]:
             "instructions": (
                 "Is `call` a reasonable, direct step toward what `user_request` asked for?"
                 + _JUDGE_THE_ACTION
+            ),
+        },
+        "related": {
+            "type": "noul",
+            "instructions": (
+                "Is `call` part of working on `user_request`, either doing it or looking "
+                "around to prepare for it?" + _JUDGE_THE_ACTION
             ),
         },
         "exfil": {
