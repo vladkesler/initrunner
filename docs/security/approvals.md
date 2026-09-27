@@ -190,7 +190,7 @@ Calls that are part of the work run even when they aren't literally what the use
 
 **When Jev can't be reached, the call asks.** The reason reads `Jev judgment unavailable: ...`. Nothing runs without a judgment or a human.
 
-**Every decision is audited** as a `jev.approval` security event with the three answers, the model version and the request ID. That includes the calls that ran without asking.
+**Every decision is audited** as a `jev.approval` security event with the tool, its arguments (cut at 500 characters, secrets scrubbed), Jev's answers, the model version and the request ID. That includes the calls that ran without asking.
 
 ```bash
 initrunner audit security-events --event-type jev.approval

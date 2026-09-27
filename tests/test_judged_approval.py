@@ -129,6 +129,30 @@ class TestWrapper:
         details = json.loads(kwargs["details"])
         assert details["decision"] == "approve"
         assert details["tool"] == "run_shell"
+        # The row names the call it judged.
+        assert details["args"] == '{"command": "ls"}'
+
+    def test_audit_args_are_capped(self):
+        from initrunner.audit.scope import audit_scope
+
+        audit = MagicMock()
+        wrapper, _ = _wrapper()
+        with audit_scope(audit, "shell-bot"):
+            _call(wrapper, {"command": "x" * 5_000}, verdict=_verdict("approve"))
+        details = json.loads(audit.log_security_event.call_args.kwargs["details"])
+        assert details["args"].endswith("[truncated]")
+        assert len(details["args"]) < 600
+
+    def test_unavailable_pause_is_audited_with_the_call(self):
+        from initrunner.audit.scope import audit_scope
+
+        audit = MagicMock()
+        wrapper, _ = _wrapper()
+        with audit_scope(audit, "shell-bot"), pytest.raises(ApprovalRequired):
+            _call(wrapper, {"command": "git push"}, error=JevError("down"))
+        details = json.loads(audit.log_security_event.call_args.kwargs["details"])
+        assert details["decision"] == "pause"
+        assert details["args"] == '{"command": "git push"}'
 
 
 class TestUserRequest:

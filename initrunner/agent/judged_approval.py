@@ -62,22 +62,32 @@ class JudgedApprovalToolset(AbstractToolset[Any]):
         from initrunner.jev import JevError
         from initrunner.jev.approval import judge_tool_call_async
 
+        call = {"tool": name, "args": _args_preview(tool_args)}
         try:
             verdict = await judge_tool_call_async(user_request(ctx), name, tool_args)
         except JevError as exc:
             reason = f"Jev judgment unavailable: {exc}"
             log_security_event(
-                "jev.approval",
-                json.dumps({"tool": name, "decision": "pause", "reason": reason}),
+                "jev.approval", json.dumps({**call, "decision": "pause", "reason": reason})
             )
             raise ApprovalRequired(metadata={"reason": reason}) from None
 
-        log_security_event("jev.approval", json.dumps({"tool": name, **verdict.to_dict()}))
+        log_security_event("jev.approval", json.dumps({**call, **verdict.to_dict()}))
         if verdict.decision == "approve":
             return await self._inner.call_tool(name, tool_args, ctx, tool)
         if verdict.decision == "deny":
             return f"Permission denied: {name} -- judged: {verdict.reason}"
         raise ApprovalRequired(metadata={"reason": verdict.reason})
+
+
+# The audit row names the call it judged; long arguments are cut, and the audit
+# logger scrubs secrets from the details before writing them.
+_AUDIT_ARGS_CHARS = 500
+
+
+def _args_preview(tool_args: dict[str, Any]) -> str:
+    text = json.dumps(tool_args, default=str, ensure_ascii=False)
+    return text if len(text) <= _AUDIT_ARGS_CHARS else text[:_AUDIT_ARGS_CHARS] + " [truncated]"
 
 
 def user_request(ctx: Any) -> str:

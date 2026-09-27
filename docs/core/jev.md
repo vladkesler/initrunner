@@ -226,7 +226,7 @@ Screening decisions go to the audit trail as security events with Jev's raw answ
 |-------|--------------|
 | `jev.input` | A prompt is blocked, or can't be screened |
 | `jev.tool_result` | A result is withheld, passes in the uncertain band, or can't be screened |
-| `jev.approval` | Every judged tool call, whatever the decision |
+| `jev.approval` | Every judged tool call, whatever the decision, with its tool and arguments |
 
 ```bash
 initrunner audit security-events --event-type jev.input
