@@ -160,13 +160,15 @@ def doctor(
     )
 
     # ----- Jev typed judgments (optional) -----
+    from rich.markup import escape
+
     from initrunner.services.doctor import diagnose_jev
 
     jev_diag = diagnose_jev()
     jev_style = {"ok": "green", "warn": "yellow", "off": "dim"}[jev_diag.status]
     console.print()
     console.print(
-        f"[bold]Jev typed judgments:[/bold] [{jev_style}]{jev_diag.message}[/{jev_style}] "
+        f"[bold]Jev typed judgments:[/bold] [{jev_style}]{escape(jev_diag.message)}[/{jev_style}] "
         "[dim](optional; see docs/core/jev.md)[/dim]"
     )
 

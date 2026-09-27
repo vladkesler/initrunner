@@ -1832,3 +1832,15 @@ class TestDiagnoseJev:
                 result = runner.invoke(app, ["doctor"])
         assert result.exit_code == 0
         assert "Jev typed judgments" in result.output
+
+
+def test_doctor_jev_row_keeps_the_install_hint_intact(monkeypatch):
+    """'initrunner[jev]' must not be eaten as a Rich markup tag."""
+    import initrunner.jev as jev
+
+    monkeypatch.setattr(jev, "api_key", lambda: "ts_test")
+    monkeypatch.setattr("initrunner._compat.is_extra_installed", lambda extra: extra != "jev")
+    with patch("initrunner.agent.loader._load_dotenv"):
+        with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+            result = runner.invoke(app, ["doctor"])
+    assert "uv pip install initrunner[jev]" in " ".join(result.output.split())
