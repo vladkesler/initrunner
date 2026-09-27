@@ -459,7 +459,24 @@ def _jev_seams(role: RoleDefinition) -> list[str]:
         seams.append("security.content.screening.input")
     if screening.tool_results:
         seams.append("security.content.screening.tool_results")
+    seams.extend(f"{t.type} approval: judged" for t in role.spec.tools if t.approval == "judged")
     return seams
+
+
+def _validate_judged_approval(role: RoleDefinition) -> None:
+    """Reject ``approval: judged`` where nothing would enforce it.
+
+    Run-scoped tools (think, todo, spawn, ...) are built per run without the
+    approval wrappers, so a judged setting on them would do nothing except
+    widen the output type.
+    """
+    from initrunner.agent.tools._registry import is_run_scoped
+
+    for tool in role.spec.tools:
+        if tool.approval == "judged" and is_run_scoped(tool.type):
+            raise RoleLoadError(
+                f"approval: judged is not supported on the run-scoped '{tool.type}' tool"
+            )
 
 
 def _require_jev(role: RoleDefinition) -> None:
@@ -799,6 +816,7 @@ def build_agent(
         role = _set_model(role, ModelConfig(**role.spec.model.model_dump()))  # type: ignore[union-attr]
     _validate_provider(role)
     _validate_reasoning(role)
+    _validate_judged_approval(role)
 
     instructions, all_tools, explicit_paths = _resolve_skills_and_merge(
         role, role_dir, extra_skill_dirs
@@ -825,7 +843,7 @@ def build_agent(
     # requires human approval, so PydanticAI can surface pending calls
     # instead of executing them. Only widens when the caller didn't supply
     # an explicit output_type to preserve caller intent.
-    if any(t.approval == "required" for t in all_tools):
+    if any(t.approval in ("required", "judged") for t in all_tools):
         from pydantic_ai import DeferredToolRequests
 
         output_type = [output_type, DeferredToolRequests]

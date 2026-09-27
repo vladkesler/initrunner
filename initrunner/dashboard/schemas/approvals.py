@@ -13,6 +13,7 @@ class PendingCallResponse(BaseModel):
     tool_call_id: str
     tool_name: str
     arguments: dict[str, Any]
+    reason: str | None = None  # why it paused (approval: judged)
 
 
 class PendingRunResponse(BaseModel):

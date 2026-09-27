@@ -50,6 +50,7 @@ def pending(
                 "agent_name": r.agent_name,
                 "role_path": r.role_path,
                 "arguments": _safe_load(r.arguments_json),
+                "reason": r.reason,
                 "created_at": r.created_at,
             }
             for r in rows
@@ -70,6 +71,7 @@ def pending(
     table.add_column("agent")
     table.add_column("created_at", style="dim")
     table.add_column("arguments", overflow="fold")
+    table.add_column("why", style="yellow", overflow="fold")
     for r in rows:
         table.add_row(
             r.run_id,

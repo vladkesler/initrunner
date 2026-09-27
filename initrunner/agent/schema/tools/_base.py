@@ -43,13 +43,15 @@ class ToolConfigBase(BaseModel):
 
     type: str
     permissions: ToolPermissions | None = None
-    approval: Literal["auto", "required"] = "auto"
+    approval: Literal["auto", "required", "judged"] = "auto"
     """Human-in-the-loop gating.
 
     ``"auto"`` (default) lets PydanticAI invoke the tool directly. ``"required"``
     marks the tool so every call is surfaced as a
     :class:`~pydantic_ai.DeferredToolRequests` and must be approved out-of-band
-    before execution resumes.
+    before execution resumes. ``"judged"`` asks Jev about each call (needs the
+    ``jev`` extra): clearly safe, requested calls run, clearly harmful
+    unrequested ones are denied, and everything in between pauses for a human.
     """
 
     def summary(self) -> str:

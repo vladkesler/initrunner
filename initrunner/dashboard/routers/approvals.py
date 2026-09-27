@@ -99,6 +99,7 @@ def _group_by_run(rows: list[PendingApprovalRecord]) -> list[PendingRunResponse]
                         tool_call_id=r.tool_call_id,
                         tool_name=r.tool_name,
                         arguments=_parse_args(r.arguments_json),
+                        reason=r.reason,
                     )
                     for r in run_rows
                 ],
@@ -219,6 +220,7 @@ async def resolve_run(run_id: str, req: ApprovalsResolveRequest) -> ApprovalsRes
                     tool_call_id=p.tool_call_id,
                     tool_name=p.tool_name,
                     arguments=p.arguments,
+                    reason=p.reason,
                 )
                 for p in result.pending_approvals
             ],

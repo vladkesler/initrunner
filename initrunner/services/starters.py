@@ -7,7 +7,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.role import RoleDefinition
@@ -273,16 +273,30 @@ def detect_extra_requirements(data: dict) -> list[ExtraRequirement]:
 
 def _jev_features(member: dict) -> list[str]:
     """Jev-backed security checks a document member turns on."""
+    features: list[str] = []
     security = member.get("security")
     content = security.get("content") if isinstance(security, dict) else None
     screening = content.get("screening") if isinstance(content, dict) else None
-    if not isinstance(screening, dict):
-        return []
-    return [
-        f"security.content.screening.{check}"
-        for check in ("input", "tool_results")
-        if screening.get(check)
-    ]
+    if isinstance(screening, dict):
+        features.extend(
+            f"security.content.screening.{check}"
+            for check in ("input", "tool_results")
+            if screening.get(check)
+        )
+    for item in member.get("tools") or []:
+        if not isinstance(item, dict):
+            continue
+        # Envelope {type: shell, approval: judged} or flat shorthand {shell: {approval: judged}}.
+        config: Any
+        if "type" in item:
+            name, config = str(item["type"]), item
+        elif len(item) == 1:
+            name, config = next(iter(item.items()))
+        else:
+            continue
+        if isinstance(config, dict) and cast(dict[str, Any], config).get("approval") == "judged":
+            features.append(f"{name} approval: judged")
+    return features
 
 
 def _detect_requires_extras(data: dict) -> list[str]:

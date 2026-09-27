@@ -59,6 +59,7 @@ def _seed_paused_run(
     run_id: str,
     tool_call_ids: list[str],
     role_path: Path | None = None,
+    reason: str | None = None,
 ) -> None:
     """Write pending-approval rows directly so tests don't need a live agent."""
     role = _make_role()
@@ -70,6 +71,7 @@ def _seed_paused_run(
                 tool_call_id=cid,
                 tool_name="write_file",
                 arguments={"path": f"/tmp/{cid}.txt", "content": "hello"},
+                reason=reason,
             )
             for cid in tool_call_ids
         ],
@@ -106,6 +108,7 @@ class TestStreamingPausedPayload:
                 "tool_call_id": "c1",
                 "tool_name": "write_file",
                 "arguments": {"path": "/tmp/x.txt"},
+                "reason": None,
             }
         ]
         # Message history is serialized even on pause so the resume path can use it.
@@ -160,6 +163,14 @@ class TestListPending:
         assert {c["tool_call_id"] for c in r1["calls"]} == {"c1", "c2"}
         assert r1["originating_prompt"] == "please write the file"
         assert r1["agent_name"] == "approval-demo"
+        assert all(c["reason"] is None for c in r1["calls"])
+
+    def test_judged_pause_carries_its_reason(self, client, audit_db, tmp_path):
+        _seed_paused_run(
+            audit_db, run_id="r9", tool_call_ids=["c9"], reason="Jev: may not be what was asked"
+        )
+        body = client.get("/api/approvals/pending").json()
+        assert body["runs"][0]["calls"][0]["reason"] == "Jev: may not be what was asked"
 
 
 # ---------------------------------------------------------------------------

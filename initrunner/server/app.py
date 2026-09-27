@@ -141,6 +141,7 @@ def _pending_approvals_payload(result) -> list[dict]:
             "tool_call_id": p.tool_call_id,
             "tool_name": p.tool_name,
             "arguments": p.arguments,
+            "reason": p.reason,
         }
         for p in result.pending_approvals
     ]

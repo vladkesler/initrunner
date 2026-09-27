@@ -512,11 +512,13 @@ def _finalize_run_output(
         # Capture each pending ToolCallPart verbatim — the caller resolves
         # them via execute_run_resume() with DeferredToolResults.
         result.status = "paused"
+        metadata = raw_output.metadata or {}
         result.pending_approvals = [
             PendingApproval(
                 tool_call_id=call.tool_call_id,
                 tool_name=call.tool_name,
                 arguments=_coerce_args_to_dict(call.args),
+                reason=(metadata.get(call.tool_call_id) or {}).get("reason"),
             )
             for call in raw_output.approvals
         ]

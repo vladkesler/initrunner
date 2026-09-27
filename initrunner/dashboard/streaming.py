@@ -85,6 +85,7 @@ def _build_result_payload(
                 "tool_call_id": p.tool_call_id,
                 "tool_name": p.tool_name,
                 "arguments": p.arguments,
+                "reason": p.reason,
             }
             for p in result.pending_approvals
         ],

@@ -881,6 +881,28 @@
     "tools": []
   },
   {
+    "name": "judged-shell",
+    "category": "role",
+    "description": "Shell assistant where Jev decides which commands run, which are refused, and which wait for you",
+    "tags": [
+      "example",
+      "security",
+      "approval",
+      "jev"
+    ],
+    "files": [
+      "judged-shell.yaml"
+    ],
+    "primary_file": "judged-shell.yaml",
+    "primary_content": "# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json\nname: judged-shell\ndescription: Shell assistant where Jev decides which commands run, which are refused,\n  and which wait for you\nspec_version: 3\ntags:\n- example\n- security\n- approval\n- jev\nmodel: openai:gpt-5-mini\nprompt: |\n  You are a careful developer assistant working in the current directory.\n  Use the shell to inspect and tidy the project. Commands run without a\n  shell: no pipes, globs or redirects, one program and its arguments per call.\n\n  Some commands are refused, and some wait for the user to approve them.\n  When a command is refused, say so and don't try to get around it.\n# Needs: uv pip install \"initrunner[jev]\" and TYPESAFE_API_KEY (see docs/core/jev.md).\ntools:\n- shell:\n    # Jev judges each command against the request: requested, low-risk local\n    # commands run; unrequested ones that destroy data or send secrets out are\n    # refused; everything else pauses for you. That judgment is what lets `rm`\n    # off the default blocked list below.\n    approval: judged\n    allowed_commands: [ls, cat, git, rm]\n    blocked_commands: [mkfs, dd, fdisk, parted, mount, umount, shutdown, reboot,\n      halt, poweroff, chmod, chown, passwd, useradd, userdel, sudo, su]\n    working_dir: .\n    require_confirmation: false\nsecurity:\n  content:\n    screening:\n      input: true           # block prompt injection before the model sees it\n      tool_results: true    # withhold file contents that give the model orders\nguardrails:\n  max_tool_calls: 15\n  timeout_seconds: 120\n",
+    "multi_file": false,
+    "difficulty": "beginner",
+    "features": [],
+    "tools": [
+      "shell"
+    ]
+  },
+  {
     "name": "kube-advisor",
     "category": "role",
     "description": "Tell it what's broken in your cluster and it runs kubectl to diagnose the issue, identifies the root cause, and gives you exact commands to fix it. Handles CrashLoopBackOff, OOMKilled, pending pods, service connectivity, DNS, storage, stuck rollouts, and more.\n",

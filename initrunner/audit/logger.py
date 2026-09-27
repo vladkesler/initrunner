@@ -335,6 +335,7 @@ CREATE TABLE IF NOT EXISTS pending_approvals (
     resolved_at TEXT,
     resolved_by TEXT,
     decision TEXT,
+    reason TEXT,
     PRIMARY KEY (run_id, tool_call_id)
 );
 """
@@ -349,8 +350,8 @@ _CREATE_PENDING_APPROVALS_INDEXES = [
 _INSERT_PENDING_APPROVAL = """\
 INSERT INTO pending_approvals (
     run_id, tool_call_id, tool_name, agent_name, role_path,
-    arguments_json, message_history_json, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    arguments_json, message_history_json, created_at, reason
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 _SELECT_PENDING_BY_RUN = """\
@@ -464,6 +465,7 @@ class PendingApprovalRecord:
     resolved_at: str | None = None
     resolved_by: str | None = None
     decision: str | None = None  # "approve" | "deny"
+    reason: str | None = None  # why it paused, when not a blanket approval: required
 
 
 def _default_db_path() -> Path:
@@ -591,6 +593,14 @@ def _migrate_add_checkpoint_message_column(conn: sqlite3.Connection) -> None:
         pass  # Column already exists
 
 
+def _migrate_add_pending_reason_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add reason to pending_approvals (judged approvals)."""
+    try:
+        conn.execute("ALTER TABLE pending_approvals ADD COLUMN reason TEXT")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+
 def _build_where(
     filters: list[tuple[str, object]],
 ) -> tuple[str, list[object]]:
@@ -641,6 +651,7 @@ def _row_to_pending(row: sqlite3.Row) -> PendingApprovalRecord:
         resolved_at=row["resolved_at"],
         resolved_by=row["resolved_by"],
         decision=row["decision"],
+        reason=row["reason"],
     )
 
 
@@ -758,6 +769,7 @@ class AuditLogger:
             _migrate_add_judge_verdicts_column(self._conn)
             _migrate_add_hash_columns(self._conn)
             _migrate_add_checkpoint_message_column(self._conn)
+            _migrate_add_pending_reason_column(self._conn)
             for idx in _CREATE_INDEXES:
                 self._conn.execute(idx)
             for idx in _CREATE_SECURITY_INDEXES:
@@ -1761,6 +1773,7 @@ class AuditLogger:
         role_path: str | None,
         arguments_json: str,
         message_history_json: str,
+        reason: str | None = None,
     ) -> None:
         """Persist one pending tool-call approval. Never raises.
 
@@ -1782,6 +1795,7 @@ class AuditLogger:
                 scrubbed_args,
                 message_history_json,
                 ts,
+                scrub_secrets(reason) if reason else None,
             ),
             error_label="pending approval",
             auto_prune=False,

@@ -181,6 +181,7 @@ def persist_paused_run(
             role_path=role_path_str,
             arguments_json=_args_to_json(pending.arguments),
             message_history_json=history_json,
+            reason=pending.reason,
         )
 
 

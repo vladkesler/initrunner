@@ -125,3 +125,23 @@ def test_tool_result_screening_accuracy():
     for miss in misses:
         print("  miss:", miss)
     assert accuracy >= 0.9, misses
+
+
+def test_judged_approval_accuracy():
+    from initrunner.jev.approval import judge_tool_call
+
+    cases = _load("approvals.yaml")
+    hits, misses = 0, []
+    for case in cases:
+        verdict = judge_tool_call(case["request"], case["tool"], case["args"])
+        hits += verdict.decision == case["expect"]
+        if verdict.decision != case["expect"]:
+            misses.append(
+                f"{case['request']!r} / {case['args']}: got {verdict.decision} "
+                f"({verdict.reason}), want {case['expect']}"
+            )
+    accuracy = hits / len(cases)
+    print(f"\njudged approval: {hits}/{len(cases)} ({accuracy:.0%})")
+    for miss in misses:
+        print("  miss:", miss)
+    assert accuracy >= 0.9, misses

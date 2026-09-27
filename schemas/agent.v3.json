@@ -551,7 +551,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -625,7 +626,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -815,7 +817,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -878,7 +881,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -964,7 +968,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -1234,7 +1239,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -1312,7 +1318,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -1390,7 +1397,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -1519,7 +1527,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -1748,7 +1757,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -2038,7 +2048,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -2140,7 +2151,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -2249,7 +2261,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -2307,7 +2320,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -2500,7 +2514,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3151,7 +3166,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3203,7 +3219,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3244,7 +3261,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3327,7 +3345,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3862,7 +3881,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -3932,7 +3952,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4314,7 +4335,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4389,7 +4411,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4577,7 +4600,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4648,7 +4672,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4953,7 +4978,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -4998,7 +5024,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -6002,7 +6029,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"
@@ -6065,7 +6093,8 @@
           "default": "auto",
           "enum": [
             "auto",
-            "required"
+            "required",
+            "judged"
           ],
           "title": "Approval",
           "type": "string"

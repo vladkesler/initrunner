@@ -16,6 +16,9 @@ class PendingApproval:
     tool_call_id: str
     tool_name: str
     arguments: dict[str, Any]
+    # Why the call is waiting, when something other than a blanket
+    # ``approval: required`` paused it (e.g. Jev under ``approval: judged``).
+    reason: str | None = None
 
 
 class ErrorCategory(StrEnum):

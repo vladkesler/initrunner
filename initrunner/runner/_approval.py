@@ -13,6 +13,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
+
 from initrunner.runner.display import console
 
 if TYPE_CHECKING:
@@ -34,6 +36,8 @@ def render_paused_run(result: RunResult, *, run_cmd: str = "initrunner approve")
         console.print(
             f"  [magenta]{p.tool_call_id}[/magenta]  [bold]{p.tool_name}[/bold]  {p.arguments}"
         )
+        if p.reason:
+            console.print(f"    [yellow]why:[/yellow] {escape(p.reason)}")
     console.print(f"\nResume with: [bold]{run_cmd} {result.run_id} --all[/bold]")
 
 

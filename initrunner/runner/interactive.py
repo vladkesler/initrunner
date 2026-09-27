@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from rich.markup import escape
 
 from initrunner.agent.executor import check_token_budget
 from initrunner.agent.memory_ops import finalize_turn, load_session
@@ -47,6 +48,8 @@ def _prompt_and_resume(
         console.print(
             f"\n  [bold]{p.tool_name}[/bold]  [magenta]{p.tool_call_id}[/magenta]\n  {p.arguments}"
         )
+        if p.reason:
+            console.print(f"  [yellow]why:[/yellow] {escape(p.reason)}")
         approvals[p.tool_call_id] = Confirm.ask("  Approve?", default=False)
 
     return execute_run_resume(

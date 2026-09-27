@@ -119,14 +119,30 @@ def build_toolsets(
                 toolset = PermissionToolset(toolset, tool.permissions, tool.type)
             # Observable status events
             wrapped: Any = wrap_observable(toolset)
-            # Outermost: approval gating via PydanticAI's native toolset.
-            # Unapproved calls raise ApprovalRequired before any status event
-            # fires; approved resumes (ctx.tool_call_approved) pass through to
-            # the permission/policy layers, so deny-rules still apply.
+            # Outermost: approval gating. Unapproved calls raise ApprovalRequired
+            # before any status event fires; approved resumes
+            # (ctx.tool_call_approved) pass through to the permission/policy
+            # layers, so deny-rules still apply.
             if tool.approval == "required":
                 from pydantic_ai.toolsets import ApprovalRequiredToolset
 
-                wrapped = ApprovalRequiredToolset(wrapped)
+                if tool.permissions is None:
+                    wrapped = ApprovalRequiredToolset(wrapped)
+                else:
+                    from initrunner.agent.permissions import check_tool_permission
+
+                    # Don't ask a human about a call the deny rules block anyway.
+                    # The default binds this tool's rules, not the loop variable's.
+                    wrapped = ApprovalRequiredToolset(
+                        wrapped,
+                        approval_required_func=lambda ctx, td, args, perms=tool.permissions: (
+                            check_tool_permission(args, perms)[0]
+                        ),
+                    )
+            elif tool.approval == "judged":
+                from initrunner.agent.judged_approval import JudgedApprovalToolset
+
+                wrapped = JudgedApprovalToolset(wrapped, tool.permissions, tool.type)
             toolsets.append(wrapped)
 
     # Auto-tools (retrieval, memory) — not user-configured, wired from role spec

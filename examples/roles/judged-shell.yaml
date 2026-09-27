@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/vladkesler/initrunner/main/schemas/agent.v3.json
+name: judged-shell
+description: Shell assistant where Jev decides which commands run, which are refused,
+  and which wait for you
+spec_version: 3
+tags:
+- example
+- security
+- approval
+- jev
+model: openai:gpt-5-mini
+prompt: |
+  You are a careful developer assistant working in the current directory.
+  Use the shell to inspect and tidy the project. Commands run without a
+  shell: no pipes, globs or redirects, one program and its arguments per call.
+
+  Some commands are refused, and some wait for the user to approve them.
+  When a command is refused, say so and don't try to get around it.
+# Needs: uv pip install "initrunner[jev]" and TYPESAFE_API_KEY (see docs/core/jev.md).
+tools:
+- shell:
+    # Jev judges each command against the request: requested, low-risk local
+    # commands run; unrequested ones that destroy data or send secrets out are
+    # refused; everything else pauses for you. That judgment is what lets `rm`
+    # off the default blocked list below.
+    approval: judged
+    allowed_commands: [ls, cat, git, rm]
+    blocked_commands: [mkfs, dd, fdisk, parted, mount, umount, shutdown, reboot,
+      halt, poweroff, chmod, chown, passwd, useradd, userdel, sudo, su]
+    working_dir: .
+    require_confirmation: false
+security:
+  content:
+    screening:
+      input: true           # block prompt injection before the model sees it
+      tool_results: true    # withhold file contents that give the model orders
+guardrails:
+  max_tool_calls: 15
+  timeout_seconds: 120

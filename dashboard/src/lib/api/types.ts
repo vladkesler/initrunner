@@ -70,6 +70,8 @@ export interface PendingCall {
 	tool_call_id: string;
 	tool_name: string;
 	arguments: Record<string, unknown>;
+	/** Why the call is waiting (approval: judged); absent for approval: required. */
+	reason?: string | null;
 }
 
 export interface RunResponse {

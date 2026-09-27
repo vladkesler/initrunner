@@ -159,6 +159,9 @@
 					<div class="mt-0.5 overflow-hidden font-mono text-[12px] text-fg-muted">
 						{previewOf(call.tool_name, call.arguments)}
 					</div>
+					{#if call.reason}
+						<div class="mt-0.5 text-[12px] leading-snug text-warn">{call.reason}</div>
+					{/if}
 					<button
 						type="button"
 						class="mt-1 inline-flex items-center gap-1 text-[11px] text-fg-faint hover:text-fg-muted"
