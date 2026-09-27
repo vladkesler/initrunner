@@ -170,7 +170,7 @@ def _build_role_entry(path: Path, category_dir: Path) -> dict | None:
 
     if path.is_dir():
         # Multi-file role: find the primary YAML
-        yamls = list(path.glob("*.yaml")) + list(path.glob("*.yml"))
+        yamls = sorted(path.glob("*.yaml")) + sorted(path.glob("*.yml"))
         primary = None
         for y in yamls:
             if y.stem == path.name:
