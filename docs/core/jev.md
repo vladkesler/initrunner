@@ -41,7 +41,7 @@ export TYPESAFE_API_KEY=$OPENROUTER_API_KEY
 export TYPESAFE_DEFAULT_MODEL=~typesafe/jev-latest
 ```
 
-`jev-latest` is an alias that moves when TypeSafe ships a new version. The thresholds below were tuned on `jev-1.13.0`; see [Model version](#model-version).
+`jev-latest` is an alias that moves when TypeSafe ships a new version. The thresholds below were tuned on `jev-1.13.0`; see [Model version](#model-version). Through OpenRouter the sense panel's reason line reports the model it got, for example `typesafe/jev-1.13-20260917`.
 
 ## Where InitRunner uses it
 

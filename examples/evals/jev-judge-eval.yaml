@@ -24,4 +24,6 @@ cases:
         threshold: 0.7   # a criterion passes at or above this probability
         criteria:
           - "The explanation is beginner-friendly and avoids excessive jargon"
-          - "The response includes at least one concrete example"
+          # "concrete example" alone scored an everyday analogy 0.55 (uncertain);
+          # name what counts so the case doesn't flip on how the agent phrases it.
+          - "The response includes a concrete example or an everyday analogy"

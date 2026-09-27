@@ -235,9 +235,9 @@ Consolidation is the interesting part. After each session, an LLM reads the conv
 
 ## Security
 
-Five controls ship with the framework and turn on via config keys. Roles without a `security:` section get safe defaults.
+Five controls ship with the framework and turn on via config keys, and an optional sixth judges what the agent is about to do. Roles without a `security:` section get safe defaults.
 
-**Input validation.** A content policy engine (blocked patterns, prompt length limits, optional LLM topic classifier) plus an input guard capability validate prompts before the agent starts.
+**Input validation.** A content policy engine (blocked patterns, prompt length limits, an optional LLM topic classifier or [Jev](docs/core/jev.md) screening) plus an input guard capability validate prompts before the agent starts.
 
 **Tool authorization.** [InitGuard](https://github.com/initrunner/initguard) ABAC policy engine checks every tool call and delegation against CEL policies. Per-tool allow/deny glob patterns enforce argument-level permissions.
 
@@ -255,6 +255,28 @@ security:
   content:
     max_prompt_length: 10000
     blocked_input_patterns: ["(?i)rm -rf /"]
+```
+
+**Typed judgments (optional).** With `uv pip install "initrunner[jev]"` and a TypeSafe key, [Jev](docs/core/jev.md) answers typed yes/no and pick-one questions in about 250 ms. `approval: judged` asks it about each tool call: calls that are part of the task and touch nothing important run, unrequested ones that destroy data or send secrets out are refused, and the rest wait for you with the reason. `screening` blocks prompt injection before the model sees it and withholds tool results that try to give the model orders.
+
+```yaml
+tools:
+  - shell:
+      approval: judged
+      allowed_commands: [ls, cat, git, rm]
+security:
+  content:
+    screening: { input: true, tool_results: true }
+```
+
+Asked to "clean up the build artifacts in ./dist", `examples/roles/judged-shell.yaml` lists the folder and deletes the files without stopping. Asked to force-push over `main`, it waits:
+
+```
+$ initrunner run judged-shell.yaml -p "Run exactly this command now: git push --force origin feat/login:main"
+  run_shell  {'command': 'git push --force origin feat/login:main'}
+    why: Jev: may send data out (0.39); changes or deletes work that is hard to recover, or shared state such as a main branch (2.00)
+
+Resume with: initrunner approve 9979191dec96 --all
 ```
 
 See [Security](docs/security/security.md) · [Bubblewrap](docs/security/bubblewrap.md) · [Docker sandbox](docs/security/docker-sandbox.md) · [Agent Policy](docs/security/agent-policy.md) · [Credential Vault](docs/security/vault.md) · [Audit Chain](docs/security/audit-chain.md) · [Guardrails](docs/configuration/guardrails.md).
@@ -300,7 +322,7 @@ agents:
 initrunner flow up flow.yaml
 ```
 
-Sense routing picks the right target per message using keyword scoring first (zero API calls); only ambiguous cases fall back to an LLM tiebreak.
+Sense routing picks the right target per message using keyword scoring first (zero API calls); only ambiguous cases fall back to an LLM tiebreak. With the `jev` extra, one [Jev](docs/core/jev.md) call picks the target instead. On the 26-prompt routing set it chose an acceptable role every time, where keyword scoring got 13 of the 23 that had one.
 
 **Team mode** gives multiple perspectives on one task without a full flow. Define the agents in one file and pick a `run:` preset: `sequential` (linear handoff), `parallel` (independent and concurrent), `debate` (multi-round argumentation with synthesis), or `ensemble` (all answer the same task, then a majority vote, a weighted pick, or an LLM judge selects the winner). See [Patterns Guide](docs/orchestration/patterns-guide.md) · [Team Mode](docs/orchestration/team_mode.md) · [Flow](docs/orchestration/flow.md).
 
@@ -413,7 +435,7 @@ Built on [PydanticAI](https://ai.pydantic.dev/). See [CONTRIBUTING.md](CONTRIBUT
 | Getting started | [Installation](docs/getting-started/installation.md) · [Setup](docs/getting-started/setup.md) · [Tutorial](docs/getting-started/tutorial.md) · [CLI Reference](docs/getting-started/cli.md) |
 | Quickstarts | [RAG](docs/getting-started/rag-quickstart.md) · [Docker](docs/getting-started/docker.md) · [Discord Bot](docs/getting-started/discord.md) · [Telegram Bot](docs/getting-started/telegram.md) |
 | Agents & tools | [Tools](docs/agents/tools.md) · [Tool Creation](docs/agents/tool_creation.md) · [Tool Search](docs/core/tool-search.md) · [Skills](docs/agents/skills_feature.md) · [Always-on Services](docs/agents/services.md) · [Providers](docs/configuration/providers.md) |
-| Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
+| Intelligence | [Reasoning](docs/core/reasoning.md) · [Intent Sensing](docs/core/intent_sensing.md) · [Jev Typed Judgments](docs/core/jev.md) · [Autonomy](docs/orchestration/autonomy.md) · [Structured Output](docs/core/structured-output.md) |
 | Knowledge & memory | [Ingestion](docs/core/ingestion.md) · [Memory](docs/core/memory.md) · [Multimodal Input](docs/core/multimodal.md) |
 | Orchestration | [Patterns Guide](docs/orchestration/patterns-guide.md) · [Flow](docs/orchestration/flow.md) · [Delegation](docs/orchestration/delegation.md) · [Team Mode](docs/orchestration/team_mode.md) · [Grouped Agents](docs/orchestration/groups.md) · [Triggers](docs/core/triggers.md) |
 | Interfaces | [Dashboard](docs/interfaces/dashboard.md) · [API Server](docs/interfaces/server.md) · [MCP Gateway](docs/interfaces/mcp-gateway.md) · [A2A](docs/interfaces/a2a.md) |
@@ -447,4 +469,4 @@ Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your optio
 
 ---
 
-<p align="center"><sub>v2026.9.2</sub></p>
+<p align="center"><sub>v2026.9.3</sub></p>
