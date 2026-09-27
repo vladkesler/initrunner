@@ -12,6 +12,7 @@ from initrunner.agent.schema.adapt import (
     run_kind_from_mapping,
 )
 from initrunner.agent.schema.normalize import normalize_mapping
+from initrunner.agent.schema.role import RoleDefinition
 from initrunner.flow.loader import load_flow
 from initrunner.team.loader import load_team
 
@@ -70,8 +71,9 @@ def test_document_to_flow_inline() -> None:
         }
     )
     flow = document_to_flow(result.document)
-    assert flow.spec.agents["writer"].inline_role is not None
-    assert flow.spec.agents["writer"].inline_role.spec.role == "write a draft"
+    writer = flow.spec.agents["writer"].inline_role
+    assert isinstance(writer, RoleDefinition)
+    assert writer.spec.role == "write a draft"
     assert flow.spec.agents["editor"].needs == ["writer"]
 
 
@@ -114,8 +116,9 @@ def test_document_to_flow_applies_referenced_child_overrides(tmp_path: Path) -> 
     role = config.inline_role
 
     assert config.role == "roles/base.yaml"
-    assert role is not None
+    assert isinstance(role, RoleDefinition)
     assert role.spec.role == "overridden prompt"
+    assert role.spec.model is not None
     assert role.spec.model.provider == "anthropic"
     assert role.spec.model.name == "claude-sonnet-4-5"
     assert [tool.type for tool in role.spec.tools] == ["datetime", "shell"]

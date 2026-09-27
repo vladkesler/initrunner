@@ -1,6 +1,7 @@
 """Tests for the trigger system."""
 
 import time
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from initrunner.agent.schema.triggers import (
@@ -254,7 +255,7 @@ class TestCronTrigger:
 
         import initrunner.triggers.cron as cron_mod
 
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         class _FakeCron:
             def __init__(self, schedule, anchor):

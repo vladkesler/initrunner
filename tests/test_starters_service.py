@@ -8,8 +8,10 @@ from unittest.mock import patch
 
 import pytest
 
+from initrunner.agent.schema.tools import FileSystemToolConfig
 from initrunner.services.starters import (
     STARTERS_DIR,
+    StarterEntry,
     StarterNotFoundError,
     check_prerequisites,
     copy_starter,
@@ -18,6 +20,12 @@ from initrunner.services.starters import (
     list_starters,
     resolve_starter_path,
 )
+
+
+def _starter(slug: str) -> StarterEntry:
+    entry = get_starter(slug)
+    assert entry is not None, slug
+    return entry
 
 
 class TestListStarters:
@@ -275,7 +283,7 @@ class TestApplyContentRoot:
         assert entry is not None
         role = load_role(entry.path)
         rewritten = apply_starter_content_root(role, entry.path)
-        fs = next(t for t in rewritten.spec.tools if t.type == "filesystem")
+        fs = next(t for t in rewritten.spec.tools if isinstance(t, FileSystemToolConfig))
         assert Path(fs.root_path).is_absolute()
         assert (Path(fs.root_path) / "faq.md").is_file()
 
@@ -474,14 +482,14 @@ class TestDetectExtraRequirements:
 
     def test_empty_memory_starters_need_vector(self):
         for slug in ("memory", "telegram"):
-            assert "vector" in get_starter(slug).requires_extras, slug
+            assert "vector" in _starter(slug).requires_extras, slug
 
     def test_inline_child_search_is_seen(self):
-        assert "search" in get_starter("scholar").requires_extras
+        assert "search" in _starter("scholar").requires_extras
 
     @pytest.mark.parametrize("slug", ["scholar", "writer"])
     def test_shared_memory_starters_need_vector(self, slug):
-        assert "vector" in get_starter(slug).requires_extras
+        assert "vector" in _starter(slug).requires_extras
 
     def test_child_trigger_token_is_a_required_env(self):
         from initrunner.services.starters import _detect_requires_env

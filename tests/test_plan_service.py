@@ -75,7 +75,7 @@ class TestPolicy:
         # Default-deny example policy: tools carry an explicit decision.
         decided = [t for t in plan.tools if t.policy is not None]
         assert decided and all(d.policy is not None for d in decided)
-        assert any(d.policy.allowed is False for d in decided)
+        assert any(d.policy is not None and d.policy.allowed is False for d in decided)
 
 
 class TestSandbox:

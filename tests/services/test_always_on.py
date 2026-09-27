@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -52,7 +53,7 @@ def test_prompt_from_flat_role(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("INITRUNNER_HOME", str(tmp_path / "home"))
     from initrunner.config import get_home_dir
 

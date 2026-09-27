@@ -1,5 +1,6 @@
 """Tests for initrunner._html — shared fetch + HTML->markdown utility."""
 
+from typing import cast
 from unittest.mock import patch
 
 import httpx
@@ -132,7 +133,7 @@ class TestStreamingByteCap:
     def test_read_body_capped_stops_at_ceiling(self):
         # 100 chunks x 1000 bytes = 100 KB available; cap at 2500 bytes.
         resp = self._FakeResp([b"x" * 1000 for _ in range(100)])
-        text = _read_body_capped(resp, max_bytes=2500)
+        text = _read_body_capped(cast(httpx.Response, resp), max_bytes=2500)
         # Stopped early: only a few chunks read, not the full 100 KB.
         assert resp.bytes_read <= 3000
         assert len(text) <= 3000

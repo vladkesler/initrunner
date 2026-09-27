@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
+from initrunner.agent.schema.tools import CustomToolConfig
 from initrunner.runner import single
 from initrunner.runner.interactive import _attach_tool
 from initrunner.runner.reload import _CARRYOVER_ATTRS, AgentHandle, ReloadResult
@@ -63,7 +65,7 @@ class TestRebuildFromRole:
         )
         # A fresh mock would auto-create any attribute, so use a real object
         # for the new agent to prove the values are actually copied across.
-        new_agent = type("A", (), {})()
+        new_agent = cast(Any, type("A", (), {})())
         handle = AgentHandle(old_agent, make_role(), role_dir=None)
 
         with patch("initrunner.agent.loader.build_agent", return_value=new_agent):
@@ -132,7 +134,7 @@ class TestAttachTool:
 
         assert result.ok is True
         _agent, role = handle.current()
-        customs = [t for t in role.spec.tools if getattr(t, "type", None) == "custom"]
+        customs = [t for t in role.spec.tools if isinstance(t, CustomToolConfig)]
         assert [t.module for t in customs] == ["mymod"]
 
     def test_reattach_replaces_not_duplicates(self, tmp_path):

@@ -68,6 +68,7 @@ class TestMcpStaysRegistered:
 
     def test_builder_raises_with_the_install_hint(self, no_fastmcp):
         builder = get_builder("mcp")
+        assert builder is not None
         ctx = ToolBuildContext(role=make_role())
         with pytest.raises(MissingExtraError, match=r"initrunner\[mcp\]"):
             builder(McpToolConfig(command="echo"), ctx)

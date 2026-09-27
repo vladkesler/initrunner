@@ -336,7 +336,7 @@ class TestSpanTreeCapture:
 
     def test_get_span_tree_returns_tree_with_provider(self):
         pytest.importorskip("pydantic_evals")
-        from pydantic_evals.otel.span_tree import SpanTree
+        from pydantic_evals.otel.span_tree import SpanTree  # type: ignore[import-not-found]
 
         import initrunner.observability as obs
 
@@ -346,7 +346,7 @@ class TestSpanTreeCapture:
 
     def test_capture_span_tree_empty_without_instrumentation(self):
         pytest.importorskip("pydantic_evals")
-        from pydantic_evals.otel.span_tree import SpanTree
+        from pydantic_evals.otel.span_tree import SpanTree  # type: ignore[import-not-found]
 
         import initrunner.observability as obs
 

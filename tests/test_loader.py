@@ -14,7 +14,7 @@ from initrunner.agent.loader import (
     build_agent,
     load_role,
 )
-from initrunner.agent.schema.base import ModelConfig
+from initrunner.agent.schema.base import ModelConcurrencyConfig, ModelConfig
 
 
 @pytest.fixture
@@ -1021,7 +1021,9 @@ class TestModelConcurrencyLimit:
     def test_per_agent_limit_wraps_model(self):
         from pydantic_ai.models.concurrency import ConcurrencyLimitedModel
 
-        mc = ModelConfig(provider="openai", name="gpt-5-mini", concurrency={"max_running": 4})
+        mc = ModelConfig(
+            provider="openai", name="gpt-5-mini", concurrency=ModelConcurrencyConfig(max_running=4)
+        )
         result = _build_model(mc)
         assert isinstance(result, ConcurrencyLimitedModel)
 
@@ -1036,10 +1038,14 @@ class TestModelConcurrencyLimit:
     @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
     def test_shared_limiter_is_same_instance(self):
         a = ModelConfig(
-            provider="openai", name="gpt-5-mini", concurrency={"max_running": 3, "share": "pool"}
+            provider="openai",
+            name="gpt-5-mini",
+            concurrency=ModelConcurrencyConfig(max_running=3, share="pool"),
         )
         b = ModelConfig(
-            provider="openai", name="gpt-4o-mini", concurrency={"max_running": 3, "share": "pool"}
+            provider="openai",
+            name="gpt-4o-mini",
+            concurrency=ModelConcurrencyConfig(max_running=3, share="pool"),
         )
         ra = _build_model(a)
         rb = _build_model(b)
@@ -1047,8 +1053,12 @@ class TestModelConcurrencyLimit:
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
     def test_unnamed_limiters_are_distinct(self):
-        a = ModelConfig(provider="openai", name="gpt-5-mini", concurrency={"max_running": 2})
-        b = ModelConfig(provider="openai", name="gpt-5-mini", concurrency={"max_running": 2})
+        a = ModelConfig(
+            provider="openai", name="gpt-5-mini", concurrency=ModelConcurrencyConfig(max_running=2)
+        )
+        b = ModelConfig(
+            provider="openai", name="gpt-5-mini", concurrency=ModelConcurrencyConfig(max_running=2)
+        )
         ra = _build_model(a)
         rb = _build_model(b)
         assert ra._limiter is not rb._limiter  # per-agent, not shared
@@ -1061,7 +1071,7 @@ class TestModelConcurrencyLimit:
             provider="openai",
             name="gpt-5-mini",
             fallback=["openai:gpt-4o-mini"],
-            concurrency={"max_running": 2},
+            concurrency=ModelConcurrencyConfig(max_running=2),
         )
         result = _build_model(mc)
         assert isinstance(result, ConcurrencyLimitedModel)

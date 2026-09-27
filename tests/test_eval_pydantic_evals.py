@@ -290,8 +290,11 @@ class TestRunSuitePydanticEvals:
 
 class TestSpanAssertionEvaluatorOtel:
     def test_prefers_span_tree_when_recorded(self):
-        from pydantic_evals.evaluators import EvaluatorContext
-        from pydantic_evals.otel.span_tree import SpanNode, SpanTree
+        from pydantic_evals.evaluators import EvaluatorContext  # type: ignore[import-not-found]
+        from pydantic_evals.otel.span_tree import (  # type: ignore[import-not-found]
+            SpanNode,
+            SpanTree,
+        )
 
         from initrunner.eval.evaluators import RunRecord, SpanAssertionEvaluator
 
@@ -328,8 +331,10 @@ class TestSpanAssertionEvaluatorOtel:
         assert reason is not None and "otel" in reason
 
     def test_falls_back_to_timeline_without_spans(self):
-        from pydantic_evals.evaluators import EvaluatorContext
-        from pydantic_evals.otel._errors import SpanTreeRecordingError
+        from pydantic_evals.evaluators import EvaluatorContext  # type: ignore[import-not-found]
+        from pydantic_evals.otel._errors import (  # type: ignore[import-not-found]
+            SpanTreeRecordingError,
+        )
 
         from initrunner.eval.evaluators import RunRecord, SpanAssertionEvaluator
 
