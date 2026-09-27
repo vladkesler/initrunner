@@ -8,13 +8,21 @@ injected into provider construction in ``loader._build_single_model``.
 The provider SDKs are mid-migration from ``httpx`` to ``httpx2`` and type-check
 the client they are handed, so the client is built in the flavor the SDK will
 accept. InitRunner's own HTTP tools are unaffected and still use httpx.
+
+The client is built once, with the agent, but every synchronous run starts a
+fresh event loop (``run_sync`` -> ``anyio.run``). A connection pooled on one
+run's loop is dead on the next, and reusing it raised "Event loop is closed" on
+the second REPL turn and on every approval resume. So the transport keeps one
+connection pool per event loop.
 """
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import contextvars
 import logging
+import weakref
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FuturesTimeout
@@ -78,14 +86,64 @@ def _retry_config(error_cls: type[Exception], *, attempts: int, max_wait: float)
     )
 
 
+class _PerLoopHTTPX2Transport(httpx2.AsyncBaseTransport):
+    """One inner transport, and so one connection pool, per running event loop.
+
+    Pools are held weakly by loop: once a run's loop is gone, its pool goes too,
+    and no later loop ever touches a connection opened on it.
+    """
+
+    def __init__(self, factory: Callable[[], httpx2.AsyncBaseTransport]) -> None:
+        self._factory = factory
+        self._pools: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, httpx2.AsyncBaseTransport
+        ] = weakref.WeakKeyDictionary()
+
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
+        loop = asyncio.get_running_loop()
+        transport = self._pools.get(loop)
+        if transport is None:
+            transport = self._pools[loop] = self._factory()
+        return await transport.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        transport = self._pools.pop(asyncio.get_running_loop(), None)
+        if transport is not None:
+            await transport.aclose()
+
+
+class _PerLoopHTTPXTransport(httpx.AsyncBaseTransport):
+    """:class:`_PerLoopHTTPX2Transport` for SDKs still on legacy httpx."""
+
+    def __init__(self, factory: Callable[[], httpx.AsyncBaseTransport]) -> None:
+        self._factory = factory
+        self._pools: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, httpx.AsyncBaseTransport
+        ] = weakref.WeakKeyDictionary()
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        loop = asyncio.get_running_loop()
+        transport = self._pools.get(loop)
+        if transport is None:
+            transport = self._pools[loop] = self._factory()
+        return await transport.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        transport = self._pools.pop(asyncio.get_running_loop(), None)
+        if transport is not None:
+            await transport.aclose()
+
+
 def _build_httpx2_client(*, attempts: int, max_wait: float) -> httpx2.AsyncClient:
     from pydantic_ai.models import DEFAULT_HTTP_TIMEOUT, get_user_agent
     from pydantic_ai.retries import AsyncHTTPX2TenacityTransport
 
     return httpx2.AsyncClient(
-        transport=AsyncHTTPX2TenacityTransport(
-            _retry_config(httpx2.HTTPStatusError, attempts=attempts, max_wait=max_wait),
-            validate_response=_raise_for_retryable_status,
+        transport=_PerLoopHTTPX2Transport(
+            lambda: AsyncHTTPX2TenacityTransport(
+                _retry_config(httpx2.HTTPStatusError, attempts=attempts, max_wait=max_wait),
+                validate_response=_raise_for_retryable_status,
+            )
         ),
         # Mirror pydantic_ai's own client defaults: the library's 5s default
         # connect timeout would kill long model calls.
@@ -99,9 +157,11 @@ def _build_legacy_client(*, attempts: int, max_wait: float) -> httpx.AsyncClient
     from pydantic_ai.retries import AsyncTenacityTransport
 
     return httpx.AsyncClient(
-        transport=AsyncTenacityTransport(
-            _retry_config(httpx.HTTPStatusError, attempts=attempts, max_wait=max_wait),
-            validate_response=_raise_for_retryable_status,
+        transport=_PerLoopHTTPXTransport(
+            lambda: AsyncTenacityTransport(
+                _retry_config(httpx.HTTPStatusError, attempts=attempts, max_wait=max_wait),
+                validate_response=_raise_for_retryable_status,
+            )
         ),
         timeout=httpx.Timeout(timeout=DEFAULT_HTTP_TIMEOUT, connect=5),
         headers={"User-Agent": get_user_agent()},

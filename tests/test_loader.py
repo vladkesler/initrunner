@@ -103,8 +103,11 @@ class TestBuildModel:
         assert isinstance(result, OpenAIResponsesModel)
         assert result.model_name == "gpt-5-mini"
         assert result.system == "openai"
+        from initrunner.agent.executor_retry import _PerLoopHTTPX2Transport
+
         transport = result.client._client._transport
-        assert isinstance(transport, AsyncHTTPX2TenacityTransport)
+        assert isinstance(transport, _PerLoopHTTPX2Transport)
+        assert isinstance(transport._factory(), AsyncHTTPX2TenacityTransport)
 
     def test_missing_sdk_falls_back_to_string(self, monkeypatch):
         """When a provider SDK is not installed, fall back to the plain

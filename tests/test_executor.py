@@ -83,21 +83,30 @@ class TestRetryingHttpClient:
     def test_client_has_tenacity_transport(self):
         from pydantic_ai.retries import AsyncHTTPX2TenacityTransport
 
-        from initrunner.agent.executor_retry import build_retrying_async_client
+        from initrunner.agent.executor_retry import (
+            _PerLoopHTTPX2Transport,
+            build_retrying_async_client,
+        )
 
         client = build_retrying_async_client("openai")
-        assert isinstance(client._transport, AsyncHTTPX2TenacityTransport)
+        # One retrying transport per event loop (see test_executor_retry_loops.py).
+        assert isinstance(client._transport, _PerLoopHTTPX2Transport)
+        assert isinstance(client._transport._factory(), AsyncHTTPX2TenacityTransport)
 
     def test_a_provider_still_on_legacy_httpx_gets_a_legacy_client(self):
         """groq's SDK rejects an httpx2 client, so it must be handed an httpx one."""
         import httpx
         from pydantic_ai.retries import AsyncTenacityTransport
 
-        from initrunner.agent.executor_retry import build_retrying_async_client
+        from initrunner.agent.executor_retry import (
+            _PerLoopHTTPXTransport,
+            build_retrying_async_client,
+        )
 
         client = build_retrying_async_client("groq")
         assert isinstance(client, httpx.AsyncClient)
-        assert isinstance(client._transport, AsyncTenacityTransport)
+        assert isinstance(client._transport, _PerLoopHTTPXTransport)
+        assert isinstance(client._transport._factory(), AsyncTenacityTransport)
 
     def test_retryable_status_raises_for_retry(self):
         """The validate_response hook raises only for transient status codes."""
