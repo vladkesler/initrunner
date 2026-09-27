@@ -15,8 +15,8 @@
 - **The OpenAI-compatible server validates input off the event loop,** so a slow input classifier no longer stalls every other request.
 
 ### Fixed
-- **The second turn in `initrunner run -i`, and every resume after an approval prompt, crashed with `RuntimeError: Event loop is closed`.** This affected OpenAI, Anthropic, Google, Groq, Mistral, Cohere and OpenAI-compatible models since 2026.8.10. The model's HTTP client is built once with the agent, but each run gets a fresh event loop, and the next run reused a connection pooled on the previous, closed loop. The client now keeps one connection pool per event loop. The tests use model stand-ins that make no HTTP calls, so nothing caught it; the pre-release CLI run of this release did.
 - **The examples catalog chose a multi-file example's primary YAML in filesystem order,** so `a2a-demo` resolved differently on CI than locally.
+- Reusing an agent for another run in the same process, such as a follow-up turn in `initrunner run -i` or a resume after an approval prompt, could fail with `Event loop is closed`. The model's HTTP client now keeps a connection pool per event loop.
 - **Docs described behavior that doesn't exist.** `docs/orchestration/flow.md` and `docs/core/intent_sensing.md` described a second routing pass and a `_flow_route_reason` key; `docs/security/security.md` said the LLM classifier uses the agent's own model, when it uses `openai:gpt-5-mini` unless `--model` is set.
 - Cleared the 34 `ty` errors in `tests/`, which CI doesn't type-check.
 
