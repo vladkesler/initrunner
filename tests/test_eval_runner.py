@@ -2,7 +2,7 @@
 
 import json
 import textwrap
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic_ai import Agent
@@ -521,3 +521,32 @@ class TestRunSingleCase:
         assert cr.passed is True
         assert len(cr.assertion_results) == 1
         assert cr.assertion_results[0].passed is True
+
+
+class TestJevJudgeInSuite:
+    def test_case_prompt_reaches_the_judge(self):
+        from initrunner.jev.criteria import CriteriaVerdict, CriterionResult
+
+        suite = TestSuiteDefinition.model_validate(
+            {
+                "apiVersion": "initrunner/v1",
+                "kind": "TestSuite",
+                "metadata": {"name": "jev-suite"},
+                "cases": [
+                    {
+                        "name": "explain",
+                        "prompt": "Explain what a REST API is",
+                        "assertions": [{"type": "jev_judge", "criteria": ["Answers the question"]}],
+                    }
+                ],
+            }
+        )
+        verdict = CriteriaVerdict(
+            results=[
+                CriterionResult(criterion="Answers the question", probability=0.9, status="pass")
+            ]
+        )
+        with patch("initrunner.jev.criteria.judge_criteria", return_value=verdict) as judge:
+            result = run_suite(_make_real_agent(), _make_role(), suite)
+        assert judge.call_args.args[0] == "Explain what a REST API is"
+        assert result.all_passed

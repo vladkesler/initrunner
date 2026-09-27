@@ -9,6 +9,7 @@ from typing import Any
 from initrunner.eval.schema import (
     Assertion,
     ContainsAssertion,
+    JevJudgeAssertion,
     LLMJudgeAssertion,
     MaxLatencyAssertion,
     MaxTokensAssertion,
@@ -25,6 +26,7 @@ from initrunner.eval.schema import (
 @dataclass
 class EvalContext:
     output: str
+    prompt: str = ""
     tool_call_names: list[str] = field(default_factory=list)
     total_tokens: int = 0
     duration_ms: int = 0
@@ -130,6 +132,9 @@ def evaluate_assertion(
 
     if isinstance(assertion, LLMJudgeAssertion):
         return _evaluate_llm_judge(assertion, ctx, dry_run=dry_run)
+
+    if isinstance(assertion, JevJudgeAssertion):
+        return _evaluate_jev_judge(assertion, ctx, dry_run=dry_run)
 
     return AssertionResult(assertion=assertion, passed=False, message="Unknown assertion type")
 
@@ -268,6 +273,29 @@ def _evaluate_llm_judge(
         passed=judge_result.all_passed,
         message=judge_result.summary,
     )
+
+
+def _evaluate_jev_judge(
+    assertion: JevJudgeAssertion, ctx: EvalContext, *, dry_run: bool = False
+) -> AssertionResult:
+    """Judge the output against each criterion with Jev, skipping in dry-run mode."""
+    if dry_run:
+        return AssertionResult(
+            assertion=assertion,
+            passed=False,
+            message="[skipped] Jev judge not run in dry-run mode",
+        )
+
+    from initrunner.jev import JevError
+    from initrunner.jev.criteria import judge_criteria
+
+    try:
+        verdict = judge_criteria(
+            ctx.prompt, ctx.output, assertion.criteria, threshold=assertion.threshold
+        )
+    except JevError as exc:
+        return AssertionResult(assertion=assertion, passed=False, message=f"Jev judge: {exc}")
+    return AssertionResult(assertion=assertion, passed=verdict.passed, message=verdict.summary)
 
 
 def evaluate_assertions(

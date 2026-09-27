@@ -51,6 +51,7 @@ export TYPESAFE_DEFAULT_MODEL=~typesafe/jev-latest
 | [Input screening](#input-screening) | `security.content.screening.input: true` | Whether a prompt tries injection, fishes for secrets, or is off-topic | Blocks the input |
 | [Tool-result screening](#tool-result-screening) | `security.content.screening.tool_results: true` | Whether a tool result carries instructions aimed at the model | Withholds the result |
 | [Judged approval](#judged-approval) | `approval: judged` on a tool | Whether a tool call runs, is refused, or waits for a human | Waits for a human |
+| [Eval criteria](#eval-criteria) | `type: jev_judge` in a test suite | Whether an agent's output meets each criterion | The assertion fails |
 
 A role that turns on screening or judged approval fails to load if the extra or the key is missing. The CLI offers to install the extra or asks for the key. Those checks fail closed, so running without Jev would block every input, withhold every result, or pause every call.
 
@@ -175,6 +176,19 @@ An earlier wording of the data question, "local files, environment variables, or
 
 Calibration: 14 of 14 on `tests/jev/fixtures/approvals.yaml`. That includes an argument that claims to be pre-approved while sending `~/.ssh/id_rsa` to a server; it is refused at 0.98.
 
+## Eval criteria
+
+`jev_judge` is `llm_judge` with Jev as the judge. The criteria are the same strings, and each becomes one Noul:
+
+```python
+{"criterion::0": {"type": "noul",
+                  "instructions": "Does `output` meet this criterion: The response includes at least one concrete example"}}
+```
+
+The state is `{"prompt": <the case prompt>, "output": <the agent's output>}`, with the prompt first so the output is read as an answer to it. A criterion passes at or above the assertion's `threshold` (default 0.7), and is reported as `uncertain` between 0.3 and the threshold. See [Agent Evals](evals.md#jev_judge).
+
+Calibration: 14 of 14 criterion judgments on `tests/jev/fixtures/criteria.yaml`. The set covers explanations, support replies and incident summaries, with criteria that are met, not met, and not applicable.
+
 ## Model version
 
 InitRunner pins `jev-1.13.0`. Every threshold on this page was tuned against it, and the pin is in `initrunner/jev/questions.py` next to those thresholds. Set `TYPESAFE_DEFAULT_MODEL` to use a different version.
@@ -195,6 +209,7 @@ Everything Jev judges is sent to TypeSafe's API, or OpenRouter's if you route th
 - **Input screening** sends every prompt and your `allowed_topics_prompt`.
 - **Tool-result screening** sends every tool result and the tool's name. For an agent that reads private files or mail, this is the one to think about.
 - **Judged approval** sends the user's latest request, capped at 4,000 characters, and each judged call's tool name and arguments, capped at 8,000 characters.
+- **`jev_judge`** sends each case's prompt and the agent's output (capped at 60,000 characters) with the criteria.
 
 Set `TYPESAFE_LOG_LEVEL=debug` only on a machine you trust. The SDK then logs full request and response bodies, and it does not redact them.
 
@@ -220,3 +235,4 @@ initrunner audit security-events --event-type jev.input
 - `initrunner/jev/questions.py` holds every question InitRunner asks and every threshold that acts on the answers, next to the pinned model.
 - `initrunner/jev/screening.py` does the windowing and batching and turns answers into verdicts for input and tool-result screening.
 - `initrunner/jev/approval.py` turns the three approval answers into run, refuse or ask. `initrunner/agent/judged_approval.py` is the toolset wrapper that applies it.
+- `initrunner/jev/criteria.py` judges eval criteria for the `jev_judge` assertion.

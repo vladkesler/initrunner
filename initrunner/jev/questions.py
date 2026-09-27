@@ -182,3 +182,27 @@ def approval() -> dict[str, Question]:
             ),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Eval criteria (jev_judge): does an agent's output meet each criterion
+# ---------------------------------------------------------------------------
+
+# A criterion passes at or above the assertion's threshold (default below).
+# Between EVAL_UNCERTAIN and the threshold it fails but is reported as
+# "uncertain", so a result that flips on Jev's ~0.01 run-to-run noise is visible.
+EVAL_THRESHOLD = 0.7
+EVAL_UNCERTAIN = 0.3
+EVAL_PROMPT_CHARS = 8_000
+EVAL_OUTPUT_CHARS = 60_000
+
+
+def eval_criteria(criteria: list[str]) -> dict[str, Question]:
+    """One Noul per criterion (state: ``prompt``, then ``output``)."""
+    return {
+        f"criterion::{i}": {
+            "type": "noul",
+            "instructions": f"Does `output` meet this criterion: {criterion}",
+        }
+        for i, criterion in enumerate(criteria)
+    }

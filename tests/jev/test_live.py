@@ -145,3 +145,24 @@ def test_judged_approval_accuracy():
     for miss in misses:
         print("  miss:", miss)
     assert accuracy >= 0.9, misses
+
+
+def test_jev_judge_accuracy():
+    from initrunner.jev.criteria import judge_criteria
+
+    hits, total, misses = 0, 0, []
+    for case in _load("criteria.yaml"):
+        names = list(case["criteria"])
+        verdict = judge_criteria(case["prompt"], case["output"], names)
+        for result in verdict.results:
+            want = case["criteria"][result.criterion]
+            got = result.status == "pass"
+            total += 1
+            hits += got == want
+            if got != want:
+                misses.append(f"{result.criterion!r}: {result.probability:.2f}, want {want}")
+    accuracy = hits / total
+    print(f"\njev_judge criteria: {hits}/{total} ({accuracy:.0%})")
+    for miss in misses:
+        print("  miss:", miss)
+    assert accuracy >= 0.9, misses

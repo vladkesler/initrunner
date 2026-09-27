@@ -26,6 +26,7 @@ from initrunner.eval.assertions import (
 )
 from initrunner.eval.schema import (
     ContainsAssertion,
+    JevJudgeAssertion,
     LLMJudgeAssertion,
     MaxLatencyAssertion,
     MaxTokensAssertion,
@@ -60,6 +61,7 @@ class RunRecord:
     """
 
     output: str = ""
+    prompt: str = ""
     tool_call_names: list[str] = field(default_factory=list)
     total_tokens: int = 0
     reasoning_tokens: int = 0
@@ -70,6 +72,7 @@ class RunRecord:
 def _eval_context_from_output(output: RunRecord) -> EvalContext:
     return EvalContext(
         output=output.output,
+        prompt=output.prompt,
         tool_call_names=output.tool_call_names,
         total_tokens=output.total_tokens,
         duration_ms=output.duration_ms,
@@ -158,6 +161,7 @@ _GENERIC_ASSERTION_TYPES = (
     NotContainsAssertion,
     RegexAssertion,
     LLMJudgeAssertion,
+    JevJudgeAssertion,
     ToolCallsAssertion,
     MaxTokensAssertion,
     MaxLatencyAssertion,

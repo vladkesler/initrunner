@@ -1,0 +1,27 @@
+# Criteria judged by Jev (docs/core/jev.md): one typed yes/no per criterion.
+# Needs: uv pip install "initrunner[jev]" and TYPESAFE_API_KEY.
+#   initrunner test examples/roles/hello-world.yaml -s examples/evals/jev-judge-eval.yaml
+# Swap `jev_judge` for `llm_judge` and the same criteria run on an LLM instead.
+apiVersion: initrunner/v1
+kind: TestSuite
+metadata:
+  name: jev-judge-eval
+cases:
+  - name: greeting
+    prompt: "Hello!"
+    expected_output: "Hello there! How can I help you today?"
+    assertions:
+      - type: jev_judge
+        criteria:
+          - "The reply greets the user"
+          - "The reply offers to help"
+
+  - name: plain-explanation
+    prompt: "Explain what a REST API is in simple terms"
+    expected_output: "A REST API lets programs talk over the web, like a waiter taking orders."
+    assertions:
+      - type: jev_judge
+        threshold: 0.7   # a criterion passes at or above this probability
+        criteria:
+          - "The explanation is beginner-friendly and avoids excessive jargon"
+          - "The response includes at least one concrete example"

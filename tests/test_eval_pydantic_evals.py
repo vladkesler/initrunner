@@ -173,6 +173,7 @@ class TestBuildEvaluators:
                         {"type": "contains", "value": "x"},
                         {"type": "tool_order", "sequence": ["a"]},
                         {"type": "span", "name_contains": "search"},
+                        {"type": "jev_judge", "criteria": ["Answers the question"]},
                     ],
                 }
             ]
@@ -181,6 +182,7 @@ class TestBuildEvaluators:
         assert isinstance(evaluators[0], AssertionEvaluator)
         assert isinstance(evaluators[1], AssertionEvaluator)
         assert isinstance(evaluators[2], SpanAssertionEvaluator)
+        assert isinstance(evaluators[3], AssertionEvaluator)
 
 
 class TestRunSuitePydanticEvals:

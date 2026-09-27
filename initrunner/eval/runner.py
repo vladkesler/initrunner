@@ -154,6 +154,7 @@ def _run_single_case(
 
     ctx = EvalContext(
         output=run_result.output,
+        prompt=case.prompt,
         tool_call_names=run_result.tool_call_names,
         total_tokens=run_result.total_tokens,
         duration_ms=duration_ms,
@@ -317,6 +318,7 @@ def run_suite_pydantic_evals(
         duration_ms = int((time.monotonic() - start) * 1000)
         return RunRecord(
             output=run_result.output,
+            prompt=case.prompt,
             tool_call_names=run_result.tool_call_names,
             total_tokens=run_result.total_tokens,
             reasoning_tokens=run_result.reasoning_tokens,

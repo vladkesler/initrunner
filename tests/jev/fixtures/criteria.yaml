@@ -1,0 +1,42 @@
+# jev_judge calibration: each criterion is expected to pass (true) or not (false).
+- prompt: Explain what a REST API is in simple terms
+  output: >-
+    A REST API is a way for programs to talk over the web. Think of a restaurant:
+    your app gives an order to the waiter (the API), who brings back food (data)
+    from the kitchen (the server). For example, a weather app asks
+    GET /weather?city=Paris and gets back the forecast.
+  criteria:
+    "The explanation is beginner-friendly and avoids excessive jargon": true
+    "The response includes at least one concrete example": true
+    "The response is written as a poem": false
+- prompt: Explain what a REST API is in simple terms
+  output: >-
+    REST leverages stateless HATEOAS-driven resource representations over
+    idempotent HTTP verbs with content negotiation and hypermedia controls.
+  criteria:
+    "The explanation is beginner-friendly and avoids excessive jargon": false
+    "The response includes at least one concrete example": false
+- prompt: "Customer: my order A-104 arrived broken, I want my money back."
+  output: >-
+    I'm so sorry your order arrived damaged. I've issued a full refund to your
+    card; you'll see it within 5 business days. No need to send the item back.
+  criteria:
+    "The reply apologizes to the customer": true
+    "The reply offers a refund": true
+    "The reply asks the customer for their order number": false
+- prompt: "Customer: my order arrived broken, I want my money back."
+  output: >-
+    Sale items can't be refunded. Please reply with your order number and a
+    photo of the damage and we'll look into sending a replacement.
+  criteria:
+    "The reply apologizes to the customer": false
+    "The reply offers a refund": false
+    "The reply asks the customer for their order number": true
+- prompt: Summarize the incident report for the status page
+  output: >-
+    Checkout failed for about a third of EU users for 45 minutes because a config
+    push set the payments pool size to zero. Rolling the change back fixed it.
+  criteria:
+    "The summary states the cause of the incident": true
+    "The summary says how long the incident lasted": true
+    "The summary blames a named employee": false

@@ -106,6 +106,33 @@ assertions:
 
 The judge returns pass/fail per criterion with a reason. In `--dry-run` mode, LLM judge assertions are skipped (marked as failed with a `[skipped]` message) to avoid API costs.
 
+### `jev_judge`
+
+The same criteria, judged by [Jev](jev.md) instead of an LLM. Change `llm_judge` to `jev_judge` and the criteria carry over. It needs `uv pip install "initrunner[jev]"` and `TYPESAFE_API_KEY`.
+
+```yaml
+assertions:
+  - type: jev_judge
+    criteria:
+      - "The explanation is beginner-friendly and avoids excessive jargon"
+      - "The response includes at least one concrete example"
+    threshold: 0.7   # default; a criterion passes at or above it
+```
+
+Every criterion becomes one yes/no question ("Does `output` meet this criterion: ..."), asked in a single request that also includes the case's prompt. Instead of a pass or fail from a model's reply, you get a probability per criterion:
+
+```
+1/2 criteria met (pass 0.95: The explanation is beginner-friendly and avoids excessive jargon; uncertain 0.42: The response includes at least one concrete example)
+```
+
+A criterion below the threshold fails the assertion. Between 0.3 and the threshold it is reported as `uncertain`, so a case sitting on the line is visible rather than flipping between runs. There's no model setting and nothing to parse. In `--dry-run` mode it is skipped like `llm_judge`. If Jev can't be reached, the assertion fails with `Jev judge: <reason>`.
+
+`examples/evals/jev-judge-eval.yaml` runs it against the hello-world role:
+
+```bash
+initrunner test examples/roles/hello-world.yaml -s examples/evals/jev-judge-eval.yaml
+```
+
 ## Tags
 
 Tag test cases for selective execution:

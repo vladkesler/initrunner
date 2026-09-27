@@ -36,6 +36,18 @@ class LLMJudgeAssertion(BaseModel):
     model: str = "openai:gpt-4o-mini"
 
 
+class JevJudgeAssertion(BaseModel):
+    """``llm_judge`` criteria judged by Jev: one typed yes/no per criterion.
+
+    A criterion passes when Jev's probability is at or above ``threshold``.
+    Needs the ``jev`` extra and ``TYPESAFE_API_KEY``.
+    """
+
+    type: Literal["jev_judge"] = "jev_judge"
+    criteria: list[str] = Field(min_length=1)
+    threshold: float = Field(default=0.7, gt=0.0, lt=1.0)
+
+
 class ToolCallsAssertion(BaseModel):
     type: Literal["tool_calls"] = "tool_calls"
     expected: list[str]
@@ -118,6 +130,7 @@ Assertion = Annotated[
     | NotContainsAssertion
     | RegexAssertion
     | LLMJudgeAssertion
+    | JevJudgeAssertion
     | ToolCallsAssertion
     | MaxTokensAssertion
     | MaxLatencyAssertion

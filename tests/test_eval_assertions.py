@@ -306,3 +306,84 @@ class TestEvaluateAssertions:
         results = evaluate_assertions(assertions, EvalContext(output="output"), dry_run=True)  # type: ignore[invalid-argument-type]
         assert results[0].passed is False
         assert "[skipped]" in results[0].message
+
+
+class TestJevJudgeAssertion:
+    def _verdict(self, passed: bool):
+        from initrunner.jev.criteria import CriteriaVerdict, CriterionResult
+
+        status = "pass" if passed else "fail"
+        return CriteriaVerdict(
+            results=[CriterionResult(criterion="Is helpful", probability=0.9, status=status)]
+        )
+
+    def test_parses_from_yaml_shape(self):
+        from initrunner.eval.schema import TestCase
+
+        case = TestCase.model_validate(
+            {
+                "name": "c",
+                "prompt": "p",
+                "assertions": [{"type": "jev_judge", "criteria": ["Is helpful"]}],
+            }
+        )
+        from initrunner.eval.schema import JevJudgeAssertion
+
+        assertion = case.assertions[0]
+        assert isinstance(assertion, JevJudgeAssertion)
+        assert assertion.threshold == 0.7
+
+    def test_rejects_empty_criteria(self):
+        import pytest
+        from pydantic import ValidationError
+
+        from initrunner.eval.schema import JevJudgeAssertion
+
+        with pytest.raises(ValidationError):
+            JevJudgeAssertion(criteria=[])
+
+    def test_pass_and_message(self):
+        from initrunner.eval.schema import JevJudgeAssertion
+
+        a = JevJudgeAssertion(criteria=["Is helpful"])
+        ctx = EvalContext(output="Sure, here is how.", prompt="How do I?")
+        with patch(
+            "initrunner.jev.criteria.judge_criteria", return_value=self._verdict(True)
+        ) as judge:
+            result = evaluate_assertion(a, ctx)
+        assert result.passed is True
+        assert result.message.startswith("1/1 criteria met")
+        judge.assert_called_once_with(
+            "How do I?", "Sure, here is how.", ["Is helpful"], threshold=0.7
+        )
+
+    def test_fail(self):
+        from initrunner.eval.schema import JevJudgeAssertion
+
+        with patch("initrunner.jev.criteria.judge_criteria", return_value=self._verdict(False)):
+            result = evaluate_assertion(
+                JevJudgeAssertion(criteria=["Is helpful"]), EvalContext("x")
+            )
+        assert result.passed is False
+
+    def test_dry_run_skips(self):
+        from initrunner.eval.schema import JevJudgeAssertion
+
+        with patch("initrunner.jev.criteria.judge_criteria") as judge:
+            result = evaluate_assertion(
+                JevJudgeAssertion(criteria=["Is helpful"]), EvalContext("x"), dry_run=True
+            )
+        judge.assert_not_called()
+        assert result.passed is False
+        assert result.message.startswith("[skipped]")
+
+    def test_jev_error_fails_with_the_reason(self):
+        from initrunner.eval.schema import JevJudgeAssertion
+        from initrunner.jev import JevError
+
+        with patch("initrunner.jev.criteria.judge_criteria", side_effect=JevError("no key")):
+            result = evaluate_assertion(
+                JevJudgeAssertion(criteria=["Is helpful"]), EvalContext("x")
+            )
+        assert result.passed is False
+        assert result.message == "Jev judge: no key"
