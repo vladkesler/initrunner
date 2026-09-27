@@ -64,10 +64,12 @@ def judge_tool_call(user_request: str, tool: str, tool_args: dict[str, Any]) -> 
     related = judgment.nouls["related"]
     exfil = judgment.nouls["exfil"]
     sure_of_blast = blast.confidence >= q.APPROVAL_AUTO_BLAST_CONFIDENCE
-    read_only = blast.score <= q.APPROVAL_READONLY_BLAST_MAX and sure_of_blast
 
     level = q.BLAST_LEVELS[min(round(blast.score), len(q.BLAST_LEVELS) - 1)]
-    facts = f"blast {blast.score:.2f}, requested {requested:.2f}, sends data out {exfil:.2f}"
+    facts = (
+        f"blast {blast.score:.2f}, related {related:.2f}, requested {requested:.2f}, "
+        f"sends data out {exfil:.2f}"
+    )
 
     decision: Decision
     if requested < q.APPROVAL_DENY_UNREQUESTED and (
@@ -76,24 +78,19 @@ def judge_tool_call(user_request: str, tool: str, tool_args: dict[str, Any]) -> 
         decision = "deny"
         why = "sends local data out" if exfil >= q.APPROVAL_DENY_EXFIL else level.rstrip(".")
         reason = f"not requested and {why[0].lower()}{why[1:]} ({facts})"
-    elif read_only and related >= q.APPROVAL_READONLY_RELATED and exfil < q.APPROVAL_AUTO_EXFIL_MAX:
-        decision = "approve"
-        reason = f"read-only and part of the task ({facts}, related {related:.2f})"
     elif (
-        requested >= q.APPROVAL_AUTO_REQUESTED
+        related >= q.APPROVAL_AUTO_RELATED
         and exfil < q.APPROVAL_AUTO_EXFIL_MAX
         and blast.score <= q.APPROVAL_AUTO_BLAST_MAX
         and sure_of_blast
     ):
         decision = "approve"
-        reason = f"requested and low risk ({facts})"
+        reason = f"part of the task and low risk ({facts})"
     else:
         decision = "pause"
         concerns = []
-        if read_only and related < q.APPROVAL_READONLY_RELATED:
+        if related < q.APPROVAL_AUTO_RELATED:
             concerns.append(f"looks unrelated to the request ({related:.2f})")
-        elif requested < q.APPROVAL_AUTO_REQUESTED:
-            concerns.append(f"may not be what was asked ({requested:.2f})")
         if exfil >= q.APPROVAL_AUTO_EXFIL_MAX:
             concerns.append(f"may send data out ({exfil:.2f})")
         if blast.score > q.APPROVAL_AUTO_BLAST_MAX:

@@ -61,7 +61,21 @@ def test_related_read_only_call_runs_without_being_requested(monkeypatch):
     _answer(monkeypatch, blast=0.0, confidence=1.0, requested=0.18, related=0.84, exfil=0.04)
     verdict = judge_tool_call("show me notes.md", "run_shell", {"command": "ls -la"})
     assert verdict.decision == "approve"
-    assert verdict.reason.startswith("read-only and part of the task")
+    assert verdict.reason.startswith("part of the task and low risk")
+
+
+def test_scratch_write_that_is_part_of_the_task_runs(monkeypatch):
+    """Deleting one artifact at a time: 'requested' reads it literally (0.50)."""
+    _answer(monkeypatch, blast=1.04, confidence=0.95, requested=0.50, related=0.86, exfil=0.02)
+    cmd = {"command": "rm -f ./dist/app-1.0.tar.gz"}
+    assert judge_tool_call("clean up ./dist", "run_shell", cmd).decision == "approve"
+
+
+def test_harder_to_recover_write_asks_even_when_related(monkeypatch):
+    _answer(monkeypatch, blast=1.64, confidence=0.62, requested=0.97, related=0.97, exfil=0.03)
+    verdict = judge_tool_call("delete old_notes.txt", "run_shell", {"command": "rm old_notes.txt"})
+    assert verdict.decision == "pause"
+    assert "hard to recover" in verdict.reason
 
 
 def test_unrelated_read_asks(monkeypatch):
@@ -88,7 +102,7 @@ def test_pause_reason_names_each_concern(monkeypatch):
     _answer(monkeypatch, blast=2.0, requested=0.07, exfil=0.33)
     reason = judge_tool_call("tidy my branch", "run_shell", {}).reason
     assert reason.startswith("Jev: ")
-    assert "may not be what was asked (0.07)" in reason
+    assert "looks unrelated to the request (0.07)" in reason
     assert "may send data out (0.33)" in reason
     assert "shared state such as a main branch" in reason
 
