@@ -64,7 +64,13 @@ def sense_member_or_exit(roster: Roster, prompt: str, *, dry_run: bool) -> str:
         )
         for member in roster.members.values()
     ]
-    selection = select_candidate_sync(prompt, candidates, allow_llm=not dry_run)
+    try:
+        selection = select_candidate_sync(
+            prompt, candidates, allow_llm=not dry_run, allow_none=True
+        )
+    except ValueError as e:  # includes NoFitError: no member fits the task
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
     display_sense_result(selection)
 
     by_name = {member.role.metadata.name: key for key, member in roster.members.items()}

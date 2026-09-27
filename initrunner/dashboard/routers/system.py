@@ -53,6 +53,13 @@ def _run_doctor_checks() -> list[DoctorCheck]:
         else:
             checks.append(DoctorCheck(name=preset.name, status="fail", message="API key not set"))
 
+    # Jev typed judgments (optional extra)
+    from initrunner.services.doctor import diagnose_jev
+
+    jev_diag = diagnose_jev()
+    jev_status = {"ok": "ok", "warn": "warn", "off": "fail"}[jev_diag.status]
+    checks.append(DoctorCheck(name="jev", status=jev_status, message=jev_diag.message))
+
     # Ollama
     try:
         from initrunner.services.providers import is_ollama_running

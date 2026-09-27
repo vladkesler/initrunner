@@ -53,6 +53,8 @@ def display_sense_result(result: SelectionResult) -> None:
         )
     elif method == "llm":
         method_str = "[yellow]LLM selection[/yellow]"
+    elif method == "jev":
+        method_str = f"[green]Jev[/green] (confidence {result.confidence or 0.0:.2f})"
     else:
         method_str = "[yellow]fallback — no strong match[/yellow]"
 
@@ -67,6 +69,11 @@ def display_sense_result(result: SelectionResult) -> None:
     table.add_row("Method", method_str)
     if c.reason:
         table.add_row("Reason", escape(c.reason))
+    if result.runner_up is not None:
+        from initrunner.jev.questions import ROUTE_CONFIDENT
+
+        if (result.confidence or 0.0) < ROUTE_CONFIDENT:
+            table.add_row("Runner-up", f"[cyan]{escape(result.runner_up.name)}[/cyan]")
 
     console.print(Panel(table, title="[bold]Intent Sensing[/bold]", border_style="dim"))
 

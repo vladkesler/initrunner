@@ -129,6 +129,26 @@ def _reset_credential_resolver():
     reset_resolver()
 
 
+@pytest.fixture(autouse=True)
+def _jev_unconfigured(request, monkeypatch):
+    """Keep Jev off unless a test opts in, so no test reaches TypeSafe by accident.
+
+    A developer with ``TYPESAFE_API_KEY`` in their shell or vault would otherwise
+    turn every sensing test into a live call. Tests that need Jev patch
+    ``initrunner.jev.is_configured`` / ``ask``; ``tests/jev/test_live.py`` is
+    marked ``jev_live`` and keeps the real key.
+    """
+    import initrunner.jev as jev
+    from initrunner.jev import client
+
+    client.reset()
+    if request.node.get_closest_marker("jev_live") is None:
+        monkeypatch.setattr(client, "api_key", lambda: None)
+        monkeypatch.setattr(jev, "api_key", lambda: None)
+    yield
+    client.reset()
+
+
 @pytest.fixture
 def role():
     """Provide a default test RoleDefinition."""

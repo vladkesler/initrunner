@@ -1788,3 +1788,47 @@ class TestDiagnoseRoleExtrasSharesDetection:
             gaps = diagnose_role_extras(raw)
 
         assert [g.extras_name for g in gaps] == ["vector"]
+
+
+class TestDiagnoseJev:
+    def test_off_without_key(self):
+        from initrunner.services.doctor import diagnose_jev
+
+        diag = diagnose_jev()  # the autouse fixture leaves no key
+        assert diag.key_set is False
+        assert diag.status in ("off", "warn")
+
+    def test_ready_with_key_and_extra(self, monkeypatch):
+        import initrunner.jev as jev
+        from initrunner.services.doctor import diagnose_jev
+
+        monkeypatch.setattr(jev, "api_key", lambda: "ts_test")
+        monkeypatch.setattr("initrunner._compat.is_extra_installed", lambda extra: True)
+        diag = diagnose_jev()
+        assert diag.status == "ok"
+        assert diag.message == f"Ready ({jev.model()})"
+
+    def test_key_without_extra_points_at_the_install(self, monkeypatch):
+        import initrunner.jev as jev
+        from initrunner.services.doctor import diagnose_jev
+
+        monkeypatch.setattr(jev, "api_key", lambda: "ts_test")
+        monkeypatch.setattr("initrunner._compat.is_extra_installed", lambda extra: False)
+        diag = diagnose_jev()
+        assert diag.status == "warn"
+        assert "initrunner[jev]" in diag.message
+
+    def test_extra_without_key(self, monkeypatch):
+        from initrunner.services.doctor import diagnose_jev
+
+        monkeypatch.setattr("initrunner._compat.is_extra_installed", lambda extra: True)
+        diag = diagnose_jev()
+        assert diag.status == "warn"
+        assert "TYPESAFE_API_KEY" in diag.message
+
+    def test_doctor_prints_the_jev_row(self):
+        with patch("initrunner.agent.loader._load_dotenv"):
+            with patch("urllib.request.urlopen", side_effect=Exception("no ollama")):
+                result = runner.invoke(app, ["doctor"])
+        assert result.exit_code == 0
+        assert "Jev typed judgments" in result.output

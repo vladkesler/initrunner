@@ -1,0 +1,56 @@
+# Routing calibration over examples/roles.
+# expect: the roles an operator would accept, or `none` when no example role fits
+# (a none case passes when Jev abstains or stays below ROUTE_CONFIDENT, which
+# shows the runner-up at the confirm prompt).
+- prompt: my pods keep getting OOMKilled after the last helm upgrade, what should I check
+  expect: [kube-advisor]
+- prompt: turn last week's merged PRs into release notes
+  expect: [changelog-generator, changelog-slack]
+- prompt: is our marketing site down right now?
+  expect: [uptime-monitor, deployment-checker, api-monitor]
+- prompt: sort these vendor bills into categories for accounting
+  expect: [invoice-classifier]
+- prompt: look over this diff before I merge it
+  expect: [pr-reviewer, code-reviewer]
+- prompt: what's 17% of 2,340 compounded monthly over 3 years
+  expect: [math-assistant]
+- prompt: why did the build fail? here's the CI log
+  expect: [ci-explainer]
+- prompt: summarize this youtube video for me
+  expect: [audio-assistant, discord-assistant, telegram-assistant]
+- prompt: find the average order value per region in sales.csv
+  expect: [csv-analyst, data-analyst]
+- prompt: draft replies to the unread emails in my inbox
+  expect: [postman, email-assistant]
+- prompt: generate tests for the parser module and make them pass
+  expect: [unit-tester]
+- prompt: scan the repo for security vulnerabilities
+  expect: [security-scanner]
+- prompt: compare these two contracts in PDF and list the differences
+  expect: [pdf-analyst, pdf-agent]
+- prompt: make an image of a lighthouse at dusk in watercolor style
+  expect: [creative-studio]
+- prompt: which docs still mention the functions we renamed last sprint?
+  expect: [stale-docs-bloodhound]
+- prompt: post a morning news briefing to our slack channel every day
+  expect: [slack-digest]
+- prompt: how do I configure a cron trigger in initrunner?
+  expect: [initrunner-support]
+- prompt: "fetch this article and give me the key points: https://example.com/post"
+  expect: [web-reader, web-researcher, scout]
+- prompt: search the web for the latest news on solid-state batteries
+  expect: [web-searcher, research-team, scout, web-researcher]
+- prompt: open an issue on our repo for the login bug
+  expect: [github-tracker]
+- prompt: run the integration suite and tell me why the database tests fail
+  expect: [integration-tester]
+- prompt: check that yesterday's deploy is healthy and report to slack
+  expect: [deploy-notifier, deployment-checker]
+- prompt: remember that I prefer metric units from now on
+  expect: [memory-assistant, rich-memory-assistant, telegram-assistant]
+- prompt: book me a table for two at an Italian place tonight
+  expect: none
+- prompt: order a large pepperoni pizza to my apartment
+  expect: none
+- prompt: water my houseplants while I'm away
+  expect: none

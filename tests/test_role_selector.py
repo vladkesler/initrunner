@@ -181,3 +181,148 @@ class TestScoreCandidates:
         # Original candidates should be unchanged
         for c, orig in zip(candidates, original_scores, strict=True):
             assert c.score == orig
+
+
+# ---------------------------------------------------------------------------
+# Jev routing
+# ---------------------------------------------------------------------------
+
+
+def _jev_answer(probabilities: dict[str, float]):
+    from initrunner.jev import ChoiceResult, Judgment
+
+    choice = max(probabilities, key=lambda k: probabilities[k])
+    return Judgment(
+        choices={
+            "agent": ChoiceResult(
+                choice=choice,
+                confidence=probabilities[choice],
+                probabilities=probabilities,
+            )
+        },
+        model="jev-1.13.0",
+        request_id="req_test",
+    )
+
+
+@pytest.fixture
+def jev_on(monkeypatch):
+    """Turn Jev on and return a setter for the next routing answer."""
+    import initrunner.jev as jev
+
+    calls: list[tuple] = []
+    answer: dict = {}
+
+    def _ask(state, questions):
+        calls.append((state, questions))
+        return _jev_answer(answer["probabilities"])
+
+    monkeypatch.setattr(jev, "is_configured", lambda: True)
+    monkeypatch.setattr(jev, "ask", _ask)
+
+    def _set(probabilities: dict[str, float]) -> list[tuple]:
+        answer["probabilities"] = probabilities
+        return calls
+
+    return _set
+
+
+class TestJevRouting:
+    def test_jev_picks_the_candidate(self, jev_on):
+        calls = jev_on(
+            {"researcher": 0.1, "responder": 0.8, "escalator": 0.05, "none_of_these": 0.05}
+        )
+        result = select_candidate_sync("research machine learning papers", _make_candidates())
+        assert result.method == "jev"
+        assert result.candidate.name == "responder"
+        assert result.confidence == pytest.approx(0.8)
+        assert result.runner_up is not None and result.runner_up.name == "researcher"
+        # One call, every candidate plus none_of_these as options, task in the state.
+        state, questions = calls[0]
+        assert state == {"task": "research machine learning papers"}
+        assert set(questions["agent"]["criteria"]) == {
+            "researcher",
+            "responder",
+            "escalator",
+            "none_of_these",
+        }
+
+    def test_keyword_pass_is_skipped(self, jev_on):
+        """A confident keyword match must not pre-empt Jev (it can be confidently wrong)."""
+        jev_on({"researcher": 0.05, "responder": 0.05, "escalator": 0.85, "none_of_these": 0.05})
+        result = select_candidate_sync("research machine learning papers", _make_candidates())
+        assert result.candidate.name == "escalator"
+
+    def test_none_of_these_abstains_when_allowed(self, jev_on):
+        from initrunner.services.role_selector import NoFitError
+
+        jev_on({"researcher": 0.1, "responder": 0.1, "escalator": 0.1, "none_of_these": 0.7})
+        with pytest.raises(NoFitError, match="No role fits"):
+            select_candidate_sync("book a table", _make_candidates(), allow_none=True)
+
+    def test_none_of_these_is_ignored_for_closed_sets(self, jev_on):
+        jev_on({"researcher": 0.1, "responder": 0.15, "escalator": 0.05, "none_of_these": 0.7})
+        result = select_candidate_sync("book a table", _make_candidates())
+        assert result.method == "jev"
+        assert result.candidate.name == "responder"
+
+    def test_no_fit_error_is_a_value_error(self):
+        from initrunner.services.role_selector import NoFitError
+
+        # The CLI's existing `except ValueError` handlers rely on this.
+        assert issubclass(NoFitError, ValueError)
+
+    def test_jev_error_falls_back_to_keyword(self, monkeypatch):
+        import initrunner.jev as jev
+
+        def _fail(state, questions):
+            raise jev.JevError("down")
+
+        monkeypatch.setattr(jev, "is_configured", lambda: True)
+        monkeypatch.setattr(jev, "ask", _fail)
+        result = select_candidate_sync("research machine learning papers", _make_candidates())
+        assert result.method == "keyword"
+        assert result.candidate.name == "researcher"
+
+    def test_dry_run_never_calls_jev(self, jev_on):
+        calls = jev_on({"researcher": 1.0})
+        result = select_candidate_sync(
+            "research machine learning papers", _make_candidates(), allow_llm=False
+        )
+        assert calls == []
+        assert result.method == "keyword"
+
+    def test_not_configured_uses_keyword(self):
+        # The autouse fixture leaves Jev unconfigured.
+        result = select_candidate_sync("research machine learning papers", _make_candidates())
+        assert result.method == "keyword"
+
+    def test_duplicate_names_get_distinct_options(self, jev_on):
+        dupes = [
+            RoleCandidate(path=Path("a/role.yaml"), name="helper", description="A", tags=[]),
+            RoleCandidate(path=Path("b/role.yaml"), name="helper", description="B", tags=[]),
+        ]
+        calls = jev_on({"helper@a": 0.2, "helper@b": 0.7, "none_of_these": 0.1})
+        result = select_candidate_sync("help me", dupes)
+        assert set(calls[0][1]["agent"]["criteria"]) == {"helper@a", "helper@b", "none_of_these"}
+        assert result.candidate.path == Path("b/role.yaml")
+
+    def test_role_selection_passes_allow_none_through(self):
+        from initrunner.services.role_selector import select_role_sync
+
+        with patch("initrunner.services.role_selector.select_candidate_sync") as sel:
+            with patch(
+                "initrunner.services.discovery.discover_roles_sync",
+                return_value=[_fake_discovered()],
+            ):
+                select_role_sync("research papers", allow_none=True)
+        assert sel.call_args.kwargs["allow_none"] is True
+
+
+def _fake_discovered():
+    from types import SimpleNamespace
+
+    metadata = SimpleNamespace(name="researcher", description="Research topics", tags=[])
+    return SimpleNamespace(
+        error=None, path=Path("roles/researcher.yaml"), role=SimpleNamespace(metadata=metadata)
+    )

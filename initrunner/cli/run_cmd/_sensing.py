@@ -23,7 +23,7 @@ def _resolve_via_sensing(prompt: str, *, dry_run: bool) -> Path:
 
     try:
         with console.status("[dim]Sensing best role...[/dim]"):
-            selection = select_role_sync(prompt, allow_llm=not dry_run)
+            selection = select_role_sync(prompt, allow_llm=not dry_run, allow_none=True)
     except (NoRolesFoundError, ValueError) as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1) from None

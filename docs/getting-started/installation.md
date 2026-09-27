@@ -71,14 +71,15 @@ pip install "initrunner[all]"
 
 ## What to install
 
-Four names cover it. Everything else in `pyproject.toml` is there for packagers.
+Five names cover it. Everything else in `pyproject.toml` is there for packagers.
 
 | Install | Gets you |
 |---------|----------|
 | `initrunner` | The core runtime: OpenAI and Ollama models, every tool that needs no extra dependency, triggers, flows, teams, groups, and the OpenAI-compatible `--serve` API. |
 | `initrunner[recommended]` | Core plus web search, document ingestion, the vector store behind `memory:` and `ingest:`, MCP, and the dashboard. This is what the install script gives you. |
-| `initrunner[all]` | Everything above plus every provider SDK, YouTube transcripts, the profanity filter, OpenTelemetry, the Telegram/Discord/Slack triggers, the A2A server, and the credential vault. |
+| `initrunner[all]` | Everything above plus every provider SDK, YouTube transcripts, the profanity filter, OpenTelemetry, the Telegram/Discord/Slack triggers, the A2A server, the credential vault, and the Jev SDK. |
 | `initrunner[anthropic]` and friends | One provider SDK. Also `google`, `groq`, `mistral`, `cohere`, `bedrock`, `xai`, or `all-models` for all seven. |
+| `initrunner[jev]` | The TypeSafe SDK for [Jev](../core/jev.md) typed judgments: role routing, input and tool-result screening, judged tool approval. It does nothing until you set `TYPESAFE_API_KEY`. |
 
 Two things are deliberately outside `[all]`, because both are large and neither
 is worth carrying by default: the desktop app (`desktop`, which needs a system

@@ -52,6 +52,7 @@ _EXTRA_PACKAGES: dict[str, tuple[str, str]] = {
     "pymupdf4llm": ("ingest", "pymupdf4llm"),
     "fastapi": ("dashboard", "fastapi"),
     "opentelemetry.sdk": ("observability", "opentelemetry-sdk"),
+    "typesafe_sdk": ("jev", "typesafe-sdk"),
 }
 
 # extra -> the module whose presence stands for it.  Where an extra ships more
@@ -212,6 +213,11 @@ def require_vector() -> None:
 def require_embeddings_local() -> None:
     """Check that fastembed is importable, or raise with install hint."""
     require_extra("fastembed", extra="local-embeddings", pip_name="fastembed")
+
+
+def require_jev() -> None:
+    """Check that typesafe-sdk is importable, or raise with install hint."""
+    require_extra("typesafe_sdk", extra="jev", pip_name="typesafe-sdk")
 
 
 def is_dashboard_available() -> bool:

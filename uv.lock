@@ -1737,6 +1737,7 @@ all = [
     { name = "python-multipart" },
     { name = "python-telegram-bot" },
     { name = "slack-sdk" },
+    { name = "typesafe-sdk" },
     { name = "uvicorn" },
     { name = "youtube-transcript-api" },
 ]
@@ -1785,6 +1786,9 @@ ingest = [
     { name = "openpyxl" },
     { name = "pymupdf4llm" },
     { name = "python-docx" },
+]
+jev = [
+    { name = "typesafe-sdk" },
 ]
 local-embeddings = [
     { name = "fastembed" },
@@ -1934,6 +1938,8 @@ requires-dist = [
     { name = "slack-sdk", marker = "extra == 'slack'", specifier = ">=3.27" },
     { name = "starlette", specifier = ">=0.46.2" },
     { name = "typer", specifier = ">=0.21.1" },
+    { name = "typesafe-sdk", marker = "extra == 'all'", specifier = ">=0.7.2,<0.8" },
+    { name = "typesafe-sdk", marker = "extra == 'jev'", specifier = ">=0.7.2,<0.8" },
     { name = "uvicorn", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'a2a'", specifier = ">=0.42.0" },
     { name = "uvicorn", marker = "extra == 'all'", specifier = ">=0.42.0" },
@@ -1944,7 +1950,7 @@ requires-dist = [
     { name = "youtube-transcript-api", marker = "extra == 'all'", specifier = ">=1.2.4" },
     { name = "youtube-transcript-api", marker = "extra == 'audio'", specifier = ">=1.2.4" },
 ]
-provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "bedrock", "channels", "cohere", "dashboard", "desktop", "discord", "google", "groq", "ingest", "local-embeddings", "mcp", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring", "vector", "xai"]
+provides-extras = ["a2a", "all", "all-models", "anthropic", "audio", "bedrock", "channels", "cohere", "dashboard", "desktop", "discord", "google", "groq", "ingest", "jev", "local-embeddings", "mcp", "mistral", "observability", "recommended", "safety", "search", "slack", "telegram", "vault", "vault-keyring", "vector", "xai"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -4805,6 +4811,22 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0f/f3/a0663907082280664d745929205a89d41dffb29e89a50f753af7d57d0a96/types_requests-2.32.4.20260107.tar.gz", hash = "sha256:018a11ac158f801bfa84857ddec1650750e393df8a004a8a9ae2a9bec6fcb24f", size = 23165, upload-time = "2026-01-07T03:20:54.091Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/12/709ea261f2bf91ef0a26a9eed20f2623227a8ed85610c1e54c5805692ecb/types_requests-2.32.4.20260107-py3-none-any.whl", hash = "sha256:b703fe72f8ce5b31ef031264fe9395cac8f46a04661a79f7ed31a80fb308730d", size = 20676, upload-time = "2026-01-07T03:20:52.929Z" },
+]
+
+[[package]]
+name = "typesafe-sdk"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx2" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/ac/8bad2c02c038b85039cdb198ba106650d54bade0c0c986c68dc6e9cef8c3/typesafe_sdk-0.7.2.tar.gz", hash = "sha256:2434f4af5cdfc45d6ab5ff27048e8b257207f786b60456e69995e345b32e77e1", size = 23169, upload-time = "2026-09-26T21:20:24.988Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/99/5e/2b97ba9b0b77612e3a480ddb60c0c0325b4809ef57a7b565341d65ef7bec/typesafe_sdk-0.7.2-py3-none-any.whl", hash = "sha256:0a961148187d52e18276ed7f2d02617cfac48e3b97673cb631a8749397d43d1e", size = 36448, upload-time = "2026-09-26T21:20:23.511Z" },
 ]
 
 [[package]]

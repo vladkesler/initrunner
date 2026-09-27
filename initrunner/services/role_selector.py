@@ -1,6 +1,7 @@
 """Autonomous role selection service.
 
-Two-pass selection:
+With the ``jev`` extra and a TypeSafe key, Jev judges every candidate in one
+typed call and the passes below are skipped. Otherwise, or when Jev fails:
   Pass 1: Keyword/tag scoring — zero API calls, covers obvious matches.
   Pass 2: LLM tiebreaker — compact call used only when Pass 1 is ambiguous.
 """
@@ -81,14 +82,21 @@ class RoleCandidate:
 @dataclass
 class SelectionResult:
     candidate: RoleCandidate
-    method: Literal["only_one", "keyword", "llm", "fallback"]
+    method: Literal["only_one", "keyword", "llm", "jev", "fallback"]
     top_score: float = 0.0
     gap: float = 0.0
     used_llm: bool = False
+    # Jev only: the probability Jev gave the chosen candidate, and the next best.
+    confidence: float | None = None
+    runner_up: RoleCandidate | None = None
 
 
 class NoRolesFoundError(Exception):
     """No valid role files found; message includes searched dirs."""
+
+
+class NoFitError(ValueError):
+    """Jev judged that none of the candidates is built for the task."""
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +215,69 @@ def _llm_select(prompt: str, top_candidates: list[RoleCandidate]) -> RoleCandida
 
 
 # ---------------------------------------------------------------------------
+# Jev: one typed judgment over every candidate (private)
+# ---------------------------------------------------------------------------
+
+
+def _candidate_keys(candidates: list[RoleCandidate]) -> dict[str, RoleCandidate]:
+    """Map a unique option label to each candidate; duplicate names get ``@dir``."""
+    counts: dict[str, int] = {}
+    for c in candidates:
+        counts[c.name] = counts.get(c.name, 0) + 1
+    keys: dict[str, RoleCandidate] = {}
+    for c in candidates:
+        key = c.name if counts[c.name] == 1 else f"{c.name}@{c.path.parent.name}"
+        base, n = key, 2
+        while key in keys:
+            key, n = f"{base}#{n}", n + 1
+        keys[key] = c
+    return keys
+
+
+def _describe(c: RoleCandidate) -> str:
+    desc = c.description.strip() or c.name
+    return f"{desc} (tags: {', '.join(c.tags)})" if c.tags else desc
+
+
+def _jev_select(
+    prompt: str, candidates: list[RoleCandidate], *, allow_none: bool
+) -> SelectionResult:
+    """Ask Jev which candidate fits *prompt*. Raises ``JevError`` or ``NoFitError``."""
+    import copy
+
+    from initrunner import jev
+    from initrunner.jev import questions as q
+
+    if len(candidates) > q.ROUTE_MAX_OPTIONS:
+        candidates = score_candidates(prompt, candidates)[: q.ROUTE_MAX_OPTIONS]
+    keys = _candidate_keys(candidates)
+    judgment = jev.ask({"task": prompt}, q.route({k: _describe(c) for k, c in keys.items()}))
+    answer = judgment.choices[q.ROUTE_KEY]
+
+    ranked = sorted(
+        ((p, k) for k, p in answer.probabilities.items() if k in keys),
+        reverse=True,
+    )
+    if allow_none and answer.choice == q.NONE_OF_THESE:
+        closest = ", ".join(f"{k} ({p:.2f})" for p, k in ranked[:3])
+        raise NoFitError(f"No role fits this task. Closest: {closest}")
+
+    best_p, best_key = ranked[0]
+    second_p, second_key = ranked[1] if len(ranked) > 1 else (0.0, None)
+    winner = copy.copy(keys[best_key])
+    winner.score = best_p
+    winner.reason = f"Jev selected (confidence {best_p:.2f}, model {judgment.model})"
+    return SelectionResult(
+        candidate=winner,
+        method="jev",
+        top_score=best_p,
+        gap=best_p - second_p,
+        confidence=best_p,
+        runner_up=keys[second_key] if second_key is not None else None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -216,14 +287,18 @@ def select_candidate_sync(
     candidates: list[RoleCandidate],
     *,
     allow_llm: bool = True,
+    allow_none: bool = False,
 ) -> SelectionResult:
     """Score candidates against prompt using sense logic. No filesystem I/O.
 
     Args:
         prompt: The user's task description.
         candidates: Pre-built candidate list (from compose services, role files, etc.).
-        allow_llm: When False, skips the LLM tiebreaker and uses Pass-1 top
-                   scorer as fallback instead.
+        allow_llm: When False, makes no network calls: skips Jev and the LLM
+                   tiebreaker and uses the Pass-1 top scorer as fallback.
+        allow_none: When True, Jev may answer that no candidate fits, which
+                    raises :class:`NoFitError`. Flows leave it off: their
+                    targets are a closed set, so the best one always wins.
 
     Returns:
         :class:`SelectionResult` with the chosen candidate and diagnostics.
@@ -231,6 +306,7 @@ def select_candidate_sync(
     Raises:
         ValueError: If the prompt contains no meaningful keywords after filtering
                     or candidates list is empty.
+        NoFitError: If *allow_none* is set and Jev finds no fitting candidate.
     """
     prompt_tokens = _tokenize(prompt)
     if not prompt_tokens:
@@ -240,6 +316,15 @@ def select_candidate_sync(
 
     if len(candidates) == 1:
         return SelectionResult(candidate=candidates[0], method="only_one")
+
+    if allow_llm:
+        from initrunner import jev
+
+        if jev.is_configured():
+            try:
+                return _jev_select(prompt, candidates, allow_none=allow_none)
+            except jev.JevError as exc:
+                _logger.warning("Jev routing failed (%s); falling back to keyword scoring", exc)
 
     scored = score_candidates(prompt, candidates)
     top_score = scored[0].score
@@ -290,14 +375,16 @@ def select_role_sync(
     *,
     role_dir: Path | None = None,
     allow_llm: bool = True,
+    allow_none: bool = False,
 ) -> SelectionResult:
     """Select the best matching role for *prompt*.
 
     Args:
         prompt: The user's task description.
         role_dir: Optional explicit directory to search (passed to discovery).
-        allow_llm: When False (e.g. ``--dry-run``), skips the LLM tiebreaker
-                   and uses Pass-1 top scorer as fallback instead.
+        allow_llm: When False (e.g. ``--dry-run``), makes no network calls and
+                   uses the Pass-1 top scorer as fallback instead.
+        allow_none: Passed to :func:`select_candidate_sync`.
 
     Returns:
         :class:`SelectionResult` with the chosen candidate and diagnostics.
@@ -336,4 +423,4 @@ def select_role_sync(
             )
         )
 
-    return select_candidate_sync(prompt, candidates, allow_llm=allow_llm)
+    return select_candidate_sync(prompt, candidates, allow_llm=allow_llm, allow_none=allow_none)

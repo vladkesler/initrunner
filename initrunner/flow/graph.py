@@ -675,6 +675,15 @@ def build_flow_graph(
     return builder.build(), topo.entry_name
 
 
+def _route_reason(result) -> str:
+    """Short routing reason for the delegate event, e.g. ``jev 0.78``."""
+    if result.method == "jev":
+        return f"jev {result.confidence or 0.0:.2f}"
+    if result.method == "keyword":
+        return f"keyword {result.top_score:.2f}"
+    return result.method
+
+
 def _wire_routing_decision(builder, steps, source_name, targets, strategy, agent_refs):
     """Wire a Decision node for keyword/sense routing."""
     from initrunner.services.role_selector import RoleCandidate
@@ -703,6 +712,18 @@ def _wire_routing_decision(builder, steps, source_name, targets, strategy, agent
             lambda: select_candidate_sync(envelope.prompt, candidates, allow_llm=allow_llm)
         )
         selected = result.candidate.name
+        deps = ctx.deps
+        if deps.audit_logger is not None:
+            deps.audit_logger.log_delegate_event(
+                source_service=source_name,
+                target_service=selected,
+                status="routed",
+                source_run_id=deps.flow_run_id,
+                reason=_route_reason(result),
+                trace=",".join(envelope.trace),
+                payload_preview=envelope.prompt,
+                compose_name=deps.flow_name,
+            )
         # Return (selected_target, envelope) so decision can route
         return (selected, envelope)
 

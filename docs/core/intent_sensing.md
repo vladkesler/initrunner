@@ -11,6 +11,8 @@ When you have multiple agents and just want to describe a task, Intent Sensing r
 
 The result is displayed in a panel before the agent runs, showing which role was selected and why.
 
+If you install the `jev` extra and set a TypeSafe key, both passes are replaced by one typed [Jev](jev.md) judgment over every candidate. See [With Jev](#with-jev) below.
+
 ## Quick Start
 
 ```bash
@@ -73,14 +75,48 @@ If the LLM call fails for any reason (network error, unrecognized response, etc.
 
 ### Selection outcomes
 
-After sensing, the result panel shows one of four methods:
+After sensing, the result panel shows one of five methods:
 
 | Method | Meaning |
 |--------|---------|
 | `only role available` | Only one valid role was found — selected immediately |
+| `Jev (confidence 0.78)` | Jev picked the role; the number is the probability it gave that role |
 | `keyword match` | Pass 1 selected confidently; shows score and gap |
 | `LLM selection` | Pass 2 resolved an ambiguous set |
 | `fallback — no strong match` | Pass 1 was ambiguous and Pass 2 was skipped or failed |
+
+## With Jev
+
+Keyword scoring can be confidently wrong. Over the example roles, "turn last week's merged PRs into release notes" scores `pr-reviewer` well ahead of everything else, so Pass 1 picks it and the tiebreaker never runs. The right answer is `changelog-generator`.
+
+With the [`jev` extra](jev.md) installed and `TYPESAFE_API_KEY` set (in the environment or the vault), sensing skips both passes and asks Jev one question: which of these agents is the best fit for the task? Every discovered role is an option, labelled with its name and described by its description and tags, plus a `none_of_these` option. The answer comes back in about 250 ms as a probability for every role.
+
+```bash
+uv pip install "initrunner[jev]"
+export TYPESAFE_API_KEY=...        # or: initrunner vault set TYPESAFE_API_KEY
+initrunner run --sense -p "turn last week's merged PRs into release notes"
+```
+
+```
+╭─────────────────────────── Intent Sensing ───────────────────────────╮
+│ Name   changelog-generator                                           │
+│ File   examples/roles/changelog-generator.yaml                       │
+│ Tags   example, git, developer-tools                                 │
+│ Method Jev (confidence 0.73)                                         │
+│ Reason Jev selected (confidence 0.73, model jev-1.13.0)              │
+╰──────────────────────────────────────────────────────────────────────╯
+```
+
+On the 26-prompt calibration set in `tests/jev/fixtures/routing.yaml`, Jev picked an acceptable role every time. The keyword pass got 13 of the 23 prompts that have a fitting role.
+
+What changes with Jev:
+
+- **Low confidence shows the runner-up.** Below 0.6, the panel adds a `Runner-up` row, so when sensing asks "Use this role?" you can see the alternative. "look over this diff before I merge it" splits about evenly between `code-reviewer` and `pr-reviewer`, and both are reasonable.
+- **It can say no role fits.** When `none_of_these` wins, sensing stops with `No role fits this task. Closest: ...` and exits 1 instead of running something unrelated. A weak real role can still beat `none_of_these`; the confidence number and the confirm prompt cover that case.
+- **`--dry-run` still makes no network calls.** It uses keyword scoring only.
+- **Failures fall back quietly.** If Jev can't be reached, sensing logs a warning and runs the two passes above as before.
+
+Without the extra or the key, nothing changes.
 
 ## Role Discovery
 
@@ -248,10 +284,10 @@ triager:
     strategy: sense
 ```
 
-The same two-pass scoring (keyword + optional LLM tiebreak) runs on each message, using the target agents' role metadata (name, description, tags) as candidates. See [Flow -- Routing Strategy](../orchestration/flow.md#routing-strategy) for full details.
+The same selection runs on each message, using the target agents' role metadata (name, description, tags) as candidates. `strategy: keyword` is keyword scoring only. `strategy: sense` uses Jev when it is configured, otherwise keyword scoring with the LLM tiebreaker. A flow's targets are a closed set you chose, so the flow never abstains: it routes to the best target. See [Flow -- Routing Strategy](../orchestration/flow.md#routing-strategy) for full details.
 
 ### Dashboard Configuration
 
 The [dashboard flow builder](../interfaces/dashboard.md) surfaces routing strategy as a first-class option when creating a new flow with the **Route** pattern. Three inline pill buttons (Broadcast / Keyword / Sense) let you choose the strategy visually, with Sense recommended by default. A collapsible detail section shows scoring weights and per-slot quality indicators based on whether the assigned agents have tags and descriptions.
 
-The Route pattern supports variable agent counts (3-10) with semantic specialist names (`researcher`, `responder`, `escalator`, `analyst`, etc.) that contribute to the 2x name-match weight in scoring. After creation, the flow detail Events tab shows a **Routing** column with the method and score for each delegation event.
+The Route pattern supports variable agent counts (3-10) with semantic specialist names (`researcher`, `responder`, `escalator`, `analyst`, etc.) that contribute to the 2x name-match weight in scoring. Every routing decision is recorded as a delegate event (for example `jev 0.78` or `keyword 0.60`). The flow detail Events tab shows it in the **Routing** column, and `initrunner flow events` lists it from the command line.

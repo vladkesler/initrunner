@@ -6,6 +6,7 @@ import copy
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -23,6 +24,33 @@ class ProviderDiagnosis:
     fixable_sdk: bool  # key set + SDK missing + known extra
     fixable_key: bool  # SDK available + no key set
     extras_name: str | None
+
+
+@dataclass
+class JevDiagnosis:
+    """Whether Jev typed judgments are usable (optional ``jev`` extra)."""
+
+    key_set: bool
+    sdk_available: bool
+    model: str
+
+    @property
+    def status(self) -> Literal["ok", "warn", "off"]:
+        if self.key_set and self.sdk_available:
+            return "ok"
+        if self.key_set or self.sdk_available:
+            return "warn"
+        return "off"
+
+    @property
+    def message(self) -> str:
+        if self.status == "ok":
+            return f"Ready ({self.model})"
+        if self.key_set:
+            return "Key set but typesafe-sdk missing: uv pip install initrunner[jev]"
+        if self.sdk_available:
+            return "typesafe-sdk installed but TYPESAFE_API_KEY not set"
+        return "Not configured (optional)"
 
 
 @dataclass
@@ -191,6 +219,18 @@ def diagnose_providers() -> list[ProviderDiagnosis]:
             )
         )
     return results
+
+
+def diagnose_jev() -> JevDiagnosis:
+    """Check the TypeSafe key (env or vault) and the ``jev`` extra. Makes no calls."""
+    from initrunner import jev
+    from initrunner._compat import is_extra_installed
+
+    return JevDiagnosis(
+        key_set=jev.api_key() is not None,
+        sdk_available=is_extra_installed("jev"),
+        model=jev.model(),
+    )
 
 
 # ---------------------------------------------------------------------------

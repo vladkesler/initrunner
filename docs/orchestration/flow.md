@@ -162,10 +162,10 @@ When a delegate sink has multiple targets, the `strategy` field controls how mes
 |----------|----------|-----------|
 | `all` | Fan-out -- every target receives every message (default, backward compatible) | None |
 | `keyword` | [Intent Sensing](../core/intent_sensing.md) keyword scoring picks the best target | None |
-| `sense` | Keyword scoring first; LLM tiebreaker when ambiguous | 0 or 1 per message |
+| `sense` | [Jev](../core/jev.md) picks the target when configured; otherwise keyword scoring with an LLM tiebreaker when ambiguous | 1 Jev call, or 0 to 1 LLM calls, per message |
 | `ensemble` | Fan-out to every target, then vote on the answers and keep one winner | 0 (majority/weighted) or 1 per candidate (judge) |
 
-The `keyword` and `sense` strategies use the same two-pass [Intent Sensing](../core/intent_sensing.md) logic used by `--sense` in the CLI. They score the agent's output text against each target agent's `name`, `description`, and `tags` from its role definition.
+The `keyword` and `sense` strategies use the same [Intent Sensing](../core/intent_sensing.md) logic as `--sense` in the CLI. They judge the upstream agent's output against each target agent's `name`, `description`, and `tags` from its role definition.
 
 **Before (static fan-out):** every message goes to ALL targets:
 
@@ -188,12 +188,12 @@ triager:
 
 #### How routing works
 
-1. The upstream agent's output is scored against each target's role metadata (name, description, tags) using keyword matching.
-2. If the output doesn't produce a confident match, the original user prompt (preserved from the head of the delegation chain) is also scored.
-3. For `sense` strategy, if both attempts are inconclusive, an LLM tiebreaker call selects the best target.
+1. The router judges the upstream agent's output, which is also what the chosen target receives.
+2. With `strategy: sense` and [Jev](../core/jev.md) configured (the `jev` extra plus `TYPESAFE_API_KEY`), one Jev call picks the target from all of them. A flow's targets are a closed set you chose, so it always routes to the best one; it never abstains.
+3. Otherwise the output is scored against each target's role metadata with keyword matching. For `strategy: sense`, an inconclusive score goes to an LLM tiebreaker. If Jev is unreachable, `sense` falls back to this path.
 4. The message is forwarded to the selected target only (not fanned out).
 
-Routing diagnostics are injected into the payload's trigger metadata as `_flow_route_reason` for audit visibility.
+Each decision is recorded as a delegate event with a short reason such as `jev 0.78` or `keyword 0.60`. The dashboard's flow Events tab shows it in the Routing column, and `initrunner flow events` lists it.
 
 #### Optimizing roles for routing
 

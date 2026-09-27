@@ -186,7 +186,7 @@ class TestRun:
             app, ["run", "--sense", "-p", "test task", "--format", "rich", "--no-audit"]
         )
         assert result.exit_code == 0
-        mock_select.assert_called_once_with("test task", allow_llm=True)
+        mock_select.assert_called_once_with("test task", allow_llm=True, allow_none=True)
         mock_run_single.assert_called_once()
 
     @patch("initrunner.services.role_selector.select_role_sync")
@@ -197,7 +197,7 @@ class TestRun:
         mock_select.side_effect = NoRolesFoundError("no roles")
         result = runner.invoke(app, ["run", "--sense", "--dry-run", "-p", "task"])
         assert result.exit_code == 1
-        mock_select.assert_called_once_with("task", allow_llm=False)
+        mock_select.assert_called_once_with("task", allow_llm=False, allow_none=True)
 
     @patch("initrunner.runner.run_single")
     @patch("initrunner.agent.loader.load_and_build")

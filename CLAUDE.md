@@ -18,6 +18,7 @@ initrunner/              # main package (flat layout)
 ├── eval/                # eval framework: test roles against prompt suites
 ├── flow/                # multi-agent orchestration (flow.yaml)
 ├── ingestion/           # document pipeline: extract, chunk, embed, store
+├── jev/                 # optional Jev typed judgments: client.py (only typesafe_sdk importer), questions.py
 ├── mcp/                 # MCP server integration
 ├── packaging/           # OCI bundles: build, push, pull
 ├── registry/            # community role registry (install, search, manage)
@@ -45,7 +46,7 @@ deploy/                  # Docker entrypoint, fly.toml
 
 | Command | What it does |
 |---|---|
-| `uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector` | install deps (full suite baseline) |
+| `uv sync --dev --extra dashboard --extra a2a --extra mcp --extra vector --extra jev` | install deps (full suite baseline) |
 | `uv sync --dev` | install deps, core only (matches CI's `test-lean` job) |
 | `uv run pytest tests/ -v` | run tests |
 | `uv run ruff check .` | lint |
@@ -146,6 +147,7 @@ The tag push triggers the release pipeline (PyPI publish + GitHub Release).
 | Memory system | `docs/core/memory.md` |
 | Audit trail | `docs/core/audit.md` |
 | Intent sensing (auto role selection) | `docs/core/intent_sensing.md` |
+| Jev typed judgments (routing, screening, judged approval, `jev_judge`) | `docs/core/jev.md` |
 | Capabilities (PydanticAI) | `docs/core/capabilities.md` |
 | Reasoning primitives | `docs/core/reasoning.md` |
 | Structured output modes | `docs/core/structured-output.md` |

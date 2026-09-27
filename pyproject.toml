@@ -82,6 +82,8 @@ desktop = ["fastapi>=0.135.2", "uvicorn>=0.42.0", "python-multipart>=0.0.20", "p
 a2a = ["a2a-sdk[http-server]>=1.1.2", "uvicorn>=0.42.0"]
 vault = ["cryptography>=48"]
 vault-keyring = ["cryptography>=48", "keyring>=25"]
+# Typed judgments (routing, screening, judged tool approval) from TypeSafe's Jev.
+jev = ["typesafe-sdk>=0.7.2,<0.8"]
 recommended = [
     "initrunner[search]",
     "initrunner[ingest]",
@@ -102,6 +104,7 @@ all = [
     "initrunner[dashboard]",
     "initrunner[a2a]",
     "initrunner[vault-keyring]",
+    "initrunner[jev]",
 ]
 
 [project.scripts]
@@ -135,6 +138,9 @@ packages = ["initrunner"]
 
 [tool.pytest.ini_options]
 timeout = 60
+markers = [
+    "jev_live: calls the real Jev API (skipped without TYPESAFE_API_KEY)",
+]
 
 [tool.ruff]
 target-version = "py311"
