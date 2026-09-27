@@ -33,6 +33,7 @@ from initrunner.agent.capabilities.content_guard import ContentBlockedError
 from initrunner.agent.prompt import UserPrompt
 from initrunner.agent.schema.role import RoleDefinition
 from initrunner.audit.logger import AuditLogger
+from initrunner.audit.scope import reset_audit_scope, set_audit_scope
 
 # ---------------------------------------------------------------------------
 # Explicit re-exports from sub-modules (compatibility facade)
@@ -207,6 +208,8 @@ async def _execute_orchestrated_async(
 ) -> tuple[RunResult, list]:
     """Async execution skeleton shared by ``execute_run_async`` and ``execute_run_stream_async``."""
     agent_token = _enter_agent_context(role)
+    # Screening and judged approval log security events from inside the run.
+    audit_token = set_audit_scope(audit_logger, role.metadata.name)
     try:
         run_id, _usage_limits, run_kwargs, blocked = _prepare_run(
             role,
@@ -263,6 +266,7 @@ async def _execute_orchestrated_async(
 
         return result, new_messages
     finally:
+        reset_audit_scope(audit_token)
         _exit_agent_context(agent_token)
 
 
@@ -331,6 +335,8 @@ async def _execute_resume_async_inner(
     from pydantic_ai import DeferredToolResults
 
     agent_token = _enter_agent_context(role)
+    # Screening and judged approval log security events from inside the run.
+    audit_token = set_audit_scope(audit_logger, role.metadata.name)
     try:
         result = RunResult(run_id=run_id)
         start = time.monotonic()
@@ -389,6 +395,7 @@ async def _execute_resume_async_inner(
         )
         return result, new_messages
     finally:
+        reset_audit_scope(audit_token)
         _exit_agent_context(agent_token)
 
 

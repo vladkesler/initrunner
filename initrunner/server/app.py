@@ -439,6 +439,16 @@ def create_multi_app(
             headers={"X-Conversation-Id": conv_id, "X-Run-Id": run_id},
         )
 
+    async def _preflight(role, prompt, audit_logger: AuditLogger | None):
+        """Validate input off the event loop; Jev screening and the LLM classifier block."""
+        from initrunner.audit.scope import audit_scope
+
+        def _validate():
+            with audit_scope(audit_logger, role.metadata.name):
+                return validate_input(extract_text_from_prompt(prompt), role.spec.security.content)
+
+        return await asyncio.to_thread(_validate)
+
     # --- Non-streaming handler ---
 
     async def _handle_non_stream(
@@ -451,8 +461,7 @@ def create_multi_app(
         request: Request | None = None,
     ) -> JSONResponse:
         role = member.role
-        content_policy = role.spec.security.content
-        validation = validate_input(extract_text_from_prompt(prompt), content_policy)
+        validation = await _preflight(role, prompt, audit_logger)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
 
@@ -523,8 +532,7 @@ def create_multi_app(
         model_name = member.key
         # Pre-flight input validation — reject before streaming starts so the
         # client gets a proper HTTP 400, not a 200 SSE stream with an error.
-        content_policy = role.spec.security.content
-        validation = validate_input(extract_text_from_prompt(prompt), content_policy)
+        validation = await _preflight(role, prompt, audit_logger)
         if not validation.valid:
             return _error_response(400, "invalid_request_error", validation.reason)
 

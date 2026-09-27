@@ -1139,6 +1139,13 @@
           "title": "Allowed Topics Prompt",
           "type": "string"
         },
+        "screening": {
+          "$ref": "#/$defs/ScreeningConfig",
+          "default": {
+            "input": false,
+            "tool_results": false
+          }
+        },
         "max_prompt_length": {
           "default": 50000,
           "exclusiveMinimum": 0,
@@ -3718,6 +3725,24 @@
       "title": "SandboxConfig",
       "type": "object"
     },
+    "ScreeningConfig": {
+      "additionalProperties": false,
+      "description": "Jev checks on what enters the model's context (needs the ``jev`` extra).\n\n``input`` screens each user prompt for injection, secret extraction and,\nwhen ``allowed_topics_prompt`` is set, topic. ``tool_results`` screens every\ntool result for instructions aimed at the model. Both fail closed: if Jev\ncannot answer, the input is blocked or the result withheld.",
+      "properties": {
+        "input": {
+          "default": false,
+          "title": "Input",
+          "type": "boolean"
+        },
+        "tool_results": {
+          "default": false,
+          "title": "Tool Results",
+          "type": "boolean"
+        }
+      },
+      "title": "ScreeningConfig",
+      "type": "object"
+    },
     "ScriptDefinition": {
       "additionalProperties": false,
       "description": "A single inline script that becomes a tool function.",
@@ -3977,6 +4002,10 @@
             "output_action": "strip",
             "llm_classifier_enabled": false,
             "allowed_topics_prompt": "",
+            "screening": {
+              "input": false,
+              "tool_results": false
+            },
             "max_prompt_length": 50000,
             "max_output_length": 100000,
             "redact_patterns": [],

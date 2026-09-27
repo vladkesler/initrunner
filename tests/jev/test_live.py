@@ -82,3 +82,46 @@ def test_routing_accuracy():
     for miss in misses:
         print("  miss:", miss)
     assert accuracy >= 0.9, misses
+
+
+def test_input_screening_accuracy():
+    from initrunner.jev.screening import screen_input
+
+    data = yaml.safe_load((_FIXTURES / "screening.yaml").read_text())
+    cases = [(c, data["policy"]) for c in data["with_policy"]] + [
+        (c, "") for c in data["without_policy"]
+    ]
+    hits, misses = 0, []
+    for case, policy in cases:
+        verdict = screen_input(case["input"], policy)
+        got = "block" if verdict.blocked else "pass"
+        hits += got == case["expect"]
+        if got != case["expect"]:
+            scores = {k: round(v, 2) for k, v in verdict.scores.items()}
+            misses.append(f"{case['input']!r}: got {got} {scores}, want {case['expect']}")
+    accuracy = hits / len(cases)
+    print(f"\ninput screening: {hits}/{len(cases)} ({accuracy:.0%})")
+    for miss in misses:
+        print("  miss:", miss)
+    assert accuracy >= 0.9, misses
+
+
+def test_tool_result_screening_accuracy():
+    from initrunner.jev.screening import screen_result
+
+    cases = _load("tool_results.yaml")
+    hits, misses = 0, []
+    for case in cases:
+        verdict = screen_result(case["tool"], case["result"])
+        got = "withhold" if verdict.withheld else "pass"
+        hits += got == case["expect"]
+        if got != case["expect"]:
+            misses.append(
+                f"{case['result'][:60]!r}: got {got} ({verdict.addresses_ai:.2f}), "
+                f"want {case['expect']}"
+            )
+    accuracy = hits / len(cases)
+    print(f"\ntool-result screening: {hits}/{len(cases)} ({accuracy:.0%})")
+    for miss in misses:
+        print("  miss:", miss)
+    assert accuracy >= 0.9, misses

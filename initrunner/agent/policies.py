@@ -14,6 +14,7 @@ from pydantic_ai.models import AbstractModel, Model
 
 if TYPE_CHECKING:
     from initrunner.agent.schema.security import ContentPolicy
+    from initrunner.jev.screening import InputVerdict
 
 _logger = logging.getLogger(__name__)
 
@@ -85,11 +86,21 @@ def validate_input(
     if result is not None:
         return result
 
-    # Layer 2: LLM classifier
+    # Layer 2: LLM classifier, or Jev screening (the schema allows one)
     if policy.llm_classifier_enabled and policy.allowed_topics_prompt:
         result = _run_llm_classifier_sync(prompt, policy.allowed_topics_prompt, model_override)
         if not result.valid:
             return result
+
+    if policy.screening.input:
+        from initrunner.jev import JevError
+        from initrunner.jev.screening import screen_input
+
+        try:
+            verdict = screen_input(prompt, policy.allowed_topics_prompt)
+        except JevError as exc:
+            return _screening_unavailable(exc)
+        return _screening_result(verdict)
 
     return ValidationResult(valid=True)
 
@@ -113,7 +124,43 @@ async def validate_input_async(
         if not result.valid:
             return result
 
+    if policy.screening.input:
+        from initrunner.jev import JevError
+        from initrunner.jev.screening import screen_input_async
+
+        try:
+            verdict = await screen_input_async(prompt, policy.allowed_topics_prompt)
+        except JevError as exc:
+            return _screening_unavailable(exc)
+        return _screening_result(verdict)
+
     return ValidationResult(valid=True)
+
+
+def _screening_result(verdict: InputVerdict) -> ValidationResult:
+    if not verdict.blocked:
+        return ValidationResult(valid=True)
+    import json
+
+    from initrunner.audit.scope import log_security_event
+
+    details = {"decision": "blocked", "scores": verdict.scores, "judgments": verdict.judgments}
+    log_security_event("jev.input", json.dumps(details))
+    return ValidationResult(valid=False, reason=verdict.reason, validator="jev_screen")
+
+
+def _screening_unavailable(exc: Exception) -> ValidationResult:
+    # Fail closed: an input that could not be screened is not let through.
+    import json
+
+    from initrunner.audit.scope import log_security_event
+
+    log_security_event("jev.input", json.dumps({"decision": "unavailable", "error": str(exc)}))
+    return ValidationResult(
+        valid=False,
+        reason=f"Input screening unavailable: {exc}",
+        validator="jev_screen",
+    )
 
 
 # ---------------------------------------------------------------------------

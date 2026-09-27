@@ -262,11 +262,27 @@ def detect_extra_requirements(data: dict) -> list[ExtraRequirement]:
             extra = FEATURE_EXTRAS.get(name)
             if extra is not None:
                 found.append(ExtraRequirement(extra, name))
+        for feature in _jev_features(member):
+            found.append(ExtraRequirement("jev", feature))
 
     first: dict[str, ExtraRequirement] = {}
     for requirement in found:
         first.setdefault(requirement.extra, requirement)
     return [first[extra] for extra in sorted(first)]
+
+
+def _jev_features(member: dict) -> list[str]:
+    """Jev-backed security checks a document member turns on."""
+    security = member.get("security")
+    content = security.get("content") if isinstance(security, dict) else None
+    screening = content.get("screening") if isinstance(content, dict) else None
+    if not isinstance(screening, dict):
+        return []
+    return [
+        f"security.content.screening.{check}"
+        for check in ("input", "tool_results")
+        if screening.get(check)
+    ]
 
 
 def _detect_requires_extras(data: dict) -> list[str]:

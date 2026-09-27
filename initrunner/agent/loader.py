@@ -447,6 +447,42 @@ def _require_role_extras(role: RoleDefinition) -> None:
     """
     if role.spec.memory is not None or role.spec.ingest is not None:
         require_vector()
+    if _jev_seams(role):
+        _require_jev(role)
+
+
+def _jev_seams(role: RoleDefinition) -> list[str]:
+    """The Jev-backed security checks this role turns on."""
+    screening = role.spec.security.content.screening
+    seams = []
+    if screening.input:
+        seams.append("security.content.screening.input")
+    if screening.tool_results:
+        seams.append("security.content.screening.tool_results")
+    return seams
+
+
+def _require_jev(role: RoleDefinition) -> None:
+    """Fail at build, not mid-run, when a Jev-backed security check can't work.
+
+    These checks fail closed, so a role that asks for them without the SDK or a
+    key would block every input or withhold every result. Say so up front.
+    """
+    from initrunner._compat import require_jev
+    from initrunner.jev import API_KEY_ENV, api_key
+
+    require_jev()
+    if api_key() is None:
+        raise MissingApiKeyError(
+            env_var=API_KEY_ENV,
+            provider="jev",
+            message=(
+                f"{API_KEY_ENV} not found, and this role uses Jev for "
+                f"{', '.join(_jev_seams(role))}. Set it:\n"
+                f"  export {API_KEY_ENV}=your-key-here\n"
+                f"Or store it in the vault: initrunner vault set {API_KEY_ENV}"
+            ),
+        )
 
 
 def _validate_reasoning(role: RoleDefinition) -> None:
@@ -657,6 +693,7 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
         content.blocked_input_patterns
         or content.profanity_filter
         or content.llm_classifier_enabled
+        or content.screening.input
         or content.max_prompt_length != 50_000
     )
     if _has_input_guard:
@@ -664,6 +701,11 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
 
         auto_guard = InputGuardCapability(policy=content)
         capabilities = [auto_guard] + (capabilities or [])
+
+    if content.screening.tool_results:
+        from initrunner.agent.capabilities import ToolResultScreenCapability
+
+        capabilities = (capabilities or []) + [ToolResultScreenCapability()]
 
     return capabilities
 

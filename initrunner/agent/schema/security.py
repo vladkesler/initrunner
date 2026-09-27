@@ -151,6 +151,20 @@ def _probe_regexes_safe(patterns: list[str], timeout: float = 5.0) -> str | None
     return None
 
 
+class ScreeningConfig(BaseModel):
+    """Jev checks on what enters the model's context (needs the ``jev`` extra).
+
+    ``input`` screens each user prompt for injection, secret extraction and,
+    when ``allowed_topics_prompt`` is set, topic. ``tool_results`` screens every
+    tool result for instructions aimed at the model. Both fail closed: if Jev
+    cannot answer, the input is blocked or the result withheld.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    input: bool = False
+    tool_results: bool = False
+
+
 class ContentPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profanity_filter: bool = False
@@ -159,10 +173,19 @@ class ContentPolicy(BaseModel):
     output_action: Literal["strip", "block"] = "strip"
     llm_classifier_enabled: bool = False
     allowed_topics_prompt: str = ""
+    screening: ScreeningConfig = ScreeningConfig()
     max_prompt_length: Annotated[int, Field(gt=0)] = 50_000
     max_output_length: Annotated[int, Field(gt=0)] = 100_000
     redact_patterns: list[str] = []
     pii_redaction: bool = False
+
+    @model_validator(mode="after")
+    def _one_input_classifier(self) -> ContentPolicy:
+        if self.screening.input and self.llm_classifier_enabled:
+            raise ValueError(
+                "choose one input classifier: screening.input (Jev) or llm_classifier_enabled"
+            )
+        return self
 
     @field_validator("blocked_input_patterns", "blocked_output_patterns", "redact_patterns")
     @classmethod

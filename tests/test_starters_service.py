@@ -498,3 +498,21 @@ class TestDetectExtraRequirements:
             {"prompt": None, "agents": {"bot": {"prompt": "p", "triggers": [{"type": "telegram"}]}}}
         )
         assert _detect_requires_env("", data) == ["TELEGRAM_BOT_TOKEN"]
+
+
+class TestJevExtraDetection:
+    def test_screening_needs_jev(self):
+        from initrunner.services.starters import detect_extra_requirements
+
+        found = detect_extra_requirements(
+            _as_flat({"security": {"content": {"screening": {"input": True}}}})
+        )
+        assert [(r.extra, r.feature) for r in found] == [
+            ("jev", "security.content.screening.input")
+        ]
+
+    def test_screening_off_needs_nothing(self):
+        from initrunner.services.starters import detect_extra_requirements
+
+        doc = _as_flat({"security": {"content": {"screening": {"input": False}}}})
+        assert detect_extra_requirements(doc) == []
