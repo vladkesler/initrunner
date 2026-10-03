@@ -433,7 +433,7 @@ Runs shell, Python, and script tool execution in a separate subprocess, outside 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `backend` | `"auto" \| "bwrap" \| "docker" \| "ssh" \| "none"` | `"none"` | Isolation mechanism. `auto` prefers bwrap on Linux, falls back to Docker. `ssh` is remote execution, not isolation, and must be selected explicitly. |
-| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Network mode. `bridge` is Docker-only, and rejected with `backend: ssh`. |
+| `network` | `"none" \| "bridge" \| "host"` | `"none"` | Network mode. `bridge` is Docker-only, and rejected with `backend: bwrap` or `backend: ssh`. |
 | `allowed_read_paths` | `list[str]` | `[]` | Host paths mounted read-only into the sandbox. Rejected with `backend: ssh`. |
 | `allowed_write_paths` | `list[str]` | `[]` | Host paths mounted read-write into the sandbox. Rejected with `backend: ssh`. |
 | `memory_limit` | `str` | `"256m"` | Memory cap. Enforced via `systemd-run` cgroups on bwrap, `-m` on Docker. |

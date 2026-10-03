@@ -108,7 +108,7 @@ initrunner creates paths under `allowed_*` and `bind_mounts` on the host if they
 |---|---|
 | `none` | Adds `--unshare-net`. The sandbox has no interfaces beyond loopback, no routes, no DNS. |
 | `host` | No network namespace. The sandbox shares the host's network — useful for tools that need your normal DNS/proxy setup. |
-| `bridge` | **Not supported.** bwrap has no bridge-networking mode. Raises `SandboxConfigError` at runtime. Use `backend: docker` if you need bridge networking. |
+| `bridge` | **Not supported.** bwrap has no bridge-networking mode. `backend: bwrap` with `network: bridge` is rejected when the role loads. Use `backend: docker` if you need bridge networking; `backend: auto` picks Docker for it. |
 
 ### Environment
 

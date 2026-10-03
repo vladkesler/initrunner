@@ -7,7 +7,7 @@ import subprocess
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from initrunner.agent._subprocess import SubprocessTimeout
 from initrunner.agent.docker_sandbox import (
@@ -145,7 +145,6 @@ class DockerBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -209,7 +208,6 @@ class DockerBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -223,7 +221,6 @@ class DockerBackend:
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,
-                net=net,
                 memory_limit=memory_limit,
                 cpu_limit=cpu_limit,
             )

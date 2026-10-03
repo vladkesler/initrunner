@@ -47,14 +47,14 @@ security:
 | `bwrap` | Bubblewrap (Linux only). Lightweight user-namespace sandbox. |
 | `docker` | Docker container. Requires a running Docker daemon. |
 | `ssh` | Remote execution on a host via OpenSSH. Not a kernel sandbox. See [ssh-sandbox.md](ssh-sandbox.md). |
-| `auto` | Prefers bwrap on Linux, falls back to Docker. Never selects `ssh` (requires explicit host) and never falls to `none`. |
+| `auto` | Prefers bwrap on Linux, falls back to Docker. With `network: bridge` it goes straight to Docker. Never selects `ssh` (requires explicit host) and never falls to `none`. |
 
 ### `network`
 
 | Value | bwrap | docker |
 |---|---|---|
 | `none` | `--unshare-net` (empty namespace) | `--network none` |
-| `bridge` | Not supported (raises error) | `--network bridge` |
+| `bridge` | Not supported (rejected when the role loads; `auto` picks Docker) | `--network bridge` |
 | `host` | Host network (no namespace) | `--network host` |
 
 ### `docker` sub-config

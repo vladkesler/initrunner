@@ -466,6 +466,16 @@ class SandboxConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def _no_bridge_under_bwrap(self) -> SandboxConfig:
+        if self.backend == "bwrap" and self.network == "bridge":
+            raise ValueError(
+                "sandbox.network: bridge is not supported with backend: bwrap "
+                "(bubblewrap has no bridge networking). "
+                "Use 'none' or 'host', or backend: docker for bridge networking."
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_ssh_constraints(self) -> SandboxConfig:
         """SSH is remote execution, not isolation. Reject knobs that don't apply.
 

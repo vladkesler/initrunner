@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Literal
 
 from initrunner.agent._subprocess import scrub_env
 from initrunner.agent.runtime_sandbox.base import SandboxResult, _timed_subprocess
@@ -50,7 +49,6 @@ class NullBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -74,7 +72,6 @@ class NullBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -88,7 +85,6 @@ class NullBackend:
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,
-                net=net,
                 memory_limit=memory_limit,
                 cpu_limit=cpu_limit,
             )

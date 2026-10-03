@@ -6,7 +6,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from initrunner.agent.schema.security import BindMount
 
@@ -55,7 +55,6 @@ class SandboxBackend(Protocol):
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -71,7 +70,6 @@ class SandboxBackend(Protocol):
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:

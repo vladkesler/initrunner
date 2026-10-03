@@ -69,7 +69,8 @@ def _resolve_auto(
     agent_name: str = "",
 ) -> SandboxBackend:
     """auto: prefer bwrap on Linux, then docker, then error."""
-    if sys.platform == "linux":
+    # bwrap has no bridge networking, so network: bridge goes straight to docker.
+    if sys.platform == "linux" and config.network != "bridge":
         from initrunner.agent.runtime_sandbox.bwrap import BwrapBackend
 
         bwrap = BwrapBackend(config, role_dir=role_dir, audit=audit, agent_name=agent_name)

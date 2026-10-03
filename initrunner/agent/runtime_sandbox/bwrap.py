@@ -9,7 +9,7 @@ import sys
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from initrunner.agent._subprocess import SubprocessTimeout, scrub_env
 from initrunner.agent.runtime_sandbox.base import (
@@ -187,10 +187,9 @@ class BwrapBackend:
         env: Mapping[str, str],
         cwd: Path,
         extra_mounts: Sequence[BindMount],
-        net: Literal["none", "bridge", "host"],
         stdin_used: bool,
     ) -> list[str]:
-        if net == "bridge":
+        if self._config.network == "bridge":
             raise SandboxConfigError(
                 "network: bridge is not supported by the bwrap backend. "
                 "Use network: none or network: host."
@@ -208,7 +207,7 @@ class BwrapBackend:
             ]
         )
 
-        if net == "none":
+        if self._config.network == "none":
             cmd.append("--unshare-net")
 
         if not sys.stdin.isatty():
@@ -309,7 +308,6 @@ class BwrapBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -318,7 +316,6 @@ class BwrapBackend:
             env=env,
             cwd=cwd,
             extra_mounts=extra_mounts,
-            net=net,
             stdin_used=stdin is not None,
         )
         cmd = self._wrap_with_limits(cmd, memory_limit, cpu_limit)
@@ -361,7 +358,6 @@ class BwrapBackend:
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
-        net: Literal["none", "bridge", "host"] = "none",
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
@@ -375,7 +371,6 @@ class BwrapBackend:
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,
-                net=net,
                 memory_limit=memory_limit,
                 cpu_limit=cpu_limit,
             )
