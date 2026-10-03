@@ -205,7 +205,7 @@ Controls the OpenAI-compatible API server (`initrunner run <role> --serve`).
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `cors_origins` | `list[str]` | `[]` | Allowed CORS origins. Empty means **no CORS headers** (secure default). |
-| `require_https` | `bool` | `false` | Reject requests without `X-Forwarded-Proto: https` (except `/health`). |
+| `require_https` | `bool` | `false` | Reject requests that did not arrive over HTTPS (except `/health`). `X-Forwarded-Proto` counts only from a trusted proxy. |
 | `max_request_body_bytes` | `int` | `1048576` | Maximum request body size (1 MB). Returns 413 if exceeded. |
 | `max_conversations` | `int` | `1000` | Maximum concurrent conversations. Oldest evicted when exceeded. |
 
@@ -226,7 +226,15 @@ reviewable in the same file as the rest of its policy.
 
 #### HTTPS Enforcement
 
-With `require_https: true`, the server checks the `X-Forwarded-Proto` header set by reverse proxies (nginx, cloud load balancers). Non-`https` requests get a 403. `/health` is exempt so probes still work over HTTP.
+With `require_https: true`, the server rejects any request whose connection scheme is not `https` with a 403. `/health` is exempt so probes still work over HTTP.
+
+The server itself speaks plain HTTP, so HTTPS means a reverse proxy (nginx, a cloud load balancer) that terminates TLS and sets `X-Forwarded-Proto: https`. That header is honoured only when it comes from a trusted proxy. A proxy on the same machine (`127.0.0.1`) is trusted by default. For a proxy on another host or in another container, set the `FORWARDED_ALLOW_IPS` environment variable to its address:
+
+```bash
+FORWARDED_ALLOW_IPS=10.0.0.5 initrunner run role.yaml --serve --host 0.0.0.0
+```
+
+`FORWARDED_ALLOW_IPS` takes a comma-separated list and replaces the default, so include `127.0.0.1` if a local proxy should stay trusted. A client that sends `X-Forwarded-Proto: https` itself is still rejected. The first time that happens the server logs a warning naming the address, which is the thing to look for if a proxied deployment starts returning 403.
 
 ### `rate_limit` -- Rate Limiting
 

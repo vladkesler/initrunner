@@ -37,10 +37,12 @@ def _make_request(
     headers=None,
     cookies=None,
     query_params=None,
+    scheme="http",
 ):
     req = MagicMock()
     req.url = MagicMock()
     req.url.path = path
+    req.url.scheme = scheme
     req.method = method
     req.headers = headers or {}
     req.cookies = cookies or {}
@@ -554,7 +556,7 @@ class TestMakeHttpsDispatch:
             applies_to=all_paths_predicate(),
             error_response=detail_error_response,
         )
-        req = _make_request(headers={"x-forwarded-proto": "https"})
+        req = _make_request(scheme="https")
         call_next, resp = _make_call_next()
         result = await dispatch(req, call_next)
         assert result is resp
@@ -565,21 +567,40 @@ class TestMakeHttpsDispatch:
             applies_to=all_paths_predicate(),
             error_response=detail_error_response,
         )
-        req = _make_request(headers={"x-forwarded-proto": "http"})
+        req = _make_request(scheme="http")
         call_next, _ = _make_call_next()
         result = await dispatch(req, call_next)
         assert result.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_missing_header_treated_as_non_https(self):
+    async def test_forwarded_proto_header_alone_is_not_trusted(self):
+        """The connection scheme decides; any client can send the header."""
         dispatch = make_https_dispatch(
             applies_to=all_paths_predicate(),
             error_response=detail_error_response,
         )
-        req = _make_request(headers={})
+        req = _make_request(scheme="http", headers={"x-forwarded-proto": "https"})
         call_next, _ = _make_call_next()
         result = await dispatch(req, call_next)
         assert result.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_untrusted_forwarded_proto_warns_once(self, monkeypatch, caplog):
+        import logging
+
+        monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
+        dispatch = make_https_dispatch(
+            applies_to=all_paths_predicate(),
+            error_response=detail_error_response,
+        )
+        call_next, _ = _make_call_next()
+        with caplog.at_level(logging.WARNING, logger="initrunner"):
+            await dispatch(_make_request(scheme="http"), call_next)
+            assert "FORWARDED_ALLOW_IPS" not in caplog.text
+            for _ in range(2):
+                req = _make_request(scheme="http", headers={"x-forwarded-proto": "https"})
+                await dispatch(req, call_next)
+        assert caplog.text.count("FORWARDED_ALLOW_IPS") == 1
 
     @pytest.mark.asyncio
     async def test_non_applicable_path_passes(self):

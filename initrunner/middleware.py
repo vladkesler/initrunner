@@ -302,13 +302,28 @@ def make_https_dispatch(
     error_response: ErrorResponseFn,
     error_message: str = "HTTPS is required",
 ):
-    """Reject non-HTTPS requests based on ``X-Forwarded-Proto``."""
+    """Reject requests that did not arrive over HTTPS.
+
+    Goes by ``request.url.scheme``, which uvicorn only sets from
+    ``X-Forwarded-Proto`` when the proxy is trusted: loopback by default, other
+    addresses through ``FORWARDED_ALLOW_IPS``. The header is not read for the
+    decision -- any client can send it.
+    """
+    warned = False
 
     async def dispatch(request: Request, call_next) -> Response:
-        if applies_to(request):
-            proto = request.headers.get("x-forwarded-proto", "")
-            if proto != "https":
-                return error_response(403, error_message)
+        nonlocal warned
+        if applies_to(request) and request.url.scheme != "https":
+            if not warned and request.headers.get("x-forwarded-proto", "") == "https":
+                # Most likely a real proxy that uvicorn was not told to trust.
+                warned = True
+                _logger.warning(
+                    "require_https rejected a request that sent X-Forwarded-Proto: https "
+                    "from %s, which is not a trusted proxy. If that is your reverse proxy, "
+                    "set FORWARDED_ALLOW_IPS to its address.",
+                    request.client.host if request.client else "an unknown address",
+                )
+            return error_response(403, error_message)
         return await call_next(request)
 
     return dispatch

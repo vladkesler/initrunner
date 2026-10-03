@@ -551,7 +551,7 @@ When enabled:
 
 Without `--api-key`, a **localhost** dashboard runs with no authentication (suitable for local-only use). Binding to a non-loopback host (`--expose`) always requires a key — one is generated and printed if you don't supply it.
 
-The session cookie's `Secure` flag is set from the connection scheme (`request.url.scheme`), which uvicorn only marks HTTPS for a trusted proxy (`--forwarded-allow-ips`); the client-supplied `X-Forwarded-Proto` header is not trusted on its own.
+The session cookie's `Secure` flag is set from the connection scheme (`request.url.scheme`), which uvicorn only marks HTTPS for a trusted proxy (`127.0.0.1` by default, others through the `FORWARDED_ALLOW_IPS` environment variable); the client-supplied `X-Forwarded-Proto` header is not trusted on its own.
 
 **Limitations**: Authentication mode supports the built-in same-origin UI and Bearer-token API clients. The cross-origin Vite dev server (`localhost:5173`) is not supported in authenticated mode. For development with auth, use the production build served by the backend.
 

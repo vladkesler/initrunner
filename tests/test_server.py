@@ -461,10 +461,18 @@ class TestHTTPSEnforcement:
         assert resp.status_code == 403
 
     def test_https_enforcement_allows_https(self):
+        from initrunner.server.app import create_app
+
+        role = _make_security_role(server=ServerConfig(require_https=True))
+        client = TestClient(create_app(MagicMock(), role), base_url="https://testserver")
+        resp = client.get("/v1/models")
+        assert resp.status_code == 200
+
+    def test_https_enforcement_ignores_a_client_sent_forwarded_proto(self):
         role = _make_security_role(server=ServerConfig(require_https=True))
         client = _create_security_client(role)
         resp = client.get("/v1/models", headers={"X-Forwarded-Proto": "https"})
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     def test_health_exempt_from_https(self):
         role = _make_security_role(server=ServerConfig(require_https=True))

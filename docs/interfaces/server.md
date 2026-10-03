@@ -244,6 +244,10 @@ Invalid or missing tokens return:
 {"error": {"message": "invalid API key", "type": "authentication_error", "code": 401}}
 ```
 
+## Behind a reverse proxy
+
+The server speaks plain HTTP. Put a reverse proxy in front of it for TLS. With `security.server.require_https: true`, requests must arrive over HTTPS: the proxy's `X-Forwarded-Proto: https` header is trusted from `127.0.0.1` by default, and from other addresses once you list them in the `FORWARDED_ALLOW_IPS` environment variable. The header is not trusted when a client sends it directly. See [HTTPS Enforcement](../security/security.md#https-enforcement).
+
 ## CORS
 
 By default, the server sends **no CORS headers** (secure default). CORS origins are configured in the role YAML (`security.server.cors_origins`).
