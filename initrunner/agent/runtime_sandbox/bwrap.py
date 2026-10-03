@@ -37,6 +37,24 @@ _SYSTEM_RO_BINDS = [
 
 _DEFAULT_ENV_PASSTHROUGH = ("PATH", "HOME", "LANG", "TERM")
 
+
+def _system_ro_binds() -> list[str]:
+    """bwrap arguments that mount the host's system paths read-only."""
+    args: list[str] = []
+    for path in _SYSTEM_RO_BINDS:
+        if Path(path).exists():
+            args.extend(["--ro-bind", path, path])
+    return args
+
+
+def _systemd_memory(limit: str) -> str:
+    """Rewrite a docker-style limit ("256m", "512b") the way systemd reads it ("256M", "512").
+
+    systemd only accepts upper-case K/M/G suffixes and takes a bare number as bytes.
+    """
+    return limit.upper().removesuffix("B")
+
+
 _systemd_run_checked = False
 _systemd_run_available = False
 
@@ -156,7 +174,9 @@ class BwrapBackend:
             )
         try:
             result = subprocess.run(
-                ["bwrap", "--ro-bind", "/usr", "/usr", "--", "/bin/true"],
+                # Same system mounts as a real run. With only /usr mounted there
+                # is no /bin on distros where /bin is a symlink into /usr.
+                ["bwrap", *_system_ro_binds(), "--", "true"],
                 capture_output=True,
                 timeout=5,
             )
@@ -229,9 +249,7 @@ class BwrapBackend:
             cmd.extend(["--setenv", key, value])
 
         # System read-only mounts
-        for path in _SYSTEM_RO_BINDS:
-            if Path(path).exists():
-                cmd.extend(["--ro-bind", path, path])
+        cmd.extend(_system_ro_binds())
 
         # Configured read paths
         for path in self._config.allowed_read_paths:
@@ -293,7 +311,7 @@ class BwrapBackend:
             return cmd
 
         wrapper = ["systemd-run", "--user", "--scope", "--quiet"]
-        wrapper.extend(["-p", f"MemoryMax={ml}"])
+        wrapper.extend(["-p", f"MemoryMax={_systemd_memory(ml)}"])
         cpu_pct = int(cl * 100)
         wrapper.extend(["-p", f"CPUQuota={cpu_pct}%"])
         wrapper.append("--")

@@ -91,6 +91,51 @@ class TestUnsetEnv:
         assert cmd[cmd.index("TZ") - 1 : cmd.index("TZ") + 2] == ["--setenv", "TZ", "UTC"]
 
 
+class TestPreflight:
+    def test_probe_mounts_the_same_system_paths_as_a_run(self):
+        """With only /usr mounted, /bin/true is missing wherever /bin links into /usr."""
+        from initrunner.agent.runtime_sandbox.bwrap import _system_ro_binds
+
+        backend = BwrapBackend(SandboxConfig(backend="bwrap"))
+        with (
+            patch("initrunner.agent.runtime_sandbox.bwrap.sys.platform", "linux"),
+            patch(
+                "initrunner.agent.runtime_sandbox.bwrap.shutil.which", return_value="/usr/bin/bwrap"
+            ),
+            patch(_RUN, return_value=_ok()) as mock_run,
+        ):
+            backend.preflight()
+
+        probe = mock_run.call_args[0][0]
+        assert probe == ["bwrap", *_system_ro_binds(), "--", "true"]
+        assert ["--ro-bind", "/usr", "/usr"] == probe[1:4]
+
+
+class TestLimits:
+    @pytest.mark.parametrize(
+        ("limit", "systemd_value"),
+        [
+            ("256m", "256M"),
+            ("1g", "1G"),
+            ("512K", "512K"),
+            ("4096b", "4096"),
+            ("1048576", "1048576"),
+        ],
+    )
+    def test_memory_limit_is_written_the_way_systemd_reads_it(self, tmp_path, limit, systemd_value):
+        backend = BwrapBackend(SandboxConfig(backend="bwrap", memory_limit=limit, cpu_limit=0.5))
+        with (
+            patch("initrunner.agent.runtime_sandbox.bwrap._check_systemd_run", return_value=True),
+            patch(_RUN, return_value=_ok()) as mock_run,
+        ):
+            backend.run(["true"], env={}, cwd=tmp_path, timeout=5)
+
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "systemd-run"
+        assert f"MemoryMax={systemd_value}" in cmd
+        assert "CPUQuota=50%" in cmd
+
+
 class TestAutoSelection:
     def test_bridge_goes_to_docker(self):
         with (
