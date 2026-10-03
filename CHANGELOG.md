@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026.10.1] - 2026-10-03
+
+### Security
+- **Installing a bundle could write files outside the install directory.** A member named `data//tmp/x` landed in `/tmp/x`. (#286)
+- **Topic screening passed a long prompt if any one part of it was on topic.** The least on-topic part now decides. A long prompt that pastes material before its question can now be blocked; see `docs/core/jev.md`. (#287)
+- **The python tool left the host's proxy variables set with `network_disabled`.** Thanks to @Jah-yee for tracking it down in #293. (#288)
+- **Shell allow and block lists matched the file name only,** so `/tmp/x/git` passed as `git` and `sh -c 'rm ...'` got past the block list. (#289)
+- **`POST /v1/approvals/{run_id}` ignored `max_request_body_bytes`** on chunked requests. (#290)
+- **`require_https` accepted any request that sent `X-Forwarded-Proto: https`.** It now goes by the connection scheme. (#291)
+- **bwrap ignored `sandbox.network`.** `host` now shares the host network and `bridge` is rejected when the role loads. (#292)
+- Dashboard: bumped `dompurify` to 3.4.16 (GHSA-p98j-92pf-mc4p) and `devalue` to 5.9.4 (six advisories, three high). `dompurify` comes in through `posthog-js`, `devalue` through `svelte` and SvelteKit.
+
+### Fixed
+- **`backend: bwrap` did not run where `/bin` is a symlink into `/usr`** (Ubuntu, Debian, Fedora, Arch), and failed with "Failed to parse MemoryMax" where `systemd-run` was available. (#304)
+
+### Changed
+- Shell tool: a command written as a path must be listed as that path. `allowed_commands: [git]` no longer allows `/usr/bin/git`.
+- Shell tool: `sh`, `bash`, `env`, `xargs`, `timeout`, `nice`, `nohup`, `time` and other programs that run other programs are refused unless listed in `allowed_commands`. The full list is in `docs/agents/tools.md`.
+- `require_https` behind a proxy on another host needs `FORWARDED_ALLOW_IPS` set to the proxy's address.
+
 ## [2026.9.4] - 2026-09-30
 
 ### Security
