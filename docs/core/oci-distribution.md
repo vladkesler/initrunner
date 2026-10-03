@@ -150,7 +150,8 @@ OCI bundles are extracted to `~/.initrunner/roles/oci__<registry>__<repo>__<name
 
 ## Security
 
-- All archive paths are validated to prevent path traversal attacks
+- Every archive member is checked against the path it will be installed at (after the `data/` prefix is removed), and must stay inside the install directory
+- Only regular files and directories are accepted. Links and device files are rejected, and so are two files that would land on the same path
 - SHA-256 integrity checks are performed on every file during extraction
 - Credentials are stored with restrictive file permissions (0600)
 - Bundle contents are deterministic -- only explicitly referenced files are included

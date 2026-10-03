@@ -195,8 +195,10 @@ class OCIClient:
 
         from initrunner.packaging.bundle import extract_bundle
 
-        extract_bundle(archive_path, target_dir)
-        archive_path.unlink()
+        try:
+            extract_bundle(archive_path, target_dir)
+        finally:
+            archive_path.unlink()
 
         return target_dir
 

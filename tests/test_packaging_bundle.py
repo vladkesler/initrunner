@@ -267,7 +267,7 @@ class TestValidateBundle:
         extract_dir = tmp_path / "corrupt"
         extract_dir.mkdir()
         with tarfile.open(archive, "r:gz") as tar:
-            tar.extractall(extract_dir)
+            tar.extractall(extract_dir, filter="data")
 
         # Modify the role.yaml content
         (extract_dir / "role.yaml").write_text("corrupted content")
@@ -308,7 +308,79 @@ class TestValidateBundle:
             validate_bundle(archive)
 
 
+def _write_archive(path, files, extra_members=()):
+    """Write a bundle whose manifest lists *files* (name -> bytes) with correct hashes."""
+    import hashlib
+    import io
+
+    manifest = {
+        "format_version": "1",
+        "name": "crafted",
+        "version": "1",
+        "files": [
+            {
+                "path": name,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "size": len(data),
+                "kind": "data",
+            }
+            for name, data in files.items()
+        ],
+    }
+    with tarfile.open(path, "w:gz") as tar:
+        for name, data in {"manifest.json": json.dumps(manifest).encode(), **files}.items():
+            info = tarfile.TarInfo(name=name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+        for info in extra_members:
+            tar.addfile(info)
+    return path
+
+
 class TestExtractBundle:
+    def test_data_prefix_is_stripped(self, tmp_path):
+        archive = _write_archive(tmp_path / "b.tar.gz", {"data/kb/a.md": b"hello"})
+
+        extract_bundle(archive, tmp_path / "out")
+
+        assert (tmp_path / "out" / "kb" / "a.md").read_bytes() == b"hello"
+
+    def test_data_prefix_cannot_hide_an_absolute_path(self, tmp_path):
+        outside = tmp_path / "outside.txt"
+        # "data//abs/path": relative with no ".." until the prefix is stripped.
+        archive = _write_archive(tmp_path / "b.tar.gz", {f"data/{outside}": b"escaped"})
+
+        with pytest.raises(ValueError, match="Unsafe path"):
+            extract_bundle(archive, tmp_path / "out")
+
+        assert not outside.exists()
+        assert not (tmp_path / "out").exists()
+
+    def test_data_prefix_cannot_hide_a_parent_reference(self, tmp_path):
+        archive = _write_archive(tmp_path / "b.tar.gz", {"data/../escaped.txt": b"escaped"})
+
+        with pytest.raises(ValueError, match="Unsafe path"):
+            extract_bundle(archive, tmp_path / "out")
+
+        assert not (tmp_path / "escaped.txt").exists()
+
+    def test_symlink_member_rejected(self, tmp_path):
+        link = tarfile.TarInfo(name="data/link")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "/etc/passwd"
+        archive = _write_archive(tmp_path / "b.tar.gz", {}, extra_members=[link])
+
+        with pytest.raises(ValueError, match="Unsafe member type"):
+            extract_bundle(archive, tmp_path / "out")
+
+    def test_two_members_on_one_install_path_rejected(self, tmp_path):
+        archive = _write_archive(
+            tmp_path / "b.tar.gz", {"role.yaml": b"declared", "data/role.yaml": b"replacement"}
+        )
+
+        with pytest.raises(ValueError, match="Duplicate path"):
+            extract_bundle(archive, tmp_path / "out")
+
     def test_roundtrip(self, tmp_path):
         """Create → extract → verify exact file set."""
         role_file = tmp_path / "role.yaml"

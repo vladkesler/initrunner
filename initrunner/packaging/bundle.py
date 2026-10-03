@@ -210,13 +210,37 @@ def create_bundle(role_path: Path, output_dir: Path | None = None) -> Path:
     return archive_path
 
 
+def _install_path(name: str) -> str:
+    """Return where an archive member lands under the install directory.
+
+    The "data/" prefix is stripped so extracted paths match the original
+    development layout (e.g. data/knowledge-base/foo.md -> knowledge-base/foo.md).
+    This keeps role.yaml relative paths working after install. The safety check
+    runs on the stripped name, because that is the path that gets written:
+    "data//tmp/x" strips to "/tmp/x".
+    """
+    path = name.removeprefix("data/")
+    # str.split keeps the empty component of a leading or doubled slash;
+    # PurePosixPath would collapse it and hide the absolute path.
+    if any(part in ("", ".", "..") for part in path.split("/")):
+        raise ValueError(f"Unsafe path in archive: {name}")
+    return path
+
+
 def validate_bundle(archive_path: Path) -> BundleManifest:
     """Validate a bundle archive (read-only). Returns manifest."""
     with tarfile.open(archive_path, "r:gz") as tar:
-        # Safety: reject paths with .. or absolute paths
+        # Safety: only files and directories, each at a distinct path inside
+        # the install directory
+        installed: set[str] = set()
         for member in tar.getmembers():
-            if member.name.startswith("/") or ".." in member.name.split("/"):
-                raise ValueError(f"Unsafe path in archive: {member.name}")
+            if not (member.isfile() or member.isdir()):
+                raise ValueError(f"Unsafe member type in archive: {member.name}")
+            path = _install_path(member.name)
+            if member.isfile():
+                if path in installed:
+                    raise ValueError(f"Duplicate path in archive: {member.name}")
+                installed.add(path)
 
         manifest_member = tar.getmember("manifest.json")
         f = tar.extractfile(manifest_member)
@@ -251,13 +275,14 @@ def extract_bundle(archive_path: Path, target_dir: Path) -> BundleManifest:
         allowed = {"manifest.json"} | {bf.path for bf in manifest.files}
         members = [m for m in tar.getmembers() if m.name in allowed]
 
-        # Strip the "data/" prefix so extracted paths match the original
-        # development layout (e.g. data/knowledge-base/foo.md -> knowledge-base/foo.md).
-        # This keeps role.yaml relative paths working after install.
         for m in members:
-            if m.name.startswith("data/"):
-                m.name = m.name[5:]  # len("data/") == 5
+            m.name = _install_path(m.name)
 
-        tar.extractall(target_dir, members=members)
+        # filter= arrived in Python 3.11.4; earlier 3.11 releases rely on
+        # the checks in validate_bundle alone.
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(target_dir, members=members, filter="data")
+        else:
+            tar.extractall(target_dir, members=members)
 
     return manifest
