@@ -73,7 +73,7 @@ def screen_input(prompt: str, allowed_topics_prompt: str = "") -> InputVerdict:
     with_topic = bool(allowed_topics_prompt.strip())
     worst: dict[str, float] = {"injection": 0.0, "extraction": 0.0}
     if with_topic:
-        worst["on_topic"] = 0.0
+        worst["on_topic"] = 1.0
     judgments: list[dict[str, Any]] = []
 
     for indices in batches(parts):
@@ -81,11 +81,17 @@ def screen_input(prompt: str, allowed_topics_prompt: str = "") -> InputVerdict:
         # scored 0.87 to 0.89 on-topic; with the input first, 0.52 to 0.59.
         state: dict[str, Any] = {"policy": allowed_topics_prompt} if with_topic else {}
         state["input"] = _state_windows(parts, indices)
-        judgment = jev.ask(state, q.screen_input(indices, len(parts), with_topic=with_topic))
+        questions = q.screen_input(indices, len(parts), with_topic=with_topic)
+        judgment = jev.ask(state, questions)
         judgments.append(judgment.to_dict())
-        for key, p in judgment.nouls.items():
+        for key in questions:
             check = key.split("::", 1)[0]
-            worst[check] = max(worst[check], p)
+            if check == "on_topic":
+                # Low is the bad end here, so the least on-topic window decides,
+                # and a window Jev left unanswered counts as off-topic.
+                worst[check] = min(worst[check], judgment.nouls.get(key, 0.0))
+            elif key in judgment.nouls:
+                worst[check] = max(worst[check], judgment.nouls[key])
 
     reasons = []
     if worst["injection"] >= q.SCREEN_INJECTION_BLOCK:
