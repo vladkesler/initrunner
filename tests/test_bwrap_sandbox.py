@@ -77,6 +77,20 @@ class TestNetwork:
         mock_run.assert_not_called()
 
 
+class TestUnsetEnv:
+    def test_named_variables_are_not_passed_through(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+        monkeypatch.setenv("TZ", "UTC")
+        backend = BwrapBackend(SandboxConfig(backend="bwrap", env_passthrough=["HTTP_PROXY", "TZ"]))
+
+        with patch(_RUN, return_value=_ok()) as mock_run:
+            backend.run(["true"], env={}, unset_env=["HTTP_PROXY"], cwd=tmp_path, timeout=5)
+
+        cmd = mock_run.call_args[0][0]
+        assert "HTTP_PROXY" not in cmd
+        assert cmd[cmd.index("TZ") - 1 : cmd.index("TZ") + 2] == ["--setenv", "TZ", "UTC"]
+
+
 class TestAutoSelection:
     def test_bridge_goes_to_docker(self):
         with (

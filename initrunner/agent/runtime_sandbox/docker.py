@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -142,6 +142,7 @@ class DockerBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -160,6 +161,7 @@ class DockerBackend:
             interactive=stdin is not None,
             role_dir=self._role_dir,
             env=dict(env),
+            unset_env=unset_env,
         )
         cmd.extend(argv)
 
@@ -205,6 +207,7 @@ class DockerBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -218,6 +221,7 @@ class DockerBackend:
                 argv,
                 stdin=stdin,
                 env=env,
+                unset_env=unset_env,
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,

@@ -90,6 +90,37 @@ class TestPythonToolset:
         finally:
             del os.environ["OPENAI_API_KEY"]
 
+    _PROXY_NAMES = ("HTTP_PROXY", "https_proxy", "ALL_PROXY", "ftp_proxy", "SOCKS_PROXY")
+    _PRINT_PROXY_VARS = (
+        "import os; "
+        "print(sorted(k for k in os.environ if k.lower().endswith('_proxy')), "
+        "os.environ.get('NO_PROXY'))"
+    )
+
+    def test_network_disabled_drops_host_proxy_variables(self, monkeypatch):
+        """Any <scheme>_proxy variable is a proxy to urllib, not only http/https/all."""
+        for name in self._PROXY_NAMES:
+            monkeypatch.setenv(name, "http://127.0.0.1:3128")
+        config = PythonToolConfig(require_confirmation=False)
+        assert config.network_disabled is True
+        fn = build_python_toolset(config, _make_ctx()).tools["run_python"].function
+
+        result = fn(code=self._PRINT_PROXY_VARS)
+
+        assert "['NO_PROXY', 'no_proxy'] *" in result
+        assert "3128" not in result
+
+    def test_network_enabled_keeps_host_proxy_variables(self, monkeypatch):
+        for name in self._PROXY_NAMES:
+            monkeypatch.setenv(name, "http://127.0.0.1:3128")
+        config = PythonToolConfig(require_confirmation=False, network_disabled=False)
+        fn = build_python_toolset(config, _make_ctx()).tools["run_python"].function
+
+        result = fn(code=self._PRINT_PROXY_VARS)
+
+        for name in self._PROXY_NAMES:
+            assert name in result
+
     def test_confirmation_default_true(self):
         config = PythonToolConfig()
         assert config.require_confirmation is True

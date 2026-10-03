@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -185,6 +185,7 @@ class BwrapBackend:
         argv: list[str],
         *,
         env: Mapping[str, str],
+        unset_env: Collection[str],
         cwd: Path,
         extra_mounts: Sequence[BindMount],
         stdin_used: bool,
@@ -215,7 +216,7 @@ class BwrapBackend:
 
         # Clean environment
         cmd.append("--clearenv")
-        scrubbed = scrub_env()
+        scrubbed = {k: v for k, v in scrub_env().items() if k not in unset_env}
         for key in _DEFAULT_ENV_PASSTHROUGH:
             value = scrubbed.get(key)
             if value is not None:
@@ -305,6 +306,7 @@ class BwrapBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -314,6 +316,7 @@ class BwrapBackend:
         cmd = self._build_cmd(
             argv,
             env=env,
+            unset_env=unset_env,
             cwd=cwd,
             extra_mounts=extra_mounts,
             stdin_used=stdin is not None,
@@ -355,6 +358,7 @@ class BwrapBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -368,6 +372,7 @@ class BwrapBackend:
                 argv,
                 stdin=stdin,
                 env=env,
+                unset_env=unset_env,
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,

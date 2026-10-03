@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -52,13 +52,19 @@ class SandboxBackend(Protocol):
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
         memory_limit: str | None = None,
         cpu_limit: float | None = None,
     ) -> SandboxResult:
-        """Run a command inside the sandbox."""
+        """Run a command inside the sandbox.
+
+        *env* is added to the child's environment. *unset_env* names host
+        variables that must not reach the child, whatever the backend would
+        otherwise inherit or pass through.
+        """
         ...
 
     async def arun(
@@ -67,6 +73,7 @@ class SandboxBackend(Protocol):
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),

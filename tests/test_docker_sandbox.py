@@ -318,6 +318,16 @@ class TestBuildDockerCmd:
         assert "LANG=en_US.UTF-8" in env_args
         assert "TZ=UTC" in env_args
 
+    def test_env_passthrough_skips_unset_env(self, monkeypatch):
+        from initrunner.agent.docker_sandbox import _build_docker_cmd
+
+        monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:3128")
+        monkeypatch.setenv("TZ", "UTC")
+        config = SandboxConfig(backend="docker", env_passthrough=["HTTP_PROXY", "TZ"])
+        cmd = _build_docker_cmd(config, unset_env=["HTTP_PROXY"])
+        env_args = [cmd[i + 1] for i, x in enumerate(cmd) if x == "-e"]
+        assert env_args == ["TZ=UTC"]
+
     def test_env_passthrough_skips_missing(self, monkeypatch):
         from initrunner.agent.docker_sandbox import _build_docker_cmd
 

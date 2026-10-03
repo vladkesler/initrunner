@@ -674,7 +674,7 @@ tools:
 ### Security
 
 - **Env scrubbing** — API keys and other sensitive environment variables are removed from the subprocess environment.
-- **Network restriction** — When `network_disabled: true`, a `sys.addaudithook` shim blocks socket connections to non-loopback addresses. Proxy environment variables are also cleared.
+- **Network restriction** — When `network_disabled: true`, a `sys.addaudithook` shim blocks socket connections to non-loopback addresses. The host's proxy variables (anything ending in `_proxy`, either case) are kept out of the child's environment and `NO_PROXY=*` is set, so a proxy on loopback is not a way around the shim.
 - **No `shell=True`** — Code is executed via `subprocess.run` with list args.
 - **Temp directory cleanup** — When `working_dir` is `null`, the temporary directory and all contents are removed after execution.
 

@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Collection
 from pathlib import Path
 from uuid import uuid4
 
@@ -122,6 +123,7 @@ def _build_docker_cmd(
     interactive: bool = False,
     role_dir: Path | None = None,
     env: dict[str, str] | None = None,
+    unset_env: Collection[str] = (),
 ) -> list[str]:
     """Build the ``docker run --rm`` command prefix (without the final command)."""
     cmd = ["docker", "run", "--rm", "--init"]
@@ -169,7 +171,7 @@ def _build_docker_cmd(
     if work_dir:
         cmd.extend(["-v", f"{work_dir}:/work", "-w", "/work"])
 
-    scrubbed = scrub_env()
+    scrubbed = {k: v for k, v in scrub_env().items() if k not in unset_env}
     for key in config.env_passthrough:
         value = scrubbed.get(key)
         if value is not None:

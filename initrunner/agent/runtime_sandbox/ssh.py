@@ -18,7 +18,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -164,6 +164,7 @@ class SSHBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -178,6 +179,8 @@ class SSHBackend:
                 "with a remote-installed interpreter, or wait for v1.1 stdin/SCP support."
             )
 
+        # unset_env has nothing to act on here: only *env* is sent, never the
+        # host's variables. The remote account's own environment is not ours.
         # Build the remote command. Local cwd is intentionally ignored -- the
         # remote host's filesystem is unrelated to the local role_dir. Use
         # ssh.remote_cwd if the user wants a specific working directory.
@@ -231,6 +234,7 @@ class SSHBackend:
         *,
         stdin: bytes | None = None,
         env: Mapping[str, str],
+        unset_env: Collection[str] = (),
         cwd: Path,
         timeout: float,
         extra_mounts: Sequence[BindMount] = (),
@@ -244,6 +248,7 @@ class SSHBackend:
                 argv,
                 stdin=stdin,
                 env=env,
+                unset_env=unset_env,
                 cwd=cwd,
                 timeout=timeout,
                 extra_mounts=extra_mounts,

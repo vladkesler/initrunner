@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
@@ -44,14 +45,14 @@ _NETWORK_DISABLE_SHIM = textwrap.dedent("""\
     del _block_network, _sys
     """)
 
-_PROXY_ENV_KEYS = (
-    "http_proxy",
-    "https_proxy",
-    "all_proxy",
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "ALL_PROXY",
-)
+
+def _host_proxy_variables() -> list[str]:
+    """Names of the host variables a child would read as a proxy.
+
+    urllib, requests and httpx treat any ``<scheme>_proxy`` variable as one, in
+    either case, so the match is on the suffix rather than a fixed list.
+    """
+    return [name for name in os.environ if name.lower().endswith("_proxy")]
 
 
 @register_tool("python", PythonToolConfig)
@@ -61,17 +62,21 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
 
     backend = ctx.sandbox_backend
     warn_if_unsandboxed(backend, "python")
-    sandbox_cfg = ctx.role.spec.security.sandbox
 
     toolset = FunctionToolset()
 
     @toolset.tool_plain
     def run_python(code: str) -> str:
         """Execute Python code and return the output."""
-        if config.network_disabled and sandbox_cfg.network != "none":
+        env: dict[str, str] = {}
+        unset_env: list[str] = []
+        if config.network_disabled:
             code = _NETWORK_DISABLE_SHIM + code
-        elif config.network_disabled:
-            code = _NETWORK_DISABLE_SHIM + code
+            # The shim allows loopback, so a proxy on 127.0.0.1 named in the
+            # inherited environment would be a way out. The child gets none of
+            # the host's proxy variables, only NO_PROXY.
+            unset_env = _host_proxy_variables()
+            env = {"no_proxy": "*", "NO_PROXY": "*"}
 
         use_temp = config.working_dir is None
         if use_temp:
@@ -84,18 +89,12 @@ def build_python_toolset(config: PythonToolConfig, ctx: ToolBuildContext) -> Fun
         code_file = Path(work_dir) / "_run.py"
         code_file.write_text(code, encoding="utf-8")
 
-        env: dict[str, str] = {}
-        if config.network_disabled:
-            for key in _PROXY_ENV_KEYS:
-                env.pop(key, None)
-            env["no_proxy"] = "*"
-            env["NO_PROXY"] = "*"
-
         python_bin = sys.executable if backend.name == "none" else "python3"
         try:
             sr = backend.run(
                 [python_bin, "/work/_run.py"],
                 env=env,
+                unset_env=unset_env,
                 cwd=Path(work_dir),
                 timeout=config.timeout_seconds,
                 extra_mounts=[
