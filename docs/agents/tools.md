@@ -751,7 +751,7 @@ Executes commands in a subprocess with command allow/block lists. Commands are t
 ```yaml
 tools:
   - shell:
-      allowed_commands: []         # default: [] (all commands, subject to blocked list)
+      allowed_commands: []         # default: [] (all commands except launchers, subject to blocked list)
       working_dir: ./workspace     # default: null (role directory)
       timeout_seconds: 30          # default: 30
       require_confirmation: true   # default: true
@@ -761,8 +761,8 @@ tools:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `allowed_commands` | `list[str]` | `[]` | Commands the agent may run. Empty list allows all (subject to blocked list). |
-| `blocked_commands` | `list[str]` | *(see below)* | Commands the agent may not run. |
+| `allowed_commands` | `list[str]` | `[]` | Commands the agent may run, matched exactly against the command's first word. Empty list allows all except launchers (subject to blocked list). |
+| `blocked_commands` | `list[str]` | *(see below)* | Commands the agent may not run, matched by file name. |
 | `working_dir` | `str \| null` | `null` | Working directory for commands. `null` uses the role file's directory. |
 | `timeout_seconds` | `int` | `30` | Timeout for each command. |
 | `max_output_bytes` | `int` | `102400` | Maximum output size (100 KB). Truncated output includes a `[truncated]` marker. |
@@ -771,6 +771,14 @@ tools:
 ### Default Blocked Commands
 
 When `blocked_commands` is not specified, the following are blocked by default: `rm`, `mkfs`, `dd`, `fdisk`, `parted`, `mount`, `umount`, `shutdown`, `reboot`, `halt`, `poweroff`, `chmod`, `chown`, `passwd`, `useradd`, `userdel`, `sudo`, `su`.
+
+### How the Lists Match
+
+- **`allowed_commands` is an exact match on the first word.** `git` allows the bare command `git`, which the `PATH` resolves. A command written as a path must be listed as that path: `/usr/bin/git` needs `/usr/bin/git` in the list, and `/tmp/somewhere/git` does not pass as `git`.
+- **`blocked_commands` matches the file name,** so `rm` also blocks `/bin/rm`.
+- **Launchers are refused unless you allow them.** These programs exist to run other programs: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `csh`, `tcsh`, `env`, `xargs`, `nohup`, `nice`, `ionice`, `timeout`, `stdbuf`, `setsid`, `chrt`, `taskset`, `time`, `watch`, `flock`, `chroot`, `unshare`, `nsenter`, `busybox`, `toybox`, `sudo`, `su`, `doas`, `pkexec`, `strace`, `ltrace`. With an empty `allowed_commands` they are all refused. Add one to `allowed_commands` to use it.
+- **An allowed launcher opens the allow list.** With `allowed_commands: [env, git]`, `env curl ...` runs `curl`. Only `blocked_commands` is applied to what a launcher runs: every word in its arguments is checked, including the words inside a `-c` string, so `sh -c 'ls; rm x'` is refused while `rm` is blocked. That check reads text and can be dodged by a shell that builds the name at run time, so treat an allowed shell as full access.
+- **Other programs can start programs too.** `python`, `node`, `perl`, `find -exec`, `make`, `docker`, `ssh` and `awk` are not launchers here, because refusing `docker rm web` or `git rm file` would be wrong more often than right. If one of them is allowed, the agent can run anything through it. The allow list is the control that matters; keep it to what the agent needs, and use a [sandbox](../security/sandbox.md) for anything untrusted.
 
 ### Registered Functions
 
@@ -781,7 +789,7 @@ When `blocked_commands` is not specified, the following are blocked by default: 
 - **No `shell=True`** — Commands are parsed with `shlex.split` and executed as a list, preventing shell injection.
 - **Shell operator blocking** — Pipe (`|`), chain (`&&`, `||`, `;`), redirection (`>`, `<`), and background (`&`) operators are rejected.
 - **Fork bomb detection** — The `:(){ ...` pattern is detected and blocked.
-- **Command allow/block lists** — `allowed_commands` restricts execution to listed commands; `blocked_commands` provides a blocklist of dangerous commands.
+- **Command allow/block lists** — `allowed_commands` restricts execution to listed commands; `blocked_commands` provides a blocklist of dangerous commands. Shells and other launchers are refused unless listed. See [How the Lists Match](#how-the-lists-match).
 - **Env scrubbing** — Sensitive environment variables are removed from the subprocess environment.
 
 ## Slack Tool
@@ -1226,7 +1234,7 @@ When `allowed_commands` is set on a script definition, the script body is valida
 
 1. Each line is split into tokens with `shlex.split`.
 2. Blank lines and comment lines (starting with `#`) are skipped.
-3. The first token of each line is checked against the allowed list (using the base command name, so `/usr/bin/echo` matches `echo`).
+3. The first token of each line is checked against the allowed list. The match is exact: `echo` allows the bare command, and `/usr/bin/echo` must be listed as `/usr/bin/echo`.
 4. Lines containing shell operators (`|`, `&&`, `;`, `>`, `<`, etc.) are rejected.
 5. On any violation, the tool returns an error string without executing.
 

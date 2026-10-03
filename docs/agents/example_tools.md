@@ -107,7 +107,7 @@ tools:
       working_dir: .
 ```
 
-> `allowed_commands` is an allowlist — only these binaries can be invoked. `require_confirmation: false` is safe here because the commands are read-only status checks. For write operations, keep the default `true`. The shell tool also has a built-in blocklist (fork bombs, `rm -rf /`, etc.) and scrubs sensitive env vars.
+> `allowed_commands` is an allowlist — only these commands can be invoked directly. A listed program that can start other programs (`python`, `docker`, `make`, a shell) can still run anything. `require_confirmation: false` is safe here because the commands are read-only status checks. For write operations, keep the default `true`. The shell tool also has a built-in blocklist (fork bombs, `rm -rf /`, etc.) and scrubs sensitive env vars.
 
 - Full example: [`examples/roles/deploy-notifier.yaml`](../examples/roles/deploy-notifier.yaml)
 

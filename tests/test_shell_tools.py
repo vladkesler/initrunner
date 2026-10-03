@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from initrunner.agent.schema.tools import ShellToolConfig
 from initrunner.agent.tools._registry import ToolBuildContext
 from initrunner.agent.tools.shell import (
@@ -119,8 +121,83 @@ class TestCommandValidation:
     def test_quoted_args_with_spaces(self):
         assert validate_command('grep -r "hello world" .', allowed=[], blocked=[]) is None
 
-    def test_full_path_command(self):
-        assert validate_command("/usr/bin/env python", allowed=["env"], blocked=[]) is None
+    def test_path_does_not_match_a_bare_allow_entry(self):
+        err = validate_command("/tmp/not-git/git status", allowed=["git"], blocked=[])
+        assert err is not None
+        assert "must be listed as that path" in err
+        assert validate_command("/usr/bin/git status", allowed=["git"], blocked=[]) is not None
+
+    def test_path_matches_the_same_path_in_the_allow_list(self):
+        assert validate_command("/usr/bin/git status", allowed=["/usr/bin/git"], blocked=[]) is None
+        assert validate_command("git status", allowed=["/usr/bin/git"], blocked=[]) is not None
+
+    def test_blocklist_matches_a_path_by_file_name(self):
+        err = validate_command("/bin/rm -rf /", allowed=[], blocked=["rm"])
+        assert err is not None
+        assert "blocked" in err
+
+
+class TestLaunchers:
+    """Shells and exec wrappers can run any program, so the lists treat them specially."""
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "sh -c 'rm -rf /'",
+            "bash -c 'ls'",
+            "env rm x",
+            "busybox rm x",
+            "timeout 5 ls",
+            "xargs rm",
+            "/bin/sh -c 'ls'",
+        ],
+    )
+    def test_refused_with_an_empty_allow_list(self, command):
+        err = validate_command(command, allowed=[], blocked=["rm"])
+        assert err is not None
+        assert "refused unless it is listed in allowed_commands" in err
+
+    def test_refused_when_not_in_the_allow_list(self):
+        err = validate_command("sh -c 'ls'", allowed=["ls"], blocked=[])
+        assert err is not None
+        assert "not in the allowed list" in err
+
+    def test_sudo_is_a_launcher_even_with_no_block_list(self):
+        err = validate_command("sudo ls", allowed=[], blocked=[])
+        assert err is not None
+        assert "refused unless" in err
+
+    def test_allowed_launcher_runs(self):
+        assert validate_command("sh -c 'ls -la'", allowed=["sh"], blocked=["rm"]) is None
+        assert validate_command("env FOO=1 make test", allowed=["env"], blocked=["rm"]) is None
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "sh -c 'rm -rf /'",
+            "sh -c 'ls; rm x'",
+            "sh -c 'ls;rm x'",
+            "sh -c 'ls && /bin/rm x'",
+            "sh -c 'echo $(rm x)'",
+            "sh -c 'echo `rm x`'",
+            "sh -c \"sh -c 'rm x'\"",
+            "sh -c '{rm,-rf,/tmp/x}'",
+            "env rm x",
+            "env A=rm ls",
+            "busybox rm x",
+            "xargs rm",
+            "timeout 5 /bin/rm x",
+        ],
+    )
+    def test_allowed_launcher_cannot_run_a_blocked_command(self, command):
+        launcher = command.split()[0]
+        err = validate_command(command, allowed=[launcher], blocked=["rm"])
+        assert err is not None
+        assert "'rm' is blocked" in err
+
+    def test_ordinary_command_with_a_blocked_word_as_argument(self):
+        assert validate_command("git rm file.txt", allowed=[], blocked=["rm"]) is None
+        assert validate_command("docker rm web", allowed=["docker"], blocked=["rm"]) is None
 
 
 class TestParseCommand:
@@ -209,6 +286,22 @@ class TestShellToolset:
         fn = toolset.tools["run_shell"].function
         output = fn(command="false")
         assert "Exit code:" in output
+
+    def test_launcher_in_the_allow_list_warns(self, monkeypatch, caplog):
+        import logging
+
+        monkeypatch.setattr(logging.getLogger("initrunner"), "propagate", True)
+        config = ShellToolConfig(allowed_commands=["git", "env"])
+        with caplog.at_level(logging.WARNING, logger="initrunner"):
+            build_shell_toolset(config, _make_ctx())
+        assert "Shell tool allows env, which can run any other program" in caplog.text
+
+    def test_shell_refused_with_default_config(self):
+        config = ShellToolConfig(require_confirmation=False)
+        toolset = build_shell_toolset(config, _make_ctx())
+        fn = toolset.tools["run_shell"].function
+        output = fn(command="sh -c 'echo hello'")
+        assert "refused unless it is listed in allowed_commands" in output
 
     def test_blocked_command_rejected(self):
         config = ShellToolConfig(blocked_commands=["rm"])

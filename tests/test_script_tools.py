@@ -359,9 +359,13 @@ class TestScriptValidation:
         err = _validate_script_body(body, ["echo"])
         assert err is None
 
-    def test_full_path_command(self):
-        err = _validate_script_body("/usr/bin/echo hello", ["echo"])
-        assert err is None
+    def test_path_does_not_match_a_bare_allow_entry(self):
+        err = _validate_script_body("/tmp/not-echo/echo hello", ["echo"])
+        assert err is not None
+        assert "not in the allowed list" in err
+
+    def test_path_matches_the_same_path_in_the_allow_list(self):
+        assert _validate_script_body("/usr/bin/echo hello", ["/usr/bin/echo"]) is None
 
     def test_execution_with_allowed_commands(self):
         config = ScriptToolConfig(

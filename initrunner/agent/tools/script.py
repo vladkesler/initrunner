@@ -50,11 +50,11 @@ def _validate_script_body(body: str, allowed_commands: list[str]) -> str | None:
                     f"is not allowed with allowed_commands"
                 )
 
-        # Check first token against allowed list
-        base = Path(tokens[0]).name
-        if base not in allowed_commands:
+        # Check first token against allowed list. The match is exact, as in the
+        # shell tool: a command written as a path must be listed as that path.
+        if tokens[0] not in allowed_commands:
             return (
-                f"Error: command '{base}' on line {lineno} "
+                f"Error: command '{tokens[0]}' on line {lineno} "
                 f"is not in the allowed list: {allowed_commands}"
             )
 
