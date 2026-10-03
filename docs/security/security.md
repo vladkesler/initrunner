@@ -206,7 +206,7 @@ Controls the OpenAI-compatible API server (`initrunner run <role> --serve`).
 |-------|------|---------|-------------|
 | `cors_origins` | `list[str]` | `[]` | Allowed CORS origins. Empty means **no CORS headers** (secure default). |
 | `require_https` | `bool` | `false` | Reject requests that did not arrive over HTTPS (except `/health`). `X-Forwarded-Proto` counts only from a trusted proxy. |
-| `max_request_body_bytes` | `int` | `1048576` | Maximum request body size (1 MB). Returns 413 if exceeded. |
+| `max_request_body_bytes` | `int` | `1048576` | Maximum request body size (1 MB). Returns 413 if exceeded. Counted on the bytes received, so a chunked request without `Content-Length` is capped too. |
 | `max_conversations` | `int` | `1000` | Maximum concurrent conversations. Oldest evicted when exceeded. |
 
 #### CORS
@@ -568,7 +568,7 @@ prompt: You are a helpful assistant.
 When running `initrunner run <role> --serve`, middleware executes in this order (outermost first):
 
 1. **HTTPS enforcement** -- 403 if HTTP when `require_https: true`
-2. **Body size check** -- 413 if Content-Length exceeds limit
+2. **Body size check** -- 413 if Content-Length exceeds limit. `/v1/chat/completions` and `/v1/approvals/{run_id}` also stop reading at the limit, which covers chunked bodies that send no Content-Length
 3. **Rate limiting** -- 429 if token bucket is empty
 4. **Authentication** -- 401 if Bearer token doesn't match (timing-safe comparison)
 5. **CORS** -- Headers added only if `cors_origins` is non-empty

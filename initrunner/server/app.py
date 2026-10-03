@@ -369,8 +369,16 @@ def create_multi_app(
         if audit_logger is None:
             return _error_response(501, "server_error", "approvals endpoint requires audit logging")
         run_id = request.path_params["run_id"]
+
+        from initrunner.middleware import read_body_capped
+
+        # Same bounded read as chat_completions: the Content-Length middleware
+        # does not see a chunked body.
+        raw = await read_body_capped(request, server_cfg.max_request_body_bytes)
+        if raw is None:
+            return _error_response(413, "request_too_large", "request body too large")
         try:
-            body = await request.json()
+            body = json.loads(raw)
         except Exception:
             return _error_response(400, "invalid_request_error", "invalid JSON body")
         if not isinstance(body, dict) or not all(isinstance(v, bool) for v in body.values()):

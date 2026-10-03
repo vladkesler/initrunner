@@ -324,3 +324,22 @@ class TestApprovalsApi:
             assert resp.status_code == 400
         finally:
             audit.close()
+
+    def test_resume_route_caps_a_chunked_body(self, tmp_path):
+        """A chunked body has no Content-Length, so only the handler's bounded read stops it."""
+        client, audit, role = self._client(tmp_path)
+        cap = role.spec.security.server.max_request_body_bytes
+
+        def chunks():
+            yield b'{"c1": true, "pad": "'
+            for _ in range(cap // 65_536 + 1):
+                yield b"x" * 65_536
+            yield b'"}'
+
+        try:
+            resp = client.post("/v1/approvals/r1", content=chunks())
+            assert "content-length" not in resp.request.headers
+            assert resp.status_code == 413
+            assert resp.json()["error"]["type"] == "request_too_large"
+        finally:
+            audit.close()
