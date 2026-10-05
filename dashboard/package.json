@@ -29,7 +29,7 @@
     "@dicebear/core": "^9.4.3",
     "@dicebear/rings": "^9.4.3",
     "@xyflow/svelte": "^1.7.0",
-    "posthog-js": "^1.434.13"
+    "posthog-js": "^1.435.6"
   },
   "pnpm": {
     "overrides": {
