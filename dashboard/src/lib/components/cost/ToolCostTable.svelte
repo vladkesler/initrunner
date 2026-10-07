@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ToolCost } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import type { ToolCost } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 
 	let { data }: { data: ToolCost[] } = $props();

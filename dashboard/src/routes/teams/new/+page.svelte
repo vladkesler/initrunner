@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchTeamBuilderOptions, seedTeam, validateTeam, saveTeam } from '$lib/api/teams';
-	import { saveProviderKey } from '$lib/api/providers';
-	import { ApiError } from '$lib/api/client';
-	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '$lib/api/types';
+	import { fetchTeamBuilderOptions, seedTeam, validateTeam, saveTeam } from '#lib/api/teams.ts';
+	import { saveProviderKey } from '#lib/api/providers.ts';
+	import { ApiError } from '#lib/api/client.ts';
+	import type { TeamBuilderOptions, ValidationIssue, PersonaSeedEntry } from '#lib/api/types.ts';
 	import { page } from '$app/state';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Teams', href: '/teams' }, { label: 'New Team' }]); });
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
-	import PersonaList, { type PersonaEntry } from '$lib/components/teams/PersonaList.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import ModelSelector from '#lib/components/ui/ModelSelector.svelte';
+	import PersonaList, { type PersonaEntry } from '#lib/components/teams/PersonaList.svelte';
 	import {
 		ArrowLeft,
 		Check,

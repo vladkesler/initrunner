@@ -16,6 +16,7 @@ from fastapi import (  # type: ignore[import-not-found]
 from fastapi.responses import StreamingResponse  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import TeamCache, get_team_cache
+from initrunner.dashboard.routers.ingest import _save_upload_capped
 from initrunner.dashboard.schemas import (
     AddUrlRequest,
     IngestDocumentResponse,
@@ -117,6 +118,9 @@ async def upload_files(
     dt, role = _resolve_team(team_id, team_cache)
     upload_dir = uploads_dir(dt.team.metadata.name)  # type: ignore[union-attr]
 
+    max_mb = role.spec.security.resources.max_file_size_mb
+    max_bytes = int(max_mb * 1024 * 1024)
+
     saved: list[Path] = []
     for f in files:
         if not f.filename:
@@ -127,8 +131,11 @@ async def upload_files(
         dest = (upload_dir / safe_name).resolve()
         if not dest.is_relative_to(upload_dir.resolve()):
             continue
-        content = await f.read()
-        await asyncio.to_thread(dest.write_bytes, content)
+        if not await _save_upload_capped(f, dest, max_bytes):
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{safe_name}' exceeds the {max_mb} MB limit",
+            )
         saved.append(dest)
 
     if not saved:

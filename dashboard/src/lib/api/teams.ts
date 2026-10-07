@@ -1,4 +1,4 @@
-import { request, ApiError } from '$lib/api/client';
+import { request, ApiError } from '#lib/api/client.ts';
 import type {
 	TeamSummary,
 	TeamDetail,

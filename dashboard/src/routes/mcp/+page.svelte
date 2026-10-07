@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
-	import { listMcpServers } from '$lib/api/mcp';
-	import type { McpServer } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
+	import { listMcpServers } from '#lib/api/mcp.ts';
+	import type { McpServer } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Tabs, TabsList, TabsTrigger, TabsContent } from '#lib/components/ui/tabs/index.ts';
 	import { Cable, Compass, Terminal, Network } from 'lucide-svelte';
-	import McpServerList from '$lib/components/mcp/McpServerList.svelte';
-	import McpDiscover from '$lib/components/mcp/McpDiscover.svelte';
-	import McpPlayground from '$lib/components/mcp/McpPlayground.svelte';
-	import McpCanvas from '$lib/components/mcp/McpCanvas.svelte';
+	import McpServerList from '#lib/components/mcp/McpServerList.svelte';
+	import McpDiscover from '#lib/components/mcp/McpDiscover.svelte';
+	import McpPlayground from '#lib/components/mcp/McpPlayground.svelte';
+	import McpCanvas from '#lib/components/mcp/McpCanvas.svelte';
 
 	$effect(() => {
 		setCrumbs([{ label: 'MCP Hub' }]);

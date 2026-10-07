@@ -2,19 +2,19 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getSkillDetail, getSkillContent, deleteSkill } from '$lib/api/skills';
-	import type { SkillDetail } from '$lib/api/types';
-	import { loadOr404 } from '$lib/utils/load';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import ScopeBadge from '$lib/components/skills/ScopeBadge.svelte';
-	import SkillConfigPanel from '$lib/components/skills/SkillConfigPanel.svelte';
-	import SkillEditorTab from '$lib/components/skills/SkillEditorTab.svelte';
+	import { getSkillDetail, getSkillContent, deleteSkill } from '#lib/api/skills.ts';
+	import type { SkillDetail } from '#lib/api/types.ts';
+	import { loadOr404 } from '#lib/utils/load.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import ScopeBadge from '#lib/components/skills/ScopeBadge.svelte';
+	import SkillConfigPanel from '#lib/components/skills/SkillConfigPanel.svelte';
+	import SkillEditorTab from '#lib/components/skills/SkillEditorTab.svelte';
 	import { ArrowLeft, Settings, FileCode, Trash2 } from 'lucide-svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { if (detail) setCrumbs([{ label: 'Skills', href: '/skills' }, { label: detail.name }]); });
 

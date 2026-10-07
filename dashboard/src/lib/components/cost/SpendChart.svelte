@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { DailyCost } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import type { DailyCost } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	let { data }: { data: DailyCost[] } = $props();
 

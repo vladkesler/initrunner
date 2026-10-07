@@ -9,7 +9,7 @@
 		type Edge
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
-	import type { TeamDetail, PersonaDetail, PersonaStepResponse } from '$lib/api/types';
+	import type { TeamDetail, PersonaDetail, PersonaStepResponse } from '#lib/api/types.ts';
 	import PersonaNode from './PersonaNode.svelte';
 	import AnchorNode from './AnchorNode.svelte';
 	import { RotateCcw } from 'lucide-svelte';

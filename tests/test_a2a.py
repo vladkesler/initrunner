@@ -277,6 +277,31 @@ class TestA2AServer:
 
 
 class TestA2AProtocol:
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("chunked", [False, True])
+    async def test_received_body_limit_prevents_execution(self, chunked):
+        from initrunner.a2a.server import build_a2a_app
+
+        role = make_role()
+        role.spec.security.server.max_request_body_bytes = 64
+        with patch("initrunner.a2a.server.execute_run_stream_async", new_callable=AsyncMock) as run:
+            app = build_a2a_app(MagicMock(), role, url="http://test")
+            async with await self._client(app) as client:
+
+                async def chunks():
+                    yield b"x" * 32
+                    yield b"x" * 33
+
+                response = await client.post(
+                    "/",
+                    content=chunks() if chunked else b"x" * 65,
+                    headers={"content-length": "1"},
+                )
+                assert response.status_code == 413
+                assert response.json()["error"]["code"] == 413
+                assert (await client.get("/.well-known/agent-card.json")).status_code == 200
+            run.assert_not_called()
+
     async def _client(self, app: Starlette, **headers: str):
         merged = {"A2A-Version": "1.0", **headers}
         return httpx.AsyncClient(

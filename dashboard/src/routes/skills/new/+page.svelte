@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { createSkill, getSkillDirectories } from '$lib/api/skills';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { createSkill, getSkillDirectories } from '#lib/api/skills.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { ArrowLeft, AlertCircle } from 'lucide-svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Skills', href: '/skills' }, { label: 'New Skill' }]); });
 

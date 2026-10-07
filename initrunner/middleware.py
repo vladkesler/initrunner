@@ -14,6 +14,7 @@ from collections.abc import Callable, Set
 
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 _logger = logging.getLogger(__name__)
 
@@ -132,6 +133,88 @@ def openai_error_response(status_code: int, message: str) -> Response:
 
 ErrorResponseFn = Callable[[int, str], Response]
 AppliesFn = Callable[[Request], bool]
+
+
+class BodySizeLimitMiddleware:
+    """Validate received bytes before parsers run, then replay the bounded body.
+
+    Bodies over 1 MiB spool to a temporary file rather than filling memory.
+    Responses are passed through untouched, including SSE. Authentication can
+    wrap this middleware to reject unauthorized requests without reading them.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_bytes: int,
+        error_response: ErrorResponseFn,
+        limit_for_scope: Callable[[Scope], int] | None = None,
+    ) -> None:
+        if max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
+        self.app = app
+        self.max_bytes = max_bytes
+        self.error_response = error_response
+        self.limit_for_scope = limit_for_scope
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH", "DELETE"}:
+            await self.app(scope, receive, send)
+            return
+
+        import tempfile
+
+        import anyio
+
+        limit = self.limit_for_scope(scope) if self.limit_for_scope else self.max_bytes
+        if limit <= 0:
+            raise ValueError("request body limit must be positive")
+
+        async def reject() -> None:
+            await self.error_response(413, "Request body too large")(scope, receive, send)
+
+        # An honest header saves reading the body. A missing, malformed or
+        # understated one never replaces counting the bytes actually received.
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"content-length":
+                try:
+                    if int(value) > limit:
+                        await reject()
+                        return
+                except ValueError:
+                    pass
+
+        with tempfile.SpooledTemporaryFile(max_size=1_048_576, mode="w+b") as body:
+            total = 0
+            while True:
+                message = await receive()
+                if message["type"] == "http.disconnect":
+                    return
+                chunk = message.get("body", b"")
+                total += len(chunk)
+                if total > limit:
+                    await reject()
+                    return
+                if chunk:
+                    await anyio.to_thread.run_sync(body.write, chunk)
+                if not message.get("more_body", False):
+                    break
+
+            await anyio.to_thread.run_sync(body.seek, 0)
+            remaining = total
+            complete = False
+
+            async def replay() -> Message:
+                nonlocal remaining, complete
+                if complete:
+                    return await receive()
+                chunk = await anyio.to_thread.run_sync(body.read, 65_536)
+                remaining -= len(chunk)
+                complete = remaining == 0
+                return {"type": "http.request", "body": chunk, "more_body": not complete}
+
+            await self.app(scope, replay, send)
 
 
 def make_auth_dispatch(

@@ -10,12 +10,12 @@
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { goto } from '$app/navigation';
-	import type { McpServer, McpAgentRef } from '$lib/api/types';
+	import type { McpServer, McpAgentRef } from '#lib/api/types.ts';
 	import McpServerNode from './McpServerNode.svelte';
 	import McpAgentNode from './McpAgentNode.svelte';
-	import { safeGet, safeSet } from '$lib/utils/storage';
+	import { safeGet, safeSet } from '#lib/utils/storage.ts';
 	import { RotateCcw, Copy } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { servers }: { servers: McpServer[] } = $props();
 

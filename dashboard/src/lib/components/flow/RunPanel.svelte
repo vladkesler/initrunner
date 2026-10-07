@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { streamFlowRun } from '$lib/api/flow';
+	import { streamFlowRun } from '#lib/api/flow.ts';
 	import type {
 		FlowRunResponse,
 		FlowThreadMessage,
@@ -8,13 +8,13 @@
 		ThreadMessage,
 		ToolEventData,
 		UsageData
-	} from '$lib/api/types';
-	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
-	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
-	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
+	} from '#lib/api/types.ts';
+	import ConversationThread from '#lib/components/runs/ConversationThread.svelte';
+	import ToolActivityPanel from '#lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '#lib/components/runs/TokenMeter.svelte';
 	import AgentTrace from './AgentTrace.svelte';
 	import PipelineStepper from './PipelineStepper.svelte';
-	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
+	import SeedAvatar from '#lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let {

@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchTeamList, deleteTeam } from '$lib/api/teams';
-	import { getStarters, type StarterInfo } from '$lib/api/builder';
-	import type { TeamSummary } from '$lib/api/types';
-	import TeamList from '$lib/components/teams/TeamList.svelte';
-	import StarterCard from '$lib/components/ui/StarterCard.svelte';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { fetchTeamList, deleteTeam } from '#lib/api/teams.ts';
+	import { getStarters, type StarterInfo } from '#lib/api/builder.ts';
+	import type { TeamSummary } from '#lib/api/types.ts';
+	import TeamList from '#lib/components/teams/TeamList.svelte';
+	import StarterCard from '#lib/components/ui/StarterCard.svelte';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Search, X, Users, Plus } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Teams' }]); });
 

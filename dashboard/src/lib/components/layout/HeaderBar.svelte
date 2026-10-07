@@ -2,10 +2,10 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { Search } from 'lucide-svelte';
-	import { getCrumbs } from '$lib/stores/breadcrumb.svelte';
-	import { togglePalette } from '$lib/stores/command-palette.svelte';
-	import { request } from '$lib/api/client';
-	import type { HealthStatus } from '$lib/api/types';
+	import { getCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
+	import { togglePalette } from '#lib/stores/command-palette.svelte.ts';
+	import { request } from '#lib/api/client.ts';
+	import type { HealthStatus } from '#lib/api/types.ts';
 
 	let healthy = $state<boolean | null>(null);
 

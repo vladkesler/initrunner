@@ -69,6 +69,7 @@ class Judgment:
         return {
             "model": self.model,
             "request_id": self.request_id,
+            "input_tokens": self.input_tokens,
             "nouls": {k: round(v, 4) for k, v in self.nouls.items()},
             "choices": {
                 k: {

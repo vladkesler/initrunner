@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,6 +21,7 @@ from fastapi.responses import (  # type: ignore[import-not-found]
 from fastapi.staticfiles import StaticFiles  # type: ignore[import-not-found]
 from starlette.middleware.base import BaseHTTPMiddleware  # type: ignore[import-not-found]
 from starlette.responses import RedirectResponse
+from starlette.types import Scope
 
 from initrunner._compat import MissingExtraError
 from initrunner.dashboard.config import DashboardSettings
@@ -35,6 +37,7 @@ from initrunner.dashboard.deps import (
 )
 from initrunner.dashboard.login import render_login_page
 from initrunner.dashboard.schemas import HealthResponse
+from initrunner.middleware import BodySizeLimitMiddleware, detail_error_response
 
 _logger = logging.getLogger(__name__)
 
@@ -63,6 +66,20 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         lifespan=lifespan,
+    )
+
+    def body_limit(scope: Scope) -> int:
+        if re.fullmatch(r"/api/(?:agents|teams)/[^/]+/ingest/upload/?", scope["path"]):
+            return settings.max_upload_body_bytes
+        return settings.max_request_body_bytes
+
+    # Count received bytes before FastAPI parses JSON, forms or uploads. The
+    # login route is protected even though it is intentionally public.
+    app.add_middleware(
+        BodySizeLimitMiddleware,  # type: ignore[arg-type]
+        max_bytes=settings.max_request_body_bytes,
+        limit_for_scope=body_limit,
+        error_response=detail_error_response,
     )
 
     # CORS -- allow the Vite dev server during development
@@ -261,7 +278,6 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     if _auth_key := settings.api_key:
         from initrunner.middleware import (
             all_paths_predicate,
-            detail_error_response,
             make_auth_dispatch,
         )
 

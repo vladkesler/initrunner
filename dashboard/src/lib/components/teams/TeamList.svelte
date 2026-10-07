@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TeamSummary } from '$lib/api/types';
+	import type { TeamSummary } from '#lib/api/types.ts';
 	import TeamCard from './TeamCard.svelte';
 
 	let { teams, onDelete }: { teams: TeamSummary[]; onDelete?: (team: TeamSummary) => void } = $props();

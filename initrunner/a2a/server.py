@@ -216,6 +216,15 @@ def build_a2a_app(
 
     from starlette.middleware import Middleware
     from starlette.middleware.cors import CORSMiddleware
+    from starlette.responses import JSONResponse
+
+    from initrunner.middleware import BodySizeLimitMiddleware
+
+    def _a2a_error_response(status_code: int, message: str) -> JSONResponse:
+        return JSONResponse(
+            {"error": {"message": message, "code": status_code}},
+            status_code=status_code,
+        )
 
     executor = InitRunnerAgentExecutor(
         agent=agent,
@@ -249,18 +258,11 @@ def build_a2a_app(
 
     if api_key:
         from starlette.middleware.base import BaseHTTPMiddleware
-        from starlette.responses import JSONResponse
 
         from initrunner.middleware import (
             all_paths_predicate,
             make_auth_dispatch,
         )
-
-        def _a2a_error_response(status_code: int, message: str) -> JSONResponse:
-            return JSONResponse(
-                {"error": {"message": message, "code": status_code}},
-                status_code=status_code,
-            )
 
         middleware.append(
             Middleware(
@@ -272,6 +274,14 @@ def build_a2a_app(
                 ),
             )
         )
+
+    middleware.append(
+        Middleware(
+            BodySizeLimitMiddleware,  # type: ignore[arg-type]
+            max_bytes=role.spec.security.server.max_request_body_bytes,
+            error_response=_a2a_error_response,
+        )
+    )
 
     return Starlette(
         routes=[

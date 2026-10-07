@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { NodeProps } from '@xyflow/svelte';
-	import type { AgentSummary } from '$lib/api/types';
+	import type { AgentSummary } from '#lib/api/types.ts';
 	import { goto } from '$app/navigation';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';
 	import { Play, Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle } from 'lucide-svelte';

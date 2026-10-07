@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SaveResult } from '$lib/api/builder';
+	import type { SaveResult } from '#lib/api/builder.ts';
 	import { CheckCircle, Copy, Check } from 'lucide-svelte';
 
 	let {

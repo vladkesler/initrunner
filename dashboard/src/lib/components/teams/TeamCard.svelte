@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TeamSummary } from '$lib/api/types';
+	import type { TeamSummary } from '#lib/api/types.ts';
 	import { goto } from '$app/navigation';
 	import { Database, FileText, Trash2 } from 'lucide-svelte';
 

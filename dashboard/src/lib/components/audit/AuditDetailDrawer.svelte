@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { AuditRecord, AuditRunDetail } from '$lib/api/types';
-	import { getAuditRunDetail } from '$lib/api/audit';
+	import type { AuditRecord, AuditRunDetail } from '#lib/api/types.ts';
+	import { getAuditRunDetail } from '#lib/api/audit.ts';
 	import { X, CheckCircle, XCircle, Copy } from 'lucide-svelte';
-	import { formatCost } from '$lib/utils/format';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	let { record, onClose }: { record: AuditRecord; onClose: () => void } = $props();
 

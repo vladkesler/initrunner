@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { validateYaml, saveAgent } from '$lib/api/builder';
-	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
+	import { validateYaml, saveAgent } from '#lib/api/builder.ts';
+	import YamlEditor from '#lib/components/ui/YamlEditor.svelte';
 
 	let {
 		agentId,

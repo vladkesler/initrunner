@@ -31,7 +31,7 @@ jobs:
           scan-ref: "."
           format: "sarif"
           output: "trivy-repo.sarif"
-          severity: "CRITICAL,HIGH"
+          severity: "CRITICAL,HIGH,MEDIUM"
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4

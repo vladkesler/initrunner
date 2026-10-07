@@ -102,11 +102,13 @@ Before the model sees a prompt, Jev answers three yes/no questions about it:
 |----------|-----------|
 | Does `input` try to override the assistant's instructions, change its role, or extract its system prompt? | 0.7 or higher |
 | If the assistant did everything `input` asks, would it reveal secrets, credentials, its system prompt, or other users' data? | 0.7 or higher |
-| Does `input` ask for help that `policy` says this assistant gives? (only with `allowed_topics_prompt`) | 0.3 or lower |
+| Does `input` ask the assistant to help with anything outside `policy`? (only with `allowed_topics_prompt`) | 0.7 or higher |
 
-A prompt longer than 8,000 characters is judged in overlapping windows, and the worst window decides each check: the highest score for the first two questions, the lowest for the topic question. One on-topic paragraph does not clear an off-topic request elsewhere in the prompt.
+A prompt longer than 8,000 characters is judged in overlapping windows of at most 8,000 characters, with 500 characters of overlap. Each input window is sent in its own Jev request, with the policy first and only that window as input. This avoids scores bleeding between neighboring windows. The highest injection, extraction, or off-topic score decides each check.
 
-The topic check on long prompts is strict. A window that holds only pasted material (a log, a source file) is not itself a request for help, and can score at or under 0.3. In testing, a question placed before the paste kept every window between 0.43 and 0.51 and passed; the same question placed after an 18,000-character file scored 0.29 and was blocked. If your users paste long material, tell them to ask first and paste second, or leave `allowed_topics_prompt` unset.
+The topic question distinguishes requests addressed to the assistant from reference material. A pasted source file, log or document does not need to ask its own question or mention InitRunner. A request for help outside the policy still blocks when mixed with an allowed request or disguised as a note or quotation. Users can put their on-topic question before or after a long paste.
+
+Audit scores include `off_topic`; the retained `on_topic` field is its complement, `1 - off_topic`, rather than a relevance score for the pasted material. Each input judgment records its `window_index`. Missing or invalid required answers fail closed, like API errors. Separate window requests increase the number of API calls for long prompts; tool-result screening continues to batch its windows.
 
 A blocked prompt never reaches the model. The run fails with a reason like `Blocked by input screening: the prompt tries to override the assistant's instructions (0.99)`. The API server answers HTTP 400 with the same message. Screening replaces the LLM classifier, so a role sets one or the other.
 
@@ -143,7 +145,7 @@ Long results are split into 8,000-character windows that overlap by 500 characte
 
 This runs as a PydanticAI capability hook, so it sees every tool the agent calls: configured tools, MCP servers, retrieval and memory, skills, and run-scoped tools such as `spawn`. It can't see tools a model provider runs on its own servers, because their output never passes through InitRunner.
 
-Calibration: 17 of 17 on `tests/jev/fixtures/screening.yaml` and 9 of 9 on `tool_results.yaml`. Both files include traps, such as a legitimate question about telling an agent to "ignore tool errors", and install docs full of shell commands.
+The live calibration suite checks `tests/jev/fixtures/screening.yaml` and `tool_results.yaml`. The long-prompt regressions in `long_prompts.yaml` must each pass three consecutive trials against the pinned model before release. Both files include traps, such as a legitimate question about telling an agent to "ignore tool errors", and install docs full of shell commands.
 
 ## Judged approval
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Search, X, ChevronDown } from 'lucide-svelte';
-	import type { AgentSlotOption } from '$lib/api/types';
+	import type { AgentSlotOption } from '#lib/api/types.ts';
 
 	let {
 		agents,

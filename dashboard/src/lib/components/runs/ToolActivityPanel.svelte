@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ToolEventData } from '$lib/api/types';
+	import type { ToolEventData } from '#lib/api/types.ts';
 
 	let { events = [] }: { events?: ToolEventData[] } = $props();
 

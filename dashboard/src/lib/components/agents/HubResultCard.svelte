@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { HubSearchResult } from '$lib/api/builder';
+	import type { HubSearchResult } from '#lib/api/builder.ts';
 	import { Download } from 'lucide-svelte';
 
 	let {

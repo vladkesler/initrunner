@@ -7,9 +7,9 @@
 		addTeamIngestUrl,
 		uploadTeamIngestFiles,
 		streamTeamIngest
-	} from '$lib/api/teams';
-	import type { IngestDocument, IngestSummary } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	} from '#lib/api/teams.ts';
+	import type { IngestDocument, IngestSummary } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import {
 		RefreshCw,
 		Database,
@@ -21,7 +21,7 @@
 		Upload,
 		Link
 	} from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { teamId, hasIngest }: { teamId: string; hasIngest: boolean } = $props();
 

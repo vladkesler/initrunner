@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Check, X, ChevronDown, ChevronRight } from 'lucide-svelte';
-	import { Button } from '$lib/components/ui/button';
-	import type { PendingCall } from '$lib/api/types';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import type { PendingCall } from '#lib/api/types.ts';
 	import { previewOf } from './preview';
 	import Kbd from './Kbd.svelte';
 

@@ -2,13 +2,13 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
-	import { approvals, subscribeApprovals } from '$lib/stores/approvals.svelte';
-	import ApprovalsQueue from '$lib/components/approvals/ApprovalsQueue.svelte';
-	import ApprovalDrawer from '$lib/components/approvals/ApprovalDrawer.svelte';
-	import type { PendingRun } from '$lib/api/approvals';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
+	import { approvals, subscribeApprovals } from '#lib/stores/approvals.svelte.ts';
+	import ApprovalsQueue from '#lib/components/approvals/ApprovalsQueue.svelte';
+	import ApprovalDrawer from '#lib/components/approvals/ApprovalDrawer.svelte';
+	import type { PendingRun } from '#lib/api/approvals.ts';
 
 	let selection = $state(new Set<string>());
 	let submittingIds = $state(new Set<string>());
@@ -113,11 +113,11 @@
 	}
 
 	function openDrawer(runId: string): void {
-		goto(`/approvals/${runId}`, { replaceState: false, keepFocus: true });
+		goto(`/approvals/${runId}`, { replace: false, reset: false });
 	}
 
 	function closeDrawer(): void {
-		goto('/approvals', { replaceState: false, keepFocus: true });
+		goto('/approvals', { replace: false, reset: false });
 	}
 </script>
 

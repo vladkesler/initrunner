@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { ChevronUp, ChevronDown, X } from 'lucide-svelte';
-	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
-	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
-	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '$lib/api/types';
+	import ModelSelector from '#lib/components/ui/ModelSelector.svelte';
+	import AgentPicker from '#lib/components/ui/AgentPicker.svelte';
+	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '#lib/api/types.ts';
 
 	const DEFAULT_NAMES = [
 		'analyst', 'reviewer', 'advisor', 'checker',

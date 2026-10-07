@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { AuditRecord } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import type { AuditRecord } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	let {
 		records,

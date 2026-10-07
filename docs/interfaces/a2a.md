@@ -265,3 +265,7 @@ See [Logging](../operations/logging.md) for the full set of levels.
 | Agents per server | 1 | Multiple | 1 |
 | Client tool | `delegate` mode `mcp` | Native MCP clients | `delegate` mode `a2a` |
 | Use case | Drop-in OpenAI replacement | Tool sharing with AI IDEs | Cross-framework agent communication |
+
+## Request body limit
+
+The A2A JSON-RPC server enforces `security.server.max_request_body_bytes` from its role (1 MiB by default). It counts the bytes actually received before the SDK parses JSON, so missing or understated `Content-Length` headers and chunked requests cannot bypass the limit. Oversized requests receive HTTP 413 and do not start an agent run. Agent-card discovery and streaming responses are unchanged.

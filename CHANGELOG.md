@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026.10.2] - 2026-10-08
+
+### Security
+- **The A2A server and dashboard now cap bytes received before parsing request bodies.** Chunked requests and missing or understated `Content-Length` headers cannot bypass the cap. Oversized bodies return HTTP 413 before JSON, form or multipart parsing. A2A uses the role's `security.server.max_request_body_bytes` (1 MiB by default). The dashboard defaults to 1 MiB for ordinary requests, including the public login form, and 64 MiB for an entire agent or team upload request. Large bodies spool to temporary storage, which is closed on rejection or disconnect. (#301, #302)
+- **Team uploads honor the same per-file limit as agent uploads** (50 MiB by default). An oversized file returns HTTP 413, its partial file is removed, and ingestion does not run. Thanks to @Jah-yee for the dashboard and upload changes in #311.
+- **Bumped `fsspec` 2026.2.0 to 2026.6.0 and `multidict` 6.7.1 to 6.9.1.** Addresses the crafted-reference-document code execution advisory CVE-2026-104851 and the items-view memory leak advisory CVE-2026-104874. These are transitive dependencies; InitRunner does not import either directly.
+
+### Fixed
+- **Long-prompt input screening judges each window in a separate Jev request.** Neighboring windows no longer share input state. The topic question checks for requests outside the policy, distinguishing those requests from pasted source code, logs and documents; a reference-only window does not need to ask its own question. The highest off-topic probability decides, at 0.7 or above. Missing or invalid required answers fail closed. Audit judgments include window indices, token usage and `off_topic`; the retained `on_topic` score is its complement. The pinned Jev model is unchanged. (#300)
+
+### Dependencies
+- Dashboard: SvelteKit 3.0.1 and adapter-static 4.0.0 (#307), PostHog 1.438.2 (#308), bits-ui 2.19.5 (#309), and Vite 8.3.3 (#310). The allowed ranges resolved newer patch releases than the original PRs requested. The SvelteKit migration preserves the static SPA, updates configuration and imports, and requires Node 22.17 or newer to build. PR CI now builds the dashboard before release.
+- Development: virtualenv 20.36.1 to 21.7.13 (#306), merged after 2026.10.1.
+
 ## [2026.10.1] - 2026-10-03
 
 ### Security

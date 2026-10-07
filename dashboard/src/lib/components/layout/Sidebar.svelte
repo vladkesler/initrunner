@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { Compass, Blocks, Sparkles, Cable, ScanEye, Receipt, Gavel, Cpu, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
-	import { getMcpHealthSummary } from '$lib/api/mcp';
+	import { getMcpHealthSummary } from '#lib/api/mcp.ts';
 	import { onMount } from 'svelte';
-	import { approvals, subscribeApprovals } from '$lib/stores/approvals.svelte';
+	import { approvals, subscribeApprovals } from '#lib/stores/approvals.svelte.ts';
 
 	let { collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void } = $props();
 

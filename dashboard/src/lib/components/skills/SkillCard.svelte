@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { SkillSummary } from '$lib/api/types';
+	import type { SkillSummary } from '#lib/api/types.ts';
 	import ScopeBadge from './ScopeBadge.svelte';
 	import { Sparkles, AlertTriangle } from 'lucide-svelte';
 

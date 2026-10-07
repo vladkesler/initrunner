@@ -1,10 +1,10 @@
 <script lang="ts">
 	import '../app.css';
 	import { afterNavigate } from '$app/navigation';
-	import Shell from '$lib/components/layout/Shell.svelte';
-	import ToastContainer from '$lib/components/ui/ToastContainer.svelte';
-	import ShortcutOverlay from '$lib/components/ShortcutOverlay.svelte';
-	import { capturePageview } from '$lib/telemetry';
+	import Shell from '#lib/components/layout/Shell.svelte';
+	import ToastContainer from '#lib/components/ui/ToastContainer.svelte';
+	import ShortcutOverlay from '#lib/components/ShortcutOverlay.svelte';
+	import { capturePageview } from '#lib/telemetry.ts';
 
 	let { children } = $props();
 

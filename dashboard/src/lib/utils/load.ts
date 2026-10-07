@@ -1,5 +1,5 @@
-import { ApiError } from '$lib/api/client';
-import { toast } from '$lib/stores/toast.svelte';
+import { ApiError } from '#lib/api/client.ts';
+import { toast } from '#lib/stores/toast.svelte.ts';
 
 export type LoadResult = { ok: true } | { ok: false; notFound: boolean };
 

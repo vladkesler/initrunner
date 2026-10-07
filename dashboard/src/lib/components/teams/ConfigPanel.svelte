@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TeamDetail } from '$lib/api/types';
+	import type { TeamDetail } from '#lib/api/types.ts';
 	import { ChevronRight, Database, FileText, Eye, EyeOff, Wrench } from 'lucide-svelte';
 
 	let { team }: { team: TeamDetail } = $props();

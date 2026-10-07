@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
+	import SeedAvatar from '#lib/components/ui/SeedAvatar.svelte';
 	import { CheckCircle } from 'lucide-svelte';
 
 	let {

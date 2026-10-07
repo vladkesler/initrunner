@@ -2,11 +2,11 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { Search, Blocks, ScanEye, Receipt, Cpu, Compass, Plus } from 'lucide-svelte';
-	import { listAgents } from '$lib/api/agents';
-	import { fetchFlowList } from '$lib/api/flow';
-	import { fetchTeamList } from '$lib/api/teams';
-	import type { AgentSummary, FlowSummary, TeamSummary } from '$lib/api/types';
-	import { isPaletteOpen, togglePalette, closePalette, openPalette } from '$lib/stores/command-palette.svelte';
+	import { listAgents } from '#lib/api/agents.ts';
+	import { fetchFlowList } from '#lib/api/flow.ts';
+	import { fetchTeamList } from '#lib/api/teams.ts';
+	import type { AgentSummary, FlowSummary, TeamSummary } from '#lib/api/types.ts';
+	import { isPaletteOpen, togglePalette, closePalette, openPalette } from '#lib/stores/command-palette.svelte.ts';
 
 	const open = $derived(isPaletteOpen());
 	let query = $state('');

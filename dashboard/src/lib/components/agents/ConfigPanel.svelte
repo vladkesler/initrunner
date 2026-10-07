@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AgentDetail } from '$lib/api/types';
+	import type { AgentDetail } from '#lib/api/types.ts';
 	import ConfigSection from './ConfigSection.svelte';
 	import SecurityBadge from './SecurityBadge.svelte';
 	import { Copy, Check, ExternalLink } from 'lucide-svelte';

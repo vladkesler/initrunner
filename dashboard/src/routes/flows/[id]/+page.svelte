@@ -9,22 +9,22 @@
 		fetchFlowStats,
 		fetchFlowTimeline,
 		deleteFlow
-	} from '$lib/api/flow';
-	import type { FlowDetail, FlowStats, DelegateEvent } from '$lib/api/types';
-	import { loadOr404 } from '$lib/utils/load';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	} from '#lib/api/flow.ts';
+	import type { FlowDetail, FlowStats, DelegateEvent } from '#lib/api/types.ts';
+	import { loadOr404 } from '#lib/utils/load.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { if (detail) setCrumbs([{ label: 'Flows', href: '/flows' }, { label: detail.name }]); });
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import FlowCanvas from '$lib/components/flow/FlowCanvas.svelte';
-	import RunPanel from '$lib/components/flow/RunPanel.svelte';
-	import EventsTab from '$lib/components/flow/EventsTab.svelte';
-	import ConfigPanel from '$lib/components/flow/ConfigPanel.svelte';
-	import EditorTab from '$lib/components/flow/EditorTab.svelte';
-	import TimelineView from '$lib/components/agents/TimelineView.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import FlowCanvas from '#lib/components/flow/FlowCanvas.svelte';
+	import RunPanel from '#lib/components/flow/RunPanel.svelte';
+	import EventsTab from '#lib/components/flow/EventsTab.svelte';
+	import ConfigPanel from '#lib/components/flow/ConfigPanel.svelte';
+	import EditorTab from '#lib/components/flow/EditorTab.svelte';
+	import TimelineView from '#lib/components/agents/TimelineView.svelte';
 	import {
 		ArrowLeft,
 		Activity,

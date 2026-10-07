@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AgentSummary } from '$lib/api/types';
+	import type { AgentSummary } from '#lib/api/types.ts';
 	import { goto } from '$app/navigation';
 	import { Play, Trash2 } from 'lucide-svelte';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';

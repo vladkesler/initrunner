@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { ThreadMessage } from '$lib/api/types';
+	import type { ThreadMessage } from '#lib/api/types.ts';
 	import type { Snippet } from 'svelte';
 	import { OctagonX, CircleStop, Play } from 'lucide-svelte';
-	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
+	import SeedAvatar from '#lib/components/ui/SeedAvatar.svelte';
 
 	let {
 		messages = [],

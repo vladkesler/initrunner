@@ -41,6 +41,10 @@ that a plain install never imports the MCP stack or LanceDB, and that a role nee
 either fails at load with an install command. They pass trivially when the extras are
 present, so this job is the one that actually enforces them.
 
+### `dashboard-build`
+
+PR CI also installs the dashboard with pnpm and a frozen lockfile, builds the static SPA on Node 22, and verifies that the packaged `index.html` exists. This catches frontend migration failures before a release tag is pushed. SvelteKit 3 requires Node 22.17 or newer.
+
 ## Running Locally
 
 Run the same checks locally before pushing:
@@ -70,7 +74,7 @@ A standalone **Security** workflow (`.github/workflows/security.yml`) runs on PR
 
 ### Trivy Repository Scan
 
-Scans the full repository filesystem for known CVEs in `uv.lock` and `pnpm-lock.yaml`, plus Dockerfile misconfigurations. Filters to CRITICAL and HIGH severity. Results are uploaded as SARIF to the GitHub Security tab.
+Scans the full repository filesystem for known CVEs in `uv.lock` and `pnpm-lock.yaml`, plus Dockerfile misconfigurations. Reports CRITICAL, HIGH, and MEDIUM severity. Results are uploaded as SARIF to the GitHub Security tab.
 
 ### pip-audit
 

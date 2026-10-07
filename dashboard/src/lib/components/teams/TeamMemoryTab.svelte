@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getTeamMemories, consolidateTeamMemories } from '$lib/api/teams';
-	import type { MemoryItem } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { getTeamMemories, consolidateTeamMemories } from '#lib/api/teams.ts';
+	import type { MemoryItem } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { RefreshCw, Sparkles } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { teamId, hasMemory, refreshKey = 0 }: { teamId: string; hasMemory: boolean; refreshKey?: number } = $props();
 

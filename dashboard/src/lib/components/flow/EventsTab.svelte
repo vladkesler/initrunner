@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { DelegateEvent } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import type { DelegateEvent } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 
 	let {
 		events,
