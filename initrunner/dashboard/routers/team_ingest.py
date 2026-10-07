@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Annotated
 
 from fastapi import (  # type: ignore[import-not-found]
@@ -24,8 +23,6 @@ from initrunner.dashboard.schemas import (
     IngestStatsResponse,
     IngestSummaryResponse,
 )
-
-_logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/teams", tags=["team-ingest"])
 
@@ -135,8 +132,10 @@ async def upload_files(
         if not dest.is_relative_to(upload_dir.resolve()):
             continue
         if not await _save_upload_capped(f, dest, max_bytes):
-            _logger.warning("Rejected team upload %s: exceeds %dMB", f.filename, max_mb)
-            continue
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{safe_name}' exceeds the {max_mb} MB limit",
+            )
         saved.append(dest)
 
     if not saved:

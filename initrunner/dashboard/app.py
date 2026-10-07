@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,6 +21,7 @@ from fastapi.responses import (  # type: ignore[import-not-found]
 from fastapi.staticfiles import StaticFiles  # type: ignore[import-not-found]
 from starlette.middleware.base import BaseHTTPMiddleware  # type: ignore[import-not-found]
 from starlette.responses import RedirectResponse
+from starlette.types import Scope
 
 from initrunner._compat import MissingExtraError
 from initrunner.dashboard.config import DashboardSettings
@@ -35,6 +37,7 @@ from initrunner.dashboard.deps import (
 )
 from initrunner.dashboard.login import render_login_page
 from initrunner.dashboard.schemas import HealthResponse
+from initrunner.middleware import BodySizeLimitMiddleware, detail_error_response
 
 _logger = logging.getLogger(__name__)
 
@@ -65,23 +68,26 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
+    def body_limit(scope: Scope) -> int:
+        if re.fullmatch(r"/api/(?:agents|teams)/[^/]+/ingest/upload/?", scope["path"]):
+            return settings.max_upload_body_bytes
+        return settings.max_request_body_bytes
+
+    # Count received bytes before FastAPI parses JSON, forms or uploads. The
+    # login route is protected even though it is intentionally public.
+    app.add_middleware(
+        BodySizeLimitMiddleware,  # type: ignore[arg-type]
+        max_bytes=settings.max_request_body_bytes,
+        limit_for_scope=body_limit,
+        error_response=detail_error_response,
+    )
+
     # CORS -- allow the Vite dev server during development
     app.add_middleware(
         CORSMiddleware,  # type: ignore[arg-type]
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
         allow_methods=["*"],
         allow_headers=["*"],
-    )
-
-    # Body size limit -- reject POST/PUT/PATCH requests whose Content-Length
-    # exceeds the configured cap. The login endpoint is excluded from auth and
-    # would otherwise accept an arbitrarily large form body.
-    app.add_middleware(
-        BaseHTTPMiddleware,  # type: ignore[arg-type]
-        dispatch=make_body_size_dispatch(
-            max_bytes=settings.max_request_body_bytes,
-            error_response=detail_error_response,
-        ),
     )
 
     # Host-header allowlist (anti-DNS-rebinding). A malicious web page can point
@@ -272,9 +278,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
     if _auth_key := settings.api_key:
         from initrunner.middleware import (
             all_paths_predicate,
-            detail_error_response,
             make_auth_dispatch,
-            make_body_size_dispatch,
         )
 
         _auth_session_token = hmac.new(

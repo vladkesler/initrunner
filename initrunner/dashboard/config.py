@@ -24,6 +24,11 @@ class DashboardSettings:
     # (mandatory auth is the protection there).
     allowed_hosts: list[str] | None = None
     max_request_body_bytes: int = 1_048_576
+    max_upload_body_bytes: int = 64 * 1024 * 1024
+
+    def __post_init__(self) -> None:
+        if self.max_request_body_bytes <= 0 or self.max_upload_body_bytes <= 0:
+            raise ValueError("Dashboard request body limits must be positive")
 
     @property
     def host(self) -> str:

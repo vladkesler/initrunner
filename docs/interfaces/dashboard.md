@@ -1188,3 +1188,11 @@ Aggregate health counts for the sidebar badge. Uses the 30-second TTL cache, so 
 ```json
 {"status": "ok", "version": "1.39.2"}
 ```
+
+## Request and upload limits
+
+The dashboard counts bytes received before parsing request bodies, including chunked requests without a `Content-Length` header. Ordinary requests, including the public login form, have a 1 MiB cap. Agent and team ingestion upload requests have a separate 64 MiB cap for the entire multipart body, including all files and multipart overhead. Requests over either limit receive HTTP 413.
+
+Uploads also honor the resolved agent's `security.resources.max_file_size_mb` (50 MiB by default). Team ingestion uses the same per-file cap as agent ingestion. An oversized file is rejected with HTTP 413, its partial file is removed, and ingestion does not run. Larger received bodies spool to temporary storage; temporary files are closed on success, rejection, disconnect or cancellation.
+
+Applications constructing the dashboard with `create_app()` can set positive `DashboardSettings.max_request_body_bytes` and `max_upload_body_bytes` values. Authentication and host checks remain in front of body parsing, and streaming responses are unchanged.
