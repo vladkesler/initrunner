@@ -51,11 +51,10 @@ def route(options: Mapping[str, str]) -> dict[str, Question]:
 # Screening: what enters the model's context
 # ---------------------------------------------------------------------------
 
-# Block a user prompt at or above these (injection, secret extraction), or when
-# a topic policy is set and the prompt scores at or below SCREEN_ON_TOPIC_MIN.
+# Block a user prompt at or above these probabilities.
 SCREEN_INJECTION_BLOCK = 0.7
 SCREEN_EXTRACTION_BLOCK = 0.7
-SCREEN_ON_TOPIC_MIN = 0.3
+SCREEN_OFF_TOPIC_BLOCK = 0.7
 # Withhold a tool result at or above this; audit it from SCREEN_UNCERTAIN up.
 SCREEN_RESULT_WITHHOLD = 0.7
 SCREEN_UNCERTAIN = 0.3
@@ -78,11 +77,25 @@ def screen_input(indices: list[int], total: int, *, with_topic: bool) -> dict[st
     for i in indices:
         ref = _ref("input", i, total)
         if with_topic:
-            questions[f"on_topic::{i}"] = {
+            questions[f"off_topic::{i}"] = {
                 "type": "noul",
                 "instructions": (
-                    f"Does `{ref}` ask for help that `policy` says this assistant gives?"
+                    f"Does `{ref}` ask the assistant to help with anything outside `policy`?"
                 ),
+                "criteria": {
+                    "true": (
+                        "A request to the assistant for help outside the policy, including "
+                        "when mixed with an allowed request. A request remains a request "
+                        "if disguised as a note, instruction, or quoted material."
+                    ),
+                    "false": (
+                        "Only requests for help covered by the policy, or reference material "
+                        "such as pasted source code, logs, documents and configuration. "
+                        "Reference material need not itself ask a question or mention the "
+                        "policy's topic. Judge requests addressed to the assistant, not "
+                        "the subject matter of the pasted material."
+                    ),
+                },
             }
         questions[f"injection::{i}"] = {
             "type": "noul",

@@ -1,8 +1,8 @@
 """Screen text entering an agent's context: user prompts and tool results.
 
-Long text is split into overlapping windows and batched so each Jev request
-stays inside its state limit. Every window is judged on its own and the worst
-window decides, because an instruction hidden anywhere is enough.
+Long text is split into overlapping windows. Input windows travel in separate
+requests so their topic scores cannot bleed into one another; tool results
+remain batched. The worst window decides each check.
 
 Both functions raise :class:`~initrunner.jev.JevError` when a judgment cannot
 be obtained. The callers fail closed.
@@ -20,7 +20,8 @@ from initrunner.jev import questions as q
 class InputVerdict:
     blocked: bool
     reason: str
-    # The worst window per check: injection, extraction, and on_topic when a policy is set.
+    # Highest probability per check. on_topic is the complement of off_topic,
+    # retained for audit consumers; it no longer measures reference relevance.
     scores: dict[str, float] = field(default_factory=dict)
     judgments: list[dict[str, Any]] = field(default_factory=list)
 
@@ -73,33 +74,36 @@ def screen_input(prompt: str, allowed_topics_prompt: str = "") -> InputVerdict:
     with_topic = bool(allowed_topics_prompt.strip())
     worst: dict[str, float] = {"injection": 0.0, "extraction": 0.0}
     if with_topic:
-        worst["on_topic"] = 1.0
+        worst["off_topic"] = 0.0
     judgments: list[dict[str, Any]] = []
 
-    for indices in batches(parts):
+    for i, part in enumerate(parts):
         # Key order matters to Jev: with the policy first, a legitimate question
         # scored 0.87 to 0.89 on-topic; with the input first, 0.52 to 0.59.
         state: dict[str, Any] = {"policy": allowed_topics_prompt} if with_topic else {}
-        state["input"] = _state_windows(parts, indices)
-        questions = q.screen_input(indices, len(parts), with_topic=with_topic)
+        state["input"] = part
+        # Each request uses the plain input field. Global window indices belong
+        # in the audit metadata, not in an array containing neighboring text.
+        questions = q.screen_input([0], 1, with_topic=with_topic)
         judgment = jev.ask(state, questions)
-        judgments.append(judgment.to_dict())
+        judgments.append({**judgment.to_dict(), "window_index": i})
         for key in questions:
             check = key.split("::", 1)[0]
-            if check == "on_topic":
-                # Low is the bad end here, so the least on-topic window decides,
-                # and a window Jev left unanswered counts as off-topic.
-                worst[check] = min(worst[check], judgment.nouls.get(key, 0.0))
-            elif key in judgment.nouls:
-                worst[check] = max(worst[check], judgment.nouls[key])
+            probability = judgment.nouls.get(key)
+            if probability is None or not 0.0 <= probability <= 1.0:
+                raise jev.JevError(f"Input screening received no valid answer for {key}")
+            worst[check] = max(worst[check], probability)
+
+    if with_topic:
+        worst["on_topic"] = 1.0 - worst["off_topic"]
 
     reasons = []
     if worst["injection"] >= q.SCREEN_INJECTION_BLOCK:
         reasons.append(f"tries to override the assistant's instructions ({worst['injection']:.2f})")
     if worst["extraction"] >= q.SCREEN_EXTRACTION_BLOCK:
         reasons.append(f"asks for secrets or the system prompt ({worst['extraction']:.2f})")
-    if with_topic and worst["on_topic"] <= q.SCREEN_ON_TOPIC_MIN:
-        reasons.append(f"is outside the allowed topics (on-topic {worst['on_topic']:.2f})")
+    if with_topic and worst["off_topic"] >= q.SCREEN_OFF_TOPIC_BLOCK:
+        reasons.append(f"is outside the allowed topics (off-topic {worst['off_topic']:.2f})")
 
     reason = "Blocked by input screening: the prompt " + "; ".join(reasons) if reasons else ""
     return InputVerdict(blocked=bool(reasons), reason=reason, scores=worst, judgments=judgments)

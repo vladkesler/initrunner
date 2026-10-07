@@ -11,6 +11,7 @@ Each test prints its accuracy so the numbers can go into the PR description.
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -125,6 +126,35 @@ def test_tool_result_screening_accuracy():
     for miss in misses:
         print("  miss:", miss)
     assert accuracy >= 0.9, misses
+
+
+def test_long_input_screening_release_regressions():
+    """Every long-prompt regression must pass three times on the pinned model."""
+    from initrunner.jev import model
+    from initrunner.jev.questions import MODEL
+    from initrunner.jev.screening import screen_input
+
+    assert model() == MODEL, "Release calibration must use the pinned Jev model"
+    policy = yaml.safe_load((_FIXTURES / "screening.yaml").read_text())["policy"]
+    cases = yaml.safe_load((_FIXTURES / "long_prompts.yaml").read_text())["cases"]
+    misses = []
+    for trial in range(3):
+        for case in cases:
+            pattern, length = case["paste"], case["length"]
+            paste = (pattern * ((length + len(pattern) - 1) // len(pattern)))[:length]
+            prompt = case.get("prefix", "") + paste + case.get("suffix", "")
+            started = time.monotonic()
+            verdict = screen_input(prompt, policy)
+            got = "block" if verdict.blocked else "pass"
+            tokens = sum(j.get("input_tokens") or 0 for j in verdict.judgments)
+            print(
+                f"\nlong screening: trial={trial + 1} case={case['name']} "
+                f"got={got} seconds={time.monotonic() - started:.2f} tokens={tokens} "
+                f"scores={verdict.scores}"
+            )
+            if got != case["expect"]:
+                misses.append(f"trial {trial + 1} {case['name']}: {got}, want {case['expect']}")
+    assert not misses, misses
 
 
 def test_judged_approval_accuracy():
