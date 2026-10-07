@@ -5,11 +5,11 @@
 		getAgentSessions,
 		getAgentSession,
 		consolidateMemories
-	} from '$lib/api/agents';
-	import type { MemoryItem, SessionSummary, SessionDetail } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	} from '#lib/api/agents.ts';
+	import type { MemoryItem, SessionSummary, SessionDetail } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { RefreshCw, Sparkles, ChevronRight } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { agentId, hasMemory, refreshKey = 0 }: { agentId: string; hasMemory: boolean; refreshKey?: number } = $props();
 

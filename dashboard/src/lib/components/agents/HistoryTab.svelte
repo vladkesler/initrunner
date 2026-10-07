@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { queryAudit } from '$lib/api/audit';
-	import type { AuditRecord } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import AuditTable from '$lib/components/audit/AuditTable.svelte';
-	import AuditDetailDrawer from '$lib/components/audit/AuditDetailDrawer.svelte';
+	import { queryAudit } from '#lib/api/audit.ts';
+	import type { AuditRecord } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import AuditTable from '#lib/components/audit/AuditTable.svelte';
+	import AuditDetailDrawer from '#lib/components/audit/AuditDetailDrawer.svelte';
 	import { RefreshCw } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { agentName, refreshKey = 0 }: { agentName: string; refreshKey?: number } = $props();
 

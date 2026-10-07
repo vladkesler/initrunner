@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  dashboard-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: corepack enable
+        working-directory: dashboard
+      - run: bash scripts/build-dashboard.sh
+      - run: test -f initrunner/dashboard/_static/index.html
+
   lint:
     runs-on: ubuntu-latest
     steps:

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Inbox, AlertTriangle, RefreshCw } from 'lucide-svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import type { PendingRun } from '$lib/api/approvals';
+	import { Button } from '#lib/components/ui/button/index.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import type { PendingRun } from '#lib/api/approvals.ts';
 	import { previewOf } from './preview';
 
 	let {

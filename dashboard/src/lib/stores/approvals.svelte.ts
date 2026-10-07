@@ -4,8 +4,8 @@ import {
 	resolveRun,
 	type ApprovalsResolveResponse,
 	type PendingRun
-} from '$lib/api/approvals';
-import { ApiError } from '$lib/api/client';
+} from '#lib/api/approvals.ts';
+import { ApiError } from '#lib/api/client.ts';
 import { toast } from './toast.svelte';
 import { startedRuns } from './startedRuns.svelte';
 

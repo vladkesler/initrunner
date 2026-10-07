@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AgentStepResponse } from '$lib/api/types';
+	import type { AgentStepResponse } from '#lib/api/types.ts';
 	import { ChevronRight, CheckCircle, XCircle } from 'lucide-svelte';
 
 	let { steps }: { steps: AgentStepResponse[] } = $props();

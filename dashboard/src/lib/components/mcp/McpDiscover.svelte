@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getMcpRegistry } from '$lib/api/mcp';
-	import type { McpRegistryEntry } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { getMcpRegistry } from '#lib/api/mcp.ts';
+	import type { McpRegistryEntry } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Search, Copy, Check } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let entries = $state<McpRegistryEntry[]>([]);
 	let loading = $state(true);

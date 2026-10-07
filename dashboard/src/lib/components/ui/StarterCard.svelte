@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { StarterInfo } from '$lib/api/builder';
+	import type { StarterInfo } from '#lib/api/builder.ts';
 
 	interface Props {
 		starter: StarterInfo;

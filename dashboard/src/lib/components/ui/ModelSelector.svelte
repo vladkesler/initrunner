@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CheckCircle } from 'lucide-svelte';
-	import type { ProviderModels, ProviderPreset } from '$lib/api/types';
+	import type { ProviderModels, ProviderPreset } from '#lib/api/types.ts';
 	import ModelCombobox from './ModelCombobox.svelte';
 
 	let {

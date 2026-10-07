@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { TimelineResponse, TimelineEntry } from '$lib/api/types';
+	import type { TimelineResponse, TimelineEntry } from '#lib/api/types.ts';
 	import { Activity } from 'lucide-svelte';
-	import { formatCost } from '$lib/utils/format';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	let { fetchData, refreshKey = 0 }: { fetchData: () => Promise<TimelineResponse>; refreshKey?: number } = $props();
 

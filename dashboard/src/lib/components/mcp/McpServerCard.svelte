@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { McpServer, McpTool } from '$lib/api/types';
-	import { getMcpServerTools, checkMcpServerHealth, invalidateMcpCache } from '$lib/api/mcp';
+	import type { McpServer, McpTool } from '#lib/api/types.ts';
+	import { getMcpServerTools, checkMcpServerHealth, invalidateMcpCache } from '#lib/api/mcp.ts';
 	import { ChevronDown, ChevronRight, Play, RefreshCw, Trash2 } from 'lucide-svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 
 	let {
 		server,

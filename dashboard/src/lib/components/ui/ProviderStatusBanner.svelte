@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { ProviderStatus } from '$lib/api/builder';
-	import { saveProviderKey } from '$lib/api/providers';
-	import { ApiError } from '$lib/api/client';
+	import type { ProviderStatus } from '#lib/api/builder.ts';
+	import { saveProviderKey } from '#lib/api/providers.ts';
+	import { ApiError } from '#lib/api/client.ts';
 	import { AlertTriangle, Loader2, ExternalLink } from 'lucide-svelte';
 
 	interface Props {

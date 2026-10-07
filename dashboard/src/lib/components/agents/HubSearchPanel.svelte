@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { HubSearchResult } from '$lib/api/builder';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import type { HubSearchResult } from '#lib/api/builder.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import HubResultCard from './HubResultCard.svelte';
 	import { Search, Loader2, Info, ExternalLink } from 'lucide-svelte';
 

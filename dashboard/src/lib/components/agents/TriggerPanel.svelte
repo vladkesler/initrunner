@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TriggerStat } from '$lib/api/types';
+	import type { TriggerStat } from '#lib/api/types.ts';
 	import { ChevronRight } from 'lucide-svelte';
 
 	let { stats }: { stats: TriggerStat[] } = $props();

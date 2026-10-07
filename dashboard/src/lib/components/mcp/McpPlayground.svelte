@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getMcpServerTools, callMcpTool } from '$lib/api/mcp';
-	import type { McpServer, McpTool, McpPlaygroundResult } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { getMcpServerTools, callMcpTool } from '#lib/api/mcp.ts';
+	import type { McpServer, McpTool, McpPlaygroundResult } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Play, Copy, Clock, Trash2 } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let {
 		servers,

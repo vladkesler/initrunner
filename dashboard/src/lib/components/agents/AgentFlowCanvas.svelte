@@ -11,10 +11,10 @@
 	} from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { goto } from '$app/navigation';
-	import type { AgentSummary } from '$lib/api/types';
+	import type { AgentSummary } from '#lib/api/types.ts';
 	import AgentNode from './AgentNode.svelte';
 	import CategoryLabel from './CategoryLabel.svelte';
-	import { safeGet, safeSet } from '$lib/utils/storage';
+	import { safeGet, safeSet } from '#lib/utils/storage.ts';
 	import { RotateCcw } from 'lucide-svelte';
 
 	let {

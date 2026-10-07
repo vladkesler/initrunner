@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import { getToasts, dismissToast, type ToastLevel } from '$lib/stores/toast.svelte';
+	import { getToasts, dismissToast, type ToastLevel } from '#lib/stores/toast.svelte.ts';
 	import { XCircle, CheckCircle, AlertTriangle, Info, X } from 'lucide-svelte';
 
 	const toasts = $derived(getToasts());

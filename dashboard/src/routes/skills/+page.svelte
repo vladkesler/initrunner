@@ -2,13 +2,13 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { listSkills } from '$lib/api/skills';
-	import type { SkillSummary } from '$lib/api/types';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import SkillList from '$lib/components/skills/SkillList.svelte';
+	import { listSkills } from '#lib/api/skills.ts';
+	import type { SkillSummary } from '#lib/api/types.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import SkillList from '#lib/components/skills/SkillList.svelte';
 	import { Sparkles, Search } from 'lucide-svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Skills' }]); });
 
@@ -81,7 +81,7 @@
 		if (activeType !== 'all') params.set('type', activeType);
 		if (query) params.set('search', query);
 		const qs = params.toString();
-		goto(`/skills${qs ? `?${qs}` : ''}`, { replaceState: true });
+		goto(`/skills${qs ? `?${qs}` : ''}`, { replace: true });
 	}
 
 	let searchTimer: ReturnType<typeof setTimeout> | null = null;

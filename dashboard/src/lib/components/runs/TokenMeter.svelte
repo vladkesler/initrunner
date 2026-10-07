@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { CostData, CostUpdateData, UsageData } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import type { CostData, CostUpdateData, UsageData } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	interface ResultMetrics {
 		tokens_in: number;

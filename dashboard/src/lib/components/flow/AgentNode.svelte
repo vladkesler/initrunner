@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import type { FlowAgentDetail } from '$lib/api/types';
+	import type { FlowAgentDetail } from '#lib/api/types.ts';
 	import {
 		Zap,
 		HeartPulse,

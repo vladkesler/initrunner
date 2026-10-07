@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import { fetchFlowList, deleteFlow } from '$lib/api/flow';
-	import { getStarters, type StarterInfo } from '$lib/api/builder';
-	import type { FlowSummary } from '$lib/api/types';
-	import StarterCard from '$lib/components/ui/StarterCard.svelte';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { fetchFlowList, deleteFlow } from '#lib/api/flow.ts';
+	import { getStarters, type StarterInfo } from '#lib/api/builder.ts';
+	import type { FlowSummary } from '#lib/api/types.ts';
+	import StarterCard from '#lib/components/ui/StarterCard.svelte';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Search, X, Workflow, Plus, ExternalLink, Trash2 } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Flows' }]); });
 

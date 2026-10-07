@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { BuilderOptions, HubSearchResult } from '$lib/api/builder';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
-	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
+	import type { BuilderOptions, HubSearchResult } from '#lib/api/builder.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import ProviderStatusBanner from '#lib/components/ui/ProviderStatusBanner.svelte';
+	import ModelSelector from '#lib/components/ui/ModelSelector.svelte';
 	import HubSearchPanel from './HubSearchPanel.svelte';
 	import {
 		LayoutTemplate,

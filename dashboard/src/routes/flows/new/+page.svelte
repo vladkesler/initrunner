@@ -5,24 +5,24 @@
 		seedFlow,
 		validateFlow,
 		saveFlow
-	} from '$lib/api/flow';
-	import { saveProviderKey } from '$lib/api/providers';
-	import { ApiError } from '$lib/api/client';
+	} from '#lib/api/flow.ts';
+	import { saveProviderKey } from '#lib/api/providers.ts';
+	import { ApiError } from '#lib/api/client.ts';
 	import { page } from '$app/state';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Flows', href: '/flows' }, { label: 'New Flow' }]); });
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import AgentPicker from '$lib/components/ui/AgentPicker.svelte';
-	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import AgentPicker from '#lib/components/ui/AgentPicker.svelte';
+	import ModelSelector from '#lib/components/ui/ModelSelector.svelte';
 	import type {
 		FlowBuilderOptions,
 		PatternInfo,
 		SlotAssignment,
 		ValidationIssue
-	} from '$lib/api/types';
+	} from '#lib/api/types.ts';
 	import {
 		ArrowLeft,
 		ArrowRight,

@@ -12,17 +12,17 @@
 		type EmbeddingWarning,
 		type SaveResult,
 		type HubSearchResult
-	} from '$lib/api/builder';
-	import { saveProviderKey } from '$lib/api/providers';
-	import { ApiError } from '$lib/api/client';
+	} from '#lib/api/builder.ts';
+	import { saveProviderKey } from '#lib/api/providers.ts';
+	import { ApiError } from '#lib/api/client.ts';
 	import { page } from '$app/state';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import ConfigureScreen from '$lib/components/agents/ConfigureScreen.svelte';
-	import EditorScreen from '$lib/components/agents/EditorScreen.svelte';
-	import SuccessScreen from '$lib/components/agents/SuccessScreen.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import ConfigureScreen from '#lib/components/agents/ConfigureScreen.svelte';
+	import EditorScreen from '#lib/components/agents/EditorScreen.svelte';
+	import SuccessScreen from '#lib/components/agents/SuccessScreen.svelte';
 	import { ArrowLeft } from 'lucide-svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Agents', href: '/agents' }, { label: 'New Agent' }]); });
 

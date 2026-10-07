@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PersonaStepResponse } from '$lib/api/types';
+	import type { PersonaStepResponse } from '#lib/api/types.ts';
 	import { ChevronRight, CheckCircle, XCircle } from 'lucide-svelte';
 
 	let { steps }: { steps: PersonaStepResponse[] } = $props();

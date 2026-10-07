@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { validateFlow, saveFlowYaml } from '$lib/api/flow';
-	import YamlEditor from '$lib/components/ui/YamlEditor.svelte';
+	import { validateFlow, saveFlowYaml } from '#lib/api/flow.ts';
+	import YamlEditor from '#lib/components/ui/YamlEditor.svelte';
 
 	let {
 		flowId,

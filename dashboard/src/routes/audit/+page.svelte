@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { queryAudit } from '$lib/api/audit';
-	import { fetchAuditStats } from '$lib/api/system';
-	import type { AuditRecord, AuditStats } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import AuditTable from '$lib/components/audit/AuditTable.svelte';
-	import AuditDetailDrawer from '$lib/components/audit/AuditDetailDrawer.svelte';
+	import { queryAudit } from '#lib/api/audit.ts';
+	import { fetchAuditStats } from '#lib/api/system.ts';
+	import type { AuditRecord, AuditStats } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import AuditTable from '#lib/components/audit/AuditTable.svelte';
+	import AuditDetailDrawer from '#lib/components/audit/AuditDetailDrawer.svelte';
 	import { RefreshCw, Download } from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	let records = $state<AuditRecord[]>([]);
 	let stats = $state<AuditStats | null>(null);

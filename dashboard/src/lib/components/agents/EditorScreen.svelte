@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { validateYaml, type ValidationIssue, type EmbeddingWarning } from '$lib/api/builder';
+	import { validateYaml, type ValidationIssue, type EmbeddingWarning } from '#lib/api/builder.ts';
 	import CognitionPanel from './CognitionPanel.svelte';
-	import EmbeddingWarningBanner from '$lib/components/ui/EmbeddingWarningBanner.svelte';
+	import EmbeddingWarningBanner from '#lib/components/ui/EmbeddingWarningBanner.svelte';
 	import {
 		Brain,
 		CircleX,

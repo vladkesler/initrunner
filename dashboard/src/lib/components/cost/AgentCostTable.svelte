@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { AgentCost, AgentSummary } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import type { AgentCost, AgentSummary } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 	import { ChevronUp, ChevronDown } from 'lucide-svelte';
 
 	let {

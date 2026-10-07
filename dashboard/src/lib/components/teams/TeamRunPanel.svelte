@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { streamTeamRun } from '$lib/api/teams';
-	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData, UsageData } from '$lib/api/types';
-	import ConversationThread from '$lib/components/runs/ConversationThread.svelte';
-	import ToolActivityPanel from '$lib/components/runs/ToolActivityPanel.svelte';
-	import TokenMeter from '$lib/components/runs/TokenMeter.svelte';
+	import { streamTeamRun } from '#lib/api/teams.ts';
+	import type { TeamRunResponse, TeamThreadMessage, PersonaStepResponse, ThreadMessage, TeamDetail, ToolEventData, UsageData } from '#lib/api/types.ts';
+	import ConversationThread from '#lib/components/runs/ConversationThread.svelte';
+	import ToolActivityPanel from '#lib/components/runs/ToolActivityPanel.svelte';
+	import TokenMeter from '#lib/components/runs/TokenMeter.svelte';
 	import PersonaTrace from './PersonaTrace.svelte';
-	import SeedAvatar from '$lib/components/ui/SeedAvatar.svelte';
+	import SeedAvatar from '#lib/components/ui/SeedAvatar.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
 
 	let { teamId, detail, onRunCompleted }: { teamId: string; detail: TeamDetail; onRunCompleted?: () => void } = $props();

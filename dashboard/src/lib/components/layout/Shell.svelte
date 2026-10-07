@@ -3,8 +3,8 @@
 	import Sidebar from './Sidebar.svelte';
 	import HeaderBar from './HeaderBar.svelte';
 	import CommandPalette from './CommandPalette.svelte';
-	import { safeGet, safeSet } from '$lib/utils/storage';
-	import { needsConsentPrompt, setConsent } from '$lib/telemetry';
+	import { safeGet, safeSet } from '#lib/utils/storage.ts';
+	import { needsConsentPrompt, setConsent } from '#lib/telemetry.ts';
 
 	let { children }: { children: any } = $props();
 	let collapsed = $state(false);

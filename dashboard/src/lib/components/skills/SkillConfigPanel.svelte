@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { SkillDetail } from '$lib/api/types';
-	import ConfigSection from '$lib/components/agents/ConfigSection.svelte';
+	import type { SkillDetail } from '#lib/api/types.ts';
+	import ConfigSection from '#lib/components/agents/ConfigSection.svelte';
 	import { CheckCircle, XCircle } from 'lucide-svelte';
 
 	let { detail }: { detail: SkillDetail } = $props();

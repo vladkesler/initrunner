@@ -1,4 +1,4 @@
-import { request } from '$lib/api/client';
+import { request } from '#lib/api/client.ts';
 import type { SkillSummary, SkillDetail } from './types';
 
 export function listSkills(params?: {

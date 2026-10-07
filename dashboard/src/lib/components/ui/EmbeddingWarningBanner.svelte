@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { EmbeddingWarning } from '$lib/api/builder';
-	import { setEmbeddingProvider } from '$lib/api/builder';
-	import { saveProviderKey } from '$lib/api/providers';
-	import { ApiError } from '$lib/api/client';
+	import type { EmbeddingWarning } from '#lib/api/builder.ts';
+	import { setEmbeddingProvider } from '#lib/api/builder.ts';
+	import { saveProviderKey } from '#lib/api/providers.ts';
+	import { ApiError } from '#lib/api/client.ts';
 	import { AlertTriangle, Loader2 } from 'lucide-svelte';
 
 	const VALIDATABLE = new Set(['openai']);
@@ -66,7 +66,7 @@
 					await handleApply();
 				} else {
 					// Trigger re-validation via the validate endpoint
-					const { validateYaml } = await import('$lib/api/builder');
+					const { validateYaml } = await import('#lib/api/builder.ts');
 					const res = await validateYaml(yamlText);
 					onResolved({
 						yaml_text: res.yaml_text,

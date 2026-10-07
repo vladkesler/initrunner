@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchBudgetProgress } from '$lib/api/agents';
-	import type { BudgetGauge, BudgetProgress } from '$lib/api/types';
-	import { formatCost } from '$lib/utils/format';
+	import { fetchBudgetProgress } from '#lib/api/agents.ts';
+	import type { BudgetGauge, BudgetProgress } from '#lib/api/types.ts';
+	import { formatCost } from '#lib/utils/format.ts';
 
 	let { agentId }: { agentId: string } = $props();
 

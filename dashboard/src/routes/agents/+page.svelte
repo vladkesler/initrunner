@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { listAgents, deleteAgent } from '$lib/api/agents';
-	import type { AgentSummary } from '$lib/api/types';
-	import AgentList from '$lib/components/agents/AgentList.svelte';
-	import AgentFlowCanvas from '$lib/components/agents/AgentFlowCanvas.svelte';
-	import QuickRunDrawer from '$lib/components/runs/QuickRunDrawer.svelte';
-	import CapabilityFilterBar from '$lib/components/agents/CapabilityFilterBar.svelte';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { listAgents, deleteAgent } from '#lib/api/agents.ts';
+	import type { AgentSummary } from '#lib/api/types.ts';
+	import AgentList from '#lib/components/agents/AgentList.svelte';
+	import AgentFlowCanvas from '#lib/components/agents/AgentFlowCanvas.svelte';
+	import QuickRunDrawer from '#lib/components/runs/QuickRunDrawer.svelte';
+	import CapabilityFilterBar from '#lib/components/agents/CapabilityFilterBar.svelte';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Search, Workflow, List, X } from 'lucide-svelte';
-	import { safeGet, safeSet } from '$lib/utils/storage';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { safeGet, safeSet } from '#lib/utils/storage.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'Agents' }]); });
 

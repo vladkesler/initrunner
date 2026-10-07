@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { saveSkillContent } from '$lib/api/skills';
+	import { saveSkillContent } from '#lib/api/skills.ts';
 	import { Copy, Check, AlertCircle, AlertTriangle, Save, RotateCcw } from 'lucide-svelte';
 
 	let {

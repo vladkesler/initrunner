@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AgentSummary } from '$lib/api/types';
+	import type { AgentSummary } from '#lib/api/types.ts';
 	import { Layers, Wrench, Zap, BookOpen, Plug, Sparkles, Brain, Gem, AlertTriangle } from 'lucide-svelte';
 
 	let {

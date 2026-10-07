@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { request } from '$lib/api/client';
-	import { runDoctor, listToolTypes, getDefaultModel, saveDefaultModel, resetDefaultModel, type DefaultModelResponse } from '$lib/api/system';
-	import { getBuilderOptions, type BuilderOptions } from '$lib/api/builder';
-	import { getProviderStatus, type ProviderStatusResponse } from '$lib/api/providers';
-	import type { HealthStatus, DoctorCheck, ToolType } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { request } from '#lib/api/client.ts';
+	import { runDoctor, listToolTypes, getDefaultModel, saveDefaultModel, resetDefaultModel, type DefaultModelResponse } from '#lib/api/system.ts';
+	import { getBuilderOptions, type BuilderOptions } from '#lib/api/builder.ts';
+	import { getProviderStatus, type ProviderStatusResponse } from '#lib/api/providers.ts';
+	import type { HealthStatus, DoctorCheck, ToolType } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import { Stethoscope, RefreshCw, CheckCircle, AlertTriangle, XCircle, Wrench, Save, RotateCcw, Info } from 'lucide-svelte';
-	import ProviderStatusBanner from '$lib/components/ui/ProviderStatusBanner.svelte';
-	import ModelSelector from '$lib/components/ui/ModelSelector.svelte';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import ProviderStatusBanner from '#lib/components/ui/ProviderStatusBanner.svelte';
+	import ModelSelector from '#lib/components/ui/ModelSelector.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { setCrumbs([{ label: 'System' }]); });
 

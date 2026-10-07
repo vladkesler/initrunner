@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import type { PersonaDetail, PersonaStepResponse } from '$lib/api/types';
+	import type { PersonaDetail, PersonaStepResponse } from '#lib/api/types.ts';
 	import { CheckCircle, XCircle, Wrench } from 'lucide-svelte';
 
 	let { data, selected }: NodeProps<{

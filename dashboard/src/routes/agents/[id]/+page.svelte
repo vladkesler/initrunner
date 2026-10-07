@@ -2,27 +2,27 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { getAgent, getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats, fetchTimeline } from '$lib/api/agents';
-	import { fetchAuditStats } from '$lib/api/system';
-	import type { AgentDetail, AuditStats, TriggerStat } from '$lib/api/types';
-	import { loadOr404 } from '$lib/utils/load';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { getAgent, getAgentDetail, getAgentYaml, deleteAgent, getAgentTriggerStats, fetchTimeline } from '#lib/api/agents.ts';
+	import { fetchAuditStats } from '#lib/api/system.ts';
+	import type { AgentDetail, AuditStats, TriggerStat } from '#lib/api/types.ts';
+	import { loadOr404 } from '#lib/utils/load.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	$effect(() => { if (detail) setCrumbs([{ label: 'Agents', href: '/agents' }, { label: detail.name }]); });
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import ConfirmDeleteDialog from '$lib/components/ui/ConfirmDeleteDialog.svelte';
-	import LoadError from '$lib/components/ui/LoadError.svelte';
-	import ConfigPanel from '$lib/components/agents/ConfigPanel.svelte';
-	import TriggerPanel from '$lib/components/agents/TriggerPanel.svelte';
-	import RunPanel from '$lib/components/runs/RunPanel.svelte';
-	import TimelineView from '$lib/components/agents/TimelineView.svelte';
-	import HistoryTab from '$lib/components/agents/HistoryTab.svelte';
-	import MemoryTab from '$lib/components/agents/MemoryTab.svelte';
-	import IngestTab from '$lib/components/agents/IngestTab.svelte';
-	import EditorTab from '$lib/components/agents/EditorTab.svelte';
-	import BudgetProgressBar from '$lib/components/agents/BudgetProgressBar.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '#lib/components/ui/tabs/index.ts';
+	import ConfirmDeleteDialog from '#lib/components/ui/ConfirmDeleteDialog.svelte';
+	import LoadError from '#lib/components/ui/LoadError.svelte';
+	import ConfigPanel from '#lib/components/agents/ConfigPanel.svelte';
+	import TriggerPanel from '#lib/components/agents/TriggerPanel.svelte';
+	import RunPanel from '#lib/components/runs/RunPanel.svelte';
+	import TimelineView from '#lib/components/agents/TimelineView.svelte';
+	import HistoryTab from '#lib/components/agents/HistoryTab.svelte';
+	import MemoryTab from '#lib/components/agents/MemoryTab.svelte';
+	import IngestTab from '#lib/components/agents/IngestTab.svelte';
+	import EditorTab from '#lib/components/agents/EditorTab.svelte';
+	import BudgetProgressBar from '#lib/components/agents/BudgetProgressBar.svelte';
 	import {
 		AlertTriangle,
 		ArrowLeft,
@@ -109,11 +109,11 @@
 		try {
 			const summary = await getAgent(agentId);
 			if (summary.shape === 'preset') {
-				await goto(`/teams/${agentId}`, { replaceState: true });
+				await goto(`/teams/${agentId}`, { replace: true });
 				return;
 			}
 			if (summary.shape === 'graph') {
-				await goto(`/flows/${agentId}`, { replaceState: true });
+				await goto(`/flows/${agentId}`, { replace: true });
 				return;
 			}
 		} catch {

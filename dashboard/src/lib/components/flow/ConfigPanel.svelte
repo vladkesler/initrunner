@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { FlowDetail, FlowAgentDetail } from '$lib/api/types';
-	import ConfigSection from '$lib/components/agents/ConfigSection.svelte';
+	import type { FlowDetail, FlowAgentDetail } from '#lib/api/types.ts';
+	import ConfigSection from '#lib/components/agents/ConfigSection.svelte';
 	import { Database, ArrowRight, Zap, ShieldAlert, HeartPulse, RefreshCw, Box } from 'lucide-svelte';
 
 	let { detail }: { detail: FlowDetail } = $props();

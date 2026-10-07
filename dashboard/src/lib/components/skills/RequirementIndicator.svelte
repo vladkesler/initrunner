@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { RequirementStatus } from '$lib/api/types';
-	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/ui/tooltip';
+	import type { RequirementStatus } from '#lib/api/types.ts';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '#lib/components/ui/tooltip/index.ts';
 
 	let { requirements }: { requirements: RequirementStatus[] } = $props();
 

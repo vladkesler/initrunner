@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { X } from 'lucide-svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { getPendingRun, type PendingRun } from '$lib/api/approvals';
-	import { approvals } from '$lib/stores/approvals.svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import { getPendingRun, type PendingRun } from '#lib/api/approvals.ts';
+	import { approvals } from '#lib/stores/approvals.svelte.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 	import ApprovalCardGroup from './ApprovalCardGroup.svelte';
 
 	let { runId, onClose }: { runId: string; onClose: () => void } = $props();

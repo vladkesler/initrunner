@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import type { McpServer } from '$lib/api/types';
+	import type { McpServer } from '#lib/api/types.ts';
 
 	let { data, selected }: NodeProps<{ server: McpServer }> = $props();
 

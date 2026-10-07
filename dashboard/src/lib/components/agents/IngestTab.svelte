@@ -7,9 +7,9 @@
 		addIngestUrl,
 		uploadIngestFiles,
 		streamIngest
-	} from '$lib/api/agents';
-	import type { IngestDocument, IngestSummary } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+	} from '#lib/api/agents.ts';
+	import type { IngestDocument, IngestSummary } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
 	import {
 		RefreshCw,
 		Database,
@@ -21,7 +21,7 @@
 		Upload,
 		Link
 	} from 'lucide-svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let { agentId, hasIngest }: { agentId: string; hasIngest: boolean } = $props();
 

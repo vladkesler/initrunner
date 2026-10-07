@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import type { McpAgentRef } from '$lib/api/types';
+	import type { McpAgentRef } from '#lib/api/types.ts';
 	import { ExternalLink } from 'lucide-svelte';
 
 	let { data, selected }: NodeProps<{ agent: McpAgentRef }> = $props();

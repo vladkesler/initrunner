@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { fetchCostSummary, fetchCostByAgent, fetchCostDaily, fetchCostByModel, fetchCostByTool } from '$lib/api/cost';
-	import { listAgents } from '$lib/api/agents';
-	import type { CostSummary, AgentCost, DailyCost, ModelCost, ToolCost, AgentSummary } from '$lib/api/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import SpendChart from '$lib/components/cost/SpendChart.svelte';
-	import AgentCostTable from '$lib/components/cost/AgentCostTable.svelte';
-	import ModelCostTable from '$lib/components/cost/ModelCostTable.svelte';
-	import ToolCostTable from '$lib/components/cost/ToolCostTable.svelte';
-	import { formatCost } from '$lib/utils/format';
-	import { toast } from '$lib/stores/toast.svelte';
-	import { setCrumbs } from '$lib/stores/breadcrumb.svelte';
+	import { fetchCostSummary, fetchCostByAgent, fetchCostDaily, fetchCostByModel, fetchCostByTool } from '#lib/api/cost.ts';
+	import { listAgents } from '#lib/api/agents.ts';
+	import type { CostSummary, AgentCost, DailyCost, ModelCost, ToolCost, AgentSummary } from '#lib/api/types.ts';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.ts';
+	import SpendChart from '#lib/components/cost/SpendChart.svelte';
+	import AgentCostTable from '#lib/components/cost/AgentCostTable.svelte';
+	import ModelCostTable from '#lib/components/cost/ModelCostTable.svelte';
+	import ToolCostTable from '#lib/components/cost/ToolCostTable.svelte';
+	import { formatCost } from '#lib/utils/format.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { setCrumbs } from '#lib/stores/breadcrumb.svelte.ts';
 
 	type Period = '7d' | '30d' | '90d';
 	const PERIOD_DAYS: Record<Period, number> = { '7d': 7, '30d': 30, '90d': 90 };

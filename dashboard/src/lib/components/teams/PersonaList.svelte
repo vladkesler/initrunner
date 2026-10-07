@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Plus, ArrowDown } from 'lucide-svelte';
 	import PersonaCard from './PersonaCard.svelte';
-	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '$lib/api/types';
+	import type { AgentSlotOption, ProviderModels, ProviderPreset } from '#lib/api/types.ts';
 
 	const DEFAULT_NAMES = [
 		'analyst',

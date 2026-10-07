@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AgentSummary } from '$lib/api/types';
+	import type { AgentSummary } from '#lib/api/types.ts';
 	import CapabilityGlyph from './CapabilityGlyph.svelte';
 	import { Wrench, Zap, BookOpen, Plug, Sparkles, AlertTriangle } from 'lucide-svelte';
 

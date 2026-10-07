@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { McpServer } from '$lib/api/types';
-	import { checkMcpServerHealth } from '$lib/api/mcp';
+	import type { McpServer } from '#lib/api/types.ts';
+	import { checkMcpServerHealth } from '#lib/api/mcp.ts';
 	import McpServerCard from './McpServerCard.svelte';
 	import { Search, RefreshCw } from 'lucide-svelte';
 

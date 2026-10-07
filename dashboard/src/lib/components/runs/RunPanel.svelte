@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { streamRun } from '$lib/api/runs';
+	import { streamRun } from '#lib/api/runs.ts';
 	import type {
 		ApprovalRequiredData,
 		CostUpdateData,
@@ -8,15 +8,15 @@
 		ThreadMessage,
 		ToolEventData,
 		UsageData
-	} from '$lib/api/types';
+	} from '#lib/api/types.ts';
 	import ConversationThread from './ConversationThread.svelte';
 	import ToolActivityPanel from './ToolActivityPanel.svelte';
 	import TokenMeter from './TokenMeter.svelte';
 	import { Play, Square, RotateCcw } from 'lucide-svelte';
-	import ApprovalCardGroup from '$lib/components/approvals/ApprovalCardGroup.svelte';
-	import { approvals } from '$lib/stores/approvals.svelte';
-	import { startedRuns } from '$lib/stores/startedRuns.svelte';
-	import { toast } from '$lib/stores/toast.svelte';
+	import ApprovalCardGroup from '#lib/components/approvals/ApprovalCardGroup.svelte';
+	import { approvals } from '#lib/stores/approvals.svelte.ts';
+	import { startedRuns } from '#lib/stores/startedRuns.svelte.ts';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 
 	let {
 		agentId,

@@ -9,7 +9,7 @@
  */
 import posthog from 'posthog-js';
 
-import { safeGet, safeSet } from '$lib/utils/storage';
+import { safeGet, safeSet } from '#lib/utils/storage.ts';
 
 const KEY = import.meta.env.VITE_POSTHOG_KEY ?? 'phc_xCsEKz7e2YnCzneVDsPd3moRDnK5PaHudUridGfAJCrw';
 const HOST = import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com';
