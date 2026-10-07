@@ -76,6 +76,7 @@ class TestAsk:
         assert data["nouls"] == {"yes": 0.91}
         assert data["scores"]["level"]["probabilities"] == {0: 0.1, 1: 0.6, 2: 0.3}
         assert data["model"] == "jev-1.13.0"
+        assert data["input_tokens"] == 12
 
     def test_http_error_maps_to_jev_error_with_status(self, monkeypatch):
         _install(

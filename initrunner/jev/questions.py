@@ -80,7 +80,10 @@ def screen_input(indices: list[int], total: int, *, with_topic: bool) -> dict[st
             questions[f"off_topic::{i}"] = {
                 "type": "noul",
                 "instructions": (
-                    f"Does `{ref}` ask the assistant to help with anything outside `policy`?"
+                    f"Does `{ref}` ask the assistant for help unrelated to `policy`? "
+                    "A request to integrate, configure or debug the policy's product is "
+                    "about that product, even when it involves source code or logs. "
+                    "Honor any explicit restrictions in the policy."
                 ),
                 "criteria": {
                     "true": (
@@ -93,7 +96,9 @@ def screen_input(indices: list[int], total: int, *, with_topic: bool) -> dict[st
                         "such as pasted source code, logs, documents and configuration. "
                         "Reference material need not itself ask a question or mention the "
                         "policy's topic. Judge requests addressed to the assistant, not "
-                        "the subject matter of the pasted material."
+                        "the subject matter of the pasted material. Source code used as a "
+                        "tool in the policy's product is supporting material for that "
+                        "product, rather than an unrelated programming request."
                     ),
                 },
             }
