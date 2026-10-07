@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Annotated
 
 from fastapi import (  # type: ignore[import-not-found]
@@ -16,12 +17,15 @@ from fastapi import (  # type: ignore[import-not-found]
 from fastapi.responses import StreamingResponse  # type: ignore[import-not-found]
 
 from initrunner.dashboard.deps import TeamCache, get_team_cache
+from initrunner.dashboard.routers.ingest import _save_upload_capped
 from initrunner.dashboard.schemas import (
     AddUrlRequest,
     IngestDocumentResponse,
     IngestStatsResponse,
     IngestSummaryResponse,
 )
+
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/teams", tags=["team-ingest"])
 
@@ -117,6 +121,9 @@ async def upload_files(
     dt, role = _resolve_team(team_id, team_cache)
     upload_dir = uploads_dir(dt.team.metadata.name)  # type: ignore[union-attr]
 
+    max_mb = role.spec.security.resources.max_file_size_mb
+    max_bytes = int(max_mb * 1024 * 1024)
+
     saved: list[Path] = []
     for f in files:
         if not f.filename:
@@ -127,8 +134,9 @@ async def upload_files(
         dest = (upload_dir / safe_name).resolve()
         if not dest.is_relative_to(upload_dir.resolve()):
             continue
-        content = await f.read()
-        await asyncio.to_thread(dest.write_bytes, content)
+        if not await _save_upload_capped(f, dest, max_bytes):
+            _logger.warning("Rejected team upload %s: exceeds %dMB", f.filename, max_mb)
+            continue
         saved.append(dest)
 
     if not saved:

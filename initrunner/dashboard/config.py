@@ -23,6 +23,7 @@ class DashboardSettings:
     # create_app: loopback names only when not exposed, permissive when exposed
     # (mandatory auth is the protection there).
     allowed_hosts: list[str] | None = None
+    max_request_body_bytes: int = 1_048_576
 
     @property
     def host(self) -> str:

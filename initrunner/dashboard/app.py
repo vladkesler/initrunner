@@ -73,6 +73,17 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Body size limit -- reject POST/PUT/PATCH requests whose Content-Length
+    # exceeds the configured cap. The login endpoint is excluded from auth and
+    # would otherwise accept an arbitrarily large form body.
+    app.add_middleware(
+        BaseHTTPMiddleware,  # type: ignore[arg-type]
+        dispatch=make_body_size_dispatch(
+            max_bytes=settings.max_request_body_bytes,
+            error_response=detail_error_response,
+        ),
+    )
+
     # Host-header allowlist (anti-DNS-rebinding). A malicious web page can point
     # its hostname at 127.0.0.1 and drive a keyless localhost dashboard through
     # the victim's browser; rejecting unexpected Host headers blocks that. When
@@ -263,6 +274,7 @@ def create_app(settings: DashboardSettings | None = None) -> FastAPI:
             all_paths_predicate,
             detail_error_response,
             make_auth_dispatch,
+            make_body_size_dispatch,
         )
 
         _auth_session_token = hmac.new(
