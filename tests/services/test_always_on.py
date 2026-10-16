@@ -403,14 +403,17 @@ def test_status_omits_rss_for_an_unverified_process(
 
 def test_check_requires_search_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     entry = get_catalog_entry("collector")
-    real_import = __import__
+    import importlib
 
-    def fake_import(name: str, *args: object, **kwargs: object):
+    real_import = importlib.import_module
+
+    def fake_import(name: str, package: str | None = None) -> object:
         if name == "ddgs":
             raise ImportError("nope")
-        return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+        return real_import(name, package)
 
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    # is_extra_installed goes through importlib, not builtins.__import__.
+    monkeypatch.setattr("initrunner._compat.importlib.import_module", fake_import)
     missing = check_requires(entry.definition)
     assert any("search" in m for m in missing)
 

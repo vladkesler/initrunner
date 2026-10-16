@@ -80,7 +80,7 @@ LAYERS: list[tuple[str, str, str, str | None]] = [
     ),
     (
         "+ MCP stack (`mcp` extra)",
-        "pydantic_ai imports it eagerly whenever fastmcp is installed",
+        "paid when a role builds an MCP server; not imported by pydantic_ai itself",
         "import fastmcp.client\n"
         "from pydantic_ai.models.openai import OpenAIChatModel\n"
         "import initrunner.agent.executor\n"

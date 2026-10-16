@@ -31,7 +31,7 @@ Names are CamelCase class names matching PydanticAI's capability registry.
 | `Thinking` | `effort`: `minimal`, `low`, `medium`, `high`, `xhigh` | Enable model-level extended thinking |
 | `WebSearch` | `allowed_domains`, `blocked_domains`, `search_context_size`, `max_uses` | Native provider web search (raises on models without native web search) |
 | `WebFetch` | `allowed_domains`, `blocked_domains`, `max_uses` | URL fetching with local fallback |
-| `ImageGeneration` | `fallback_model`, `image_model`, `quality`, `size`, `output_format`, `action`, `background`, `moderation` | Provider-native image generation (OpenAI Responses, Google) with optional `fallback_model` delegation on providers that lack it |
+| `ImageGeneration` | `fallback_subagent_model`, `image_model`, `quality`, `size`, `output_format`, `action`, `background`, `moderation` | Provider-native image generation (OpenAI Responses, Google) with optional subagent delegation on providers that lack it |
 | `MCP` | `url` (required), `id`, `authorization_token`, `headers`, `allowed_tools` | PydanticAI-native MCP server connection |
 | `NativeTool` | native tool fields (`kind`, plus tool-specific args) | Register one provider-native tool (web search, advisor, …) |
 | `PrefixTools` | `prefix`, `capability` (nested spec) | Namespace tool names to avoid conflicts |
@@ -57,7 +57,7 @@ capabilities:
 
 ### Image generation with fallback
 
-`ImageGeneration` uses the provider's native image tool on OpenAI Responses and Google. On a provider that has no native image tool, set `fallback_model` to delegate generation to a subagent running that model, so the same role works across providers without code:
+`ImageGeneration` uses the provider's native image tool on OpenAI Responses and Google. On a provider that has no native image tool, set `fallback_subagent_model` to delegate generation to a subagent running that model, so the same role works across providers without code. `fallback_model` is the old spelling and still loads.
 
 ```yaml
 model:
@@ -65,7 +65,7 @@ model:
   name: claude-sonnet-4-5-20250929
 capabilities:
   - ImageGeneration:
-      fallback_model: openai:gpt-5   # delegate image gen here
+      fallback_subagent_model: openai:gpt-5   # delegate image gen here
       size: "1024x1024"
       quality: high
 ```

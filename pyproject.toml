@@ -21,7 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-ai-slim[openai,retries]>=2.32.1",
+    "pydantic-ai-slim[openai,retries]>=2.56.0",
     # The provider SDKs moved to httpx2; executor_retry builds the retrying
     # client the SDKs are handed, so it has to speak the same library.
     "httpx2>=2.12.0",
@@ -48,9 +48,9 @@ dependencies = [
 # and the provider names. The fine-grained ones below are kept for packagers and
 # for `initrunner doctor --fix`; the docs point at the bundles instead, and a
 # command that needs one of these offers to install it.
-# MCP client + server stack. Not in the core install: importing pydantic_ai
-# eagerly imports its MCP capability, which imports fastmcp, for ~26% of RSS.
-mcp = ["pydantic-ai-slim[mcp]>=2.32.1", "fastmcp>=4,<5"]
+# MCP client + server stack. Not in the core install. pydantic-ai 2.56 loads
+# pydantic_ai.mcp only when an MCP capability or tool is built.
+mcp = ["pydantic-ai-slim[mcp]>=2.56.0", "fastmcp>=4,<5"]
 # Vector store behind ingestion, vector memory and the web_scraper tool.
 vector = ["lancedb>=0.29.2"]
 ingest = ["initrunner[vector]", "pymupdf4llm>=0.2.9", "python-docx>=1.2.0", "openpyxl>=3.1.5"]
@@ -58,20 +58,20 @@ local-embeddings = ["fastembed>=0.7.4"]
 search = ["ddgs>=9.10.0"]
 audio = ["youtube-transcript-api>=1.2.4"]
 safety = ["better-profanity>=0.7.0"]
-anthropic = ["pydantic-ai-slim[anthropic]>=2.32.1"]
-google = ["pydantic-ai-slim[google]>=2.32.1"]
-groq = ["pydantic-ai-slim[groq]>=2.32.1"]
-mistral = ["pydantic-ai-slim[mistral]>=2.32.1"]
-cohere = ["pydantic-ai-slim[cohere]>=2.32.1"]
-bedrock = ["pydantic-ai-slim[bedrock]>=2.32.1"]
-xai = ["pydantic-ai-slim[xai]>=2.32.1"]
-all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.32.1"]
+anthropic = ["pydantic-ai-slim[anthropic]>=2.56.0"]
+google = ["pydantic-ai-slim[google]>=2.56.0"]
+groq = ["pydantic-ai-slim[groq]>=2.56.0"]
+mistral = ["pydantic-ai-slim[mistral]>=2.56.0"]
+cohere = ["pydantic-ai-slim[cohere]>=2.56.0"]
+bedrock = ["pydantic-ai-slim[bedrock]>=2.56.0"]
+xai = ["pydantic-ai-slim[xai]>=2.56.0"]
+all-models = ["pydantic-ai-slim[anthropic,google,groq,mistral,cohere,bedrock,xai]>=2.56.0"]
 # OpenTelemetry tracing plus span-based evaluation (pydantic-evals).
 observability = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "opentelemetry-instrumentation-logging>=0.41b0",
-    "pydantic-evals>=2.32.1",
+    "pydantic-evals>=2.56.0",
 ]
 telegram = ["python-telegram-bot>=21.0"]
 discord = ["discord.py>=2.3"]

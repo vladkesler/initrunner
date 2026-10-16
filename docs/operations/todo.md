@@ -22,7 +22,10 @@ So `_LEGACY_HTTPX_PROVIDERS = frozenset({"groq"})` selects `AsyncTenacityTranspo
 plus `httpx.AsyncClient` for groq, and `AsyncHTTPX2TenacityTransport` plus
 `httpx2.AsyncClient` for everyone else. Passing the wrong one is a `TypeError`
 raised from inside the SDK constructor, not a degraded mode, which is why the
-choice cannot be left to the caller.
+choice cannot be left to the caller. pydantic-ai 2.56 deprecates
+`AsyncTenacityTransport` (removed in v3). `_legacy_transport()` ignores that
+one warning. Do not delete the ignore until groq accepts httpx2 and the
+transport goes away.
 
 Two separate things have to happen before this goes away.
 
@@ -36,19 +39,14 @@ import httpx2
 GroqProvider(api_key="k", http_client=httpx2.AsyncClient())  # TypeError today
 ```
 
-**2. pydantic-ai fixes `AnthropicProvider`.** As of pydantic-ai 2.32.1 it builds
-a legacy `httpx` client internally, which anthropic 1.0.0 rejects, so
-`AnthropicProvider(api_key="k")` raises `TypeError` with no client passed at all.
-Anthropic 1.0.0 shipped 2026-08-20 19:58 UTC and pydantic-ai 2.32.1 shipped the
-same day at 02:26 UTC, seventeen hours earlier, so upstream had not seen it yet.
-Our explicit httpx2 client is what makes Anthropic work at all right now. That
-stays correct after they fix it (it is what their own deprecation warning asks
-for), but the reason for it changes, so re-read this entry then rather than
-assuming it is still load-bearing.
+**2. pydantic-ai fixes `AnthropicProvider`.** Done in 2.33.0. Checked on 2.56.0:
+`AnthropicProvider(api_key="k")` constructs with no client, and it builds an
+httpx2 client internally. InitRunner still passes its own httpx2 client,
+because that client is the retry transport (`AsyncHTTPX2TenacityTransport`),
+not because Anthropic would otherwise fail.
 
-Also revisit the floors in `pyproject.toml` (`pydantic-ai-slim>=2.32.1`, the
-explicit `httpx2>=2.12.0` core dependency) once pydantic-ai v3 lands, since v3
-removes the deprecated `httpx` transports entirely.
+The split stays until groq accepts httpx2. Revisit the `httpx2>=2.12.0` core
+dependency once pydantic-ai v3 removes the deprecated `httpx` transports.
 
 ## The site docs have no schema guard
 

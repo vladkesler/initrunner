@@ -141,10 +141,10 @@ def _run_single_case(
     """Execute a single test case and evaluate its assertions."""
     model_override = None
     if dry_run:
-        from pydantic_ai.models.test import TestModel
+        from initrunner.runner.dry_run import dry_run_model
 
         output_text = case.expected_output or _DEFAULT_DRY_RUN_OUTPUT
-        model_override = TestModel(custom_output_text=output_text, call_tools=[])
+        model_override = dry_run_model(output_text)
 
     start = time.monotonic()
     run_result, _ = execute_run(
@@ -305,10 +305,10 @@ def run_suite_pydantic_evals(
         case = cases_by_name[inputs["name"]]
         model_override = None
         if dry_run:
-            from pydantic_ai.models.test import TestModel
+            from initrunner.runner.dry_run import dry_run_model
 
             output_text = case.expected_output or _DEFAULT_DRY_RUN_OUTPUT
-            model_override = TestModel(custom_output_text=output_text, call_tools=[])
+            model_override = dry_run_model(output_text)
 
         start = time.monotonic()
         with capture_span_tree():

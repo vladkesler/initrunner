@@ -152,16 +152,33 @@ def _build_httpx2_client(*, attempts: int, max_wait: float) -> httpx2.AsyncClien
     )
 
 
+def _legacy_transport(*, attempts: int, max_wait: float) -> httpx.AsyncBaseTransport:
+    """Build the legacy-httpx retry transport Groq still requires.
+
+    ``AsyncTenacityTransport`` is deprecated and removed in pydantic-ai v3.
+    Groq's SDK rejects an ``httpx2`` client, so this is the one call site that
+    still has to construct it. The warning is swallowed here; everywhere else
+    a ``PydanticAIDeprecationWarning`` should stay visible.
+    """
+    import warnings
+
+    from pydantic_ai.exceptions import PydanticAIDeprecationWarning
+    from pydantic_ai.retries import AsyncTenacityTransport
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", PydanticAIDeprecationWarning)
+        return AsyncTenacityTransport(
+            _retry_config(httpx.HTTPStatusError, attempts=attempts, max_wait=max_wait),
+            validate_response=_raise_for_retryable_status,
+        )
+
+
 def _build_legacy_client(*, attempts: int, max_wait: float) -> httpx.AsyncClient:
     from pydantic_ai.models import DEFAULT_HTTP_TIMEOUT, get_user_agent
-    from pydantic_ai.retries import AsyncTenacityTransport
 
     return httpx.AsyncClient(
         transport=_PerLoopHTTPXTransport(
-            lambda: AsyncTenacityTransport(
-                _retry_config(httpx.HTTPStatusError, attempts=attempts, max_wait=max_wait),
-                validate_response=_raise_for_retryable_status,
-            )
+            lambda: _legacy_transport(attempts=attempts, max_wait=max_wait)
         ),
         timeout=httpx.Timeout(timeout=DEFAULT_HTTP_TIMEOUT, connect=5),
         headers={"User-Agent": get_user_agent()},

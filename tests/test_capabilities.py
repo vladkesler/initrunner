@@ -377,7 +377,7 @@ class TestImageGenerationCapability:
         assert caps is not None
         cap = caps[0]
         assert type(cap).__name__ == "ImageGeneration"
-        assert cap.fallback_model == "openai:gpt-5"
+        assert cap.fallback_subagent_model == "openai:gpt-5"
 
 
 # ---------------------------------------------------------------------------

@@ -202,6 +202,16 @@ class TestTestCommand:
         assert result.exit_code == 1
         assert "Error" in result.output
 
+    def test_dry_run_model_ignores_native_tools(self):
+        """WebSearch is a native tool. TestModel rejects those as of pydantic-ai 2.56."""
+        from pydantic_ai.capabilities import WebSearch
+
+        from initrunner.runner.dry_run import dry_run_model
+
+        agent = Agent(TestModel(), capabilities=[WebSearch()])
+        result = agent.run_sync("hello", model=dry_run_model("simulated"))
+        assert result.output == "simulated"
+
     @patch("initrunner.agent.loader.load_and_build")
     def test_invalid_suite_yaml(self, mock_load, tmp_path):
         role = _make_mock_role()
