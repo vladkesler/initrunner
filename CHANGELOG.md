@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026.10.4] - 2026-10-16
+
+### Retired
+- **InitRunner is no longer maintained. This is the last release.** No further releases, including security fixes. Do not install it for anything that holds API keys or runs tools. The [GitHub repository](https://github.com/vladkesler/initrunner) is archived read-only, the install script at initrunner.ai refuses to install, and the Docker images are no longer published. Old releases stay on PyPI.
+
 ## [2026.10.3] - 2026-10-16
 
 ### Security
