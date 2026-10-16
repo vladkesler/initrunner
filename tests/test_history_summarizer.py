@@ -156,24 +156,23 @@ class TestEstimateTokens:
         assert est == expected
 
     def test_multimodal_user_prompt(self):
-        """ImageUrl-like objects get a fixed media token estimate."""
-
-        class FakeImageUrl:
-            kind = "image-url"
+        """ImageUrl objects get a fixed media token estimate."""
+        from pydantic_ai.messages import ImageUrl
 
         msgs: list[ModelMessage] = [
-            ModelRequest(parts=[UserPromptPart(content=["text", FakeImageUrl()])])  # type: ignore[arg-type]
+            ModelRequest(
+                parts=[UserPromptPart(content=["text", ImageUrl(url="https://example.com/a.png")])]
+            )
         ]
         est = estimate_tokens(msgs)
         expected = _MSG_OVERHEAD + (len("text") // 4 + _MEDIA_TOKENS) + _PART_OVERHEAD
         assert est == expected
 
     def test_cache_point_zero_tokens(self):
-        class FakeCachePoint:
-            kind = "cache-point"
+        from pydantic_ai.messages import CachePoint
 
         msgs: list[ModelMessage] = [
-            ModelRequest(parts=[UserPromptPart(content=["text", FakeCachePoint()])])  # type: ignore[arg-type]
+            ModelRequest(parts=[UserPromptPart(content=["text", CachePoint()])])
         ]
         est = estimate_tokens(msgs)
         # CachePoint contributes nothing

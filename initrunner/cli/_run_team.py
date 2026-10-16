@@ -66,9 +66,9 @@ def _run_team(
 
     dry_run_model = None
     if dry_run:
-        from pydantic_ai.models.test import TestModel
+        from initrunner.runner.dry_run import dry_run_model as make_dry_run_model
 
-        dry_run_model = TestModel(custom_output_text="[dry-run] Simulated response.", call_tools=[])
+        dry_run_model = make_dry_run_model("[dry-run] Simulated response.")
 
     persona_names = list(team.spec.personas.keys())
     console.print(f"[bold]Team mode[/bold] -- team: [cyan]{team.metadata.name}[/cyan]")

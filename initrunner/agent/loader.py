@@ -658,6 +658,27 @@ def _create_agent(
 # ---------------------------------------------------------------------------
 
 
+# ImageGeneration and XSearch renamed this argument. The old spelling still
+# constructs, and warns, until pydantic-ai v3. YAML written with it keeps
+# loading; the rename happens here so role files do not have to change at once.
+_RENAMED_FALLBACK_CAPS = frozenset({"ImageGeneration", "XSearch"})
+
+
+def _capability_spec_payload(spec: Any) -> dict[str, Any]:
+    """Dump a capability spec, rewriting a deprecated fallback argument."""
+    payload = spec.model_dump(mode="json")
+    if payload.get("name") not in _RENAMED_FALLBACK_CAPS:
+        return payload
+    arguments = payload.get("arguments")
+    if not isinstance(arguments, dict) or "fallback_model" not in arguments:
+        return payload
+    if "fallback_subagent_model" in arguments:
+        return payload
+    arguments = dict(arguments)
+    arguments["fallback_subagent_model"] = arguments.pop("fallback_model")
+    return {**payload, "arguments": arguments}
+
+
 def _build_capabilities(role: RoleDefinition) -> list | None:
     """Load PydanticAI capabilities, inject fallbacks, add input guard if configured."""
     capabilities = None
@@ -674,7 +695,7 @@ def _build_capabilities(role: RoleDefinition) -> list | None:
         )
 
         caps = [
-            load_capability_from_nested_spec(s.model_dump(mode="json"))
+            load_capability_from_nested_spec(_capability_spec_payload(s))
             for s in role.spec.capabilities
         ]
         capabilities = caps

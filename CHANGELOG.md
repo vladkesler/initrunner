@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026.10.3] - 2026-10-16
+
+### Security
+- **Bumped `pydantic-ai-slim`, `pydantic-evals`, and `pydantic-graph` from 2.32.1 to 2.56.0.** Closes [GHSA-6fqq-452j-qhrp](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-6fqq-452j-qhrp) (high, CVE-2026-107286, fixed in 2.53.0). A streamed request through `ConcurrencyLimitedModel` could keep its concurrency slot when the slot was released on a different task than the one that acquired it, including after a fully consumed `stream_text()`. Later streams sharing that limiter then blocked. InitRunner hits this when `spec.model.concurrency` wraps the model and a run streams. Agent-level `execution.max_concurrency` is a separate limiter and was not the bug. The same bump also closes the `web_fetch` advisories fixed in 2.44.0 and 2.52.0 (quadratic title extraction, nested-HTML cost, IPv6 zone-identifier SSRF, and telemetry content on exception events). InitRunner still injects its own URL fetcher for `WebFetch`.
+- **Pinned `source-map-js` to 1.2.2.** [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high, CVE-2026-93749). Through 1.2.1, an indexed source map with a huge section offset blocked the event loop. It arrives through PostCSS and Tailwind, both build tools. A pnpm override forces 1.2.2.
+
+### Fixed
+- **`initrunner run --dry-run` works on roles that declare a native tool.** PydanticAI 2.56's `TestModel` rejects WebSearch and ImageGeneration. The dry-run model drops those tools and still returns the simulated answer.
+
+### Dependencies
+- **Bumped `pydantic-ai` from 2.32.1 to 2.56.0.** The lock moved `openai` 3.3.1 to 3.31.0, `anthropic` 1.0.0 to 1.15.0, `google-genai` 2.19.0 to 2.31.0, and `genai-prices` 0.1.4 to 0.1.13. `fastmcp` stayed on 4.x. YAML `model.max_tokens` still defaults to 4096 and is always passed through, so the new Anthropic default (the model's output cap) does not lengthen replies. `import pydantic_ai` no longer imports `pydantic_ai.mcp`. Groq still accepts only legacy `httpx`; its retry transport is the deprecated `AsyncTenacityTransport`, and that one construction warning is swallowed until Groq takes `httpx2`. `ImageGeneration` YAML may still say `fallback_model`; load rewrites it to `fallback_subagent_model`. Supersedes Dependabot #317, which asked for 2.53.0.
+- **Dashboard:** `svelte` 5.57.2 (#313), `vite` 8.3.4 (#316), `js-yaml` 5.5.0 (#315 asked for 5.4.3; `^5.4.3` resolved 5.5.0), and `posthog-js` 1.438.12 (#314 asked for 1.438.5).
+
 ## [2026.10.2] - 2026-10-08
 
 ### Security

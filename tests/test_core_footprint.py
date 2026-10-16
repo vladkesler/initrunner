@@ -1,8 +1,8 @@
 """What a core install must not import.
 
 MCP and LanceDB are optional extras because they are the two heaviest things
-in the dependency tree (the MCP client stack alone is about a quarter of a
-plain agent's RSS, and it loads eagerly the moment fastmcp is importable).
+in the dependency tree. pydantic-ai 2.56 loads ``pydantic_ai.mcp`` only when
+an MCP capability or tool is built, so a core install must not import it.
 That only holds if nothing on the ordinary build path reaches for them, so
 this asserts on ``sys.modules`` rather than on megabytes: module names are
 deterministic across platforms and allocators, RSS numbers are not.

@@ -25,7 +25,7 @@ between platforms and dependency versions; the proportions do not.
 | + Provider SDK | +18 MB | 1512 | OpenAI; only the SDK for your configured model loads |
 | + InitRunner | +7 MB | 1632 | schema, executor, CLI, and all built-in tools |
 | **Import total, plain agent** | **~83 MB** | | |
-| + MCP client stack (`mcp` extra) | +28 MB | 2517 | flat cost, whether or not a role uses MCP |
+| + MCP client stack (`mcp` extra) | +28 MB | 2517 | paid when a role builds an MCP server; not imported otherwise |
 | + LanceDB (`vector` extra) | +77 MB | 1937 | only when a store is actually opened |
 
 Runtime allocations (the event loop, TLS buffers, message history, glibc
@@ -45,12 +45,12 @@ it imports; a compiled binary links only the code paths it uses.
 
 ## What you are not paying for
 
-- **The MCP client stack is an extra.** Importing `pydantic_ai` imports its MCP
-  capability, which imports `fastmcp` -- eagerly, whether or not any role uses
-  MCP. Installing without the `mcp` extra is the only way to avoid it, and it
-  is worth 28 MB on every process. `initrunner[recommended]`, `[all]` and the
-  `:latest` image include it; a plain `pip install initrunner` and the `:slim`
-  image do not. A role that needs it fails at load with the install command.
+- **The MCP client stack is an extra.** Since pydantic-ai 2.56.0, importing
+  `pydantic_ai` does not import `pydantic_ai.mcp` or `fastmcp`. A process pays
+  the stack, about 28 MB when it was last measured, only when a role builds an
+  MCP server. `initrunner[recommended]`, `[all]` and the `:latest` image
+  include the extra; a plain `pip install initrunner` and the `:slim` image do
+  not. A role that needs it fails at load with the install command.
 - **LanceDB loads when a store is opened**, not at startup, so a role without
   `ingest` or vector memory never pays the +77 MB even with the extra
   installed. Leaving the extra out saves ~300 MB of disk as well.

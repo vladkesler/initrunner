@@ -167,11 +167,9 @@ def _run_agent(
 
     model_override = None
     if dry_run:
-        from pydantic_ai.models.test import TestModel
+        from initrunner.runner.dry_run import dry_run_model
 
-        model_override = TestModel(
-            custom_output_text="[dry-run] Simulated response.", call_tools=[]
-        )
+        model_override = dry_run_model("[dry-run] Simulated response.")
 
     user_prompt = _build_user_prompt(prompt, attach)
 
