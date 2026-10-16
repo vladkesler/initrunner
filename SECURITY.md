@@ -2,25 +2,11 @@
 
 ## Supported Versions
 
-| Version   | Supported          |
-|-----------|--------------------|
-| 1.x       | Yes                |
-| < 1.0     | No                 |
+None. InitRunner is unmaintained and no security fixes will be published, for any version.
 
 ## Reporting a Vulnerability
 
-**Do not open a public issue.** Instead, email **contact@initrunner.ai** with:
-
-- A description of the vulnerability
-- Steps to reproduce
-- Affected versions
-- Any suggested fix (optional)
-
-### Response Timeline
-
-- **Acknowledgement:** within 48 hours
-- **Initial assessment:** within 1 week
-- **Fix or mitigation:** varies by severity, targeting 30 days for critical issues
+**Do not open a public issue.** You can still email **contact@initrunner.ai**, but there is no promise of a response or a fix.
 
 ## Scope
 

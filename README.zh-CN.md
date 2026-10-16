@@ -1,5 +1,9 @@
 # InitRunner
 
+> **InitRunner is unmaintained.** No security fixes will be published. Do not install it for anything that holds API keys or runs tools. The repository is archived and read-only; old releases stay on PyPI.
+>
+> **已停止维护。** InitRunner 不再维护，也不会发布任何安全修复。请勿将其用于任何持有 API 密钥或运行工具的场景。
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">

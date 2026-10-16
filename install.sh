@@ -8,6 +8,14 @@
 #        curl -fsSL https://initrunner.ai/install.sh | sh -s -- --uninstall
 set -eu
 
+cat >&2 <<'NOTICE'
+InitRunner is unmaintained and this installer no longer installs it.
+No security fixes will be published. Do not install it for anything
+that holds API keys or runs tools.
+Archived source: https://github.com/vladkesler/initrunner
+NOTICE
+exit 1
+
 INSTALLER_VERSION="1.0.0"
 PACKAGE_NAME="initrunner"
 MIN_PYTHON_MAJOR=3
